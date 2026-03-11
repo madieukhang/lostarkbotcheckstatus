@@ -174,9 +174,18 @@ async function handleRosterCommand(interaction) {
   const name = raw.charAt(0).toUpperCase() + raw.slice(1);
   await interaction.deferReply();
 
+  const headers = {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+      'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+      'Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+  };
+
   try {
     const url = `https://lostark.bible/character/NA/${name}/roster`;
-    const response = await fetch(url);
+    const response = await fetch(url, { headers });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const html = await response.text();
@@ -214,7 +223,7 @@ async function handleRosterCommand(interaction) {
       characters.slice(0, 10).map(async (c) => {
         try {
           const charUrl = `https://lostark.bible/character/NA/${c.name}`;
-          const res = await fetch(charUrl);
+          const res = await fetch(charUrl, { headers });
           if (!res.ok) return;
           const charHtml = await res.text();
           const { document: charDoc } = new JSDOM(charHtml).window;
