@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Environment variables – NEVER commit secrets
+.env
+
+# Runtime state file
+data/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/

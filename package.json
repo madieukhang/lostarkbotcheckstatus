@@ -1,0 +1,20 @@
+{
+  "name": "lostark-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord bot that monitors Lost Ark Brelshaza server status",
+  "type": "module",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "node --watch bot.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "jsdom": "^24.0.0",
+    "node-fetch": "^3.3.2"
+  }
+}

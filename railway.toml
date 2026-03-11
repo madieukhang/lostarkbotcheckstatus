@@ -1,0 +1,10 @@
+[build]
+# Use the existing Dockerfile for the build
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Discord bot – no HTTP server, so no healthcheck needed
+startCommand = "node bot.js"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
