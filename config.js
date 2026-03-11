@@ -4,12 +4,12 @@
  * Centralizes configuration so no sensitive data is hardcoded.
  */
 
-// Only load .env file in local development.
-// On Railway (NODE_ENV=production), env vars are injected natively.
+// dotenv.config() is safe to call in all environments:
+// - Locally: loads vars from .env file
+// - On Railway: .env doesn't exist in the container, so this is a no-op.
+//   Railway-injected vars in process.env are NEVER overridden by dotenv.
 import dotenv from 'dotenv';
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config();
-}
+dotenv.config();
 
 /**
  * Validate all required environment variables up-front.
@@ -17,6 +17,10 @@ if (process.env.NODE_ENV !== 'production') {
  * @param {string[]} keys
  */
 function validateEnv(keys) {
+  // Debug: print which vars are present (names only, never values)
+  console.log('[config] NODE_ENV:', process.env.NODE_ENV ?? '(not set)');
+  console.log('[config] Env vars present:', keys.map((k) => `${k}=${process.env[k] ? '✓' : '✗'}`).join(', '));
+
   const missing = keys.filter((k) => !process.env[k] || process.env[k].trim() === '');
   if (missing.length > 0) {
     console.error('[config] Missing required environment variables:');
