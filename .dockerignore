@@ -1,0 +1,9 @@
+# Never bake secrets into the Docker image
+.env
+
+# Not needed in the image
+node_modules/
+data/
+.git/
+*.md
+.gitignore

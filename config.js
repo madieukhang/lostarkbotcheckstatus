@@ -4,7 +4,12 @@
  * Centralizes configuration so no sensitive data is hardcoded.
  */
 
-import 'dotenv/config';
+// Only load .env file in local development.
+// On Railway (NODE_ENV=production), env vars are injected natively.
+import dotenv from 'dotenv';
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 /**
  * Validate all required environment variables up-front.
