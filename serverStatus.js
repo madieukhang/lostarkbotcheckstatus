@@ -129,6 +129,12 @@ export async function getServerStatus() {
   // ── 2. Parse HTML ───────────────────────────────────────────────────────────
   const { document } = new JSDOM(html).window;
 
+  // Debug: check if the page actually contains server status data
+  console.log(`[serverStatus] HTML length: ${html.length}`);
+  console.log(`[serverStatus] Contains 'ags-ServerStatus': ${html.includes('ags-ServerStatus')}`);
+  console.log(`[serverStatus] Contains 'Brelshaza': ${html.includes('Brelshaza')}`);
+  console.log(`[serverStatus] Server rows found: ${document.querySelectorAll(`.${CLS.SERVER_ROW}`).length}`);
+
   // ── 3. Primary strategy: walk known server row elements ─────────────────────
   // Each server appears in a <div class="ags-ServerStatus-…-server"> row.
   const serverRows = document.querySelectorAll(`.${CLS.SERVER_ROW}`);
