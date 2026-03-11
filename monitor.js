@@ -47,7 +47,7 @@ async function saveState(state) {
 // ─── Notification builder ─────────────────────────────────────────────────────
 
 /**
- * Build and send the Discord "server is online" embed + role mention.
+ * Build and send the Discord "server is online" embed to the configured channel.
  * @param {import('discord.js').Client} client
  */
 async function sendOnlineNotification(client) {
@@ -59,7 +59,7 @@ async function sendOnlineNotification(client) {
     }
 
     // Role mention string (<@&ROLE_ID>)
-    const roleMention = `<@&${config.roleId}>`;
+    // const roleMention = `<@&${config.roleId}>`;
 
     // Embed matching the spec: title "Thông báo", Vietnamese celebration message
     const embed = new EmbedBuilder()
@@ -68,7 +68,9 @@ async function sendOnlineNotification(client) {
       .setColor(15258703) // Decimal colour value from spec (#E9B84F amber-gold)
       .setTimestamp();
 
-    await channel.send({ content: roleMention, embeds: [embed] });
+    // await channel.send({ content: roleMention, embeds: [embed] });
+    await channel.send({ content: '@here', embeds: [embed] });
+
     console.log('[monitor] Online notification sent.');
   } catch (err) {
     console.error('[monitor] Failed to send notification:', err.message);

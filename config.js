@@ -41,7 +41,7 @@ const config = {
   channelId: requireEnv('CHANNEL_ID'),
 
   /** ID of the role to mention in notifications */
-  roleId: requireEnv('ROLE_ID'),
+  // roleId: requireEnv('ROLE_ID'),
 
   /** How often to check server status (milliseconds) */
   checkIntervalMs: parseInterval(),
