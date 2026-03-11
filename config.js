@@ -19,6 +19,7 @@ dotenv.config();
 function validateEnv(keys) {
   // Debug: print which vars are present (names only, never values)
   console.log('[config] NODE_ENV:', process.env.NODE_ENV ?? '(not set)');
+  console.log('[config] All env keys available:', Object.keys(process.env).join(', '));
   console.log('[config] Env vars present:', keys.map((k) => `${k}=${process.env[k] ? '✓' : '✗'}`).join(', '));
 
   const missing = keys.filter((k) => !process.env[k] || process.env[k].trim() === '');
