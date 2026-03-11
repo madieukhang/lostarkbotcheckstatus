@@ -7,18 +7,30 @@
 import 'dotenv/config';
 
 /**
- * Parse and validate a required environment variable.
- * Throws a clear error if the variable is missing.
- * @param {string} key - The environment variable name
+ * Validate all required environment variables up-front.
+ * Logs every missing key and exits cleanly so Railway shows a clear error.
+ * @param {string[]} keys
+ */
+function validateEnv(keys) {
+  const missing = keys.filter((k) => !process.env[k] || process.env[k].trim() === '');
+  if (missing.length > 0) {
+    console.error('[config] Missing required environment variables:');
+    missing.forEach((k) => console.error(`  - ${k}`));
+    console.error('[config] Set these in the Railway Variables tab and redeploy.');
+    process.exit(1);
+  }
+}
+
+/**
+ * Get a required environment variable (assumed already validated).
+ * @param {string} key
  * @returns {string}
  */
 function requireEnv(key) {
-  const value = process.env[key];
-  if (!value || value.trim() === '') {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return value.trim();
+  return process.env[key].trim();
 }
+
+validateEnv(['DISCORD_TOKEN', 'CHANNEL_ID']);
 
 /**
  * Parse CHECK_INTERVAL from env (in seconds), fallback to 30s.
