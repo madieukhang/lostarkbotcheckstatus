@@ -211,7 +211,7 @@ async function handleRosterCommand(interaction) {
       const filtered = suggestions.filter((s) => s.itemLevel > 1680);
       if (filtered.length > 0) {
         const suggLines = filtered
-          .map((s) => `[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) — \`${s.itemLevel}\` — ${getClassName(s.cls)}`)
+          .map((s) => `[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) — \`${Number(s.itemLevel).toFixed(2)}\` — ${getClassName(s.cls)}`)
           .join('\n');
         const embed = new EmbedBuilder()
           .setDescription(suggLines)
