@@ -275,8 +275,16 @@ async function handleRosterCommand(interaction) {
  */
 async function handleRosterBlackListCheck(name) {
   try {
-    console.log(`[blacklist] Checking "${name}" against blacklist…`);
+    console.log(`[blacklist] Checking — input name: "${name}" (length: ${name.length}, charCodes: ${[...name].map(c => c.charCodeAt(0)).join(',')})`);
     await connectDB();
+
+    // Dump all documents to compare
+    const allDocs = await Blacklist.find({}).lean();
+    console.log(`[blacklist] Total docs in DB: ${allDocs.length}`);
+    allDocs.forEach((doc) => {
+      console.log(`[blacklist] DB entry — name: "${doc.name}" (length: ${doc.name.length}, charCodes: ${[...doc.name].map(c => c.charCodeAt(0)).join(',')})`);
+    });
+
     const entry = await Blacklist.findOne({ name })
       .collation({ locale: 'en', strength: 2 })
       .lean();
