@@ -25,6 +25,7 @@ import { startMonitor, checkStatus, getState, resetState } from './monitor.js';
 import { STATUS } from './serverStatus.js';
 import { connectDB } from './db.js';
 import Blacklist from './models/Blacklist.js';
+import { getClassName } from './models/Class.js';
 
 // ─── Discord client ───────────────────────────────────────────────────────────
 
@@ -210,14 +211,14 @@ async function handleRosterCommand(interaction) {
       const filtered = suggestions.filter((s) => s.itemLevel > 1680);
       if (filtered.length > 0) {
         const suggLines = filtered
-          .map((s) => `[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) · \`${s.itemLevel}\` · ${s.cls}`)
+          .map((s) => `[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) — \`${s.itemLevel}\` — ${getClassName(s.cls)}`)
           .join('\n');
         const embed = new EmbedBuilder()
           .setDescription(suggLines)
           .setColor(0xed4245)
           .setTimestamp();
         await interaction.editReply({
-          content: `❌ No roster found for **${name}**. Names similar to **${name}**:`,
+          content: `❌ No roster found for **${name}**. Rosters similar to **${name}**:`,
           embeds: [embed],
         });
       } else {

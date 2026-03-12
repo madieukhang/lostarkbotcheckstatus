@@ -1,0 +1,54 @@
+/**
+ * Mapping of lostark.bible internal class IDs to display names.
+ * Update this file when new classes are added to the game.
+ */
+export const CLASS_NAMES = {
+  // Warriors
+  berserker:          'Berserker',
+  dragon_knight:      'Slayer',
+  warlord:            'Gunlancer',
+  holyknight:         'Paladin',
+  destroyer:          'Destroyer',
+
+  // Martial Artists
+  battle_master:      'Wardancer',
+  infighter:          'Scrapper',
+  soulmaster:         'Soulfist',
+  lance_master:       'Glaivier',
+  breaker:            'Breaker',
+
+  // Gunners
+  devil_hunter:       'Deadeye',
+  devil_hunter_female:'Gunslinger',
+  blaster:            'Artillerist',
+  hawkeye:            'Sharpshooter',
+  scouter:            'Machinist',
+
+  // Mages
+  bard:               'Bard',
+  arcana:             'Arcanist',
+  summoner:           'Summoner',
+  elemental_master:   'Sorceress',
+
+  // Assassins
+  blade:              'Deathblade',
+  demonic:            'Shadow Hunter',
+  reaper:             'Reaper',
+  soul_eater:         'Souleater',
+
+  // Specialists
+  yinyangshi:         'Artist',
+  weather_artist:     'Aeromancer',
+  holyknight_female:  'Valkyrie',
+};
+
+/**
+ * Resolve a lostark.bible class ID to a human-readable display name.
+ * Falls back to a title-cased version of the ID if not found.
+ * @param {string} clsId
+ * @returns {string}
+ */
+export function getClassName(clsId) {
+  if (!clsId) return '';
+  return CLASS_NAMES[clsId] ?? clsId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
