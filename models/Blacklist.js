@@ -10,11 +10,10 @@
 import mongoose from 'mongoose';
 
 const blacklistSchema = new mongoose.Schema({
-  /** Character name (case-insensitive unique index) */
+  /** Character name — unique index defined via schema.index() below (case-insensitive) */
   name: {
     type: String,
     required: true,
-    unique: true,
     trim: true,
   },
 

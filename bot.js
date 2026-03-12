@@ -275,15 +275,19 @@ async function handleRosterCommand(interaction) {
  */
 async function handleRosterBlackListCheck(name) {
   try {
+    console.log(`[blacklist] Checking "${name}" against blacklist…`);
     await connectDB();
     const entry = await Blacklist.findOne({ name })
       .collation({ locale: 'en', strength: 2 })
       .lean();
-    return entry
-      ? { isBlacklisted: true, reason: entry.reason ?? '' }
-      : { isBlacklisted: false, reason: '' };
+    if (entry) {
+      console.log(`[blacklist] ⛔ "${name}" is BLACKLISTED — reason: ${entry.reason || '(none)'}`);
+      return { isBlacklisted: true, reason: entry.reason ?? '' };
+    }
+    console.log(`[blacklist] ✅ "${name}" is clean (not in blacklist)`);
+    return { isBlacklisted: false, reason: '' };
   } catch (err) {
-    console.error('[bot] Blacklist check failed:', err.message, '| code:', err.code, '| name:', err.name);
+    console.error('[blacklist] ❌ Check failed:', err.message, '| code:', err.code, '| name:', err.name);
     return { isBlacklisted: false, reason: '' };
   }
 }
