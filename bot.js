@@ -241,26 +241,26 @@ async function handleRosterCommand(interaction) {
       description = description.slice(0, 4000) + '\n…';
     }
 
+    // ── Blacklist check ────────────────────────────────────────────────────
+    const blacklistResult = await handleRosterBlackListCheck(name);
+
     const embed = new EmbedBuilder()
       .setTitle(`Roster – ${name}`)
       .setURL(targetUrl)
       .setDescription(description)
-      .setColor(0x5865f2)
+      .setColor(blacklistResult.isBlacklisted ? 0xed4245 : 0x5865f2)
       .setFooter({ text: `${characters.length} character(s) · lostark.bible` })
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
-
-    // ── Blacklist check ────────────────────────────────────────────────────
-    const blacklistResult = await handleRosterBlackListCheck(name);
+    let content = undefined;
     if (blacklistResult.isBlacklisted) {
       const reason = blacklistResult.reason
-        ? `\n> Reason: *${blacklistResult.reason}*`
+        ? ` — Reason: *${blacklistResult.reason}*`
         : '';
-      await interaction.followUp({
-        content: `⛔ **${name}** is on the blacklist.${reason}`,
-      });
+      content = `⛔ **${name}** is on the blacklist.${reason}`;
     }
+
+    await interaction.editReply({ content, embeds: [embed] });
   } catch (err) {
     await interaction.editReply({
       content: `⚠️ Failed to fetch roster: \`${err.message}\``,
