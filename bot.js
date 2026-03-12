@@ -169,37 +169,17 @@ async function handleCheckCommand(interaction) {
 }
 
 /**
- * /roster – scrape and display a character's roster from lostark.bible.
+ * /roster – scrape lostark.bible via ScraperAPI proxy to bypass Cloudflare.
  */
 async function handleRosterCommand(interaction) {
   const raw = interaction.options.getString('name');
   const name = raw.charAt(0).toUpperCase() + raw.slice(1);
   await interaction.deferReply();
 
-  const headers = {
-    'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-      'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-      'Chrome/124.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Referer': 'https://lostark.bible/',
-    'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
-    'sec-fetch-dest': 'document',
-    'sec-fetch-mode': 'navigate',
-    'sec-fetch-site': 'same-origin',
-    'sec-fetch-user': '?1',
-    'upgrade-insecure-requests': '1',
-    'Cache-Control': 'max-age=0',
-    'Connection': 'keep-alive',
-  };
-
   try {
-    const url = `https://lostark.bible/character/NA/${name}/roster`;
-    const response = await fetch(url, { headers });
+    const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
+    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
+    const response = await fetch(proxyUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const html = await response.text();
@@ -236,12 +216,11 @@ async function handleRosterCommand(interaction) {
     await Promise.all(
       characters.slice(0, 10).map(async (c) => {
         try {
-          const charUrl = `https://lostark.bible/character/NA/${c.name}`;
-          const res = await fetch(charUrl, { headers });
+          const charProxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(`https://lostark.bible/character/NA/${c.name}`)}`;
+          const res = await fetch(charProxyUrl);
           if (!res.ok) return;
           const charHtml = await res.text();
           const { document: charDoc } = new JSDOM(charHtml).window;
-          // Title lives in the h2 inside the header banner, in a styled <span>
           const h2 = charDoc.querySelector('h2.flex.items-center');
           const titleSpan = h2?.querySelector('span[style*="color"]');
           c.title = titleSpan?.textContent.trim() ?? null;
@@ -264,10 +243,10 @@ async function handleRosterCommand(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle(`Roster – ${name}`)
-      .setURL(url)
+      .setURL(targetUrl)
       .setDescription(description)
       .setColor(0x5865f2)
-      .setFooter({ text: `${characters.length} character(s) · titles shown for first 10` })
+      .setFooter({ text: `${characters.length} character(s) · lostark.bible` })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
