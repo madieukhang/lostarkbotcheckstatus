@@ -206,9 +206,19 @@ async function handleRosterCommand(interaction) {
     }
 
     if (characters.length === 0) {
-      await interaction.editReply({
-        content: `❌ No roster found for **${name}**. Check the name and try again.`,
-      });
+      const suggestions = await fetchNameSuggestions(name);
+      if (suggestions.length > 0) {
+        const suggList = suggestions
+          .map((s) => `**${s.name}** · \`${s.itemLevel}\` · ${s.cls}`)
+          .join('\n');
+        await interaction.editReply({
+          content: `❌ No roster found for **${name}** on NA.\n\n**Tên tương tự trên NA:**\n${suggList}`,
+        });
+      } else {
+        await interaction.editReply({
+          content: `❌ No roster found for **${name}**. Check the name and try again.`,
+        });
+      }
       return;
     }
 
@@ -267,6 +277,48 @@ async function handleRosterCommand(interaction) {
     await interaction.editReply({
       content: `⚠️ Failed to fetch roster: \`${err.message}\``,
     });
+  }
+}
+
+/**
+ * Suggest similar NA character names using lostark.bible's internal search API.
+ * Payload format: Base64(JSON([[1,2], name, "NA"]))
+ * Result is a compact flat array where data[0] holds pointers to each character group.
+ * Each group is [nameIdx, classIdx, itemLevelIdx] referencing positions in the flat array.
+ * @param {string} name  Title-cased character name
+ * @returns {Promise<Array<{name: string, itemLevel: number, cls: string}>>}
+ */
+async function fetchNameSuggestions(name) {
+  try {
+    const payload = Buffer.from(JSON.stringify([[1, 2], name, 'NA'])).toString('base64');
+    const targetUrl = `https://lostark.bible/_app/remote/ngsbie/search?payload=${encodeURIComponent(payload)}`;
+    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return [];
+
+    const json = await res.json();
+    if (json.type !== 'result' || !json.result) return [];
+
+    const data = JSON.parse(json.result);
+    if (!Array.isArray(data) || !Array.isArray(data[0]) || data[0].length === 0) return [];
+
+    // data[0] = array of pointers; each pointer p → data[p] = [nameIdx, classIdx, ilvlIdx]
+    return data[0]
+      .map((p) => {
+        const group = data[p];
+        if (!Array.isArray(group) || group.length < 3) return null;
+        const [nameIdx, classIdx, ilvlIdx] = group;
+        const charName = data[nameIdx];
+        if (!charName || typeof charName !== 'string') return null;
+        return {
+          name: charName,
+          cls: data[classIdx] ?? '',
+          itemLevel: data[ilvlIdx] ?? 0,
+        };
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
   }
 }
 
