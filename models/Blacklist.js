@@ -37,4 +37,4 @@ blacklistSchema.index(
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 
-export default mongoose.model('Blacklist', blacklistSchema);
+export default mongoose.model('blacklists', blacklistSchema);
