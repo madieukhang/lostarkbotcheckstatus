@@ -207,12 +207,18 @@ async function handleRosterCommand(interaction) {
 
     if (characters.length === 0) {
       const suggestions = await fetchNameSuggestions(name);
-      if (suggestions.length > 0) {
-        const suggList = suggestions
-          .map((s) => `**${s.name}** · \`${s.itemLevel}\` · ${s.cls}`)
+      const filtered = suggestions.filter((s) => s.itemLevel > 1680);
+      if (filtered.length > 0) {
+        const suggLines = filtered
+          .map((s) => `[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) · \`${s.itemLevel}\` · ${s.cls}`)
           .join('\n');
+        const embed = new EmbedBuilder()
+          .setDescription(suggLines)
+          .setColor(0xed4245)
+          .setTimestamp();
         await interaction.editReply({
-          content: `❌ No roster found for **${name}** on NA.\n\n**Tên tương tự trên NA:**\n${suggList}`,
+          content: `❌ No roster found for **${name}**. Names similar to **${name}**:`,
+          embeds: [embed],
         });
       } else {
         await interaction.editReply({
