@@ -242,7 +242,10 @@ async function handleRosterCommand(interaction) {
     }
 
     // ── Blacklist check ────────────────────────────────────────────────────
-    const charNames = characters.map((c) => c.name);
+    // Check characters with item level 1640+
+    const charNames = characters
+      .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1640)
+      .map((c) => c.name);
     const blacklistResult = await handleRosterBlackListCheck(charNames);
 
     const embed = new EmbedBuilder()
@@ -256,7 +259,7 @@ async function handleRosterCommand(interaction) {
     let content = undefined;
     if (blacklistResult) {
       const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';
-      content = `⛔ **${blacklistResult.name}** is on the blacklist.${reason}`;
+      content = `⛔ **${name}** is on the blacklist.${reason}`;
     }
 
     await interaction.editReply({ content, embeds: [embed] });
