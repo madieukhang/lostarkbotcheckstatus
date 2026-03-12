@@ -77,6 +77,33 @@ async function sendOnlineNotification(client) {
   }
 }
 
+// ─── Maintenance window helper ───────────────────────────────────────────────
+
+/**
+ * Returns true if current UTC time is inside the weekly Lost Ark maintenance window.
+ * Maintenance always falls on Wednesday UTC (converted from Vietnam UTC+7):
+ *   - DST off (is_dst=false): Wednesday 08:00 → 20:00 UTC
+ *   - DST on  (is_dst=true):  Wednesday 07:00 → 19:00 UTC
+ */
+function isInMaintenanceWindow() {
+  const now = new Date();
+
+  // Detect US DST: July offset < January offset means DST is active
+  const janOffset = new Date(now.getUTCFullYear(), 0, 1).getTimezoneOffset();
+  const julOffset = new Date(now.getUTCFullYear(), 6, 1).getTimezoneOffset();
+  const isDst = julOffset < janOffset;
+
+  const day  = now.getUTCDay();   // 3 = Wednesday
+  const hour = now.getUTCHours();
+
+  if (day !== 3) return false;  // Only Wednesday UTC
+
+  const startHour = isDst ? 7 : 8;
+  const endHour   = isDst ? 19 : 20;
+
+  return hour >= startHour && hour < endHour;
+}
+
 // ─── Core check logic ─────────────────────────────────────────────────────────
 
 /**
@@ -89,7 +116,13 @@ async function sendOnlineNotification(client) {
  * @param {import('discord.js').Client} client
  * @returns {Promise<string>} The current STATUS value
  */
-export async function checkStatus(client) {
+export async function checkStatus(client, { force = false } = {}) {
+  if (!force && isInMaintenanceWindow()) {
+    console.log('[monitor] 🛠️  Skipping check – inside weekly maintenance window.');
+    const state = await loadState();
+    return state.lastStatus;
+  }
+
   const state = await loadState();
   let currentStatus;
 

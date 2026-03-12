@@ -147,7 +147,7 @@ async function handleCheckCommand(interaction) {
   await interaction.deferReply();
 
   try {
-    const current = await checkStatus(client);
+    const current = await checkStatus(client, { force: true });
     const embed = new EmbedBuilder()
       .setTitle('Server status – Live Check')
       .setDescription(`Status right now: **${formatStatus(current)}**`)
