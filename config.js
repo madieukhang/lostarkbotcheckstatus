@@ -39,7 +39,7 @@ function requireEnv(key) {
   return process.env[key].trim();
 }
 
-validateEnv(['DISCORD_TOKEN', 'CHANNEL_ID']);
+validateEnv(['DISCORD_TOKEN', 'CHANNEL_ID', 'MONGODB_URI']);
 
 /**
  * Parse CHECK_INTERVAL from env (in seconds), fallback to 30s.
@@ -66,6 +66,9 @@ const config = {
 
   /** How often to check server status (milliseconds) */
   checkIntervalMs: parseInterval(),
+
+  /** MongoDB connection string */
+  mongoUri: requireEnv('MONGODB_URI'),
 
   /** Lost Ark server status page URL */
   statusUrl: 'https://www.playlostark.com/en-gb/support/server-status',

@@ -23,6 +23,8 @@ import { JSDOM } from 'jsdom';
 import config from './config.js';
 import { startMonitor, checkStatus, getState, resetState } from './monitor.js';
 import { STATUS } from './serverStatus.js';
+import { connectDB } from './db.js';
+import Blacklist from './models/Blacklist.js';
 
 // ─── Discord client ───────────────────────────────────────────────────────────
 
@@ -257,10 +259,41 @@ async function handleRosterCommand(interaction) {
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
+
+    // ── Blacklist check ────────────────────────────────────────────────────
+    const blacklistResult = await handleRosterBlackListCheck(name);
+    if (blacklistResult.isBlacklisted) {
+      const reason = blacklistResult.reason
+        ? `\n> Reason: *${blacklistResult.reason}*`
+        : '';
+      await interaction.followUp({
+        content: `⛔ **${name}** is on the blacklist.${reason}`,
+      });
+    }
   } catch (err) {
     await interaction.editReply({
       content: `⚠️ Failed to fetch roster: \`${err.message}\``,
     });
+  }
+}
+
+/**
+ * Check whether a character name exists in the MongoDB blacklist.
+ * @param {string} name  Character name (case-insensitive match)
+ * @returns {Promise<{ isBlacklisted: boolean, reason: string }>}
+ */
+async function handleRosterBlackListCheck(name) {
+  try {
+    await connectDB();
+    const entry = await Blacklist.findOne({ name })
+      .collation({ locale: 'en', strength: 2 })
+      .lean();
+    return entry
+      ? { isBlacklisted: true, reason: entry.reason ?? '' }
+      : { isBlacklisted: false, reason: '' };
+  } catch (err) {
+    console.error('[bot] Blacklist check failed:', err.message);
+    return { isBlacklisted: false, reason: '' };
   }
 }
 
