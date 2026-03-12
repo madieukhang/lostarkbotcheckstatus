@@ -173,7 +173,7 @@ async function handleCheckCommand(interaction) {
  */
 async function handleRosterCommand(interaction) {
   const raw = interaction.options.getString('name');
-  const name = raw.charAt(0).toUpperCase() + raw.slice(1);
+  const name = raw.trim().charAt(0).toUpperCase() + raw.trim().slice(1).toLowerCase();
   await interaction.deferReply();
 
   try {
@@ -242,22 +242,21 @@ async function handleRosterCommand(interaction) {
     }
 
     // ── Blacklist check ────────────────────────────────────────────────────
-    const blacklistResult = await handleRosterBlackListCheck(name);
+    const charNames = characters.map((c) => c.name);
+    const blacklistResult = await handleRosterBlackListCheck(charNames);
 
     const embed = new EmbedBuilder()
       .setTitle(`Roster – ${name}`)
       .setURL(targetUrl)
       .setDescription(description)
-      .setColor(blacklistResult.isBlacklisted ? 0xed4245 : 0x5865f2)
+      .setColor(blacklistResult ? 0xed4245 : 0x5865f2)
       .setFooter({ text: `${characters.length} character(s) · lostark.bible` })
       .setTimestamp();
 
     let content = undefined;
-    if (blacklistResult.isBlacklisted) {
-      const reason = blacklistResult.reason
-        ? ` — Reason: *${blacklistResult.reason}*`
-        : '';
-      content = `⛔ **${name}** is on the blacklist.${reason}`;
+    if (blacklistResult) {
+      const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';
+      content = `⛔ **${blacklistResult.name}** is on the blacklist.${reason}`;
     }
 
     await interaction.editReply({ content, embeds: [embed] });
@@ -269,34 +268,36 @@ async function handleRosterCommand(interaction) {
 }
 
 /**
- * Check whether a character name exists in the MongoDB blacklist.
- * @param {string} name  Character name (case-insensitive match)
- * @returns {Promise<{ isBlacklisted: boolean, reason: string }>}
+ * Loop name checks against the blacklist collection in Blacklist DB.
+ * @param {string[]} names  List of character names to check against the blacklist.
+ * @returns {Promise<{ name: string, reason: string } | null>}
  */
-async function handleRosterBlackListCheck(name) {
+async function handleRosterBlackListCheck(names) {
   try {
-    console.log(`[blacklist] Checking — input name: "${name}" (length: ${name.length}, charCodes: ${[...name].map(c => c.charCodeAt(0)).join(',')})`);
+    console.log(`[blacklist] Checking ${names.length} character(s):`, names.join(', '));
     await connectDB();
 
-    // Dump all documents to compare
     const allDocs = await Blacklist.find({}).lean();
     console.log(`[blacklist] Total docs in DB: ${allDocs.length}`);
     allDocs.forEach((doc) => {
       console.log(`[blacklist] DB entry — name: "${doc.name}" (length: ${doc.name.length}, charCodes: ${[...doc.name].map(c => c.charCodeAt(0)).join(',')})`);
     });
 
-    const entry = await Blacklist.findOne({ name })
-      .collation({ locale: 'en', strength: 2 })
-      .lean();
-    if (entry) {
-      console.log(`[blacklist] ⛔ "${name}" is BLACKLISTED — reason: ${entry.reason || '(none)'}`);
-      return { isBlacklisted: true, reason: entry.reason ?? '' };
+    for (const charName of names) {
+      const entry = await Blacklist.findOne({ name: charName })
+        .collation({ locale: 'en', strength: 2 })
+        .lean();
+      if (entry) {
+        console.log(`[blacklist] ⛔ "${charName}" is BLACKLISTED — reason: ${entry.reason || '(none)'}`);
+        return { name: entry.name, reason: entry.reason ?? '' };
+      }
     }
-    console.log(`[blacklist] ✅ "${name}" is clean (not in blacklist)`);
-    return { isBlacklisted: false, reason: '' };
+
+    console.log('[blacklist] ✅ No blacklisted characters found in roster');
+    return null;
   } catch (err) {
     console.error('[blacklist] ❌ Check failed:', err.message, '| code:', err.code, '| name:', err.name);
-    return { isBlacklisted: false, reason: '' };
+    return null;
   }
 }
 
