@@ -8,6 +8,7 @@ export const CLASS_NAMES = {
   dragon_knight:      'Slayer',
   warlord:            'Gunlancer',
   holyknight:         'Paladin',
+  holyknight_female:  'Valkyrie',
   destroyer:          'Destroyer',
 
   // Martial Artists
@@ -39,7 +40,7 @@ export const CLASS_NAMES = {
   // Specialists
   yinyangshi:         'Artist',
   weather_artist:     'Aeromancer',
-  holyknight_female:  'Valkyrie',
+  alchemist:          'Wildsoul',
 };
 
 /**
