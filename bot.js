@@ -65,7 +65,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('blacklist_add')
     .setDescription('Add a character to blacklist with reason and optional image')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((opt) =>
       opt
         .setName('name')
@@ -81,7 +80,7 @@ const commands = [
     .addAttachmentOption((opt) =>
       opt
         .setName('image')
-        .setDescription('Optional screenshot/evidence image')
+        .setDescription('Optional screenshot image')
         .setRequired(false)
     ),
 ].map((cmd) => cmd.toJSON());
