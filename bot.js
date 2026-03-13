@@ -322,10 +322,10 @@ async function handleRosterCommand(interaction) {
 
       if (blacklistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
-          .setTitle('Blacklist evidence')
+          .setTitle('Image reasoning evidence')
           .setImage(blacklistResult.imageUrl)
           .setColor(0xed4245);
-        embeds.push(evidenceEmbed);
+        embeds.unshift(evidenceEmbed);
       }
     }
 
