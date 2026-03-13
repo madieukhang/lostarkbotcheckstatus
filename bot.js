@@ -319,7 +319,8 @@ async function handleBlacklistAddCommand(interaction) {
   const image = interaction.options.getAttachment('image');
   const name = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
 
-  await interaction.deferReply({ ephemeral: true });
+  // await interaction.deferReply({ ephemeral: true }); // This command show only user who added blacklist
+  await interaction.deferReply(); // This command's result may be relevant to everyone, so not ephemeral
 
   if (image?.contentType && !image.contentType.startsWith('image/')) {
     await interaction.editReply({
@@ -329,9 +330,9 @@ async function handleBlacklistAddCommand(interaction) {
   }
 
   try {
-    let candidateNames = [name];
+    let allCharacters = [name];
 
-    // Pull full roster and keep only 1640+ characters for blacklist add.
+    // Build roster character array for this single entry.
     try {
       const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
       const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
@@ -351,92 +352,45 @@ async function handleBlacklistAddCommand(interaction) {
             .map((n) => n.textContent.trim())
             .find((t) => t.length > 0);
 
-          const itemLevel = headerDiv.querySelectorAll('span')[0]?.textContent.trim() ?? '0';
-          if (!charName) continue;
-
-          const ilvl = Number.parseFloat(itemLevel.replace(/,/g, ''));
-          if (!Number.isNaN(ilvl) && ilvl >= 1640) {
-            rosterChars.push(charName);
-          }
+          if (charName) rosterChars.push(charName);
         }
 
         if (rosterChars.length > 0) {
-          candidateNames = [...new Set(rosterChars)];
+          allCharacters = [...new Set(rosterChars)];
         }
       }
     } catch (err) {
-      console.warn('[blacklist] Failed roster expansion for add, fallback single name:', err.message);
+      console.warn('[blacklist] Failed to fetch roster characters for add, fallback single name:', err.message);
     }
 
     await connectDB();
 
-    const existedDocs = await Blacklist.find({
-      $or: [
-        { name: { $in: candidateNames } },
-        { allCharacters: { $in: candidateNames } },
-      ],
+    const existed = await Blacklist.findOne({
+      $or: [{ name }, { allCharacters: name }],
     })
       .collation({ locale: 'en', strength: 2 })
       .lean();
 
-    const existedSet = new Set();
-    existedDocs.forEach((doc) => {
-      if (doc.name) existedSet.add(doc.name.toLowerCase());
-      if (Array.isArray(doc.allCharacters)) {
-        doc.allCharacters.forEach((char) => {
-          if (char) existedSet.add(char.toLowerCase());
-        });
-      }
+    if (existed) {
+      await interaction.editReply({
+        content: `⚠️ **${name}** existed in blacklist.`,
+      });
+      return;
+    }
+
+    const entry = await Blacklist.create({
+      name,
+      reason,
+      imageUrl: image?.url ?? '',
+      allCharacters,
     });
-    const namesToAdd = candidateNames.filter((n) => !existedSet.has(n.toLowerCase()));
-
-    if (namesToAdd.length === 0) {
-      await interaction.editReply({
-        content: `⚠️ All matching 1640+ roster names are already in blacklist for **${name}**.`,
-      });
-      return;
-    }
-
-    const addedEntries = [];
-    const raceDuplicateNames = [];
-    for (const entryName of namesToAdd) {
-      try {
-        const entry = await Blacklist.create({
-          name: entryName,
-          reason,
-          imageUrl: image?.url ?? '',
-          allCharacters: candidateNames,
-        });
-        addedEntries.push(entry);
-      } catch (err) {
-        if (err?.code === 11000) {
-          raceDuplicateNames.push(entryName);
-          continue;
-        }
-        throw err;
-      }
-    }
-
-    if (addedEntries.length === 0) {
-      await interaction.editReply({
-        content: `⚠️ No new names were added for **${name}** (already existed).`,
-      });
-      return;
-    }
-
-    const addedNames = addedEntries.map((e) => e.name);
-    const alreadyExistedCount = existedDocs.length + raceDuplicateNames.length;
 
     const embed = new EmbedBuilder()
-      .setTitle('Blacklist entries added')
+      .setTitle('Blacklist entry added')
       .addFields(
+        { name: 'Name', value: entry.name, inline: true },
         { name: 'Reason', value: reason || 'N/A', inline: true },
-        { name: 'Added', value: String(addedEntries.length), inline: true },
-        { name: 'Already existed', value: String(alreadyExistedCount), inline: true },
-        {
-          name: 'Names added',
-          value: addedNames.join(', ').slice(0, 1024),
-        }
+        { name: 'All Characters', value: String(allCharacters.length), inline: true }
       )
       .setColor(0xed4245)
       .setTimestamp(new Date());
@@ -448,7 +402,7 @@ async function handleBlacklistAddCommand(interaction) {
     }
 
     await interaction.editReply({
-      content: `✅ Added **${addedEntries.length}** blacklist name(s) from **${name}** roster.`,
+      content: `✅ Added **${entry.name}** to blacklist.`,
       embeds: [embed],
     });
   } catch (err) {
