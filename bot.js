@@ -17,6 +17,7 @@ import {
   SlashCommandBuilder,
   EmbedBuilder,
   InteractionType,
+  PermissionFlagsBits,
 } from 'discord.js';
 import { JSDOM } from 'jsdom';
 
@@ -59,6 +60,29 @@ const commands = [
         .setName('name')
         .setDescription('Character name to look up (e.g. Lazy)')
         .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('blacklist_add')
+    .setDescription('Add a character to blacklist with reason and optional image')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .addStringOption((opt) =>
+      opt
+        .setName('name')
+        .setDescription('Character name to blacklist')
+        .setRequired(true)
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName('reason')
+        .setDescription('Reason for blacklist')
+        .setRequired(true)
+    )
+    .addAttachmentOption((opt) =>
+      opt
+        .setName('image')
+        .setDescription('Optional screenshot/evidence image')
+        .setRequired(false)
     ),
 ].map((cmd) => cmd.toJSON());
 
@@ -288,6 +312,162 @@ async function handleRosterCommand(interaction) {
 }
 
 /**
+ * /blacklist_add – add a character to blacklist with reason + optional image.
+ */
+async function handleBlacklistAddCommand(interaction) {
+  const rawName = interaction.options.getString('name', true).trim();
+  const reason = interaction.options.getString('reason', true).trim();
+  const image = interaction.options.getAttachment('image');
+  const name = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
+
+  await interaction.deferReply({ ephemeral: true });
+
+  if (image?.contentType && !image.contentType.startsWith('image/')) {
+    await interaction.editReply({
+      content: '❌ Attachment must be an image file.',
+    });
+    return;
+  }
+
+  try {
+    let candidateNames = [name];
+
+    // Pull full roster and keep only 1640+ characters for blacklist add.
+    try {
+      const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
+      const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+      if (response.ok) {
+        const html = await response.text();
+        const { document } = new JSDOM(html).window;
+        const links = document.querySelectorAll('a[href^="/character/NA/"]');
+        const rosterChars = [];
+
+        for (const link of links) {
+          const headerDiv = link.querySelector('.text-lg.font-semibold');
+          if (!headerDiv) continue;
+
+          const charName = [...headerDiv.childNodes]
+            .filter((n) => n.nodeType === 3)
+            .map((n) => n.textContent.trim())
+            .find((t) => t.length > 0);
+
+          const itemLevel = headerDiv.querySelectorAll('span')[0]?.textContent.trim() ?? '0';
+          if (!charName) continue;
+
+          const ilvl = Number.parseFloat(itemLevel.replace(/,/g, ''));
+          if (!Number.isNaN(ilvl) && ilvl >= 1640) {
+            rosterChars.push(charName);
+          }
+        }
+
+        if (rosterChars.length > 0) {
+          candidateNames = [...new Set(rosterChars)];
+        }
+      }
+    } catch (err) {
+      console.warn('[blacklist] Failed roster expansion for add, fallback single name:', err.message);
+    }
+
+    await connectDB();
+
+    const existedDocs = await Blacklist.find({
+      $or: [
+        { name: { $in: candidateNames } },
+        { allCharacters: { $in: candidateNames } },
+      ],
+    })
+      .collation({ locale: 'en', strength: 2 })
+      .lean();
+
+    const existedSet = new Set();
+    existedDocs.forEach((doc) => {
+      if (doc.name) existedSet.add(doc.name.toLowerCase());
+      if (Array.isArray(doc.allCharacters)) {
+        doc.allCharacters.forEach((char) => {
+          if (char) existedSet.add(char.toLowerCase());
+        });
+      }
+    });
+    const namesToAdd = candidateNames.filter((n) => !existedSet.has(n.toLowerCase()));
+
+    if (namesToAdd.length === 0) {
+      await interaction.editReply({
+        content: `⚠️ All matching 1640+ roster names are already in blacklist for **${name}**.`,
+      });
+      return;
+    }
+
+    const addedEntries = [];
+    const raceDuplicateNames = [];
+    for (const entryName of namesToAdd) {
+      try {
+        const entry = await Blacklist.create({
+          name: entryName,
+          reason,
+          imageUrl: image?.url ?? '',
+          allCharacters: candidateNames,
+        });
+        addedEntries.push(entry);
+      } catch (err) {
+        if (err?.code === 11000) {
+          raceDuplicateNames.push(entryName);
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (addedEntries.length === 0) {
+      await interaction.editReply({
+        content: `⚠️ No new names were added for **${name}** (already existed).`,
+      });
+      return;
+    }
+
+    const addedNames = addedEntries.map((e) => e.name);
+    const alreadyExistedCount = existedDocs.length + raceDuplicateNames.length;
+
+    const embed = new EmbedBuilder()
+      .setTitle('Blacklist entries added')
+      .addFields(
+        { name: 'Reason', value: reason || 'N/A', inline: true },
+        { name: 'Added', value: String(addedEntries.length), inline: true },
+        { name: 'Already existed', value: String(alreadyExistedCount), inline: true },
+        {
+          name: 'Names added',
+          value: addedNames.join(', ').slice(0, 1024),
+        }
+      )
+      .setColor(0xed4245)
+      .setTimestamp(new Date());
+
+    if (image?.url) {
+      embed
+        .addFields({ name: 'Attachment', value: '[Open image](' + image.url + ')' })
+        .setImage(image.url);
+    }
+
+    await interaction.editReply({
+      content: `✅ Added **${addedEntries.length}** blacklist name(s) from **${name}** roster.`,
+      embeds: [embed],
+    });
+  } catch (err) {
+    if (err?.code === 11000) {
+      await interaction.editReply({
+        content: `⚠️ **${name}** is already in blacklist.`,
+      });
+      return;
+    }
+
+    console.error('[blacklist] ❌ Add failed:', err.message);
+    await interaction.editReply({
+      content: `⚠️ Failed to add blacklist entry: \`${err.message}\``,
+    });
+  }
+}
+
+/**
  * Suggest similar NA character names using lostark.bible's internal search API.
  * Payload format: Base64(JSON([[1,2], name, "NA"]))
  * Result is a compact flat array where data[0] holds pointers to each character group.
@@ -403,6 +583,8 @@ client.on('interactionCreate', async (interaction) => {
       await handleResetCommand(interaction);
     } else if (commandName === 'roster') {
       await handleRosterCommand(interaction);
+    } else if (commandName === 'blacklist_add') {
+      await handleBlacklistAddCommand(interaction);
     }
   } catch (err) {
     console.error(`[bot] Unhandled error in /${commandName}:`, err);

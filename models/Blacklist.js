@@ -24,6 +24,19 @@ const blacklistSchema = new mongoose.Schema({
     trim: true,
   },
 
+  /** Optional attachment image URL from slash command */
+  imageUrl: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+
+  /** Full 1640+ roster snapshot used to detect future existed matches */
+  allCharacters: {
+    type: [String],
+    default: [],
+  },
+
   /** Timestamp of when the entry was added */
   addedAt: {
     type: Date,
