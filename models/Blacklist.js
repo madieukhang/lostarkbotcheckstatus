@@ -31,7 +31,7 @@ const blacklistSchema = new mongoose.Schema({
     trim: true,
   },
 
-  /** Full 1640+ roster snapshot used to detect future existed matches */
+  /** Full 1680+ roster snapshot used to detect future existed matches */
   allCharacters: {
     type: [String],
     default: [],

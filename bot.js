@@ -37,6 +37,9 @@ const client = new Client({
   ],
 });
 
+// Store pending suggestion lists per user so they can quickly pick by index.
+const pendingBlacklistSuggestions = new Map();
+
 // ─── Slash command definitions ────────────────────────────────────────────────
 
 const commands = [
@@ -65,6 +68,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName('blacklist_add')
     .setDescription('Add a character to blacklist with reason and optional image')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((opt) =>
       opt
         .setName('name')
@@ -82,6 +86,19 @@ const commands = [
         .setName('image')
         .setDescription('Optional screenshot image')
         .setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('blacklist_pick')
+    .setDescription('Pick a suggestion index from the last blacklist_add result')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .addIntegerOption((opt) =>
+      opt
+        .setName('number')
+        .setDescription('Suggestion index to pick (1-10)')
+        .setRequired(true)
+        .setMinValue(1)
+        .setMaxValue(10)
     ),
 ].map((cmd) => cmd.toJSON());
 
@@ -282,9 +299,9 @@ async function handleRosterCommand(interaction) {
     }
 
     // ── Blacklist check ────────────────────────────────────────────────────
-    // Check characters with item level 1640+
+    // Check characters with item level 1680+
     const charNames = characters
-      .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1640)
+      .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1680)
       .map((c) => c.name);
     const blacklistResult = await handleRosterBlackListCheck(charNames);
 
@@ -296,13 +313,23 @@ async function handleRosterCommand(interaction) {
       .setFooter({ text: `${characters.length} character(s) · lostark.bible` })
       .setTimestamp();
 
+    const embeds = [embed];
+
     let content = undefined;
     if (blacklistResult) {
       const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';
       content = `⛔ **${name}** is on the blacklist.${reason}`;
+
+      if (blacklistResult.imageUrl) {
+        const evidenceEmbed = new EmbedBuilder()
+          .setTitle('Blacklist evidence')
+          .setImage(blacklistResult.imageUrl)
+          .setColor(0xed4245);
+        embeds.push(evidenceEmbed);
+      }
     }
 
-    await interaction.editReply({ content, embeds: [embed] });
+    await interaction.editReply({ content, embeds });
   } catch (err) {
     await interaction.editReply({
       content: `⚠️ Failed to fetch roster: \`${err.message}\``,
@@ -331,6 +358,8 @@ async function handleBlacklistAddCommand(interaction) {
 
   try {
     let allCharacters = [name];
+    let rosterChars = [];
+    let hasValidRoster = false;
 
     // Build roster character array for this single entry.
     try {
@@ -341,7 +370,6 @@ async function handleBlacklistAddCommand(interaction) {
         const html = await response.text();
         const { document } = new JSDOM(html).window;
         const links = document.querySelectorAll('a[href^="/character/NA/"]');
-        const rosterChars = [];
 
         for (const link of links) {
           const headerDiv = link.querySelector('.text-lg.font-semibold');
@@ -356,11 +384,49 @@ async function handleBlacklistAddCommand(interaction) {
         }
 
         if (rosterChars.length > 0) {
+          hasValidRoster = true;
           allCharacters = [...new Set(rosterChars)];
         }
       }
     } catch (err) {
       console.warn('[blacklist] Failed to fetch roster characters for add, fallback single name:', err.message);
+    }
+
+    if (!hasValidRoster) {
+      const suggestions = await fetchNameSuggestions(name);
+      if (suggestions.length > 0) {
+        const topSuggestions = suggestions.slice(0, 10);
+        pendingBlacklistSuggestions.set(interaction.user.id, {
+          createdAt: Date.now(),
+          reason,
+          imageUrl: image?.url ?? '',
+          names: topSuggestions.map((s) => s.name),
+        });
+
+        const suggestionLines = suggestions
+          .slice(0, 10)
+          .map(
+            (s, idx) =>
+              `**${idx + 1}.** [${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) — \`${Number(s.itemLevel || 0).toFixed(2)}\` — ${getClassName(s.cls)}`
+          )
+          .join('\n');
+
+        const suggEmbed = new EmbedBuilder()
+          .setTitle('No roster found')
+          .setDescription(suggestionLines)
+          .setColor(0xfee75c)
+          .setTimestamp();
+
+        await interaction.editReply({
+          content: `❌ No roster found for **${name}**. Use **/blacklist_pick number:<1-10>** to quickly choose from the list below.`,
+          embeds: [suggEmbed],
+        });
+      } else {
+        await interaction.editReply({
+          content: `❌ No roster found for **${name}**, and no similar name suggestions were found.`,
+        });
+      }
+      return;
     }
 
     await connectDB();
@@ -390,7 +456,7 @@ async function handleBlacklistAddCommand(interaction) {
       .addFields(
         { name: 'Name', value: entry.name, inline: true },
         { name: 'Reason', value: reason || 'N/A', inline: true },
-        { name: 'All Characters', value: String(allCharacters.length), inline: true }
+        { name: 'All Characters i.lvl 1680+', value: String(allCharacters.length), inline: true }
       )
       .setColor(0xed4245)
       .setTimestamp(new Date());
@@ -416,6 +482,128 @@ async function handleBlacklistAddCommand(interaction) {
     console.error('[blacklist] ❌ Add failed:', err.message);
     await interaction.editReply({
       content: `⚠️ Failed to add blacklist entry: \`${err.message}\``,
+    });
+  }
+}
+
+/**
+ * /blacklist_pick – choose one of the last suggestions by index and add.
+ */
+async function handleBlacklistPickCommand(interaction) {
+  const number = interaction.options.getInteger('number', true);
+  await interaction.deferReply();
+
+  const pending = pendingBlacklistSuggestions.get(interaction.user.id);
+  if (!pending || !Array.isArray(pending.names) || pending.names.length === 0) {
+    await interaction.editReply({
+      content: '⚠️ No pending suggestions. Run **/blacklist_add** first.',
+    });
+    return;
+  }
+
+  if (Date.now() - pending.createdAt > 10 * 60 * 1000) {
+    pendingBlacklistSuggestions.delete(interaction.user.id);
+    await interaction.editReply({
+      content: '⚠️ Suggestion list expired. Run **/blacklist_add** again.',
+    });
+    return;
+  }
+
+  const pickedName = pending.names[number - 1];
+  if (!pickedName) {
+    await interaction.editReply({
+      content: `⚠️ Invalid index. Pick from **1-${pending.names.length}**.`,
+    });
+    return;
+  }
+
+  try {
+    let allCharacters = [pickedName];
+
+    try {
+      const targetUrl = `https://lostark.bible/character/NA/${pickedName}/roster`;
+      const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+      if (response.ok) {
+        const html = await response.text();
+        const { document } = new JSDOM(html).window;
+        const links = document.querySelectorAll('a[href^="/character/NA/"]');
+        const rosterChars = [];
+
+        for (const link of links) {
+          const headerDiv = link.querySelector('.text-lg.font-semibold');
+          if (!headerDiv) continue;
+
+          const charName = [...headerDiv.childNodes]
+            .filter((n) => n.nodeType === 3)
+            .map((n) => n.textContent.trim())
+            .find((t) => t.length > 0);
+
+          if (charName) rosterChars.push(charName);
+        }
+
+        if (rosterChars.length > 0) {
+          allCharacters = [...new Set(rosterChars)];
+        }
+      }
+    } catch (err) {
+      console.warn('[blacklist] Failed to fetch roster in blacklist_pick:', err.message);
+    }
+
+    await connectDB();
+
+    const existed = await Blacklist.findOne({
+      $or: [{ name: pickedName }, { allCharacters: pickedName }],
+    })
+      .collation({ locale: 'en', strength: 2 })
+      .lean();
+
+    if (existed) {
+      await interaction.editReply({
+        content: `⚠️ **${pickedName}** existed in blacklist.`,
+      });
+      return;
+    }
+
+    const entry = await Blacklist.create({
+      name: pickedName,
+      reason: pending.reason,
+      imageUrl: pending.imageUrl,
+      allCharacters,
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle('Blacklist entry added')
+      .addFields(
+        { name: 'Name', value: entry.name, inline: true },
+        { name: 'Reason', value: pending.reason || 'N/A', inline: true },
+        { name: 'All Characters', value: String(allCharacters.length), inline: true }
+      )
+      .setColor(0xed4245)
+      .setTimestamp(new Date());
+
+    if (pending.imageUrl) {
+      embed
+        .addFields({ name: 'Attachment', value: '[Open image](' + pending.imageUrl + ')' })
+        .setImage(pending.imageUrl);
+    }
+
+    pendingBlacklistSuggestions.delete(interaction.user.id);
+    await interaction.editReply({
+      content: `✅ Added **${entry.name}** to blacklist from suggestion #${number}.`,
+      embeds: [embed],
+    });
+  } catch (err) {
+    if (err?.code === 11000) {
+      await interaction.editReply({
+        content: `⚠️ **${pickedName}** is already in blacklist.`,
+      });
+      return;
+    }
+
+    console.error('[blacklist] ❌ Add from suggestion failed:', err.message);
+    await interaction.editReply({
+      content: `⚠️ Failed to add from suggestion: \`${err.message}\``,
     });
   }
 }
@@ -484,7 +672,11 @@ async function handleRosterBlackListCheck(names) {
         .lean();
       if (entry) {
         console.log(`[blacklist] ⛔ "${charName}" is BLACKLISTED — reason: ${entry.reason || '(none)'}`);
-        return { name: entry.name, reason: entry.reason ?? '' };
+        return {
+          name: entry.name,
+          reason: entry.reason ?? '',
+          imageUrl: entry.imageUrl ?? '',
+        };
       }
     }
 
@@ -538,6 +730,8 @@ client.on('interactionCreate', async (interaction) => {
       await handleRosterCommand(interaction);
     } else if (commandName === 'blacklist_add') {
       await handleBlacklistAddCommand(interaction);
+    } else if (commandName === 'blacklist_pick') {
+      await handleBlacklistPickCommand(interaction);
     }
   } catch (err) {
     console.error(`[bot] Unhandled error in /${commandName}:`, err);
