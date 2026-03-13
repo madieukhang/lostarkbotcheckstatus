@@ -456,15 +456,13 @@ async function handleBlacklistAddCommand(interaction) {
       .addFields(
         { name: 'Name', value: entry.name, inline: true },
         { name: 'Reason', value: reason || 'N/A', inline: true },
-        { name: 'All Characters i.lvl 1680+', value: String(allCharacters.length), inline: true }
+        { name: 'All Characters', value: String(allCharacters.length), inline: true }
       )
       .setColor(0xed4245)
       .setTimestamp(new Date());
 
     if (image?.url) {
-      embed
-        .addFields({ name: 'Attachment', value: '[Open image](' + image.url + ')' })
-        .setImage(image.url);
+      embed.setImage(image.url);
     }
 
     await interaction.editReply({
@@ -583,9 +581,7 @@ async function handleBlacklistPickCommand(interaction) {
       .setTimestamp(new Date());
 
     if (pending.imageUrl) {
-      embed
-        .addFields({ name: 'Attachment', value: '[Open image](' + pending.imageUrl + ')' })
-        .setImage(pending.imageUrl);
+      embed.setImage(pending.imageUrl);
     }
 
     pendingBlacklistSuggestions.delete(interaction.user.id);
