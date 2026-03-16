@@ -319,36 +319,55 @@ async function handleRosterCommand(interaction) {
       description = description.slice(0, 4000) + '\n…';
     }
 
-    // ── Blacklist check ────────────────────────────────────────────────────
+    // ── Blacklist/Whitelist checks ─────────────────────────────────────────
     // Check characters with item level 1680+
     const charNames = characters
       .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1680)
       .map((c) => c.name);
-    const blacklistResult = await handleRosterBlackListCheck(charNames);
+
+    const [blacklistResult, whitelistResult] = await Promise.all([
+      handleRosterBlackListCheck(charNames),
+      handleRosterWhiteListCheck(charNames),
+    ]);
 
     const embed = new EmbedBuilder()
       .setTitle(`Roster – ${name}`)
       .setURL(targetUrl)
       .setDescription(description)
-      .setColor(blacklistResult ? 0xed4245 : 0x5865f2)
+      .setColor(blacklistResult ? 0xed4245 : whitelistResult ? 0x57f287 : 0x5865f2)
       .setFooter({ text: `${characters.length} character(s) · lostark.bible` })
       .setTimestamp();
 
     const embeds = [embed];
 
-    let content = undefined;
+    const contentLines = [];
     if (blacklistResult) {
       const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';
-      content = `⛔ **${name}** is on the blacklist.${reason}`;
+      contentLines.push(`⛔ **${name}** is on the blacklist.${reason}`);
 
       if (blacklistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
-          .setTitle('Image reasoning evidence')
+          .setTitle('Blacklist evidence')
           .setImage(blacklistResult.imageUrl)
           .setColor(0xed4245);
         embeds.unshift(evidenceEmbed);
       }
     }
+
+    if (whitelistResult) {
+      const reason = whitelistResult.reason ? ` — *${whitelistResult.reason}*` : '';
+      contentLines.push(`✅ **${name}** is on the whitelist.${reason}`);
+
+      if (whitelistResult.imageUrl) {
+        const evidenceEmbed = new EmbedBuilder()
+          .setTitle('Whitelist evidence')
+          .setImage(whitelistResult.imageUrl)
+          .setColor(0x57f287);
+        embeds.unshift(evidenceEmbed);
+      }
+    }
+
+    const content = contentLines.length > 0 ? contentLines.join('\n') : undefined;
 
     await interaction.editReply({ content, embeds });
   } catch (err) {
@@ -653,6 +672,38 @@ async function handleRosterBlackListCheck(names) {
     return null;
   } catch (err) {
     console.error('[blacklist] ❌ Check failed:', err.message, '| code:', err.code, '| name:', err.name);
+    return null;
+  }
+}
+
+/**
+ * Loop name checks against the whitelist collection in Whitelist DB.
+ * @param {string[]} names  List of character names to check against the whitelist.
+ * @returns {Promise<{ name: string, reason: string, imageUrl: string } | null>}
+ */
+async function handleRosterWhiteListCheck(names) {
+  try {
+    console.log(`[whitelist] Checking ${names.length} character(s):`, names.join(', '));
+    await connectDB();
+
+    for (const charName of names) {
+      const entry = await Whitelist.findOne({ name: charName })
+        .collation({ locale: 'en', strength: 2 })
+        .lean();
+      if (entry) {
+        console.log(`[whitelist] ✅ "${charName}" is WHITELISTED — reason: ${entry.reason || '(none)'}`);
+        return {
+          name: entry.name,
+          reason: entry.reason ?? '',
+          imageUrl: entry.imageUrl ?? '',
+        };
+      }
+    }
+
+    console.log('[whitelist] No whitelisted characters found in roster');
+    return null;
+  } catch (err) {
+    console.error('[whitelist] ❌ Check failed:', err.message, '| code:', err.code, '| name:', err.name);
     return null;
   }
 }

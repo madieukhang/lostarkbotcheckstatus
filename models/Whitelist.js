@@ -60,4 +60,4 @@ whitelistSchema.index(
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 
-export default mongoose.model('whitelist', whitelistSchema);
+export default mongoose.model('whitelist', whitelistSchema, 'whitelist');
