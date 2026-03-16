@@ -1,15 +1,11 @@
 /**
- * models/Blacklist.js
- * Mongoose schema for the roster blacklist.
- *
- * Each document represents one blacklisted character name.
- * Example MongoDB document:
- *   { name: "Lazy", reason: "RMT", addedAt: ISODate("...") }
+ * models/Whitelist.js
+ * Mongoose schema for the roster whitelist.
  */
 
 import mongoose from 'mongoose';
 
-const blacklistSchema = new mongoose.Schema({
+const whitelistSchema = new mongoose.Schema({
   /** Character name — unique index defined via schema.index() below (case-insensitive) */
   name: {
     type: String,
@@ -17,7 +13,7 @@ const blacklistSchema = new mongoose.Schema({
     trim: true,
   },
 
-  /** Optional reason for the blacklist entry */
+  /** Optional reason for the whitelist entry */
   reason: {
     type: String,
     default: '',
@@ -59,9 +55,9 @@ const blacklistSchema = new mongoose.Schema({
 });
 
 // Case-insensitive collation index so lookups ignore capitalisation
-blacklistSchema.index(
+whitelistSchema.index(
   { name: 1 },
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 
-export default mongoose.model('blacklist', blacklistSchema);
+export default mongoose.model('whitelist', whitelistSchema);

@@ -26,6 +26,7 @@ import { startMonitor, checkStatus, getState, resetState } from './monitor.js';
 import { STATUS } from './serverStatus.js';
 import { connectDB } from './db.js';
 import Blacklist from './models/Blacklist.js';
+import Whitelist from './models/Whitelist.js';
 import { getClassName } from './models/Class.js';
 
 // ─── Discord client ───────────────────────────────────────────────────────────
@@ -36,9 +37,6 @@ const client = new Client({
     GatewayIntentBits.Guilds,
   ],
 });
-
-// Store pending suggestion lists per user so they can quickly pick by index.
-const pendingBlacklistSuggestions = new Map();
 
 // ─── Slash command definitions ────────────────────────────────────────────────
 
@@ -66,39 +64,62 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
-    .setName('blacklist_add')
-    .setDescription('Add a character to blacklist with reason and optional image')
+    .setName('list')
+    .setDescription('Manage black/white list entries')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .addStringOption((opt) =>
-      opt
-        .setName('name')
-        .setDescription('Character name to blacklist')
-        .setRequired(true)
+    .addSubcommand((sub) =>
+      sub
+        .setName('add')
+        .setDescription('Add a character to black/white list')
+        .addStringOption((opt) =>
+          opt
+            .setName('type')
+            .setDescription('Which list to update')
+            .setRequired(true)
+            .addChoices(
+              { name: 'black', value: 'black' },
+              { name: 'white', value: 'white' }
+            )
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('name')
+            .setDescription('Character name to add')
+            .setRequired(true)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('reason')
+            .setDescription('Reason for this entry')
+            .setRequired(true)
+        )
+        .addAttachmentOption((opt) =>
+          opt
+            .setName('image')
+            .setDescription('Optional screenshot image')
+            .setRequired(false)
+        )
     )
-    .addStringOption((opt) =>
-      opt
-        .setName('reason')
-        .setDescription('Reason for blacklist')
-        .setRequired(true)
-    )
-    .addAttachmentOption((opt) =>
-      opt
-        .setName('image')
-        .setDescription('Optional screenshot image')
-        .setRequired(false)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('blacklist_pick')
-    .setDescription('Pick a suggestion index from the last blacklist_add result')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .addIntegerOption((opt) =>
-      opt
-        .setName('number')
-        .setDescription('Suggestion index to pick (1-10)')
-        .setRequired(true)
-        .setMinValue(1)
-        .setMaxValue(10)
+    .addSubcommand((sub) =>
+      sub
+        .setName('remove')
+        .setDescription('Remove a character from black/white list')
+        .addStringOption((opt) =>
+          opt
+            .setName('type')
+            .setDescription('Which list to update')
+            .setRequired(true)
+            .addChoices(
+              { name: 'black', value: 'black' },
+              { name: 'white', value: 'white' }
+            )
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('name')
+            .setDescription('Character name to remove')
+            .setRequired(true)
+        )
     ),
 ].map((cmd) => cmd.toJSON());
 
@@ -337,17 +358,74 @@ async function handleRosterCommand(interaction) {
   }
 }
 
+function getListContext(type) {
+  if (type === 'black') {
+    return {
+      model: Blacklist,
+      label: 'blacklist',
+      color: 0xed4245,
+      icon: '⛔',
+    };
+  }
+
+  return {
+    model: Whitelist,
+    label: 'whitelist',
+    color: 0x57f287,
+    icon: '✅',
+  };
+}
+
+async function buildRosterCharacters(name) {
+  let allCharacters = [name];
+  let hasValidRoster = false;
+
+  try {
+    const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
+    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
+    const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+    if (response.ok) {
+      const html = await response.text();
+      const { document } = new JSDOM(html).window;
+      const links = document.querySelectorAll('a[href^="/character/NA/"]');
+      const rosterChars = [];
+
+      for (const link of links) {
+        const headerDiv = link.querySelector('.text-lg.font-semibold');
+        if (!headerDiv) continue;
+
+        const charName = [...headerDiv.childNodes]
+          .filter((n) => n.nodeType === 3)
+          .map((n) => n.textContent.trim())
+          .find((t) => t.length > 0);
+
+        if (charName) rosterChars.push(charName);
+      }
+
+      if (rosterChars.length > 0) {
+        hasValidRoster = true;
+        allCharacters = [...new Set(rosterChars)];
+      }
+    }
+  } catch (err) {
+    console.warn('[list] Failed to fetch roster characters:', err.message);
+  }
+
+  return { hasValidRoster, allCharacters };
+}
+
 /**
- * /blacklist_add – add a character to blacklist with reason + optional image.
+ * /list add – add a character to blacklist/whitelist with reason + optional image.
  */
-async function handleBlacklistAddCommand(interaction) {
+async function handleListAddCommand(interaction) {
+  const type = interaction.options.getString('type', true);
   const rawName = interaction.options.getString('name', true).trim();
   const reason = interaction.options.getString('reason', true).trim();
   const image = interaction.options.getAttachment('image');
   const name = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
+  const { model, label, color, icon } = getListContext(type);
 
-  // await interaction.deferReply({ ephemeral: true }); // This command show only user who added blacklist
-  await interaction.deferReply(); // This command's result may be relevant to everyone, so not ephemeral
+  await interaction.deferReply();
 
   if (image?.contentType && !image.contentType.startsWith('image/')) {
     await interaction.editReply({
@@ -357,52 +435,11 @@ async function handleBlacklistAddCommand(interaction) {
   }
 
   try {
-    let allCharacters = [name];
-    let rosterChars = [];
-    let hasValidRoster = false;
-
-    // Build roster character array for this single entry.
-    try {
-      const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
-      const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
-      const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-      if (response.ok) {
-        const html = await response.text();
-        const { document } = new JSDOM(html).window;
-        const links = document.querySelectorAll('a[href^="/character/NA/"]');
-
-        for (const link of links) {
-          const headerDiv = link.querySelector('.text-lg.font-semibold');
-          if (!headerDiv) continue;
-
-          const charName = [...headerDiv.childNodes]
-            .filter((n) => n.nodeType === 3)
-            .map((n) => n.textContent.trim())
-            .find((t) => t.length > 0);
-
-          if (charName) rosterChars.push(charName);
-        }
-
-        if (rosterChars.length > 0) {
-          hasValidRoster = true;
-          allCharacters = [...new Set(rosterChars)];
-        }
-      }
-    } catch (err) {
-      console.warn('[blacklist] Failed to fetch roster characters for add, fallback single name:', err.message);
-    }
+    const { hasValidRoster, allCharacters } = await buildRosterCharacters(name);
 
     if (!hasValidRoster) {
       const suggestions = await fetchNameSuggestions(name);
       if (suggestions.length > 0) {
-        const topSuggestions = suggestions.slice(0, 10);
-        pendingBlacklistSuggestions.set(interaction.user.id, {
-          createdAt: Date.now(),
-          reason,
-          imageUrl: image?.url ?? '',
-          names: topSuggestions.map((s) => s.name),
-        });
-
         const suggestionLines = suggestions
           .slice(0, 10)
           .map(
@@ -418,7 +455,7 @@ async function handleBlacklistAddCommand(interaction) {
           .setTimestamp();
 
         await interaction.editReply({
-          content: `❌ No roster found for **${name}**. Use **/blacklist_pick number:<1-10>** to quickly choose from the list below.`,
+          content: `❌ No roster found for **${name}**. Re-run **/list add type:${type}** with one of the suggested names.`,
           embeds: [suggEmbed],
         });
       } else {
@@ -431,7 +468,7 @@ async function handleBlacklistAddCommand(interaction) {
 
     await connectDB();
 
-    const existed = await Blacklist.findOne({
+    const existed = await model.findOne({
       $or: [{ name }, { allCharacters: name }],
     })
       .collation({ locale: 'en', strength: 2 })
@@ -439,26 +476,28 @@ async function handleBlacklistAddCommand(interaction) {
 
     if (existed) {
       await interaction.editReply({
-        content: `⚠️ **${name}** existed in blacklist.`,
+        content: `⚠️ **${name}** already exists in ${label}.`,
       });
       return;
     }
 
-    const entry = await Blacklist.create({
+    const entry = await model.create({
       name,
       reason,
       imageUrl: image?.url ?? '',
       allCharacters,
+      addedByUserId: interaction.user.id,
+      addedByTag: interaction.user.tag,
     });
 
     const embed = new EmbedBuilder()
-      .setTitle('Blacklist entry added')
+      .setTitle(`${label} entry added`)
       .addFields(
         { name: 'Name', value: entry.name, inline: true },
         { name: 'Reason', value: reason || 'N/A', inline: true },
         { name: 'All Characters', value: String(allCharacters.length), inline: true }
       )
-      .setColor(0xed4245)
+      .setColor(color)
       .setTimestamp(new Date());
 
     if (image?.url) {
@@ -466,140 +505,74 @@ async function handleBlacklistAddCommand(interaction) {
     }
 
     await interaction.editReply({
-      content: `✅ Added **${entry.name}** to blacklist.`,
+      content: `${icon} Added **${entry.name}** to ${label}.`,
       embeds: [embed],
     });
   } catch (err) {
     if (err?.code === 11000) {
       await interaction.editReply({
-        content: `⚠️ **${name}** is already in blacklist.`,
+        content: `⚠️ **${name}** is already in ${label}.`,
       });
       return;
     }
 
-    console.error('[blacklist] ❌ Add failed:', err.message);
+    console.error(`[${label}] ❌ Add failed:`, err.message);
     await interaction.editReply({
-      content: `⚠️ Failed to add blacklist entry: \`${err.message}\``,
+      content: `⚠️ Failed to add ${label} entry: \`${err.message}\``,
     });
   }
 }
 
 /**
- * /blacklist_pick – choose one of the last suggestions by index and add.
+ * /list remove – remove an entry only if requester is the creator.
  */
-async function handleBlacklistPickCommand(interaction) {
-  const number = interaction.options.getInteger('number', true);
+async function handleListRemoveCommand(interaction) {
+  const type = interaction.options.getString('type', true);
+  const rawName = interaction.options.getString('name', true).trim();
+  const name = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
+  const { model, label, icon } = getListContext(type);
+
   await interaction.deferReply();
 
-  const pending = pendingBlacklistSuggestions.get(interaction.user.id);
-  if (!pending || !Array.isArray(pending.names) || pending.names.length === 0) {
-    await interaction.editReply({
-      content: '⚠️ No pending suggestions. Run **/blacklist_add** first.',
-    });
-    return;
-  }
-
-  if (Date.now() - pending.createdAt > 10 * 60 * 1000) {
-    pendingBlacklistSuggestions.delete(interaction.user.id);
-    await interaction.editReply({
-      content: '⚠️ Suggestion list expired. Run **/blacklist_add** again.',
-    });
-    return;
-  }
-
-  const pickedName = pending.names[number - 1];
-  if (!pickedName) {
-    await interaction.editReply({
-      content: `⚠️ Invalid index. Pick from **1-${pending.names.length}**.`,
-    });
-    return;
-  }
-
   try {
-    let allCharacters = [pickedName];
-
-    try {
-      const targetUrl = `https://lostark.bible/character/NA/${pickedName}/roster`;
-      const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
-      const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-      if (response.ok) {
-        const html = await response.text();
-        const { document } = new JSDOM(html).window;
-        const links = document.querySelectorAll('a[href^="/character/NA/"]');
-        const rosterChars = [];
-
-        for (const link of links) {
-          const headerDiv = link.querySelector('.text-lg.font-semibold');
-          if (!headerDiv) continue;
-
-          const charName = [...headerDiv.childNodes]
-            .filter((n) => n.nodeType === 3)
-            .map((n) => n.textContent.trim())
-            .find((t) => t.length > 0);
-
-          if (charName) rosterChars.push(charName);
-        }
-
-        if (rosterChars.length > 0) {
-          allCharacters = [...new Set(rosterChars)];
-        }
-      }
-    } catch (err) {
-      console.warn('[blacklist] Failed to fetch roster in blacklist_pick:', err.message);
-    }
-
     await connectDB();
 
-    const existed = await Blacklist.findOne({
-      $or: [{ name: pickedName }, { allCharacters: pickedName }],
+    const entry = await model.findOne({
+      $or: [{ name }, { allCharacters: name }],
     })
       .collation({ locale: 'en', strength: 2 })
       .lean();
 
-    if (existed) {
+    if (!entry) {
       await interaction.editReply({
-        content: `⚠️ **${pickedName}** existed in blacklist.`,
+        content: `⚠️ No ${label} entry found for **${name}**.`,
       });
       return;
     }
 
-    const entry = await Blacklist.create({
-      name: pickedName,
-      reason: pending.reason,
-      imageUrl: pending.imageUrl,
-      allCharacters,
-    });
-
-    const embed = new EmbedBuilder()
-      .setTitle('Blacklist entry added')
-      .addFields(
-        { name: 'Name', value: entry.name, inline: true },
-        { name: 'Reason', value: pending.reason || 'N/A', inline: true },
-        { name: 'All Characters', value: String(allCharacters.length), inline: true }
-      )
-      .setColor(0xed4245)
-      .setTimestamp(new Date());
-
-    if (pending.imageUrl) {
-      embed.setImage(pending.imageUrl);
+    if (!entry.addedByUserId) {
+      await interaction.editReply({
+        content: `⚠️ **${entry.name}** is a legacy entry without owner metadata, so it cannot be removed with this command.`,
+      });
+      return;
     }
 
-    pendingBlacklistSuggestions.delete(interaction.user.id);
+    if (entry.addedByUserId !== interaction.user.id) {
+      await interaction.editReply({
+        content: `⛔ You cannot remove **${entry.name}**. Only **${entry.addedByTag || entry.addedByUserId}** (who added it) can remove it.`,
+      });
+      return;
+    }
+
+    await model.deleteOne({ _id: entry._id });
+
     await interaction.editReply({
-      content: `✅ Added **${entry.name}** to blacklist from suggestion #${number}.`,
-      embeds: [embed],
+      content: `${icon} Removed **${entry.name}** from ${label}.`,
     });
   } catch (err) {
-    if (err?.code === 11000) {
-      await interaction.editReply({
-        content: `⚠️ **${pickedName}** is already in blacklist.`,
-      });
-      return;
-    }
-
-    console.error('[blacklist] ❌ Add from suggestion failed:', err.message);
+    console.error(`[${label}] ❌ Remove failed:`, err.message);
     await interaction.editReply({
-      content: `⚠️ Failed to add from suggestion: \`${err.message}\``,
+      content: `⚠️ Failed to remove ${label} entry: \`${err.message}\``,
     });
   }
 }
@@ -724,10 +697,13 @@ client.on('interactionCreate', async (interaction) => {
       await handleResetCommand(interaction);
     } else if (commandName === 'roster') {
       await handleRosterCommand(interaction);
-    } else if (commandName === 'blacklist_add') {
-      await handleBlacklistAddCommand(interaction);
-    } else if (commandName === 'blacklist_pick') {
-      await handleBlacklistPickCommand(interaction);
+    } else if (commandName === 'list') {
+      const subcommand = interaction.options.getSubcommand();
+      if (subcommand === 'add') {
+        await handleListAddCommand(interaction);
+      } else if (subcommand === 'remove') {
+        await handleListRemoveCommand(interaction);
+      }
     }
   } catch (err) {
     console.error(`[bot] Unhandled error in /${commandName}:`, err);
