@@ -128,6 +128,17 @@ const commands = [
             .setRequired(true)
         )
     ),
+
+  new SlashCommandBuilder()
+    .setName('listcheck')
+    .setDescription('Check multiple names against blacklist/whitelist')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .addStringOption((opt) =>
+      opt
+        .setName('names')
+        .setDescription('Up to 7 names, e.g. [name1, name2] or name1,name2')
+        .setRequired(true)
+    ),
 ].map((cmd) => cmd.toJSON());
 
 // ─── Register commands with Discord ──────────────────────────────────────────
@@ -401,6 +412,107 @@ function getListContext(type) {
     color: 0x57f287,
     icon: '✅',
   };
+}
+
+function normalizeCharacterName(raw) {
+  const value = raw.trim();
+  if (!value) return '';
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+function parseListCheckNames(raw) {
+  const cleaned = raw.replace(/[\[\]]/g, ' ');
+  const names = cleaned
+    .split(/[\n,;]+/)
+    .map((item) => normalizeCharacterName(item))
+    .filter(Boolean);
+
+  const seen = new Set();
+  const unique = [];
+  for (const name of names) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(name);
+  }
+
+  return unique;
+}
+
+/**
+ * /listcheck – check multiple names across blacklist and whitelist.
+ */
+async function handleListCheckCommand(interaction) {
+  const rawNames = interaction.options.getString('names', true);
+  const names = parseListCheckNames(rawNames);
+
+  await interaction.deferReply();
+
+  if (names.length === 0) {
+    await interaction.editReply({
+      content: '⚠️ No valid names found. Example: `/listcheck names:[name1, name2]`',
+    });
+    return;
+  }
+
+  // Limit to 7 names per command.
+  const limitedNames = names.slice(0, 7);
+
+  try {
+    await connectDB();
+
+    const results = await Promise.all(
+      limitedNames.map(async (name) => {
+        const [blackEntry, whiteEntry] = await Promise.all([
+          Blacklist.findOne({ $or: [{ name }, { allCharacters: name }] })
+            .collation({ locale: 'en', strength: 2 })
+            .lean(),
+          Whitelist.findOne({ $or: [{ name }, { allCharacters: name }] })
+            .collation({ locale: 'en', strength: 2 })
+            .lean(),
+        ]);
+
+        return { name, blackEntry, whiteEntry };
+      })
+    );
+
+    const lines = results.map((item, idx) => {
+      const isBlack = Boolean(item.blackEntry);
+      const isWhite = Boolean(item.whiteEntry);
+
+      let icon = '';
+      let status = 'not found';
+
+      if (isBlack && isWhite) {
+        icon = '⛔✅ ';
+        status = 'blacklist + whitelist';
+      } else if (isBlack) {
+        icon = '⛔ ';
+        status = 'blacklist';
+      } else if (isWhite) {
+        icon = '✅ ';
+        status = 'whitelist';
+      }
+
+      return `${idx + 1}. ${icon}**${item.name}** (${status})`;
+    });
+
+    const sections = [
+      `Checked: **${limitedNames.length}** name(s)`,
+      limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: 7)` : null,
+      '',
+      ...lines,
+    ].filter((line) => line !== null);
+
+    await interaction.editReply({
+      content: sections.join('\n'),
+    });
+  } catch (err) {
+    console.error('[listcheck] ❌ Check failed:', err.message);
+    await interaction.editReply({
+      content: `⚠️ Failed to run list check: \`${err.message}\``,
+    });
+  }
 }
 
 async function buildRosterCharacters(name) {
@@ -824,6 +936,8 @@ client.on('interactionCreate', async (interaction) => {
       } else if (subcommand === 'remove') {
         await handleListRemoveCommand(interaction);
       }
+    } else if (commandName === 'listcheck') {
+      await handleListCheckCommand(interaction);
     }
   } catch (err) {
     console.error(`[bot] Unhandled error in /${commandName}:`, err);

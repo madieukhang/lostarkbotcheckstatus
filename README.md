@@ -8,6 +8,7 @@ A Discord bot that monitors Lost Ark server status (Brelshaza), supports roster 
 - Slash commands for quick status operations (`/status`, `/check`, `/reset`).
 - `/roster` command to fetch roster data from lostark.bible (via ScraperAPI).
 - `/list add` and `/list remove` to manage blacklist/whitelist entries.
+- `/listcheck` command to check up to 7 names at once against blacklist/whitelist.
 - Optional `raid` tag and optional evidence image when adding list entries.
 - Roster-based duplicate checks (`allCharacters`) with case-insensitive matching.
 
@@ -19,6 +20,7 @@ A Discord bot that monitors Lost Ark server status (Brelshaza), supports roster 
 - `/roster name:<character>`: Fetch roster and warn if it matches blacklist/whitelist.
 - `/list add type:<black|white> name:<character> reason:<text> [raid] [image]`: Add a list entry.
 - `/list remove name:<character>`: Remove an entry. If the name exists in both lists, the bot shows 3 removal options (black/white/both).
+- `/listcheck names:[name1, name2, ...]`: Check up to 7 names in one command and return one combined list with status icons (`⛔` blacklist, `✅` whitelist, `⛔✅` both, no icon for not found).
 
 ## Requirements
 

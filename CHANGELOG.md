@@ -11,12 +11,14 @@ All notable changes to this project are documented here.
 - Added owner metadata for list entries: `addedByUserId`, `addedByTag`.
 - Added `allCharacters` roster snapshot storage to detect matches across the same roster.
 - Added `/list remove` flow with 3 options when a name exists in both lists (black/white/both).
+- Added `/listcheck` command to check multiple character names against blacklist/whitelist in one request.
 
 ### Changed
 
 - Refactored list commands: replaced the old flow with `/list add` and `/list remove`.
 - Updated roster checks to compare against DB list collections and provide clearer output.
 - Updated notification/image behavior to prioritize cleaner evidence image display in replies.
+- Updated `/listcheck` output format to a single combined list with status icons and a hard limit of 7 names per command.
 
 ### Fixed
 
