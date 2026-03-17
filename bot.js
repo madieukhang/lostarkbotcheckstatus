@@ -142,7 +142,7 @@ const commands = [
     .addBooleanOption((opt) =>
       opt
         .setName('show_reason')
-        .setDescription('Show blacklist/whitelist reason in result (default: false)')
+        .setDescription('Show blacklist/whitelist reason in result (default: not shown)')
         .setRequired(false)
     ),
 ].map((cmd) => cmd.toJSON());
