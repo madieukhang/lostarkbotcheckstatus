@@ -20,6 +20,13 @@ const whitelistSchema = new mongoose.Schema({
     trim: true,
   },
 
+  /** Optional raid tag selected from /list add */
+  raid: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+
   /** Optional attachment image URL from slash command */
   imageUrl: {
     type: String,

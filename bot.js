@@ -28,6 +28,7 @@ import { connectDB } from './db.js';
 import Blacklist from './models/Blacklist.js';
 import Whitelist from './models/Whitelist.js';
 import { getClassName } from './models/Class.js';
+import { getRaidChoices } from './models/Raid.js';
 
 // ─── Discord client ───────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ const commands = [
     .addSubcommand((sub) =>
       sub
         .setName('add')
-        .setDescription('Add a character to black/white list')
+        .setDescription('Add a character (will include in roster checks) to black/white list')
         .addStringOption((opt) =>
           opt
             .setName('type')
@@ -93,6 +94,18 @@ const commands = [
             .setDescription('Reason for this entry')
             .setRequired(true)
         )
+        .addStringOption((opt) => {
+          opt
+            .setName('raid')
+            .setDescription('Optional raid tag for this entry')
+            .setRequired(false);
+
+          for (const choice of getRaidChoices()) {
+            opt.addChoices(choice);
+          }
+
+          return opt;
+        })
         .addAttachmentOption((opt) =>
           opt
             .setName('image')
@@ -127,15 +140,14 @@ const commands = [
 
 /**
  * Register slash commands globally (available in all guilds the bot is in).
- * Global commands can take up to 1 hour to propagate; for development
- * you can register them per-guild for instant updates by passing a guildId.
+ * Global commands can take up to 1 hour to propagate.
  */
 async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(config.token);
   try {
-    console.log('[bot] Registering slash commands…');
+    console.log('[bot] Registering global slash commands…');
     await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-    console.log('[bot] Slash commands registered successfully.');
+    console.log('[bot] Global slash commands registered successfully.');
   } catch (err) {
     console.error('[bot] Failed to register slash commands:', err.message);
   }
@@ -343,7 +355,8 @@ async function handleRosterCommand(interaction) {
     const contentLines = [];
     if (blacklistResult) {
       const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';
-      contentLines.push(`⛔ **${name}** is on the blacklist.${reason}`);
+      const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
+      contentLines.push(`⛔ **${name}** is on the blacklist.${raid}${reason}`);
 
       if (blacklistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
@@ -356,7 +369,8 @@ async function handleRosterCommand(interaction) {
 
     if (whitelistResult) {
       const reason = whitelistResult.reason ? ` — *${whitelistResult.reason}*` : '';
-      contentLines.push(`✅ **${name}** is on the whitelist.${reason}`);
+      const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
+      contentLines.push(`✅ **${name}** is on the whitelist.${raid}${reason}`);
 
       if (whitelistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
@@ -440,6 +454,7 @@ async function handleListAddCommand(interaction) {
   const type = interaction.options.getString('type', true);
   const rawName = interaction.options.getString('name', true).trim();
   const reason = interaction.options.getString('reason', true).trim();
+  const raid = interaction.options.getString('raid') ?? '';
   const image = interaction.options.getAttachment('image');
   const name = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
   const { model, label, color, icon } = getListContext(type);
@@ -503,6 +518,7 @@ async function handleListAddCommand(interaction) {
     const entry = await model.create({
       name,
       reason,
+      raid,
       imageUrl: image?.url ?? '',
       allCharacters,
       addedByUserId: interaction.user.id,
@@ -514,6 +530,7 @@ async function handleListAddCommand(interaction) {
       .addFields(
         { name: 'Name', value: entry.name, inline: true },
         { name: 'Reason', value: reason || 'N/A', inline: true },
+        { name: 'Raid', value: raid || 'N/A', inline: true },
         { name: 'All Characters', value: String(allCharacters.length), inline: true }
       )
       .setColor(color)
@@ -641,7 +658,7 @@ async function fetchNameSuggestions(name) {
 /**
  * Loop name checks against the blacklist collection in Blacklist DB.
  * @param {string[]} names  List of character names to check against the blacklist.
- * @returns {Promise<{ name: string, reason: string } | null>}
+ * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string } | null>}
  */
 async function handleRosterBlackListCheck(names) {
   try {
@@ -663,6 +680,7 @@ async function handleRosterBlackListCheck(names) {
         return {
           name: entry.name,
           reason: entry.reason ?? '',
+          raid: entry.raid ?? '',
           imageUrl: entry.imageUrl ?? '',
         };
       }
@@ -679,7 +697,7 @@ async function handleRosterBlackListCheck(names) {
 /**
  * Loop name checks against the whitelist collection in Whitelist DB.
  * @param {string[]} names  List of character names to check against the whitelist.
- * @returns {Promise<{ name: string, reason: string, imageUrl: string } | null>}
+ * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string } | null>}
  */
 async function handleRosterWhiteListCheck(names) {
   try {
@@ -695,6 +713,7 @@ async function handleRosterWhiteListCheck(names) {
         return {
           name: entry.name,
           reason: entry.reason ?? '',
+          raid: entry.raid ?? '',
           imageUrl: entry.imageUrl ?? '',
         };
       }
