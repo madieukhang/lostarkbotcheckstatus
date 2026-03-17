@@ -500,7 +500,7 @@ async function handleListCheckCommand(interaction) {
     });
 
     const sections = [
-      `Checked: **${limitedNames.length}** name(s)`,
+      `Checked: **${limitedNames.length}** name(s) included in roster`,
       limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: 7)` : null,
       '',
       ...lines,
