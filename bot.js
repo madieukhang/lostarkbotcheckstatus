@@ -492,9 +492,11 @@ async function handleListCheckCommand(interaction) {
       } else if (isWhite) {
         icon = '✅ ';
         status = 'whitelist';
+      } else {
+        icon ='❓ ';
       }
 
-      return `${idx + 1}. ${icon}**${item.name}** (${status})`;
+      return `${idx + 1}. ${icon}**${item.name}**`;
     });
 
     const sections = [
