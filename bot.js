@@ -472,7 +472,13 @@ async function handleListCheckCommand(interaction) {
             .lean(),
         ]);
 
-        return { name, blackEntry, whiteEntry };
+        let hasRoster = false;
+        if (!blackEntry && !whiteEntry) {
+          const rosterResult = await buildRosterCharacters(name);
+          hasRoster = rosterResult.hasValidRoster;
+        }
+
+        return { name, blackEntry, whiteEntry, hasRoster };
       })
     );
 
@@ -481,26 +487,23 @@ async function handleListCheckCommand(interaction) {
       const isWhite = Boolean(item.whiteEntry);
 
       let icon = '';
-      let status = 'not found';
-
       if (isBlack && isWhite) {
         icon = '⛔✅ ';
-        status = 'blacklist + whitelist';
       } else if (isBlack) {
         icon = '⛔ ';
-        status = 'blacklist';
       } else if (isWhite) {
         icon = '✅ ';
-        status = 'whitelist';
-      } else {
+      } else if (item.hasRoster) {
         icon ='❓ ';
+      } else {
+        return `${idx + 1}. No roster found: **${item.name}**`;
       }
 
       return `${idx + 1}. ${icon}**${item.name}**`;
     });
 
     const sections = [
-      `Checked: **${limitedNames.length}** name(s) included in roster`,
+      `Checked: **${limitedNames.length}** name(s)`,
       limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: 7)` : null,
       '',
       ...lines,

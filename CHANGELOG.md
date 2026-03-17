@@ -19,6 +19,7 @@ All notable changes to this project are documented here.
 - Updated roster checks to compare against DB list collections and provide clearer output.
 - Updated notification/image behavior to prioritize cleaner evidence image display in replies.
 - Updated `/listcheck` output format to a single combined list with status icons and a hard limit of 7 names per command.
+- Updated `/listcheck` fallback behavior: names not in both lists are validated against lostark.bible, showing `❓` when roster exists and `No roster found: <name>` when it does not.
 
 ### Fixed
 

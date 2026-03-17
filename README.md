@@ -20,7 +20,7 @@ A Discord bot that monitors Lost Ark server status (Brelshaza), supports roster 
 - `/roster name:<character>`: Fetch roster and warn if it matches blacklist/whitelist.
 - `/list add type:<black|white> name:<character> reason:<text> [raid] [image]`: Add a list entry.
 - `/list remove name:<character>`: Remove an entry. If the name exists in both lists, the bot shows 3 removal options (black/white/both).
-- `/listcheck names:[name1, name2, ...]`: Check up to 7 names in one command and return one combined list with status icons (`⛔` blacklist, `✅` whitelist, `⛔✅` both, no icon for not found).
+- `/listcheck names:[name1, name2, ...]`: Check up to 7 names in one command and return one combined list with status icons (`⛔` blacklist, `✅` whitelist, `⛔✅` both). If a name is not in either list, the bot checks lostark.bible: `❓` means roster exists, otherwise it returns `No roster found: <name>`.
 
 ## Requirements
 
