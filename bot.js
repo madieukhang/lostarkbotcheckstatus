@@ -18,6 +18,10 @@ import {
   EmbedBuilder,
   InteractionType,
   PermissionFlagsBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
 } from 'discord.js';
 import { JSDOM } from 'jsdom';
 
@@ -117,16 +121,6 @@ const commands = [
       sub
         .setName('remove')
         .setDescription('Remove a character from black/white list')
-        .addStringOption((opt) =>
-          opt
-            .setName('type')
-            .setDescription('Which list to update')
-            .setRequired(true)
-            .addChoices(
-              { name: 'black', value: 'black' },
-              { name: 'white', value: 'white' }
-            )
-        )
         .addStringOption((opt) =>
           opt
             .setName('name')
@@ -563,52 +557,108 @@ async function handleListAddCommand(interaction) {
  * /list remove – remove an entry only if requester is the creator.
  */
 async function handleListRemoveCommand(interaction) {
-  const type = interaction.options.getString('type', true);
   const rawName = interaction.options.getString('name', true).trim();
   const name = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
-  const { model, label, icon } = getListContext(type);
 
   await interaction.deferReply();
 
   try {
     await connectDB();
 
-    const entry = await model.findOne({
-      $or: [{ name }, { allCharacters: name }],
-    })
-      .collation({ locale: 'en', strength: 2 })
-      .lean();
+    const [blackEntry, whiteEntry] = await Promise.all([
+      Blacklist.findOne({
+        $or: [{ name }, { allCharacters: name }],
+      })
+        .collation({ locale: 'en', strength: 2 })
+        .lean(),
+      Whitelist.findOne({
+        $or: [{ name }, { allCharacters: name }],
+      })
+        .collation({ locale: 'en', strength: 2 })
+        .lean(),
+    ]);
 
-    if (!entry) {
+    if (!blackEntry && !whiteEntry) {
       await interaction.editReply({
-        content: `⚠️ No ${label} entry found for **${name}**.`,
+        content: `⚠️ No blacklist/whitelist entry found for **${name}**.`,
       });
       return;
     }
 
-    if (!entry.addedByUserId) {
+    const removeOne = async (entry, type) => {
+      const { model, label, icon } = getListContext(type);
+
+      if (!entry.addedByUserId) {
+        return `⚠️ **${entry.name}** in ${label} is a legacy entry without owner metadata, so it cannot be removed with this command.`;
+      }
+
+      if (entry.addedByUserId !== interaction.user.id) {
+        return `⛔ You cannot remove **${entry.name}** from ${label}. Only **${entry.addedByTag || entry.addedByUserId}** (who added it) can remove it.`;
+      }
+
+      await model.deleteOne({ _id: entry._id });
+      return `${icon} Removed **${entry.name}** from ${label}.`;
+    };
+
+    if (blackEntry && whiteEntry) {
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('remove_black')
+          .setLabel('1. Remove in black list')
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId('remove_white')
+          .setLabel('2. Remove in white list')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId('remove_both')
+          .setLabel('3. Remove both')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
       await interaction.editReply({
-        content: `⚠️ **${entry.name}** is a legacy entry without owner metadata, so it cannot be removed with this command.`,
+        content: `🔎 Found **${name}** in both blacklist and whitelist.\n choose a removal option:`,
+        components: [row],
+      });
+
+      const reply = await interaction.fetchReply();
+      const button = await reply.awaitMessageComponent({
+        componentType: ComponentType.Button,
+        filter: (i) => i.user.id === interaction.user.id,
+        time: 30000,
+      });
+
+      let messages = [];
+      if (button.customId === 'remove_black') {
+        messages.push(await removeOne(blackEntry, 'black'));
+      } else if (button.customId === 'remove_white') {
+        messages.push(await removeOne(whiteEntry, 'white'));
+      } else {
+        messages = await Promise.all([
+          removeOne(blackEntry, 'black'),
+          removeOne(whiteEntry, 'white'),
+        ]);
+      }
+
+      await button.update({
+        content: messages.join('\n'),
+        components: [],
       });
       return;
     }
 
-    if (entry.addedByUserId !== interaction.user.id) {
-      await interaction.editReply({
-        content: `⛔ You cannot remove **${entry.name}**. Only **${entry.addedByTag || entry.addedByUserId}** (who added it) can remove it.`,
-      });
+    if (blackEntry) {
+      const message = await removeOne(blackEntry, 'black');
+      await interaction.editReply({ content: message });
       return;
     }
 
-    await model.deleteOne({ _id: entry._id });
-
-    await interaction.editReply({
-      content: `${icon} Removed **${entry.name}** from ${label}.`,
-    });
+    const message = await removeOne(whiteEntry, 'white');
+    await interaction.editReply({ content: message });
   } catch (err) {
-    console.error(`[${label}] ❌ Remove failed:`, err.message);
+    console.error('[list] ❌ Remove failed:', err.message);
     await interaction.editReply({
-      content: `⚠️ Failed to remove ${label} entry: \`${err.message}\``,
+      content: `⚠️ Failed to remove entry: \`${err.message}\``,
     });
   }
 }
