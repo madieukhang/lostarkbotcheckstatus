@@ -138,6 +138,12 @@ const commands = [
         .setName('names')
         .setDescription('Up to 7 names, e.g. [name1, name2] or name1,name2')
         .setRequired(true)
+    )
+    .addBooleanOption((opt) =>
+      opt
+        .setName('show_reason')
+        .setDescription('Show blacklist/whitelist reason in result (default: false)')
+        .setRequired(false)
     ),
 ].map((cmd) => cmd.toJSON());
 
@@ -444,6 +450,7 @@ function parseListCheckNames(raw) {
  */
 async function handleListCheckCommand(interaction) {
   const rawNames = interaction.options.getString('names', true);
+  const showReason = interaction.options.getBoolean('show_reason') ?? false;
   const names = parseListCheckNames(rawNames);
 
   await interaction.deferReply();
@@ -485,6 +492,18 @@ async function handleListCheckCommand(interaction) {
     const lines = results.map((item, idx) => {
       const isBlack = Boolean(item.blackEntry);
       const isWhite = Boolean(item.whiteEntry);
+      const blackReason = item.blackEntry?.reason?.trim();
+      const whiteReason = item.whiteEntry?.reason?.trim();
+
+      const reasonParts = [];
+      if (showReason && isBlack && blackReason) {
+        reasonParts.push(`black: ${blackReason}`);
+      }
+      if (showReason && isWhite && whiteReason) {
+        reasonParts.push(`white: ${whiteReason}`);
+      }
+
+      const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
 
       let icon = '';
       if (isBlack && isWhite) {
@@ -499,7 +518,7 @@ async function handleListCheckCommand(interaction) {
         return `${idx + 1}. No roster found: **${item.name}**`;
       }
 
-      return `${idx + 1}. ${icon}**${item.name}**`;
+      return `${idx + 1}. ${icon}**${item.name}**${reasonSuffix}`;
     });
 
     const sections = [
