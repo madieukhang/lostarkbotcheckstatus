@@ -133,17 +133,11 @@ const commands = [
     .setName('listcheck')
     .setDescription('Check multiple names against blacklist/whitelist')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .addStringOption((opt) =>
-      opt
-        .setName('names')
-        .setDescription('Up to 7 names, e.g. [name1, name2] or name1,name2')
-        .setRequired(false)
-    )
     .addAttachmentOption((opt) =>
       opt
         .setName('image')
-        .setDescription('Optional image. If names is empty, Gemini extracts names from image')
-        .setRequired(false)
+        .setDescription('Team screenshot for Gemini to extract up to 8 names')
+        .setRequired(true)
     )
     .addBooleanOption((opt) =>
       opt
@@ -432,25 +426,6 @@ function normalizeCharacterName(raw) {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
-function parseListCheckNames(raw) {
-  const cleaned = raw.replace(/[\[\]]/g, ' ');
-  const names = cleaned
-    .split(/[\n,;]+/)
-    .map((item) => normalizeCharacterName(item))
-    .filter(Boolean);
-
-  const seen = new Set();
-  const unique = [];
-  for (const name of names) {
-    const key = name.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(name);
-  }
-
-  return unique;
-}
-
 function extractJsonArrayFromText(raw) {
   if (!raw) return null;
 
@@ -595,33 +570,30 @@ async function extractNamesFromImageWithGemini(image) {
  * /listcheck – check multiple names across blacklist and whitelist.
  */
 async function handleListCheckCommand(interaction) {
-  const rawNames = interaction.options.getString('names');
-  const image = interaction.options.getAttachment('image');
+  const image = interaction.options.getAttachment('image', true);
   const showReason = interaction.options.getBoolean('show_reason') ?? false;
-  let names = rawNames ? parseListCheckNames(rawNames) : [];
+  let names = [];
 
   await interaction.deferReply();
 
-  if (names.length === 0 && image) {
-    try {
-      names = await extractNamesFromImageWithGemini(image);
-    } catch (err) {
-      await interaction.editReply({
-        content: `⚠️ Failed to extract names from image: \`${err.message}\``,
-      });
-      return;
-    }
-  }
-
-  if (names.length === 0) {
+  try {
+    names = await extractNamesFromImageWithGemini(image);
+  } catch (err) {
     await interaction.editReply({
-      content: '⚠️ No valid names found. Use `/listcheck names:[name1,name2]` or attach an image in `image`.',
+      content: `⚠️ Failed to extract names from image: \`${err.message}\``,
     });
     return;
   }
 
-  // Limit to 7 names per command.
-  const limitedNames = names.slice(0, 7);
+  if (names.length === 0) {
+    await interaction.editReply({
+      content: '⚠️ No valid names found in the uploaded image. Please use a clearer screenshot.',
+    });
+    return;
+  }
+
+  // Limit to 8 names per command.
+  const limitedNames = names.slice(0, 8);
 
   try {
     await connectDB();
@@ -681,8 +653,8 @@ async function handleListCheckCommand(interaction) {
 
     const sections = [
       `Checked: **${limitedNames.length}** name(s)`,
-      image && !rawNames ? 'Source: **Gemini OCR from image**' : null,
-      limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: 7)` : null,
+      'Source: **Gemini OCR from image**',
+      limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: 8)` : null,
       '',
       ...lines,
     ].filter((line) => line !== null);
