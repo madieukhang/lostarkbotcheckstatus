@@ -136,7 +136,7 @@ const commands = [
     .addAttachmentOption((opt) =>
       opt
         .setName('image')
-        .setDescription('Team screenshot for Gemini to extract up to 8 names')
+        .setDescription('Team screenshot for checking')
         .setRequired(true)
     )
     .addBooleanOption((opt) =>
