@@ -137,7 +137,13 @@ const commands = [
       opt
         .setName('names')
         .setDescription('Up to 7 names, e.g. [name1, name2] or name1,name2')
-        .setRequired(true)
+        .setRequired(false)
+    )
+    .addAttachmentOption((opt) =>
+      opt
+        .setName('image')
+        .setDescription('Optional image. If names is empty, Gemini extracts names from image')
+        .setRequired(false)
     )
     .addBooleanOption((opt) =>
       opt
@@ -445,19 +451,171 @@ function parseListCheckNames(raw) {
   return unique;
 }
 
+function extractJsonArrayFromText(raw) {
+  if (!raw) return null;
+
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    return trimmed;
+  }
+
+  const match = trimmed.match(/\[[\s\S]*\]/);
+  return match ? match[0] : null;
+}
+
+function shouldFailoverGeminiModel(status, bodyText) {
+  const text = (bodyText || '').toLowerCase();
+  if (status === 429 || status === 503) return true;
+  return (
+    text.includes('resource_exhausted') ||
+    text.includes('quota') ||
+    text.includes('rate limit') ||
+    text.includes('too many requests')
+  );
+}
+
+function buildGeminiRequestBody(mimeType, imageBase64) {
+  const prompt = [
+    'Read this image and extract only Lost Ark character names that are clearly visible.',
+    'Return JSON array only, no markdown, no explanation.',
+    'Example output: ["name1","name2"].',
+    'If no valid names are found, return [].',
+  ].join(' ');
+
+  return {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType,
+              data: imageBase64,
+            },
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0,
+      topP: 0.1,
+      maxOutputTokens: 512,
+    },
+  };
+}
+
+function parseGeminiNamesFromPayload(payload) {
+  const text = payload?.candidates?.[0]?.content?.parts
+    ?.map((part) => part?.text ?? '')
+    .join('')
+    .trim();
+
+  if (!text) return [];
+
+  const jsonArrayText = extractJsonArrayFromText(text);
+  if (!jsonArrayText) {
+    throw new Error('Gemini did not return a JSON array.');
+  }
+
+  const parsed = JSON.parse(jsonArrayText);
+  if (!Array.isArray(parsed)) {
+    throw new Error('Gemini output is not an array.');
+  }
+
+  const names = parsed
+    .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
+    .filter(Boolean);
+
+  const seen = new Set();
+  const unique = [];
+  for (const name of names) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(name);
+  }
+
+  return unique;
+}
+
+async function extractNamesFromImageWithGemini(image) {
+  if (!config.geminiApiKey) {
+    throw new Error('GEMINI_API_KEY is not configured.');
+  }
+
+  if (image.contentType && !image.contentType.startsWith('image/')) {
+    throw new Error('Attachment must be an image file.');
+  }
+
+  const imageRes = await fetch(image.url, { signal: AbortSignal.timeout(15000) });
+  if (!imageRes.ok) {
+    throw new Error(`Failed to download attachment (HTTP ${imageRes.status})`);
+  }
+
+  const mimeType = image.contentType || imageRes.headers.get('content-type') || 'image/png';
+  const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+  const imageBase64 = imageBuffer.toString('base64');
+
+  const models = config.geminiModels.length > 0 ? config.geminiModels : ['gemini-2.5-flash', 'gemini-3.1-flash-lite-2'];
+  const requestBody = buildGeminiRequestBody(mimeType, imageBase64);
+  const failures = [];
+
+  for (let i = 0; i < models.length; i += 1) {
+    const model = models[i];
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
+
+    const aiRes = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!aiRes.ok) {
+      const errBody = await aiRes.text().catch(() => '');
+      failures.push(`${model}: HTTP ${aiRes.status}`);
+
+      const canFallback = i < models.length - 1;
+      if (canFallback && shouldFailoverGeminiModel(aiRes.status, errBody)) {
+        console.warn(`[listcheck] Gemini quota/rate hit on ${model}, trying fallback model.`);
+        continue;
+      }
+
+      throw new Error(`Gemini request failed on ${model} (HTTP ${aiRes.status}) ${errBody}`.trim());
+    }
+
+    const payload = await aiRes.json();
+    return parseGeminiNamesFromPayload(payload);
+  }
+
+  throw new Error(`All Gemini models failed: ${failures.join(' | ')}`);
+}
+
 /**
  * /listcheck – check multiple names across blacklist and whitelist.
  */
 async function handleListCheckCommand(interaction) {
-  const rawNames = interaction.options.getString('names', true);
+  const rawNames = interaction.options.getString('names');
+  const image = interaction.options.getAttachment('image');
   const showReason = interaction.options.getBoolean('show_reason') ?? false;
-  const names = parseListCheckNames(rawNames);
+  let names = rawNames ? parseListCheckNames(rawNames) : [];
 
   await interaction.deferReply();
 
+  if (names.length === 0 && image) {
+    try {
+      names = await extractNamesFromImageWithGemini(image);
+    } catch (err) {
+      await interaction.editReply({
+        content: `⚠️ Failed to extract names from image: \`${err.message}\``,
+      });
+      return;
+    }
+  }
+
   if (names.length === 0) {
     await interaction.editReply({
-      content: '⚠️ No valid names found. Example: `/listcheck names:[name1, name2]`',
+      content: '⚠️ No valid names found. Use `/listcheck names:[name1,name2]` or attach an image in `image`.',
     });
     return;
   }
@@ -523,6 +681,7 @@ async function handleListCheckCommand(interaction) {
 
     const sections = [
       `Checked: **${limitedNames.length}** name(s)`,
+      image && !rawNames ? 'Source: **Gemini OCR from image**' : null,
       limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: 7)` : null,
       '',
       ...lines,

@@ -73,6 +73,15 @@ const config = {
   /** ScraperAPI key to bypass Cloudflare when scraping lostark.bible */
   scraperApiKey: requireEnv('SCRAPERAPI_KEY'),
 
+  /** Optional Gemini API key for image-based /listcheck name extraction */
+  geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
+
+  /** Gemini model priority list for image parsing with auto-failover on quota limits */
+  geminiModels: (process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || 'gemini-2.5-flash,gemini-3.1-flash-lite-2')
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean),
+
   /** Lost Ark server status page URL */
   statusUrl: 'https://www.playlostark.com/en-gb/support/server-status',
 

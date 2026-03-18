@@ -9,6 +9,7 @@ A Discord bot that monitors Lost Ark server status (Brelshaza), supports roster 
 - `/roster` command to fetch roster data from lostark.bible (via ScraperAPI).
 - `/list add` and `/list remove` to manage blacklist/whitelist entries.
 - `/listcheck` command to check up to 7 names at once against blacklist/whitelist.
+- `/listcheck` can also read names from an uploaded image via Gemini (optional).
 - Optional `raid` tag and optional evidence image when adding list entries.
 - Roster-based duplicate checks (`allCharacters`) with case-insensitive matching.
 
@@ -20,7 +21,8 @@ A Discord bot that monitors Lost Ark server status (Brelshaza), supports roster 
 - `/roster name:<character>`: Fetch roster and warn if it matches blacklist/whitelist.
 - `/list add type:<black|white> name:<character> reason:<text> [raid] [image]`: Add a list entry.
 - `/list remove name:<character>`: Remove an entry. If the name exists in both lists, the bot shows 3 removal options (black/white/both).
-- `/listcheck names:[name1, name2, ...]`: Check up to 7 names in one command and return one combined list with status icons (`⛔` blacklist, `✅` whitelist, `⛔✅` both). If a name is not in either list, the bot checks lostark.bible: `❓` means roster exists, otherwise it returns `No roster found: <name>`.
+- `/listcheck names:[name1, name2, ...] [show_reason]`: Check up to 7 names in one command and return one combined list with status icons (`⛔` blacklist, `✅` whitelist, `⛔✅` both). If a name is not in either list, the bot checks lostark.bible: `❓` means roster exists, otherwise it returns `No roster found: <name>`.
+- `/listcheck image:<screenshot> [show_reason]`: If `names` is empty, the bot sends the image to Gemini and expects a JSON array of names, then runs the same listcheck flow.
 
 ## Requirements
 
@@ -28,6 +30,7 @@ A Discord bot that monitors Lost Ark server status (Brelshaza), supports roster 
 - MongoDB
 - Discord bot token and channel ID
 - ScraperAPI key
+- Gemini API key (optional, only needed for image-based `/listcheck`)
 
 ## Environment Setup
 
@@ -39,6 +42,11 @@ Copy `.env.example` to `.env` and fill in all values:
 - `CHECK_INTERVAL`: Check interval in seconds (minimum 10, default 30)
 - `MONGODB_URI`: MongoDB connection string
 - `SCRAPERAPI_KEY`: API key for crawling lostark.bible
+- `GEMINI_API_KEY`: optional key for Gemini image parsing in `/listcheck`
+- `GEMINI_MODELS`: optional comma-separated model priority list for failover (default: `gemini-2.5-flash,gemini-3.1-flash-lite-2`)
+- `GEMINI_MODEL`: backward-compatible single-model fallback if `GEMINI_MODELS` is not set
+
+When image parsing hits Gemini free-tier quota/rate limits (for example RPM/RPD exhaustion), the bot automatically tries the next model in `GEMINI_MODELS`.
 
 ## Run Locally
 
