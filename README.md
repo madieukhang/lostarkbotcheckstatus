@@ -42,7 +42,7 @@ Copy `.env.example` to `.env` and fill in all values:
 - `MONGODB_URI`: MongoDB connection string
 - `SCRAPERAPI_KEY`: API key for crawling lostark.bible
 - `GEMINI_API_KEY`: optional key for Gemini image parsing in `/listcheck`
-- `GEMINI_MODELS`: optional comma-separated model priority list for failover (default: `gemini-2.5-flash,gemini-3.1-flash-lite-2`)
+- `GEMINI_MODELS`: optional comma-separated model priority list for failover (default: `gemini-2.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash-lite,gemini-3-flash`)
 - `GEMINI_MODEL`: backward-compatible single-model fallback if `GEMINI_MODELS` is not set
 
 When image parsing hits Gemini free-tier quota/rate limits (for example RPM/RPD exhaustion), the bot automatically tries the next model in `GEMINI_MODELS`.

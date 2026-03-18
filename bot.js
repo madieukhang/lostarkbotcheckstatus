@@ -531,7 +531,9 @@ async function extractNamesFromImageWithGemini(image) {
   const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
   const imageBase64 = imageBuffer.toString('base64');
 
-  const models = config.geminiModels.length > 0 ? config.geminiModels : ['gemini-2.5-flash', 'gemini-3.1-flash-lite-2'];
+  const models = config.geminiModels.length > 0
+    ? config.geminiModels
+    : ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite', 'gemini-3-flash'];
   const requestBody = buildGeminiRequestBody(mimeType, imageBase64);
   const failures = [];
 

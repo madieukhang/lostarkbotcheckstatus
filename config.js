@@ -77,7 +77,7 @@ const config = {
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
 
   /** Gemini model priority list for image parsing with auto-failover on quota limits */
-  geminiModels: (process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || 'gemini-2.5-flash,gemini-3.1-flash-lite-2')
+  geminiModels: (process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || 'gemini-2.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash-lite,gemini-3-flash')
     .split(',')
     .map((m) => m.trim())
     .filter(Boolean),
