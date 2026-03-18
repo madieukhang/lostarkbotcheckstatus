@@ -653,7 +653,6 @@ async function handleListCheckCommand(interaction) {
 
     const sections = [
       `Checked: **${limitedNames.length}** name(s)`,
-      'Source: **Gemini OCR from image**',
       limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: 8)` : null,
       '',
       ...lines,
