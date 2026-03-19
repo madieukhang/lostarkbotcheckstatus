@@ -408,17 +408,26 @@ export function createListHandlers({ client }) {
 
       if (!channel || !channel.isTextBased()) return;
 
-      if (rejected) {
-        await channel.send({
-          content: `<@${payload.requestedByUserId}> ❌ Your list add request for **${payload.name}** was rejected by Officer.`,
-        });
-        return;
+      const decisionContent = rejected
+        ? `<@${payload.requestedByUserId}> ❌ Your list add request for **${payload.name}** was rejected by Officer.`
+        : `<@${payload.requestedByUserId}> ${result.content}`;
+
+      const decisionPayload = {
+        content: decisionContent,
+        embeds: rejected ? [] : (result.embeds ?? []),
+      };
+
+      if (payload.requestMessageId && 'messages' in channel) {
+        try {
+          const requestMessage = await channel.messages.fetch(payload.requestMessageId);
+          await requestMessage.reply(decisionPayload);
+          return;
+        } catch (err) {
+          console.warn('[list] Failed to reply on original request message, falling back to channel send:', err.message);
+        }
       }
 
-      await channel.send({
-        content: `<@${payload.requestedByUserId}> ${result.content}`,
-        embeds: result.embeds ?? [],
-      });
+      await channel.send(decisionPayload);
     } catch (err) {
       console.warn('[list] Failed to notify requester in origin channel:', err.message);
     }
@@ -671,6 +680,16 @@ export function createListHandlers({ client }) {
           }),
         ],
       });
+
+      try {
+        const requestReply = await interaction.fetchReply();
+        const pending = pendingListAddApprovals.get(requestId);
+        if (pending) {
+          pending.requestMessageId = requestReply.id;
+        }
+      } catch (err) {
+        console.warn('[list] Failed to capture request reply message ID:', err.message);
+      }
     } catch (err) {
       console.error('[list] ❌ Proposal create/send failed:', err.message);
       await interaction.editReply({
