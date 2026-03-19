@@ -367,7 +367,9 @@ async function handleRosterCommand(interaction) {
     if (blacklistResult) {
       const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';
       const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
-      contentLines.push(`⛔ **${name}** is on the blacklist.${raid}${reason}`);
+      const addedBy = getAddedByDisplay(blacklistResult);
+      const addedByText = addedBy ? ` — Added by: **${addedBy}**` : '';
+      contentLines.push(`⛔ **${name}** is on the blacklist.${raid}${reason}${addedByText}`);
 
       if (blacklistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
@@ -381,7 +383,9 @@ async function handleRosterCommand(interaction) {
     if (whitelistResult) {
       const reason = whitelistResult.reason ? ` — *${whitelistResult.reason}*` : '';
       const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
-      contentLines.push(`✅ **${name}** is on the whitelist.${raid}${reason}`);
+      const addedBy = getAddedByDisplay(whitelistResult);
+      const addedByText = addedBy ? ` — Added by: **${addedBy}**` : '';
+      contentLines.push(`✅ **${name}** is on the whitelist.${raid}${reason}${addedByText}`);
 
       if (whitelistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
@@ -424,6 +428,10 @@ function normalizeCharacterName(raw) {
   const value = raw.trim();
   if (!value) return '';
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+function getAddedByDisplay(entry) {
+  return entry?.addedByName?.trim() || '';
 }
 
 function extractJsonArrayFromText(raw) {
@@ -629,13 +637,25 @@ async function handleListCheckCommand(interaction) {
       const isWhite = Boolean(item.whiteEntry);
       const blackReason = item.blackEntry?.reason?.trim();
       const whiteReason = item.whiteEntry?.reason?.trim();
+      const blackAddedBy = getAddedByDisplay(item.blackEntry);
+      const whiteAddedBy = getAddedByDisplay(item.whiteEntry);
 
       const reasonParts = [];
-      if (showReason && isBlack && blackReason) {
-        reasonParts.push(`black: ${blackReason}`);
+      if (showReason && isBlack) {
+        const details = [];
+        if (blackReason) details.push(blackReason);
+        if (blackAddedBy) details.push(`Added by: **${blackAddedBy}**`);
+        if (details.length > 0) {
+          reasonParts.push(`black: ${details.join(' — ')}`);
+        }
       }
-      if (showReason && isWhite && whiteReason) {
-        reasonParts.push(`white: ${whiteReason}`);
+      if (showReason && isWhite) {
+        const details = [];
+        if (whiteReason) details.push(whiteReason);
+        if (whiteAddedBy) details.push(`Added by: **${whiteAddedBy}**`);
+        if (details.length > 0) {
+          reasonParts.push(`white: ${details.join(' — ')}`);
+        }
       }
 
       const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
@@ -788,6 +808,7 @@ async function handleListAddCommand(interaction) {
       allCharacters,
       addedByUserId: interaction.user.id,
       addedByTag: interaction.user.tag,
+      addedByName: interaction.user.username,
     });
 
     const embed = new EmbedBuilder()
@@ -979,7 +1000,7 @@ async function fetchNameSuggestions(name) {
 /**
  * Loop name checks against the blacklist collection in Blacklist DB.
  * @param {string[]} names  List of character names to check against the blacklist.
- * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string } | null>}
+ * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string, addedByName: string, addedByTag: string, addedByUserId: string } | null>}
  */
 async function handleRosterBlackListCheck(names) {
   try {
@@ -1003,6 +1024,9 @@ async function handleRosterBlackListCheck(names) {
           reason: entry.reason ?? '',
           raid: entry.raid ?? '',
           imageUrl: entry.imageUrl ?? '',
+          addedByName: entry.addedByName ?? '',
+          addedByTag: entry.addedByTag ?? '',
+          addedByUserId: entry.addedByUserId ?? '',
         };
       }
     }
@@ -1018,7 +1042,7 @@ async function handleRosterBlackListCheck(names) {
 /**
  * Loop name checks against the whitelist collection in Whitelist DB.
  * @param {string[]} names  List of character names to check against the whitelist.
- * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string } | null>}
+ * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string, addedByName: string, addedByTag: string, addedByUserId: string } | null>}
  */
 async function handleRosterWhiteListCheck(names) {
   try {
@@ -1036,6 +1060,9 @@ async function handleRosterWhiteListCheck(names) {
           reason: entry.reason ?? '',
           raid: entry.raid ?? '',
           imageUrl: entry.imageUrl ?? '',
+          addedByName: entry.addedByName ?? '',
+          addedByTag: entry.addedByTag ?? '',
+          addedByUserId: entry.addedByUserId ?? '',
         };
       }
     }

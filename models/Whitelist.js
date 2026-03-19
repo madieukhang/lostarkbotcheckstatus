@@ -54,6 +54,13 @@ const whitelistSchema = new mongoose.Schema({
     trim: true,
   },
 
+  /** Discord username that created this entry */
+  addedByName: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+
   /** Timestamp of when the entry was added */
   addedAt: {
     type: Date,
