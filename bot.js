@@ -441,8 +441,22 @@ function normalizeCharacterName(raw) {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
+function getInteractionDisplayName(interaction) {
+  const member = interaction.member;
+  if (member && typeof member === 'object') {
+    if ('displayName' in member && typeof member.displayName === 'string' && member.displayName.trim()) {
+      return member.displayName.trim();
+    }
+    if ('nick' in member && typeof member.nick === 'string' && member.nick.trim()) {
+      return member.nick.trim();
+    }
+  }
+
+  return interaction.user.globalName?.trim() || interaction.user.username;
+}
+
 function getAddedByDisplay(entry) {
-  return entry?.addedByName?.trim() || '';
+  return entry?.addedByDisplayName?.trim() || entry?.addedByName?.trim() || '';
 }
 
 function extractJsonArrayFromText(raw) {
@@ -752,6 +766,7 @@ async function handleListAddCommand(interaction) {
   const raid = interaction.options.getString('raid') ?? '';
   const image = interaction.options.getAttachment('image');
   const name = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
+  const addedByDisplayName = getInteractionDisplayName(interaction);
   const { model, label, color, icon } = getListContext(type);
 
   await interaction.deferReply();
@@ -819,6 +834,7 @@ async function handleListAddCommand(interaction) {
       addedByUserId: interaction.user.id,
       addedByTag: interaction.user.tag,
       addedByName: interaction.user.username,
+      addedByDisplayName,
     });
 
     const embed = new EmbedBuilder()
@@ -1010,7 +1026,7 @@ async function fetchNameSuggestions(name) {
 /**
  * Loop name checks against the blacklist collection in Blacklist DB.
  * @param {string[]} names  List of character names to check against the blacklist.
- * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string, addedByName: string, addedByTag: string, addedByUserId: string } | null>}
+ * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string, addedByDisplayName: string, addedByName: string, addedByTag: string, addedByUserId: string } | null>}
  */
 async function handleRosterBlackListCheck(names) {
   try {
@@ -1034,6 +1050,7 @@ async function handleRosterBlackListCheck(names) {
           reason: entry.reason ?? '',
           raid: entry.raid ?? '',
           imageUrl: entry.imageUrl ?? '',
+          addedByDisplayName: entry.addedByDisplayName ?? '',
           addedByName: entry.addedByName ?? '',
           addedByTag: entry.addedByTag ?? '',
           addedByUserId: entry.addedByUserId ?? '',
@@ -1052,7 +1069,7 @@ async function handleRosterBlackListCheck(names) {
 /**
  * Loop name checks against the whitelist collection in Whitelist DB.
  * @param {string[]} names  List of character names to check against the whitelist.
- * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string, addedByName: string, addedByTag: string, addedByUserId: string } | null>}
+ * @returns {Promise<{ name: string, reason: string, raid: string, imageUrl: string, addedByDisplayName: string, addedByName: string, addedByTag: string, addedByUserId: string } | null>}
  */
 async function handleRosterWhiteListCheck(names) {
   try {
@@ -1070,6 +1087,7 @@ async function handleRosterWhiteListCheck(names) {
           reason: entry.reason ?? '',
           raid: entry.raid ?? '',
           imageUrl: entry.imageUrl ?? '',
+          addedByDisplayName: entry.addedByDisplayName ?? '',
           addedByName: entry.addedByName ?? '',
           addedByTag: entry.addedByTag ?? '',
           addedByUserId: entry.addedByUserId ?? '',
