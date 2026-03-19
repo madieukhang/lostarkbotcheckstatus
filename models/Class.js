@@ -6,7 +6,7 @@ export const CLASS_NAMES = {
   // Warriors
   berserker:          'Berserker',
   berserker_female:   'Slayer',
-  dragon_knight:      'Slayer',
+  dragon_knight:      'Guardian Knight',
   warlord:            'Gunlancer',
   holyknight:         'Paladin',
   holyknight_female:  'Valkyrie',
