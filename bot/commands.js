@@ -90,6 +90,16 @@ export function buildCommands() {
       ),
 
     new SlashCommandBuilder()
+      .setName('search')
+      .setDescription('Search for a character name and cross-check blacklist/whitelist')
+      .addStringOption((opt) =>
+        opt
+          .setName('name')
+          .setDescription('Character name to search (e.g. Megumi)')
+          .setRequired(true)
+      ),
+
+    new SlashCommandBuilder()
       .setName('listcheck')
       .setDescription('Check multiple names against blacklist/whitelist')
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)

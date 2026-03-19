@@ -17,6 +17,7 @@ import { buildCommands } from './bot/commands.js';
 import { createSystemHandlers } from './bot/handlers/systemHandlers.js';
 import { handleRosterCommand } from './bot/handlers/rosterHandler.js';
 import { createListHandlers } from './bot/handlers/listHandlers.js';
+import { handleSearchCommand } from './bot/handlers/searchHandler.js';
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -79,6 +80,8 @@ client.on('interactionCreate', async (interaction) => {
       await systemHandlers.handleResetCommand(interaction);
     } else if (commandName === 'roster') {
       await handleRosterCommand(interaction);
+    } else if (commandName === 'search') {
+      await handleSearchCommand(interaction);
     } else if (commandName === 'list') {
       const subcommand = interaction.options.getSubcommand();
       if (subcommand === 'add') {
