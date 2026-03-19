@@ -11,6 +11,7 @@ import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
+import PendingApproval from '../../models/PendingApproval.js';
 import { getClassName } from '../../models/Class.js';
 import {
   buildRosterCharacters,
@@ -279,7 +280,6 @@ function buildApprovalProcessingRow(action) {
 }
 
 export function createListHandlers({ client }) {
-  const pendingListAddApprovals = new Map();
 
   async function sendListAddApprovalToApprovers(guild, payload) {
     const approverIds = getApproverRecipientIds();
@@ -472,7 +472,8 @@ export function createListHandlers({ client }) {
 
   async function handleListAddApprovalButton(interaction) {
     const [action, requestId] = interaction.customId.split(':');
-    const payload = pendingListAddApprovals.get(requestId);
+    await connectDB();
+    const payload = await PendingApproval.findOne({ requestId }).lean();
 
     if (!payload) {
       await interaction.reply({
@@ -513,7 +514,7 @@ export function createListHandlers({ client }) {
       { excludeMessageId: interaction.message.id }
     );
 
-    pendingListAddApprovals.delete(requestId);
+    await PendingApproval.deleteOne({ requestId });
 
     if (!isApproveAction) {
       await interaction.editReply({
@@ -754,7 +755,8 @@ export function createListHandlers({ client }) {
         return;
       }
 
-      pendingListAddApprovals.set(requestId, {
+      await connectDB();
+      await PendingApproval.create({
         ...payload,
         approverIds: sent.deliveredApproverIds,
         approverDmMessages: sent.deliveredDmMessages,
@@ -771,10 +773,10 @@ export function createListHandlers({ client }) {
 
       try {
         const requestReply = await interaction.fetchReply();
-        const pending = pendingListAddApprovals.get(requestId);
-        if (pending) {
-          pending.requestMessageId = requestReply.id;
-        }
+        await PendingApproval.updateOne(
+          { requestId },
+          { $set: { requestMessageId: requestReply.id } }
+        );
       } catch (err) {
         console.warn('[list] Failed to capture request reply message ID:', err.message);
       }
