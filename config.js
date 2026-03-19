@@ -85,8 +85,8 @@ const config = {
   /** Lost Ark server status page URL */
   statusUrl: 'https://www.playlostark.com/en-gb/support/server-status',
 
-  /** The server name to monitor */
-  targetServer: 'Brelshaza',
+  /** The server name to monitor (must match the name shown on the status page exactly) */
+  targetServer: (process.env.TARGET_SERVER || 'Brelshaza').trim(),
 
   /** Path to the local state file */
   stateFilePath: './data/status.json',
