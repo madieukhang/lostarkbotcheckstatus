@@ -5,6 +5,7 @@
 export const CLASS_NAMES = {
   // Warriors
   berserker:          'Berserker',
+  berserker_female:   'Slayer',
   dragon_knight:      'Slayer',
   warlord:            'Gunlancer',
   holyknight:         'Paladin',
@@ -23,6 +24,7 @@ export const CLASS_NAMES = {
   devil_hunter_female:'Gunslinger',
   blaster:            'Artillerist',
   hawkeye:            'Sharpshooter',
+  hawk_eye:           'Sharpshooter',
   scouter:            'Machinist',
 
   // Mages

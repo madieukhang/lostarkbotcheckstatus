@@ -138,12 +138,6 @@ const commands = [
         .setName('image')
         .setDescription('Team screenshot for checking')
         .setRequired(true)
-    )
-    .addBooleanOption((opt) =>
-      opt
-        .setName('show_reason')
-        .setDescription('Show blacklist/whitelist reason in result (default: not shown)')
-        .setRequired(false)
     ),
 ].map((cmd) => cmd.toJSON());
 
@@ -178,6 +172,20 @@ function formatStatus(status) {
     case STATUS.MAINTENANCE:  return '🟡 Maintenance';
     default:                  return '❓ Unknown';
   }
+}
+
+function extractRosterClassMapFromHtml(html) {
+  const rosterClassMap = new Map();
+  const regex = /name:\"([^\"]+)\",class:\"([^\"]+)\"/g;
+
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    const [, charName, clsId] = match;
+    if (!charName || !clsId) continue;
+    rosterClassMap.set(charName, clsId);
+  }
+
+  return rosterClassMap;
 }
 
 // ─── Interaction handlers ─────────────────────────────────────────────────────
@@ -269,6 +277,7 @@ async function handleRosterCommand(interaction) {
 
     const html = await response.text();
     const { document } = new JSDOM(html).window;
+    const rosterClassMap = extractRosterClassMapFromHtml(html);
 
     const characters = [];
     const links = document.querySelectorAll('a[href^="/character/NA/"]');
@@ -286,8 +295,10 @@ async function handleRosterCommand(interaction) {
       const spans = headerDiv.querySelectorAll('span');
       const itemLevel = spans[0]?.textContent.trim() ?? '?';
       const combatScore = spans[1]?.textContent.trim() ?? '?';
+      const classId = charName ? rosterClassMap.get(charName) ?? '' : '';
+      const className = getClassName(classId);
 
-      if (charName) characters.push({ name: charName, itemLevel, combatScore });
+      if (charName) characters.push({ name: charName, itemLevel, combatScore, classId, className });
     }
 
     if (characters.length === 0) {
@@ -333,7 +344,7 @@ async function handleRosterCommand(interaction) {
 
     const lines = characters.map(
       (c, i) =>
-        `**${i + 1}.** ${c.name} · \`${c.itemLevel}\`${c.title ? ` — *${c.title}*` : ''} · ${c.combatScore}`
+        `**${i + 1}.** ${c.name}${c.className ? ` (${c.className})` : ''} · \`${c.itemLevel}\`${c.title ? ` — *${c.title}*` : ''} · ${c.combatScore}`
     );
 
     // Discord embed description cap is 4096 chars; trim if needed
@@ -584,7 +595,6 @@ async function extractNamesFromImageWithGemini(image) {
  */
 async function handleListCheckCommand(interaction) {
   const image = interaction.options.getAttachment('image', true);
-  const showReason = interaction.options.getBoolean('show_reason') ?? false;
   let names = [];
 
   await interaction.deferReply();
@@ -641,7 +651,7 @@ async function handleListCheckCommand(interaction) {
       const whiteAddedBy = getAddedByDisplay(item.whiteEntry);
 
       const reasonParts = [];
-      if (showReason && isBlack) {
+      if (isBlack) {
         const details = [];
         if (blackReason) details.push(blackReason);
         if (blackAddedBy) details.push(`Added by: **${blackAddedBy}**`);
@@ -649,7 +659,7 @@ async function handleListCheckCommand(interaction) {
           reasonParts.push(`black: ${details.join(' — ')}`);
         }
       }
-      if (showReason && isWhite) {
+      if (isWhite) {
         const details = [];
         if (whiteReason) details.push(whiteReason);
         if (whiteAddedBy) details.push(`Added by: **${whiteAddedBy}**`);
