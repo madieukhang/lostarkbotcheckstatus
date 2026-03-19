@@ -193,9 +193,11 @@ async function extractNamesFromImageWithGemini(image) {
   throw new Error(`All Gemini models failed: ${failures.join(' | ')}`);
 }
 
-function buildListAddApprovalEmbed(guild, payload) {
+function buildListAddApprovalEmbed(guild, payload, options = {}) {
+  const title = options.title || 'List add approval required';
+
   const embed = new EmbedBuilder()
-    .setTitle('List add approval required')
+    .setTitle(title)
     .setDescription(`A new list add request was submitted in **${guild.name}**.`)
     .addFields(
       { name: 'Request ID', value: payload.requestId, inline: false },
@@ -628,6 +630,11 @@ export function createListHandlers({ client }) {
 
       await interaction.editReply({
         content: `📝 Proposal submitted for approval. Request ID: **${requestId}**`,
+        embeds: [
+          buildListAddApprovalEmbed(interaction.guild, payload, {
+            title: 'List add proposal submitted',
+          }),
+        ],
       });
     } catch (err) {
       console.error('[list] ❌ Proposal create/send failed:', err.message);
