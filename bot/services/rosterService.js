@@ -97,26 +97,30 @@ export async function handleRosterBlackListCheck(names) {
     console.log(`[blacklist] Checking ${names.length} character(s):`, names.join(', '));
     await connectDB();
 
-    const allDocs = await Blacklist.find({}).lean();
-    console.log(`[blacklist] Total docs in DB: ${allDocs.length}`);
+    const docCount = await Blacklist.countDocuments();
+    console.log(`[blacklist] Total docs in DB: ${docCount}`);
 
-    for (const charName of names) {
-      const entry = await Blacklist.findOne({ name: charName })
-        .collation({ locale: 'en', strength: 2 })
-        .lean();
-      if (entry) {
-        console.log(`[blacklist] ⛔ "${charName}" is BLACKLISTED — reason: ${entry.reason || '(none)'}`);
-        return {
-          name: entry.name,
-          reason: entry.reason ?? '',
-          raid: entry.raid ?? '',
-          imageUrl: entry.imageUrl ?? '',
-          addedByDisplayName: entry.addedByDisplayName ?? '',
-          addedByName: entry.addedByName ?? '',
-          addedByTag: entry.addedByTag ?? '',
-          addedByUserId: entry.addedByUserId ?? '',
-        };
-      }
+    const entry = await Blacklist.findOne({
+      $or: [
+        { name: { $in: names } },
+        { allCharacters: { $in: names } },
+      ],
+    })
+      .collation({ locale: 'en', strength: 2 })
+      .lean();
+
+    if (entry) {
+      console.log(`[blacklist] ⛔ "${entry.name}" is BLACKLISTED — reason: ${entry.reason || '(none)'}`);
+      return {
+        name: entry.name,
+        reason: entry.reason ?? '',
+        raid: entry.raid ?? '',
+        imageUrl: entry.imageUrl ?? '',
+        addedByDisplayName: entry.addedByDisplayName ?? '',
+        addedByName: entry.addedByName ?? '',
+        addedByTag: entry.addedByTag ?? '',
+        addedByUserId: entry.addedByUserId ?? '',
+      };
     }
 
     console.log('[blacklist] ✅ No blacklisted characters found in roster');
@@ -132,23 +136,27 @@ export async function handleRosterWhiteListCheck(names) {
     console.log(`[whitelist] Checking ${names.length} character(s):`, names.join(', '));
     await connectDB();
 
-    for (const charName of names) {
-      const entry = await Whitelist.findOne({ name: charName })
-        .collation({ locale: 'en', strength: 2 })
-        .lean();
-      if (entry) {
-        console.log(`[whitelist] ✅ "${charName}" is WHITELISTED — reason: ${entry.reason || '(none)'}`);
-        return {
-          name: entry.name,
-          reason: entry.reason ?? '',
-          raid: entry.raid ?? '',
-          imageUrl: entry.imageUrl ?? '',
-          addedByDisplayName: entry.addedByDisplayName ?? '',
-          addedByName: entry.addedByName ?? '',
-          addedByTag: entry.addedByTag ?? '',
-          addedByUserId: entry.addedByUserId ?? '',
-        };
-      }
+    const entry = await Whitelist.findOne({
+      $or: [
+        { name: { $in: names } },
+        { allCharacters: { $in: names } },
+      ],
+    })
+      .collation({ locale: 'en', strength: 2 })
+      .lean();
+
+    if (entry) {
+      console.log(`[whitelist] ✅ "${entry.name}" is WHITELISTED — reason: ${entry.reason || '(none)'}`);
+      return {
+        name: entry.name,
+        reason: entry.reason ?? '',
+        raid: entry.raid ?? '',
+        imageUrl: entry.imageUrl ?? '',
+        addedByDisplayName: entry.addedByDisplayName ?? '',
+        addedByName: entry.addedByName ?? '',
+        addedByTag: entry.addedByTag ?? '',
+        addedByUserId: entry.addedByUserId ?? '',
+      };
     }
 
     console.log('[whitelist] No whitelisted characters found in roster');
