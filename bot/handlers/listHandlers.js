@@ -23,8 +23,8 @@ import {
 } from '../utils/names.js';
 
 // Hardcoded approver IDs for /list add proposal flow.
-// - One random ID from OFFICER_APPROVER_IDS gets the approval DM.
-// - SENIOR_APPROVER_ID always gets the same approval DM.
+// - SENIOR_APPROVER_ID alone is sufficient for approval routing.
+// - One random ID from OFFICER_APPROVER_IDS is optional and also gets the approval DM.
 const OFFICER_APPROVER_IDS = [
   // '123456789012345678',
 ];
@@ -217,15 +217,17 @@ function buildListAddApprovalEmbed(guild, payload) {
 
 function getApproverRecipientIds() {
   const officers = OFFICER_APPROVER_IDS.filter(Boolean);
-  if (officers.length === 0) {
-    return [];
+  const recipientIds = [];
+
+  if (SENIOR_APPROVER_ID) {
+    recipientIds.push(SENIOR_APPROVER_ID);
   }
 
-  const randomOfficerId = officers[Math.floor(Math.random() * officers.length)];
-  const recipientIds = [randomOfficerId];
-
-  if (SENIOR_APPROVER_ID && SENIOR_APPROVER_ID !== randomOfficerId) {
-    recipientIds.push(SENIOR_APPROVER_ID);
+  if (officers.length > 0) {
+    const randomOfficerId = officers[Math.floor(Math.random() * officers.length)];
+    if (!recipientIds.includes(randomOfficerId)) {
+      recipientIds.push(randomOfficerId);
+    }
   }
 
   return recipientIds;
@@ -247,7 +249,7 @@ export function createListHandlers({ client }) {
   async function sendListAddApprovalToApprovers(guild, payload) {
     const approverIds = getApproverRecipientIds();
     if (approverIds.length === 0) {
-      return { success: false, reason: 'No approver user IDs configured. Set OFFICER_APPROVER_IDS first.' };
+      return { success: false, reason: 'No approver user IDs configured. Set SENIOR_APPROVER_ID or OFFICER_APPROVER_IDS.' };
     }
 
     const row = new ActionRowBuilder().addComponents(
