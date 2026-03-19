@@ -107,13 +107,7 @@ function isInMaintenanceWindow() {
  * @param {import('discord.js').Client} client
  * @returns {Promise<string>} The current STATUS value
  */
-export async function checkStatus(client, { force = false } = {}) {
-  if (!force && isInMaintenanceWindow()) {
-    console.log('[monitor] 🛠️  Skipping check – inside weekly maintenance window.');
-    const state = await loadState();
-    return state.lastStatus;
-  }
-
+export async function checkStatus(client) {
   const state = await loadState();
   let currentStatus;
 
@@ -177,6 +171,10 @@ export function startMonitor(client) {
   );
 
   const handle = setInterval(() => {
+    if (!isInMaintenanceWindow()) {
+      return;
+    }
+
     checkStatus(client).catch((err) =>
       console.error('[monitor] Scheduled check failed:', err.message)
     );

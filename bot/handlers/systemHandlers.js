@@ -60,7 +60,7 @@ export function createSystemHandlers({ getState, checkStatus, resetState, client
     await interaction.deferReply();
 
     try {
-      const current = await checkStatus(client, { force: true });
+      const current = await checkStatus(client);
       const embed = new EmbedBuilder()
         .setTitle('Server status – Live Check')
         .setDescription(`Status right now: **${formatStatus(current)}**`)
