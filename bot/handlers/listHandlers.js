@@ -446,8 +446,10 @@ export function createListHandlers({ client }) {
 
     const isApproveAction = action === 'listadd_approve';
 
-    // Update message immediately so users see processing state and cannot spam clicks.
-    await interaction.update({
+    // Acknowledge immediately, then show processing state to avoid 3s timeout issues.
+    await interaction.deferUpdate();
+
+    await interaction.editReply({
       content: isApproveAction
         ? `⏳ Processing approval by **${interaction.user.tag}**...`
         : `⏳ Processing rejection by **${interaction.user.tag}**...`,
