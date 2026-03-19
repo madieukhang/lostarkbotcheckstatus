@@ -16,8 +16,10 @@ export const CLASS_NAMES = {
   battle_master:      'Wardancer',
   infighter:          'Scrapper',
   soulmaster:         'Soulfist',
+  force_master:       'Soulfist',
   lance_master:       'Glaivier',
   infighter_male:     'Breaker',
+  battle_master_male:  'Striker',
 
   // Gunners
   devil_hunter:       'Deadeye',
