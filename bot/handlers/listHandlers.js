@@ -662,7 +662,6 @@ export function createListHandlers({ client }) {
       });
 
       await interaction.editReply({
-        content: `📝 Proposal submitted for approval. Request ID: **${requestId}**`,
         embeds: [
           buildListAddApprovalEmbed(interaction.guild, payload, {
             title: 'List add proposal submitted',
