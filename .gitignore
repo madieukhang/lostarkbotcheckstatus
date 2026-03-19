@@ -7,6 +7,10 @@ node_modules/
 # Runtime state file
 data/
 
+# Dusk's local toolkit (not part of the bot)
+dusk-check.js
+exports/
+
 # OS / editor junk
 .DS_Store
 Thumbs.db
