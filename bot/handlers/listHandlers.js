@@ -416,10 +416,13 @@ export function createListHandlers({ client }) {
       return;
     }
 
+    // Acknowledge the button click immediately to avoid Discord's 3s timeout.
+    await interaction.deferUpdate();
+
     pendingListAddApprovals.delete(requestId);
 
     if (action === 'listadd_reject') {
-      await interaction.update({
+      await interaction.editReply({
         content: `❌ Rejected by **${interaction.user.tag}**`,
         components: [buildApprovalResultRow('Rejected')],
       });
@@ -429,7 +432,7 @@ export function createListHandlers({ client }) {
 
     try {
       const result = await executeListAddToDatabase(payload);
-      await interaction.update({
+      await interaction.editReply({
         content: result.ok
           ? `✅ Approved by **${interaction.user.tag}** and executed successfully.`
           : `⚠️ Approved by **${interaction.user.tag}** but execution returned: ${result.content}`,
@@ -438,7 +441,7 @@ export function createListHandlers({ client }) {
 
       await notifyRequesterAboutDecision(payload, result, false);
     } catch (err) {
-      await interaction.update({
+      await interaction.editReply({
         content: `⚠️ Approval executed by **${interaction.user.tag}** but failed: \`${err.message}\``,
         components: [buildApprovalResultRow('Failed')],
       });
