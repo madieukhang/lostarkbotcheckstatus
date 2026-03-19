@@ -26,7 +26,8 @@ import {
 // - SENIOR_APPROVER_ID alone is sufficient for approval routing.
 // - One random ID from OFFICER_APPROVER_IDS is optional and also gets the approval DM.
 const OFFICER_APPROVER_IDS = [
-  // '123456789012345678',
+  '338779757510524928', // Khoai
+  '287894237587046400', // KilZ
 ];
 const SENIOR_APPROVER_ID = '324502048102154241';
 
@@ -242,6 +243,12 @@ function getApproverRecipientIds() {
   }
 
   return recipientIds;
+}
+
+function isRequesterAutoApprover(userId) {
+  if (!userId) return false;
+  if (SENIOR_APPROVER_ID === userId) return true;
+  return OFFICER_APPROVER_IDS.includes(userId);
 }
 
 function buildApprovalResultRow(actionLabel) {
@@ -658,6 +665,17 @@ export function createListHandlers({ client }) {
         requestedByDisplayName: getInteractionDisplayName(interaction),
         createdAt: Date.now(),
       };
+
+      if (isRequesterAutoApprover(payload.requestedByUserId)) {
+        const result = await executeListAddToDatabase(payload);
+        await interaction.editReply({
+          content: result.ok
+            ? `✅ Auto-approved for officer. ${result.content}`
+            : `⚠️ Auto-approved for officer but execution returned: ${result.content}`,
+          embeds: result.embeds ?? [],
+        });
+        return;
+      }
 
       const sent = await sendListAddApprovalToApprovers(interaction.guild, payload);
       if (!sent.success) {
