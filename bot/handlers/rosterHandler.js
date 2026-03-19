@@ -9,11 +9,11 @@ import {
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
 } from '../services/rosterService.js';
-import { getAddedByDisplay } from '../utils/names.js';
+import { getAddedByDisplay, normalizeCharacterName } from '../utils/names.js';
 
 export async function handleRosterCommand(interaction) {
   const raw = interaction.options.getString('name');
-  const name = raw.trim().charAt(0).toUpperCase() + raw.trim().slice(1).toLowerCase();
+  const name = normalizeCharacterName(raw);
   await interaction.deferReply();
 
   try {
