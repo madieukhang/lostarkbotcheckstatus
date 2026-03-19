@@ -669,9 +669,7 @@ export function createListHandlers({ client }) {
       if (isRequesterAutoApprover(payload.requestedByUserId)) {
         const result = await executeListAddToDatabase(payload);
         await interaction.editReply({
-          content: result.ok
-            ? `✅ Auto-approved for officer. ${result.content}`
-            : `⚠️ Auto-approved for officer but execution returned: ${result.content}`,
+          content: `${result.content}`,
           embeds: result.embeds ?? [],
         });
         return;
