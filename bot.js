@@ -344,7 +344,7 @@ async function handleRosterCommand(interaction) {
 
     const lines = characters.map(
       (c, i) =>
-        `**${i + 1}.** ${c.name}${c.className ? ` (${c.className})` : ''} · \`${c.itemLevel}\`${c.title ? ` — *${c.title}*` : ''} · ${c.combatScore}`
+        `**${i + 1}.** ${c.name} · ${c.className || 'Unknown'} · \`${c.itemLevel}\`${c.title ? ` — *${c.title}*` : ''} · ${c.combatScore}`
     );
 
     // Discord embed description cap is 4096 chars; trim if needed
