@@ -300,6 +300,7 @@ export function createListHandlers({ client }) {
 
     const embed = buildListAddApprovalEmbed(guild, payload);
     const deliveredApproverIds = [];
+    const deliveredDmMessages = [];
 
     await Promise.all(
       approverIds.map(async (approverId) => {
@@ -307,8 +308,13 @@ export function createListHandlers({ client }) {
           const user = await client.users.fetch(approverId);
           if (!user || user.bot) return;
 
-          await user.send({ embeds: [embed], components: [row] });
+          const sentMessage = await user.send({ embeds: [embed], components: [row] });
           deliveredApproverIds.push(user.id);
+          deliveredDmMessages.push({
+            approverId: user.id,
+            channelId: sentMessage.channelId,
+            messageId: sentMessage.id,
+          });
         } catch (err) {
           console.warn(`[list] Failed to DM approver ${approverId}:`, err.message);
         }
@@ -319,7 +325,31 @@ export function createListHandlers({ client }) {
       return { success: false, reason: 'Unable to DM configured approvers. Check user IDs/privacy settings.' };
     }
 
-    return { success: true, deliveredApproverIds };
+    return { success: true, deliveredApproverIds, deliveredDmMessages };
+  }
+
+  async function syncApproverDmMessages(payload, messageOptions, options = {}) {
+    const refs = payload.approverDmMessages || [];
+    if (refs.length === 0) return;
+
+    const excludeMessageId = options.excludeMessageId || '';
+
+    await Promise.all(
+      refs.map(async (ref) => {
+        if (!ref?.channelId || !ref?.messageId) return;
+        if (excludeMessageId && ref.messageId === excludeMessageId) return;
+
+        try {
+          const dmChannel = await client.channels.fetch(ref.channelId);
+          if (!dmChannel || !dmChannel.isTextBased()) return;
+
+          const dmMessage = await dmChannel.messages.fetch(ref.messageId);
+          await dmMessage.edit(messageOptions);
+        } catch (err) {
+          console.warn(`[list] Failed to sync approver DM ${ref.messageId}:`, err.message);
+        }
+      })
+    );
   }
 
   async function executeListAddToDatabase(payload) {
@@ -472,6 +502,17 @@ export function createListHandlers({ client }) {
       components: [buildApprovalProcessingRow(action)],
     });
 
+    await syncApproverDmMessages(
+      payload,
+      {
+        content: isApproveAction
+          ? `⏳ Processing approval by **${interaction.user.tag}**...`
+          : `⏳ Processing rejection by **${interaction.user.tag}**...`,
+        components: [buildApprovalProcessingRow(action)],
+      },
+      { excludeMessageId: interaction.message.id }
+    );
+
     pendingListAddApprovals.delete(requestId);
 
     if (!isApproveAction) {
@@ -479,6 +520,16 @@ export function createListHandlers({ client }) {
         content: `❌ Rejected by **${interaction.user.tag}**`,
         components: [buildApprovalResultRow('Rejected')],
       });
+
+      await syncApproverDmMessages(
+        payload,
+        {
+          content: `❌ Rejected by **${interaction.user.tag}**`,
+          components: [buildApprovalResultRow('Rejected')],
+        },
+        { excludeMessageId: interaction.message.id }
+      );
+
       await notifyRequesterAboutDecision(payload, null, true);
       return;
     }
@@ -492,12 +543,32 @@ export function createListHandlers({ client }) {
         components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed')],
       });
 
+      await syncApproverDmMessages(
+        payload,
+        {
+          content: result.ok
+            ? `✅ Approved by **${interaction.user.tag}** and executed successfully.`
+            : `⚠️ Approved by **${interaction.user.tag}** but execution returned: ${result.content}`,
+          components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed')],
+        },
+        { excludeMessageId: interaction.message.id }
+      );
+
       await notifyRequesterAboutDecision(payload, result, false);
     } catch (err) {
       await interaction.editReply({
         content: `⚠️ Approval executed by **${interaction.user.tag}** but failed: \`${err.message}\``,
         components: [buildApprovalResultRow('Failed')],
       });
+
+      await syncApproverDmMessages(
+        payload,
+        {
+          content: `⚠️ Approval executed by **${interaction.user.tag}** but failed: \`${err.message}\``,
+          components: [buildApprovalResultRow('Failed')],
+        },
+        { excludeMessageId: interaction.message.id }
+      );
 
       await notifyRequesterAboutDecision(
         payload,
@@ -686,6 +757,7 @@ export function createListHandlers({ client }) {
       pendingListAddApprovals.set(requestId, {
         ...payload,
         approverIds: sent.deliveredApproverIds,
+        approverDmMessages: sent.deliveredDmMessages,
       });
 
       await interaction.editReply({
