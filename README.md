@@ -8,6 +8,7 @@ A Discord bot that monitors Lost Ark server status (Brelshaza), supports roster 
 - Slash commands for quick status operations (`/status`, `/check`, `/reset`).
 - `/roster` command to fetch roster data from lostark.bible (via ScraperAPI).
 - `/list add` and `/list remove` to manage blacklist/whitelist entries.
+- `/list add` now uses approver-ID approval flow (proposal -> DM Approve/Reject).
 - `/listcheck` command to check up to 8 names at once against blacklist/whitelist from image.
 - `/listcheck` reads names from an uploaded image via Gemini.
 - Optional `raid` tag and optional evidence image when adding list entries.
@@ -19,7 +20,7 @@ A Discord bot that monitors Lost Ark server status (Brelshaza), supports roster 
 - `/check`: Force an immediate live check.
 - `/reset`: Reset state in `data/status.json`.
 - `/roster name:<character>`: Fetch roster and warn if it matches blacklist/whitelist.
-- `/list add type:<black|white> name:<character> reason:<text> [raid] [image]`: Add a list entry.
+- `/list add type:<black|white> name:<character> reason:<text> [raid] [image]`: Create an add proposal. Bot sends DM approval UI to one random ID from `OFFICER_APPROVER_IDS` and always to `SENIOR_APPROVER_ID`. On approval, the entry is saved and the requester gets the result.
 - `/list remove name:<character>`: Remove an entry. If the name exists in both lists, the bot shows 3 removal options (black/white/both).
 - `/listcheck image:<screenshot>`: Required image input. The bot sends the screenshot to Gemini, extracts up to 8 names, then returns one combined list with status icons (`⛔` blacklist, `✅` whitelist, `⛔✅` both). If a name is not in either list, the bot checks lostark.bible: `❓` means roster exists, otherwise it returns `No roster found: <name>`. Blacklist/whitelist reason is always shown in the result.
 
@@ -78,6 +79,16 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 ```text
 .
 |- bot.js
+|- bot/
+|  |- commands.js
+|  |- handlers/
+|  |  |- systemHandlers.js
+|  |  |- rosterHandler.js
+|  |  |- listHandlers.js
+|  |- services/
+|  |  |- rosterService.js
+|  |- utils/
+|  |  |- names.js
 |- config.js
 |- db.js
 |- monitor.js
