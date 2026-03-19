@@ -452,6 +452,9 @@ function shouldFailoverGeminiModel(status, bodyText) {
 function buildGeminiRequestBody(mimeType, imageBase64) {
   const prompt = [
     'Read this image and extract only Lost Ark character names that are clearly visible.',
+    'Preserve every character exactly as shown in the image, including special letters and diacritics.',
+    'Keep umlaut letters exactly: ë, ö, ü.',
+    'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
     'Return JSON array only, no markdown, no explanation.',
     'Example output: ["name1","name2"].',
     'If no valid names are found, return [].',
