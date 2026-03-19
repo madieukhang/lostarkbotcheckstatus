@@ -195,18 +195,27 @@ async function extractNamesFromImageWithGemini(image) {
 
 function buildListAddApprovalEmbed(guild, payload, options = {}) {
   const title = options.title || 'List add approval required';
+  const includeRequestedBy = options.includeRequestedBy ?? true;
+  const fields = [
+    { name: 'Request ID', value: payload.requestId, inline: false },
+    { name: 'Type', value: payload.type, inline: true },
+    { name: 'Name', value: payload.name, inline: true },
+    { name: 'Raid', value: payload.raid || 'N/A', inline: true },
+    { name: 'Reason', value: payload.reason, inline: false },
+  ];
+
+  if (includeRequestedBy) {
+    fields.push({
+      name: 'Requested by',
+      value: `${payload.requestedByDisplayName} (<@${payload.requestedByUserId}>)`,
+      inline: false,
+    });
+  }
 
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(`A new list add request was submitted in **${guild.name}**.`)
-    .addFields(
-      { name: 'Request ID', value: payload.requestId, inline: false },
-      { name: 'Type', value: payload.type, inline: true },
-      { name: 'Name', value: payload.name, inline: true },
-      { name: 'Raid', value: payload.raid || 'N/A', inline: true },
-      { name: 'Reason', value: payload.reason, inline: false },
-      { name: 'Requested by', value: `${payload.requestedByDisplayName} (<@${payload.requestedByUserId}>)`, inline: false }
-    )
+    .addFields(fields)
     .setColor(payload.type === 'black' ? 0xed4245 : 0x57f287)
     .setTimestamp(new Date());
 
@@ -241,6 +250,23 @@ function buildApprovalResultRow(actionLabel) {
       .setCustomId('listadd_approved_done')
       .setLabel(actionLabel)
       .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true)
+  );
+}
+
+function buildApprovalProcessingRow(action) {
+  const isApprove = action === 'listadd_approve';
+
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('listadd_processing_approve')
+      .setLabel(isApprove ? 'Approving...' : 'Approve')
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('listadd_processing_reject')
+      .setLabel(!isApprove ? 'Rejecting...' : 'Reject')
+      .setStyle(ButtonStyle.Danger)
       .setDisabled(true)
   );
 }
@@ -418,12 +444,19 @@ export function createListHandlers({ client }) {
       return;
     }
 
-    // Acknowledge the button click immediately to avoid Discord's 3s timeout.
-    await interaction.deferUpdate();
+    const isApproveAction = action === 'listadd_approve';
+
+    // Update message immediately so users see processing state and cannot spam clicks.
+    await interaction.update({
+      content: isApproveAction
+        ? `⏳ Processing approval by **${interaction.user.tag}**...`
+        : `⏳ Processing rejection by **${interaction.user.tag}**...`,
+      components: [buildApprovalProcessingRow(action)],
+    });
 
     pendingListAddApprovals.delete(requestId);
 
-    if (action === 'listadd_reject') {
+    if (!isApproveAction) {
       await interaction.editReply({
         content: `❌ Rejected by **${interaction.user.tag}**`,
         components: [buildApprovalResultRow('Rejected')],
@@ -633,6 +666,7 @@ export function createListHandlers({ client }) {
         embeds: [
           buildListAddApprovalEmbed(interaction.guild, payload, {
             title: 'List add proposal submitted',
+            includeRequestedBy: false,
           }),
         ],
       });
