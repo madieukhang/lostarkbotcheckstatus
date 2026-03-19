@@ -2,7 +2,41 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased] - 2026-03-17
+## [Unreleased] - 2026-03-19
+
+### Added
+
+- Added image-based `/listcheck` flow using Gemini OCR input.
+- Added Gemini model failover support via `GEMINI_MODELS` priority list.
+- Added approver-ID workflow for `/list add` proposals (DM Approve/Reject buttons).
+- Added hardcoded approver routing with one random officer plus always-on senior approver.
+- Added requester preview embed for submitted `/list add` proposals.
+- Added synchronized DM state updates across approvers during approval processing.
+- Added auto-approve path when requester is an officer or senior approver ID.
+- Added `addedByDisplayName` support for better creator display in list/roster results.
+
+### Changed
+
+- Refactored bot architecture from monolithic `bot.js` into modular handlers/services/utils.
+- Changed `/listcheck` to image-driven checking with a hard limit of 8 names.
+- Changed `/listcheck` output to always include reason details when available.
+- Changed roster output lines to include class info (`Name · Class · ilvl · power`).
+- Changed list add requester notification flow to reply in the original request channel context when possible.
+- Changed maintenance logic to fixed weekly window: Wednesday 07:00 UTC to Thursday 07:00 UTC.
+- Changed monitor scheduler behavior to execute status checks only during maintenance window ticks.
+
+### Fixed
+
+- Fixed Discord interaction timeout issues on approval buttons by acknowledging interactions immediately.
+- Fixed duplicate-click behavior by disabling approval buttons and showing processing state.
+- Fixed OCR extraction prompt for diacritic-sensitive names (`ë`, `ö`, `ü`).
+- Fixed approval UX so both approver DM messages reflect processing/final state consistently.
+
+### Documentation
+
+- Updated README command behavior notes for `/list add` approval flow and image-based `/listcheck`.
+
+## [2026-03-17]
 
 ### Added
 
