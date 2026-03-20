@@ -1,6 +1,5 @@
 import { JSDOM } from 'jsdom';
 
-import config from '../../config.js';
 import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
@@ -25,8 +24,7 @@ export async function fetchNameSuggestions(name) {
   try {
     const payload = Buffer.from(JSON.stringify([[1, 2], name, 'NA'])).toString('base64');
     const targetUrl = `https://lostark.bible/_app/remote/ngsbie/search?payload=${encodeURIComponent(payload)}`;
-    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    const res = await fetch(targetUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(10000) });
     if (!res.ok) return [];
 
     const json = await res.json();
@@ -60,8 +58,7 @@ export async function buildRosterCharacters(name) {
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
-    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
-    const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+    const response = await fetch(targetUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(15000) });
     if (response.ok) {
       const html = await response.text();
       const { document } = new JSDOM(html).window;
@@ -195,7 +192,9 @@ export async function parseRosterCharactersFromHtml(html, document) {
 
 // ─── Alt detection via Stronghold fingerprint ────────────────────────────────
 
-const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0' };
+const FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+};
 
 /**
  * Fetch a character's meta from lostark.bible (Stronghold, Roster Level, Guild).
