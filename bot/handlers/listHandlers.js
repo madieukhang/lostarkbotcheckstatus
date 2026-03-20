@@ -473,19 +473,24 @@ export function createListHandlers({ client }) {
   async function handleListAddApprovalButton(interaction) {
     const [action, requestId] = interaction.customId.split(':');
     await connectDB();
-    const payload = await PendingApproval.findOne({ requestId }).lean();
+    const payload = await PendingApproval.findOneAndDelete({
+      requestId,
+      approverIds: interaction.user.id,
+    }).lean();
 
     if (!payload) {
+      const stillExists = await PendingApproval.exists({ requestId });
+
+      if (stillExists) {
+        await interaction.reply({
+          content: '⛔ You are not allowed to approve/reject this request.',
+          ephemeral: true,
+        });
+        return;
+      }
+
       await interaction.reply({
         content: '⚠️ This approval request was already processed or has expired.',
-        ephemeral: true,
-      });
-      return;
-    }
-
-    if (!payload.approverIds.includes(interaction.user.id)) {
-      await interaction.reply({
-        content: '⛔ You are not allowed to approve/reject this request.',
         ephemeral: true,
       });
       return;
@@ -513,8 +518,6 @@ export function createListHandlers({ client }) {
       },
       { excludeMessageId: interaction.message.id }
     );
-
-    await PendingApproval.deleteOne({ requestId });
 
     if (!isApproveAction) {
       await interaction.editReply({
