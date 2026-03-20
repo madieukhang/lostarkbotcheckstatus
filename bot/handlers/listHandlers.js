@@ -676,27 +676,20 @@ export function createListHandlers({ client }) {
             hasRoster = rosterResult.hasValidRoster;
             failReason = rosterResult.failReason;
 
-            // OCR correction: if no roster, search for similar names (handles missed diacritics)
+            // If no roster found, search for similar names as suggestions (not auto-replace)
             if (!hasRoster) {
               const suggestions = await fetchNameSuggestions(name);
-              const topMatch = suggestions.find((s) => Number(s.itemLevel || 0) >= 1700);
-              if (topMatch && topMatch.name.toLowerCase() !== name.toLowerCase()) {
-                correctedName = topMatch.name;
-                // Re-check lists with corrected name
-                const [corrBlack, corrWhite, corrWatch] = await Promise.all([
-                  Blacklist.findOne({ $or: [{ name: correctedName }, { allCharacters: correctedName }] })
-                    .collation({ locale: 'en', strength: 2 }).lean(),
-                  Whitelist.findOne({ $or: [{ name: correctedName }, { allCharacters: correctedName }] })
-                    .collation({ locale: 'en', strength: 2 }).lean(),
-                  Watchlist.findOne({ $or: [{ name: correctedName }, { allCharacters: correctedName }] })
-                    .collation({ locale: 'en', strength: 2 }).lean(),
-                ]);
-                return { name, correctedName, blackEntry: corrBlack, whiteEntry: corrWhite, watchEntry: corrWatch, hasRoster: true };
+              const similar = suggestions
+                .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== name.toLowerCase())
+                .slice(0, 3)
+                .map((s) => s.name);
+              if (similar.length > 0) {
+                return { name, similarNames: similar, blackEntry: null, whiteEntry: null, watchEntry: null, hasRoster: false, failReason };
               }
             }
           }
 
-          return { name, correctedName, blackEntry, whiteEntry, watchEntry, hasRoster, failReason };
+          return { name, similarNames: null, blackEntry, whiteEntry, watchEntry, hasRoster, failReason };
         })
       );
 
@@ -723,17 +716,16 @@ export function createListHandlers({ client }) {
         if (isWhite) icon += '✅';
         if (isWatch) icon += '⚠️';
 
-        const displayName = item.correctedName
-          ? `**${item.correctedName}** *(OCR: ${item.name})*`
-          : `**${item.name}**`;
-
         if (icon) {
-          return `${idx + 1}. ${icon} ${displayName}${reasonSuffix}`;
+          return `${idx + 1}. ${icon} **${item.name}**${reasonSuffix}`;
         } else if (item.hasRoster) {
-          return `${idx + 1}. ❓ ${displayName}`;
+          return `${idx + 1}. ❓ **${item.name}**`;
         } else {
           const reason = item.failReason ? ` *(${item.failReason})*` : '';
-          return `${idx + 1}. No roster found: **${item.name}**${reason}`;
+          const similar = item.similarNames?.length > 0
+            ? ` — Similar: ${item.similarNames.map((n) => `[${n}](https://lostark.bible/character/NA/${encodeURIComponent(n)})`).join(', ')}`
+            : '';
+          return `${idx + 1}. No roster found: **${item.name}**${reason}${similar}`;
         }
       });
 
