@@ -9,7 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { EmbedBuilder } from 'discord.js';
 import config from './config.js';
-import { getServerStatus, STATUS } from './serverStatus.js';
+import { getServerStatus, getMultiServerStatus, STATUS } from './serverStatus.js';
 
 // ─── State helpers ────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ async function saveState(state) {
  * Build and send the Discord "server is online" embed to the configured channel.
  * @param {import('discord.js').Client} client
  */
-async function sendOnlineNotification(client) {
+async function sendOnlineNotification(client, serverName) {
   try {
     const channel = await client.channels.fetch(config.channelId);
     if (!channel || !channel.isTextBased()) {
@@ -58,20 +58,15 @@ async function sendOnlineNotification(client) {
       return;
     }
 
-    // Role mention string (<@&ROLE_ID>)
-    // const roleMention = `<@&${config.roleId}>`;
-
-    // Embed matching the spec: title "Thông báo", Vietnamese celebration message
     const embed = new EmbedBuilder()
       .setTitle('Thông báo')
-      .setDescription('Server status is online 🎉')
-      .setColor(15258703) // Decimal colour value from spec (#E9B84F amber-gold)
+      .setDescription(`**${serverName}** is online 🎉`)
+      .setColor(15258703)
       .setTimestamp();
 
-    // await channel.send({ content: roleMention, embeds: [embed] });
     await channel.send({ content: '@here', embeds: [embed] });
 
-    console.log('[monitor] Online notification sent.');
+    console.log(`[monitor] Online notification sent for ${serverName}.`);
   } catch (err) {
     console.error('[monitor] Failed to send notification:', err.message);
   }
@@ -98,57 +93,68 @@ function isInMaintenanceWindow() {
 // ─── Core check logic ─────────────────────────────────────────────────────────
 
 /**
- * Perform a single status check:
- *   1. Fetch current status from the website
- *   2. Compare with stored previous status
- *   3. Send notification if the server just came online
+ * Perform a status check for all configured servers:
+ *   1. Fetch current status from the website (single page fetch)
+ *   2. Compare with stored previous status per server
+ *   3. Send notification for each server that transitions to online
  *   4. Save updated state
  *
  * @param {import('discord.js').Client} client
- * @returns {Promise<string>} The current STATUS value
+ * @returns {Promise<Map<string, string>>} Map of server name → STATUS
  */
 export async function checkStatus(client) {
   const state = await loadState();
-  let currentStatus;
+  const servers = config.targetServers;
+  let statusMap;
+
+  // Ensure per-server state structure
+  if (!state.servers) state.servers = {};
 
   try {
-    currentStatus = await getServerStatus();
-    console.log(`[monitor] Status fetched: ${currentStatus} (was: ${state.lastStatus ?? 'unknown'})`);
+    statusMap = await getMultiServerStatus(servers);
+    for (const [server, status] of statusMap) {
+      const prev = state.servers[server]?.lastStatus ?? 'unknown';
+      console.log(`[monitor] ${server}: ${status} (was: ${prev})`);
+    }
   } catch (err) {
     console.error('[monitor] Error fetching server status:', err.message);
-    // Update check time even on failure so we don't spam error logs with stale timestamps
     state.lastCheckTime = new Date().toISOString();
     await saveState(state);
-    throw err; // Re-throw so callers (/check command) can report the error
+    throw err;
   }
 
-  const previousStatus = state.lastStatus;
   const now = new Date().toISOString();
 
-  // Record the very first status observed
-  if (state.initialStatus === null) {
-    state.initialStatus = currentStatus;
+  for (const [server, currentStatus] of statusMap) {
+    if (!state.servers[server]) {
+      state.servers[server] = { initialStatus: null, lastStatus: null, lastAlertTime: null };
+    }
+
+    const serverState = state.servers[server];
+
+    if (serverState.initialStatus === null) {
+      serverState.initialStatus = currentStatus;
+    }
+
+    const wasDown =
+      serverState.lastStatus === STATUS.OFFLINE || serverState.lastStatus === STATUS.MAINTENANCE;
+    const isNowOnline = currentStatus === STATUS.ONLINE;
+
+    if (wasDown && isNowOnline) {
+      console.log(`[monitor] ${server} came online – sending notification.`);
+      await sendOnlineNotification(client, server);
+      serverState.lastAlertTime = now;
+    }
+
+    serverState.lastStatus = currentStatus;
   }
 
-  // ── Transition detection ──────────────────────────────────────────────────
-  // Only alert when transitioning FROM offline or maintenance TO online.
-  // This prevents duplicate alerts if the bot restarts while online.
-  const wasDown =
-    previousStatus === STATUS.OFFLINE || previousStatus === STATUS.MAINTENANCE;
-  const isNowOnline = currentStatus === STATUS.ONLINE;
-
-  if (wasDown && isNowOnline) {
-    console.log('[monitor] Transition detected: server came online – sending notification.');
-    await sendOnlineNotification(client);
-    state.lastAlertTime = now;
-  }
-
-  // Persist updated state
-  state.lastStatus = currentStatus;
+  // Backward compat: keep top-level lastStatus for /status command
+  state.lastStatus = statusMap.get(servers[0]) ?? null;
   state.lastCheckTime = now;
   await saveState(state);
 
-  return currentStatus;
+  return statusMap;
 }
 
 // ─── Polling loop ─────────────────────────────────────────────────────────────
