@@ -8,6 +8,7 @@ import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import {
+  FETCH_HEADERS,
   parseRosterCharactersFromHtml,
   fetchNameSuggestions,
   formatSuggestionLines,
@@ -28,7 +29,7 @@ export async function handleRosterCommand(interaction) {
   try {
     const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
     const response = await fetch(targetUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+      headers: FETCH_HEADERS,
       signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -153,7 +154,7 @@ export async function handleRosterCommand(interaction) {
         try {
           const charUrl = `https://lostark.bible/character/NA/${encodeURIComponent(c.name)}`;
           const res = await fetch(charUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            headers: FETCH_HEADERS,
             signal: AbortSignal.timeout(10000),
           });
           if (!res.ok) return;

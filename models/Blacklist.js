@@ -85,4 +85,7 @@ blacklistSchema.index(
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 
+// Index on allCharacters for fast $in lookups during roster/listcheck cross-checks
+blacklistSchema.index({ allCharacters: 1 });
+
 export default mongoose.model('blacklist', blacklistSchema, 'blacklist');
