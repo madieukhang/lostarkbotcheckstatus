@@ -131,7 +131,7 @@ export async function handleRosterCommand(interaction) {
 
       // No guild — show suggestions as before
       const suggestions = await fetchNameSuggestions(name);
-      const filtered = suggestions.filter((s) => s.itemLevel > 1680);
+      const filtered = suggestions.filter((s) => s.itemLevel > 1700);
       if (filtered.length > 0) {
         const embed = new EmbedBuilder()
           .setDescription(formatSuggestionLines(filtered))
@@ -220,7 +220,7 @@ export async function handleRosterCommand(interaction) {
     })().catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
 
     const charNames = characters
-      .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1680)
+      .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1700)
       .map((c) => c.name);
 
     const [blacklistResult, whitelistResult] = await Promise.all([

@@ -23,7 +23,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 - `/check`: Force an immediate live check for all monitored servers.
 - `/reset`: Reset state in `data/status.json`.
 - `/roster name:<character>`: Fetch roster, show progression delta, cross-check lists. If roster is hidden: detect alts via Stronghold fingerprint + check guild members against lists.
-- `/search name:<character>`: Search lostark.bible for similar names, cross-check each against blacklist/whitelist/watchlist.
+- `/search name:<character> [min_ilvl] [max_ilvl] [class]`: Search lostark.bible for similar names (default ilvl ≥ 1700), cross-check against all lists. Optional filters: item level range, class.
 - `/list add type:<black|white|watch> name:<character> reason:<text> [raid] [image]`: Create an add proposal. Officers/senior auto-approve; others go through DM approval flow.
 - `/list remove name:<character>`: Remove an entry. If the name exists in multiple lists, shows removal options.
 - `/listcheck image:<screenshot>`: Extract names from screenshot via Gemini OCR, check against all lists. Status icons: `⛔` blacklist, `✅` whitelist, `⚠️` watchlist, `❓` roster exists, `No roster found`. Background: auto-enriches alt data for flagged entries.
