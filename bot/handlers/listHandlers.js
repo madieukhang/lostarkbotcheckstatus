@@ -74,7 +74,7 @@ function buildGeminiRequestBody(mimeType, imageBase64) {
   const prompt = [
     'This is a screenshot of a Lost Ark raid waiting room (party finder lobby).',
     'Extract ONLY the player character names from the party member list.',
-    'Ignore all other text: raid names, class names, item levels, buttons, chat messages.',
+    'Ignore all other text: raid names, class names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
     'Preserve every character exactly as shown, including special letters and diacritics.',
     'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
     'Keep umlaut letters exactly: ë, ö, ü.',
@@ -124,9 +124,17 @@ function parseGeminiNamesFromPayload(payload) {
     throw new Error('Gemini output is not an array.');
   }
 
+  // Known Lost Ark server/world names to filter out from OCR results
+  const SERVER_NAMES = new Set([
+    'azena', 'avesta', 'galatur', 'karta', 'ladon', 'kharmine',
+    'una', 'regulus', 'sasha', 'vykas', 'elgacia', 'thaemine',
+    'brelshaza', 'kazeros', 'arcturus', 'enviska', 'valtan', 'mari',
+    'akkan', 'vairgrys', 'bergstrom', 'danube', 'mokoko',
+  ]);
+
   const names = parsed
     .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
-    .filter(Boolean);
+    .filter((name) => name && !SERVER_NAMES.has(name.toLowerCase()));
 
   const seen = new Set();
   const unique = [];
