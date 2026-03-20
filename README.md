@@ -1,52 +1,59 @@
 # Lost Ark Discord Bot
 
-A Discord bot that monitors Lost Ark server status (Brelshaza), supports roster lookup, and manages guild blacklist/whitelist entries.
+A Discord bot that monitors Lost Ark server status, supports roster lookup, manages guild blacklist/whitelist/watchlist entries, and detects alt characters via Stronghold fingerprinting.
 
 ## Main Features
 
-- Periodically monitors Brelshaza and sends notifications when the server changes from offline/maintenance to online.
-- Slash commands for quick status operations (`/status`, `/check`, `/reset`).
-- `/roster` command to fetch roster data from lostark.bible (via ScraperAPI).
-- `/list add` and `/list remove` to manage blacklist/whitelist entries.
-- `/list add` now uses approver-ID approval flow (proposal -> DM Approve/Reject).
-- `/listcheck` command to check up to 8 names at once against blacklist/whitelist from image.
-- `/listcheck` reads names from an uploaded image via Gemini.
-- Optional `raid` tag and optional evidence image when adding list entries.
+- **Multi-server monitoring**: Monitors one or more servers (e.g. Brelshaza, Thaemine) and sends notifications when servers come online.
+- **Slash commands** for quick status operations (`/status`, `/check`, `/reset`).
+- **`/roster`** command to fetch roster data from lostark.bible with progression tracking (shows ilvl delta since last check).
+- **Alt detection**: When roster is hidden, detects alt characters via Stronghold name + Roster Level matching across guild members.
+- **Guild member check**: When roster is hidden, checks all guild members against blacklist/whitelist/watchlist.
+- **`/search`** command to find similar character names on lostark.bible with cross-check against all lists.
+- **`/list add` and `/list remove`** to manage blacklist/whitelist/watchlist entries with approval flow.
+- **`/listcheck`** command to check up to 8 names from a screenshot (Gemini OCR) against all lists.
+- **Auto-check channels**: Drop screenshots in configured channel(s) for automatic checking without commands.
+- **Watchlist**: Mark suspicious characters as "under investigation" (`/list add type:watch`).
+- **Auto-enrich**: When `/listcheck` finds a flagged character, background guild scan discovers and links alt characters to the database.
 - Roster-based duplicate checks (`allCharacters`) with case-insensitive matching.
 
-## Command
+## Commands
 
-- `/status`: Show the latest cached status.
-- `/check`: Force an immediate live check.
+- `/status`: Show the latest cached status for all monitored servers.
+- `/check`: Force an immediate live check for all monitored servers.
 - `/reset`: Reset state in `data/status.json`.
-- `/roster name:<character>`: Fetch roster and warn if it matches blacklist/whitelist.
-- `/list add type:<black|white> name:<character> reason:<text> [raid] [image]`: Create an add proposal. Bot sends DM approval UI to one random ID from `OFFICER_APPROVER_IDS` and always to `SENIOR_APPROVER_ID`. On approval, the entry is saved and the requester gets the result.
-- `/list remove name:<character>`: Remove an entry. If the name exists in both lists, the bot shows 3 removal options (black/white/both).
-- `/listcheck image:<screenshot>`: Required image input. The bot sends the screenshot to Gemini, extracts up to 8 names, then returns one combined list with status icons (`⛔` blacklist, `✅` whitelist, `⛔✅` both). If a name is not in either list, the bot checks lostark.bible: `❓` means roster exists, otherwise it returns `No roster found: <name>`. Blacklist/whitelist reason is always shown in the result.
+- `/roster name:<character>`: Fetch roster, show progression delta, cross-check lists. If roster is hidden: detect alts via Stronghold fingerprint + check guild members against lists.
+- `/search name:<character>`: Search lostark.bible for similar names, cross-check each against blacklist/whitelist/watchlist.
+- `/list add type:<black|white|watch> name:<character> reason:<text> [raid] [image]`: Create an add proposal. Officers/senior auto-approve; others go through DM approval flow.
+- `/list remove name:<character>`: Remove an entry. If the name exists in multiple lists, shows removal options.
+- `/listcheck image:<screenshot>`: Extract names from screenshot via Gemini OCR, check against all lists. Status icons: `⛔` blacklist, `✅` whitelist, `⚠️` watchlist, `❓` roster exists, `No roster found`. Background: auto-enriches alt data for flagged entries.
 
 ## Requirements
 
 - Node.js >= 20
 - MongoDB
 - Discord bot token and channel ID
-- ScraperAPI key
-- Gemini API key (optional, only needed for image-based `/listcheck`)
+- Gemini API key (optional, needed for `/listcheck` and auto-check)
+- Discord Privileged Intent: **Message Content Intent** (needed for auto-check channel feature)
 
 ## Environment Setup
 
-Copy `.env.example` to `.env` and fill in all values:
+Copy `.env.example` to `.env` and fill in required values:
 
+### Required
 - `DISCORD_TOKEN`: Discord bot token
 - `CHANNEL_ID`: Notification channel ID
-- `ROLE_ID`: Role ID (currently not required in code)
-- `CHECK_INTERVAL`: Check interval in seconds (minimum 10, default 30)
 - `MONGODB_URI`: MongoDB connection string
-- `SCRAPERAPI_KEY`: API key for crawling lostark.bible
-- `GEMINI_API_KEY`: optional key for Gemini image parsing in `/listcheck`
-- `GEMINI_MODELS`: optional comma-separated model priority list for failover (default: `gemini-2.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash-lite,gemini-3-flash`)
-- `GEMINI_MODEL`: backward-compatible single-model fallback if `GEMINI_MODELS` is not set
 
-When image parsing hits Gemini free-tier quota/rate limits (for example RPM/RPD exhaustion), the bot automatically tries the next model in `GEMINI_MODELS`.
+### Optional
+- `CHECK_INTERVAL`: Check interval in seconds (minimum 10, default 30)
+- `TARGET_SERVERS`: Comma-separated server names to monitor (default: `Brelshaza`). Example: `Brelshaza,Thaemine`
+- `GEMINI_API_KEY`: Key for Gemini image parsing in `/listcheck` and auto-check
+- `GEMINI_MODELS`: Comma-separated model priority list for failover (default: `gemini-2.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash-lite,gemini-3-flash`)
+- `AUTO_CHECK_CHANNEL_IDS`: Comma-separated channel IDs for auto-check (drop image → auto listcheck)
+- `SCRAPERAPI_KEY`: No longer required — lostark.bible is accessed directly
+
+When image parsing hits Gemini free-tier quota/rate limits, the bot automatically tries the next model in `GEMINI_MODELS`.
 
 ## Run Locally
 
@@ -85,6 +92,8 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 |  |  |- systemHandlers.js
 |  |  |- rosterHandler.js
 |  |  |- listHandlers.js
+|  |  |- searchHandler.js
+|  |  |- autoCheckHandler.js
 |  |- services/
 |  |  |- rosterService.js
 |  |- utils/
@@ -96,8 +105,11 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 |- models/
 |  |- Blacklist.js
 |  |- Whitelist.js
+|  |- Watchlist.js
 |  |- Class.js
 |  |- Raid.js
+|  |- PendingApproval.js
+|  |- RosterSnapshot.js
 |- data/
 |  |- status.json
 ```

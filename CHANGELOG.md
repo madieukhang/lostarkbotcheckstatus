@@ -2,7 +2,46 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased] - 2026-03-19
+## [Unreleased] - 2026-03-20
+
+### Added
+
+- Added `/search name:<character>` command to find similar names on lostark.bible with cross-check against all lists.
+- Added alt detection via Stronghold fingerprint when roster is hidden — matches Stronghold name + Roster Level across guild members to find same-account alts.
+- Added guild member list check when roster is hidden — fast DB query for any flagged guild members.
+- Added auto-enrich `allCharacters` in `/listcheck` — when a flagged character is found, background guild scan discovers and links alt characters automatically.
+- Added auto-check channel feature — drop screenshots in configured channel(s), bot checks automatically without `/listcheck` command.
+- Added `AUTO_CHECK_CHANNEL_IDS` env var (comma-separated) for multi-channel/multi-server auto-check support.
+- Added multi-server monitoring — `TARGET_SERVERS` env var accepts comma-separated server names, single page fetch checks all servers.
+- Added watchlist (`/list add type:watch`) for characters under investigation — shows ⚠️ icon in check results.
+- Added roster progression tracking — `/roster` shows ilvl delta since last check (e.g. `1740 *(+10.00)*`).
+- Added `RosterSnapshot` model for storing ilvl history per character.
+- Added `PendingApproval` model with TTL index (24h auto-cleanup) to persist `/list add` approvals across bot restarts.
+- Added MongoDB index on `allCharacters` field for fast `$in` lookups.
+
+### Changed
+
+- Replaced ScraperAPI with direct fetch for all lostark.bible requests — faster, no API key needed.
+- `SCRAPERAPI_KEY` is now optional (no longer required at startup).
+- Improved Gemini OCR prompt with Lost Ark waiting room context for better name extraction accuracy.
+- Gemini timeout/network errors now trigger model failover (previously only HTTP errors did).
+- Added image upload size limit (20MB) to prevent memory issues.
+- `/roster` blacklist/whitelist check now uses `allCharacters` field (previously only checked `name`).
+- Replaced sequential `findOne` loops with batch `$in` queries for roster list checks.
+- Replaced `Blacklist.find({}).lean()` with `countDocuments()` for debug logging.
+- `/roster` name normalization now uses shared `normalizeCharacterName()` utility.
+- Exported shared `FETCH_HEADERS` from rosterService for consistent User-Agent across all handlers.
+- MongoDB connects once at startup (`bot.js`) instead of per-handler lazy connect.
+- `/listcheck` alt enrichment runs in background after reply (user no longer waits for guild scan).
+- `/status` and `/check` commands now show all monitored servers with individual status.
+- Suppressed JSDOM CSS parse warnings with VirtualConsole.
+
+### Fixed
+
+- Fixed `/roster` not detecting alt characters via `allCharacters` field (bug: only checked `name`).
+- Fixed pending `/list add` approvals lost on bot restart (now persisted to MongoDB).
+
+## [2026-03-19]
 
 ### Added
 
