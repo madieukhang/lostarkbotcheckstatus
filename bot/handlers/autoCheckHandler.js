@@ -180,11 +180,29 @@ export function setupAutoCheck(client) {
 
             if (!hasRoster) {
               const suggestions = await fetchNameSuggestions(name);
-              const similar = suggestions
+              const similarCandidates = suggestions
                 .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== name.toLowerCase())
-                .slice(0, 3)
-                .map((s) => s.name);
-              if (similar.length > 0) similarNames = similar;
+                .slice(0, 3);
+
+              if (similarCandidates.length > 0) {
+                similarNames = await Promise.all(
+                  similarCandidates.map(async (s) => {
+                    const [b, w, wa] = await Promise.all([
+                      Blacklist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
+                        .collation({ locale: 'en', strength: 2 }).lean(),
+                      Whitelist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
+                        .collation({ locale: 'en', strength: 2 }).lean(),
+                      Watchlist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
+                        .collation({ locale: 'en', strength: 2 }).lean(),
+                    ]);
+                    let flag = '';
+                    if (b) flag += '⛔';
+                    if (w) flag += '✅';
+                    if (wa) flag += '⚠️';
+                    return { name: s.name, flag };
+                  })
+                );
+              }
             }
           }
 
@@ -221,7 +239,7 @@ export function setupAutoCheck(client) {
         } else {
           const reason = item.failReason ? ` *(${item.failReason})*` : '';
           const similar = item.similarNames?.length > 0
-            ? ` — Similar: ${item.similarNames.map((n) => `[${n}](https://lostark.bible/character/NA/${encodeURIComponent(n)})`).join(', ')}`
+            ? ` — Similar: ${item.similarNames.map((s) => `${s.flag ? s.flag + ' ' : ''}[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)})`).join(', ')}`
             : '';
           return `${idx + 1}. No roster found: **${item.name}**${reason}${similar}`;
         }
