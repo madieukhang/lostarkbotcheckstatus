@@ -18,10 +18,15 @@ import { createSystemHandlers } from './bot/handlers/systemHandlers.js';
 import { handleRosterCommand } from './bot/handlers/rosterHandler.js';
 import { createListHandlers } from './bot/handlers/listHandlers.js';
 import { handleSearchCommand } from './bot/handlers/searchHandler.js';
+import { setupAutoCheck } from './bot/handlers/autoCheckHandler.js';
 import { connectDB } from './db.js';
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
 const systemHandlers = createSystemHandlers({
@@ -49,6 +54,7 @@ client.once('ready', async () => {
   await connectDB();
   await registerCommands();
   startMonitor(client);
+  setupAutoCheck(client);
 });
 
 client.on('interactionCreate', async (interaction) => {
