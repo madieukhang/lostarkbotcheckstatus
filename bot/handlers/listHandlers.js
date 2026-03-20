@@ -157,6 +157,11 @@ async function extractNamesFromImageWithGemini(image) {
     throw new Error(`Failed to download attachment (HTTP ${imageRes.status})`);
   }
 
+  const contentLength = imageRes.headers.get('content-length');
+  if (contentLength && parseInt(contentLength) > 20 * 1024 * 1024) {
+    throw new Error('Image file too large (max 20MB).');
+  }
+
   const mimeType = image.contentType || imageRes.headers.get('content-type') || 'image/png';
   const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
   const imageBase64 = imageBuffer.toString('base64');
@@ -171,12 +176,24 @@ async function extractNamesFromImageWithGemini(image) {
     const model = models[i];
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
 
-    const aiRes = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-      signal: AbortSignal.timeout(30000),
-    });
+    let aiRes;
+    try {
+      aiRes = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch (fetchErr) {
+      // Timeout or network error — try next model if available
+      failures.push(`${model}: ${fetchErr.name || fetchErr.message}`);
+      const canFallback = i < models.length - 1;
+      if (canFallback) {
+        console.warn(`[listcheck] Gemini timeout/network error on ${model}, trying fallback model.`);
+        continue;
+      }
+      throw new Error(`Gemini request failed on ${model}: ${fetchErr.message}`);
+    }
 
     if (!aiRes.ok) {
       const errBody = await aiRes.text().catch(() => '');

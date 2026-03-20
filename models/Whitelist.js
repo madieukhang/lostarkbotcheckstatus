@@ -81,4 +81,7 @@ whitelistSchema.index(
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 
+// Index on allCharacters for fast $in lookups during roster/listcheck cross-checks
+whitelistSchema.index({ allCharacters: 1 });
+
 export default mongoose.model('whitelist', whitelistSchema, 'whitelist');

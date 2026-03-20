@@ -18,6 +18,7 @@ import { createSystemHandlers } from './bot/handlers/systemHandlers.js';
 import { handleRosterCommand } from './bot/handlers/rosterHandler.js';
 import { createListHandlers } from './bot/handlers/listHandlers.js';
 import { handleSearchCommand } from './bot/handlers/searchHandler.js';
+import { connectDB } from './db.js';
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -45,6 +46,7 @@ async function registerCommands() {
 
 client.once('ready', async () => {
   console.log(`[bot] Logged in as ${client.user.tag}`);
+  await connectDB();
   await registerCommands();
   startMonitor(client);
 });
