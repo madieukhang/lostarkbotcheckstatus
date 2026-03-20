@@ -73,6 +73,12 @@ const config = {
   /** ScraperAPI key (no longer required — lostark.bible is accessible directly) */
   scraperApiKey: (process.env.SCRAPERAPI_KEY || '').trim(),
 
+  /** Optional channel IDs to broadcast list add/remove notifications (comma-separated) */
+  listNotifyChannelIds: (process.env.LIST_NOTIFY_CHANNEL_IDS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+
   /** Optional channel IDs for auto-checking screenshots (comma-separated) */
   autoCheckChannelIds: (process.env.AUTO_CHECK_CHANNEL_IDS || process.env.AUTO_CHECK_CHANNEL_ID || '')
     .split(',')
