@@ -80,11 +80,15 @@ export async function fetchNameSuggestions(name) {
 export async function buildRosterCharacters(name) {
   let allCharacters = [name];
   let hasValidRoster = false;
+  let failReason = null;
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
     const response = await fetchWithFallback(targetUrl);
-    if (response.ok) {
+
+    if (!response.ok) {
+      failReason = `HTTP ${response.status}`;
+    } else {
       const html = await response.text();
       const { document } = new JSDOM(html).window;
       const links = document.querySelectorAll('a[href^="/character/NA/"]');
@@ -108,10 +112,11 @@ export async function buildRosterCharacters(name) {
       }
     }
   } catch (err) {
+    failReason = err.name === 'TimeoutError' ? 'timeout' : err.message;
     console.warn('[list] Failed to fetch roster characters:', err.message);
   }
 
-  return { hasValidRoster, allCharacters };
+  return { hasValidRoster, allCharacters, failReason };
 }
 
 export async function handleRosterBlackListCheck(names) {

@@ -159,9 +159,11 @@ export function setupAutoCheck(client) {
 
           let hasRoster = false;
           let correctedName = null;
+          let failReason = null;
           if (!blackEntry && !whiteEntry && !watchEntry) {
             const rosterResult = await buildRosterCharacters(name);
             hasRoster = rosterResult.hasValidRoster;
+            failReason = rosterResult.failReason;
 
             // OCR correction: search for similar names when no roster found
             if (!hasRoster) {
@@ -182,7 +184,7 @@ export function setupAutoCheck(client) {
             }
           }
 
-          return { name, correctedName, blackEntry, whiteEntry, watchEntry, hasRoster };
+          return { name, correctedName, blackEntry, whiteEntry, watchEntry, hasRoster, failReason };
         })
       );
 
@@ -217,7 +219,8 @@ export function setupAutoCheck(client) {
         } else if (item.hasRoster) {
           return `${idx + 1}. ❓ ${displayName}`;
         } else {
-          return `${idx + 1}. No roster found: **${item.name}**`;
+          const reason = item.failReason ? ` *(${item.failReason})*` : '';
+          return `${idx + 1}. No roster found: **${item.name}**${reason}`;
         }
       });
 
