@@ -76,6 +76,7 @@ function buildGeminiRequestBody(mimeType, imageBase64) {
     'Extract ONLY the player character names from the party member list.',
     'Ignore all other text: raid names, class names, item levels, buttons, chat messages.',
     'Preserve every character exactly as shown, including special letters and diacritics.',
+    'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
     'Keep umlaut letters exactly: ë, ö, ü.',
     'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
     'Return JSON array only, no markdown, no explanation.',
@@ -641,12 +642,32 @@ export function createListHandlers({ client }) {
           ]);
 
           let hasRoster = false;
+          let correctedName = null;
           if (!blackEntry && !whiteEntry && !watchEntry) {
             const rosterResult = await buildRosterCharacters(name);
             hasRoster = rosterResult.hasValidRoster;
+
+            // OCR correction: if no roster, search for similar names (handles missed diacritics)
+            if (!hasRoster) {
+              const suggestions = await fetchNameSuggestions(name);
+              const topMatch = suggestions.find((s) => Number(s.itemLevel || 0) >= 1700);
+              if (topMatch && topMatch.name.toLowerCase() !== name.toLowerCase()) {
+                correctedName = topMatch.name;
+                // Re-check lists with corrected name
+                const [corrBlack, corrWhite, corrWatch] = await Promise.all([
+                  Blacklist.findOne({ $or: [{ name: correctedName }, { allCharacters: correctedName }] })
+                    .collation({ locale: 'en', strength: 2 }).lean(),
+                  Whitelist.findOne({ $or: [{ name: correctedName }, { allCharacters: correctedName }] })
+                    .collation({ locale: 'en', strength: 2 }).lean(),
+                  Watchlist.findOne({ $or: [{ name: correctedName }, { allCharacters: correctedName }] })
+                    .collation({ locale: 'en', strength: 2 }).lean(),
+                ]);
+                return { name, correctedName, blackEntry: corrBlack, whiteEntry: corrWhite, watchEntry: corrWatch, hasRoster: true };
+              }
+            }
           }
 
-          return { name, blackEntry, whiteEntry, watchEntry, hasRoster };
+          return { name, correctedName, blackEntry, whiteEntry, watchEntry, hasRoster };
         })
       );
 
@@ -673,10 +694,14 @@ export function createListHandlers({ client }) {
         if (isWhite) icon += '✅';
         if (isWatch) icon += '⚠️';
 
+        const displayName = item.correctedName
+          ? `**${item.correctedName}** *(OCR: ${item.name})*`
+          : `**${item.name}**`;
+
         if (icon) {
-          return `${idx + 1}. ${icon} **${item.name}**${reasonSuffix}`;
+          return `${idx + 1}. ${icon} ${displayName}${reasonSuffix}`;
         } else if (item.hasRoster) {
-          return `${idx + 1}. ❓ **${item.name}**`;
+          return `${idx + 1}. ❓ ${displayName}`;
         } else {
           return `${idx + 1}. No roster found: **${item.name}**`;
         }
