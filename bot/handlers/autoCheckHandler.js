@@ -8,8 +8,10 @@ import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
+import Watchlist from '../../models/Watchlist.js';
 import {
   buildRosterCharacters,
+  fetchNameSuggestions,
   detectAltsViaStronghold,
 } from '../services/rosterService.js';
 import {
@@ -143,55 +145,80 @@ export function setupAutoCheck(client) {
 
       const results = await Promise.all(
         limitedNames.map(async (name) => {
-          const [blackEntry, whiteEntry] = await Promise.all([
+          const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
             Blacklist.findOne({ $or: [{ name }, { allCharacters: name }] })
               .collation({ locale: 'en', strength: 2 })
               .lean(),
             Whitelist.findOne({ $or: [{ name }, { allCharacters: name }] })
               .collation({ locale: 'en', strength: 2 })
               .lean(),
+            Watchlist.findOne({ $or: [{ name }, { allCharacters: name }] })
+              .collation({ locale: 'en', strength: 2 })
+              .lean(),
           ]);
 
           let hasRoster = false;
-          if (!blackEntry && !whiteEntry) {
+          let correctedName = null;
+          if (!blackEntry && !whiteEntry && !watchEntry) {
             const rosterResult = await buildRosterCharacters(name);
             hasRoster = rosterResult.hasValidRoster;
+
+            // OCR correction: search for similar names when no roster found
+            if (!hasRoster) {
+              const suggestions = await fetchNameSuggestions(name);
+              const topMatch = suggestions.find((s) => Number(s.itemLevel || 0) >= 1700);
+              if (topMatch && topMatch.name.toLowerCase() !== name.toLowerCase()) {
+                correctedName = topMatch.name;
+                const [corrBlack, corrWhite, corrWatch] = await Promise.all([
+                  Blacklist.findOne({ $or: [{ name: correctedName }, { allCharacters: correctedName }] })
+                    .collation({ locale: 'en', strength: 2 }).lean(),
+                  Whitelist.findOne({ $or: [{ name: correctedName }, { allCharacters: correctedName }] })
+                    .collation({ locale: 'en', strength: 2 }).lean(),
+                  Watchlist.findOne({ $or: [{ name: correctedName }, { allCharacters: correctedName }] })
+                    .collation({ locale: 'en', strength: 2 }).lean(),
+                ]);
+                return { name, correctedName, blackEntry: corrBlack, whiteEntry: corrWhite, watchEntry: corrWatch, hasRoster: true };
+              }
+            }
           }
 
-          return { name, blackEntry, whiteEntry, hasRoster };
+          return { name, correctedName, blackEntry, whiteEntry, watchEntry, hasRoster };
         })
       );
 
       const lines = results.map((item, idx) => {
         const isBlack = Boolean(item.blackEntry);
         const isWhite = Boolean(item.whiteEntry);
+        const isWatch = Boolean(item.watchEntry);
 
         const reasonParts = [];
-        if (isBlack) {
+        for (const [entry, label] of [[item.blackEntry, 'black'], [item.whiteEntry, 'white'], [item.watchEntry, 'watch']]) {
+          if (!entry) continue;
           const details = [];
-          if (item.blackEntry.reason?.trim()) details.push(item.blackEntry.reason.trim());
-          const addedBy = getAddedByDisplay(item.blackEntry);
+          if (entry.reason?.trim()) details.push(entry.reason.trim());
+          const addedBy = getAddedByDisplay(entry);
           if (addedBy) details.push(`Added by: **${addedBy}**`);
-          if (details.length > 0) reasonParts.push(`black: ${details.join(' — ')}`);
-        }
-        if (isWhite) {
-          const details = [];
-          if (item.whiteEntry.reason?.trim()) details.push(item.whiteEntry.reason.trim());
-          const addedBy = getAddedByDisplay(item.whiteEntry);
-          if (addedBy) details.push(`Added by: **${addedBy}**`);
-          if (details.length > 0) reasonParts.push(`white: ${details.join(' — ')}`);
+          if (details.length > 0) reasonParts.push(`${label}: ${details.join(' — ')}`);
         }
 
         const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
 
-        let icon = '';
-        if (isBlack && isWhite) icon = '⛔✅ ';
-        else if (isBlack) icon = '⛔ ';
-        else if (isWhite) icon = '✅ ';
-        else if (item.hasRoster) icon = '❓ ';
-        else return `${idx + 1}. No roster found: **${item.name}**`;
+        const displayName = item.correctedName
+          ? `**${item.correctedName}** *(OCR: ${item.name})*`
+          : `**${item.name}**`;
 
-        return `${idx + 1}. ${icon}**${item.name}**${reasonSuffix}`;
+        let icon = '';
+        if (isBlack) icon += '⛔';
+        if (isWhite) icon += '✅';
+        if (isWatch) icon += '⚠️';
+
+        if (icon) {
+          return `${idx + 1}. ${icon} ${displayName}${reasonSuffix}`;
+        } else if (item.hasRoster) {
+          return `${idx + 1}. ❓ ${displayName}`;
+        } else {
+          return `${idx + 1}. No roster found: **${item.name}**`;
+        }
       });
 
       const content = [
@@ -203,11 +230,11 @@ export function setupAutoCheck(client) {
       await message.reply({ content });
 
       // Background enrichment for flagged entries
-      const flaggedItems = results.filter((item) => item.blackEntry || item.whiteEntry);
+      const flaggedItems = results.filter((item) => item.blackEntry || item.whiteEntry || item.watchEntry);
       if (flaggedItems.length > 0) {
         (async () => {
           for (const item of flaggedItems) {
-            const listEntry = item.blackEntry || item.whiteEntry;
+            const listEntry = item.blackEntry || item.whiteEntry || item.watchEntry;
             try {
               const altResult = await detectAltsViaStronghold(item.name);
               if (altResult && altResult.alts.length > 0) {
