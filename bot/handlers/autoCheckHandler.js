@@ -254,6 +254,7 @@ export function setupAutoCheck(client) {
 
       await message.reply({ content });
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
+      await message.react('✅').catch(() => {});
 
       // Background enrichment for flagged entries
       const flaggedItems = results.filter((item) => item.blackEntry || item.whiteEntry || item.watchEntry);
