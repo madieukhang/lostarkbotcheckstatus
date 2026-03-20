@@ -87,7 +87,7 @@ export async function buildRosterCharacters(name) {
     const response = await fetchWithFallback(targetUrl);
 
     if (!response.ok) {
-      failReason = `HTTP ${response.status}`;
+      failReason = response.status === 429 ? 'Rate limited — try again later' : `HTTP ${response.status}`;
     } else {
       const html = await response.text();
       const { document } = new JSDOM(html).window;
