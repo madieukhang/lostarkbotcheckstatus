@@ -1,5 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 
+import config from '../../config.js';
 import { STATUS } from '../../serverStatus.js';
 
 function formatStatus(status) {
@@ -15,42 +16,51 @@ function formatStatus(status) {
   }
 }
 
+function getStatusColor(status) {
+  if (status === STATUS.ONLINE) return 0x57f287;
+  if (status === STATUS.MAINTENANCE) return 0xfee75c;
+  return 0xed4245;
+}
+
 export function createSystemHandlers({ getState, checkStatus, resetState, client }) {
   async function handleStatusCommand(interaction) {
     await interaction.deferReply();
 
     const state = await getState();
+    const servers = state.servers || {};
+    const serverNames = config.targetServers;
+
+    const fields = [];
+
+    for (const server of serverNames) {
+      const s = servers[server];
+      fields.push({
+        name: server,
+        value: formatStatus(s?.lastStatus ?? null),
+        inline: true,
+      });
+    }
+
+    fields.push(
+      {
+        name: 'Last Checked',
+        value: state.lastCheckTime
+          ? `<t:${Math.floor(new Date(state.lastCheckTime).getTime() / 1000)}:R>`
+          : 'Never',
+        inline: true,
+      }
+    );
+
+    // Color based on worst status across all servers
+    const allStatuses = serverNames.map((s) => servers[s]?.lastStatus);
+    const hasOffline = allStatuses.some((s) => s === STATUS.OFFLINE);
+    const hasMaintenance = allStatuses.some((s) => s === STATUS.MAINTENANCE);
+    const color = hasOffline ? 0xed4245 : hasMaintenance ? 0xfee75c : 0x57f287;
 
     const embed = new EmbedBuilder()
-      .setTitle('Server status – Server Status')
-      .addFields(
-        {
-          name: 'Current Status',
-          value: formatStatus(state.lastStatus),
-          inline: true,
-        },
-        {
-          name: 'Last Checked',
-          value: state.lastCheckTime
-            ? `<t:${Math.floor(new Date(state.lastCheckTime).getTime() / 1000)}:R>`
-            : 'Never',
-          inline: true,
-        },
-        {
-          name: 'Last Alert Sent',
-          value: state.lastAlertTime
-            ? `<t:${Math.floor(new Date(state.lastAlertTime).getTime() / 1000)}:R>`
-            : 'Never',
-          inline: true,
-        }
-      )
-      .setColor(
-        state.lastStatus === STATUS.ONLINE
-          ? 0x57f287
-          : state.lastStatus === STATUS.MAINTENANCE
-          ? 0xfee75c
-          : 0xed4245
-      )
+      .setTitle('Server Status')
+      .addFields(fields)
+      .setColor(color)
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
@@ -60,17 +70,21 @@ export function createSystemHandlers({ getState, checkStatus, resetState, client
     await interaction.deferReply();
 
     try {
-      const current = await checkStatus(client);
+      const statusMap = await checkStatus(client);
+
+      const lines = [];
+      for (const [server, status] of statusMap) {
+        lines.push(`**${server}**: ${formatStatus(status)}`);
+      }
+
+      const allOnline = [...statusMap.values()].every((s) => s === STATUS.ONLINE);
+      const hasOffline = [...statusMap.values()].some((s) => s === STATUS.OFFLINE);
+      const color = hasOffline ? 0xed4245 : allOnline ? 0x57f287 : 0xfee75c;
+
       const embed = new EmbedBuilder()
-        .setTitle('Server status – Live Check')
-        .setDescription(`Status right now: **${formatStatus(current)}**`)
-        .setColor(
-          current === STATUS.ONLINE
-            ? 0x57f287
-            : current === STATUS.MAINTENANCE
-            ? 0xfee75c
-            : 0xed4245
-        )
+        .setTitle('Server Status – Live Check')
+        .setDescription(lines.join('\n'))
+        .setColor(color)
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
