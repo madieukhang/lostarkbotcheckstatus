@@ -1,10 +1,35 @@
 import { JSDOM } from 'jsdom';
 
+import config from '../../config.js';
 import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import { getClassName } from '../../models/Class.js';
 import { getAddedByDisplay } from '../utils/names.js';
+
+/**
+ * Fetch a URL with automatic ScraperAPI fallback on 403.
+ * Tries direct fetch first (fast). If blocked (403/503), retries via ScraperAPI proxy.
+ *
+ * @param {string} url
+ * @param {object} [options]
+ * @returns {Promise<Response>}
+ */
+export async function fetchWithFallback(url, options = {}) {
+  const res = await fetch(url, {
+    headers: FETCH_HEADERS,
+    signal: AbortSignal.timeout(15000),
+    ...options,
+  });
+
+  if ((res.status === 403 || res.status === 503) && config.scraperApiKey) {
+    console.warn(`[fetch] ${res.status} on direct fetch, falling back to ScraperAPI: ${url}`);
+    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(url)}`;
+    return fetch(proxyUrl, { signal: AbortSignal.timeout(30000) });
+  }
+
+  return res;
+}
 
 export function extractRosterClassMapFromHtml(html) {
   const rosterClassMap = new Map();
@@ -24,7 +49,7 @@ export async function fetchNameSuggestions(name) {
   try {
     const payload = Buffer.from(JSON.stringify([[1, 2], name, 'NA'])).toString('base64');
     const targetUrl = `https://lostark.bible/_app/remote/ngsbie/search?payload=${encodeURIComponent(payload)}`;
-    const res = await fetch(targetUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(10000) });
+    const res = await fetchWithFallback(targetUrl);
     if (!res.ok) return [];
 
     const json = await res.json();
@@ -58,7 +83,7 @@ export async function buildRosterCharacters(name) {
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
-    const response = await fetch(targetUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(15000) });
+    const response = await fetchWithFallback(targetUrl);
     if (response.ok) {
       const html = await response.text();
       const { document } = new JSDOM(html).window;
@@ -205,13 +230,13 @@ export const FETCH_HEADERS = {
 export async function fetchCharacterMeta(name) {
   try {
     const url = `https://lostark.bible/character/NA/${encodeURIComponent(name)}`;
-    let res = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(10000) });
+    let res = await fetchWithFallback(url);
 
     // Handle rate limit: wait and retry once
     if (res.status === 429) {
       console.warn(`[alt-detect] 429 rate-limited on ${name}, waiting 5s to retry...`);
       await new Promise((r) => setTimeout(r, 5000));
-      res = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(10000) });
+      res = await fetchWithFallback(url);
     }
 
     if (!res.ok) return null;
@@ -249,7 +274,7 @@ export async function fetchCharacterMeta(name) {
 export async function fetchGuildMembers(name) {
   try {
     const url = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild`;
-    const res = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(15000) });
+    const res = await fetchWithFallback(url);
     if (!res.ok) return [];
 
     const html = await res.text();

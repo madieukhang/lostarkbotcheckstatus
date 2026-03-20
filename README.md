@@ -51,7 +51,7 @@ Copy `.env.example` to `.env` and fill in required values:
 - `GEMINI_API_KEY`: Key for Gemini image parsing in `/listcheck` and auto-check
 - `GEMINI_MODELS`: Comma-separated model priority list for failover (default: `gemini-2.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash-lite,gemini-3-flash`)
 - `AUTO_CHECK_CHANNEL_IDS`: Comma-separated channel IDs for auto-check (drop image → auto listcheck)
-- `SCRAPERAPI_KEY`: No longer required — lostark.bible is accessed directly
+- `SCRAPERAPI_KEY`: Optional but recommended — used as automatic fallback when lostark.bible blocks direct access (403/503)
 
 When image parsing hits Gemini free-tier quota/rate limits, the bot automatically tries the next model in `GEMINI_MODELS`.
 

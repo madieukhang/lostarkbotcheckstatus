@@ -10,6 +10,7 @@ import Whitelist from '../../models/Whitelist.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import {
   FETCH_HEADERS,
+  fetchWithFallback,
   parseRosterCharactersFromHtml,
   fetchNameSuggestions,
   formatSuggestionLines,
@@ -29,10 +30,7 @@ export async function handleRosterCommand(interaction) {
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
-    const response = await fetch(targetUrl, {
-      headers: FETCH_HEADERS,
-      signal: AbortSignal.timeout(15000),
-    });
+    const response = await fetchWithFallback(targetUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const html = await response.text();
@@ -154,10 +152,7 @@ export async function handleRosterCommand(interaction) {
       characters.slice(0, 10).map(async (c) => {
         try {
           const charUrl = `https://lostark.bible/character/NA/${encodeURIComponent(c.name)}`;
-          const res = await fetch(charUrl, {
-            headers: FETCH_HEADERS,
-            signal: AbortSignal.timeout(10000),
-          });
+          const res = await fetchWithFallback(charUrl);
           if (!res.ok) return;
           const charHtml = await res.text();
           const titleMatch = charHtml.match(/<span[^>]*style[^>]*color[^>]*>([^<]+)<\/span>/);
