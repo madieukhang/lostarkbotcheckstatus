@@ -6,7 +6,7 @@ All notable changes to this project are documented here.
 
 ### Added
 
-- Added `/search name:<character>` command to find similar names on lostark.bible with cross-check against all lists.
+- Added `/search` command with filters: `min_ilvl` (default 1700), `max_ilvl`, `class` — find similar names on lostark.bible with cross-check against all lists.
 - Added alt detection via Stronghold fingerprint when roster is hidden — matches Stronghold name + Roster Level across guild members to find same-account alts.
 - Added guild member list check when roster is hidden — fast DB query for any flagged guild members.
 - Added auto-enrich `allCharacters` in `/listcheck` — when a flagged character is found, background guild scan discovers and links alt characters automatically.
@@ -35,6 +35,7 @@ All notable changes to this project are documented here.
 - `/listcheck` alt enrichment runs in background after reply (user no longer waits for guild scan).
 - `/status` and `/check` commands now show all monitored servers with individual status.
 - Suppressed JSDOM CSS parse warnings with VirtualConsole.
+- Standardized ilvl filter threshold from 1680 to 1700 across all features (roster suggestions, blacklist/whitelist checks, alt detection).
 
 ### Fixed
 
