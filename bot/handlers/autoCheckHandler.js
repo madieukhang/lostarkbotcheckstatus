@@ -199,6 +199,7 @@ export function setupAutoCheck(client) {
                     if (b) flag += '⛔';
                     if (w) flag += '✅';
                     if (wa) flag += '⚠️';
+                    if (!flag) flag = '❓';
                     return { name: s.name, flag };
                   })
                 );
