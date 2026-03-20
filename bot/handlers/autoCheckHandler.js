@@ -107,8 +107,8 @@ async function extractNamesFromImage(image) {
  * @param {import('discord.js').Client} client
  */
 export function setupAutoCheck(client) {
-  if (!config.autoCheckChannelId) {
-    console.log('[auto-check] AUTO_CHECK_CHANNEL_ID not set — disabled.');
+  if (config.autoCheckChannelIds.length === 0) {
+    console.log('[auto-check] AUTO_CHECK_CHANNEL_IDS not set — disabled.');
     return;
   }
 
@@ -117,11 +117,12 @@ export function setupAutoCheck(client) {
     return;
   }
 
-  console.log(`[auto-check] Monitoring channel ${config.autoCheckChannelId} for screenshots.`);
+  const channelSet = new Set(config.autoCheckChannelIds);
+  console.log(`[auto-check] Monitoring ${channelSet.size} channel(s): ${[...channelSet].join(', ')}`);
 
   client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
-    if (message.channelId !== config.autoCheckChannelId) return;
+    if (!channelSet.has(message.channelId)) return;
 
     const images = message.attachments.filter(
       (a) => a.contentType && a.contentType.startsWith('image/')

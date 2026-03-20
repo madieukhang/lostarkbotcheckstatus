@@ -73,8 +73,11 @@ const config = {
   /** ScraperAPI key (no longer required — lostark.bible is accessible directly) */
   scraperApiKey: (process.env.SCRAPERAPI_KEY || '').trim(),
 
-  /** Optional channel ID for auto-checking screenshots (drop image → auto listcheck) */
-  autoCheckChannelId: (process.env.AUTO_CHECK_CHANNEL_ID || '').trim(),
+  /** Optional channel IDs for auto-checking screenshots (comma-separated) */
+  autoCheckChannelIds: (process.env.AUTO_CHECK_CHANNEL_IDS || process.env.AUTO_CHECK_CHANNEL_ID || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
 
   /** Optional Gemini API key for image-based /listcheck name extraction */
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
