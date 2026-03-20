@@ -650,32 +650,6 @@ export function createListHandlers({ client }) {
         })
       );
 
-      // Auto-enrich: for characters found in lists, scan guild to discover & link alts
-      for (const item of results) {
-        const listEntry = item.blackEntry || item.whiteEntry;
-        if (!listEntry) continue;
-
-        try {
-          const altResult = await detectAltsViaStronghold(item.name);
-          if (altResult && altResult.alts.length > 0) {
-            const newAltNames = altResult.alts.map((a) => a.name);
-            const existingAlts = listEntry.allCharacters || [];
-            const merged = [...new Set([...existingAlts, item.name, ...newAltNames])];
-
-            if (merged.length > existingAlts.length) {
-              const model = item.blackEntry ? Blacklist : Whitelist;
-              await model.updateOne(
-                { _id: listEntry._id },
-                { $set: { allCharacters: merged } }
-              );
-              console.log(`[listcheck] Enriched ${listEntry.name} allCharacters: ${existingAlts.length} → ${merged.length}`);
-            }
-          }
-        } catch (err) {
-          console.warn(`[listcheck] Alt enrichment failed for ${item.name}:`, err.message);
-        }
-      }
-
       const lines = results.map((item, idx) => {
         const isBlack = Boolean(item.blackEntry);
         const isWhite = Boolean(item.whiteEntry);
@@ -730,6 +704,35 @@ export function createListHandlers({ client }) {
       await interaction.editReply({
         content: sections.join('\n'),
       });
+
+      // Fire-and-forget: enrich allCharacters in background for flagged entries
+      const flaggedItems = results.filter((item) => item.blackEntry || item.whiteEntry);
+      if (flaggedItems.length > 0) {
+        (async () => {
+          for (const item of flaggedItems) {
+            const listEntry = item.blackEntry || item.whiteEntry;
+            try {
+              const altResult = await detectAltsViaStronghold(item.name);
+              if (altResult && altResult.alts.length > 0) {
+                const newAltNames = altResult.alts.map((a) => a.name);
+                const existingAlts = listEntry.allCharacters || [];
+                const merged = [...new Set([...existingAlts, item.name, ...newAltNames])];
+
+                if (merged.length > existingAlts.length) {
+                  const model = item.blackEntry ? Blacklist : Whitelist;
+                  await model.updateOne(
+                    { _id: listEntry._id },
+                    { $set: { allCharacters: merged } }
+                  );
+                  console.log(`[listcheck] Enriched ${listEntry.name} allCharacters: ${existingAlts.length} → ${merged.length}`);
+                }
+              }
+            } catch (err) {
+              console.warn(`[listcheck] Alt enrichment failed for ${item.name}:`, err.message);
+            }
+          }
+        })().catch((err) => console.error('[listcheck] Background enrichment error:', err.message));
+      }
     } catch (err) {
       console.error('[listcheck] ❌ Check failed:', err.message);
       await interaction.editReply({
