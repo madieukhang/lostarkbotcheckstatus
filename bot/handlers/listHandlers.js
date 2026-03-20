@@ -741,7 +741,7 @@ export function createListHandlers({ client }) {
         } else {
           const reason = item.failReason ? ` *(${item.failReason})*` : '';
           const similar = item.similarNames?.length > 0
-            ? ` — Similar: ${item.similarNames.map((s) => `${s.flag ? s.flag + ' ' : ''}[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)})`).join(', ')}`
+            ? ` — Similar: ${item.similarNames.map((s) => `${s.flag} ${s.name}`).join(', ')}`
             : '';
           return `${idx + 1}. No roster found: **${item.name}**${reason}${similar}`;
         }
