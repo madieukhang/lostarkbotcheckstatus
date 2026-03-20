@@ -39,7 +39,7 @@ function requireEnv(key) {
   return process.env[key].trim();
 }
 
-validateEnv(['DISCORD_TOKEN', 'CHANNEL_ID', 'MONGODB_URI', 'SCRAPERAPI_KEY']);
+validateEnv(['DISCORD_TOKEN', 'CHANNEL_ID', 'MONGODB_URI']);
 
 /**
  * Parse CHECK_INTERVAL from env (in seconds), fallback to 30s.
@@ -70,8 +70,8 @@ const config = {
   /** MongoDB connection string */
   mongoUri: requireEnv('MONGODB_URI'),
 
-  /** ScraperAPI key to bypass Cloudflare when scraping lostark.bible */
-  scraperApiKey: requireEnv('SCRAPERAPI_KEY'),
+  /** ScraperAPI key (no longer required — lostark.bible is accessible directly) */
+  scraperApiKey: (process.env.SCRAPERAPI_KEY || '').trim(),
 
   /** Optional Gemini API key for image-based /listcheck name extraction */
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
