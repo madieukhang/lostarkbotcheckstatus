@@ -18,6 +18,8 @@ All notable changes to this project are documented here.
 - Added `RosterSnapshot` model for storing ilvl history per character.
 - Added `PendingApproval` model with TTL index (24h auto-cleanup) to persist `/list add` approvals across bot restarts.
 - Added MongoDB index on `allCharacters` field for fast `$in` lookups.
+- Added OCR auto-correction in `/listcheck` and auto-check — when Gemini misreads diacritics, bot searches for similar names and auto-corrects (e.g. `Laliisa` → `Lalïisa`).
+- Added fail reason display when roster lookup fails — shows cause (HTTP 403, timeout, etc.) to help diagnose issues.
 
 ### Changed
 
