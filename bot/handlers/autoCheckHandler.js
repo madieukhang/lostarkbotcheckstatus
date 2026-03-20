@@ -223,7 +223,7 @@ export function setupAutoCheck(client) {
           if (entry.reason?.trim()) details.push(entry.reason.trim());
           const addedBy = getAddedByDisplay(entry);
           if (addedBy) details.push(`Added by: **${addedBy}**`);
-          if (details.length > 0) reasonParts.push(`${label}: ${details.join(' — ')}`);
+          if (details.length > 0) reasonParts.push(details.join(' — '));
         }
 
         const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
