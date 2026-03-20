@@ -33,6 +33,9 @@ const OFFICER_APPROVER_IDS = [
   '287894237587046400', // KilZ
 ];
 const SENIOR_APPROVER_ID = '324502048102154241';
+const MEMBER_APPROVER_IDS = [
+  '1272458473493499904', // Bonnie
+];
 
 function getListContext(type) {
   if (type === 'black') {
@@ -262,7 +265,8 @@ function getApproverRecipientIds() {
 function isRequesterAutoApprover(userId) {
   if (!userId) return false;
   if (SENIOR_APPROVER_ID === userId) return true;
-  return OFFICER_APPROVER_IDS.includes(userId);
+  if (OFFICER_APPROVER_IDS.includes(userId)) return true;
+  return MEMBER_APPROVER_IDS.includes(userId);
 }
 
 function buildApprovalResultRow(actionLabel) {
