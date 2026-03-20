@@ -7,6 +7,13 @@ All notable changes to this project are documented here.
 ### Added
 
 - Added `/search` command with filters: `min_ilvl` (default 1700), `max_ilvl`, `class` — find similar names on lostark.bible with cross-check against all lists.
+- Added cross-server list notification — when entries are added/removed, bot broadcasts to all channels in `LIST_NOTIFY_CHANNEL_IDS`.
+- Added ilvl >= 1700 validation on `/list add` — rejects characters below threshold.
+- Added Roster and Logs links in list add success embed.
+- Added similar name suggestions with list flags when OCR name has no roster (e.g. `⛔ Lùcifër, ❓ Lucifer`).
+- Added server name filter to prevent OCR from extracting server names as player names (Vairgrys, Brelshaza, etc.).
+- Added 🔍 reaction loading indicator for auto-check channel.
+- Added user-friendly '429 Rate limited' message instead of raw HTTP status.
 - Added alt detection via Stronghold fingerprint when roster is hidden — matches Stronghold name + Roster Level across guild members to find same-account alts.
 - Added guild member list check when roster is hidden — fast DB query for any flagged guild members.
 - Added auto-enrich `allCharacters` in `/listcheck` — when a flagged character is found, background guild scan discovers and links alt characters automatically.

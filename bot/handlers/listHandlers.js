@@ -477,11 +477,50 @@ export function createListHandlers({ client }) {
       embed.setImage(payload.imageUrl);
     }
 
+    // Broadcast to all notification channels (fire-and-forget)
+    broadcastListChange('added', entry, payload).catch((err) =>
+      console.warn('[list] Broadcast failed:', err.message)
+    );
+
     return {
       ok: true,
       content: `${icon} Added **${entry.name}** to ${label}.`,
       embeds: [embed],
     };
+  }
+
+  async function broadcastListChange(action, entry, payload) {
+    if (config.listNotifyChannelIds.length === 0) return;
+
+    const { label, color, icon } = getListContext(payload.type);
+    const addedBy = payload.requestedByDisplayName || payload.requestedByTag || 'Unknown';
+    const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
+
+    const embed = new EmbedBuilder()
+      .setTitle(`${icon} ${label} ${action}`)
+      .addFields(
+        { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
+        { name: 'Reason', value: entry.reason || 'N/A', inline: true },
+        { name: action === 'added' ? 'Added by' : 'Removed by', value: addedBy, inline: true },
+      )
+      .setColor(color)
+      .setTimestamp(new Date());
+
+    if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
+    if (entry.imageUrl) embed.setImage(entry.imageUrl);
+
+    await Promise.all(
+      config.listNotifyChannelIds.map(async (channelId) => {
+        try {
+          const channel = await client.channels.fetch(channelId);
+          if (channel?.isTextBased()) {
+            await channel.send({ embeds: [embed] });
+          }
+        } catch (err) {
+          console.warn(`[list] Failed to broadcast to channel ${channelId}:`, err.message);
+        }
+      })
+    );
   }
 
   async function notifyRequesterAboutDecision(payload, result, rejected = false) {
@@ -935,6 +974,13 @@ export function createListHandlers({ client }) {
         }
 
         await model.deleteOne({ _id: entry._id });
+
+        broadcastListChange('removed', entry, {
+          type,
+          requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+          requestedByTag: interaction.user.tag,
+        }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
+
         return `${icon} Removed **${entry.name}** from ${label}.`;
       };
 
