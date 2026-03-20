@@ -382,6 +382,7 @@ export function createListHandlers({ client }) {
     const { model, label, color, icon } = getListContext(payload.type);
     const name = normalizeCharacterName(payload.name);
 
+    // Step 1: Check if character exists
     const { hasValidRoster, allCharacters } = await buildRosterCharacters(name);
     if (!hasValidRoster) {
       const suggestions = await fetchNameSuggestions(name);
@@ -414,6 +415,18 @@ export function createListHandlers({ client }) {
       };
     }
 
+    // Step 2: Check ilvl >= 1700
+    const { fetchCharacterMeta } = await import('../services/rosterService.js');
+    const charMeta = await fetchCharacterMeta(name);
+    if (charMeta && charMeta.itemLevel < 1700) {
+      return {
+        ok: false,
+        content: `❌ **${name}** has item level \`${charMeta.itemLevel.toFixed(2)}\` (below 1700). Cannot add to ${label}.`,
+        embeds: [],
+      };
+    }
+
+    // Step 3: Check if already in list
     await connectDB();
 
     const existed = await model.findOne({
@@ -430,6 +443,7 @@ export function createListHandlers({ client }) {
       };
     }
 
+    // Step 4: Create entry
     const entry = await model.create({
       name,
       reason: payload.reason,
@@ -442,13 +456,18 @@ export function createListHandlers({ client }) {
       addedByDisplayName: payload.requestedByDisplayName,
     });
 
+    // Build result embed with character links
+    const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
+    const logsLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/logs`;
+
     const embed = new EmbedBuilder()
       .setTitle(`${label} entry added`)
       .addFields(
-        { name: 'Name', value: entry.name, inline: true },
+        { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: payload.reason || 'N/A', inline: true },
         { name: 'Raid', value: payload.raid || 'N/A', inline: true },
-        { name: 'All Characters', value: String(allCharacters.length), inline: true }
+        { name: 'All Characters', value: String(allCharacters.length), inline: true },
+        { name: 'Links', value: `[Roster](${rosterLink}) · [Logs](${logsLink})`, inline: false }
       )
       .setColor(color)
       .setTimestamp(new Date());
