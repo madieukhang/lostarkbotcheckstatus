@@ -135,10 +135,16 @@ export function setupAutoCheck(client) {
     const image = images.first();
     console.log(`[auto-check] Image detected from ${message.author.tag}, processing...`);
 
+    // Show loading indicator immediately
+    await message.react('🔍').catch(() => {});
+
     try {
       const names = await extractNamesFromImage(image);
 
-      if (names.length === 0) return; // Silently skip if no names found
+      if (names.length === 0) {
+        await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
+        return;
+      }
 
       const limitedNames = names.slice(0, 8);
       await connectDB();
@@ -231,6 +237,7 @@ export function setupAutoCheck(client) {
       ].join('\n');
 
       await message.reply({ content });
+      await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
 
       // Background enrichment for flagged entries
       const flaggedItems = results.filter((item) => item.blackEntry || item.whiteEntry || item.watchEntry);
@@ -262,6 +269,7 @@ export function setupAutoCheck(client) {
       }
     } catch (err) {
       console.error('[auto-check] Error processing image:', err.message);
+      await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
     }
   });
 }
