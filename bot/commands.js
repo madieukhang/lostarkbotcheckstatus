@@ -43,7 +43,8 @@ export function buildCommands() {
               .setRequired(true)
               .addChoices(
                 { name: 'black', value: 'black' },
-                { name: 'white', value: 'white' }
+                { name: 'white', value: 'white' },
+                { name: 'watch', value: 'watch' }
               )
           )
           .addStringOption((opt) =>

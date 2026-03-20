@@ -11,6 +11,7 @@ import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
+import Watchlist from '../../models/Watchlist.js';
 import PendingApproval from '../../models/PendingApproval.js';
 import { getClassName } from '../../models/Class.js';
 import {
@@ -35,20 +36,12 @@ const SENIOR_APPROVER_ID = '324502048102154241';
 
 function getListContext(type) {
   if (type === 'black') {
-    return {
-      model: Blacklist,
-      label: 'blacklist',
-      color: 0xed4245,
-      icon: '⛔',
-    };
+    return { model: Blacklist, label: 'blacklist', color: 0xed4245, icon: '⛔' };
   }
-
-  return {
-    model: Whitelist,
-    label: 'whitelist',
-    color: 0x57f287,
-    icon: '✅',
-  };
+  if (type === 'watch') {
+    return { model: Watchlist, label: 'watchlist', color: 0xfee75c, icon: '⚠️' };
+  }
+  return { model: Whitelist, label: 'whitelist', color: 0x57f287, icon: '✅' };
 }
 
 function extractJsonArrayFromText(raw) {
@@ -631,67 +624,58 @@ export function createListHandlers({ client }) {
 
       const results = await Promise.all(
         limitedNames.map(async (name) => {
-          const [blackEntry, whiteEntry] = await Promise.all([
+          const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
             Blacklist.findOne({ $or: [{ name }, { allCharacters: name }] })
               .collation({ locale: 'en', strength: 2 })
               .lean(),
             Whitelist.findOne({ $or: [{ name }, { allCharacters: name }] })
               .collation({ locale: 'en', strength: 2 })
               .lean(),
+            Watchlist.findOne({ $or: [{ name }, { allCharacters: name }] })
+              .collation({ locale: 'en', strength: 2 })
+              .lean(),
           ]);
 
           let hasRoster = false;
-          if (!blackEntry && !whiteEntry) {
+          if (!blackEntry && !whiteEntry && !watchEntry) {
             const rosterResult = await buildRosterCharacters(name);
             hasRoster = rosterResult.hasValidRoster;
           }
 
-          return { name, blackEntry, whiteEntry, hasRoster };
+          return { name, blackEntry, whiteEntry, watchEntry, hasRoster };
         })
       );
 
       const lines = results.map((item, idx) => {
         const isBlack = Boolean(item.blackEntry);
         const isWhite = Boolean(item.whiteEntry);
-        const blackReason = item.blackEntry?.reason?.trim();
-        const whiteReason = item.whiteEntry?.reason?.trim();
-        const blackAddedBy = getAddedByDisplay(item.blackEntry);
-        const whiteAddedBy = getAddedByDisplay(item.whiteEntry);
+        const isWatch = Boolean(item.watchEntry);
 
         const reasonParts = [];
-        if (isBlack) {
+
+        for (const [entry, label] of [[item.blackEntry, 'black'], [item.whiteEntry, 'white'], [item.watchEntry, 'watch']]) {
+          if (!entry) continue;
           const details = [];
-          if (blackReason) details.push(blackReason);
-          if (blackAddedBy) details.push(`Added by: **${blackAddedBy}**`);
-          if (details.length > 0) {
-            reasonParts.push(`black: ${details.join(' — ')}`);
-          }
-        }
-        if (isWhite) {
-          const details = [];
-          if (whiteReason) details.push(whiteReason);
-          if (whiteAddedBy) details.push(`Added by: **${whiteAddedBy}**`);
-          if (details.length > 0) {
-            reasonParts.push(`white: ${details.join(' — ')}`);
-          }
+          if (entry.reason?.trim()) details.push(entry.reason.trim());
+          const addedBy = getAddedByDisplay(entry);
+          if (addedBy) details.push(`Added by: **${addedBy}**`);
+          if (details.length > 0) reasonParts.push(`${label}: ${details.join(' — ')}`);
         }
 
         const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
 
         let icon = '';
-        if (isBlack && isWhite) {
-          icon = '⛔✅ ';
-        } else if (isBlack) {
-          icon = '⛔ ';
-        } else if (isWhite) {
-          icon = '✅ ';
+        if (isBlack) icon += '⛔';
+        if (isWhite) icon += '✅';
+        if (isWatch) icon += '⚠️';
+
+        if (icon) {
+          return `${idx + 1}. ${icon} **${item.name}**${reasonSuffix}`;
         } else if (item.hasRoster) {
-          icon = '❓ ';
+          return `${idx + 1}. ❓ **${item.name}**`;
         } else {
           return `${idx + 1}. No roster found: **${item.name}**`;
         }
-
-        return `${idx + 1}. ${icon}**${item.name}**${reasonSuffix}`;
       });
 
       const sections = [

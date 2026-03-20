@@ -7,6 +7,7 @@ virtualConsole.on('error', () => {});
 import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
+import RosterSnapshot from '../../models/RosterSnapshot.js';
 import {
   FETCH_HEADERS,
   parseRosterCharactersFromHtml,
@@ -167,15 +168,56 @@ export async function handleRosterCommand(interaction) {
       })
     );
 
-    const lines = characters.map(
-      (c, i) =>
-        `**${i + 1}.** ${c.name} · ${c.className || 'Unknown'} · \`${c.itemLevel}\`${c.title ? ` — *${c.title}*` : ''} · ${c.combatScore}`
-    );
+    // Load previous snapshots for progression delta
+    await connectDB();
+    const prevSnapshots = new Map();
+    const existingSnaps = await RosterSnapshot.find({
+      name: { $in: characters.map((c) => c.name) },
+    })
+      .collation({ locale: 'en', strength: 2 })
+      .lean();
+
+    for (const snap of existingSnaps) {
+      prevSnapshots.set(snap.name.toLowerCase(), snap);
+    }
+
+    const lines = characters.map((c, i) => {
+      const prevSnap = prevSnapshots.get(c.name.toLowerCase());
+      const currentIlvl = parseFloat((c.itemLevel ?? '0').replace(/,/g, ''));
+      let delta = '';
+      if (prevSnap && prevSnap.itemLevel > 0) {
+        const diff = currentIlvl - prevSnap.itemLevel;
+        if (diff > 0) delta = ` *(+${diff.toFixed(2)})*`;
+        else if (diff < 0) delta = ` *(${diff.toFixed(2)})*`;
+      }
+
+      return `**${i + 1}.** ${c.name} · ${c.className || 'Unknown'} · \`${c.itemLevel}\`${delta}${c.title ? ` — *${c.title}*` : ''} · ${c.combatScore}`;
+    });
 
     let description = lines.join('\n');
     if (description.length > 4000) {
       description = description.slice(0, 4000) + '\n…';
     }
+
+    // Save/update snapshots in background
+    (async () => {
+      for (const c of characters) {
+        const ilvl = parseFloat((c.itemLevel ?? '0').replace(/,/g, ''));
+        await RosterSnapshot.updateOne(
+          { name: c.name },
+          {
+            $set: {
+              itemLevel: ilvl,
+              classId: c.classId || '',
+              combatScore: c.combatScore || '',
+              rosterName: name,
+              updatedAt: new Date(),
+            },
+          },
+          { upsert: true, collation: { locale: 'en', strength: 2 } }
+        );
+      }
+    })().catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
 
     const charNames = characters
       .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1680)
