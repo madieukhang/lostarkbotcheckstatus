@@ -2,6 +2,9 @@ import { EmbedBuilder } from 'discord.js';
 import { JSDOM } from 'jsdom';
 
 import config from '../../config.js';
+import { connectDB } from '../../db.js';
+import Blacklist from '../../models/Blacklist.js';
+import Whitelist from '../../models/Whitelist.js';
 import {
   parseRosterCharactersFromHtml,
   fetchNameSuggestions,
@@ -9,7 +12,10 @@ import {
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
   detectAltsViaStronghold,
+  fetchCharacterMeta,
+  fetchGuildMembers,
 } from '../services/rosterService.js';
+import { getClassName } from '../../models/Class.js';
 import { getAddedByDisplay, normalizeCharacterName } from '../utils/names.js';
 
 export async function handleRosterCommand(interaction) {
@@ -28,73 +34,96 @@ export async function handleRosterCommand(interaction) {
     const characters = await parseRosterCharactersFromHtml(html, document);
 
     if (characters.length === 0) {
-      // Try alt detection via Stronghold fingerprint before giving up
-      const altResult = await detectAltsViaStronghold(name);
+      // ── Hidden roster: try guild-based detection ──
+      const meta = await fetchCharacterMeta(name);
+      const hasGuild = meta && meta.guildName;
 
-      if (altResult && altResult.alts.length > 0) {
-        const { target, alts } = altResult;
+      if (hasGuild) {
+        // Step 1: Get guild member list (fast, single request)
+        const guildMembers = await fetchGuildMembers(name);
+        const memberNames = guildMembers.map((m) => m.name);
 
-        const altLines = alts.map(
-          (a, i) => `**${i + 1}.** [${a.name}](https://lostark.bible/character/NA/${encodeURIComponent(a.name)}/roster) · ${a.className || '?'} · \`${a.itemLevel}\``
-        );
-
-        const description = [
-          `Roster is hidden, but **${alts.length} alt(s)** detected via Stronghold fingerprint:`,
-          `Stronghold: **${target.strongholdName}** Lv.${target.strongholdLevel} · Roster Lv.${target.rosterLevel} · Guild: **${target.guildName}**`,
-          '',
-          ...altLines,
-        ].join('\n');
-
-        // Cross-check alts against blacklist/whitelist
-        const altNames = alts.map((a) => a.name);
-        const [blacklistResult, whitelistResult] = await Promise.all([
-          handleRosterBlackListCheck([name, ...altNames]),
-          handleRosterWhiteListCheck([name, ...altNames]),
+        // Step 2: Quick DB check — are any guild members already in the lists?
+        await connectDB();
+        const [guildBlackHits, guildWhiteHits] = await Promise.all([
+          Blacklist.find({
+            $or: [
+              { name: { $in: memberNames } },
+              { allCharacters: { $in: memberNames } },
+            ],
+          })
+            .collation({ locale: 'en', strength: 2 })
+            .lean(),
+          Whitelist.find({
+            $or: [
+              { name: { $in: memberNames } },
+              { allCharacters: { $in: memberNames } },
+            ],
+          })
+            .collation({ locale: 'en', strength: 2 })
+            .lean(),
         ]);
 
-        const color = blacklistResult ? 0xed4245 : whitelistResult ? 0x57f287 : 0xfee75c;
+        // Step 3: Stronghold fingerprint scan for same-account alts
+        const altResult = await detectAltsViaStronghold(name);
+        const alts = altResult?.alts ?? [];
+
+        // Build response
+        const descriptionParts = [];
+
+        descriptionParts.push(
+          `Roster is hidden. Guild: **${meta.guildName}** (${guildMembers.length} members)`,
+          `Stronghold: **${meta.strongholdName}** Lv.${meta.strongholdLevel} · Roster Lv.${meta.rosterLevel}`,
+        );
+
+        if (alts.length > 0) {
+          descriptionParts.push(
+            '',
+            `**Same-account alts (${alts.length}):**`,
+            ...alts.map(
+              (a, i) => `${i + 1}. [${a.name}](https://lostark.bible/character/NA/${encodeURIComponent(a.name)}/roster) · ${a.className || '?'} · \`${a.itemLevel}\``
+            ),
+          );
+        }
+
+        if (guildBlackHits.length > 0) {
+          descriptionParts.push(
+            '',
+            `**⛔ Blacklisted guild members (${guildBlackHits.length}):**`,
+            ...guildBlackHits.map(
+              (e) => `⛔ **${e.name}** — ${e.reason || 'no reason'}${e.raid ? ' [' + e.raid + ']' : ''}`
+            ),
+          );
+        }
+
+        if (guildWhiteHits.length > 0) {
+          descriptionParts.push(
+            '',
+            `**✅ Whitelisted guild members (${guildWhiteHits.length}):**`,
+            ...guildWhiteHits.map(
+              (e) => `✅ **${e.name}** — ${e.reason || 'no reason'}${e.raid ? ' [' + e.raid + ']' : ''}`
+            ),
+          );
+        }
+
+        const description = descriptionParts.join('\n');
+        const hasBlack = guildBlackHits.length > 0;
+        const hasWhite = guildWhiteHits.length > 0;
+        const color = hasBlack ? 0xed4245 : hasWhite ? 0x57f287 : 0xfee75c;
 
         const embed = new EmbedBuilder()
           .setTitle(`Hidden Roster – ${name}`)
           .setURL(`https://lostark.bible/character/NA/${encodeURIComponent(name)}`)
           .setDescription(description.length > 4000 ? description.slice(0, 4000) + '\n…' : description)
           .setColor(color)
-          .setFooter({ text: `${alts.length} alt(s) detected · ${altResult.totalMembers} guild members scanned · lostark.bible` })
+          .setFooter({ text: `${alts.length} alt(s) · ${guildMembers.length} guild members · lostark.bible` })
           .setTimestamp();
 
-        const embeds = [embed];
-        const contentLines = [];
-
-        if (blacklistResult) {
-          const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';
-          const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
-          const addedBy = getAddedByDisplay(blacklistResult);
-          const addedByText = addedBy ? ` — Added by: **${addedBy}**` : '';
-          contentLines.push(`⛔ **${blacklistResult.name}** is on the blacklist.${raid}${reason}${addedByText}`);
-
-          if (blacklistResult.imageUrl) {
-            embeds.unshift(new EmbedBuilder().setTitle('Blacklist evidence').setImage(blacklistResult.imageUrl).setColor(0xed4245));
-          }
-        }
-
-        if (whitelistResult) {
-          const reason = whitelistResult.reason ? ` — *${whitelistResult.reason}*` : '';
-          const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
-          const addedBy = getAddedByDisplay(whitelistResult);
-          const addedByText = addedBy ? ` — Added by: **${addedBy}**` : '';
-          contentLines.push(`✅ **${whitelistResult.name}** is on the whitelist.${raid}${reason}${addedByText}`);
-
-          if (whitelistResult.imageUrl) {
-            embeds.unshift(new EmbedBuilder().setTitle('Whitelist evidence').setImage(whitelistResult.imageUrl).setColor(0x57f287));
-          }
-        }
-
-        const content = contentLines.length > 0 ? contentLines.join('\n') : undefined;
-        await interaction.editReply({ content, embeds });
+        await interaction.editReply({ embeds: [embed] });
         return;
       }
 
-      // No alts found either — show suggestions as before
+      // No guild — show suggestions as before
       const suggestions = await fetchNameSuggestions(name);
       const filtered = suggestions.filter((s) => s.itemLevel > 1680);
       if (filtered.length > 0) {
