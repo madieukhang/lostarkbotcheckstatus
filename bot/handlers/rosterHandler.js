@@ -1,7 +1,9 @@
 import { EmbedBuilder } from 'discord.js';
-import { JSDOM } from 'jsdom';
+import { JSDOM, VirtualConsole } from 'jsdom';
 
-import config from '../../config.js';
+const virtualConsole = new VirtualConsole();
+virtualConsole.on('error', () => {});
+
 import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
@@ -25,12 +27,14 @@ export async function handleRosterCommand(interaction) {
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
-    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(targetUrl)}`;
-    const response = await fetch(proxyUrl);
+    const response = await fetch(targetUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+      signal: AbortSignal.timeout(15000),
+    });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const html = await response.text();
-    const { document } = new JSDOM(html).window;
+    const { document } = new JSDOM(html, { virtualConsole }).window;
     const characters = await parseRosterCharactersFromHtml(html, document);
 
     if (characters.length === 0) {
@@ -143,17 +147,19 @@ export async function handleRosterCommand(interaction) {
       return;
     }
 
+    // Fetch titles via direct access (no ScraperAPI needed)
     await Promise.all(
       characters.slice(0, 10).map(async (c) => {
         try {
-          const charProxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(`https://lostark.bible/character/NA/${c.name}`)}`;
-          const res = await fetch(charProxyUrl);
+          const charUrl = `https://lostark.bible/character/NA/${encodeURIComponent(c.name)}`;
+          const res = await fetch(charUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            signal: AbortSignal.timeout(10000),
+          });
           if (!res.ok) return;
           const charHtml = await res.text();
-          const { document: charDoc } = new JSDOM(charHtml).window;
-          const h2 = charDoc.querySelector('h2.flex.items-center');
-          const titleSpan = h2?.querySelector('span[style*="color"]');
-          c.title = titleSpan?.textContent.trim() ?? null;
+          const titleMatch = charHtml.match(/<span[^>]*style[^>]*color[^>]*>([^<]+)<\/span>/);
+          c.title = titleMatch?.[1]?.trim() ?? null;
         } catch {
           c.title = null;
         }
