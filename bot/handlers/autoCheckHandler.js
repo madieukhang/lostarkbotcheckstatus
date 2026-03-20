@@ -39,7 +39,7 @@ async function extractNamesFromImage(image) {
   const prompt = [
     'This is a screenshot of a Lost Ark raid waiting room (party finder lobby).',
     'Extract ONLY the player character names from the party member list.',
-    'Ignore all other text: raid names, class names, item levels, buttons, chat messages.',
+    'Ignore all other text: raid names, class names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
     'Preserve every character exactly as shown, including special letters and diacritics.',
     'Keep umlaut letters exactly: ë, ö, ü.',
     'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
@@ -84,9 +84,16 @@ async function extractNamesFromImage(image) {
       const parsed = JSON.parse(match[0]);
       if (!Array.isArray(parsed)) return [];
 
+      const SERVER_NAMES = new Set([
+        'azena', 'avesta', 'galatur', 'karta', 'ladon', 'kharmine',
+        'una', 'regulus', 'sasha', 'vykas', 'elgacia', 'thaemine',
+        'brelshaza', 'kazeros', 'arcturus', 'enviska', 'valtan', 'mari',
+        'akkan', 'vairgrys', 'bergstrom', 'danube', 'mokoko',
+      ]);
+
       const names = parsed
         .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
-        .filter(Boolean);
+        .filter((name) => name && !SERVER_NAMES.has(name.toLowerCase()));
 
       const seen = new Set();
       return names.filter((n) => {
