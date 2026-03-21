@@ -1,22 +1,22 @@
-# Lost Ark Discord Bot
+# 🎮 Lost Ark Discord Bot
 
 A Discord bot that monitors Lost Ark server status, supports roster lookup, manages guild blacklist/whitelist/watchlist entries, and detects alt characters via Stronghold fingerprinting.
 
 ## Main Features
 
-### Server Monitoring
+### 🖥️ Server Monitoring
 - **Multi-server monitoring**: Monitors one or more servers (e.g. Brelshaza, Thaemine) with a single page fetch.
 - **Auto-notification**: Sends `@here` when servers transition from offline/maintenance to online.
 - **`/status`**: Live server status check on demand.
 
-### Roster & Character Lookup
+### 🔍 Roster & Character Lookup
 - **`/roster`**: Fetch roster from lostark.bible with progression tracking (shows ilvl delta since last check).
 - **`/search`**: Find similar character names with filters (ilvl range, class) and cross-check against all lists.
 - **Alt detection**: When roster is hidden, detects alt characters via Stronghold name + Roster Level matching across guild members.
 - **Guild member check**: When roster is hidden, checks all guild members against all lists.
 - **OCR similar suggestions**: When Gemini misreads diacritics, shows similar names with list flags (e.g. `⛔ Lùcifër, ❓ Lucifer`).
 
-### List Management
+### 📋 List Management
 - **Blacklist / Whitelist / Watchlist**: Three list types with `⛔`, `✅`, `⚠️` icons.
 - **`/list add`**: Add entries with approval flow (officers auto-approve), optional raid tag, logs URL, and evidence image. Validates ilvl >= 1700.
 - **`/list remove`**: Remove entries with ownership check.
@@ -24,28 +24,38 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 - **Cross-server broadcast**: When entries are added/removed, notifications sent to all configured channels across servers.
 - **Auto-enrich**: When a flagged character is found, background guild scan discovers and links alt characters to `allCharacters`.
 
-### Screenshot Checking
+### 📸 Screenshot Checking
 - **`/listcheck`**: Extract up to 8 names from a screenshot via Gemini OCR, check against all lists.
 - **Auto-check channels**: Drop screenshots in configured channel(s) for automatic checking (🔍 → ✅).
 - **Server name filter**: Prevents OCR from extracting server names (Vairgrys, Brelshaza, etc.) as player names.
 - **Gemini model failover**: Automatically switches to next model on quota/rate limits or timeout.
 
-### Technical
+### ⚙️ Technical
 - **Direct fetch with ScraperAPI fallback**: Fast direct access to lostark.bible, auto-fallback via proxy on 403/503.
 - **Roster-based duplicate checks**: `allCharacters` field with case-insensitive matching and MongoDB index.
-- **`/help`**: Shows all available commands.
 
 ## Commands
 
-- `/status`: Show live server status for all monitored servers.
-- `/reset`: Reset state in `data/status.json`.
-- `/roster name:<character>`: Fetch roster, show progression delta, cross-check lists. If roster is hidden: detect alts via Stronghold fingerprint + check guild members against lists.
-- `/search name:<character> [min_ilvl] [max_ilvl] [class]`: Search lostark.bible for similar names (default ilvl ≥ 1700), cross-check against all lists. Optional filters: item level range, class.
-- `/list add type:<black|white|watch> name:<character> reason:<text> [raid] [logs] [image]`: Create an add proposal. Officers/senior auto-approve; others go through DM approval flow. Optional logs URL for evidence.
-- `/list remove name:<character>`: Remove an entry. If the name exists in multiple lists, shows removal options.
-- `/list view type:<black|white|watch>`: View all entries in a list.
-- `/listcheck image:<screenshot>`: Extract names from screenshot via Gemini OCR, check against all lists. Status icons: `⛔` blacklist, `✅` whitelist, `⚠️` watchlist, `❓` roster exists, `No roster found`. Background: auto-enriches alt data for flagged entries.
-- `/help`: Show all available commands.
+| Command | Description |
+|---|---|
+| `/status` | Show live server status for all monitored servers |
+| `/reset` | Reset the stored status state |
+| `/roster name` | Fetch roster, progression delta, cross-check lists. Hidden roster: alt detection + guild check |
+| `/search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default ilvl ≥ 1700), cross-check all lists |
+| `/list add type name reason [raid] [logs] [image]` | Add to blacklist/whitelist/watchlist. Officers auto-approve |
+| `/list remove name` | Remove an entry (ownership check) |
+| `/list view type` | View all entries in a list |
+| `/listcheck image` | OCR screenshot → check names against all lists |
+| `/help` | Show all available commands |
+
+### Status Icons
+
+| Icon | Meaning |
+|---|---|
+| ⛔ | Blacklisted |
+| ✅ | Whitelisted |
+| ⚠️ | Watchlist (under investigation) |
+| ❓ | Not in any list, roster exists |
 
 ## Requirements
 
@@ -57,23 +67,27 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 
 ## Environment Setup
 
-Copy `.env.example` to `.env` and fill in required values:
+Copy `.env.example` to `.env` and fill in values:
 
 ### Required
-- `DISCORD_TOKEN`: Discord bot token
-- `CHANNEL_ID`: Notification channel ID
-- `MONGODB_URI`: MongoDB connection string
+
+| Variable | Description |
+|---|---|
+| `DISCORD_TOKEN` | Discord bot token |
+| `CHANNEL_ID` | Channel ID for server online notifications |
+| `MONGODB_URI` | MongoDB connection string |
 
 ### Optional
-- `CHECK_INTERVAL`: Check interval in seconds (minimum 10, default 30)
-- `TARGET_SERVERS`: Comma-separated server names to monitor (default: `Brelshaza`). Example: `Brelshaza,Thaemine`
-- `GEMINI_API_KEY`: Key for Gemini image parsing in `/listcheck` and auto-check
-- `GEMINI_MODELS`: Comma-separated model priority list for failover (default: `gemini-2.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash-lite,gemini-3-flash`)
-- `AUTO_CHECK_CHANNEL_IDS`: Comma-separated channel IDs for auto-check (drop image → auto listcheck)
-- `LIST_NOTIFY_CHANNEL_IDS`: Comma-separated channel IDs to broadcast list add/remove notifications across servers
-- `SCRAPERAPI_KEY`: Optional but recommended — used as automatic fallback when lostark.bible blocks direct access (403/503)
 
-When image parsing hits Gemini free-tier quota/rate limits, the bot automatically tries the next model in `GEMINI_MODELS`.
+| Variable | Description | Default |
+|---|---|---|
+| `CHECK_INTERVAL` | Status check interval in seconds (min: 10) | `30` |
+| `TARGET_SERVERS` | Comma-separated server names to monitor | `Brelshaza` |
+| `GEMINI_API_KEY` | Gemini API key for image OCR | — |
+| `GEMINI_MODELS` | Comma-separated model priority list for failover | `gemini-2.5-flash,...` |
+| `AUTO_CHECK_CHANNEL_IDS` | Channel IDs for auto-check (drop image → auto listcheck) | — |
+| `LIST_NOTIFY_CHANNEL_IDS` | Channel IDs for cross-server list add/remove notifications | — |
+| `SCRAPERAPI_KEY` | Fallback proxy when lostark.bible blocks direct access (403/503) | — |
 
 ## Run Locally
 
@@ -82,7 +96,7 @@ npm install
 npm start
 ```
 
-Dev mode:
+Dev mode (auto-restart on changes):
 
 ```bash
 npm run dev
@@ -97,40 +111,44 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 
 ## Deploy on Railway
 
-- This repository already includes `Dockerfile` and `railway.toml`.
-- Set environment variables in the Railway Variables tab (do not upload `.env`).
-- Start command: `node bot.js`.
+1. Repository includes `Dockerfile` and `railway.toml`.
+2. Set environment variables in the Railway **Variables** tab (do not upload `.env`).
+3. Start command: `node bot.js`.
+4. Enable **Message Content Intent** in Discord Developer Portal if using auto-check.
 
 ## Project Structure
 
 ```text
 .
-|- bot.js
-|- bot/
-|  |- commands.js
-|  |- handlers/
-|  |  |- systemHandlers.js
-|  |  |- rosterHandler.js
-|  |  |- listHandlers.js
-|  |  |- searchHandler.js
-|  |  |- autoCheckHandler.js
-|  |- services/
-|  |  |- rosterService.js
-|  |  |- listCheckService.js
-|  |- utils/
-|  |  |- names.js
-|- config.js
-|- db.js
-|- monitor.js
-|- serverStatus.js
-|- models/
-|  |- Blacklist.js
-|  |- Whitelist.js
-|  |- Watchlist.js
-|  |- Class.js
-|  |- Raid.js
-|  |- PendingApproval.js
-|  |- RosterSnapshot.js
-|- data/
-|  |- status.json
+├── bot.js                          # Entry point: Discord client, command routing
+├── config.js                       # Environment variable loading and validation
+├── db.js                           # MongoDB connection (lazy singleton)
+├── monitor.js                      # Server status polling loop + notifications
+├── serverStatus.js                 # Scrapes playlostark.com for server status
+│
+├── bot/
+│   ├── commands.js                 # Slash command definitions
+│   ├── handlers/
+│   │   ├── systemHandlers.js       # /status, /reset
+│   │   ├── rosterHandler.js        # /roster (+ alt detection, progression)
+│   │   ├── listHandlers.js         # /list add, /list remove, /list view, /listcheck
+│   │   ├── searchHandler.js        # /search
+│   │   └── autoCheckHandler.js     # Auto-check channel listener
+│   ├── services/
+│   │   ├── rosterService.js        # lostark.bible scraping, alt detection, list checks
+│   │   └── listCheckService.js     # Shared OCR + name checking + formatting
+│   └── utils/
+│       └── names.js                # Character name normalization
+│
+├── models/
+│   ├── Blacklist.js                # Blacklist schema
+│   ├── Whitelist.js                # Whitelist schema
+│   ├── Watchlist.js                # Watchlist schema (under investigation)
+│   ├── PendingApproval.js          # /list add approval requests (24h TTL)
+│   ├── RosterSnapshot.js           # ilvl progression tracking
+│   ├── Class.js                    # Class ID → display name mapping
+│   └── Raid.js                     # Raid label choices
+│
+└── data/
+    └── status.json                 # Persisted server status state
 ```
