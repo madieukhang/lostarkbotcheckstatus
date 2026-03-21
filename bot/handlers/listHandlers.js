@@ -800,14 +800,14 @@ export function createListHandlers({ client }) {
   }
 
   async function handleListViewCommand(interaction) {
-    const type = interaction.options.getString('type') ?? null;
+    const type = interaction.options.getString('type', true);
 
     await interaction.deferReply();
 
     try {
       await connectDB();
 
-      const types = type ? [type] : ['black', 'white', 'watch'];
+      const types = type === 'all' ? ['black', 'white', 'watch'] : [type];
       const embeds = [];
 
       for (const t of types) {

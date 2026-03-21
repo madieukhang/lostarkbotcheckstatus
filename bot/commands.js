@@ -108,13 +108,14 @@ export function buildCommands() {
       .addSubcommand((sub) =>
         sub
           .setName('view')
-          .setDescription('View all entries in a list (or all lists)')
+          .setDescription('View all entries in a list')
           .addStringOption((opt) =>
             opt
               .setName('type')
-              .setDescription('Which list to view (leave empty for all)')
-              .setRequired(false)
+              .setDescription('Which list to view')
+              .setRequired(true)
               .addChoices(
+                { name: 'all', value: 'all' },
                 { name: 'black', value: 'black' },
                 { name: 'white', value: 'white' },
                 { name: 'watch', value: 'watch' }
