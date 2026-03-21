@@ -14,7 +14,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 - **`/search`**: Find similar character names with filters (ilvl range, class) and cross-check against all lists.
 - **Alt detection**: When roster is hidden, detects alt characters via Stronghold name + Roster Level matching across guild members.
 - **Guild member check**: When roster is hidden, checks all guild members against all lists.
-- **OCR similar suggestions**: When Gemini misreads diacritics, shows similar names with list flags (e.g. `⛔ Lùcifër, ❓ Lucifer`).
+- **OCR similar suggestions**: When Gemini misreads diacritics, shows similar names with list flags (e.g. `⛔ Lùnaria, ❓ Lunaria`).
 
 ### 📋 List Management
 - **Blacklist / Whitelist / Watchlist**: Three list types with `⛔`, `✅`, `⚠️` icons.
