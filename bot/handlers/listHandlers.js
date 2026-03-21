@@ -794,10 +794,53 @@ export function createListHandlers({ client }) {
     }
   }
 
+  async function handleListViewCommand(interaction) {
+    const type = interaction.options.getString('type', true);
+    const { model, label, color, icon } = getListContext(type);
+
+    await interaction.deferReply();
+
+    try {
+      await connectDB();
+      const entries = await model.find({}).sort({ addedAt: -1 }).lean();
+
+      if (entries.length === 0) {
+        await interaction.editReply({ content: `${icon} ${label} is empty.` });
+        return;
+      }
+
+      const lines = entries.map((e, i) => {
+        const parts = [`**${e.name}**`];
+        if (e.reason) parts.push(e.reason);
+        if (e.raid) parts.push(`[${e.raid}]`);
+        const addedBy = getAddedByDisplay(e);
+        if (addedBy) parts.push(`by: ${addedBy}`);
+        return `${i + 1}. ${parts.join(' — ')}`;
+      });
+
+      let description = lines.join('\n');
+      if (description.length > 4000) {
+        description = description.slice(0, 4000) + '\n…';
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(`${icon} ${label} (${entries.length} entries)`)
+        .setDescription(description)
+        .setColor(color)
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (err) {
+      console.error(`[list] View failed:`, err.message);
+      await interaction.editReply({ content: `⚠️ Failed to load ${label}: \`${err.message}\`` });
+    }
+  }
+
   return {
     handleListCheckCommand,
     handleListAddCommand,
     handleListRemoveCommand,
+    handleListViewCommand,
     handleListAddApprovalButton,
   };
 }

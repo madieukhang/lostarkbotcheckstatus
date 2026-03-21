@@ -96,9 +96,30 @@ client.on('interactionCreate', async (interaction) => {
         await listHandlers.handleListAddCommand(interaction);
       } else if (subcommand === 'remove') {
         await listHandlers.handleListRemoveCommand(interaction);
+      } else if (subcommand === 'view') {
+        await listHandlers.handleListViewCommand(interaction);
       }
     } else if (commandName === 'listcheck') {
       await listHandlers.handleListCheckCommand(interaction);
+    } else if (commandName === 'help') {
+      const helpText = [
+        '**📋 Available Commands:**',
+        '',
+        '`/status` — Show server status for all monitored servers',
+        '`/check` — Force an immediate live server status check',
+        '`/reset` — Reset the stored status state',
+        '',
+        '`/roster name` — Fetch roster + progression tracking + list check',
+        '`/search name [min_ilvl] [max_ilvl] [class]` — Search similar names with filters',
+        '',
+        '`/list add type name reason [raid] [logs] [image]` — Add to blacklist/whitelist/watchlist',
+        '`/list remove name` — Remove an entry from a list',
+        '`/list view type` — View all entries in a list',
+        '',
+        '`/listcheck image` — Check names from screenshot against all lists',
+      ].join('\n');
+
+      await interaction.reply({ content: helpText, ephemeral: true });
     }
   } catch (err) {
     console.error(`[bot] Unhandled error in /${commandName}:`, err);
