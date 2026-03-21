@@ -5,7 +5,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 ## Main Features
 
 - **Multi-server monitoring**: Monitors one or more servers (e.g. Brelshaza, Thaemine) and sends notifications when servers come online.
-- **Slash commands** for quick status operations (`/status`, `/check`, `/reset`).
+- **Slash commands** for quick status operations (`/status`, `/reset`).
 - **`/roster`** command to fetch roster data from lostark.bible with progression tracking (shows ilvl delta since last check).
 - **Alt detection**: When roster is hidden, detects alt characters via Stronghold name + Roster Level matching across guild members.
 - **Guild member check**: When roster is hidden, checks all guild members against blacklist/whitelist/watchlist.
@@ -19,8 +19,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 
 ## Commands
 
-- `/status`: Show the latest cached status for all monitored servers.
-- `/check`: Force an immediate live check for all monitored servers.
+- `/status`: Show live server status for all monitored servers.
 - `/reset`: Reset state in `data/status.json`.
 - `/roster name:<character>`: Fetch roster, show progression delta, cross-check lists. If roster is hidden: detect alts via Stronghold fingerprint + check guild members against lists.
 - `/search name:<character> [min_ilvl] [max_ilvl] [class]`: Search lostark.bible for similar names (default ilvl ≥ 1700), cross-check against all lists. Optional filters: item level range, class.

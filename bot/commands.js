@@ -23,11 +23,7 @@ export function buildCommands() {
   return [
     new SlashCommandBuilder()
       .setName('status')
-      .setDescription('Show the current cached server status'),
-
-    new SlashCommandBuilder()
-      .setName('check')
-      .setDescription('Force an immediate server status check right now'),
+      .setDescription('Show live server status'),
 
     new SlashCommandBuilder()
       .setName('reset')

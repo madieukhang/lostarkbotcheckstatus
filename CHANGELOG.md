@@ -33,6 +33,7 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- Merged `/check` into `/status` — `/status` now does live check instead of showing cached data. Removed `/check` command.
 - Refactored shared OCR + check logic into `listCheckService.js` — eliminates code duplication between `/listcheck` and auto-check.
 - Replaced ScraperAPI with direct fetch for all lostark.bible requests — faster, no API key needed.
 - Added automatic ScraperAPI fallback on 403/503 — direct fetch first, proxy retry if blocked by Cloudflare.
