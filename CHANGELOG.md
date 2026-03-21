@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased] - 2026-03-20
+## [v0.3.0] - 2026-03-20
 
 ### Added
 
@@ -58,7 +58,7 @@ All notable changes to this project are documented here.
 - Fixed `/roster` not detecting alt characters via `allCharacters` field (bug: only checked `name`).
 - Fixed pending `/list add` approvals lost on bot restart (now persisted to MongoDB).
 
-## [2026-03-19]
+## [v0.2.0] - 2026-03-19
 
 ### Added
 
@@ -92,7 +92,7 @@ All notable changes to this project are documented here.
 
 - Updated README command behavior notes for `/list add` approval flow and image-based `/listcheck`.
 
-## [2026-03-17]
+## [v0.1.0] - 2026-03-17
 
 ### Added
 
