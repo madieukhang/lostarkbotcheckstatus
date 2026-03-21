@@ -30,6 +30,7 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- Refactored shared OCR + check logic into `listCheckService.js` — eliminates code duplication between `/listcheck` and auto-check.
 - Replaced ScraperAPI with direct fetch for all lostark.bible requests — faster, no API key needed.
 - Added automatic ScraperAPI fallback on 403/503 — direct fetch first, proxy retry if blocked by Cloudflare.
 - `SCRAPERAPI_KEY` is now optional (no longer required at startup) but recommended as fallback.

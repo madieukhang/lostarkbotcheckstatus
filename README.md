@@ -97,6 +97,7 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 |  |  |- autoCheckHandler.js
 |  |- services/
 |  |  |- rosterService.js
+|  |  |- listCheckService.js
 |  |- utils/
 |  |  |- names.js
 |- config.js
