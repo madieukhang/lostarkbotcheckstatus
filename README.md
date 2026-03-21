@@ -4,18 +4,36 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 
 ## Main Features
 
-- **Multi-server monitoring**: Monitors one or more servers (e.g. Brelshaza, Thaemine) and sends notifications when servers come online.
-- **Slash commands** for quick status operations (`/status`, `/reset`).
-- **`/roster`** command to fetch roster data from lostark.bible with progression tracking (shows ilvl delta since last check).
+### Server Monitoring
+- **Multi-server monitoring**: Monitors one or more servers (e.g. Brelshaza, Thaemine) with a single page fetch.
+- **Auto-notification**: Sends `@here` when servers transition from offline/maintenance to online.
+- **`/status`**: Live server status check on demand.
+
+### Roster & Character Lookup
+- **`/roster`**: Fetch roster from lostark.bible with progression tracking (shows ilvl delta since last check).
+- **`/search`**: Find similar character names with filters (ilvl range, class) and cross-check against all lists.
 - **Alt detection**: When roster is hidden, detects alt characters via Stronghold name + Roster Level matching across guild members.
-- **Guild member check**: When roster is hidden, checks all guild members against blacklist/whitelist/watchlist.
-- **`/search`** command to find similar character names on lostark.bible with cross-check against all lists.
-- **`/list add` and `/list remove`** to manage blacklist/whitelist/watchlist entries with approval flow.
-- **`/listcheck`** command to check up to 8 names from a screenshot (Gemini OCR) against all lists.
-- **Auto-check channels**: Drop screenshots in configured channel(s) for automatic checking without commands.
-- **Watchlist**: Mark suspicious characters as "under investigation" (`/list add type:watch`).
-- **Auto-enrich**: When `/listcheck` finds a flagged character, background guild scan discovers and links alt characters to the database.
-- Roster-based duplicate checks (`allCharacters`) with case-insensitive matching.
+- **Guild member check**: When roster is hidden, checks all guild members against all lists.
+- **OCR similar suggestions**: When Gemini misreads diacritics, shows similar names with list flags (e.g. `⛔ Lùcifër, ❓ Lucifer`).
+
+### List Management
+- **Blacklist / Whitelist / Watchlist**: Three list types with `⛔`, `✅`, `⚠️` icons.
+- **`/list add`**: Add entries with approval flow (officers auto-approve), optional raid tag, logs URL, and evidence image. Validates ilvl >= 1700.
+- **`/list remove`**: Remove entries with ownership check.
+- **`/list view`**: View all entries in a list.
+- **Cross-server broadcast**: When entries are added/removed, notifications sent to all configured channels across servers.
+- **Auto-enrich**: When a flagged character is found, background guild scan discovers and links alt characters to `allCharacters`.
+
+### Screenshot Checking
+- **`/listcheck`**: Extract up to 8 names from a screenshot via Gemini OCR, check against all lists.
+- **Auto-check channels**: Drop screenshots in configured channel(s) for automatic checking (🔍 → ✅).
+- **Server name filter**: Prevents OCR from extracting server names (Vairgrys, Brelshaza, etc.) as player names.
+- **Gemini model failover**: Automatically switches to next model on quota/rate limits or timeout.
+
+### Technical
+- **Direct fetch with ScraperAPI fallback**: Fast direct access to lostark.bible, auto-fallback via proxy on 403/503.
+- **Roster-based duplicate checks**: `allCharacters` field with case-insensitive matching and MongoDB index.
+- **`/help`**: Shows all available commands.
 
 ## Commands
 
