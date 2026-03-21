@@ -10,7 +10,7 @@ All notable changes to this project are documented here.
 - Added cross-server list notification — when entries are added/removed, bot broadcasts to all channels in `LIST_NOTIFY_CHANNEL_IDS`.
 - Added ilvl >= 1700 validation on `/list add` — rejects characters below threshold.
 - Added optional `logs` parameter to `/list add` for attaching lostark.bible logs URL as evidence.
-- Added `/list view type:<black|white|watch>` command to view all entries in a list.
+- Added `/list view [type]` command to view entries — type is optional, shows all lists when empty. Entries sorted newest first with relative timestamps.
 - Added `/help` command showing all available commands (ephemeral).
 - Added Roster and Logs links in list add success embed.
 - Added similar name suggestions with list flags when OCR name has no roster (e.g. `⛔ Lùnaria, ❓ Lunaria`).
