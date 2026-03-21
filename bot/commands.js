@@ -108,6 +108,22 @@ export function buildCommands() {
               .setDescription('Character name to remove')
               .setRequired(true)
           )
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('view')
+          .setDescription('View all entries in a list')
+          .addStringOption((opt) =>
+            opt
+              .setName('type')
+              .setDescription('Which list to view')
+              .setRequired(true)
+              .addChoices(
+                { name: 'black', value: 'black' },
+                { name: 'white', value: 'white' },
+                { name: 'watch', value: 'watch' }
+              )
+          )
       ),
 
     new SlashCommandBuilder()
@@ -155,5 +171,8 @@ export function buildCommands() {
           .setDescription('Raid waiting room screenshot')
           .setRequired(true)
       ),
+    new SlashCommandBuilder()
+      .setName('help')
+      .setDescription('Show all available commands'),
   ].map((cmd) => cmd.toJSON());
 }
