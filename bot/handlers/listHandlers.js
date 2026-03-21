@@ -800,44 +800,62 @@ export function createListHandlers({ client }) {
   }
 
   async function handleListViewCommand(interaction) {
-    const type = interaction.options.getString('type', true);
-    const { model, label, color, icon } = getListContext(type);
+    const type = interaction.options.getString('type') ?? null;
 
     await interaction.deferReply();
 
     try {
       await connectDB();
-      const entries = await model.find({}).sort({ addedAt: -1 }).lean();
 
-      if (entries.length === 0) {
-        await interaction.editReply({ content: `${icon} ${label} is empty.` });
+      const types = type ? [type] : ['black', 'white', 'watch'];
+      const embeds = [];
+
+      for (const t of types) {
+        const { model, label, color, icon } = getListContext(t);
+        const entries = await model.find({}).sort({ addedAt: -1 }).lean();
+
+        if (entries.length === 0) {
+          if (type) {
+            await interaction.editReply({ content: `${icon} ${label} is empty.` });
+            return;
+          }
+          continue;
+        }
+
+        const lines = entries.map((e, i) => {
+          const parts = [`**${e.name}**`];
+          if (e.reason) parts.push(e.reason);
+          if (e.raid) parts.push(`[${e.raid}]`);
+          const addedBy = getAddedByDisplay(e);
+          if (addedBy) parts.push(`by: ${addedBy}`);
+          const date = e.addedAt ? `<t:${Math.floor(new Date(e.addedAt).getTime() / 1000)}:R>` : '';
+          if (date) parts.push(date);
+          return `${i + 1}. ${parts.join(' — ')}`;
+        });
+
+        let description = lines.join('\n');
+        if (description.length > 4000) {
+          description = description.slice(0, 4000) + '\n…';
+        }
+
+        embeds.push(
+          new EmbedBuilder()
+            .setTitle(`${icon} ${label} (${entries.length})`)
+            .setDescription(description)
+            .setColor(color)
+            .setTimestamp()
+        );
+      }
+
+      if (embeds.length === 0) {
+        await interaction.editReply({ content: 'All lists are empty.' });
         return;
       }
 
-      const lines = entries.map((e, i) => {
-        const parts = [`**${e.name}**`];
-        if (e.reason) parts.push(e.reason);
-        if (e.raid) parts.push(`[${e.raid}]`);
-        const addedBy = getAddedByDisplay(e);
-        if (addedBy) parts.push(`by: ${addedBy}`);
-        return `${i + 1}. ${parts.join(' — ')}`;
-      });
-
-      let description = lines.join('\n');
-      if (description.length > 4000) {
-        description = description.slice(0, 4000) + '\n…';
-      }
-
-      const embed = new EmbedBuilder()
-        .setTitle(`${icon} ${label} (${entries.length} entries)`)
-        .setDescription(description)
-        .setColor(color)
-        .setTimestamp();
-
-      await interaction.editReply({ embeds: [embed] });
+      await interaction.editReply({ embeds: embeds.slice(0, 10) });
     } catch (err) {
       console.error(`[list] View failed:`, err.message);
-      await interaction.editReply({ content: `⚠️ Failed to load ${label}: \`${err.message}\`` });
+      await interaction.editReply({ content: `⚠️ Failed to load list: \`${err.message}\`` });
     }
   }
 
