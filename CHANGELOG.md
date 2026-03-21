@@ -28,7 +28,7 @@ All notable changes to this project are documented here.
 - Added `RosterSnapshot` model for storing ilvl history per character.
 - Added `PendingApproval` model with TTL index (24h auto-cleanup) to persist `/list add` approvals across bot restarts.
 - Added MongoDB index on `allCharacters` field for fast `$in` lookups.
-- Added OCR auto-correction in `/listcheck` and auto-check — when Gemini misreads diacritics, bot searches for similar names and auto-corrects (e.g. `Laliisa` → `Lalïisa`).
+- Added OCR similar name suggestions in `/listcheck` and auto-check — when Gemini misreads diacritics, shows similar names with list flags instead of auto-replacing.
 - Added fail reason display when roster lookup fails — shows cause (HTTP 403, timeout, etc.) to help diagnose issues.
 
 ### Changed
@@ -49,7 +49,7 @@ All notable changes to this project are documented here.
 - Exported shared `FETCH_HEADERS` from rosterService for consistent User-Agent across all handlers.
 - MongoDB connects once at startup (`bot.js`) instead of per-handler lazy connect.
 - `/listcheck` alt enrichment runs in background after reply (user no longer waits for guild scan).
-- `/status` and `/check` commands now show all monitored servers with individual status.
+- `/status` now shows all monitored servers with individual status.
 - Suppressed JSDOM CSS parse warnings with VirtualConsole.
 - Standardized ilvl filter threshold from 1680 to 1700 across all features (roster suggestions, blacklist/whitelist checks, alt detection).
 
