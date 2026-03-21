@@ -11,6 +11,7 @@ const watchlistSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   reason: { type: String, default: '', trim: true },
   raid: { type: String, default: '', trim: true },
+  logsUrl: { type: String, default: '', trim: true },
   imageUrl: { type: String, default: '', trim: true },
   allCharacters: { type: [String], default: [] },
   addedByUserId: { type: String, default: '', trim: true },

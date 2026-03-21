@@ -31,6 +31,13 @@ const blacklistSchema = new mongoose.Schema({
     trim: true,
   },
 
+  /** Optional lostark.bible logs URL */
+  logsUrl: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+
   /** Optional attachment image URL from slash command */
   imageUrl: {
     type: String,

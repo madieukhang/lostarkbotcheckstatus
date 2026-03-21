@@ -449,6 +449,7 @@ export function createListHandlers({ client }) {
       name,
       reason: payload.reason,
       raid: payload.raid,
+      logsUrl: payload.logsUrl || '',
       imageUrl: payload.imageUrl,
       allCharacters,
       addedByUserId: payload.requestedByUserId,
@@ -459,7 +460,10 @@ export function createListHandlers({ client }) {
 
     // Build result embed with character links
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
-    const logsLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/logs`;
+    const autoLogsLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/logs`;
+
+    const linkParts = [`[Roster](${rosterLink})`, `[Logs](${autoLogsLink})`];
+    if (payload.logsUrl) linkParts.push(`[Evidence Logs](${payload.logsUrl})`);
 
     const embed = new EmbedBuilder()
       .setTitle(`${label} entry added`)
@@ -468,7 +472,7 @@ export function createListHandlers({ client }) {
         { name: 'Reason', value: payload.reason || 'N/A', inline: true },
         { name: 'Raid', value: payload.raid || 'N/A', inline: true },
         { name: 'All Characters', value: String(allCharacters.length), inline: true },
-        { name: 'Links', value: `[Roster](${rosterLink}) · [Logs](${logsLink})`, inline: false }
+        { name: 'Links', value: linkParts.join(' · '), inline: false }
       )
       .setColor(color)
       .setTimestamp(new Date());
@@ -839,6 +843,7 @@ export function createListHandlers({ client }) {
     const rawName = interaction.options.getString('name', true).trim();
     const reason = interaction.options.getString('reason', true).trim();
     const raid = interaction.options.getString('raid') ?? '';
+    const logs = interaction.options.getString('logs') ?? '';
     const image = interaction.options.getAttachment('image');
     const name = normalizeCharacterName(rawName);
 
@@ -875,6 +880,7 @@ export function createListHandlers({ client }) {
         name,
         reason,
         raid,
+        logsUrl: logs,
         imageUrl: image?.url ?? '',
         requestedByUserId: interaction.user.id,
         requestedByTag: interaction.user.tag,

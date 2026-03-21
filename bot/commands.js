@@ -85,6 +85,12 @@ export function buildCommands() {
 
             return opt;
           })
+          .addStringOption((opt) =>
+            opt
+              .setName('logs')
+              .setDescription('Optional lostark.bible logs URL')
+              .setRequired(false)
+          )
           .addAttachmentOption((opt) =>
             opt
               .setName('image')
