@@ -298,13 +298,18 @@ export function createListHandlers({ client }) {
     const linkParts = [`[Roster](${rosterLink})`, `[Logs](${autoLogsLink})`];
     if (payload.logsUrl) linkParts.push(`[Evidence Logs](${payload.logsUrl})`);
 
+    const allCharsDisplay = allCharacters.length <= 6
+      ? allCharacters.join(', ')
+      : allCharacters.slice(0, 6).join(', ') + ` +${allCharacters.length - 6} more`;
+
     const embed = new EmbedBuilder()
       .setTitle(`${label} entry added`)
       .addFields(
         { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: payload.reason || 'N/A', inline: true },
         { name: 'Raid', value: payload.raid || 'N/A', inline: true },
-        { name: 'All Characters', value: String(allCharacters.length), inline: true },
+        { name: `All Characters (${allCharacters.length})`, value: allCharsDisplay, inline: false },
+        { name: 'Added by', value: payload.requestedByDisplayName || payload.requestedByTag || 'Unknown', inline: true },
         { name: 'Links', value: linkParts.join(' · '), inline: false }
       )
       .setColor(color)
