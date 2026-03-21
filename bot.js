@@ -12,7 +12,7 @@ import {
 } from 'discord.js';
 
 import config from './config.js';
-import { startMonitor, checkStatus, getState, resetState } from './monitor.js';
+import { startMonitor, checkStatus, resetState } from './monitor.js';
 import { buildCommands } from './bot/commands.js';
 import { createSystemHandlers } from './bot/handlers/systemHandlers.js';
 import { handleRosterCommand } from './bot/handlers/rosterHandler.js';
@@ -30,7 +30,6 @@ const client = new Client({
 });
 
 const systemHandlers = createSystemHandlers({
-  getState,
   checkStatus,
   resetState,
   client,
@@ -82,8 +81,6 @@ client.on('interactionCreate', async (interaction) => {
   try {
     if (commandName === 'status') {
       await systemHandlers.handleStatusCommand(interaction);
-    } else if (commandName === 'check') {
-      await systemHandlers.handleCheckCommand(interaction);
     } else if (commandName === 'reset') {
       await systemHandlers.handleResetCommand(interaction);
     } else if (commandName === 'roster') {
@@ -105,8 +102,7 @@ client.on('interactionCreate', async (interaction) => {
       const helpText = [
         '**📋 Available Commands:**',
         '',
-        '`/status` — Show server status for all monitored servers',
-        '`/check` — Force an immediate live server status check',
+        '`/status` — Show live server status for all monitored servers',
         '`/reset` — Reset the stored status state',
         '',
         '`/roster name` — Fetch roster + progression tracking + list check',
