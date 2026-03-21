@@ -9,6 +9,9 @@ All notable changes to this project are documented here.
 - Added `/search` command with filters: `min_ilvl` (default 1700), `max_ilvl`, `class` — find similar names on lostark.bible with cross-check against all lists.
 - Added cross-server list notification — when entries are added/removed, bot broadcasts to all channels in `LIST_NOTIFY_CHANNEL_IDS`.
 - Added ilvl >= 1700 validation on `/list add` — rejects characters below threshold.
+- Added optional `logs` parameter to `/list add` for attaching lostark.bible logs URL as evidence.
+- Added `/list view type:<black|white|watch>` command to view all entries in a list.
+- Added `/help` command showing all available commands (ephemeral).
 - Added Roster and Logs links in list add success embed.
 - Added similar name suggestions with list flags when OCR name has no roster (e.g. `⛔ Lùcifër, ❓ Lucifer`).
 - Added server name filter to prevent OCR from extracting server names as player names (Vairgrys, Brelshaza, etc.).
