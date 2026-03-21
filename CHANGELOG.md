@@ -13,7 +13,7 @@ All notable changes to this project are documented here.
 - Added `/list view type:<black|white|watch>` command to view all entries in a list.
 - Added `/help` command showing all available commands (ephemeral).
 - Added Roster and Logs links in list add success embed.
-- Added similar name suggestions with list flags when OCR name has no roster (e.g. `⛔ Lùcifër, ❓ Lucifer`).
+- Added similar name suggestions with list flags when OCR name has no roster (e.g. `⛔ Lùnaria, ❓ Lunaria`).
 - Added server name filter to prevent OCR from extracting server names as player names (Vairgrys, Brelshaza, etc.).
 - Added 🔍 reaction loading indicator for auto-check channel.
 - Added user-friendly '429 Rate limited' message instead of raw HTTP status.
