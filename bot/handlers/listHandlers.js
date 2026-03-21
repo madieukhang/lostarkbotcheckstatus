@@ -17,8 +17,14 @@ import { getClassName } from '../../models/Class.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
+  fetchCharacterMeta,
   detectAltsViaStronghold,
 } from '../services/rosterService.js';
+import {
+  extractNamesFromImage,
+  checkNamesAgainstLists,
+  formatCheckResults,
+} from '../services/listCheckService.js';
 import {
   normalizeCharacterName,
   getAddedByDisplay,
@@ -46,179 +52,6 @@ function getListContext(type) {
     return { model: Watchlist, label: 'watchlist', color: 0xfee75c, icon: '⚠️' };
   }
   return { model: Whitelist, label: 'whitelist', color: 0x57f287, icon: '✅' };
-}
-
-function extractJsonArrayFromText(raw) {
-  if (!raw) return null;
-
-  const trimmed = raw.trim();
-  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-    return trimmed;
-  }
-
-  const match = trimmed.match(/\[[\s\S]*\]/);
-  return match ? match[0] : null;
-}
-
-function shouldFailoverGeminiModel(status, bodyText) {
-  const text = (bodyText || '').toLowerCase();
-  if (status === 429 || status === 503) return true;
-  return (
-    text.includes('resource_exhausted') ||
-    text.includes('quota') ||
-    text.includes('rate limit') ||
-    text.includes('too many requests')
-  );
-}
-
-function buildGeminiRequestBody(mimeType, imageBase64) {
-  const prompt = [
-    'This is a screenshot of a Lost Ark raid waiting room (party finder lobby).',
-    'Extract ONLY the player character names from the party member list.',
-    'Ignore all other text: raid names, class names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
-    'Preserve every character exactly as shown, including special letters and diacritics.',
-    'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
-    'Keep umlaut letters exactly: ë, ö, ü.',
-    'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
-    'Return JSON array only, no markdown, no explanation.',
-    'Example output: ["name1","name2"].',
-    'If no valid names are found, return [].',
-  ].join(' ');
-
-  return {
-    contents: [
-      {
-        parts: [
-          { text: prompt },
-          {
-            inlineData: {
-              mimeType,
-              data: imageBase64,
-            },
-          },
-        ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0,
-      topP: 0.1,
-      maxOutputTokens: 512,
-    },
-  };
-}
-
-function parseGeminiNamesFromPayload(payload) {
-  const text = payload?.candidates?.[0]?.content?.parts
-    ?.map((part) => part?.text ?? '')
-    .join('')
-    .trim();
-
-  if (!text) return [];
-
-  const jsonArrayText = extractJsonArrayFromText(text);
-  if (!jsonArrayText) {
-    throw new Error('Gemini did not return a JSON array.');
-  }
-
-  const parsed = JSON.parse(jsonArrayText);
-  if (!Array.isArray(parsed)) {
-    throw new Error('Gemini output is not an array.');
-  }
-
-  // Known Lost Ark server/world names to filter out from OCR results
-  const SERVER_NAMES = new Set([
-    'azena', 'avesta', 'galatur', 'karta', 'ladon', 'kharmine',
-    'una', 'regulus', 'sasha', 'vykas', 'elgacia', 'thaemine',
-    'brelshaza', 'kazeros', 'arcturus', 'enviska', 'valtan', 'mari',
-    'akkan', 'vairgrys', 'bergstrom', 'danube', 'mokoko',
-  ]);
-
-  const names = parsed
-    .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
-    .filter((name) => name && !SERVER_NAMES.has(name.toLowerCase()));
-
-  const seen = new Set();
-  const unique = [];
-  for (const name of names) {
-    const key = name.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(name);
-  }
-
-  return unique;
-}
-
-async function extractNamesFromImageWithGemini(image) {
-  if (!config.geminiApiKey) {
-    throw new Error('GEMINI_API_KEY is not configured.');
-  }
-
-  if (image.contentType && !image.contentType.startsWith('image/')) {
-    throw new Error('Attachment must be an image file.');
-  }
-
-  const imageRes = await fetch(image.url, { signal: AbortSignal.timeout(15000) });
-  if (!imageRes.ok) {
-    throw new Error(`Failed to download attachment (HTTP ${imageRes.status})`);
-  }
-
-  const contentLength = imageRes.headers.get('content-length');
-  if (contentLength && parseInt(contentLength) > 20 * 1024 * 1024) {
-    throw new Error('Image file too large (max 20MB).');
-  }
-
-  const mimeType = image.contentType || imageRes.headers.get('content-type') || 'image/png';
-  const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-  const imageBase64 = imageBuffer.toString('base64');
-
-  const models = config.geminiModels.length > 0
-    ? config.geminiModels
-    : ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite', 'gemini-3-flash'];
-  const requestBody = buildGeminiRequestBody(mimeType, imageBase64);
-  const failures = [];
-
-  for (let i = 0; i < models.length; i += 1) {
-    const model = models[i];
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
-
-    let aiRes;
-    try {
-      aiRes = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(30000),
-      });
-    } catch (fetchErr) {
-      // Timeout or network error — try next model if available
-      failures.push(`${model}: ${fetchErr.name || fetchErr.message}`);
-      const canFallback = i < models.length - 1;
-      if (canFallback) {
-        console.warn(`[listcheck] Gemini timeout/network error on ${model}, trying fallback model.`);
-        continue;
-      }
-      throw new Error(`Gemini request failed on ${model}: ${fetchErr.message}`);
-    }
-
-    if (!aiRes.ok) {
-      const errBody = await aiRes.text().catch(() => '');
-      failures.push(`${model}: HTTP ${aiRes.status}`);
-
-      const canFallback = i < models.length - 1;
-      if (canFallback && shouldFailoverGeminiModel(aiRes.status, errBody)) {
-        console.warn(`[listcheck] Gemini quota/rate hit on ${model}, trying fallback model.`);
-        continue;
-      }
-
-      throw new Error(`Gemini request failed on ${model} (HTTP ${aiRes.status}) ${errBody}`.trim());
-    }
-
-    const payload = await aiRes.json();
-    return parseGeminiNamesFromPayload(payload);
-  }
-
-  throw new Error(`All Gemini models failed: ${failures.join(' | ')}`);
 }
 
 function buildListAddApprovalEmbed(guild, payload, options = {}) {
@@ -678,7 +511,7 @@ export function createListHandlers({ client }) {
     await interaction.deferReply();
 
     try {
-      names = await extractNamesFromImageWithGemini(image);
+      names = await extractNamesFromImage(image);
     } catch (err) {
       await interaction.editReply({
         content: `⚠️ Failed to extract names from image: \`${err.message}\``,
@@ -696,100 +529,8 @@ export function createListHandlers({ client }) {
     const limitedNames = names.slice(0, 8);
 
     try {
-      await connectDB();
-
-      const results = await Promise.all(
-        limitedNames.map(async (name) => {
-          const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
-            Blacklist.findOne({ $or: [{ name }, { allCharacters: name }] })
-              .collation({ locale: 'en', strength: 2 })
-              .lean(),
-            Whitelist.findOne({ $or: [{ name }, { allCharacters: name }] })
-              .collation({ locale: 'en', strength: 2 })
-              .lean(),
-            Watchlist.findOne({ $or: [{ name }, { allCharacters: name }] })
-              .collation({ locale: 'en', strength: 2 })
-              .lean(),
-          ]);
-
-          let hasRoster = false;
-          let correctedName = null;
-          let failReason = null;
-          if (!blackEntry && !whiteEntry && !watchEntry) {
-            const rosterResult = await buildRosterCharacters(name);
-            hasRoster = rosterResult.hasValidRoster;
-            failReason = rosterResult.failReason;
-
-            // If no roster found, search for similar names + check each against lists
-            if (!hasRoster) {
-              const suggestions = await fetchNameSuggestions(name);
-              const similarCandidates = suggestions
-                .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== name.toLowerCase())
-                .slice(0, 3);
-
-              if (similarCandidates.length > 0) {
-                const similarWithFlags = await Promise.all(
-                  similarCandidates.map(async (s) => {
-                    const [b, w, wa] = await Promise.all([
-                      Blacklist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-                        .collation({ locale: 'en', strength: 2 }).lean(),
-                      Whitelist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-                        .collation({ locale: 'en', strength: 2 }).lean(),
-                      Watchlist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-                        .collation({ locale: 'en', strength: 2 }).lean(),
-                    ]);
-                    let flag = '';
-                    if (b) flag += '⛔';
-                    if (w) flag += '✅';
-                    if (wa) flag += '⚠️';
-                    if (!flag) flag = '❓';
-                    return { name: s.name, flag };
-                  })
-                );
-                return { name, similarNames: similarWithFlags, blackEntry: null, whiteEntry: null, watchEntry: null, hasRoster: false, failReason };
-              }
-            }
-          }
-
-          return { name, similarNames: null, blackEntry, whiteEntry, watchEntry, hasRoster, failReason };
-        })
-      );
-
-      const lines = results.map((item, idx) => {
-        const isBlack = Boolean(item.blackEntry);
-        const isWhite = Boolean(item.whiteEntry);
-        const isWatch = Boolean(item.watchEntry);
-
-        const reasonParts = [];
-
-        for (const [entry, label] of [[item.blackEntry, 'black'], [item.whiteEntry, 'white'], [item.watchEntry, 'watch']]) {
-          if (!entry) continue;
-          const details = [];
-          if (entry.reason?.trim()) details.push(entry.reason.trim());
-          const addedBy = getAddedByDisplay(entry);
-          if (addedBy) details.push(`Added by: **${addedBy}**`);
-          if (details.length > 0) reasonParts.push(details.join(' — '));
-        }
-
-        const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
-
-        let icon = '';
-        if (isBlack) icon += '⛔';
-        if (isWhite) icon += '✅';
-        if (isWatch) icon += '⚠️';
-
-        if (icon) {
-          return `${idx + 1}. ${icon} **${item.name}**${reasonSuffix}`;
-        } else if (item.hasRoster) {
-          return `${idx + 1}. ❓ **${item.name}**`;
-        } else {
-          const reason = item.failReason ? ` *(${item.failReason})*` : '';
-          const similar = item.similarNames?.length > 0
-            ? ` — Similar: ${item.similarNames.map((s) => `${s.flag} ${s.name}`).join(', ')}`
-            : '';
-          return `${idx + 1}. No roster found: **${item.name}**${reason}${similar}`;
-        }
-      });
+      const results = await checkNamesAgainstLists(limitedNames);
+      const lines = formatCheckResults(results);
 
       const sections = [
         `Checked: **${limitedNames.length}** name(s)`,
@@ -803,11 +544,11 @@ export function createListHandlers({ client }) {
       });
 
       // Fire-and-forget: enrich allCharacters in background for flagged entries
-      const flaggedItems = results.filter((item) => item.blackEntry || item.whiteEntry);
+      const flaggedItems = results.filter((item) => item.blackEntry || item.whiteEntry || item.watchEntry);
       if (flaggedItems.length > 0) {
         (async () => {
           for (const item of flaggedItems) {
-            const listEntry = item.blackEntry || item.whiteEntry;
+            const listEntry = item.blackEntry || item.whiteEntry || item.watchEntry;
             try {
               const altResult = await detectAltsViaStronghold(item.name);
               if (altResult && altResult.alts.length > 0) {
@@ -816,7 +557,7 @@ export function createListHandlers({ client }) {
                 const merged = [...new Set([...existingAlts, item.name, ...newAltNames])];
 
                 if (merged.length > existingAlts.length) {
-                  const model = item.blackEntry ? Blacklist : Whitelist;
+                  const model = item.blackEntry ? Blacklist : item.whiteEntry ? Whitelist : Watchlist;
                   await model.updateOne(
                     { _id: listEntry._id },
                     { $set: { allCharacters: merged } }
