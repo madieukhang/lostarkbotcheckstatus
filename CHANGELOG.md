@@ -17,6 +17,10 @@ All notable changes to this project are documented here.
 - Added server name filter to prevent OCR from extracting server names as player names (Vairgrys, Brelshaza, etc.).
 - Added 🔍 reaction loading indicator for auto-check channel.
 - Added user-friendly '429 Rate limited' message instead of raw HTTP status.
+- Added roster match origin display — when flagged via `allCharacters`, shows "via MainChar — reason" across `/listcheck`, `/search`, auto-check.
+- Added 📎 Evidence dropdown to `/search` for viewing flagged entries' images and details.
+- Added ✅ reaction after successful auto-check completion.
+- Added session timeout message ("Session expired") when `/list view` buttons expire.
 - Added alt detection via Stronghold fingerprint when roster is hidden — matches Stronghold name + Roster Level across guild members to find same-account alts.
 - Added guild member list check when roster is hidden — fast DB query for any flagged guild members.
 - Added auto-enrich `allCharacters` in `/listcheck` — when a flagged character is found, background guild scan discovers and links alt characters automatically.
@@ -36,7 +40,10 @@ All notable changes to this project are documented here.
 - Moved approver IDs from hardcoded to env vars: `OFFICER_APPROVER_IDS`, `SENIOR_APPROVER_IDS`, `MEMBER_APPROVER_IDS`. `SENIOR_APPROVER_ID` changed to array `SENIOR_APPROVER_IDS` for multiple seniors.
 - Hidden "Added by" display from all outputs for privacy (data kept in DB).
 - Merged `/check` into `/status` — `/status` now does live check instead of showing cached data. Removed `/check` command.
-- Improved list add embed: shows character names instead of count, added "Added by" field.
+- Improved list add embed: shows character names instead of count.
+- Renamed `/help` to `/lahelp` to avoid conflicts with other bots.
+- `/list add` duplicate check now shows roster match origin: "roster match: MainChar is already in blacklist".
+- Fixed ilvl check in `/list add` — now uses correct character ilvl from roster DOM instead of fragile regex.
 - Refactored shared OCR + check logic into `listCheckService.js` — eliminates code duplication between `/listcheck` and auto-check.
 - Replaced ScraperAPI with direct fetch for all lostark.bible requests — faster, no API key needed.
 - Added automatic ScraperAPI fallback on 403/503 — direct fetch first, proxy retry if blocked by Cloudflare.
