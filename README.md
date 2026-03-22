@@ -46,7 +46,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | `/list remove name` | Remove an entry (ownership check) |
 | `/list view [type]` | View entries in a list (optional type, shows all if empty) |
 | `/listcheck image` | OCR screenshot → check names against all lists |
-| `/help` | Show all available commands |
+| `/lahelp` | Show all available commands |
 
 ### Status Icons
 
