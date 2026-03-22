@@ -893,7 +893,6 @@ export function createListHandlers({ client }) {
         components,
       });
 
-      if (totalPages <= 1 && !allEntries.some((e) => e.imageUrl)) return;
 
       const reply = await interaction.fetchReply();
       const collector = reply.createMessageComponentCollector({
