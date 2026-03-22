@@ -256,7 +256,6 @@ export function formatCheckResults(results) {
       const details = [];
       if (entry.reason?.trim()) details.push(entry.reason.trim());
       const addedBy = getAddedByDisplay(entry);
-      if (addedBy) details.push(`Added by: **${addedBy}**`);
       if (details.length > 0) reasonParts.push(details.join(' — '));
     }
 

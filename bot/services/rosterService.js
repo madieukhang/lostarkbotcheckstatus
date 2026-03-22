@@ -394,7 +394,5 @@ export function formatSuggestionLines(suggestions) {
 export function buildRosterStatusContent(name, result, label) {
   const reason = result.reason ? ` — *${result.reason}*` : '';
   const raid = result.raid ? ` [${result.raid}]` : '';
-  const addedBy = getAddedByDisplay(result);
-  const addedByText = addedBy ? ` — Added by: **${addedBy}**` : '';
-  return `${label} **${name}**${label === '⛔' ? ' is on the blacklist.' : ' is on the whitelist.'}${raid}${reason}${addedByText}`;
+  return `${label} **${name}**${label === '⛔' ? ' is on the blacklist.' : ' is on the whitelist.'}${raid}${reason}`;
 }
