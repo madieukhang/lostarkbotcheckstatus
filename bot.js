@@ -98,7 +98,7 @@ client.on('interactionCreate', async (interaction) => {
       }
     } else if (commandName === 'listcheck') {
       await listHandlers.handleListCheckCommand(interaction);
-    } else if (commandName === 'help') {
+    } else if (commandName === 'lahelp') {
       const helpText = [
         '**📋 Available Commands:**',
         '',

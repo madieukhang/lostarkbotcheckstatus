@@ -11,7 +11,7 @@ All notable changes to this project are documented here.
 - Added ilvl >= 1700 validation on `/list add` — rejects characters below threshold.
 - Added optional `logs` parameter to `/list add` for attaching lostark.bible logs URL as evidence.
 - Added `/list view [type]` command to view entries — type is optional, shows all lists when empty. Entries sorted newest first with relative timestamps.
-- Added `/help` command showing all available commands (ephemeral).
+- Added `/lahelp` command showing all available commands (ephemeral).
 - Added Roster and Logs links in list add success embed.
 - Added similar name suggestions with list flags when OCR name has no roster (e.g. `⛔ Lùnaria, ❓ Lunaria`).
 - Added server name filter to prevent OCR from extracting server names as player names (Vairgrys, Brelshaza, etc.).

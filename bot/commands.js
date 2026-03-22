@@ -169,7 +169,7 @@ export function buildCommands() {
           .setRequired(true)
       ),
     new SlashCommandBuilder()
-      .setName('help')
-      .setDescription('Show all available commands'),
+      .setName('lahelp')
+      .setDescription('Show all available Lost Ark bot commands'),
   ].map((cmd) => cmd.toJSON());
 }
