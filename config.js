@@ -73,6 +73,14 @@ const config = {
   /** ScraperAPI key (no longer required — lostark.bible is accessible directly) */
   scraperApiKey: (process.env.SCRAPERAPI_KEY || '').trim(),
 
+  /** Approver IDs for /list add approval flow (comma-separated Discord user IDs) */
+  officerApproverIds: (process.env.OFFICER_APPROVER_IDS || '')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+  seniorApproverIds: (process.env.SENIOR_APPROVER_IDS || '')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+  memberApproverIds: (process.env.MEMBER_APPROVER_IDS || '')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+
   /** Optional channel IDs to broadcast list add/remove notifications (comma-separated) */
   listNotifyChannelIds: (process.env.LIST_NOTIFY_CHANNEL_IDS || '')
     .split(',')

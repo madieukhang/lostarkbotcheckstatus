@@ -87,6 +87,9 @@ Copy `.env.example` to `.env` and fill in values:
 | `GEMINI_MODELS` | Comma-separated model priority list for failover | `gemini-2.5-flash,...` |
 | `AUTO_CHECK_CHANNEL_IDS` | Channel IDs for auto-check (drop image → auto listcheck) | — |
 | `LIST_NOTIFY_CHANNEL_IDS` | Channel IDs for cross-server list add/remove notifications | — |
+| `OFFICER_APPROVER_IDS` | Officer Discord user IDs for /list add auto-approve | — |
+| `SENIOR_APPROVER_IDS` | Senior approver Discord user IDs (always receive approval DMs) | — |
+| `MEMBER_APPROVER_IDS` | Member approver Discord user IDs | — |
 | `SCRAPERAPI_KEY` | Fallback proxy when lostark.bible blocks direct access (403/503) | — |
 
 ## Run Locally
