@@ -309,7 +309,6 @@ export function createListHandlers({ client }) {
         { name: 'Reason', value: payload.reason || 'N/A', inline: true },
         { name: 'Raid', value: payload.raid || 'N/A', inline: true },
         { name: `All Characters (${allCharacters.length})`, value: allCharsDisplay, inline: false },
-        { name: 'Added by', value: payload.requestedByDisplayName || payload.requestedByTag || 'Unknown', inline: true },
         { name: 'Links', value: linkParts.join(' · '), inline: false }
       )
       .setColor(color)
@@ -343,7 +342,6 @@ export function createListHandlers({ client }) {
       .addFields(
         { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: entry.reason || 'N/A', inline: true },
-        { name: action === 'added' ? 'Added by' : 'Removed by', value: addedBy, inline: true },
       )
       .setColor(color)
       .setTimestamp(new Date());
@@ -826,8 +824,6 @@ export function createListHandlers({ client }) {
           const parts = [`**${e.name}**`];
           if (e.reason) parts.push(e.reason);
           if (e.raid) parts.push(`[${e.raid}]`);
-          const addedBy = getAddedByDisplay(e);
-          if (addedBy) parts.push(`by: ${addedBy}`);
           const date = e.addedAt ? `<t:${Math.floor(new Date(e.addedAt).getTime() / 1000)}:R>` : '';
           if (date) parts.push(date);
           return `${i + 1}. ${parts.join(' — ')}`;

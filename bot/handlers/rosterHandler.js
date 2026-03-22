@@ -237,9 +237,7 @@ export async function handleRosterCommand(interaction) {
     if (blacklistResult) {
       const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';
       const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
-      const addedBy = getAddedByDisplay(blacklistResult);
-      const addedByText = addedBy ? ` — Added by: **${addedBy}**` : '';
-      contentLines.push(`⛔ **${name}** is on the blacklist.${raid}${reason}${addedByText}`);
+      contentLines.push(`⛔ **${name}** is on the blacklist.${raid}${reason}`);
 
       if (blacklistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
@@ -253,9 +251,7 @@ export async function handleRosterCommand(interaction) {
     if (whitelistResult) {
       const reason = whitelistResult.reason ? ` — *${whitelistResult.reason}*` : '';
       const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
-      const addedBy = getAddedByDisplay(whitelistResult);
-      const addedByText = addedBy ? ` — Added by: **${addedBy}**` : '';
-      contentLines.push(`✅ **${name}** is on the whitelist.${raid}${reason}${addedByText}`);
+      contentLines.push(`✅ **${name}** is on the whitelist.${raid}${reason}`);
 
       if (whitelistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
