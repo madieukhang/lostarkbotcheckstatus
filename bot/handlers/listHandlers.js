@@ -261,9 +261,11 @@ export function createListHandlers({ client }) {
       .lean();
 
     if (existed) {
+      const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
+      const via = isRosterMatch ? ` (roster match: **${existed.name}** is already in ${label})` : '';
       return {
         ok: false,
-        content: `⚠️ **${name}** already exists in ${label}.`,
+        content: `⚠️ **${name}** already exists in ${label}.${via}`,
         embeds: [],
       };
     }
