@@ -81,6 +81,7 @@ export async function buildRosterCharacters(name) {
   let allCharacters = [name];
   let hasValidRoster = false;
   let failReason = null;
+  let targetItemLevel = null;
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
@@ -103,7 +104,17 @@ export async function buildRosterCharacters(name) {
           .map((n) => n.textContent.trim())
           .find((t) => t.length > 0);
 
-        if (charName) rosterChars.push(charName);
+        if (!charName) continue;
+
+        rosterChars.push(charName);
+
+        // Extract ilvl for the target character
+        if (charName.toLowerCase() === name.toLowerCase()) {
+          const spans = headerDiv.querySelectorAll('span');
+          const ilvlText = spans[0]?.textContent.trim() ?? '';
+          const parsed = parseFloat(ilvlText.replace(/,/g, ''));
+          if (!isNaN(parsed)) targetItemLevel = parsed;
+        }
       }
 
       if (rosterChars.length > 0) {
@@ -116,7 +127,7 @@ export async function buildRosterCharacters(name) {
     console.warn('[list] Failed to fetch roster characters:', err.message);
   }
 
-  return { hasValidRoster, allCharacters, failReason };
+  return { hasValidRoster, allCharacters, failReason, targetItemLevel };
 }
 
 export async function handleRosterBlackListCheck(names) {
@@ -251,8 +262,14 @@ export async function fetchCharacterMeta(name) {
     const rlMatch = html.match(/rosterLevel:(\d+)/);
     const shMatch = html.match(/stronghold:\{[^}]*level:(\d+),name:"([^"]+)"\}/);
     const guildMatch = html.match(/guild:\{name:"([^"]+)",grade:"([^"]+)"\}/);
-    const classMatch = html.match(/class:"([^"]+)"/);
-    const ilvlMatch = html.match(/itemLevel:([\d.]+)/);
+
+    // Extract class from near rosterLevel position (avoid matching roster alt data)
+    let classId = '';
+    if (rlMatch) {
+      const beforeRL = html.substring(Math.max(0, rlMatch.index - 500), rlMatch.index);
+      const classMatch = beforeRL.match(/class:"([^"]+)"/);
+      if (classMatch) classId = classMatch[1];
+    }
 
     if (!rlMatch || !shMatch) return null;
 
@@ -262,8 +279,7 @@ export async function fetchCharacterMeta(name) {
       strongholdName: shMatch[2],
       guildName: guildMatch ? guildMatch[1] : null,
       guildGrade: guildMatch ? guildMatch[2] : null,
-      classId: classMatch ? classMatch[1] : '',
-      itemLevel: ilvlMatch ? parseFloat(ilvlMatch[1]) : 0,
+      classId,
     };
   } catch (err) {
     console.warn(`[alt-detect] Failed to fetch meta for ${name}:`, err.message);

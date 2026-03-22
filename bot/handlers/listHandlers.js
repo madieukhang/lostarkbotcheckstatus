@@ -209,7 +209,7 @@ export function createListHandlers({ client }) {
     const name = normalizeCharacterName(payload.name);
 
     // Step 1: Check if character exists
-    const { hasValidRoster, allCharacters } = await buildRosterCharacters(name);
+    const { hasValidRoster, allCharacters, targetItemLevel } = await buildRosterCharacters(name);
     if (!hasValidRoster) {
       const suggestions = await fetchNameSuggestions(name);
       if (suggestions.length > 0) {
@@ -241,13 +241,11 @@ export function createListHandlers({ client }) {
       };
     }
 
-    // Step 2: Check ilvl >= 1700
-    const { fetchCharacterMeta } = await import('../services/rosterService.js');
-    const charMeta = await fetchCharacterMeta(name);
-    if (charMeta && charMeta.itemLevel < 1700) {
+    // Step 2: Check ilvl >= 1700 (using exact ilvl from roster, not regex on HTML)
+    if (targetItemLevel !== null && targetItemLevel < 1700) {
       return {
         ok: false,
-        content: `❌ **${name}** has item level \`${charMeta.itemLevel.toFixed(2)}\` (below 1700). Cannot add to ${label}.`,
+        content: `❌ **${name}** has item level \`${targetItemLevel.toFixed(2)}\` (below 1700). Cannot add to ${label}.`,
         embeds: [],
       };
     }
