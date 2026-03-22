@@ -3,6 +3,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
   ComponentType,
   EmbedBuilder,
 } from 'discord.js';
@@ -842,8 +843,11 @@ export function createListHandlers({ client }) {
         return embed;
       }
 
-      function buildButtons(page) {
-        const row = new ActionRowBuilder().addComponents(
+      function buildComponents(page) {
+        const rows = [];
+
+        // Navigation buttons
+        const navRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId('listview_prev')
             .setLabel('◀ Previous')
@@ -854,57 +858,85 @@ export function createListHandlers({ client }) {
             .setLabel('Next ▶')
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(page >= totalPages - 1),
-          new ButtonBuilder()
-            .setCustomId('listview_evidence')
-            .setLabel('📎 Evidence')
-            .setStyle(ButtonStyle.Primary)
         );
-        return row;
+        rows.push(navRow);
+
+        // Evidence dropdown for entries with images on current page
+        const start = page * ITEMS_PER_PAGE;
+        const pageEntries = allEntries.slice(start, start + ITEMS_PER_PAGE);
+        const withImages = pageEntries.filter((e) => e.imageUrl);
+
+        if (withImages.length > 0) {
+          const selectRow = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId('listview_evidence')
+              .setPlaceholder('📎 View evidence for...')
+              .addOptions(
+                withImages.slice(0, 25).map((e, i) => ({
+                  label: e.name,
+                  description: (e.reason || 'No reason').slice(0, 100),
+                  value: String(start + pageEntries.indexOf(e)),
+                  emoji: e._icon,
+                }))
+              )
+          );
+          rows.push(selectRow);
+        }
+
+        return rows;
       }
+
+      const components = buildComponents(0);
 
       await interaction.editReply({
         embeds: [buildPage(0)],
-        components: totalPages > 1 || allEntries.some((e) => e.imageUrl) ? [buildButtons(0)] : [],
+        components,
       });
 
       if (totalPages <= 1 && !allEntries.some((e) => e.imageUrl)) return;
 
       const reply = await interaction.fetchReply();
       const collector = reply.createMessageComponentCollector({
-        componentType: ComponentType.Button,
         time: 120000,
       });
 
-      collector.on('collect', async (btn) => {
-        if (btn.user.id !== interaction.user.id) {
-          await btn.reply({ content: '⛔ Only the command user can navigate.', ephemeral: true });
+      collector.on('collect', async (i) => {
+        if (i.user.id !== interaction.user.id) {
+          await i.reply({ content: '⛔ Only the command user can navigate.', ephemeral: true });
           return;
         }
 
-        if (btn.customId === 'listview_prev') {
+        if (i.customId === 'listview_prev') {
           currentPage = Math.max(0, currentPage - 1);
-          await btn.update({ embeds: [buildPage(currentPage)], components: [buildButtons(currentPage)] });
-        } else if (btn.customId === 'listview_next') {
+          await i.update({ embeds: [buildPage(currentPage)], components: buildComponents(currentPage) });
+        } else if (i.customId === 'listview_next') {
           currentPage = Math.min(totalPages - 1, currentPage + 1);
-          await btn.update({ embeds: [buildPage(currentPage)], components: [buildButtons(currentPage)] });
-        } else if (btn.customId === 'listview_evidence') {
-          const start = currentPage * ITEMS_PER_PAGE;
-          const pageEntries = allEntries.slice(start, start + ITEMS_PER_PAGE);
-          const withImages = pageEntries.filter((e) => e.imageUrl);
+          await i.update({ embeds: [buildPage(currentPage)], components: buildComponents(currentPage) });
+        } else if (i.customId === 'listview_evidence') {
+          const idx = parseInt(i.values[0]);
+          const entry = allEntries[idx];
 
-          if (withImages.length === 0) {
-            await btn.reply({ content: 'No evidence images on this page.', ephemeral: true });
+          if (!entry?.imageUrl) {
+            await i.reply({ content: 'No evidence image for this entry.', ephemeral: true });
             return;
           }
 
-          const embeds = withImages.slice(0, 5).map((e) =>
-            new EmbedBuilder()
-              .setTitle(`${e._icon} ${e.name}`)
-              .setImage(e.imageUrl)
-              .setColor(e._color)
-          );
+          const embed = new EmbedBuilder()
+            .setTitle(`${entry._icon} ${entry.name}`)
+            .addFields(
+              { name: 'Reason', value: entry.reason || 'N/A', inline: true },
+              { name: 'Raid', value: entry.raid || 'N/A', inline: true },
+              { name: 'List', value: entry._label, inline: true },
+            )
+            .setImage(entry.imageUrl)
+            .setColor(entry._color)
+            .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : undefined);
 
-          await btn.reply({ embeds, ephemeral: true });
+          if (entry.logsUrl) {
+            embed.addFields({ name: 'Logs', value: `[View Logs](${entry.logsUrl})`, inline: false });
+          }
+
+          await i.reply({ embeds: [embed], ephemeral: true });
         }
       });
 
