@@ -789,6 +789,7 @@ export function createListHandlers({ client }) {
 
   async function handleListViewCommand(interaction) {
     const type = interaction.options.getString('type', true);
+    const ITEMS_PER_PAGE = 10;
 
     await interaction.deferReply();
 
@@ -796,49 +797,120 @@ export function createListHandlers({ client }) {
       await connectDB();
 
       const types = type === 'all' ? ['black', 'white', 'watch'] : [type];
-      const embeds = [];
+      const allEntries = [];
 
       for (const t of types) {
         const { model, label, color, icon } = getListContext(t);
         const entries = await model.find({}).sort({ addedAt: -1 }).lean();
-
-        if (entries.length === 0) {
-          if (type) {
-            await interaction.editReply({ content: `${icon} ${label} is empty.` });
-            return;
-          }
-          continue;
+        for (const e of entries) {
+          allEntries.push({ ...e, _listType: t, _label: label, _color: color, _icon: icon });
         }
+      }
 
-        const lines = entries.map((e, i) => {
-          const parts = [`**${e.name}**`];
+      if (allEntries.length === 0) {
+        await interaction.editReply({ content: type === 'all' ? 'All lists are empty.' : `${getListContext(type).icon} ${getListContext(type).label} is empty.` });
+        return;
+      }
+
+      // Sort all entries by addedAt (newest first)
+      allEntries.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0));
+
+      const totalPages = Math.ceil(allEntries.length / ITEMS_PER_PAGE);
+      let currentPage = 0;
+
+      function buildPage(page) {
+        const start = page * ITEMS_PER_PAGE;
+        const pageEntries = allEntries.slice(start, start + ITEMS_PER_PAGE);
+
+        const lines = pageEntries.map((e, i) => {
+          const parts = [`${e._icon} **${e.name}**`];
           if (e.reason) parts.push(e.reason);
           if (e.raid) parts.push(`[${e.raid}]`);
           const date = e.addedAt ? `<t:${Math.floor(new Date(e.addedAt).getTime() / 1000)}:R>` : '';
           if (date) parts.push(date);
-          return `${i + 1}. ${parts.join(' — ')}`;
+          if (e.imageUrl) parts.push('📎');
+          return `${start + i + 1}. ${parts.join(' — ')}`;
         });
 
-        let description = lines.join('\n');
-        if (description.length > 4000) {
-          description = description.slice(0, 4000) + '\n…';
+        const embed = new EmbedBuilder()
+          .setTitle(type === 'all' ? `All Lists (${allEntries.length})` : `${getListContext(type).icon} ${getListContext(type).label} (${allEntries.length})`)
+          .setDescription(lines.join('\n'))
+          .setColor(type === 'all' ? 0x5865f2 : getListContext(type).color)
+          .setFooter({ text: `Page ${page + 1}/${totalPages}` })
+          .setTimestamp();
+
+        return embed;
+      }
+
+      function buildButtons(page) {
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('listview_prev')
+            .setLabel('◀ Previous')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page === 0),
+          new ButtonBuilder()
+            .setCustomId('listview_next')
+            .setLabel('Next ▶')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page >= totalPages - 1),
+          new ButtonBuilder()
+            .setCustomId('listview_evidence')
+            .setLabel('📎 Evidence')
+            .setStyle(ButtonStyle.Primary)
+        );
+        return row;
+      }
+
+      await interaction.editReply({
+        embeds: [buildPage(0)],
+        components: totalPages > 1 || allEntries.some((e) => e.imageUrl) ? [buildButtons(0)] : [],
+      });
+
+      if (totalPages <= 1 && !allEntries.some((e) => e.imageUrl)) return;
+
+      const reply = await interaction.fetchReply();
+      const collector = reply.createMessageComponentCollector({
+        componentType: ComponentType.Button,
+        time: 120000,
+      });
+
+      collector.on('collect', async (btn) => {
+        if (btn.user.id !== interaction.user.id) {
+          await btn.reply({ content: '⛔ Only the command user can navigate.', ephemeral: true });
+          return;
         }
 
-        embeds.push(
-          new EmbedBuilder()
-            .setTitle(`${icon} ${label} (${entries.length})`)
-            .setDescription(description)
-            .setColor(color)
-            .setTimestamp()
-        );
-      }
+        if (btn.customId === 'listview_prev') {
+          currentPage = Math.max(0, currentPage - 1);
+          await btn.update({ embeds: [buildPage(currentPage)], components: [buildButtons(currentPage)] });
+        } else if (btn.customId === 'listview_next') {
+          currentPage = Math.min(totalPages - 1, currentPage + 1);
+          await btn.update({ embeds: [buildPage(currentPage)], components: [buildButtons(currentPage)] });
+        } else if (btn.customId === 'listview_evidence') {
+          const start = currentPage * ITEMS_PER_PAGE;
+          const pageEntries = allEntries.slice(start, start + ITEMS_PER_PAGE);
+          const withImages = pageEntries.filter((e) => e.imageUrl);
 
-      if (embeds.length === 0) {
-        await interaction.editReply({ content: 'All lists are empty.' });
-        return;
-      }
+          if (withImages.length === 0) {
+            await btn.reply({ content: 'No evidence images on this page.', ephemeral: true });
+            return;
+          }
 
-      await interaction.editReply({ embeds: embeds.slice(0, 10) });
+          const embeds = withImages.slice(0, 5).map((e) =>
+            new EmbedBuilder()
+              .setTitle(`${e._icon} ${e.name}`)
+              .setImage(e.imageUrl)
+              .setColor(e._color)
+          );
+
+          await btn.reply({ embeds, ephemeral: true });
+        }
+      });
+
+      collector.on('end', async () => {
+        await interaction.editReply({ components: [] }).catch(() => {});
+      });
     } catch (err) {
       console.error(`[list] View failed:`, err.message);
       await interaction.editReply({ content: `⚠️ Failed to load list: \`${err.message}\`` });
