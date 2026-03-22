@@ -33,6 +33,8 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- Moved approver IDs from hardcoded to env vars: `OFFICER_APPROVER_IDS`, `SENIOR_APPROVER_IDS`, `MEMBER_APPROVER_IDS`. `SENIOR_APPROVER_ID` changed to array `SENIOR_APPROVER_IDS` for multiple seniors.
+- Hidden "Added by" display from all outputs for privacy (data kept in DB).
 - Merged `/check` into `/status` — `/status` now does live check instead of showing cached data. Removed `/check` command.
 - Improved list add embed: shows character names instead of count, added "Added by" field.
 - Refactored shared OCR + check logic into `listCheckService.js` — eliminates code duplication between `/listcheck` and auto-check.

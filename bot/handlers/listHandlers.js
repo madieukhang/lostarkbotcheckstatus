@@ -31,18 +31,10 @@ import {
   getInteractionDisplayName,
 } from '../utils/names.js';
 
-// Hardcoded approver IDs for /list add proposal flow.
-// - SENIOR_APPROVER_ID alone is sufficient for approval routing.
-// - One random ID from OFFICER_APPROVER_IDS is optional and also gets the approval DM.
-const OFFICER_APPROVER_IDS = [
-  '338779757510524928', // Khoai
-  '287894237587046400', // KilZ
-  '390361918071635968', // VHT
-];
-const SENIOR_APPROVER_ID = '324502048102154241';
-const MEMBER_APPROVER_IDS = [
-  '1272458473493499904', // Bonnie
-];
+// Approver IDs loaded from environment variables
+const OFFICER_APPROVER_IDS = config.officerApproverIds;
+const SENIOR_APPROVER_IDS = config.seniorApproverIds;
+const MEMBER_APPROVER_IDS = config.memberApproverIds;
 
 function getListContext(type) {
   if (type === 'black') {
@@ -91,8 +83,8 @@ function getApproverRecipientIds() {
   const officers = OFFICER_APPROVER_IDS.filter(Boolean);
   const recipientIds = [];
 
-  if (SENIOR_APPROVER_ID) {
-    recipientIds.push(SENIOR_APPROVER_ID);
+  for (const id of SENIOR_APPROVER_IDS) {
+    if (id && !recipientIds.includes(id)) recipientIds.push(id);
   }
 
   if (officers.length > 0) {
@@ -107,7 +99,7 @@ function getApproverRecipientIds() {
 
 function isRequesterAutoApprover(userId) {
   if (!userId) return false;
-  if (SENIOR_APPROVER_ID === userId) return true;
+  if (SENIOR_APPROVER_IDS.includes(userId)) return true;
   if (OFFICER_APPROVER_IDS.includes(userId)) return true;
   return MEMBER_APPROVER_IDS.includes(userId);
 }
@@ -144,7 +136,7 @@ export function createListHandlers({ client }) {
   async function sendListAddApprovalToApprovers(guild, payload) {
     const approverIds = getApproverRecipientIds();
     if (approverIds.length === 0) {
-      return { success: false, reason: 'No approver user IDs configured. Set SENIOR_APPROVER_ID or OFFICER_APPROVER_IDS.' };
+      return { success: false, reason: 'No approver user IDs configured. Set SENIOR_APPROVER_IDS or OFFICER_APPROVER_IDS in env.' };
     }
 
     const row = new ActionRowBuilder().addComponents(
