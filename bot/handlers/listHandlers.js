@@ -896,7 +896,7 @@ export function createListHandlers({ client }) {
 
       const reply = await interaction.fetchReply();
       const collector = reply.createMessageComponentCollector({
-        time: 120000,
+        time: 300000,
       });
 
       collector.on('collect', async (i) => {
@@ -940,7 +940,14 @@ export function createListHandlers({ client }) {
       });
 
       collector.on('end', async () => {
-        await interaction.editReply({ components: [] }).catch(() => {});
+        const disabledNav = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('listview_prev_disabled').setLabel('◀ Previous').setStyle(ButtonStyle.Secondary).setDisabled(true),
+          new ButtonBuilder().setCustomId('listview_next_disabled').setLabel('Next ▶').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        );
+        await interaction.editReply({
+          content: '⏱️ Session expired. Use `/list view` again to browse.',
+          components: [disabledNav],
+        }).catch(() => {});
       });
     } catch (err) {
       console.error(`[list] View failed:`, err.message);
