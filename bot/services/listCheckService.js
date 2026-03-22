@@ -251,11 +251,12 @@ export function formatCheckResults(results) {
     const isWatch = Boolean(item.watchEntry);
 
     const reasonParts = [];
-    for (const [entry] of [[item.blackEntry], [item.whiteEntry], [item.watchEntry]]) {
+    for (const [entry, label] of [[item.blackEntry, 'blacklisted'], [item.whiteEntry, 'whitelisted'], [item.watchEntry, 'watchlisted']]) {
       if (!entry) continue;
+      const isRosterMatch = entry.name.toLowerCase() !== item.name.toLowerCase();
       const details = [];
+      if (isRosterMatch) details.push(`via **${entry.name}**`);
       if (entry.reason?.trim()) details.push(entry.reason.trim());
-      const addedBy = getAddedByDisplay(entry);
       if (details.length > 0) reasonParts.push(details.join(' — '));
     }
 
