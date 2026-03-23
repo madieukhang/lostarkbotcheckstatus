@@ -161,7 +161,6 @@ export function buildCommands() {
     new SlashCommandBuilder()
       .setName('listcheck')
       .setDescription('Check names from screenshot against all lists')
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
       .addAttachmentOption((opt) =>
         opt
           .setName('image')
