@@ -205,7 +205,8 @@ export async function extractNamesFromImage(image) {
 export async function checkNamesAgainstLists(names) {
   await connectDB();
 
-  return Promise.all(
+  // Phase 1: Check all names against lists concurrently (DB queries only — fast)
+  const results = await Promise.all(
     names.map(async (name) => {
       const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
         Blacklist.findOne({ $or: [{ name }, { allCharacters: name }] })
@@ -219,48 +220,57 @@ export async function checkNamesAgainstLists(names) {
           .lean(),
       ]);
 
-      let hasRoster = false;
-      let failReason = null;
-      let similarNames = null;
-
-      if (!blackEntry && !whiteEntry && !watchEntry) {
-        const rosterResult = await buildRosterCharacters(name);
-        hasRoster = rosterResult.hasValidRoster;
-        failReason = rosterResult.failReason;
-
-        // Search for similar names when no roster found
-        if (!hasRoster) {
-          const suggestions = await fetchNameSuggestions(name);
-          const similarCandidates = suggestions
-            .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== name.toLowerCase())
-            .slice(0, 3);
-
-          if (similarCandidates.length > 0) {
-            similarNames = await Promise.all(
-              similarCandidates.map(async (s) => {
-                const [b, w, wa] = await Promise.all([
-                  Blacklist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-                    .collation({ locale: 'en', strength: 2 }).lean(),
-                  Whitelist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-                    .collation({ locale: 'en', strength: 2 }).lean(),
-                  Watchlist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-                    .collation({ locale: 'en', strength: 2 }).lean(),
-                ]);
-                let flag = '';
-                if (b) flag += '⛔';
-                if (w) flag += '✅';
-                if (wa) flag += '⚠️';
-                if (!flag) flag = '❓';
-                return { name: s.name, flag };
-              })
-            );
-          }
-        }
-      }
-
-      return { name, similarNames, blackEntry, whiteEntry, watchEntry, hasRoster, failReason };
+      return { name, blackEntry, whiteEntry, watchEntry, hasRoster: false, failReason: null, similarNames: null };
     })
   );
+
+  // Phase 2: Sequential roster check for unflagged names (lostark.bible — rate-limited)
+  // Sequential with delay prevents HTTP 429 from concurrent requests
+  for (const item of results) {
+    if (item.blackEntry || item.whiteEntry || item.watchEntry) continue;
+
+    const rosterResult = await buildRosterCharacters(item.name);
+    item.hasRoster = rosterResult.hasValidRoster;
+    item.failReason = rosterResult.failReason;
+
+    // Search for similar names when no roster found (e.g. diacritics mismatch)
+    if (!item.hasRoster) {
+      try {
+        const suggestions = await fetchNameSuggestions(item.name);
+        const similarCandidates = suggestions
+          .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== item.name.toLowerCase())
+          .slice(0, 3);
+
+        if (similarCandidates.length > 0) {
+          item.similarNames = await Promise.all(
+            similarCandidates.map(async (s) => {
+              const [b, w, wa] = await Promise.all([
+                Blacklist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
+                  .collation({ locale: 'en', strength: 2 }).lean(),
+                Whitelist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
+                  .collation({ locale: 'en', strength: 2 }).lean(),
+                Watchlist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
+                  .collation({ locale: 'en', strength: 2 }).lean(),
+              ]);
+              let flag = '';
+              if (b) flag += '⛔';
+              if (w) flag += '✅';
+              if (wa) flag += '⚠️';
+              if (!flag) flag = '❓';
+              return { name: s.name, flag };
+            })
+          );
+        }
+      } catch (err) {
+        console.warn(`[listcheck] Similar name search failed for ${item.name}:`, err.message);
+      }
+    }
+
+    // Delay between lostark.bible requests to avoid 429
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  return results;
 }
 
 // ─── Formatting ─────────────────────────────────────────────────────────────
