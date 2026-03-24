@@ -45,13 +45,15 @@ const GEMINI_PROMPT = [
 // ─── Gemini OCR ─────────────────────────────────────────────────────────────
 
 function shouldFailoverGeminiModel(status, bodyText) {
+  // 404 = model not found, 429 = rate limit, 503 = overloaded — all should try next model
+  if (status === 404 || status === 429 || status === 503) return true;
   const text = (bodyText || '').toLowerCase();
-  if (status === 429 || status === 503) return true;
   return (
     text.includes('resource_exhausted') ||
     text.includes('quota') ||
     text.includes('rate limit') ||
-    text.includes('too many requests')
+    text.includes('too many requests') ||
+    text.includes('is not found')
   );
 }
 
@@ -109,7 +111,7 @@ export async function extractNamesFromImage(image) {
 
   const models = config.geminiModels.length > 0
     ? config.geminiModels
-    : ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite', 'gemini-3-flash'];
+    : ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
   const failures = [];
 
   for (let i = 0; i < models.length; i += 1) {
@@ -147,16 +149,32 @@ export async function extractNamesFromImage(image) {
     }
 
     const payload = await aiRes.json();
-    const text = payload?.candidates?.[0]?.content?.parts
-      ?.map((part) => part?.text ?? '')
+    const candidate = payload?.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+
+    // Filter out thinking parts (thought: true) — only keep actual response text
+    const parts = candidate?.content?.parts || [];
+    const text = parts
+      .filter((part) => !part.thought)
+      .map((part) => part?.text ?? '')
       .join('')
       .trim();
+
+    if (finishReason && finishReason !== 'STOP') {
+      console.warn(`[listcheck] Gemini (${model}) finishReason: ${finishReason}, text: ${text.slice(0, 100)}`);
+    }
 
     if (!text) return [];
 
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.warn(`[listcheck] Gemini (${model}) returned non-JSON text:`, text.slice(0, 200));
+      // If this model returned non-JSON, try next model instead of throwing immediately
+      const canFallback = i < models.length - 1;
+      console.warn(`[listcheck] Gemini (${model}) returned non-JSON text: ${text.slice(0, 200)}`);
+      if (canFallback) {
+        failures.push(`${model}: non-JSON response`);
+        continue;
+      }
       throw new Error('Gemini did not return a JSON array.');
     }
 
@@ -164,7 +182,7 @@ export async function extractNamesFromImage(image) {
     try {
       parsed = JSON.parse(jsonMatch[0]);
     } catch (parseErr) {
-      console.warn(`[listcheck] Gemini (${model}) JSON parse failed:`, jsonMatch[0].slice(0, 200));
+      console.warn(`[listcheck] Gemini (${model}) JSON parse failed: ${jsonMatch[0].slice(0, 200)}`);
       throw new Error('Gemini returned invalid JSON.');
     }
     if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
