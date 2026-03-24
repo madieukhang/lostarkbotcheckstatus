@@ -134,6 +134,10 @@ export function setupAutoCheck(client) {
     } catch (err) {
       console.error('[auto-check] Error processing image:', err.message);
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
+      await message.react('❌').catch(() => {});
+      await message.reply({
+        content: `❌ Auto-check failed: ${err.message}`,
+      }).catch(() => {});
     }
   });
 }

@@ -86,7 +86,7 @@ async function handleSetupAutoChannel(interaction) {
         updatedByTag: interaction.user.tag,
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: 'after' }
   );
 
   // Send test message to verify channel works
@@ -137,7 +137,7 @@ async function handleSetupNotifyChannel(interaction) {
         updatedByTag: interaction.user.tag,
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: 'after' }
   );
 
   // Send test message to verify channel works
