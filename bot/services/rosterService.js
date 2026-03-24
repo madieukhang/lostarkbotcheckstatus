@@ -8,14 +8,27 @@ import { getClassName } from '../../models/Class.js';
 import { getAddedByDisplay } from '../utils/names.js';
 
 /**
- * Fetch a URL with automatic ScraperAPI fallback on 403.
- * Tries direct fetch first (fast). If blocked (403/503), retries via ScraperAPI proxy.
+ * Smart fallback cache — remembers when direct fetch is blocked by Cloudflare.
+ * Skips the wasted direct request for BLOCK_CACHE_MS after a 403/503.
+ */
+let directBlockedUntil = 0;
+const BLOCK_CACHE_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch a URL with automatic ScraperAPI fallback on 403/503.
+ * Uses smart cache: if recently blocked, skips direct fetch and goes straight to ScraperAPI.
  *
  * @param {string} url
  * @param {object} [options]
  * @returns {Promise<Response>}
  */
 export async function fetchWithFallback(url, options = {}) {
+  // If recently blocked, skip direct fetch → ScraperAPI immediately
+  if (Date.now() < directBlockedUntil && config.scraperApiKey) {
+    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(url)}`;
+    return fetch(proxyUrl, { signal: AbortSignal.timeout(30000) });
+  }
+
   const res = await fetch(url, {
     headers: FETCH_HEADERS,
     signal: AbortSignal.timeout(15000),
@@ -23,7 +36,8 @@ export async function fetchWithFallback(url, options = {}) {
   });
 
   if ((res.status === 403 || res.status === 503) && config.scraperApiKey) {
-    console.warn(`[fetch] ${res.status} on direct fetch, falling back to ScraperAPI: ${url}`);
+    directBlockedUntil = Date.now() + BLOCK_CACHE_MS;
+    console.warn(`[fetch] ${res.status} on direct fetch, caching block for 5min. Falling back to ScraperAPI: ${url}`);
     const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(url)}`;
     return fetch(proxyUrl, { signal: AbortSignal.timeout(30000) });
   }

@@ -9,6 +9,7 @@ import config from '../../config.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
+import RosterCache from '../../models/RosterCache.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
@@ -225,14 +226,42 @@ export async function checkNamesAgainstLists(names) {
     })
   );
 
-  // Phase 2: Sequential roster check for unflagged names (lostark.bible — rate-limited)
-  // Sequential with delay prevents HTTP 429 from concurrent requests
+  // Phase 2: Sequential roster check for unflagged names
+  // Check DB cache first → fetch lostark.bible only on cache miss
   for (const item of results) {
     if (item.blackEntry || item.whiteEntry || item.watchEntry) continue;
 
-    const rosterResult = await buildRosterCharacters(item.name);
-    item.hasRoster = rosterResult.hasValidRoster;
-    item.failReason = rosterResult.failReason;
+    // Check roster cache first (avoids repeated HTTP requests for same name)
+    const cached = await RosterCache.findOne({ name: item.name })
+      .collation({ locale: 'en', strength: 2 })
+      .lean();
+
+    if (cached) {
+      item.hasRoster = cached.hasRoster;
+      item.failReason = cached.failReason || null;
+      console.log(`[listcheck] Cache hit: ${item.name} (hasRoster: ${cached.hasRoster})`);
+    } else {
+      // Cache miss → fetch from lostark.bible
+      const rosterResult = await buildRosterCharacters(item.name);
+      item.hasRoster = rosterResult.hasValidRoster;
+      item.failReason = rosterResult.failReason;
+
+      // Save to cache (fire-and-forget)
+      RosterCache.findOneAndUpdate(
+        { name: item.name },
+        {
+          name: item.name,
+          hasRoster: rosterResult.hasValidRoster,
+          allCharacters: rosterResult.allCharacters || [],
+          failReason: rosterResult.failReason || '',
+          cachedAt: new Date(),
+        },
+        { upsert: true, returnDocument: 'after' }
+      ).catch((err) => console.warn(`[listcheck] Cache save failed for ${item.name}:`, err.message));
+
+      // Delay between lostark.bible requests to avoid 429
+      await new Promise((r) => setTimeout(r, 500));
+    }
 
     // Search for similar names when no roster found (e.g. diacritics mismatch)
     if (!item.hasRoster) {
@@ -266,9 +295,6 @@ export async function checkNamesAgainstLists(names) {
         console.warn(`[listcheck] Similar name search failed for ${item.name}:`, err.message);
       }
     }
-
-    // Delay between lostark.bible requests to avoid 429
-    await new Promise((r) => setTimeout(r, 500));
   }
 
   return results;
