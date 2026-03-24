@@ -13,6 +13,7 @@ import config from '../../config.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
+import GuildConfig from '../../models/GuildConfig.js';
 import PendingApproval from '../../models/PendingApproval.js';
 import { getClassName } from '../../models/Class.js';
 import {
@@ -324,8 +325,6 @@ export function createListHandlers({ client }) {
   }
 
   async function broadcastListChange(action, entry, payload) {
-    if (config.listNotifyChannelIds.length === 0) return;
-
     const { label, color, icon } = getListContext(payload.type);
     const addedBy = payload.requestedByDisplayName || payload.requestedByTag || 'Unknown';
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
@@ -342,8 +341,22 @@ export function createListHandlers({ client }) {
     if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
     if (entry.imageUrl) embed.setImage(entry.imageUrl);
 
+    // Collect all notification channel IDs: DB configs + env var fallback
+    const channelIds = new Set(config.listNotifyChannelIds);
+
+    try {
+      const guildConfigs = await GuildConfig.find({ listNotifyChannelId: { $ne: '' } }).lean();
+      for (const gc of guildConfigs) {
+        channelIds.add(gc.listNotifyChannelId);
+      }
+    } catch (err) {
+      console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
+    }
+
+    if (channelIds.size === 0) return;
+
     await Promise.all(
-      config.listNotifyChannelIds.map(async (channelId) => {
+      [...channelIds].map(async (channelId) => {
         try {
           const channel = await client.channels.fetch(channelId);
           if (channel?.isTextBased()) {
