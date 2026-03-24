@@ -155,9 +155,18 @@ export async function extractNamesFromImage(image) {
     if (!text) return [];
 
     const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('Gemini did not return a JSON array.');
+    if (!jsonMatch) {
+      console.warn(`[listcheck] Gemini (${model}) returned non-JSON text:`, text.slice(0, 200));
+      throw new Error('Gemini did not return a JSON array.');
+    }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (parseErr) {
+      console.warn(`[listcheck] Gemini (${model}) JSON parse failed:`, jsonMatch[0].slice(0, 200));
+      throw new Error('Gemini returned invalid JSON.');
+    }
     if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
 
     return filterAndDeduplicateNames(parsed);
