@@ -32,7 +32,6 @@ const SERVER_NAMES = new Set([
 const GEMINI_PROMPT = [
   'This is a screenshot of a Lost Ark raid waiting room (party finder lobby).',
   'Extract ONLY the player character names from the party member list.',
-  'SKIP the name displayed in yellow/gold color — that is the party leader (self). Only extract white-colored names.',
   'Ignore all other text: raid names, class names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
   'Preserve every character exactly as shown, including special letters and diacritics.',
   'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
