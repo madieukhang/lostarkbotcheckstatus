@@ -47,7 +47,7 @@ export function extractRosterClassMapFromHtml(html) {
 
 export async function fetchNameSuggestions(name) {
   try {
-    const payload = Buffer.from(JSON.stringify([[1, 2], name, 'NA'])).toString('base64');
+    const payload = Buffer.from(JSON.stringify([{"name":1,"region":2}, name, 'NA'])).toString('base64');
     const targetUrl = `https://lostark.bible/_app/remote/ngsbie/search?payload=${encodeURIComponent(payload)}`;
     const res = await fetchWithFallback(targetUrl);
     if (!res.ok) return [];
