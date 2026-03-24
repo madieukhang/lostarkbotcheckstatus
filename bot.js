@@ -19,6 +19,7 @@ import { handleRosterCommand } from './bot/handlers/rosterHandler.js';
 import { createListHandlers } from './bot/handlers/listHandlers.js';
 import { handleSearchCommand } from './bot/handlers/searchHandler.js';
 import { setupAutoCheck } from './bot/handlers/autoCheckHandler.js';
+import { handleSetupCommand } from './bot/handlers/setupHandler.js';
 import { connectDB } from './db.js';
 
 const client = new Client({
@@ -98,6 +99,8 @@ client.on('interactionCreate', async (interaction) => {
       }
     } else if (commandName === 'listcheck') {
       await listHandlers.handleListCheckCommand(interaction);
+    } else if (commandName === 'lasetup') {
+      await handleSetupCommand(interaction);
     } else if (commandName === 'lahelp') {
       const helpText = [
         '**📋 Available Commands:**',
@@ -113,6 +116,11 @@ client.on('interactionCreate', async (interaction) => {
         '`/list view type` — View all entries in a list',
         '',
         '`/listcheck image` — Check names from screenshot against all lists',
+        '',
+        '`/lasetup autochannel #channel` — Set auto-check channel for this server',
+        '`/lasetup notifychannel #channel` — Set notification channel for this server',
+        '`/lasetup view` — View current channel configuration',
+        '`/lasetup reset` — Reset channel config (revert to env fallback)',
       ].join('\n');
 
       await interaction.reply({ content: helpText, ephemeral: true });

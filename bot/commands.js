@@ -170,5 +170,42 @@ export function buildCommands() {
     new SlashCommandBuilder()
       .setName('lahelp')
       .setDescription('Show all available Lost Ark bot commands'),
+
+    new SlashCommandBuilder()
+      .setName('lasetup')
+      .setDescription('Configure bot channels for this server')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .addSubcommand((sub) =>
+        sub
+          .setName('autochannel')
+          .setDescription('Set the channel for auto-checking screenshots')
+          .addChannelOption((opt) =>
+            opt
+              .setName('channel')
+              .setDescription('Channel where screenshots will be auto-checked')
+              .setRequired(true)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('notifychannel')
+          .setDescription('Set the channel for list add/remove notifications')
+          .addChannelOption((opt) =>
+            opt
+              .setName('channel')
+              .setDescription('Channel where list notifications will be sent')
+              .setRequired(true)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('view')
+          .setDescription('View current bot channel configuration')
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('reset')
+          .setDescription('Reset all channel configuration (revert to env var fallback)')
+      ),
   ].map((cmd) => cmd.toJSON());
 }

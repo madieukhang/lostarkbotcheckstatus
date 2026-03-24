@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## [v0.4.0] - 2026-03-24
+
+### Added
+
+- Added `/lasetup` command for per-guild channel configuration (requires Manage Server permission):
+  - `/lasetup autochannel #channel` — set auto-check channel for this server
+  - `/lasetup notifychannel #channel` — set list notification channel for this server
+  - `/lasetup view` — view current channel configuration (shows DB config vs env fallback)
+- Added `GuildConfig` MongoDB model — stores per-guild `autoCheckChannelId` and `listNotifyChannelId`.
+- Added `/lasetup reset` — clears guild config and reverts to env var fallback.
+- Added bot permission check before saving channel config — verifies View Channel, Send Messages, Read Message History.
+- Added test message after channel setup — bot sends a confirmation message (auto-deletes after 30s) to verify it works.
+- Added `/lasetup` to `/lahelp` command listing.
+
+### Changed
+
+- Auto-check now resolves channels dynamically per message: checks DB `GuildConfig` first, falls back to `AUTO_CHECK_CHANNEL_IDS` env var. No bot restart needed after `/lasetup`.
+- List broadcast (`broadcastListChange`) now merges channels from both DB `GuildConfig` and `LIST_NOTIFY_CHANNEL_IDS` env var, with automatic deduplication.
+- Bot no longer skips auto-check setup when env vars are empty — guilds configured via `/lasetup` still work.
+
 ## [v0.3.0] - 2026-03-20
 
 ### Added

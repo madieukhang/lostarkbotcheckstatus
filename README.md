@@ -48,6 +48,10 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | `/list view [type]` | View entries in a list (optional type, shows all if empty) |
 | `/listcheck image` | OCR screenshot → check names against all lists |
 | `/lahelp` | Show all available commands |
+| `/lasetup autochannel #channel` | Set auto-check channel for this server (Manage Server) |
+| `/lasetup notifychannel #channel` | Set notification channel for this server (Manage Server) |
+| `/lasetup view` | View current channel configuration |
+| `/lasetup reset` | Reset channel config (revert to env fallback) |
 
 ### Status Icons
 
@@ -86,8 +90,8 @@ Copy `.env.example` to `.env` and fill in values:
 | `TARGET_SERVERS` | Comma-separated server names to monitor | `Brelshaza` |
 | `GEMINI_API_KEY` | Gemini API key for image OCR | — |
 | `GEMINI_MODELS` | Comma-separated model priority list for failover | `gemini-2.5-flash,...` |
-| `AUTO_CHECK_CHANNEL_IDS` | Channel IDs for auto-check (drop image → auto listcheck) | — |
-| `LIST_NOTIFY_CHANNEL_IDS` | Channel IDs for cross-server list add/remove notifications | — |
+| `AUTO_CHECK_CHANNEL_IDS` | Channel IDs for auto-check — global fallback (use `/lasetup` per server) | — |
+| `LIST_NOTIFY_CHANNEL_IDS` | Channel IDs for list notifications — global fallback (use `/lasetup` per server) | — |
 | `OFFICER_APPROVER_IDS` | Officer Discord user IDs for /list add auto-approve | — |
 | `SENIOR_APPROVER_IDS` | Senior approver Discord user IDs (always receive approval DMs) | — |
 | `MEMBER_APPROVER_IDS` | Member approver Discord user IDs | — |
@@ -137,7 +141,8 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 │   │   ├── rosterHandler.js        # /roster (+ alt detection, progression)
 │   │   ├── listHandlers.js         # /list add, /list remove, /list view, /listcheck
 │   │   ├── searchHandler.js        # /search
-│   │   └── autoCheckHandler.js     # Auto-check channel listener
+│   │   ├── autoCheckHandler.js     # Auto-check channel listener
+│   │   └── setupHandler.js        # /lasetup (per-guild channel config)
 │   ├── services/
 │   │   ├── rosterService.js        # lostark.bible scraping, alt detection, list checks
 │   │   └── listCheckService.js     # Shared OCR + name checking + formatting
@@ -149,6 +154,7 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 │   ├── Whitelist.js                # Whitelist schema
 │   ├── Watchlist.js                # Watchlist schema (under investigation)
 │   ├── PendingApproval.js          # /list add approval requests (24h TTL)
+│   ├── GuildConfig.js              # Per-guild channel configuration
 │   ├── RosterSnapshot.js           # ilvl progression tracking
 │   ├── Class.js                    # Class ID → display name mapping
 │   └── Raid.js                     # Raid label choices

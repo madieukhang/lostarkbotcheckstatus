@@ -2,9 +2,14 @@
  * autoCheckHandler.js
  * Listens for image attachments in designated channels and
  * automatically runs listcheck (Gemini OCR → blacklist/whitelist/watchlist check).
+ *
+ * Channel resolution (per message):
+ *   1. Check GuildConfig in DB for this guild's autoCheckChannelId
+ *   2. Fallback to AUTO_CHECK_CHANNEL_IDS env var (global)
  */
 
 import config from '../../config.js';
+import GuildConfig from '../../models/GuildConfig.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
@@ -15,27 +20,51 @@ import {
   formatCheckResults,
 } from '../services/listCheckService.js';
 
+/** Env-based channel set (global fallback) */
+const envChannelSet = new Set(config.autoCheckChannelIds);
+
+/**
+ * Check if a channel is configured for auto-check
+ * (either via DB GuildConfig or env var fallback).
+ * @param {string} channelId
+ * @param {string} guildId
+ * @returns {Promise<boolean>}
+ */
+async function isAutoCheckChannel(channelId, guildId) {
+  // DB config takes priority for this guild
+  if (guildId) {
+    try {
+      const guildConfig = await GuildConfig.findOne({ guildId }).lean();
+      if (guildConfig?.autoCheckChannelId) {
+        return guildConfig.autoCheckChannelId === channelId;
+      }
+    } catch (err) {
+      console.warn('[auto-check] Failed to query GuildConfig:', err.message);
+    }
+  }
+
+  // Fallback to env var
+  return envChannelSet.has(channelId);
+}
+
 /**
  * Set up the auto-check message listener.
  * @param {import('discord.js').Client} client
  */
 export function setupAutoCheck(client) {
-  if (config.autoCheckChannelIds.length === 0) {
-    console.log('[auto-check] AUTO_CHECK_CHANNEL_IDS not set — disabled.');
-    return;
-  }
-
   if (!config.geminiApiKey) {
     console.log('[auto-check] GEMINI_API_KEY not set — disabled.');
     return;
   }
 
-  const channelSet = new Set(config.autoCheckChannelIds);
-  console.log(`[auto-check] Monitoring ${channelSet.size} channel(s): ${[...channelSet].join(', ')}`);
+  if (envChannelSet.size > 0) {
+    console.log(`[auto-check] Env fallback channels: ${[...envChannelSet].join(', ')}`);
+  }
+  console.log('[auto-check] Listener active (checks DB GuildConfig + env fallback per message).');
 
   client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
-    if (!channelSet.has(message.channelId)) return;
+    if (!message.guild) return;
 
     const images = message.attachments.filter(
       (a) => a.contentType && a.contentType.startsWith('image/')
@@ -43,8 +72,12 @@ export function setupAutoCheck(client) {
 
     if (images.size === 0) return;
 
+    // Check if this channel is configured for auto-check
+    const isActive = await isAutoCheckChannel(message.channelId, message.guild.id);
+    if (!isActive) return;
+
     const image = images.first();
-    console.log(`[auto-check] Image detected from ${message.author.tag}, processing...`);
+    console.log(`[auto-check] Image detected from ${message.author.tag} in #${message.channel.name}, processing...`);
 
     await message.react('🔍').catch(() => {});
 
