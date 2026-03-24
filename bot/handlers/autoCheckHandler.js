@@ -90,6 +90,12 @@ export function setupAutoCheck(client) {
       }
 
       const limitedNames = names.slice(0, 8);
+
+      // Send progress message immediately after OCR
+      const progressMsg = await message.reply({
+        content: `🔍 Extracted **${limitedNames.length}** name(s) — checking lists & roster...`,
+      });
+
       const results = await checkNamesAgainstLists(limitedNames);
       const lines = formatCheckResults(results);
 
@@ -99,7 +105,8 @@ export function setupAutoCheck(client) {
         ...lines,
       ].join('\n');
 
-      await message.reply({ content });
+      // Edit progress message with final results
+      await progressMsg.edit({ content });
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
       await message.react('✅').catch(() => {});
 
