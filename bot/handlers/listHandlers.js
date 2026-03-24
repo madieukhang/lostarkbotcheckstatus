@@ -341,8 +341,8 @@ export function createListHandlers({ client }) {
     if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
     if (entry.imageUrl) embed.setImage(entry.imageUrl);
 
-    // Collect all notification channel IDs: DB configs + env var fallback
-    const channelIds = new Set(config.listNotifyChannelIds);
+    // Collect notification channel IDs: DB configs take priority, env vars as fallback only
+    const channelIds = new Set();
 
     try {
       const guildConfigs = await GuildConfig.find({ listNotifyChannelId: { $ne: '' } }).lean();
@@ -351,6 +351,13 @@ export function createListHandlers({ client }) {
       }
     } catch (err) {
       console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
+    }
+
+    // Only use env var channels if NO guild has configured via /lasetup
+    if (channelIds.size === 0) {
+      for (const id of config.listNotifyChannelIds) {
+        channelIds.add(id);
+      }
     }
 
     if (channelIds.size === 0) return;
