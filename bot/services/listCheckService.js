@@ -111,7 +111,7 @@ export async function extractNamesFromImage(image) {
 
   const models = config.geminiModels.length > 0
     ? config.geminiModels
-    : ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+    : ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview'];
   const failures = [];
 
   for (let i = 0; i < models.length; i += 1) {
