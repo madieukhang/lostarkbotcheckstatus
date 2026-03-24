@@ -15,6 +15,16 @@ All notable changes to this project are documented here.
 - Added bot permission check before saving channel config — verifies View Channel, Send Messages, Read Message History.
 - Added test message after channel setup — bot sends a confirmation message (auto-deletes after 30s) to verify it works.
 - Added `/lasetup` to `/lahelp` command listing.
+- Added `RosterCache` model — caches roster check results in MongoDB (TTL 24h) to avoid repeated lostark.bible requests for the same character.
+- Added smart ScraperAPI fallback cache — remembers Cloudflare blocks for 5 minutes, skips wasted direct fetch attempts.
+- Added progress message during auto-check — bot replies "Checking X name(s)..." immediately after OCR, then edits with final results.
+- Added Gemini non-JSON response failover — tries next model instead of throwing immediately.
+- Added 404 to Gemini model failover conditions — non-existent models gracefully fall through.
+- Added Gemini thinking parts filter — excludes `thought: true` parts from response text.
+- Fixed lostark.bible search API payload format (`[1,2]` → `{"name":1,"region":2}`).
+- Fixed Gemini default model list — corrected `gemini-3.1-flash-lite-preview`, `gemini-3-flash-preview` names.
+- Roster checks in auto-check/listcheck now run sequentially with 500ms delay to prevent 429 rate limiting.
+- Auto-check now shows ❌ error message when processing fails (previously failed silently).
 
 ### Changed
 
