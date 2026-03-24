@@ -106,7 +106,7 @@ export async function extractNamesFromImage(image) {
 
   const requestBody = {
     contents: [{ parts: [{ text: GEMINI_PROMPT }, { inlineData: { mimeType, data: imageBase64 } }] }],
-    generationConfig: { temperature: 0, topP: 0.1, maxOutputTokens: 512 },
+    generationConfig: { temperature: 0, topP: 0.1, maxOutputTokens: 2048 },
   };
 
   const models = config.geminiModels.length > 0
