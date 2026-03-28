@@ -28,6 +28,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 ### 📸 Screenshot Checking
 - **`/listcheck`**: Extract up to 8 names from a screenshot via Gemini OCR, check against all lists.
 - **Auto-check channels**: Drop screenshots in configured channel(s) for automatic checking (🔍 → ✅).
+- **Quick Add**: After auto-check, dropdown to quickly add unflagged names to blacklist/watchlist via Modal popup.
 - **Server name filter**: Prevents OCR from extracting server names (Vairgrys, Brelshaza, etc.) as player names.
 - **Gemini model failover**: Automatically switches to next model on quota/rate limits or timeout.
 

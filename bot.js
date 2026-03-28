@@ -76,6 +76,31 @@ client.on('interactionCreate', async (interaction) => {
     return;
   }
 
+  // Quick Add: select menu → show modal
+  if (interaction.isStringSelectMenu() && interaction.customId === 'quickadd_select') {
+    try {
+      await listHandlers.handleQuickAddSelect(interaction);
+    } catch (err) {
+      console.error('[quickadd] Select error:', err.message);
+    }
+    return;
+  }
+
+  // Quick Add: modal submit → process add
+  if (interaction.isModalSubmit() && interaction.customId.startsWith('quickadd_modal:')) {
+    try {
+      await listHandlers.handleQuickAddModal(interaction);
+    } catch (err) {
+      console.error('[quickadd] Modal error:', err.message);
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: `⚠️ Failed: \`${err.message}\`` }).catch(() => {});
+      } else {
+        await interaction.reply({ content: `⚠️ Failed: \`${err.message}\``, ephemeral: true }).catch(() => {});
+      }
+    }
+    return;
+  }
+
   if (interaction.type !== InteractionType.ApplicationCommand) return;
 
   const { commandName } = interaction;

@@ -6,6 +6,9 @@ import {
   StringSelectMenuBuilder,
   ComponentType,
   EmbedBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } from 'discord.js';
 
 import { connectDB } from '../../db.js';
@@ -992,11 +995,118 @@ export function createListHandlers({ client }) {
     }
   }
 
+  async function handleQuickAddSelect(interaction) {
+    const name = interaction.values[0];
+
+    const modal = new ModalBuilder()
+      .setCustomId(`quickadd_modal:${name}`)
+      .setTitle(`Quick Add — ${name}`)
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('quickadd_type')
+            .setLabel('Type (black / watch)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('black')
+            .setValue('black')
+            .setRequired(true)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('quickadd_reason')
+            .setLabel('Reason')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Why add this player?')
+            .setRequired(true)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('quickadd_raid')
+            .setLabel('Raid (optional)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('e.g. Kazeros Hard')
+            .setRequired(false)
+        ),
+      );
+
+    await interaction.showModal(modal);
+  }
+
+  async function handleQuickAddModal(interaction) {
+    const name = interaction.customId.split(':')[1];
+    let type = interaction.fields.getTextInputValue('quickadd_type').trim().toLowerCase();
+    const reason = interaction.fields.getTextInputValue('quickadd_reason').trim();
+    const raid = interaction.fields.getTextInputValue('quickadd_raid')?.trim() || '';
+
+    // Validate type
+    if (!['black', 'white', 'watch'].includes(type)) type = 'black';
+
+    await interaction.deferReply({ ephemeral: true });
+
+    if (!reason) {
+      await interaction.editReply({ content: '❌ Reason cannot be empty.' });
+      return;
+    }
+
+    try {
+      const payload = {
+        requestId: randomUUID(),
+        guildId: interaction.guild?.id || '',
+        channelId: interaction.channelId,
+        type,
+        name,
+        reason,
+        raid,
+        logsUrl: '',
+        imageUrl: '',
+        requestedByUserId: interaction.user.id,
+        requestedByTag: interaction.user.tag,
+        requestedByName: interaction.user.username,
+        requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+        createdAt: Date.now(),
+      };
+
+      if (isRequesterAutoApprover(payload.requestedByUserId)) {
+        const result = await executeListAddToDatabase(payload);
+        await interaction.editReply({
+          content: result.content,
+          embeds: result.embeds ?? [],
+        });
+        return;
+      }
+
+      // Non-approver → send approval request
+      const sent = await sendListAddApprovalToApprovers(interaction.guild, payload);
+      if (!sent.success) {
+        await interaction.editReply({ content: `⚠️ ${sent.reason}` });
+        return;
+      }
+
+      await connectDB();
+      await PendingApproval.create({
+        ...payload,
+        approverIds: sent.deliveredApproverIds,
+        approverDmMessages: sent.deliveredDmMessages,
+      });
+
+      await interaction.editReply({
+        content: `📨 Approval request sent for **${name}** → ${type}list.`,
+      });
+    } catch (err) {
+      console.error('[quickadd] Failed:', err.message);
+      await interaction.editReply({
+        content: `⚠️ Failed: \`${err.message}\``,
+      });
+    }
+  }
+
   return {
     handleListCheckCommand,
     handleListAddCommand,
     handleListRemoveCommand,
     handleListViewCommand,
     handleListAddApprovalButton,
+    handleQuickAddSelect,
+    handleQuickAddModal,
   };
 }
