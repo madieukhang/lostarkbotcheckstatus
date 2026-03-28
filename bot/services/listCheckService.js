@@ -216,20 +216,27 @@ export async function checkNamesAgainstLists(names) {
     Watchlist.find(nameQuery).collation(collation).lean(),
   ]);
 
-  // Build lookup: match each name to its list entries
-  function findEntry(entries, name) {
-    const lower = name.toLowerCase();
-    return entries.find(
-      (e) => e.name.toLowerCase() === lower ||
-        (e.allCharacters || []).some((c) => c.toLowerCase() === lower)
-    ) || null;
+  // Build O(1) lookup maps from list entries (once per list, not per name)
+  function buildEntryMap(entries) {
+    const map = new Map();
+    for (const e of entries) {
+      map.set(e.name.toLowerCase(), e);
+      for (const c of (e.allCharacters || [])) {
+        if (!map.has(c.toLowerCase())) map.set(c.toLowerCase(), e);
+      }
+    }
+    return map;
   }
+
+  const blackMap = buildEntryMap(allBlack);
+  const whiteMap = buildEntryMap(allWhite);
+  const watchMap = buildEntryMap(allWatch);
 
   const results = names.map((name) => ({
     name,
-    blackEntry: findEntry(allBlack, name),
-    whiteEntry: findEntry(allWhite, name),
-    watchEntry: findEntry(allWatch, name),
+    blackEntry: blackMap.get(name.toLowerCase()) || null,
+    whiteEntry: whiteMap.get(name.toLowerCase()) || null,
+    watchEntry: watchMap.get(name.toLowerCase()) || null,
     hasRoster: false,
     failReason: null,
     similarNames: null,
@@ -300,11 +307,16 @@ export async function checkNamesAgainstLists(names) {
             Watchlist.find(simQuery).collation(collation).lean(),
           ]);
 
+          const simBlackMap = buildEntryMap(simBlack);
+          const simWhiteMap = buildEntryMap(simWhite);
+          const simWatchMap = buildEntryMap(simWatch);
+
           item.similarNames = similarCandidates.map((s) => {
+            const lower = s.name.toLowerCase();
             let flag = '';
-            if (findEntry(simBlack, s.name)) flag += '⛔';
-            if (findEntry(simWhite, s.name)) flag += '✅';
-            if (findEntry(simWatch, s.name)) flag += '⚠️';
+            if (simBlackMap.has(lower)) flag += '⛔';
+            if (simWhiteMap.has(lower)) flag += '✅';
+            if (simWatchMap.has(lower)) flag += '⚠️';
             if (!flag) flag = '❓';
             return { name: s.name, flag };
           });
