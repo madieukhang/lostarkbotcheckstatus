@@ -270,6 +270,8 @@ export function createListHandlers({ client }) {
       const via = isRosterMatch ? ` (roster match: **${existed.name}** is already in ${label})` : '';
       return {
         ok: false,
+        isDuplicate: true,
+        existingEntry: existed,
         content: `⚠️ **${name}** already exists in ${label}.${via}`,
         embeds: [],
       };
@@ -421,9 +423,13 @@ export function createListHandlers({ client }) {
   }
 
   async function handleListAddApprovalButton(interaction) {
-    const [action, requestId] = interaction.customId.split(':');
+    const customParts = interaction.customId.split(':');
+    const action = customParts[0];
+    const requestId = customParts[1];
     await connectDB();
-    const payload = await PendingApproval.findOneAndDelete({
+
+    // Find but don't delete yet — need to keep for duplicate overwrite flow
+    const payload = await PendingApproval.findOne({
       requestId,
       approverIds: interaction.user.id,
     }).lean();
@@ -470,6 +476,8 @@ export function createListHandlers({ client }) {
     );
 
     if (!isApproveAction) {
+      await PendingApproval.deleteOne({ requestId });
+
       await interaction.editReply({
         content: `❌ Rejected by **${interaction.user.tag}**`,
         components: [buildApprovalResultRow('Rejected')],
@@ -490,6 +498,53 @@ export function createListHandlers({ client }) {
 
     try {
       const result = await executeListAddToDatabase(payload);
+
+      // Duplicate found — show comparison and overwrite option
+      if (!result.ok && result.isDuplicate) {
+        const existing = result.existingEntry;
+        const { label } = getListContext(payload.type);
+
+        const compareEmbed = new EmbedBuilder()
+          .setTitle('⚠️ Duplicate Found — Compare')
+          .addFields(
+            { name: '📌 Existing Entry', value: `**${existing.name}**\nReason: ${existing.reason || 'N/A'}\nRaid: ${existing.raid || 'N/A'}\nAdded: <t:${Math.floor(new Date(existing.addedAt || 0).getTime() / 1000)}:R>`, inline: true },
+            { name: '🆕 New Request', value: `**${payload.name}**\nReason: ${payload.reason || 'N/A'}\nRaid: ${payload.raid || 'N/A'}\nBy: ${payload.requestedByDisplayName || 'Unknown'}`, inline: true },
+          )
+          .setColor(0xfee75c);
+
+        const overwriteRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`listadd_overwrite:${requestId}`)
+            .setLabel('Overwrite')
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId(`listadd_keep:${requestId}`)
+            .setLabel('Keep Existing')
+            .setStyle(ButtonStyle.Secondary),
+        );
+
+        await interaction.editReply({
+          content: `⚠️ **${payload.name}** already in ${label}. Overwrite or keep?`,
+          embeds: [compareEmbed],
+          components: [overwriteRow],
+        });
+
+        await syncApproverDmMessages(
+          payload,
+          {
+            content: `⚠️ **${payload.name}** already in ${label}. Overwrite or keep?`,
+            embeds: [compareEmbed],
+            components: [overwriteRow],
+          },
+          { excludeMessageId: interaction.message.id }
+        );
+        // Don't delete PendingApproval — needed for overwrite flow
+        return;
+      }
+
+      // Success or non-duplicate error — clean up
+      await PendingApproval.deleteOne({ requestId });
+
       await interaction.editReply({
         content: result.ok
           ? `✅ Approved by **${interaction.user.tag}** and executed successfully.`
@@ -510,6 +565,8 @@ export function createListHandlers({ client }) {
 
       await notifyRequesterAboutDecision(payload, result, false);
     } catch (err) {
+      await PendingApproval.deleteOne({ requestId });
+
       await interaction.editReply({
         content: `⚠️ Approval executed by **${interaction.user.tag}** but failed: \`${err.message}\``,
         components: [buildApprovalResultRow('Failed')],
@@ -1100,12 +1157,96 @@ export function createListHandlers({ client }) {
     }
   }
 
+  async function handleListAddOverwriteButton(interaction) {
+    const [, requestId] = interaction.customId.split(':');
+    const isOverwrite = interaction.customId.startsWith('listadd_overwrite:');
+
+    await connectDB();
+    const payload = await PendingApproval.findOneAndDelete({ requestId }).lean();
+
+    if (!payload) {
+      await interaction.reply({
+        content: '⚠️ This request has already been processed or expired.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await interaction.deferUpdate();
+
+    if (!isOverwrite) {
+      // Keep existing — just clean up
+      await interaction.editReply({
+        content: `✅ Kept existing entry. New request for **${payload.name}** discarded.`,
+        embeds: [],
+        components: [buildApprovalResultRow('Kept Existing')],
+      });
+
+      await syncApproverDmMessages(
+        payload,
+        {
+          content: `✅ Kept existing entry. New request for **${payload.name}** discarded.`,
+          embeds: [],
+          components: [buildApprovalResultRow('Kept Existing')],
+        },
+        { excludeMessageId: interaction.message.id }
+      );
+
+      await notifyRequesterAboutDecision(payload, null, true);
+      return;
+    }
+
+    // Overwrite: delete old entry first
+    try {
+      const { model } = getListContext(payload.type);
+      const name = normalizeCharacterName(payload.name);
+
+      await model.deleteOne({
+        $or: [{ name }, { allCharacters: name }],
+      });
+      console.log(`[list] Overwrite: deleted old ${payload.type} entry for ${name}`);
+
+      // Now add fresh
+      const result = await executeListAddToDatabase(payload);
+
+      await interaction.editReply({
+        content: result.ok
+          ? `✅ Overwritten by **${interaction.user.tag}**. Old entry replaced.`
+          : `⚠️ Overwrite attempted but: ${result.content}`,
+        embeds: [],
+        components: [buildApprovalResultRow(result.ok ? 'Overwritten' : 'Failed')],
+      });
+
+      await syncApproverDmMessages(
+        payload,
+        {
+          content: result.ok
+            ? `✅ Overwritten by **${interaction.user.tag}**. Old entry replaced.`
+            : `⚠️ Overwrite attempted but: ${result.content}`,
+          embeds: [],
+          components: [buildApprovalResultRow(result.ok ? 'Overwritten' : 'Failed')],
+        },
+        { excludeMessageId: interaction.message.id }
+      );
+
+      await notifyRequesterAboutDecision(payload, result, false);
+    } catch (err) {
+      console.error('[list] Overwrite failed:', err.message);
+      await interaction.editReply({
+        content: `⚠️ Overwrite failed: \`${err.message}\``,
+        embeds: [],
+        components: [buildApprovalResultRow('Failed')],
+      });
+    }
+  }
+
   return {
     handleListCheckCommand,
     handleListAddCommand,
     handleListRemoveCommand,
     handleListViewCommand,
     handleListAddApprovalButton,
+    handleListAddOverwriteButton,
     handleQuickAddSelect,
     handleQuickAddModal,
   };
