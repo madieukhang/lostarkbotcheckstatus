@@ -77,6 +77,10 @@ async function handleSetupAutoChannel(interaction) {
   await interaction.deferReply({ ephemeral: true });
   await connectDB();
 
+  // Warn if same channel as notify (allow but warn)
+  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+  const sameAsNotify = existing?.listNotifyChannelId === channel.id;
+
   await GuildConfig.findOneAndUpdate(
     { guildId: interaction.guild.id },
     {
@@ -92,10 +96,12 @@ async function handleSetupAutoChannel(interaction) {
   // Send test message to verify channel works
   const testOk = await sendTestMessage(channel, 'auto-check');
 
+  const warning = sameAsNotify ? '\n⚠️ This is the same channel as notifications — consider using separate channels to avoid clutter.' : '';
+
   await interaction.editReply({
     content: testOk
-      ? `✅ Auto-check channel set to <#${channel.id}>.\nBot will automatically check screenshots posted in this channel.\n\n*A test message was sent to verify — it will auto-delete in 30s.*`
-      : `✅ Auto-check channel set to <#${channel.id}>.\n⚠️ Could not send a test message — please verify bot permissions.`,
+      ? `✅ Auto-check channel set to <#${channel.id}>.\nBot will automatically check screenshots posted in this channel.${warning}\n\n*A test message was sent to verify — it will auto-delete in 30s.*`
+      : `✅ Auto-check channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message — please verify bot permissions.`,
   });
 
   console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) set autoCheckChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);
@@ -128,6 +134,10 @@ async function handleSetupNotifyChannel(interaction) {
   await interaction.deferReply({ ephemeral: true });
   await connectDB();
 
+  // Warn if same channel as auto-check (allow but warn)
+  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+  const sameAsAutoCheck = existing?.autoCheckChannelId === channel.id;
+
   await GuildConfig.findOneAndUpdate(
     { guildId: interaction.guild.id },
     {
@@ -142,11 +152,12 @@ async function handleSetupNotifyChannel(interaction) {
 
   // Send test message to verify channel works
   const testOk = await sendTestMessage(channel, 'notification');
+  const warning = sameAsAutoCheck ? '\n⚠️ This is the same channel as auto-check — consider using separate channels to avoid clutter.' : '';
 
   await interaction.editReply({
     content: testOk
-      ? `✅ Notification channel set to <#${channel.id}>.\nList add/remove actions will be broadcast here.\n\n*A test message was sent to verify — it will auto-delete in 30s.*`
-      : `✅ Notification channel set to <#${channel.id}>.\n⚠️ Could not send a test message — please verify bot permissions.`,
+      ? `✅ Notification channel set to <#${channel.id}>.\nList add/remove actions will be broadcast here.${warning}\n\n*A test message was sent to verify — it will auto-delete in 30s.*`
+      : `✅ Notification channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message — please verify bot permissions.`,
   });
 
   console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) set listNotifyChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);

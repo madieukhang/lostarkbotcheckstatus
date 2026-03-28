@@ -341,12 +341,15 @@ export function createListHandlers({ client }) {
     if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
     if (entry.imageUrl) embed.setImage(entry.imageUrl);
 
-    // Collect notification channel IDs: DB configs take priority, env vars as fallback only
+    // Collect notification channel IDs from OTHER guilds only
+    // Skip the guild where the action originated — user already sees the reply there
+    const originGuildId = payload.guildId || '';
     const channelIds = new Set();
 
     try {
       const guildConfigs = await GuildConfig.find({ listNotifyChannelId: { $ne: '' } }).lean();
       for (const gc of guildConfigs) {
+        if (gc.guildId === originGuildId) continue; // skip same server
         channelIds.add(gc.listNotifyChannelId);
       }
     } catch (err) {
@@ -740,6 +743,7 @@ export function createListHandlers({ client }) {
 
         broadcastListChange('removed', entry, {
           type,
+          guildId: interaction.guild?.id || '',
           requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
           requestedByTag: interaction.user.tag,
         }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
