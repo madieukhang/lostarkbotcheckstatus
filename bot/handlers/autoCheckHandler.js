@@ -8,6 +8,7 @@
  *   2. Fallback to AUTO_CHECK_CHANNEL_IDS env var (global)
  */
 
+import { ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import Blacklist from '../../models/Blacklist.js';
@@ -114,8 +115,31 @@ export function setupAutoCheck(client) {
         ...lines,
       ].join('\n');
 
+      // Build quick-add select menu for unflagged names (❓ or ⚪)
+      const unflaggedNames = results.filter(
+        (r) => !r.blackEntry && !r.whiteEntry && !r.watchEntry
+      );
+      const components = [];
+
+      if (unflaggedNames.length > 0) {
+        const selectRow = new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId('quickadd_select')
+            .setPlaceholder('⚡ Quick Add to List — select a name')
+            .addOptions(
+              unflaggedNames.slice(0, 25).map((r) => ({
+                label: r.name,
+                description: r.hasRoster ? 'Has roster' : 'No roster found',
+                value: r.name,
+                emoji: r.hasRoster ? '❓' : '⚪',
+              }))
+            )
+        );
+        components.push(selectRow);
+      }
+
       // Edit progress message with final results
-      await progressMsg.edit({ content });
+      await progressMsg.edit({ content, components });
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
       await message.react('✅').catch(() => {});
 

@@ -6,6 +6,7 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Added Quick Add from auto-check — dropdown to select unflagged names → Modal (type/reason/raid) → add to list directly from check results.
 - Added `/lastats` command — shows list counts, cache stats, server count, and bot uptime.
 - Added `/roster deep:true` option — runs Stronghold alt detection scan even when roster is visible.
 - Added `/lasetup` command for per-guild channel configuration (requires Manage Server permission):
