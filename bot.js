@@ -61,6 +61,18 @@ client.once('ready', async () => {
 client.on('interactionCreate', async (interaction) => {
   if (
     interaction.isButton() &&
+    (interaction.customId.startsWith('listadd_overwrite:') || interaction.customId.startsWith('listadd_keep:'))
+  ) {
+    try {
+      await listHandlers.handleListAddOverwriteButton(interaction);
+    } catch (err) {
+      console.error('[list] Overwrite button error:', err.message);
+    }
+    return;
+  }
+
+  if (
+    interaction.isButton() &&
     (interaction.customId.startsWith('listadd_approve:') || interaction.customId.startsWith('listadd_reject:'))
   ) {
     try {
