@@ -148,7 +148,7 @@ client.on('interactionCreate', async (interaction) => {
         '`/status` — Show live server status for all monitored servers',
         '`/reset` — Reset the stored status state',
         '',
-        '`/roster name` — Fetch roster + progression tracking + list check',
+        '`/roster name [deep]` — Fetch roster + progression tracking + list check. `deep:true` for Stronghold alt scan',
         '`/search name [min_ilvl] [max_ilvl] [class]` — Search similar names with filters',
         '',
         '`/list add type name reason [raid] [logs] [image]` — Add to blacklist/whitelist/watchlist',
