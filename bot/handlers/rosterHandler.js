@@ -26,6 +26,7 @@ import { getAddedByDisplay, normalizeCharacterName } from '../utils/names.js';
 export async function handleRosterCommand(interaction) {
   const raw = interaction.options.getString('name');
   const name = normalizeCharacterName(raw);
+  const deep = interaction.options.getBoolean('deep') ?? false;
   await interaction.deferReply();
 
   try {
@@ -259,6 +260,35 @@ export async function handleRosterCommand(interaction) {
           .setImage(whitelistResult.imageUrl)
           .setColor(0x57f287);
         embeds.unshift(evidenceEmbed);
+      }
+    }
+
+    // Deep scan: Stronghold alt detection even when roster is visible
+    if (deep) {
+      try {
+        const altResult = await detectAltsViaStronghold(name);
+        if (altResult && altResult.alts.length > 0) {
+          const altLines = altResult.alts.map(
+            (a, i) => `${i + 1}. [${a.name}](https://lostark.bible/character/NA/${encodeURIComponent(a.name)}/roster) · ${a.className || '?'} · \`${a.itemLevel}\``
+          );
+          embed.addFields({
+            name: `🔎 Deep Scan — Alts via Stronghold (${altResult.alts.length})`,
+            value: altLines.join('\n').slice(0, 1024),
+            inline: false,
+          });
+        } else {
+          embed.addFields({
+            name: '🔎 Deep Scan',
+            value: 'No additional alts found via Stronghold fingerprint.',
+            inline: false,
+          });
+        }
+      } catch (err) {
+        embed.addFields({
+          name: '🔎 Deep Scan',
+          value: `Failed: ${err.message}`,
+          inline: false,
+        });
       }
     }
 

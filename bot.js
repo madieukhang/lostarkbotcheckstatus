@@ -20,6 +20,7 @@ import { createListHandlers } from './bot/handlers/listHandlers.js';
 import { handleSearchCommand } from './bot/handlers/searchHandler.js';
 import { setupAutoCheck } from './bot/handlers/autoCheckHandler.js';
 import { handleSetupCommand } from './bot/handlers/setupHandler.js';
+import { handleStatsCommand } from './bot/handlers/statsHandler.js';
 import { connectDB } from './db.js';
 
 const client = new Client({
@@ -99,6 +100,8 @@ client.on('interactionCreate', async (interaction) => {
       }
     } else if (commandName === 'listcheck') {
       await listHandlers.handleListCheckCommand(interaction);
+    } else if (commandName === 'lastats') {
+      await handleStatsCommand(interaction);
     } else if (commandName === 'lasetup') {
       await handleSetupCommand(interaction);
     } else if (commandName === 'lahelp') {
@@ -116,6 +119,8 @@ client.on('interactionCreate', async (interaction) => {
         '`/list view type` — View all entries in a list',
         '',
         '`/listcheck image` — Check names from screenshot against all lists',
+        '',
+        '`/lastats` — Show bot usage statistics',
         '',
         '`/lasetup autochannel #channel` — Set auto-check channel for this server',
         '`/lasetup notifychannel #channel` — Set notification channel for this server',
