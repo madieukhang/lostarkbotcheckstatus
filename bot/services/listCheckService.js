@@ -206,34 +206,50 @@ export async function extractNamesFromImage(image) {
 export async function checkNamesAgainstLists(names) {
   await connectDB();
 
-  // Phase 1: Check all names against lists concurrently (DB queries only — fast)
-  const results = await Promise.all(
-    names.map(async (name) => {
-      const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
-        Blacklist.findOne({ $or: [{ name }, { allCharacters: name }] })
-          .collation({ locale: 'en', strength: 2 })
-          .lean(),
-        Whitelist.findOne({ $or: [{ name }, { allCharacters: name }] })
-          .collation({ locale: 'en', strength: 2 })
-          .lean(),
-        Watchlist.findOne({ $or: [{ name }, { allCharacters: name }] })
-          .collation({ locale: 'en', strength: 2 })
-          .lean(),
-      ]);
+  // Phase 1: Batch list check — 3 queries for ALL names instead of 3 × N
+  const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
+  const collation = { locale: 'en', strength: 2 };
 
-      return { name, blackEntry, whiteEntry, watchEntry, hasRoster: false, failReason: null, similarNames: null };
-    })
-  );
+  const [allBlack, allWhite, allWatch] = await Promise.all([
+    Blacklist.find(nameQuery).collation(collation).lean(),
+    Whitelist.find(nameQuery).collation(collation).lean(),
+    Watchlist.find(nameQuery).collation(collation).lean(),
+  ]);
+
+  // Build lookup: match each name to its list entries
+  function findEntry(entries, name) {
+    const lower = name.toLowerCase();
+    return entries.find(
+      (e) => e.name.toLowerCase() === lower ||
+        (e.allCharacters || []).some((c) => c.toLowerCase() === lower)
+    ) || null;
+  }
+
+  const results = names.map((name) => ({
+    name,
+    blackEntry: findEntry(allBlack, name),
+    whiteEntry: findEntry(allWhite, name),
+    watchEntry: findEntry(allWatch, name),
+    hasRoster: false,
+    failReason: null,
+    similarNames: null,
+  }));
 
   // Phase 2: Sequential roster check for unflagged names
-  // Check DB cache first → fetch lostark.bible only on cache miss
+  // Batch read all RosterCache entries at once, then process
+  const unflaggedNames = results
+    .filter((r) => !r.blackEntry && !r.whiteEntry && !r.watchEntry)
+    .map((r) => r.name);
+
+  const cachedEntries = unflaggedNames.length > 0
+    ? await RosterCache.find({ name: { $in: unflaggedNames } }).collation(collation).lean()
+    : [];
+  const cacheMap = new Map(cachedEntries.map((c) => [c.name.toLowerCase(), c]));
+
   for (const item of results) {
     if (item.blackEntry || item.whiteEntry || item.watchEntry) continue;
 
-    // Check roster cache first (avoids repeated HTTP requests for same name)
-    const cached = await RosterCache.findOne({ name: item.name })
-      .collation({ locale: 'en', strength: 2 })
-      .lean();
+    const cached = cacheMap.get(item.name.toLowerCase());
 
     if (cached) {
       item.hasRoster = cached.hasRoster;
@@ -275,24 +291,23 @@ export async function checkNamesAgainstLists(names) {
           .slice(0, 3);
 
         if (similarCandidates.length > 0) {
-          item.similarNames = await Promise.all(
-            similarCandidates.map(async (s) => {
-              const [b, w, wa] = await Promise.all([
-                Blacklist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-                  .collation({ locale: 'en', strength: 2 }).lean(),
-                Whitelist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-                  .collation({ locale: 'en', strength: 2 }).lean(),
-                Watchlist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-                  .collation({ locale: 'en', strength: 2 }).lean(),
-              ]);
-              let flag = '';
-              if (b) flag += '⛔';
-              if (w) flag += '✅';
-              if (wa) flag += '⚠️';
-              if (!flag) flag = '❓';
-              return { name: s.name, flag };
-            })
-          );
+          // Batch list check for all suggestion candidates — 3 queries instead of 3 × N
+          const simNames = similarCandidates.map((s) => s.name);
+          const simQuery = { $or: [{ name: { $in: simNames } }, { allCharacters: { $in: simNames } }] };
+          const [simBlack, simWhite, simWatch] = await Promise.all([
+            Blacklist.find(simQuery).collation(collation).lean(),
+            Whitelist.find(simQuery).collation(collation).lean(),
+            Watchlist.find(simQuery).collation(collation).lean(),
+          ]);
+
+          item.similarNames = similarCandidates.map((s) => {
+            let flag = '';
+            if (findEntry(simBlack, s.name)) flag += '⛔';
+            if (findEntry(simWhite, s.name)) flag += '✅';
+            if (findEntry(simWatch, s.name)) flag += '⚠️';
+            if (!flag) flag = '❓';
+            return { name: s.name, flag };
+          });
 
           // Save suggestions to cache
           RosterCache.findOneAndUpdate(
