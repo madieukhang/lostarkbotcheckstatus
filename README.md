@@ -33,8 +33,12 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 - **Gemini model failover**: Automatically switches to next model on quota/rate limits or timeout.
 
 ### ⚙️ Technical
-- **Direct fetch with ScraperAPI fallback**: Fast direct access to lostark.bible, auto-fallback via proxy on 403/503.
+- **Direct fetch with ScraperAPI fallback**: Fast direct access to lostark.bible, auto-fallback via proxy on 403/503. Smart cache skips wasted direct fetches when blocked.
 - **Roster-based duplicate checks**: `allCharacters` field with case-insensitive matching and MongoDB index.
+- **RosterCache**: Caches roster check results in MongoDB (TTL 24h) — same character across multiple screenshots skips HTTP requests.
+- **Batch DB queries**: List check uses `$in` batch queries (~7 queries instead of ~35 per check).
+- **Duplicate overwrite flow**: When approving a duplicate entry, officers see side-by-side comparison with Overwrite/Keep option.
+- **Spam protection**: 10s per-user cooldown on auto-check channels.
 
 ## Commands
 
