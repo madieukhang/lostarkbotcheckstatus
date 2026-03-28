@@ -714,7 +714,7 @@ export function createListHandlers({ client }) {
     try {
       await connectDB();
 
-      const [blackEntry, whiteEntry] = await Promise.all([
+      const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
         Blacklist.findOne({
           $or: [{ name }, { allCharacters: name }],
         })
@@ -725,11 +725,22 @@ export function createListHandlers({ client }) {
         })
           .collation({ locale: 'en', strength: 2 })
           .lean(),
+        Watchlist.findOne({
+          $or: [{ name }, { allCharacters: name }],
+        })
+          .collation({ locale: 'en', strength: 2 })
+          .lean(),
       ]);
 
-      if (!blackEntry && !whiteEntry) {
+      // Collect all found entries
+      const found = [];
+      if (blackEntry) found.push({ entry: blackEntry, type: 'black' });
+      if (whiteEntry) found.push({ entry: whiteEntry, type: 'white' });
+      if (watchEntry) found.push({ entry: watchEntry, type: 'watch' });
+
+      if (found.length === 0) {
         await interaction.editReply({
-          content: `⚠️ No blacklist/whitelist entry found for **${name}**.`,
+          content: `⚠️ No list entry found for **${name}**.`,
         });
         return;
       }
@@ -757,61 +768,55 @@ export function createListHandlers({ client }) {
         return `${icon} Removed **${entry.name}** from ${label}.`;
       };
 
-      if (blackEntry && whiteEntry) {
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('remove_black')
-            .setLabel('1. Remove in black list')
-            .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder()
-            .setCustomId('remove_white')
-            .setLabel('2. Remove in white list')
-            .setStyle(ButtonStyle.Primary),
-          new ButtonBuilder()
-            .setCustomId('remove_both')
-            .setLabel('3. Remove both')
-            .setStyle(ButtonStyle.Secondary)
-        );
-
-        await interaction.editReply({
-          content: `🔎 Found **${name}** in both blacklist and whitelist.\nChoose a removal option:`,
-          components: [row],
-        });
-
-        const reply = await interaction.fetchReply();
-        const button = await reply.awaitMessageComponent({
-          componentType: ComponentType.Button,
-          filter: (i) => i.user.id === interaction.user.id,
-          time: 30000,
-        });
-
-        let messages = [];
-        if (button.customId === 'remove_black') {
-          messages.push(await removeOne(blackEntry, 'black'));
-        } else if (button.customId === 'remove_white') {
-          messages.push(await removeOne(whiteEntry, 'white'));
-        } else {
-          messages = await Promise.all([
-            removeOne(blackEntry, 'black'),
-            removeOne(whiteEntry, 'white'),
-          ]);
-        }
-
-        await button.update({
-          content: messages.join('\n'),
-          components: [],
-        });
-        return;
-      }
-
-      if (blackEntry) {
-        const message = await removeOne(blackEntry, 'black');
+      // Single entry — remove directly
+      if (found.length === 1) {
+        const message = await removeOne(found[0].entry, found[0].type);
         await interaction.editReply({ content: message });
         return;
       }
 
-      const message = await removeOne(whiteEntry, 'white');
-      await interaction.editReply({ content: message });
+      // Multiple entries — show selection buttons
+      const buttonStyles = { black: ButtonStyle.Danger, white: ButtonStyle.Success, watch: ButtonStyle.Secondary };
+      const row = new ActionRowBuilder().addComponents(
+        ...found.map((f, i) => {
+          const { label } = getListContext(f.type);
+          return new ButtonBuilder()
+            .setCustomId(`remove_${f.type}`)
+            .setLabel(`${i + 1}. Remove from ${label}`)
+            .setStyle(buttonStyles[f.type] || ButtonStyle.Secondary);
+        }),
+        new ButtonBuilder()
+          .setCustomId('remove_all')
+          .setLabel(`${found.length + 1}. Remove all`)
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      const listNames = found.map((f) => getListContext(f.type).label).join(' and ');
+      await interaction.editReply({
+        content: `🔎 Found **${name}** in ${listNames}.\nChoose a removal option:`,
+        components: [row],
+      });
+
+      const reply = await interaction.fetchReply();
+      const button = await reply.awaitMessageComponent({
+        componentType: ComponentType.Button,
+        filter: (i) => i.user.id === interaction.user.id,
+        time: 30000,
+      });
+
+      let messages;
+      if (button.customId === 'remove_all') {
+        messages = await Promise.all(found.map((f) => removeOne(f.entry, f.type)));
+      } else {
+        const target = found.find((f) => button.customId === `remove_${f.type}`);
+        messages = target ? [await removeOne(target.entry, target.type)] : ['⚠️ Unknown selection.'];
+      }
+
+      await button.update({
+        content: messages.join('\n'),
+        components: [],
+      });
+      return;
     } catch (err) {
       console.error('[list] ❌ Remove failed:', err.message);
       await interaction.editReply({

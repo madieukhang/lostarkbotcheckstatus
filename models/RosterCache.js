@@ -20,6 +20,9 @@ const rosterCacheSchema = new mongoose.Schema({
   /** Reason for failure if roster not found (e.g. "HTTP 403", "Rate limited") */
   failReason: { type: String, default: '' },
 
+  /** Cached search suggestions for names without roster (diacritics correction) */
+  searchSuggestions: { type: [{ name: String, flag: String }], default: [] },
+
   /** When this cache entry was created — TTL index expires after 24h */
   cachedAt: { type: Date, default: Date.now, expires: 86400 },
 });

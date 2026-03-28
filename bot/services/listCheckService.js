@@ -238,6 +238,9 @@ export async function checkNamesAgainstLists(names) {
     if (cached) {
       item.hasRoster = cached.hasRoster;
       item.failReason = cached.failReason || null;
+      if (cached.searchSuggestions?.length > 0) {
+        item.similarNames = cached.searchSuggestions;
+      }
       console.log(`[listcheck] Cache hit: ${item.name} (hasRoster: ${cached.hasRoster})`);
     } else {
       // Cache miss → fetch from lostark.bible
@@ -263,7 +266,8 @@ export async function checkNamesAgainstLists(names) {
     }
 
     // Search for similar names when no roster found (e.g. diacritics mismatch)
-    if (!item.hasRoster) {
+    // Skip if already loaded from cache
+    if (!item.hasRoster && !item.similarNames) {
       try {
         const suggestions = await fetchNameSuggestions(item.name);
         const similarCandidates = suggestions
@@ -289,6 +293,12 @@ export async function checkNamesAgainstLists(names) {
               return { name: s.name, flag };
             })
           );
+
+          // Save suggestions to cache
+          RosterCache.findOneAndUpdate(
+            { name: item.name },
+            { $set: { searchSuggestions: item.similarNames } },
+          ).catch(() => {});
         }
       } catch (err) {
         console.warn(`[listcheck] Similar name search failed for ${item.name}:`, err.message);
