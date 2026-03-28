@@ -36,11 +36,14 @@ All notable changes to this project are documented here.
 - Broadcast notifications skip same-server (user already sees the reply).
 - Improved display: sorted by priority (⛔→⚠️→✅→❓→⚪), summary header, title casing.
 - Fixed lostark.bible search API payload format change.
+- Duplicate handling on approval: side-by-side comparison embed + Overwrite/Keep Existing buttons.
+- Batch DB queries: list check reduced from ~35 to ~7 queries per auto-check (80% reduction).
 
 ### Changed
 
 - Auto-check now resolves channels dynamically per message: checks DB `GuildConfig` first, falls back to `AUTO_CHECK_CHANNEL_IDS` env var. No bot restart needed after `/lasetup`.
-- List broadcast (`broadcastListChange`) now merges channels from both DB `GuildConfig` and `LIST_NOTIFY_CHANNEL_IDS` env var, with automatic deduplication.
+- DB notify channels override env vars when configured via `/lasetup` (no longer merged).
+- Broadcast notifications skip the origin server (user already sees the reply).
 - Bot no longer skips auto-check setup when env vars are empty — guilds configured via `/lasetup` still work.
 
 ## [v0.3.0] - 2026-03-20
