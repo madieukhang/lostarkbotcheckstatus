@@ -49,7 +49,7 @@ function getListContext(type) {
 }
 
 function buildListAddApprovalEmbed(guild, payload, options = {}) {
-  const title = options.title || 'List add approval required';
+  const title = options.title || 'List Add — Approval Required';
   const includeRequestedBy = options.includeRequestedBy ?? true;
   const fields = [
     { name: 'Request ID', value: payload.requestId, inline: false },
@@ -208,6 +208,7 @@ export function createListHandlers({ client }) {
 
   async function executeListAddToDatabase(payload) {
     const { model, label, color, icon } = getListContext(payload.type);
+    const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
     const name = normalizeCharacterName(payload.name);
 
     // Step 1: Check if character exists
@@ -224,7 +225,7 @@ export function createListHandlers({ client }) {
           .join('\n');
 
         const suggEmbed = new EmbedBuilder()
-          .setTitle('No roster found')
+          .setTitle('No Roster Found')
           .setDescription(suggestionLines)
           .setColor(0xfee75c)
           .setTimestamp();
@@ -238,7 +239,7 @@ export function createListHandlers({ client }) {
 
       return {
         ok: false,
-        content: `❌ No roster found for **${name}**, and no similar name suggestions were found.`,
+        content: `❌ No roster found for **${name}**. No similar names found.`,
         embeds: [],
       };
     }
@@ -297,7 +298,7 @@ export function createListHandlers({ client }) {
       : allCharacters.slice(0, 6).join(', ') + ` +${allCharacters.length - 6} more`;
 
     const embed = new EmbedBuilder()
-      .setTitle(`${label} entry added`)
+      .setTitle(`${labelCap} — Entry Added`)
       .addFields(
         { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: payload.reason || 'N/A', inline: true },
@@ -329,13 +330,18 @@ export function createListHandlers({ client }) {
     const addedBy = payload.requestedByDisplayName || payload.requestedByTag || 'Unknown';
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
 
+    // Capitalize label for title (blacklist → Blacklist)
+    const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+    const actionCap = action.charAt(0).toUpperCase() + action.slice(1);
+
     const embed = new EmbedBuilder()
-      .setTitle(`${icon} ${label} ${action}`)
+      .setTitle(`📢 ${icon} ${labelCap} — ${actionCap}`)
       .addFields(
         { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: entry.reason || 'N/A', inline: true },
       )
       .setColor(color)
+      .setFooter({ text: `By ${addedBy}` })
       .setTimestamp(new Date());
 
     if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
@@ -676,7 +682,7 @@ export function createListHandlers({ client }) {
       await interaction.editReply({
         embeds: [
           buildListAddApprovalEmbed(interaction.guild, payload, {
-            title: 'List add proposal submitted',
+            title: 'List Add — Proposal Submitted',
             includeRequestedBy: false,
           }),
         ],
@@ -768,7 +774,7 @@ export function createListHandlers({ client }) {
         );
 
         await interaction.editReply({
-          content: `🔎 Found **${name}** in both blacklist and whitelist.\n choose a removal option:`,
+          content: `🔎 Found **${name}** in both blacklist and whitelist.\nChoose a removal option:`,
           components: [row],
         });
 

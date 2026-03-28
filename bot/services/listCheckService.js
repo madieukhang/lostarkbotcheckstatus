@@ -302,44 +302,86 @@ export async function checkNamesAgainstLists(names) {
 // ─── Formatting ─────────────────────────────────────────────────────────────
 
 /**
+ * Format a single check result into a display line.
+ * @param {object} item
+ * @returns {{ line: string, priority: number }}
+ */
+function formatResultLine(item) {
+  const isBlack = Boolean(item.blackEntry);
+  const isWhite = Boolean(item.whiteEntry);
+  const isWatch = Boolean(item.watchEntry);
+
+  const reasonParts = [];
+  for (const [entry] of [[item.blackEntry], [item.whiteEntry], [item.watchEntry]]) {
+    if (!entry) continue;
+    const isRosterMatch = entry.name.toLowerCase() !== item.name.toLowerCase();
+    const details = [];
+    if (isRosterMatch) details.push(`via **${entry.name}**`);
+    if (entry.reason?.trim()) details.push(entry.reason.trim());
+    if (details.length > 0) reasonParts.push(details.join(' — '));
+  }
+
+  const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
+
+  if (isBlack) {
+    return { line: `⛔ **${item.name}**${reasonSuffix}`, priority: 0 };
+  }
+  if (isWatch) {
+    return { line: `⚠️ **${item.name}**${reasonSuffix}`, priority: 1 };
+  }
+  if (isWhite) {
+    return { line: `✅ **${item.name}**${reasonSuffix}`, priority: 2 };
+  }
+  if (item.hasRoster) {
+    return { line: `❓ ${item.name}`, priority: 3 };
+  }
+
+  const reason = item.failReason ? ` *(${item.failReason})*` : '';
+  const similar = item.similarNames?.length > 0
+    ? ` — Similar: ${item.similarNames.map((s) => `${s.flag} ${s.name}`).join(', ')}`
+    : '';
+  return { line: `⚪ ${item.name}${reason}${similar}`, priority: 4 };
+}
+
+/**
  * Format check results into Discord-ready text lines.
+ * Sorted by priority: ⛔ flagged first, then ⚠️ watch, ✅ white, ❓ clean, ⚪ no roster.
+ * Includes a summary header line.
  *
  * @param {Array<object>} results - Output from checkNamesAgainstLists
- * @returns {string[]} Formatted lines
+ * @returns {string[]} Formatted lines including summary
  */
 export function formatCheckResults(results) {
-  return results.map((item, idx) => {
-    const isBlack = Boolean(item.blackEntry);
-    const isWhite = Boolean(item.whiteEntry);
-    const isWatch = Boolean(item.watchEntry);
+  const formatted = results.map((item) => ({ ...formatResultLine(item), item }));
 
-    const reasonParts = [];
-    for (const [entry, label] of [[item.blackEntry, 'blacklisted'], [item.whiteEntry, 'whitelisted'], [item.watchEntry, 'watchlisted']]) {
-      if (!entry) continue;
-      const isRosterMatch = entry.name.toLowerCase() !== item.name.toLowerCase();
-      const details = [];
-      if (isRosterMatch) details.push(`via **${entry.name}**`);
-      if (entry.reason?.trim()) details.push(entry.reason.trim());
-      if (details.length > 0) reasonParts.push(details.join(' — '));
-    }
+  // Sort by priority: flagged first
+  formatted.sort((a, b) => a.priority - b.priority);
 
-    const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
+  // Count by category
+  const counts = { black: 0, watch: 0, white: 0, clean: 0, noRoster: 0 };
+  for (const f of formatted) {
+    if (f.priority === 0) counts.black++;
+    else if (f.priority === 1) counts.watch++;
+    else if (f.priority === 2) counts.white++;
+    else if (f.priority === 3) counts.clean++;
+    else counts.noRoster++;
+  }
 
-    let icon = '';
-    if (isBlack) icon += '⛔';
-    if (isWhite) icon += '✅';
-    if (isWatch) icon += '⚠️';
+  // Build summary
+  const summaryParts = [];
+  if (counts.black) summaryParts.push(`⛔ ${counts.black}`);
+  if (counts.watch) summaryParts.push(`⚠️ ${counts.watch}`);
+  if (counts.white) summaryParts.push(`✅ ${counts.white}`);
+  if (counts.clean) summaryParts.push(`❓ ${counts.clean}`);
+  if (counts.noRoster) summaryParts.push(`⚪ ${counts.noRoster}`);
 
-    if (icon) {
-      return `${idx + 1}. ${icon} **${item.name}**${reasonSuffix}`;
-    } else if (item.hasRoster) {
-      return `${idx + 1}. ❓ **${item.name}**`;
-    } else {
-      const reason = item.failReason ? ` *(${item.failReason})*` : '';
-      const similar = item.similarNames?.length > 0
-        ? ` — Similar: ${item.similarNames.map((s) => `${s.flag} ${s.name}`).join(', ')}`
-        : '';
-      return `${idx + 1}. No roster found: **${item.name}**${reason}${similar}`;
-    }
-  });
+  const lines = [];
+  lines.push(summaryParts.join(' · '));
+  lines.push('');
+
+  for (const f of formatted) {
+    lines.push(f.line);
+  }
+
+  return lines;
 }
