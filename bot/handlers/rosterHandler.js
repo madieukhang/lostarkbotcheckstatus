@@ -241,7 +241,7 @@ export async function handleRosterCommand(interaction) {
 
       if (blacklistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
-          .setTitle('Blacklist evidence')
+          .setTitle('Blacklist Evidence')
           .setImage(blacklistResult.imageUrl)
           .setColor(0xed4245);
         embeds.unshift(evidenceEmbed);
@@ -255,7 +255,7 @@ export async function handleRosterCommand(interaction) {
 
       if (whitelistResult.imageUrl) {
         const evidenceEmbed = new EmbedBuilder()
-          .setTitle('Whitelist evidence')
+          .setTitle('Whitelist Evidence')
           .setImage(whitelistResult.imageUrl)
           .setColor(0x57f287);
         embeds.unshift(evidenceEmbed);
