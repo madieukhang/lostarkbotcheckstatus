@@ -23,6 +23,10 @@ import {
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);
 
+/** Per-user cooldown to prevent spam (userId → timestamp) */
+const userCooldowns = new Map();
+const COOLDOWN_MS = 10_000; // 10 seconds between checks per user
+
 /**
  * Check if a channel is configured for auto-check
  * (either via DB GuildConfig or env var fallback).
@@ -75,6 +79,11 @@ export function setupAutoCheck(client) {
     // Check if this channel is configured for auto-check
     const isActive = await isAutoCheckChannel(message.channelId, message.guild.id);
     if (!isActive) return;
+
+    // Per-user cooldown to prevent spam
+    const lastCheck = userCooldowns.get(message.author.id) || 0;
+    if (Date.now() - lastCheck < COOLDOWN_MS) return;
+    userCooldowns.set(message.author.id, Date.now());
 
     const image = images.first();
     console.log(`[auto-check] Image detected from ${message.author.tag} in #${message.channel.name}, processing...`);
