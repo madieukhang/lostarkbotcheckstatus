@@ -37,6 +37,12 @@ export function buildCommands() {
           .setName('name')
           .setDescription('Character name to look up')
           .setRequired(true)
+      )
+      .addBooleanOption((opt) =>
+        opt
+          .setName('deep')
+          .setDescription('Run Stronghold alt detection scan (slower, finds hidden alts)')
+          .setRequired(false)
       ),
 
     new SlashCommandBuilder()
@@ -167,6 +173,10 @@ export function buildCommands() {
           .setDescription('Raid waiting room screenshot')
           .setRequired(true)
       ),
+    new SlashCommandBuilder()
+      .setName('lastats')
+      .setDescription('Show bot usage statistics'),
+
     new SlashCommandBuilder()
       .setName('lahelp')
       .setDescription('Show all available Lost Ark bot commands'),

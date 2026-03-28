@@ -41,12 +41,13 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 |---|---|
 | `/status` | Show live server status for all monitored servers |
 | `/reset` | Reset the stored status state |
-| `/roster name` | Fetch roster, progression delta, cross-check lists. Hidden roster: alt detection + guild check |
+| `/roster name [deep]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan |
 | `/search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default ilvl ≥ 1700), cross-check all lists |
 | `/list add type name reason [raid] [logs] [image]` | Add to blacklist/whitelist/watchlist. Officers auto-approve |
 | `/list remove name` | Remove an entry (ownership check) |
 | `/list view [type]` | View entries in a list (optional type, shows all if empty) |
 | `/listcheck image` | OCR screenshot → check names against all lists |
+| `/lastats` | Show bot usage statistics (lists, cache, uptime) |
 | `/lahelp` | Show all available commands |
 | `/lasetup autochannel #channel` | Set auto-check channel for this server (Manage Server) |
 | `/lasetup notifychannel #channel` | Set notification channel for this server (Manage Server) |
@@ -142,7 +143,8 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 │   │   ├── listHandlers.js         # /list add, /list remove, /list view, /listcheck
 │   │   ├── searchHandler.js        # /search
 │   │   ├── autoCheckHandler.js     # Auto-check channel listener
-│   │   └── setupHandler.js        # /lasetup (per-guild channel config)
+│   │   ├── setupHandler.js        # /lasetup (per-guild channel config)
+│   │   └── statsHandler.js       # /lastats (bot usage statistics)
 │   ├── services/
 │   │   ├── rosterService.js        # lostark.bible scraping, alt detection, list checks
 │   │   └── listCheckService.js     # Shared OCR + name checking + formatting

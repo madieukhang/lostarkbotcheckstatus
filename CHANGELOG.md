@@ -2,10 +2,12 @@
 
 All notable changes to this project are documented here.
 
-## [v0.4.0] - 2026-03-24
+## [v0.4.0] - 2026-03-28
 
 ### Added
 
+- Added `/lastats` command — shows list counts, cache stats, server count, and bot uptime.
+- Added `/roster deep:true` option — runs Stronghold alt detection scan even when roster is visible.
 - Added `/lasetup` command for per-guild channel configuration (requires Manage Server permission):
   - `/lasetup autochannel #channel` — set auto-check channel for this server
   - `/lasetup notifychannel #channel` — set list notification channel for this server
@@ -25,6 +27,14 @@ All notable changes to this project are documented here.
 - Fixed Gemini default model list — corrected `gemini-3.1-flash-lite-preview`, `gemini-3-flash-preview` names.
 - Roster checks in auto-check/listcheck now run sequentially with 500ms delay to prevent 429 rate limiting.
 - Auto-check now shows ❌ error message when processing fails (previously failed silently).
+- `/list remove` now checks watchlist (previously only blacklist + whitelist).
+- Auto-check spam protection: 10s per-user cooldown prevents overwhelming the bot.
+- Search suggestions cached in `RosterCache` alongside roster data.
+- Smart ScraperAPI fallback: caches Cloudflare block state for 5 minutes, skips wasted direct fetch.
+- `RosterCache` model with 24h TTL — avoids repeated lostark.bible requests for same character.
+- Broadcast notifications skip same-server (user already sees the reply).
+- Improved display: sorted by priority (⛔→⚠️→✅→❓→⚪), summary header, title casing.
+- Fixed lostark.bible search API payload format change.
 
 ### Changed
 
