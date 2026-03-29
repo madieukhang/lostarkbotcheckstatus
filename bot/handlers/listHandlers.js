@@ -346,7 +346,6 @@ export function createListHandlers({ client }) {
         { name: 'Reason', value: entry.reason || 'N/A', inline: true },
       )
       .setColor(color)
-      .setFooter({ text: `By ${addedBy}` })
       .setTimestamp(new Date());
 
     if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
