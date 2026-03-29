@@ -413,8 +413,13 @@ export function formatCheckResults(results) {
   if (counts.noRoster) summaryParts.push(`⚪ ${counts.noRoster}`);
 
   const lines = [];
-  lines.push(summaryParts.join(' · '));
-  lines.push('');
+
+  // Only show summary when there are flagged entries — otherwise it's just noise
+  const hasFlagged = counts.black > 0 || counts.watch > 0;
+  if (hasFlagged) {
+    lines.push(summaryParts.join(' · '));
+    lines.push('');
+  }
 
   for (const f of formatted) {
     lines.push(f.line);
