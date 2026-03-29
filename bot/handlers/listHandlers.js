@@ -1031,6 +1031,13 @@ export function createListHandlers({ client }) {
             embed.addFields({ name: 'Logs', value: `[View Logs](${entry.logsUrl})`, inline: false });
           }
 
+          // Show "Added by" only to officers/seniors (ephemeral = only they see it)
+          const isOfficer = OFFICER_APPROVER_IDS.includes(i.user.id)
+            || SENIOR_APPROVER_IDS.includes(i.user.id);
+          if (isOfficer && entry.addedByDisplayName) {
+            embed.addFields({ name: 'Added by', value: entry.addedByDisplayName, inline: true });
+          }
+
           await i.reply({ embeds: [embed], ephemeral: true });
         }
       });
