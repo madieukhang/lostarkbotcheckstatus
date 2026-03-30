@@ -102,6 +102,58 @@ export function buildCommands() {
       )
       .addSubcommand((sub) =>
         sub
+          .setName('edit')
+          .setDescription('Edit an existing list entry (reason, raid, type)')
+          .addStringOption((opt) =>
+            opt
+              .setName('name')
+              .setDescription('Character name to edit')
+              .setRequired(true)
+          )
+          .addStringOption((opt) =>
+            opt
+              .setName('reason')
+              .setDescription('New reason (leave empty to keep current)')
+              .setRequired(false)
+          )
+          .addStringOption((opt) =>
+            opt
+              .setName('type')
+              .setDescription('Move to a different list')
+              .setRequired(false)
+              .addChoices(
+                { name: 'black', value: 'black' },
+                { name: 'white', value: 'white' },
+                { name: 'watch', value: 'watch' }
+              )
+          )
+          .addStringOption((opt) => {
+            opt
+              .setName('raid')
+              .setDescription('New raid tag')
+              .setRequired(false);
+
+            for (const choice of getRaidChoices()) {
+              opt.addChoices(choice);
+            }
+
+            return opt;
+          })
+          .addStringOption((opt) =>
+            opt
+              .setName('logs')
+              .setDescription('New logs URL')
+              .setRequired(false)
+          )
+          .addAttachmentOption((opt) =>
+            opt
+              .setName('image')
+              .setDescription('New evidence screenshot')
+              .setRequired(false)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
           .setName('remove')
           .setDescription('Remove a character from blacklist/whitelist/watchlist')
           .addStringOption((opt) =>

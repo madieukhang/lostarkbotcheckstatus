@@ -49,6 +49,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | `/roster name [deep]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan |
 | `/search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default ilvl ≥ 1700), cross-check all lists |
 | `/list add type name reason [raid] [logs] [image]` | Add to blacklist/whitelist/watchlist. Officers auto-approve |
+| `/list edit name [reason] [type] [raid] [logs] [image]` | Edit existing entry (owner/officer: instant, others: approval) |
 | `/list remove name` | Remove an entry (ownership check) |
 | `/list view [type]` | View entries in a list (optional type, shows all if empty) |
 | `/listcheck image` | OCR screenshot → check names against all lists |
