@@ -130,6 +130,8 @@ client.on('interactionCreate', async (interaction) => {
       const subcommand = interaction.options.getSubcommand();
       if (subcommand === 'add') {
         await listHandlers.handleListAddCommand(interaction);
+      } else if (subcommand === 'edit') {
+        await listHandlers.handleListEditCommand(interaction);
       } else if (subcommand === 'remove') {
         await listHandlers.handleListRemoveCommand(interaction);
       } else if (subcommand === 'view') {
@@ -152,6 +154,7 @@ client.on('interactionCreate', async (interaction) => {
         '`/search name [min_ilvl] [max_ilvl] [class]` — Search similar names with filters',
         '',
         '`/list add type name reason [raid] [logs] [image]` — Add to blacklist/whitelist/watchlist',
+        '`/list edit name [reason] [type] [raid] [logs] [image]` — Edit an existing entry',
         '`/list remove name` — Remove an entry from a list',
         '`/list view type` — View all entries in a list',
         '',

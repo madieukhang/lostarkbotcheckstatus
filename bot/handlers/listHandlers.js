@@ -884,6 +884,157 @@ export function createListHandlers({ client }) {
     }
   }
 
+  async function handleListEditCommand(interaction) {
+    if (!interaction.guild) {
+      await interaction.reply({ content: '❌ This command can only be used in a server.', ephemeral: true });
+      return;
+    }
+
+    const raw = interaction.options.getString('name');
+    const name = normalizeCharacterName(raw);
+    const newReason = interaction.options.getString('reason')?.trim() || '';
+    const newType = interaction.options.getString('type') || '';
+    const newRaid = interaction.options.getString('raid')?.trim() || '';
+    const newLogs = interaction.options.getString('logs')?.trim() || '';
+    const imageAttachment = interaction.options.getAttachment('image');
+    const newImageUrl = imageAttachment?.url || '';
+
+    await interaction.deferReply();
+    await connectDB();
+
+    // Find existing entry across all lists
+    const collation = { locale: 'en', strength: 2 };
+    const query = { $or: [{ name }, { allCharacters: name }] };
+
+    const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
+      Blacklist.findOne(query).collation(collation),
+      Whitelist.findOne(query).collation(collation),
+      Watchlist.findOne(query).collation(collation),
+    ]);
+
+    const existing = blackEntry || whiteEntry || watchEntry;
+    if (!existing) {
+      await interaction.editReply({ content: `❌ **${name}** not found in any list.` });
+      return;
+    }
+
+    const currentType = blackEntry ? 'black' : whiteEntry ? 'white' : 'watch';
+    const { label: currentLabel } = getListContext(currentType);
+
+    // Check if anything is actually changing
+    if (!newReason && !newType && !newRaid && !newLogs && !newImageUrl) {
+      await interaction.editReply({ content: `⚠️ No changes provided. Use options to specify what to edit.` });
+      return;
+    }
+
+    const targetType = newType || currentType;
+    const isTypeChange = targetType !== currentType;
+
+    // Build changes summary
+    const changes = [];
+    if (newReason) changes.push(`Reason: "${existing.reason}" → "${newReason}"`);
+    if (isTypeChange) changes.push(`List: ${currentLabel} → ${getListContext(targetType).label}`);
+    if (newRaid) changes.push(`Raid: "${existing.raid || 'N/A'}" → "${newRaid}"`);
+    if (newLogs) changes.push(`Logs: updated`);
+    if (newImageUrl) changes.push(`Evidence: updated`);
+
+    // Check ownership: same person → apply now, different → approval
+    const isOwner = existing.addedByUserId === interaction.user.id;
+    const isApprover = isRequesterAutoApprover(interaction.user.id);
+
+    if (isOwner || isApprover) {
+      // Apply edit immediately
+      try {
+        if (isTypeChange) {
+          // Move to different list: delete from old, create in new
+          const { model: oldModel } = getListContext(currentType);
+          const { model: newModel, label: newLabel, icon: newIcon } = getListContext(targetType);
+
+          await oldModel.deleteOne({ _id: existing._id });
+
+          await newModel.create({
+            name: existing.name,
+            reason: newReason || existing.reason,
+            raid: newRaid || existing.raid,
+            logsUrl: newLogs || existing.logsUrl,
+            imageUrl: newImageUrl || existing.imageUrl,
+            allCharacters: existing.allCharacters || [],
+            addedByUserId: existing.addedByUserId,
+            addedByTag: existing.addedByTag,
+            addedByDisplayName: existing.addedByDisplayName,
+            addedAt: existing.addedAt,
+          });
+
+          await interaction.editReply({
+            content: `✅ **${existing.name}** edited and moved to ${newLabel}.\n${changes.map((c) => `• ${c}`).join('\n')}`,
+          });
+        } else {
+          // Update in place
+          const updateFields = {};
+          if (newReason) updateFields.reason = newReason;
+          if (newRaid) updateFields.raid = newRaid;
+          if (newLogs) updateFields.logsUrl = newLogs;
+          if (newImageUrl) updateFields.imageUrl = newImageUrl;
+
+          const { model } = getListContext(currentType);
+          await model.updateOne({ _id: existing._id }, { $set: updateFields });
+
+          await interaction.editReply({
+            content: `✅ **${existing.name}** edited in ${currentLabel}.\n${changes.map((c) => `• ${c}`).join('\n')}`,
+          });
+        }
+
+        // Broadcast edit notification
+        broadcastListChange('edited', { ...existing.toObject?.() || existing, reason: newReason || existing.reason, raid: newRaid || existing.raid }, {
+          type: targetType,
+          guildId: interaction.guild.id,
+          requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+          requestedByTag: interaction.user.tag,
+        }).catch(() => {});
+
+      } catch (err) {
+        await interaction.editReply({ content: `⚠️ Edit failed: \`${err.message}\`` });
+      }
+    } else {
+      // Not owner, not approver → send approval request
+      const payload = {
+        requestId: randomUUID(),
+        guildId: interaction.guild.id,
+        channelId: interaction.channelId,
+        type: targetType,
+        name: existing.name,
+        reason: newReason || existing.reason,
+        raid: newRaid || existing.raid,
+        logsUrl: newLogs || existing.logsUrl || '',
+        imageUrl: newImageUrl || existing.imageUrl || '',
+        requestedByUserId: interaction.user.id,
+        requestedByTag: interaction.user.tag,
+        requestedByName: interaction.user.username,
+        requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+        createdAt: Date.now(),
+      };
+
+      const sent = await sendListAddApprovalToApprovers(interaction.guild, payload, {
+        title: 'List Edit — Approval Required',
+      });
+
+      if (!sent.success) {
+        await interaction.editReply({ content: `⚠️ ${sent.reason}` });
+        return;
+      }
+
+      await PendingApproval.create({
+        ...payload,
+        approverIds: sent.deliveredApproverIds,
+        approverDmMessages: sent.deliveredDmMessages,
+      });
+
+      await interaction.editReply({
+        content: `📨 Edit request sent for approval.\nChanges:\n${changes.map((c) => `• ${c}`).join('\n')}`,
+      });
+    }
+  }
+
   async function handleListViewCommand(interaction) {
     const type = interaction.options.getString('type', true);
     const ITEMS_PER_PAGE = 10;
@@ -1249,6 +1400,7 @@ export function createListHandlers({ client }) {
   return {
     handleListCheckCommand,
     handleListAddCommand,
+    handleListEditCommand,
     handleListRemoveCommand,
     handleListViewCommand,
     handleListAddApprovalButton,
