@@ -984,13 +984,15 @@ export function createListHandlers({ client }) {
           });
         }
 
-        // Broadcast edit notification
-        broadcastListChange('edited', { ...existing.toObject?.() || existing, reason: newReason || existing.reason, raid: newRaid || existing.raid }, {
-          type: targetType,
-          guildId: interaction.guild.id,
-          requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
-          requestedByTag: interaction.user.tag,
-        }).catch(() => {});
+        // Only broadcast if editor is NOT the original owner (owner editing own entry = no alert needed)
+        if (!isOwner) {
+          broadcastListChange('edited', { ...existing.toObject?.() || existing, reason: newReason || existing.reason, raid: newRaid || existing.raid }, {
+            type: targetType,
+            guildId: interaction.guild.id,
+            requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+            requestedByTag: interaction.user.tag,
+          }).catch(() => {});
+        }
 
       } catch (err) {
         await interaction.editReply({ content: `⚠️ Edit failed: \`${err.message}\`` });
