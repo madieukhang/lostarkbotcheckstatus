@@ -65,6 +65,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | `/lasetup notifychannel #channel` | Set notification channel for this server (Manage Server) |
 | `/lasetup view` | View current channel configuration |
 | `/lasetup off` | Toggle global list notifications on/off for this server |
+| `/lasetup defaultscope global/server` | Set default blacklist scope for `/list add` (default: server) |
 
 ### Status Icons
 

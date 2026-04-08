@@ -250,6 +250,13 @@ async function handleSetupView(interaction) {
     lines.push('  → *This server will not receive broadcast notifications from other servers*');
   }
 
+  // Default blacklist scope
+  const defaultScope = guildConfig?.defaultBlacklistScope || 'server';
+  const scopeEmoji = defaultScope === 'server' ? '🔒' : '🌐';
+  lines.push('');
+  lines.push(`**${scopeEmoji} Default blacklist scope:** ${defaultScope}`);
+  lines.push(`  → *\`/list add type:black\` without scope will default to ${defaultScope}*`);
+
   if (guildConfig?.updatedAt) {
     lines.push('');
     lines.push(`Last updated: <t:${Math.floor(new Date(guildConfig.updatedAt).getTime() / 1000)}:R> by ${guildConfig.updatedByTag || 'Unknown'}`);
@@ -281,7 +288,38 @@ export async function handleSetupCommand(interaction) {
     await handleSetupNotifyChannel(interaction);
   } else if (subcommand === 'off') {
     await handleSetupOff(interaction);
+  } else if (subcommand === 'defaultscope') {
+    await handleSetupDefaultScope(interaction);
   } else if (subcommand === 'view') {
     await handleSetupView(interaction);
   }
+}
+
+/**
+ * Handle /lasetup defaultscope global|server
+ */
+async function handleSetupDefaultScope(interaction) {
+  const scope = interaction.options.getString('scope', true);
+
+  await interaction.deferReply({ ephemeral: true });
+  await connectDB();
+
+  await GuildConfig.findOneAndUpdate(
+    { guildId: interaction.guild.id },
+    {
+      $set: {
+        defaultBlacklistScope: scope,
+        updatedByUserId: interaction.user.id,
+        updatedByTag: interaction.user.tag,
+      },
+    },
+    { upsert: true, returnDocument: 'after' }
+  );
+
+  const emoji = scope === 'server' ? '🔒' : '🌐';
+  await interaction.editReply({
+    content: `${emoji} Default blacklist scope set to **${scope}**.\nWhen \`/list add type:black\` is used without specifying scope, entries will default to **${scope}**.`,
+  });
+
+  console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) defaultBlacklistScope → ${scope} by ${interaction.user.tag}`);
 }

@@ -873,7 +873,7 @@ export function createListHandlers({ client }) {
     const raid = interaction.options.getString('raid') ?? '';
     const logs = interaction.options.getString('logs') ?? '';
     const image = interaction.options.getAttachment('image');
-    const scope = interaction.options.getString('scope') || 'global';
+    const inputScope = interaction.options.getString('scope') || '';
     const name = normalizeCharacterName(rawName);
 
     await interaction.deferReply();
@@ -884,6 +884,15 @@ export function createListHandlers({ client }) {
       });
       return;
     }
+
+    // Resolve scope: explicit input > guild default setting > 'server'
+    let scope = inputScope;
+    if (!scope && type === 'black') {
+      await connectDB();
+      const guildConfig = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+      scope = guildConfig?.defaultBlacklistScope || 'server';
+    }
+    if (!scope) scope = 'global'; // non-blacklist types always global
 
     if (!reason) {
       await interaction.editReply({
@@ -1634,6 +1643,14 @@ export function createListHandlers({ client }) {
     }
 
     try {
+      // Resolve scope from guild default setting
+      let quickScope = 'global';
+      if (type === 'black' && interaction.guild?.id) {
+        await connectDB();
+        const gc = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+        quickScope = gc?.defaultBlacklistScope || 'server';
+      }
+
       const payload = {
         requestId: randomUUID(),
         guildId: interaction.guild?.id || '',
@@ -1644,7 +1661,7 @@ export function createListHandlers({ client }) {
         raid,
         logsUrl: '',
         imageUrl: '',
-        scope: 'global', // Quick Add defaults to global scope
+        scope: quickScope,
         requestedByUserId: interaction.user.id,
         requestedByTag: interaction.user.tag,
         requestedByName: interaction.user.username,

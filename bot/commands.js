@@ -326,6 +326,21 @@ export function buildCommands() {
         sub
           .setName('off')
           .setDescription('Toggle global list notifications on/off for this server')
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('defaultscope')
+          .setDescription('Set default blacklist scope for /list add (global or server)')
+          .addStringOption((opt) =>
+            opt
+              .setName('scope')
+              .setDescription('Default scope when /list add does not specify scope')
+              .setRequired(true)
+              .addChoices(
+                { name: 'global', value: 'global' },
+                { name: 'server', value: 'server' }
+              )
+          )
       ),
   ].map((cmd) => cmd.toJSON());
 }

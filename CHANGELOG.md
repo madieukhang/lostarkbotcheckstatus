@@ -13,6 +13,7 @@ All notable changes to this project are documented here.
   - Auto-check, roster, and search all scope-aware.
   - `Blacklist.syncIndexes()` on startup to migrate from old `name`-only index to compound `{name, scope, guildId}` index.
 - **`/lasetup off`**: Toggle global list notifications on/off per server (replaces `/lasetup reset`). Running again re-enables. `/lasetup notifychannel` auto-enables. `/lasetup view` shows 🔔/🔕 status.
+- **`/lasetup defaultscope global/server`**: Set default blacklist scope per guild. When `/list add type:black` is used without specifying scope, defaults to guild setting (default: `server`). Quick Add also respects this setting. `/lasetup view` shows current default scope.
 - **Show raid info in auto-check**: When a name is flagged, the raid tag from the entry is now displayed in auto-check results (e.g. `⛔ Name — reason — [G6 Aegir]`).
 - **Clickable evidence 📎**: Evidence icon in `/list view` is now a clickable markdown link that opens the image directly.
 - **Trusted user list**: New `TrustedUser` model — trusted characters cannot be added to the blacklist.
