@@ -154,11 +154,7 @@ export async function buildRosterCharacters(name) {
 
 export async function handleRosterBlackListCheck(names, options = {}) {
   try {
-    console.log(`[blacklist] Checking ${names.length} character(s):`, names.join(', '));
     await connectDB();
-
-    const docCount = await Blacklist.countDocuments();
-    console.log(`[blacklist] Total docs in DB: ${docCount}`);
 
     const { guildId } = options;
     const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };

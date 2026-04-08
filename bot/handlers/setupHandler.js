@@ -251,7 +251,7 @@ async function handleSetupView(interaction) {
   }
 
   // Default blacklist scope
-  const defaultScope = guildConfig?.defaultBlacklistScope || 'server';
+  const defaultScope = guildConfig?.defaultBlacklistScope || 'global';
   const scopeEmoji = defaultScope === 'server' ? '🔒' : '🌐';
   lines.push('');
   lines.push(`**${scopeEmoji} Default blacklist scope:** ${defaultScope}`);

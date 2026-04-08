@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 
 import { connectDB } from '../../db.js';
+import config from '../../config.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
@@ -55,31 +56,50 @@ export async function handleSearchCommand(interaction) {
     await connectDB();
 
     const searchGuildId = interaction.guild?.id || '';
-    const results = await Promise.all(
-      suggestions.slice(0, 15).map(async (s) => {
-        const blackQuery = {
-          $and: [
-            { $or: [{ name: s.name }, { allCharacters: s.name }] },
-            { $or: [
-              { scope: 'global' },
-              { scope: { $exists: false } },
-              ...(searchGuildId ? [{ scope: 'server', guildId: searchGuildId }] : []),
-            ] },
-          ],
-        };
-        const [black, white, watch, trusted] = await Promise.all([
-          Blacklist.findOne(blackQuery)
-            .collation({ locale: 'en', strength: 2 }).lean(),
-          Whitelist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-            .collation({ locale: 'en', strength: 2 }).lean(),
-          Watchlist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
-            .collation({ locale: 'en', strength: 2 }).lean(),
-          TrustedUser.findOne({ name: s.name })
-            .collation({ locale: 'en', strength: 2 }).lean(),
-        ]);
-        return { ...s, black, white, watch, trusted };
-      })
-    );
+    const isOwnerGuild = searchGuildId && searchGuildId === config.ownerGuildId;
+    const sliced = suggestions.slice(0, 15);
+    const allNames = sliced.map((s) => s.name);
+    const collation = { locale: 'en', strength: 2 };
+    const nameQuery = { $or: [{ name: { $in: allNames } }, { allCharacters: { $in: allNames } }] };
+
+    const blackQuery = isOwnerGuild
+      ? nameQuery
+      : { $and: [nameQuery, { $or: [
+          { scope: 'global' },
+          { scope: { $exists: false } },
+          ...(searchGuildId ? [{ scope: 'server', guildId: searchGuildId }] : []),
+        ] }] };
+
+    const [allBlack, allWhite, allWatch, allTrusted] = await Promise.all([
+      Blacklist.find(blackQuery).collation(collation).lean(),
+      Whitelist.find(nameQuery).collation(collation).lean(),
+      Watchlist.find(nameQuery).collation(collation).lean(),
+      TrustedUser.find({ name: { $in: allNames } }).collation(collation).lean(),
+    ]);
+
+    // Build O(1) lookup maps
+    function buildEntryMap(entries) {
+      const map = new Map();
+      for (const e of entries) {
+        map.set(e.name.toLowerCase(), e);
+        for (const c of (e.allCharacters || [])) {
+          if (!map.has(c.toLowerCase())) map.set(c.toLowerCase(), e);
+        }
+      }
+      return map;
+    }
+    const blackMap = buildEntryMap(allBlack);
+    const whiteMap = buildEntryMap(allWhite);
+    const watchMap = buildEntryMap(allWatch);
+    const trustedMap = new Map(allTrusted.map((t) => [t.name.toLowerCase(), t]));
+
+    const results = sliced.map((s) => ({
+      ...s,
+      black: blackMap.get(s.name.toLowerCase()) || null,
+      white: whiteMap.get(s.name.toLowerCase()) || null,
+      watch: watchMap.get(s.name.toLowerCase()) || null,
+      trusted: trustedMap.get(s.name.toLowerCase()) || null,
+    }));
 
     const lines = results.map((r, i) => {
       const cls = getClassName(r.cls);

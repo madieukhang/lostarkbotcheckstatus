@@ -21,7 +21,7 @@ const guildConfigSchema = new mongoose.Schema({
   globalNotifyEnabled: { type: Boolean, default: true },
 
   /** Default blacklist scope for /list add when scope option is not specified */
-  defaultBlacklistScope: { type: String, enum: ['global', 'server'], default: 'server' },
+  defaultBlacklistScope: { type: String, enum: ['global', 'server'], default: 'global' },
 
   /** Who last updated this config */
   updatedByUserId: { type: String, default: '' },

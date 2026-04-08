@@ -395,12 +395,11 @@ export function createListHandlers({ client }) {
       embed.setImage(payload.imageUrl);
     }
 
-    // Broadcast only global entries — server-scoped entries stay private
-    if (entryScope !== 'server') {
-      broadcastListChange('added', entry, payload).catch((err) =>
-        console.warn('[list] Broadcast failed:', err.message)
-      );
-    }
+    // Global: broadcast to all opted-in servers
+    // Server-scoped: broadcast only to owner guild (special privilege)
+    broadcastListChange('added', entry, payload, { onlyOwner: entryScope === 'server' }).catch((err) =>
+      console.warn('[list] Broadcast failed:', err.message)
+    );
 
     return {
       ok: true,
@@ -409,7 +408,8 @@ export function createListHandlers({ client }) {
     };
   }
 
-  async function broadcastListChange(action, entry, payload) {
+  async function broadcastListChange(action, entry, payload, options = {}) {
+    const { onlyOwner = false } = options;
     const { label, color, icon } = getListContext(payload.type);
     const addedBy = payload.requestedByDisplayName || payload.requestedByTag || 'Unknown';
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
@@ -417,9 +417,10 @@ export function createListHandlers({ client }) {
     // Capitalize label for title (blacklist → Blacklist)
     const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
     const actionCap = action.charAt(0).toUpperCase() + action.slice(1);
+    const scopeTag = entry.scope === 'server' ? ' (Local)' : '';
 
     const embed = new EmbedBuilder()
-      .setTitle(`📢 ${icon} ${labelCap} — ${actionCap}`)
+      .setTitle(`📢 ${icon} ${labelCap}${scopeTag} — ${actionCap}`)
       .addFields(
         { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: entry.reason || 'N/A', inline: true },
@@ -430,44 +431,54 @@ export function createListHandlers({ client }) {
     if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
     if (entry.imageUrl) embed.setImage(entry.imageUrl);
 
-    // Collect notification channel IDs from OTHER guilds only
-    // Skip the guild where the action originated — user already sees the reply there
     const originGuildId = payload.guildId || '';
     const channelIds = new Set();
 
-    // Collect disabled guild IDs, DB-managed guild IDs, and notify channels
-    const disabledGuildIds = new Set();
-    const dbNotifyGuildIds = new Set(); // guilds that have DB notify channel (env should not double-send)
-    try {
-      const guildConfigs = await GuildConfig.find({}).lean();
-      for (const gc of guildConfigs) {
-        if (gc.globalNotifyEnabled === false) disabledGuildIds.add(gc.guildId);
-        if (gc.listNotifyChannelId) dbNotifyGuildIds.add(gc.guildId);
-        if (gc.guildId === originGuildId) continue; // skip same server
-        if (gc.globalNotifyEnabled === false) continue; // skip opted-out servers
-        if (!gc.listNotifyChannelId) continue; // skip configs without notify channel
-        channelIds.add(gc.listNotifyChannelId);
+    // onlyOwner mode: only send to owner guild's notify channel
+    if (onlyOwner) {
+      if (!config.ownerGuildId) return; // no owner configured
+      if (config.ownerGuildId === originGuildId) return; // origin IS owner, already sees reply
+      try {
+        const ownerConfig = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
+        if (ownerConfig?.listNotifyChannelId && ownerConfig.globalNotifyEnabled !== false) {
+          channelIds.add(ownerConfig.listNotifyChannelId);
+        }
+      } catch (err) {
+        console.warn('[list] Failed to query owner GuildConfig:', err.message);
       }
-    } catch (err) {
-      console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
-    }
+    } else {
+      // Normal broadcast: collect from all opted-in guilds
+      const disabledGuildIds = new Set();
+      const dbNotifyGuildIds = new Set();
+      try {
+        const guildConfigs = await GuildConfig.find({}).lean();
+        for (const gc of guildConfigs) {
+          if (gc.globalNotifyEnabled === false) disabledGuildIds.add(gc.guildId);
+          if (gc.listNotifyChannelId) dbNotifyGuildIds.add(gc.guildId);
+          if (gc.guildId === originGuildId) continue;
+          if (gc.globalNotifyEnabled === false) continue;
+          if (!gc.listNotifyChannelId) continue;
+          channelIds.add(gc.listNotifyChannelId);
+        }
+      } catch (err) {
+        console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
+      }
 
-    // Env fallback: for guilds without DB notify channel configured.
-    // Skip origin, disabled, and guilds already using DB notify channel.
-    if (config.listNotifyChannelIds.length > 0) {
-      for (const envId of config.listNotifyChannelIds) {
-        if (channelIds.has(envId)) continue; // already added from DB
-        try {
-          const ch = await client.channels.fetch(envId);
-          if (!ch?.isTextBased()) continue;
-          const chGuildId = ch.guild?.id || '';
-          if (chGuildId === originGuildId) continue; // skip origin
-          if (disabledGuildIds.has(chGuildId)) continue; // skip opted-out
-          if (dbNotifyGuildIds.has(chGuildId)) continue; // skip guild already using DB channel
+      if (config.listNotifyChannelIds.length > 0) {
+        for (const envId of config.listNotifyChannelIds) {
+          if (channelIds.has(envId)) continue;
+          try {
+            const ch = await client.channels.fetch(envId);
+            if (!ch?.isTextBased()) continue;
+            const chGuildId = ch.guild?.id || '';
+            if (chGuildId === originGuildId) continue;
+            if (disabledGuildIds.has(chGuildId)) continue;
+            if (dbNotifyGuildIds.has(chGuildId)) continue;
           channelIds.add(envId);
         } catch { /* channel not accessible */ }
       }
-    }
+      }
+    } // end else (normal broadcast)
 
     if (channelIds.size === 0) return;
 
@@ -661,7 +672,7 @@ export function createListHandlers({ client }) {
             addedByTag: existingEntry.addedByTag,
             addedByDisplayName: existingEntry.addedByDisplayName,
             addedAt: existingEntry.addedAt,
-            ...(payload.type === 'black' ? { scope: payload.scope || existingEntry.scope || 'server', guildId: (payload.scope || existingEntry.scope || 'server') === 'server' ? (payload.guildId || '') : '' } : {}),
+            ...(payload.type === 'black' ? { scope: payload.scope || existingEntry.scope || 'global', guildId: (payload.scope || existingEntry.scope || 'global') === 'server' ? (payload.guildId || '') : '' } : {}),
           });
           await oldModel.deleteOne({ _id: existingEntry._id });
         } else {
@@ -675,16 +686,14 @@ export function createListHandlers({ client }) {
           }
         }
 
-        // Broadcast only if entry is global-scoped
+        // Broadcast edit: global to all, server-scoped to owner only
         const entryScope = existingEntry.scope || payload.scope || 'global';
-        if (entryScope !== 'server') {
-          broadcastListChange('edited', { ...existingEntry.toObject?.() || existingEntry, reason: payload.reason || existingEntry.reason, raid: payload.raid || existingEntry.raid }, {
-            type: payload.type,
-            guildId: payload.guildId,
-            requestedByDisplayName: payload.requestedByDisplayName,
-            requestedByTag: payload.requestedByTag,
-          }).catch(() => {});
-        }
+        broadcastListChange('edited', { ...existingEntry.toObject?.() || existingEntry, reason: payload.reason || existingEntry.reason, raid: payload.raid || existingEntry.raid }, {
+          type: payload.type,
+          guildId: payload.guildId,
+          requestedByDisplayName: payload.requestedByDisplayName,
+          requestedByTag: payload.requestedByTag,
+        }, { onlyOwner: entryScope === 'server' }).catch(() => {});
 
         await PendingApproval.deleteOne({ requestId });
         const editResult = { ok: true, content: `✅ Edit approved: **${existingEntry.name}**${isTypeChange ? ` moved to ${newLabel}` : ' updated'}.` };
@@ -900,7 +909,7 @@ export function createListHandlers({ client }) {
     if (!scope && type === 'black') {
       await connectDB();
       const guildConfig = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
-      scope = guildConfig?.defaultBlacklistScope || 'server';
+      scope = guildConfig?.defaultBlacklistScope || 'global';
     }
     if (!scope) scope = 'global'; // non-blacklist types always global
 
@@ -1009,6 +1018,7 @@ export function createListHandlers({ client }) {
             ] },
           ],
         })
+          .sort({ scope: -1 }) // prefer server > global
           .collation({ locale: 'en', strength: 2 })
           .lean(),
         Whitelist.findOne({
@@ -1049,15 +1059,13 @@ export function createListHandlers({ client }) {
 
         await model.deleteOne({ _id: entry._id });
 
-        // Only broadcast global removals (server-scoped stay private)
-        if (entry.scope !== 'server') {
-          broadcastListChange('removed', entry, {
-            type,
-            guildId: interaction.guild?.id || '',
-            requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
-            requestedByTag: interaction.user.tag,
-          }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
-        }
+        // Global: broadcast to all. Server-scoped: broadcast to owner only
+        broadcastListChange('removed', entry, {
+          type,
+          guildId: interaction.guild?.id || '',
+          requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+          requestedByTag: interaction.user.tag,
+        }, { onlyOwner: entry.scope === 'server' }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 
         const scopeNote = entry.scope === 'server' ? ' *(server only)*' : '';
         return `${icon} Removed **${entry.name}** from ${label}.${scopeNote}`;
@@ -1143,7 +1151,7 @@ export function createListHandlers({ client }) {
     const query = { $or: [{ name }, { allCharacters: name }] };
     const editGuildId = interaction.guild.id;
     const editGuildConfig = await GuildConfig.findOne({ guildId: editGuildId }).lean();
-    const editGuildDefaultScope = editGuildConfig?.defaultBlacklistScope || 'server';
+    const editGuildDefaultScope = editGuildConfig?.defaultBlacklistScope || 'global';
 
     const blackQuery = {
       $and: [
@@ -1157,7 +1165,7 @@ export function createListHandlers({ client }) {
     };
 
     const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
-      Blacklist.findOne(blackQuery).collation(collation),
+      Blacklist.findOne(blackQuery).sort({ scope: -1 }).collation(collation),
       Whitelist.findOne(query).collation(collation),
       Watchlist.findOne(query).collation(collation),
     ]);
@@ -1462,9 +1470,9 @@ export function createListHandlers({ client }) {
           if (e.scope === 'server') {
             if (isOwnerGuild && e.guildId) {
               const gName = guildNameCache.get(e.guildId) || e.guildId;
-              scopeLabel = ` \`[S:${gName}]\``;
+              scopeLabel = ` (Local: ${gName})`;
             } else {
-              scopeLabel = ' `[S]`';
+              scopeLabel = ' (Local)';
             }
           }
           const parts = [`${e._icon} **${e.name}**${scopeLabel}`];
@@ -1664,7 +1672,7 @@ export function createListHandlers({ client }) {
       if (type === 'black' && interaction.guild?.id) {
         await connectDB();
         const gc = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
-        quickScope = gc?.defaultBlacklistScope || 'server';
+        quickScope = gc?.defaultBlacklistScope || 'global';
       }
 
       const payload = {
@@ -1832,15 +1840,13 @@ export function createListHandlers({ client }) {
         { excludeMessageId: interaction.message.id }
       );
 
-      // Broadcast overwrite (only global-scoped)
-      if (dupeEntry.scope !== 'server') {
-        broadcastListChange('edited', dupeEntry, {
-          type: payload.type,
-          guildId: payload.guildId,
-          requestedByDisplayName: payload.requestedByDisplayName,
-          requestedByTag: payload.requestedByTag,
-        }).catch(() => {});
-      }
+      // Broadcast overwrite: global to all, server-scoped to owner only
+      broadcastListChange('edited', dupeEntry, {
+        type: payload.type,
+        guildId: payload.guildId,
+        requestedByDisplayName: payload.requestedByDisplayName,
+        requestedByTag: payload.requestedByTag,
+      }, { onlyOwner: dupeEntry.scope === 'server' }).catch(() => {});
 
       await notifyRequesterAboutDecision(payload, { ok: true, content: resultMsg }, false);
     } catch (err) {
