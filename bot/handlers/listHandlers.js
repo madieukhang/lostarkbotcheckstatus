@@ -36,7 +36,7 @@ import {
   getAddedByDisplay,
   getInteractionDisplayName,
 } from '../utils/names.js';
-import { buildBlacklistQuery, isOwnerGuild as checkOwner, getGuildConfig, invalidateGuildConfig } from '../utils/scope.js';
+import { buildBlacklistQuery, getGuildConfig } from '../utils/scope.js';
 
 // Approver IDs loaded from environment variables
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
@@ -916,7 +916,7 @@ export function createListHandlers({ client }) {
       return;
     }
 
-    // Resolve scope: explicit input > guild default setting > 'server'
+    // Resolve scope: explicit input > guild default setting > 'global'
     let scope = inputScope;
     if (!scope && type === 'black') {
       await connectDB();
