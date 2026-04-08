@@ -9,6 +9,7 @@ import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
+import TrustedUser from '../../models/TrustedUser.js';
 import { getClassName } from '../../models/Class.js';
 import { fetchNameSuggestions } from '../services/rosterService.js';
 import { normalizeCharacterName } from '../utils/names.js';
@@ -61,15 +62,17 @@ export async function handleSearchCommand(interaction) {
             ] },
           ],
         };
-        const [black, white, watch] = await Promise.all([
+        const [black, white, watch, trusted] = await Promise.all([
           Blacklist.findOne(blackQuery)
             .collation({ locale: 'en', strength: 2 }).lean(),
           Whitelist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
             .collation({ locale: 'en', strength: 2 }).lean(),
           Watchlist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
             .collation({ locale: 'en', strength: 2 }).lean(),
+          TrustedUser.findOne({ name: s.name })
+            .collation({ locale: 'en', strength: 2 }).lean(),
         ]);
-        return { ...s, black, white, watch };
+        return { ...s, black, white, watch, trusted };
       })
     );
 
@@ -83,6 +86,7 @@ export async function handleSearchCommand(interaction) {
       if (r.black) icon += '⛔';
       if (r.white) icon += '✅';
       if (r.watch) icon += '⚠️';
+      if (r.trusted) icon += '🛡️';
       if (icon) icon += ' ';
 
       const link = `[${r.name}](https://lostark.bible/character/NA/${encodeURIComponent(r.name)}/roster)`;
