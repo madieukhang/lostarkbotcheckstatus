@@ -947,7 +947,8 @@ export function createListHandlers({ client }) {
         createdAt: Date.now(),
       };
 
-      if (isRequesterAutoApprover(payload.requestedByUserId)) {
+      // Auto-approve: officers always, OR server-scoped entries (local = no approval needed)
+      if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
         const result = await executeListAddToDatabase(payload);
         await interaction.editReply({
           content: `${result.content}`,
@@ -1693,7 +1694,8 @@ export function createListHandlers({ client }) {
         createdAt: Date.now(),
       };
 
-      if (isRequesterAutoApprover(payload.requestedByUserId)) {
+      // Auto-approve: officers always, OR server-scoped (local = free)
+      if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
         const result = await executeListAddToDatabase(payload);
         await interaction.editReply({
           content: result.content,
