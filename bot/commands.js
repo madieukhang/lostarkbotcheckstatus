@@ -23,15 +23,18 @@ export function buildCommands() {
   return [
     new SlashCommandBuilder()
       .setName('status')
-      .setDescription('Show live server status'),
+      .setDescription('Show live server status')
+      .setDMPermission(false),
 
     new SlashCommandBuilder()
       .setName('reset')
-      .setDescription('Reset the stored status state back to default'),
+      .setDescription('Reset the stored status state back to default')
+      .setDMPermission(false),
 
     new SlashCommandBuilder()
       .setName('roster')
       .setDescription('Fetch roster for a Lost Ark character with progression tracking')
+      .setDMPermission(false)
       .addStringOption((opt) =>
         opt
           .setName('name')
@@ -48,6 +51,7 @@ export function buildCommands() {
     new SlashCommandBuilder()
       .setName('list')
       .setDescription('Manage blacklist/whitelist/watchlist entries')
+      .setDMPermission(false)
       .addSubcommand((sub) =>
         sub
           .setName('add')
@@ -98,6 +102,16 @@ export function buildCommands() {
               .setName('image')
               .setDescription('Optional evidence screenshot')
               .setRequired(false)
+          )
+          .addStringOption((opt) =>
+            opt
+              .setName('scope')
+              .setDescription('Global (all servers) or Server (this server only) — blacklist only')
+              .setRequired(false)
+              .addChoices(
+                { name: 'global', value: 'global' },
+                { name: 'server', value: 'server' }
+              )
           )
       )
       .addSubcommand((sub) =>
@@ -176,8 +190,48 @@ export function buildCommands() {
                 { name: 'all', value: 'all' },
                 { name: 'black', value: 'black' },
                 { name: 'white', value: 'white' },
-                { name: 'watch', value: 'watch' }
+                { name: 'watch', value: 'watch' },
+                { name: 'trusted', value: 'trusted' }
               )
+          )
+          .addStringOption((opt) =>
+            opt
+              .setName('scope')
+              .setDescription('Filter blacklist by scope (owner server only for "all servers")')
+              .setRequired(false)
+              .addChoices(
+                { name: 'all', value: 'all' },
+                { name: 'global', value: 'global' },
+                { name: 'server', value: 'server' }
+              )
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('trust')
+          .setDescription('Add a character to the trusted list (cannot be blacklisted)')
+          .addStringOption((opt) =>
+            opt
+              .setName('name')
+              .setDescription('Character name to trust')
+              .setRequired(true)
+          )
+          .addStringOption((opt) =>
+            opt
+              .setName('reason')
+              .setDescription('Reason for trust (e.g. "Guild officer")')
+              .setRequired(false)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('untrust')
+          .setDescription('Remove a character from the trusted list')
+          .addStringOption((opt) =>
+            opt
+              .setName('name')
+              .setDescription('Character name to untrust')
+              .setRequired(true)
           )
       ),
 
@@ -214,11 +268,13 @@ export function buildCommands() {
         }
 
         return opt;
-      }),
+      })
+      .setDMPermission(false),
 
     new SlashCommandBuilder()
       .setName('listcheck')
       .setDescription('Check names from screenshot against all lists')
+      .setDMPermission(false)
       .addAttachmentOption((opt) =>
         opt
           .setName('image')
@@ -227,15 +283,18 @@ export function buildCommands() {
       ),
     new SlashCommandBuilder()
       .setName('lastats')
-      .setDescription('Show bot usage statistics'),
+      .setDescription('Show bot usage statistics')
+      .setDMPermission(false),
 
     new SlashCommandBuilder()
       .setName('lahelp')
-      .setDescription('Show all available Lost Ark bot commands'),
+      .setDescription('Show all available Lost Ark bot commands')
+      .setDMPermission(false),
 
     new SlashCommandBuilder()
       .setName('lasetup')
       .setDescription('Configure bot channels for this server')
+      .setDMPermission(false)
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
       .addSubcommand((sub) =>
         sub
@@ -266,8 +325,8 @@ export function buildCommands() {
       )
       .addSubcommand((sub) =>
         sub
-          .setName('reset')
-          .setDescription('Reset all channel configuration (revert to env var fallback)')
+          .setName('off')
+          .setDescription('Toggle global list notifications on/off for this server')
       ),
   ].map((cmd) => cmd.toJSON());
 }

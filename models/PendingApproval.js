@@ -20,7 +20,23 @@ const pendingApprovalSchema = new mongoose.Schema({
   name: { type: String, required: true },
   reason: { type: String, default: '' },
   raid: { type: String, default: '' },
+  logsUrl: { type: String, default: '' },
   imageUrl: { type: String, default: '' },
+
+  /** Blacklist scope: 'global' or 'server' */
+  scope: { type: String, enum: ['global', 'server'], default: 'global' },
+
+  /** Action type: 'add' (default) or 'edit' */
+  action: { type: String, enum: ['add', 'edit'], default: 'add' },
+
+  /** For edit actions: _id of the entry being edited */
+  existingEntryId: { type: String, default: '' },
+
+  /** For edit actions: the original list type before edit */
+  currentType: { type: String, default: '' },
+
+  /** For overwrite flow: _id of the duplicate entry to delete */
+  duplicateEntryId: { type: String, default: '' },
 
   requestedByUserId: { type: String, required: true },
   requestedByTag: { type: String, default: '' },

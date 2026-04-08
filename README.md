@@ -19,10 +19,14 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 
 ### 📋 List Management
 - **Blacklist / Whitelist / Watchlist**: Three list types with `⛔`, `✅`, `⚠️` icons.
-- **`/list add`**: Add entries with approval flow (officers auto-approve), optional raid tag, logs URL, and evidence image. Validates ilvl >= 1700.
+- **Server vs Global blacklist**: Blacklist entries can be `global` (shared) or `server` (per-guild only). Owner server sees all entries; others see global + own.
+- **Trusted user list**: Trusted characters (and their alts) cannot be added to the blacklist. Officer/senior managed.
+- **`/list add`**: Add entries with approval flow (officers auto-approve), optional raid tag, logs URL, evidence image, and scope (global/server). Validates ilvl >= 1700.
+- **`/list edit`**: Edit existing entries (owner/officer instant, others via approval).
 - **`/list remove`**: Remove entries with ownership check.
-- **`/list view`**: View all entries in a list.
-- **Cross-server broadcast**: When entries are added/removed, notifications sent to all configured channels across servers.
+- **`/list view`**: View entries with scope filter. Clickable 📎 evidence links. Owner server can filter by scope.
+- **`/list trust` / `/list untrust`**: Manage trusted user list (officer/senior only).
+- **Cross-server broadcast**: Global entries broadcast to all configured channels; server-scoped entries stay private.
 - **Auto-enrich**: When a flagged character is found, background guild scan discovers and links alt characters to `allCharacters`.
 
 ### 📸 Screenshot Checking
@@ -33,6 +37,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 - **Gemini model failover**: Automatically switches to next model on quota/rate limits or timeout.
 
 ### ⚙️ Technical
+- **Guild-only commands**: All slash commands have `setDMPermission(false)` — not available in DMs.
 - **Direct fetch with ScraperAPI fallback**: Fast direct access to lostark.bible, auto-fallback via proxy on 403/503. Smart cache skips wasted direct fetches when blocked.
 - **Roster-based duplicate checks**: `allCharacters` field with case-insensitive matching and MongoDB index.
 - **RosterCache**: Caches roster check results in MongoDB (TTL 24h) — same character across multiple screenshots skips HTTP requests.
@@ -48,17 +53,19 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | `/reset` | Reset the stored status state |
 | `/roster name [deep]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan |
 | `/search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default ilvl ≥ 1700), cross-check all lists |
-| `/list add type name reason [raid] [logs] [image]` | Add to blacklist/whitelist/watchlist. Officers auto-approve |
+| `/list add type name reason [raid] [logs] [image] [scope]` | Add to blacklist/whitelist/watchlist. `scope`: global/server (blacklist only) |
 | `/list edit name [reason] [type] [raid] [logs] [image]` | Edit existing entry (owner/officer: instant, others: approval) |
 | `/list remove name` | Remove an entry (ownership check) |
-| `/list view [type]` | View entries in a list (optional type, shows all if empty) |
+| `/list view type [scope]` | View entries. `scope`: all/global/server (blacklist filter, owner sees all) |
+| `/list trust name [reason]` | Add to trusted list — cannot be blacklisted (officer/senior only) |
+| `/list untrust name` | Remove from trusted list (officer/senior only) |
 | `/listcheck image` | OCR screenshot → check names against all lists |
 | `/lastats` | Show bot usage statistics (lists, cache, uptime) |
 | `/lahelp` | Show all available commands |
 | `/lasetup autochannel #channel` | Set auto-check channel for this server (Manage Server) |
 | `/lasetup notifychannel #channel` | Set notification channel for this server (Manage Server) |
 | `/lasetup view` | View current channel configuration |
-| `/lasetup reset` | Reset channel config (revert to env fallback) |
+| `/lasetup off` | Toggle global list notifications on/off for this server |
 
 ### Status Icons
 
@@ -68,6 +75,9 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | ✅ | Whitelisted |
 | ⚠️ | Watchlist (under investigation) |
 | ❓ | Not in any list, roster exists |
+| 🛡️ | Trusted user (cannot be blacklisted) |
+| `[S]` | Server-scoped blacklist entry |
+| `[S:Name]` | Server-scoped entry with server name (owner view) |
 
 ## Requirements
 
@@ -102,6 +112,7 @@ Copy `.env.example` to `.env` and fill in values:
 | `OFFICER_APPROVER_IDS` | Officer Discord user IDs for /list add auto-approve | — |
 | `SENIOR_APPROVER_IDS` | Senior approver Discord user IDs (always receive approval DMs) | — |
 | `MEMBER_APPROVER_IDS` | Member approver Discord user IDs | — |
+| `OWNER_GUILD_ID` | Owner/admin Discord server ID — can view all server-scoped blacklist entries | — |
 | `SCRAPERAPI_KEY` | Fallback proxy when lostark.bible blocks direct access (403/503) | — |
 
 ## Run Locally
@@ -158,11 +169,13 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 │       └── names.js                # Character name normalization
 │
 ├── models/
-│   ├── Blacklist.js                # Blacklist schema
+│   ├── Blacklist.js                # Blacklist schema (scope: global/server)
 │   ├── Whitelist.js                # Whitelist schema
 │   ├── Watchlist.js                # Watchlist schema (under investigation)
+│   ├── TrustedUser.js              # Trusted users (cannot be blacklisted)
 │   ├── PendingApproval.js          # /list add approval requests (24h TTL)
-│   ├── GuildConfig.js              # Per-guild channel configuration
+│   ├── GuildConfig.js              # Per-guild channel + notification config
+│   ├── RosterCache.js              # Cached roster check results (24h TTL)
 │   ├── RosterSnapshot.js           # ilvl progression tracking
 │   ├── Class.js                    # Class ID → display name mapping
 │   └── Raid.js                     # Raid label choices

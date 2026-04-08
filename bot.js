@@ -22,6 +22,7 @@ import { setupAutoCheck } from './bot/handlers/autoCheckHandler.js';
 import { handleSetupCommand } from './bot/handlers/setupHandler.js';
 import { handleStatsCommand } from './bot/handlers/statsHandler.js';
 import { connectDB } from './db.js';
+import Blacklist from './models/Blacklist.js';
 
 const client = new Client({
   intents: [
@@ -53,6 +54,12 @@ async function registerCommands() {
 client.once('ready', async () => {
   console.log(`[bot] Logged in as ${client.user.tag}`);
   await connectDB();
+
+  // Sync blacklist indexes (drops old name-only unique, creates compound name+scope+guildId)
+  Blacklist.syncIndexes().catch((err) =>
+    console.warn('[bot] Blacklist syncIndexes:', err.message)
+  );
+
   await registerCommands();
   startMonitor(client);
   setupAutoCheck(client);
@@ -136,6 +143,10 @@ client.on('interactionCreate', async (interaction) => {
         await listHandlers.handleListRemoveCommand(interaction);
       } else if (subcommand === 'view') {
         await listHandlers.handleListViewCommand(interaction);
+      } else if (subcommand === 'trust') {
+        await listHandlers.handleListTrustCommand(interaction);
+      } else if (subcommand === 'untrust') {
+        await listHandlers.handleListUntrustCommand(interaction);
       }
     } else if (commandName === 'listcheck') {
       await listHandlers.handleListCheckCommand(interaction);
@@ -153,10 +164,12 @@ client.on('interactionCreate', async (interaction) => {
         '`/roster name [deep]` — Fetch roster + progression tracking + list check. `deep:true` for Stronghold alt scan',
         '`/search name [min_ilvl] [max_ilvl] [class]` — Search similar names with filters',
         '',
-        '`/list add type name reason [raid] [logs] [image]` — Add to blacklist/whitelist/watchlist',
+        '`/list add type name reason [raid] [logs] [image] [scope]` — Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only)',
         '`/list edit name [reason] [type] [raid] [logs] [image]` — Edit an existing entry',
         '`/list remove name` — Remove an entry from a list',
-        '`/list view type` — View all entries in a list',
+        '`/list view type [scope]` — View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
+        '`/list trust name [reason]` — Add to trusted list (officer only, cannot be blacklisted)',
+        '`/list untrust name` — Remove from trusted list (officer only)',
         '',
         '`/listcheck image` — Check names from screenshot against all lists',
         '',
@@ -165,7 +178,7 @@ client.on('interactionCreate', async (interaction) => {
         '`/lasetup autochannel #channel` — Set auto-check channel for this server',
         '`/lasetup notifychannel #channel` — Set notification channel for this server',
         '`/lasetup view` — View current channel configuration',
-        '`/lasetup reset` — Reset channel config (revert to env fallback)',
+        '`/lasetup off` — Toggle global list notifications on/off',
       ].join('\n');
 
       await interaction.reply({ content: helpText, ephemeral: true });

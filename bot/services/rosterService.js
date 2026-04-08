@@ -144,7 +144,7 @@ export async function buildRosterCharacters(name) {
   return { hasValidRoster, allCharacters, failReason, targetItemLevel };
 }
 
-export async function handleRosterBlackListCheck(names) {
+export async function handleRosterBlackListCheck(names, options = {}) {
   try {
     console.log(`[blacklist] Checking ${names.length} character(s):`, names.join(', '));
     await connectDB();
@@ -152,12 +152,15 @@ export async function handleRosterBlackListCheck(names) {
     const docCount = await Blacklist.countDocuments();
     console.log(`[blacklist] Total docs in DB: ${docCount}`);
 
-    const entry = await Blacklist.findOne({
-      $or: [
-        { name: { $in: names } },
-        { allCharacters: { $in: names } },
-      ],
-    })
+    const { guildId } = options;
+    const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
+    const scopeFilter = { $or: [
+      { scope: 'global' },
+      { scope: { $exists: false } },
+      ...(guildId ? [{ scope: 'server', guildId }] : []),
+    ] };
+
+    const entry = await Blacklist.findOne({ $and: [nameQuery, scopeFilter] })
       .collation({ locale: 'en', strength: 2 })
       .lean();
 

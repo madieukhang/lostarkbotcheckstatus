@@ -84,11 +84,24 @@ const blacklistSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+
+  /** Scope: 'global' (shared across all servers) or 'server' (per-guild only) */
+  scope: {
+    type: String,
+    enum: ['global', 'server'],
+    default: 'global',
+  },
+
+  /** Guild ID — only set when scope is 'server' */
+  guildId: {
+    type: String,
+    default: '',
+  },
 });
 
-// Case-insensitive collation index so lookups ignore capitalisation
+// Compound unique index: same name can exist in global + different servers
 blacklistSchema.index(
-  { name: 1 },
+  { name: 1, scope: 1, guildId: 1 },
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 

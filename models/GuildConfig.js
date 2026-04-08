@@ -17,6 +17,9 @@ const guildConfigSchema = new mongoose.Schema({
   /** Channel ID where list add/remove notifications are broadcast */
   listNotifyChannelId: { type: String, default: '' },
 
+  /** Whether this guild receives global list notifications from other servers */
+  globalNotifyEnabled: { type: Boolean, default: true },
+
   /** Who last updated this config */
   updatedByUserId: { type: String, default: '' },
   updatedByTag: { type: String, default: '' },
