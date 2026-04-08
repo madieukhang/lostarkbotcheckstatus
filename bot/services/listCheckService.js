@@ -283,6 +283,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     if (cached) {
       item.hasRoster = cached.hasRoster;
       item.failReason = cached.failReason || null;
+      item._allCharacters = cached.allCharacters || [];
       if (cached.searchSuggestions?.length > 0) {
         item.similarNames = cached.searchSuggestions;
       }
@@ -292,6 +293,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
       const rosterResult = await buildRosterCharacters(item.name);
       item.hasRoster = rosterResult.hasValidRoster;
       item.failReason = rosterResult.failReason;
+      item._allCharacters = rosterResult.allCharacters || [];
 
       // Save to cache (fire-and-forget)
       RosterCache.findOneAndUpdate(
@@ -376,7 +378,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   }
 
   // Phase 3: Resolve trusted status via allCharacters (alt detection)
-  // Collect all roster names from list entries + cache to check against TrustedUser
+  // Collect all roster names from list entries + roster results to check against TrustedUser
   const altNamesForTrustedCheck = new Set();
   for (const item of results) {
     if (item.trustedEntry) continue; // already matched exact
@@ -386,10 +388,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
         for (const c of entry.allCharacters) altNamesForTrustedCheck.add(c);
       }
     }
-    // From roster cache
-    const cached = cacheMap.get(item.name.toLowerCase());
-    if (cached?.allCharacters) {
-      for (const c of cached.allCharacters) altNamesForTrustedCheck.add(c);
+    // From roster fetch/cache (stored on item during Phase 2)
+    if (item._allCharacters) {
+      for (const c of item._allCharacters) altNamesForTrustedCheck.add(c);
     }
   }
 
@@ -411,14 +412,11 @@ export async function checkNamesAgainstLists(names, options = {}) {
           }
           if (item.trustedEntry) break;
         }
-        // Check roster cache allCharacters
-        if (!item.trustedEntry) {
-          const cached = cacheMap.get(item.name.toLowerCase());
-          if (cached?.allCharacters) {
-            for (const c of cached.allCharacters) {
-              const match = altTrustedSet.get(c.toLowerCase());
-              if (match) { item.trustedEntry = match; break; }
-            }
+        // Check roster allCharacters (from Phase 2 fetch/cache)
+        if (!item.trustedEntry && item._allCharacters) {
+          for (const c of item._allCharacters) {
+            const match = altTrustedSet.get(c.toLowerCase());
+            if (match) { item.trustedEntry = match; break; }
           }
         }
       }
