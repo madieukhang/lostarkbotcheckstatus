@@ -58,8 +58,8 @@ function getListContext(type) {
 function buildTrustedBlockEmbed(name, reason, { via } = {}) {
   const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
   const description = via
-    ? `**${name}** shares a roster with trusted user **${via}** and cannot be blacklisted.`
-    : `**${name}** is a trusted user and cannot be added to the blacklist.`;
+    ? `**${name}** shares a roster with trusted user **${via}** and cannot be added to any list.`
+    : `**${name}** is a trusted user and cannot be added to any list.`;
 
   return new EmbedBuilder()
     .setTitle('🛡️ Trusted User — Blocked')
@@ -238,13 +238,13 @@ export function createListHandlers({ client }) {
     const name = normalizeCharacterName(payload.name);
 
     // Step 0: Trusted user guard (exact name check — fast, before roster fetch)
-    if (payload.type === 'black') {
+    {
       const trustedExact = await TrustedUser.findOne({ name })
         .collation({ locale: 'en', strength: 2 }).lean();
       if (trustedExact) {
         return {
           ok: false,
-          content: `🛡️ **${name}** is a trusted user and cannot be blacklisted.`,
+          content: `🛡️ **${name}** is a trusted user and cannot be added to any list.`,
           embeds: [buildTrustedBlockEmbed(name, trustedExact.reason)],
         };
       }
@@ -293,7 +293,7 @@ export function createListHandlers({ client }) {
     }
 
     // Step 2b: Trusted user guard (alt check — after roster gives us allCharacters)
-    if (payload.type === 'black' && allCharacters.length > 0) {
+    if (allCharacters.length > 0) {
       const trustedAlt = await TrustedUser.findOne({ name: { $in: allCharacters } })
         .collation({ locale: 'en', strength: 2 }).lean();
       if (trustedAlt) {
@@ -624,14 +624,14 @@ export function createListHandlers({ client }) {
           }
 
           // Recheck trusted guard at approval time (status may have changed)
-          if (payload.type === 'black') {
+          {
             const trustedNow = await TrustedUser.findOne({
               $or: [{ name: existingEntry.name }, ...(existingEntry.allCharacters?.length > 0 ? [{ name: { $in: existingEntry.allCharacters } }] : [])],
             }).collation({ locale: 'en', strength: 2 }).lean();
             if (trustedNow) {
               await PendingApproval.deleteOne({ requestId });
               await interaction.editReply({
-                content: `🛡️ **${existingEntry.name}** is now a trusted user — blocked.`,
+                content: `🛡️ **${existingEntry.name}** is now a trusted user — cannot be added to any list.`,
                 embeds: [buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason)],
                 components: [buildApprovalResultRow('Blocked')],
               });
@@ -1176,8 +1176,8 @@ export function createListHandlers({ client }) {
     if (newLogs) changes.push(`Logs: updated`);
     if (newImageUrl) changes.push(`Evidence: updated`);
 
-    // Trusted user guard: block moving to blacklist if target is trusted
-    if (targetType === 'black' && currentType !== 'black') {
+    // Trusted user guard: block adding/moving trusted users to any list
+    if (isTypeChange) {
       const trustedCheck = await TrustedUser.findOne({
         $or: [
           { name: existing.name },
@@ -1187,7 +1187,7 @@ export function createListHandlers({ client }) {
       if (trustedCheck) {
         const isSelf = trustedCheck.name.toLowerCase() === existing.name.toLowerCase();
         await interaction.editReply({
-          content: `🛡️ **${existing.name}** cannot be moved to the blacklist.`,
+          content: `🛡️ **${existing.name}** is a trusted user and cannot be moved to any list.`,
           embeds: [buildTrustedBlockEmbed(existing.name, trustedCheck.reason, isSelf ? {} : { via: trustedCheck.name })],
         });
         return;
