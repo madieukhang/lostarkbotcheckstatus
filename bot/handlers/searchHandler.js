@@ -83,7 +83,8 @@ export async function handleSearchCommand(interaction) {
       for (const e of entries) {
         map.set(e.name.toLowerCase(), e);
         for (const c of (e.allCharacters || [])) {
-          if (!map.has(c.toLowerCase())) map.set(c.toLowerCase(), e);
+          const lower = c.toLowerCase();
+          if (!map.has(lower) || e.scope === 'server') map.set(lower, e);
         }
       }
       return map;
