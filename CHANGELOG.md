@@ -17,8 +17,8 @@ All notable changes to this project are documented here.
 - **Show raid info in auto-check**: When a name is flagged, the raid tag from the entry is now displayed in auto-check results (e.g. `⛔ Name — reason — [G6 Aegir]`).
 - **Clickable evidence 📎**: Evidence icon in `/list view` is now a clickable markdown link that opens the image directly.
 - **Trusted user list**: New `TrustedUser` model — trusted characters cannot be added to the blacklist.
-  - `/list trust name [reason]` — add to trusted list (officer/senior only).
-  - `/list untrust name` — remove from trusted list.
+  - `/list trust action:add name [reason]` — add to trusted list (officer/senior only).
+  - `/list trust action:remove name` — remove from trusted list.
   - `/list view trusted` — view all trusted users.
   - Guard checks both exact name and roster alts before allowing blacklist add.
 - Added `GuildConfig.globalNotifyEnabled` field for per-guild notification toggle.
