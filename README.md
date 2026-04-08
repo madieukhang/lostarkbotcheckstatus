@@ -25,7 +25,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 - **`/list edit`**: Edit existing entries (owner/officer instant, others via approval).
 - **`/list remove`**: Remove entries with ownership check.
 - **`/list view`**: View entries with scope filter. Clickable 📎 evidence links. Owner server can filter by scope.
-- **`/list trust` / `/list untrust`**: Manage trusted user list (officer/senior only).
+- **`/list trust action:add/remove`**: Manage trusted user list (officer/senior only).
 - **Cross-server broadcast**: Global entries broadcast to all configured channels; server-scoped entries stay private.
 - **Auto-enrich**: When a flagged character is found, background guild scan discovers and links alt characters to `allCharacters`.
 
