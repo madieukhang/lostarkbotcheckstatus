@@ -442,6 +442,14 @@ export function createListHandlers({ client }) {
         const ownerConfig = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
         if (ownerConfig?.listNotifyChannelId && ownerConfig.globalNotifyEnabled !== false) {
           channelIds.add(ownerConfig.listNotifyChannelId);
+        } else if (!ownerConfig?.listNotifyChannelId) {
+          // Env fallback: find env channel belonging to owner guild
+          for (const envId of config.listNotifyChannelIds) {
+            try {
+              const ch = await client.channels.fetch(envId);
+              if (ch?.guild?.id === config.ownerGuildId) { channelIds.add(envId); break; }
+            } catch { /* skip */ }
+          }
         }
       } catch (err) {
         console.warn('[list] Failed to query owner GuildConfig:', err.message);

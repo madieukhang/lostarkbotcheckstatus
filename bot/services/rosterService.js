@@ -157,14 +157,19 @@ export async function handleRosterBlackListCheck(names, options = {}) {
     await connectDB();
 
     const { guildId } = options;
+    const isOwnerGuild = guildId && guildId === config.ownerGuildId;
     const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
-    const scopeFilter = { $or: [
-      { scope: 'global' },
-      { scope: { $exists: false } },
-      ...(guildId ? [{ scope: 'server', guildId }] : []),
-    ] };
 
-    const entry = await Blacklist.findOne({ $and: [nameQuery, scopeFilter] })
+    const blackQuery = isOwnerGuild
+      ? nameQuery
+      : { $and: [nameQuery, { $or: [
+          { scope: 'global' },
+          { scope: { $exists: false } },
+          ...(guildId ? [{ scope: 'server', guildId }] : []),
+        ] }] };
+
+    const entry = await Blacklist.findOne(blackQuery)
+      .sort({ scope: -1 }) // prefer server > global
       .collation({ locale: 'en', strength: 2 })
       .lean();
 
