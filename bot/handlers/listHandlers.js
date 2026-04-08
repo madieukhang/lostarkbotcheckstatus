@@ -1831,6 +1831,7 @@ export function createListHandlers({ client }) {
       return;
     }
 
+    const action = interaction.options.getString('action', true);
     const rawName = interaction.options.getString('name', true);
     const name = normalizeCharacterName(rawName);
     const reason = interaction.options.getString('reason') || '';
@@ -1838,6 +1839,35 @@ export function createListHandlers({ client }) {
     await interaction.deferReply();
     await connectDB();
 
+    if (action === 'remove') {
+      const deleted = await TrustedUser.findOneAndDelete({ name }).collation({ locale: 'en', strength: 2 });
+      if (!deleted) {
+        await interaction.editReply({ content: `⚠️ **${name}** is not in the trusted list.` });
+        return;
+      }
+
+      const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(deleted.name)}/roster`;
+      const embed = new EmbedBuilder()
+        .setTitle('🛡️ Trusted — Entry Removed')
+        .addFields(
+          { name: 'Name', value: `[${deleted.name}](${rosterLink})`, inline: true },
+          { name: 'Was trusted for', value: deleted.reason || 'N/A', inline: true },
+          { name: 'Removed by', value: interaction.user.tag, inline: true },
+        )
+        .setColor(0xed4245)
+        .setFooter({ text: 'This character can now be blacklisted' })
+        .setTimestamp(new Date());
+
+      await interaction.editReply({
+        content: `🗑️ Removed **${deleted.name}** from the trusted list.`,
+        embeds: [embed],
+      });
+
+      console.log(`[list] Trusted user removed: ${deleted.name} by ${interaction.user.tag}`);
+      return;
+    }
+
+    // action === 'add'
     const existing = await TrustedUser.findOne({ name }).collation({ locale: 'en', strength: 2 });
     if (existing) {
       await interaction.editReply({ content: `⚠️ **${existing.name}** is already in the trusted list.` });
@@ -1848,9 +1878,8 @@ export function createListHandlers({ client }) {
     const trustGuildId = interaction.guild?.id || '';
     const isOwnerGuild = trustGuildId === config.ownerGuildId;
     const nameMatch = { $or: [{ name }, { allCharacters: name }] };
-    // Owner guild sees all scopes; other guilds see global + own server
     const scopeFilter = isOwnerGuild
-      ? {} // owner can see all
+      ? {}
       : { $or: [
           { scope: 'global' },
           { scope: { $exists: false } },
@@ -1895,47 +1924,6 @@ export function createListHandlers({ client }) {
     console.log(`[list] Trusted user added: ${name} by ${interaction.user.tag}`);
   }
 
-  async function handleListUntrustCommand(interaction) {
-    const userId = interaction.user.id;
-    const isOfficerOrSenior = OFFICER_APPROVER_IDS.includes(userId) || SENIOR_APPROVER_IDS.includes(userId);
-
-    if (!isOfficerOrSenior) {
-      await interaction.reply({ content: '❌ Only officers and seniors can manage the trusted list.', ephemeral: true });
-      return;
-    }
-
-    const rawName = interaction.options.getString('name', true);
-    const name = normalizeCharacterName(rawName);
-
-    await interaction.deferReply();
-    await connectDB();
-
-    const deleted = await TrustedUser.findOneAndDelete({ name }).collation({ locale: 'en', strength: 2 });
-    if (!deleted) {
-      await interaction.editReply({ content: `⚠️ **${name}** is not in the trusted list.` });
-      return;
-    }
-
-    const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(deleted.name)}/roster`;
-    const embed = new EmbedBuilder()
-      .setTitle('🛡️ Trusted — Entry Removed')
-      .addFields(
-        { name: 'Name', value: `[${deleted.name}](${rosterLink})`, inline: true },
-        { name: 'Was trusted for', value: deleted.reason || 'N/A', inline: true },
-        { name: 'Removed by', value: interaction.user.tag, inline: true },
-      )
-      .setColor(0xed4245)
-      .setFooter({ text: 'This character can now be blacklisted' })
-      .setTimestamp(new Date());
-
-    await interaction.editReply({
-      content: `🗑️ Removed **${deleted.name}** from the trusted list.`,
-      embeds: [embed],
-    });
-
-    console.log(`[list] Trusted user removed: ${deleted.name} by ${interaction.user.tag}`);
-  }
-
   return {
     handleListCheckCommand,
     handleListAddCommand,
@@ -1943,7 +1931,6 @@ export function createListHandlers({ client }) {
     handleListRemoveCommand,
     handleListViewCommand,
     handleListTrustCommand,
-    handleListUntrustCommand,
     handleListAddApprovalButton,
     handleListAddOverwriteButton,
     handleQuickAddSelect,

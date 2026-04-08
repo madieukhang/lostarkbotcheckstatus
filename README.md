@@ -57,8 +57,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | `/list edit name [reason] [type] [raid] [logs] [image]` | Edit existing entry (owner/officer: instant, others: approval) |
 | `/list remove name` | Remove an entry (ownership check) |
 | `/list view type [scope]` | View entries. `scope`: all/global/server (blacklist filter, owner sees all) |
-| `/list trust name [reason]` | Add to trusted list — cannot be blacklisted (officer/senior only) |
-| `/list untrust name` | Remove from trusted list (officer/senior only) |
+| `/list trust action name [reason]` | Manage trusted list — add/remove (officer/senior only) |
 | `/listcheck image` | OCR screenshot → check names against all lists |
 | `/lastats` | Show bot usage statistics (lists, cache, uptime) |
 | `/lahelp` | Show all available commands |
