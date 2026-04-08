@@ -21,12 +21,13 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 - **Blacklist / Whitelist / Watchlist**: Three list types with `⛔`, `✅`, `⚠️` icons.
 - **Server vs Global blacklist**: Blacklist entries can be `global` (shared) or `server` (per-guild only). Owner server sees all entries; others see global + own.
 - **Trusted user list**: Trusted characters (and their alts) cannot be added to any list. Officer/senior managed.
-- **`/list add`**: Add entries with approval flow (officers auto-approve), optional raid tag, logs URL, evidence image, and scope (global/server). Validates ilvl >= 1700.
+- **`/list add`**: Add entries with approval flow (officers auto-approve, server-scoped auto-approve), optional raid tag, logs URL, evidence image, and scope (global/server). Validates ilvl >= 1700.
 - **`/list edit`**: Edit existing entries (owner/officer instant, others via approval).
 - **`/list remove`**: Remove entries with ownership check.
 - **`/list view`**: View entries with scope filter. Clickable 📎 evidence links. Owner server can filter by scope.
 - **`/list trust action:add/remove`**: Manage trusted user list (officer/senior only).
-- **Cross-server broadcast**: Global entries broadcast to all configured channels; server-scoped entries stay private.
+- **Cross-server broadcast**: Global entries broadcast to all configured channels; server-scoped entries broadcast to owner guild only (with `(Local)` tag).
+- **🛡️ Trusted indicators**: Trusted users shown with 🛡️ in auto-check, `/listcheck`, `/search`, `/roster` results. Alt detection via roster allCharacters ("via **TrustedName**").
 - **Auto-enrich**: When a flagged character is found, background guild scan discovers and links alt characters to `allCharacters`.
 
 ### 📸 Screenshot Checking
@@ -41,8 +42,10 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 - **Direct fetch with ScraperAPI fallback**: Fast direct access to lostark.bible, auto-fallback via proxy on 403/503. Smart cache skips wasted direct fetches when blocked.
 - **Roster-based duplicate checks**: `allCharacters` field with case-insensitive matching and MongoDB index.
 - **RosterCache**: Caches roster check results in MongoDB (TTL 24h) — same character across multiple screenshots skips HTTP requests.
-- **Batch DB queries**: List check uses `$in` batch queries (~7 queries instead of ~35 per check).
-- **Duplicate overwrite flow**: When approving a duplicate entry, officers see side-by-side comparison with Overwrite/Keep option.
+- **Batch DB queries**: List check and search use `$in` batch queries (~4-7 queries instead of ~35-60).
+- **Scope priority**: `server > global` applied consistently — when both scopes exist for same name, server entry takes precedence.
+- **GuildConfig cache**: 60s in-memory cache reduces DB round-trips for scope/channel resolution. Invalidated on `/lasetup` changes.
+- **Duplicate overwrite flow**: Update-in-place (no delete-then-add risk). Officers see `[Global]`/`[Server]` scope labels in comparison embed.
 - **Spam protection**: 10s per-user cooldown on auto-check channels.
 
 ## Commands
@@ -166,7 +169,8 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 │   │   ├── rosterService.js        # lostark.bible scraping, alt detection, list checks
 │   │   └── listCheckService.js     # Shared OCR + name checking + formatting
 │   └── utils/
-│       └── names.js                # Character name normalization
+│       ├── names.js                # Character name normalization
+│       └── scope.js                # Blacklist scope helpers + GuildConfig cache
 │
 ├── models/
 │   ├── Blacklist.js                # Blacklist schema (scope: global/server)

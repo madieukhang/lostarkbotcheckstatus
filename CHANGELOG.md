@@ -8,12 +8,12 @@ All notable changes to this project are documented here.
 
 - **Server vs Global blacklist**: Blacklist entries now have `scope` field — `global` (shared across all servers) or `server` (per-guild only). Server-scoped entries are not broadcast to other servers.
   - `/list add` has new `scope` option (global/server) for blacklist entries.
-  - `/list view` has new `scope` filter (all/global/server) — owner server can view all server-scoped entries from every guild with `[S:ServerName]` labels; other servers only see their own.
+  - `/list view` has new `scope` filter (all/global/server) — owner server can view all server-scoped entries from every guild with `(Local: ServerName)` labels; other servers only see their own.
   - `OWNER_GUILD_ID` env var identifies the owner/admin server.
   - Auto-check, roster, and search all scope-aware.
   - `Blacklist.syncIndexes()` on startup to migrate from old `name`-only index to compound `{name, scope, guildId}` index.
 - **`/lasetup off`**: Toggle global list notifications on/off per server (replaces `/lasetup reset`). Running again re-enables. `/lasetup notifychannel` auto-enables. `/lasetup view` shows 🔔/🔕 status.
-- **`/lasetup defaultscope global/server`**: Set default blacklist scope per guild. When `/list add type:black` is used without specifying scope, defaults to guild setting (default: `server`). Quick Add also respects this setting. `/lasetup view` shows current default scope.
+- **`/lasetup defaultscope global/server`**: Set default blacklist scope per guild. When `/list add type:black` is used without specifying scope, defaults to guild setting (default: `global`). Quick Add also respects this setting. `/lasetup view` shows current default scope.
 - **Show raid info in auto-check**: When a name is flagged, the raid tag from the entry is now displayed in auto-check results (e.g. `⛔ Name — reason — [G6 Aegir]`).
 - **Clickable evidence 📎**: Evidence icon in `/list view` is now a clickable markdown link that opens the image directly.
 - **Trusted user list**: New `TrustedUser` model — trusted characters cannot be added to the blacklist.
@@ -40,6 +40,17 @@ All notable changes to this project are documented here.
 - Trusted guard rechecked at approval time; `/list trust` blocks if character already blacklisted (scope-aware).
 - Similar-name cache stores candidate names only — flags recomputed per-request for scope safety.
 - Broadcast query reads all GuildConfigs for opt-out detection (not just notify-configured ones).
+- Server-scoped (local) blacklist entries auto-approve — no officer approval needed.
+- Server-scoped blacklist broadcast to owner guild only (with `(Local)` tag); other servers don't receive.
+- Owner guild auto-check/search/roster sees all server-scoped entries from every guild.
+- Scope priority `server > global` applied consistently across all read paths (map build, findOne sort).
+- `/search` uses batch `$in` queries (4 queries instead of 60 for 15 results).
+- Removed debug `Blacklist.countDocuments()` from roster hot path.
+- `fetchNameSuggestions` returns `null` on API error (vs `[]` for no results) — `/search` shows "lostark.bible unavailable" instead of misleading "No results".
+- 🛡️ Trusted indicator shown in auto-check, `/listcheck`, `/search`, `/roster` results (exact + alt detection via allCharacters).
+- Trusted alt detection: "via **TrustedName**" shown when match is through roster.
+- Extracted `bot/utils/scope.js`: shared `buildBlacklistQuery()`, `isOwnerGuild()`, `getGuildConfig()` (60s cache), `invalidateGuildConfig()`.
+- Default blacklist scope changed to `global` (was `server`).
 
 ## [v0.4.0] - 2026-03-28
 
