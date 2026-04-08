@@ -20,7 +20,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 ### 📋 List Management
 - **Blacklist / Whitelist / Watchlist**: Three list types with `⛔`, `✅`, `⚠️` icons.
 - **Server vs Global blacklist**: Blacklist entries can be `global` (shared) or `server` (per-guild only). Owner server sees all entries; others see global + own.
-- **Trusted user list**: Trusted characters (and their alts) cannot be added to the blacklist. Officer/senior managed.
+- **Trusted user list**: Trusted characters (and their alts) cannot be added to any list. Officer/senior managed.
 - **`/list add`**: Add entries with approval flow (officers auto-approve), optional raid tag, logs URL, evidence image, and scope (global/server). Validates ilvl >= 1700.
 - **`/list edit`**: Edit existing entries (owner/officer instant, others via approval).
 - **`/list remove`**: Remove entries with ownership check.
