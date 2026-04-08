@@ -9,6 +9,7 @@ import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
+import { invalidateGuildConfig } from '../utils/scope.js';
 
 /**
  * Check if the bot has required permissions in a channel.
@@ -104,6 +105,7 @@ async function handleSetupAutoChannel(interaction) {
       : `✅ Auto-check channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message — please verify bot permissions.`,
   });
 
+  invalidateGuildConfig(interaction.guild.id);
   console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) set autoCheckChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);
 }
 
@@ -161,6 +163,7 @@ async function handleSetupNotifyChannel(interaction) {
       : `✅ Notification channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message — please verify bot permissions.`,
   });
 
+  invalidateGuildConfig(interaction.guild.id);
   console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) set listNotifyChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);
 }
 
@@ -199,6 +202,7 @@ async function handleSetupOff(interaction) {
     });
   }
 
+  invalidateGuildConfig(interaction.guild.id);
   console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) globalNotify → ${newState ? 'ON' : 'OFF'} by ${interaction.user.tag}`);
 }
 
@@ -321,5 +325,6 @@ async function handleSetupDefaultScope(interaction) {
     content: `${emoji} Default blacklist scope set to **${scope}**.\nWhen \`/list add type:black\` is used without specifying scope, entries will default to **${scope}**.`,
   });
 
+  invalidateGuildConfig(interaction.guild.id);
   console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) defaultBlacklistScope → ${scope} by ${interaction.user.tag}`);
 }

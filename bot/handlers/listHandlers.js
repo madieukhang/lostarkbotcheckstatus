@@ -36,6 +36,7 @@ import {
   getAddedByDisplay,
   getInteractionDisplayName,
 } from '../utils/names.js';
+import { buildBlacklistQuery, isOwnerGuild as checkOwner, getGuildConfig, invalidateGuildConfig } from '../utils/scope.js';
 
 // Approver IDs loaded from environment variables
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
@@ -919,7 +920,7 @@ export function createListHandlers({ client }) {
     let scope = inputScope;
     if (!scope && type === 'black') {
       await connectDB();
-      const guildConfig = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+      const guildConfig = await getGuildConfig(interaction.guild.id);
       scope = guildConfig?.defaultBlacklistScope || 'global';
     }
     if (!scope) scope = 'global'; // non-blacklist types always global
@@ -1020,17 +1021,8 @@ export function createListHandlers({ client }) {
 
       const removeGuildId = interaction.guild?.id || '';
       const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
-        Blacklist.findOne({
-          $and: [
-            { $or: [{ name }, { allCharacters: name }] },
-            { $or: [
-              { scope: 'global' },
-              { scope: { $exists: false } },
-              ...(removeGuildId ? [{ scope: 'server', guildId: removeGuildId }] : []),
-            ] },
-          ],
-        })
-          .sort({ scope: -1 }) // prefer server > global
+        Blacklist.findOne(buildBlacklistQuery({ $or: [{ name }, { allCharacters: name }] }, removeGuildId))
+          .sort({ scope: -1 })
           .collation({ locale: 'en', strength: 2 })
           .lean(),
         Whitelist.findOne({
@@ -1162,22 +1154,11 @@ export function createListHandlers({ client }) {
     const collation = { locale: 'en', strength: 2 };
     const query = { $or: [{ name }, { allCharacters: name }] };
     const editGuildId = interaction.guild.id;
-    const editGuildConfig = await GuildConfig.findOne({ guildId: editGuildId }).lean();
+    const editGuildConfig = await getGuildConfig(editGuildId);
     const editGuildDefaultScope = editGuildConfig?.defaultBlacklistScope || 'global';
 
-    const blackQuery = {
-      $and: [
-        query,
-        { $or: [
-          { scope: 'global' },
-          { scope: { $exists: false } },
-          { scope: 'server', guildId: editGuildId },
-        ] },
-      ],
-    };
-
     const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
-      Blacklist.findOne(blackQuery).sort({ scope: -1 }).collation(collation),
+      Blacklist.findOne(buildBlacklistQuery(query, editGuildId)).sort({ scope: -1 }).collation(collation),
       Whitelist.findOne(query).collation(collation),
       Watchlist.findOne(query).collation(collation),
     ]);
@@ -1683,7 +1664,7 @@ export function createListHandlers({ client }) {
       let quickScope = 'global';
       if (type === 'black' && interaction.guild?.id) {
         await connectDB();
-        const gc = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+        const gc = await getGuildConfig(interaction.guild.id);
         quickScope = gc?.defaultBlacklistScope || 'global';
       }
 
@@ -1928,20 +1909,9 @@ export function createListHandlers({ client }) {
 
     // Block trust if character is currently blacklisted (scope-aware)
     const trustGuildId = interaction.guild?.id || '';
-    const isOwnerGuild = trustGuildId === config.ownerGuildId;
-    const nameMatch = { $or: [{ name }, { allCharacters: name }] };
-    const scopeFilter = isOwnerGuild
-      ? {}
-      : { $or: [
-          { scope: 'global' },
-          { scope: { $exists: false } },
-          ...(trustGuildId ? [{ scope: 'server', guildId: trustGuildId }] : []),
-        ] };
-    const blackQuery = Object.keys(scopeFilter).length > 0
-      ? { $and: [nameMatch, scopeFilter] }
-      : nameMatch;
-    const blacklisted = await Blacklist.findOne(blackQuery)
-      .collation({ locale: 'en', strength: 2 }).lean();
+    const blacklisted = await Blacklist.findOne(
+      buildBlacklistQuery({ $or: [{ name }, { allCharacters: name }] }, trustGuildId)
+    ).collation({ locale: 'en', strength: 2 }).lean();
     if (blacklisted) {
       await interaction.editReply({
         content: `⚠️ **${name}** is currently blacklisted (entry: **${blacklisted.name}**).\nRemove the blacklist entry first before trusting.`,
