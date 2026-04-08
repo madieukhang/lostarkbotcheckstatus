@@ -375,6 +375,56 @@ export async function checkNamesAgainstLists(names, options = {}) {
     }
   }
 
+  // Phase 3: Resolve trusted status via allCharacters (alt detection)
+  // Collect all roster names from list entries + cache to check against TrustedUser
+  const altNamesForTrustedCheck = new Set();
+  for (const item of results) {
+    if (item.trustedEntry) continue; // already matched exact
+    // From list entries' allCharacters
+    for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
+      if (entry?.allCharacters) {
+        for (const c of entry.allCharacters) altNamesForTrustedCheck.add(c);
+      }
+    }
+    // From roster cache
+    const cached = cacheMap.get(item.name.toLowerCase());
+    if (cached?.allCharacters) {
+      for (const c of cached.allCharacters) altNamesForTrustedCheck.add(c);
+    }
+  }
+
+  if (altNamesForTrustedCheck.size > 0) {
+    const altTrusted = await TrustedUser.find({ name: { $in: [...altNamesForTrustedCheck] } })
+      .collation(collation).lean();
+
+    if (altTrusted.length > 0) {
+      const altTrustedSet = new Map(altTrusted.map((t) => [t.name.toLowerCase(), t]));
+
+      for (const item of results) {
+        if (item.trustedEntry) continue;
+        // Check list entry allCharacters
+        for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
+          if (!entry?.allCharacters) continue;
+          for (const c of entry.allCharacters) {
+            const match = altTrustedSet.get(c.toLowerCase());
+            if (match) { item.trustedEntry = match; break; }
+          }
+          if (item.trustedEntry) break;
+        }
+        // Check roster cache allCharacters
+        if (!item.trustedEntry) {
+          const cached = cacheMap.get(item.name.toLowerCase());
+          if (cached?.allCharacters) {
+            for (const c of cached.allCharacters) {
+              const match = altTrustedSet.get(c.toLowerCase());
+              if (match) { item.trustedEntry = match; break; }
+            }
+          }
+        }
+      }
+    }
+  }
+
   return results;
 }
 
