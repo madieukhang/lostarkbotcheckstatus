@@ -435,13 +435,12 @@ export function createListHandlers({ client }) {
     const originGuildId = payload.guildId || '';
     const channelIds = new Set();
 
-    let hasAnyGuildConfig = false;
+    // Collect disabled guild IDs and DB-configured notify channels separately
+    const disabledGuildIds = new Set();
     try {
-      // Query ALL GuildConfigs (not just ones with notify channels)
-      // so opt-out guilds without notifychannel are still detected
       const guildConfigs = await GuildConfig.find({}).lean();
-      hasAnyGuildConfig = guildConfigs.length > 0;
       for (const gc of guildConfigs) {
+        if (gc.globalNotifyEnabled === false) disabledGuildIds.add(gc.guildId);
         if (gc.guildId === originGuildId) continue; // skip same server
         if (gc.globalNotifyEnabled === false) continue; // skip opted-out servers
         if (!gc.listNotifyChannelId) continue; // skip configs without notify channel
@@ -451,11 +450,19 @@ export function createListHandlers({ client }) {
       console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
     }
 
-    // Only use env var channels if no guild has used /lasetup at all
-    // (any GuildConfig existing = system is DB-managed, no env fallback)
-    if (channelIds.size === 0 && !hasAnyGuildConfig) {
-      for (const id of config.listNotifyChannelIds) {
-        channelIds.add(id);
+    // Env fallback: for guilds without DB notify channel configured.
+    // Fetch channel to check guild, skip origin and disabled guilds.
+    if (config.listNotifyChannelIds.length > 0) {
+      for (const envId of config.listNotifyChannelIds) {
+        if (channelIds.has(envId)) continue; // already added from DB
+        try {
+          const ch = await client.channels.fetch(envId);
+          if (!ch?.isTextBased()) continue;
+          const chGuildId = ch.guild?.id || '';
+          if (chGuildId === originGuildId) continue; // skip origin
+          if (disabledGuildIds.has(chGuildId)) continue; // skip opted-out
+          channelIds.add(envId);
+        } catch { /* channel not accessible */ }
       }
     }
 
