@@ -135,7 +135,7 @@ export async function handleRosterCommand(interaction) {
       }
 
       // No guild — show suggestions as before
-      const suggestions = await fetchNameSuggestions(name);
+      const suggestions = await fetchNameSuggestions(name) || [];
       const filtered = suggestions.filter((s) => s.itemLevel > 1700);
       if (filtered.length > 0) {
         const embed = new EmbedBuilder()

@@ -26,6 +26,11 @@ export async function handleSearchCommand(interaction) {
   try {
     let suggestions = await fetchNameSuggestions(name);
 
+    if (suggestions === null) {
+      await interaction.editReply({ content: `⚠️ lostark.bible is currently unavailable. Please try again later.` });
+      return;
+    }
+
     if (suggestions.length === 0) {
       await interaction.editReply({ content: `❌ No results found for **${name}**.` });
       return;
