@@ -88,6 +88,7 @@ export async function handleSearchCommand(interaction) {
       }
       return map;
     }
+    allBlack.sort((a, b) => (a.scope === 'server' ? 1 : 0) - (b.scope === 'server' ? 1 : 0));
     const blackMap = buildEntryMap(allBlack);
     const whiteMap = buildEntryMap(allWhite);
     const watchMap = buildEntryMap(allWatch);

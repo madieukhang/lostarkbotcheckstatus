@@ -253,6 +253,8 @@ export async function checkNamesAgainstLists(names, options = {}) {
     return map;
   }
 
+  // Sort blacklist: global first, server last → server overwrites in map (higher priority)
+  allBlack.sort((a, b) => (a.scope === 'server' ? 1 : 0) - (b.scope === 'server' ? 1 : 0));
   const blackMap = buildEntryMap(allBlack);
   const whiteMap = buildEntryMap(allWhite);
   const watchMap = buildEntryMap(allWatch);
