@@ -209,7 +209,7 @@ export function buildCommands() {
       .addSubcommand((sub) =>
         sub
           .setName('trust')
-          .setDescription('Manage trusted list — trusted characters cannot be blacklisted')
+          .setDescription('Manage trusted list — trusted characters cannot be added to any list')
           .addStringOption((opt) =>
             opt
               .setName('action')

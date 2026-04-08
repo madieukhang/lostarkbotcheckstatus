@@ -20,7 +20,7 @@ All notable changes to this project are documented here.
   - `/list trust action:add name [reason]` — add to trusted list (officer/senior only).
   - `/list trust action:remove name` — remove from trusted list.
   - `/list view trusted` — view all trusted users.
-  - Guard checks both exact name and roster alts before allowing blacklist add.
+  - Guard checks both exact name and roster alts — trusted users cannot be added to any list (blacklist, whitelist, or watchlist).
 - Added `GuildConfig.globalNotifyEnabled` field for per-guild notification toggle.
 - Added `TrustedUser` model with officer-only management.
 
