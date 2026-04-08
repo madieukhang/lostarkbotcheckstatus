@@ -1855,8 +1855,21 @@ export function createListHandlers({ client }) {
       addedByTag: interaction.user.tag,
     });
 
+    const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+    const embed = new EmbedBuilder()
+      .setTitle('🛡️ Trusted — Entry Added')
+      .addFields(
+        { name: 'Name', value: `[${name}](${rosterLink})`, inline: true },
+        { name: 'Reason', value: reason || 'N/A', inline: true },
+        { name: 'Added by', value: interaction.user.tag, inline: true },
+      )
+      .setColor(0x57d6a1)
+      .setFooter({ text: 'This character (and its alts) cannot be blacklisted' })
+      .setTimestamp(new Date());
+
     await interaction.editReply({
-      content: `🛡️ Added **${name}** to the trusted list.${reason ? `\nReason: ${reason}` : ''}\nThis character (and its alts) cannot be blacklisted.`,
+      content: `🛡️ Added **${name}** to the trusted list.`,
+      embeds: [embed],
     });
 
     console.log(`[list] Trusted user added: ${name} by ${interaction.user.tag}`);
@@ -1883,8 +1896,21 @@ export function createListHandlers({ client }) {
       return;
     }
 
+    const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(deleted.name)}/roster`;
+    const embed = new EmbedBuilder()
+      .setTitle('🛡️ Trusted — Entry Removed')
+      .addFields(
+        { name: 'Name', value: `[${deleted.name}](${rosterLink})`, inline: true },
+        { name: 'Was trusted for', value: deleted.reason || 'N/A', inline: true },
+        { name: 'Removed by', value: interaction.user.tag, inline: true },
+      )
+      .setColor(0xed4245)
+      .setFooter({ text: 'This character can now be blacklisted' })
+      .setTimestamp(new Date());
+
     await interaction.editReply({
       content: `🗑️ Removed **${deleted.name}** from the trusted list.`,
+      embeds: [embed],
     });
 
     console.log(`[list] Trusted user removed: ${deleted.name} by ${interaction.user.tag}`);
