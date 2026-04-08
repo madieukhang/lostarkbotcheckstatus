@@ -145,8 +145,6 @@ client.on('interactionCreate', async (interaction) => {
         await listHandlers.handleListViewCommand(interaction);
       } else if (subcommand === 'trust') {
         await listHandlers.handleListTrustCommand(interaction);
-      } else if (subcommand === 'untrust') {
-        await listHandlers.handleListUntrustCommand(interaction);
       }
     } else if (commandName === 'listcheck') {
       await listHandlers.handleListCheckCommand(interaction);
@@ -168,8 +166,7 @@ client.on('interactionCreate', async (interaction) => {
         '`/list edit name [reason] [type] [raid] [logs] [image]` — Edit an existing entry',
         '`/list remove name` — Remove an entry from a list',
         '`/list view type [scope]` — View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
-        '`/list trust name [reason]` — Add to trusted list (officer only, cannot be blacklisted)',
-        '`/list untrust name` — Remove from trusted list (officer only)',
+        '`/list trust action name [reason]` — Manage trusted list (add/remove, officer only)',
         '',
         '`/listcheck image` — Check names from screenshot against all lists',
         '',

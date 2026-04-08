@@ -209,29 +209,28 @@ export function buildCommands() {
       .addSubcommand((sub) =>
         sub
           .setName('trust')
-          .setDescription('Add a character to the trusted list (cannot be blacklisted)')
+          .setDescription('Manage trusted list — trusted characters cannot be blacklisted')
+          .addStringOption((opt) =>
+            opt
+              .setName('action')
+              .setDescription('Add or remove from trusted list')
+              .setRequired(true)
+              .addChoices(
+                { name: 'add', value: 'add' },
+                { name: 'remove', value: 'remove' }
+              )
+          )
           .addStringOption((opt) =>
             opt
               .setName('name')
-              .setDescription('Character name to trust')
+              .setDescription('Character name')
               .setRequired(true)
           )
           .addStringOption((opt) =>
             opt
               .setName('reason')
-              .setDescription('Reason for trust (e.g. "Guild officer")')
+              .setDescription('Reason for trust (only for add)')
               .setRequired(false)
-          )
-      )
-      .addSubcommand((sub) =>
-        sub
-          .setName('untrust')
-          .setDescription('Remove a character from the trusted list')
-          .addStringOption((opt) =>
-            opt
-              .setName('name')
-              .setDescription('Character name to untrust')
-              .setRequired(true)
           )
       ),
 
