@@ -440,9 +440,12 @@ export function createListHandlers({ client }) {
       if (config.ownerGuildId === originGuildId) return; // origin IS owner, already sees reply
       try {
         const ownerConfig = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
-        if (ownerConfig?.listNotifyChannelId && ownerConfig.globalNotifyEnabled !== false) {
+        // Respect owner's opt-out
+        if (ownerConfig?.globalNotifyEnabled === false) {
+          // owner opted out — no broadcast
+        } else if (ownerConfig?.listNotifyChannelId) {
           channelIds.add(ownerConfig.listNotifyChannelId);
-        } else if (!ownerConfig?.listNotifyChannelId) {
+        } else {
           // Env fallback: find env channel belonging to owner guild
           for (const envId of config.listNotifyChannelIds) {
             try {
