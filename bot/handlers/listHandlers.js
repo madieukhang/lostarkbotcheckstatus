@@ -52,6 +52,26 @@ function getListContext(type) {
   return { model: Whitelist, label: 'whitelist', color: 0x57f287, icon: '✅' };
 }
 
+/**
+ * Build a standardized embed for trusted user block messages.
+ */
+function buildTrustedBlockEmbed(name, reason, { via } = {}) {
+  const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+  const description = via
+    ? `**${name}** shares a roster with trusted user **${via}** and cannot be blacklisted.`
+    : `**${name}** is a trusted user and cannot be added to the blacklist.`;
+
+  return new EmbedBuilder()
+    .setTitle('🛡️ Trusted User — Blocked')
+    .setDescription(description)
+    .addFields(
+      { name: 'Name', value: `[${name}](${rosterLink})`, inline: true },
+      { name: 'Trust reason', value: reason || 'N/A', inline: true },
+    )
+    .setColor(0x57d6a1)
+    .setTimestamp(new Date());
+}
+
 function buildListAddApprovalEmbed(guild, payload, options = {}) {
   const title = options.title || 'List Add — Approval Required';
   const includeRequestedBy = options.includeRequestedBy ?? true;
@@ -224,8 +244,8 @@ export function createListHandlers({ client }) {
       if (trustedExact) {
         return {
           ok: false,
-          content: `🛡️ **${name}** is a trusted user and cannot be added to the blacklist.\nReason: ${trustedExact.reason || 'N/A'}`,
-          embeds: [],
+          content: `🛡️ **${name}** is a trusted user and cannot be blacklisted.`,
+          embeds: [buildTrustedBlockEmbed(name, trustedExact.reason)],
         };
       }
     }
@@ -279,8 +299,8 @@ export function createListHandlers({ client }) {
       if (trustedAlt) {
         return {
           ok: false,
-          content: `🛡️ **${name}** shares a roster with trusted user **${trustedAlt.name}** and cannot be blacklisted.`,
-          embeds: [],
+          content: `🛡️ **${name}** shares a roster with trusted user **${trustedAlt.name}**.`,
+          embeds: [buildTrustedBlockEmbed(name, trustedAlt.reason, { via: trustedAlt.name })],
         };
       }
     }
@@ -611,7 +631,8 @@ export function createListHandlers({ client }) {
             if (trustedNow) {
               await PendingApproval.deleteOne({ requestId });
               await interaction.editReply({
-                content: `🛡️ **${existingEntry.name}** is now a trusted user — cannot move to blacklist.`,
+                content: `🛡️ **${existingEntry.name}** is now a trusted user — blocked.`,
+                embeds: [buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason)],
                 components: [buildApprovalResultRow('Blocked')],
               });
               return;
@@ -1157,9 +1178,8 @@ export function createListHandlers({ client }) {
       if (trustedCheck) {
         const isSelf = trustedCheck.name.toLowerCase() === existing.name.toLowerCase();
         await interaction.editReply({
-          content: isSelf
-            ? `🛡️ **${existing.name}** is a trusted user and cannot be moved to the blacklist.`
-            : `🛡️ **${existing.name}** shares a roster with trusted user **${trustedCheck.name}** and cannot be blacklisted.`,
+          content: `🛡️ **${existing.name}** cannot be moved to the blacklist.`,
+          embeds: [buildTrustedBlockEmbed(existing.name, trustedCheck.reason, isSelf ? {} : { via: trustedCheck.name })],
         });
         return;
       }
