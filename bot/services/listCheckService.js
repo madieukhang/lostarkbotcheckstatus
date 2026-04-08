@@ -217,17 +217,22 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
   const collation = { locale: 'en', strength: 2 };
 
-  // Blacklist: include global + server-scoped entries for this guild
-  const blackQuery = {
-    $and: [
-      nameQuery,
-      { $or: [
-        { scope: 'global' },
-        { scope: { $exists: false } }, // backward compat for old entries
-        ...(guildId ? [{ scope: 'server', guildId }] : []),
-      ] },
-    ],
-  };
+  // Blacklist: scope-aware query
+  // Owner guild sees ALL entries (global + every server's local)
+  // Other guilds see global + own server entries only
+  const isOwnerGuild = guildId && guildId === config.ownerGuildId;
+  const blackQuery = isOwnerGuild
+    ? nameQuery // owner sees everything
+    : {
+        $and: [
+          nameQuery,
+          { $or: [
+            { scope: 'global' },
+            { scope: { $exists: false } },
+            ...(guildId ? [{ scope: 'server', guildId }] : []),
+          ] },
+        ],
+      };
 
   const [allBlack, allWhite, allWatch, allTrusted] = await Promise.all([
     Blacklist.find(blackQuery).collation(collation).lean(),
@@ -341,16 +346,18 @@ export async function checkNamesAgainstLists(names, options = {}) {
           // Compute flags per-request (scope-aware for blacklist)
           const simNames = candidateNames;
           const simQuery = { $or: [{ name: { $in: simNames } }, { allCharacters: { $in: simNames } }] };
-          const simBlackQuery = {
-            $and: [
-              simQuery,
-              { $or: [
-                { scope: 'global' },
-                { scope: { $exists: false } },
-                ...(guildId ? [{ scope: 'server', guildId }] : []),
-              ] },
-            ],
-          };
+          const simBlackQuery = isOwnerGuild
+            ? simQuery
+            : {
+                $and: [
+                  simQuery,
+                  { $or: [
+                    { scope: 'global' },
+                    { scope: { $exists: false } },
+                    ...(guildId ? [{ scope: 'server', guildId }] : []),
+                  ] },
+                ],
+              };
           const [simBlack, simWhite, simWatch] = await Promise.all([
             Blacklist.find(simBlackQuery).collation(collation).lean(),
             Whitelist.find(simQuery).collation(collation).lean(),
@@ -455,7 +462,7 @@ function formatResultLine(item) {
   const trustedTag = item.trustedEntry ? ' 🛡️' : '';
 
   if (isBlack) {
-    const scopeTag = item.blackEntry?.scope === 'server' ? ' `[S]`' : '';
+    const scopeTag = item.blackEntry?.scope === 'server' ? ' (Local)' : '';
     return { line: `⛔ **${item.name}**${scopeTag}${trustedTag}${reasonSuffix}`, priority: 0 };
   }
   if (isWatch) {
