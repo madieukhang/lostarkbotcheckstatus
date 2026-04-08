@@ -435,12 +435,14 @@ export function createListHandlers({ client }) {
     const originGuildId = payload.guildId || '';
     const channelIds = new Set();
 
-    // Collect disabled guild IDs and DB-configured notify channels separately
+    // Collect disabled guild IDs, DB-managed guild IDs, and notify channels
     const disabledGuildIds = new Set();
+    const dbNotifyGuildIds = new Set(); // guilds that have DB notify channel (env should not double-send)
     try {
       const guildConfigs = await GuildConfig.find({}).lean();
       for (const gc of guildConfigs) {
         if (gc.globalNotifyEnabled === false) disabledGuildIds.add(gc.guildId);
+        if (gc.listNotifyChannelId) dbNotifyGuildIds.add(gc.guildId);
         if (gc.guildId === originGuildId) continue; // skip same server
         if (gc.globalNotifyEnabled === false) continue; // skip opted-out servers
         if (!gc.listNotifyChannelId) continue; // skip configs without notify channel
@@ -451,7 +453,7 @@ export function createListHandlers({ client }) {
     }
 
     // Env fallback: for guilds without DB notify channel configured.
-    // Fetch channel to check guild, skip origin and disabled guilds.
+    // Skip origin, disabled, and guilds already using DB notify channel.
     if (config.listNotifyChannelIds.length > 0) {
       for (const envId of config.listNotifyChannelIds) {
         if (channelIds.has(envId)) continue; // already added from DB
@@ -461,6 +463,7 @@ export function createListHandlers({ client }) {
           const chGuildId = ch.guild?.id || '';
           if (chGuildId === originGuildId) continue; // skip origin
           if (disabledGuildIds.has(chGuildId)) continue; // skip opted-out
+          if (dbNotifyGuildIds.has(chGuildId)) continue; // skip guild already using DB channel
           channelIds.add(envId);
         } catch { /* channel not accessible */ }
       }
@@ -658,7 +661,7 @@ export function createListHandlers({ client }) {
             addedByTag: existingEntry.addedByTag,
             addedByDisplayName: existingEntry.addedByDisplayName,
             addedAt: existingEntry.addedAt,
-            ...(payload.type === 'black' ? { scope: payload.scope || existingEntry.scope || 'global', guildId: existingEntry.guildId || '' } : {}),
+            ...(payload.type === 'black' ? { scope: payload.scope || existingEntry.scope || 'server', guildId: (payload.scope || existingEntry.scope || 'server') === 'server' ? (payload.guildId || '') : '' } : {}),
           });
           await oldModel.deleteOne({ _id: existingEntry._id });
         } else {
@@ -1139,6 +1142,8 @@ export function createListHandlers({ client }) {
     const collation = { locale: 'en', strength: 2 };
     const query = { $or: [{ name }, { allCharacters: name }] };
     const editGuildId = interaction.guild.id;
+    const editGuildConfig = await GuildConfig.findOne({ guildId: editGuildId }).lean();
+    const editGuildDefaultScope = editGuildConfig?.defaultBlacklistScope || 'server';
 
     const blackQuery = {
       $and: [
@@ -1248,7 +1253,11 @@ export function createListHandlers({ client }) {
             addedByTag: existing.addedByTag,
             addedByDisplayName: existing.addedByDisplayName,
             addedAt: existing.addedAt,
-            ...(targetType === 'black' ? { scope: existingObj.scope || 'global', guildId: existingObj.guildId || '' } : {}),
+            ...(targetType === 'black' ? (() => {
+              // Resolve scope: keep existing if blacklist→blacklist, else use guild default
+              const moveScope = existingObj.scope || editGuildDefaultScope;
+              return { scope: moveScope, guildId: moveScope === 'server' ? editGuildId : '' };
+            })() : {}),
           });
           await oldModel.deleteOne({ _id: existing._id });
 
@@ -1301,7 +1310,7 @@ export function createListHandlers({ client }) {
         raid: newRaid || existing.raid,
         logsUrl: newLogs || existing.logsUrl || '',
         imageUrl: newImageUrl || existing.imageUrl || '',
-        scope: existingObj.scope || 'global', // preserve existing scope
+        scope: existingObj.scope || editGuildDefaultScope, // preserve existing scope, or use guild default
         requestedByUserId: interaction.user.id,
         requestedByTag: interaction.user.tag,
         requestedByName: interaction.user.username,
