@@ -6,6 +6,7 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import { getClassName } from '../../models/Class.js';
 import { getAddedByDisplay } from '../utils/names.js';
+import { buildBlacklistQuery } from '../utils/scope.js';
 
 /**
  * Smart fallback cache — remembers when direct fetch is blocked by Cloudflare.
@@ -157,18 +158,9 @@ export async function handleRosterBlackListCheck(names, options = {}) {
     await connectDB();
 
     const { guildId } = options;
-    const isOwnerGuild = guildId && guildId === config.ownerGuildId;
     const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
 
-    const blackQuery = isOwnerGuild
-      ? nameQuery
-      : { $and: [nameQuery, { $or: [
-          { scope: 'global' },
-          { scope: { $exists: false } },
-          ...(guildId ? [{ scope: 'server', guildId }] : []),
-        ] }] };
-
-    const entry = await Blacklist.findOne(blackQuery)
+    const entry = await Blacklist.findOne(buildBlacklistQuery(nameQuery, guildId))
       .sort({ scope: -1 }) // prefer server > global
       .collation({ locale: 'en', strength: 2 })
       .lean();

@@ -6,7 +6,7 @@ import {
 } from 'discord.js';
 
 import { connectDB } from '../../db.js';
-import config from '../../config.js';
+import { buildBlacklistQuery } from '../utils/scope.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
@@ -56,19 +56,11 @@ export async function handleSearchCommand(interaction) {
     await connectDB();
 
     const searchGuildId = interaction.guild?.id || '';
-    const isOwnerGuild = searchGuildId && searchGuildId === config.ownerGuildId;
     const sliced = suggestions.slice(0, 15);
     const allNames = sliced.map((s) => s.name);
     const collation = { locale: 'en', strength: 2 };
     const nameQuery = { $or: [{ name: { $in: allNames } }, { allCharacters: { $in: allNames } }] };
-
-    const blackQuery = isOwnerGuild
-      ? nameQuery
-      : { $and: [nameQuery, { $or: [
-          { scope: 'global' },
-          { scope: { $exists: false } },
-          ...(searchGuildId ? [{ scope: 'server', guildId: searchGuildId }] : []),
-        ] }] };
+    const blackQuery = buildBlacklistQuery(nameQuery, searchGuildId);
 
     const [allBlack, allWhite, allWatch, allTrusted] = await Promise.all([
       Blacklist.find(blackQuery).collation(collation).lean(),

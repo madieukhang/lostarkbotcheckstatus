@@ -6,6 +6,7 @@ virtualConsole.on('error', () => {});
 
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
+import { buildBlacklistQuery } from '../utils/scope.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import TrustedUser from '../../models/TrustedUser.js';
@@ -53,17 +54,9 @@ export async function handleRosterCommand(interaction) {
         // Step 2: Quick DB check — are any guild members already in the lists?
         await connectDB();
         const rosterGuildId = interaction.guild?.id || '';
-        const isOwnerGuild = rosterGuildId && rosterGuildId === config.ownerGuildId;
         const memberNameQuery = { $or: [{ name: { $in: memberNames } }, { allCharacters: { $in: memberNames } }] };
-        const guildBlackQuery = isOwnerGuild
-          ? memberNameQuery
-          : { $and: [memberNameQuery, { $or: [
-              { scope: 'global' },
-              { scope: { $exists: false } },
-              ...(rosterGuildId ? [{ scope: 'server', guildId: rosterGuildId }] : []),
-            ] }] };
         const [guildBlackHits, guildWhiteHits] = await Promise.all([
-          Blacklist.find(guildBlackQuery)
+          Blacklist.find(buildBlacklistQuery(memberNameQuery, rosterGuildId))
             .collation({ locale: 'en', strength: 2 })
             .lean(),
           Whitelist.find({
