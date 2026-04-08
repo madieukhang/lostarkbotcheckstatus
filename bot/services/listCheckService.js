@@ -465,7 +465,9 @@ function formatResultLine(item) {
     return { line: `✅ **${item.name}**${trustedTag}${reasonSuffix}`, priority: 2 };
   }
   if (item.trustedEntry) {
-    return { line: `🛡️ **${item.name}** — trusted`, priority: 2 };
+    const isVia = item.trustedEntry.name.toLowerCase() !== item.name.toLowerCase();
+    const via = isVia ? ` — via **${item.trustedEntry.name}**` : '';
+    return { line: `🛡️ **${item.name}**${via} — trusted`, priority: 2 };
   }
   if (item.hasRoster) {
     return { line: `❓ ${item.name}`, priority: 3 };
