@@ -18,6 +18,7 @@ import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import PendingApproval from '../../models/PendingApproval.js';
+import TrustedUser from '../../models/TrustedUser.js';
 import { getClassName } from '../../models/Class.js';
 import {
   buildRosterCharacters,
@@ -72,7 +73,9 @@ function buildListAddApprovalEmbed(guild, payload, options = {}) {
 
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(`A new list add request was submitted in **${guild.name}**.`)
+    .setDescription(payload.action === 'edit'
+      ? `A list edit request was submitted in **${guild.name}**.`
+      : `A new list add request was submitted in **${guild.name}**.`)
     .addFields(fields)
     .setColor(payload.type === 'black' ? 0xed4245 : 0x57f287)
     .setTimestamp(new Date());
@@ -138,7 +141,7 @@ function buildApprovalProcessingRow(action) {
 
 export function createListHandlers({ client }) {
 
-  async function sendListAddApprovalToApprovers(guild, payload) {
+  async function sendListAddApprovalToApprovers(guild, payload, options = {}) {
     const approverIds = getApproverRecipientIds();
     if (approverIds.length === 0) {
       return { success: false, reason: 'No approver user IDs configured. Set SENIOR_APPROVER_IDS or OFFICER_APPROVER_IDS in env.' };
@@ -155,7 +158,7 @@ export function createListHandlers({ client }) {
         .setStyle(ButtonStyle.Danger)
     );
 
-    const embed = buildListAddApprovalEmbed(guild, payload);
+    const embed = buildListAddApprovalEmbed(guild, payload, options);
     const deliveredApproverIds = [];
     const deliveredDmMessages = [];
 
@@ -214,6 +217,19 @@ export function createListHandlers({ client }) {
     const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
     const name = normalizeCharacterName(payload.name);
 
+    // Step 0: Trusted user guard (exact name check — fast, before roster fetch)
+    if (payload.type === 'black') {
+      const trustedExact = await TrustedUser.findOne({ name })
+        .collation({ locale: 'en', strength: 2 }).lean();
+      if (trustedExact) {
+        return {
+          ok: false,
+          content: `🛡️ **${name}** is a trusted user and cannot be added to the blacklist.\nReason: ${trustedExact.reason || 'N/A'}`,
+          embeds: [],
+        };
+      }
+    }
+
     // Step 1: Check if character exists
     const { hasValidRoster, allCharacters, targetItemLevel } = await buildRosterCharacters(name);
     if (!hasValidRoster) {
@@ -256,29 +272,61 @@ export function createListHandlers({ client }) {
       };
     }
 
-    // Step 3: Check if already in list
+    // Step 2b: Trusted user guard (alt check — after roster gives us allCharacters)
+    if (payload.type === 'black' && allCharacters.length > 0) {
+      const trustedAlt = await TrustedUser.findOne({ name: { $in: allCharacters } })
+        .collation({ locale: 'en', strength: 2 }).lean();
+      if (trustedAlt) {
+        return {
+          ok: false,
+          content: `🛡️ **${name}** shares a roster with trusted user **${trustedAlt.name}** and cannot be blacklisted.`,
+          embeds: [],
+        };
+      }
+    }
+
+    // Step 3: Check if already in list (scope-aware for blacklist)
     await connectDB();
 
-    const existed = await model.findOne({
-      $or: [{ name }, { allCharacters: name }],
-    })
+    const entryScope = payload.scope || 'global';
+    const entryGuildId = entryScope === 'server' ? (payload.guildId || '') : '';
+
+    let dupeQuery;
+    if (payload.type === 'black') {
+      // For blacklist: check global + this server's entries (avoid redundant adds)
+      dupeQuery = {
+        $and: [
+          { $or: [{ name }, { allCharacters: name }] },
+          { $or: [
+            { scope: 'global' },
+            { scope: { $exists: false } }, // backward compat: old entries without scope
+            ...(entryGuildId ? [{ scope: 'server', guildId: entryGuildId }] : []),
+          ] },
+        ],
+      };
+    } else {
+      dupeQuery = { $or: [{ name }, { allCharacters: name }] };
+    }
+
+    const existed = await model.findOne(dupeQuery)
       .collation({ locale: 'en', strength: 2 })
       .lean();
 
     if (existed) {
       const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
       const via = isRosterMatch ? ` (roster match: **${existed.name}** is already in ${label})` : '';
+      const scopeNote = existed.scope === 'server' ? ' [Server]' : '';
       return {
         ok: false,
         isDuplicate: true,
         existingEntry: existed,
-        content: `⚠️ **${name}** already exists in ${label}.${via}`,
+        content: `⚠️ **${name}** already exists in ${label}.${via}${scopeNote}`,
         embeds: [],
       };
     }
 
     // Step 4: Create entry
-    const entry = await model.create({
+    const createData = {
       name,
       reason: payload.reason,
       raid: payload.raid,
@@ -289,7 +337,15 @@ export function createListHandlers({ client }) {
       addedByTag: payload.requestedByTag,
       addedByName: payload.requestedByName,
       addedByDisplayName: payload.requestedByDisplayName,
-    });
+    };
+
+    // Add scope fields for blacklist entries
+    if (payload.type === 'black') {
+      createData.scope = entryScope;
+      createData.guildId = entryGuildId;
+    }
+
+    const entry = await model.create(createData);
 
     // Build result embed with character links
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
@@ -302,8 +358,9 @@ export function createListHandlers({ client }) {
       ? allCharacters.join(', ')
       : allCharacters.slice(0, 6).join(', ') + ` +${allCharacters.length - 6} more`;
 
+    const scopeTag = (payload.type === 'black' && entryScope === 'server') ? ' [Server]' : '';
     const embed = new EmbedBuilder()
-      .setTitle(`${labelCap} — Entry Added`)
+      .setTitle(`${labelCap}${scopeTag} — Entry Added`)
       .addFields(
         { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: payload.reason || 'N/A', inline: true },
@@ -318,14 +375,16 @@ export function createListHandlers({ client }) {
       embed.setImage(payload.imageUrl);
     }
 
-    // Broadcast to all notification channels (fire-and-forget)
-    broadcastListChange('added', entry, payload).catch((err) =>
-      console.warn('[list] Broadcast failed:', err.message)
-    );
+    // Broadcast only global entries — server-scoped entries stay private
+    if (entryScope !== 'server') {
+      broadcastListChange('added', entry, payload).catch((err) =>
+        console.warn('[list] Broadcast failed:', err.message)
+      );
+    }
 
     return {
       ok: true,
-      content: `${icon} Added **${entry.name}** to ${label}.`,
+      content: `${icon} Added **${entry.name}** to ${label}.${scopeTag ? ' *(server only)*' : ''}`,
       embeds: [embed],
     };
   }
@@ -356,18 +415,25 @@ export function createListHandlers({ client }) {
     const originGuildId = payload.guildId || '';
     const channelIds = new Set();
 
+    let hasAnyGuildConfig = false;
     try {
-      const guildConfigs = await GuildConfig.find({ listNotifyChannelId: { $ne: '' } }).lean();
+      // Query ALL GuildConfigs (not just ones with notify channels)
+      // so opt-out guilds without notifychannel are still detected
+      const guildConfigs = await GuildConfig.find({}).lean();
+      hasAnyGuildConfig = guildConfigs.length > 0;
       for (const gc of guildConfigs) {
         if (gc.guildId === originGuildId) continue; // skip same server
+        if (gc.globalNotifyEnabled === false) continue; // skip opted-out servers
+        if (!gc.listNotifyChannelId) continue; // skip configs without notify channel
         channelIds.add(gc.listNotifyChannelId);
       }
     } catch (err) {
       console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
     }
 
-    // Only use env var channels if NO guild has configured via /lasetup
-    if (channelIds.size === 0) {
+    // Only use env var channels if no guild has used /lasetup at all
+    // (any GuildConfig existing = system is DB-managed, no env fallback)
+    if (channelIds.size === 0 && !hasAnyGuildConfig) {
       for (const id of config.listNotifyChannelIds) {
         channelIds.add(id);
       }
@@ -396,8 +462,9 @@ export function createListHandlers({ client }) {
 
       if (!channel || !channel.isTextBased()) return;
 
+      const actionLabel = payload.action === 'edit' ? 'edit' : 'add';
       const decisionContent = rejected
-        ? `<@${payload.requestedByUserId}> ❌ Your list add request for **${payload.name}** was rejected by Officer.`
+        ? `<@${payload.requestedByUserId}> ❌ Your list ${actionLabel} request for **${payload.name}** was rejected by Officer.`
         : `<@${payload.requestedByUserId}> ${result.content}`;
 
       const decisionPayload = {
@@ -496,6 +563,113 @@ export function createListHandlers({ client }) {
     }
 
     try {
+      // Edit approval — update/move existing entry by _id (not add new)
+      if (payload.action === 'edit' && payload.existingEntryId) {
+        const { model: oldModel } = getListContext(payload.currentType || payload.type);
+        const { model: newModel, label: newLabel, icon: newIcon } = getListContext(payload.type);
+        const isTypeChange = payload.currentType && payload.currentType !== payload.type;
+
+        const existingEntry = await oldModel.findById(payload.existingEntryId);
+        if (!existingEntry) {
+          await PendingApproval.deleteOne({ requestId });
+          await interaction.editReply({
+            content: `⚠️ Original entry no longer exists — it may have been removed.`,
+            components: [buildApprovalResultRow('Failed')],
+          });
+          return;
+        }
+
+        if (isTypeChange) {
+          // Preflight: scope-aware duplicate check on target list
+          const nameMatch = { $or: [{ name: existingEntry.name }, { allCharacters: existingEntry.name }] };
+          let preflightQuery;
+          if (payload.type === 'black') {
+            preflightQuery = { $and: [nameMatch, { $or: [
+              { scope: 'global' },
+              { scope: { $exists: false } },
+              { scope: 'server', guildId: payload.guildId || '' },
+            ] }] };
+          } else {
+            preflightQuery = nameMatch;
+          }
+          const targetDupe = await newModel.findOne(preflightQuery)
+            .collation({ locale: 'en', strength: 2 }).lean();
+          if (targetDupe) {
+            await PendingApproval.deleteOne({ requestId });
+            await interaction.editReply({
+              content: `⚠️ **${existingEntry.name}** already exists in target list. Edit aborted.`,
+              components: [buildApprovalResultRow('Failed')],
+            });
+            return;
+          }
+
+          // Recheck trusted guard at approval time (status may have changed)
+          if (payload.type === 'black') {
+            const trustedNow = await TrustedUser.findOne({
+              $or: [{ name: existingEntry.name }, ...(existingEntry.allCharacters?.length > 0 ? [{ name: { $in: existingEntry.allCharacters } }] : [])],
+            }).collation({ locale: 'en', strength: 2 }).lean();
+            if (trustedNow) {
+              await PendingApproval.deleteOne({ requestId });
+              await interaction.editReply({
+                content: `🛡️ **${existingEntry.name}** is now a trusted user — cannot move to blacklist.`,
+                components: [buildApprovalResultRow('Blocked')],
+              });
+              return;
+            }
+          }
+
+          // Create first, then delete old (safe order — if create fails, old preserved)
+          await newModel.create({
+            name: existingEntry.name,
+            reason: payload.reason || existingEntry.reason,
+            raid: payload.raid || existingEntry.raid,
+            logsUrl: payload.logsUrl || existingEntry.logsUrl,
+            imageUrl: payload.imageUrl || existingEntry.imageUrl,
+            allCharacters: existingEntry.allCharacters || [],
+            addedByUserId: existingEntry.addedByUserId,
+            addedByTag: existingEntry.addedByTag,
+            addedByDisplayName: existingEntry.addedByDisplayName,
+            addedAt: existingEntry.addedAt,
+            ...(payload.type === 'black' ? { scope: payload.scope || existingEntry.scope || 'global', guildId: existingEntry.guildId || '' } : {}),
+          });
+          await oldModel.deleteOne({ _id: existingEntry._id });
+        } else {
+          const updateFields = {};
+          if (payload.reason && payload.reason !== existingEntry.reason) updateFields.reason = payload.reason;
+          if (payload.raid && payload.raid !== existingEntry.raid) updateFields.raid = payload.raid;
+          if (payload.logsUrl && payload.logsUrl !== existingEntry.logsUrl) updateFields.logsUrl = payload.logsUrl;
+          if (payload.imageUrl && payload.imageUrl !== existingEntry.imageUrl) updateFields.imageUrl = payload.imageUrl;
+          if (Object.keys(updateFields).length > 0) {
+            await oldModel.updateOne({ _id: existingEntry._id }, { $set: updateFields });
+          }
+        }
+
+        // Broadcast only if entry is global-scoped
+        const entryScope = existingEntry.scope || payload.scope || 'global';
+        if (entryScope !== 'server') {
+          broadcastListChange('edited', { ...existingEntry.toObject?.() || existingEntry, reason: payload.reason || existingEntry.reason, raid: payload.raid || existingEntry.raid }, {
+            type: payload.type,
+            guildId: payload.guildId,
+            requestedByDisplayName: payload.requestedByDisplayName,
+            requestedByTag: payload.requestedByTag,
+          }).catch(() => {});
+        }
+
+        await PendingApproval.deleteOne({ requestId });
+        const editResult = { ok: true, content: `✅ Edit approved: **${existingEntry.name}**${isTypeChange ? ` moved to ${newLabel}` : ' updated'}.` };
+
+        await interaction.editReply({
+          content: `✅ Edit approved by **${interaction.user.tag}**.`,
+          components: [buildApprovalResultRow('Approved')],
+        });
+        await syncApproverDmMessages(payload, {
+          content: `✅ Edit approved by **${interaction.user.tag}**.`,
+          components: [buildApprovalResultRow('Approved')],
+        }, { excludeMessageId: interaction.message.id });
+        await notifyRequesterAboutDecision(payload, editResult, false);
+        return;
+      }
+
       const result = await executeListAddToDatabase(payload);
 
       // Duplicate found — show comparison and overwrite option
@@ -503,11 +677,19 @@ export function createListHandlers({ client }) {
         const existing = result.existingEntry;
         const { label } = getListContext(payload.type);
 
+        // Save duplicate entry _id for scope-safe deletion during overwrite
+        await PendingApproval.updateOne(
+          { requestId },
+          { $set: { duplicateEntryId: String(existing._id) } }
+        );
+
+        const existingScopeTag = existing.scope === 'server' ? ' [Server]' : ' [Global]';
+        const requestScopeTag = payload.scope === 'server' ? ' [Server]' : ' [Global]';
         const compareEmbed = new EmbedBuilder()
           .setTitle('⚠️ Duplicate Found — Compare')
           .addFields(
-            { name: '📌 Existing Entry', value: `**${existing.name}**\nReason: ${existing.reason || 'N/A'}\nRaid: ${existing.raid || 'N/A'}\nAdded: <t:${Math.floor(new Date(existing.addedAt || 0).getTime() / 1000)}:R>`, inline: true },
-            { name: '🆕 New Request', value: `**${payload.name}**\nReason: ${payload.reason || 'N/A'}\nRaid: ${payload.raid || 'N/A'}\nBy: ${payload.requestedByDisplayName || 'Unknown'}`, inline: true },
+            { name: `📌 Existing Entry${existingScopeTag}`, value: `**${existing.name}**\nReason: ${existing.reason || 'N/A'}\nRaid: ${existing.raid || 'N/A'}\nAdded: <t:${Math.floor(new Date(existing.addedAt || 0).getTime() / 1000)}:R>`, inline: true },
+            { name: `🆕 New Request${requestScopeTag}`, value: `**${payload.name}**\nReason: ${payload.reason || 'N/A'}\nRaid: ${payload.raid || 'N/A'}\nBy: ${payload.requestedByDisplayName || 'Unknown'}`, inline: true },
           )
           .setColor(0xfee75c);
 
@@ -613,7 +795,7 @@ export function createListHandlers({ client }) {
     const limitedNames = names.slice(0, 8);
 
     try {
-      const results = await checkNamesAgainstLists(limitedNames);
+      const results = await checkNamesAgainstLists(limitedNames, { guildId: interaction.guild?.id });
       const lines = formatCheckResults(results);
 
       const sections = [
@@ -670,6 +852,7 @@ export function createListHandlers({ client }) {
     const raid = interaction.options.getString('raid') ?? '';
     const logs = interaction.options.getString('logs') ?? '';
     const image = interaction.options.getAttachment('image');
+    const scope = interaction.options.getString('scope') || 'global';
     const name = normalizeCharacterName(rawName);
 
     await interaction.deferReply();
@@ -707,6 +890,7 @@ export function createListHandlers({ client }) {
         raid,
         logsUrl: logs,
         imageUrl: image?.url ?? '',
+        scope: type === 'black' ? scope : 'global', // scope only applies to blacklist
         requestedByUserId: interaction.user.id,
         requestedByTag: interaction.user.tag,
         requestedByName: interaction.user.username,
@@ -773,9 +957,17 @@ export function createListHandlers({ client }) {
     try {
       await connectDB();
 
+      const removeGuildId = interaction.guild?.id || '';
       const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
         Blacklist.findOne({
-          $or: [{ name }, { allCharacters: name }],
+          $and: [
+            { $or: [{ name }, { allCharacters: name }] },
+            { $or: [
+              { scope: 'global' },
+              { scope: { $exists: false } },
+              ...(removeGuildId ? [{ scope: 'server', guildId: removeGuildId }] : []),
+            ] },
+          ],
         })
           .collation({ locale: 'en', strength: 2 })
           .lean(),
@@ -817,14 +1009,18 @@ export function createListHandlers({ client }) {
 
         await model.deleteOne({ _id: entry._id });
 
-        broadcastListChange('removed', entry, {
-          type,
-          guildId: interaction.guild?.id || '',
-          requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
-          requestedByTag: interaction.user.tag,
-        }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
+        // Only broadcast global removals (server-scoped stay private)
+        if (entry.scope !== 'server') {
+          broadcastListChange('removed', entry, {
+            type,
+            guildId: interaction.guild?.id || '',
+            requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+            requestedByTag: interaction.user.tag,
+          }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
+        }
 
-        return `${icon} Removed **${entry.name}** from ${label}.`;
+        const scopeNote = entry.scope === 'server' ? ' *(server only)*' : '';
+        return `${icon} Removed **${entry.name}** from ${label}.${scopeNote}`;
       };
 
       // Single entry — remove directly
@@ -902,12 +1098,24 @@ export function createListHandlers({ client }) {
     await interaction.deferReply();
     await connectDB();
 
-    // Find existing entry across all lists
+    // Find existing entry across all lists (scope-aware for blacklist)
     const collation = { locale: 'en', strength: 2 };
     const query = { $or: [{ name }, { allCharacters: name }] };
+    const editGuildId = interaction.guild.id;
+
+    const blackQuery = {
+      $and: [
+        query,
+        { $or: [
+          { scope: 'global' },
+          { scope: { $exists: false } },
+          { scope: 'server', guildId: editGuildId },
+        ] },
+      ],
+    };
 
     const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
-      Blacklist.findOne(query).collation(collation),
+      Blacklist.findOne(blackQuery).collation(collation),
       Whitelist.findOne(query).collation(collation),
       Watchlist.findOne(query).collation(collation),
     ]);
@@ -938,6 +1146,25 @@ export function createListHandlers({ client }) {
     if (newLogs) changes.push(`Logs: updated`);
     if (newImageUrl) changes.push(`Evidence: updated`);
 
+    // Trusted user guard: block moving to blacklist if target is trusted
+    if (targetType === 'black' && currentType !== 'black') {
+      const trustedCheck = await TrustedUser.findOne({
+        $or: [
+          { name: existing.name },
+          ...(existing.allCharacters?.length > 0 ? [{ name: { $in: existing.allCharacters } }] : []),
+        ],
+      }).collation({ locale: 'en', strength: 2 }).lean();
+      if (trustedCheck) {
+        const isSelf = trustedCheck.name.toLowerCase() === existing.name.toLowerCase();
+        await interaction.editReply({
+          content: isSelf
+            ? `🛡️ **${existing.name}** is a trusted user and cannot be moved to the blacklist.`
+            : `🛡️ **${existing.name}** shares a roster with trusted user **${trustedCheck.name}** and cannot be blacklisted.`,
+        });
+        return;
+      }
+    }
+
     // Check ownership: same person → apply now, different → approval
     const isOwner = existing.addedByUserId === interaction.user.id;
     const isApprover = isRequesterAutoApprover(interaction.user.id);
@@ -946,12 +1173,34 @@ export function createListHandlers({ client }) {
       // Apply edit immediately
       try {
         if (isTypeChange) {
-          // Move to different list: delete from old, create in new
+          // Move to different list: preflight duplicate check, then delete old + create new
           const { model: oldModel } = getListContext(currentType);
           const { model: newModel, label: newLabel, icon: newIcon } = getListContext(targetType);
 
-          await oldModel.deleteOne({ _id: existing._id });
+          // Preflight: scope-aware duplicate check on target list
+          const nameMatch = { $or: [{ name: existing.name }, { allCharacters: existing.name }] };
+          let preflightQuery;
+          if (targetType === 'black') {
+            // Blacklist: only check global + own server entries (same as /list add)
+            preflightQuery = { $and: [nameMatch, { $or: [
+              { scope: 'global' },
+              { scope: { $exists: false } },
+              { scope: 'server', guildId: editGuildId },
+            ] }] };
+          } else {
+            preflightQuery = nameMatch;
+          }
+          const targetDupe = await newModel.findOne(preflightQuery)
+            .collation({ locale: 'en', strength: 2 }).lean();
+          if (targetDupe) {
+            await interaction.editReply({
+              content: `⚠️ **${existing.name}** already exists in ${newLabel}. Remove it first before moving.`,
+            });
+            return;
+          }
 
+          // Safe to move: create first, then delete old (if create fails, old entry preserved)
+          const existingObj = existing.toObject?.() || existing;
           await newModel.create({
             name: existing.name,
             reason: newReason || existing.reason,
@@ -963,7 +1212,9 @@ export function createListHandlers({ client }) {
             addedByTag: existing.addedByTag,
             addedByDisplayName: existing.addedByDisplayName,
             addedAt: existing.addedAt,
+            ...(targetType === 'black' ? { scope: existingObj.scope || 'global', guildId: existingObj.guildId || '' } : {}),
           });
+          await oldModel.deleteOne({ _id: existing._id });
 
           await interaction.editReply({
             content: `✅ **${existing.name}** edited and moved to ${newLabel}.\n${changes.map((c) => `• ${c}`).join('\n')}`,
@@ -984,9 +1235,10 @@ export function createListHandlers({ client }) {
           });
         }
 
-        // Only broadcast if editor is NOT the original owner (owner editing own entry = no alert needed)
-        if (!isOwner) {
-          broadcastListChange('edited', { ...existing.toObject?.() || existing, reason: newReason || existing.reason, raid: newRaid || existing.raid }, {
+        // Only broadcast if editor is NOT the original owner AND entry is not server-scoped
+        const entryObj = existing.toObject?.() || existing;
+        if (!isOwner && entryObj.scope !== 'server') {
+          broadcastListChange('edited', { ...entryObj, reason: newReason || existing.reason, raid: newRaid || existing.raid }, {
             type: targetType,
             guildId: interaction.guild.id,
             requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
@@ -999,8 +1251,12 @@ export function createListHandlers({ client }) {
       }
     } else {
       // Not owner, not approver → send approval request
+      const existingObj = existing.toObject?.() || existing;
       const payload = {
         requestId: randomUUID(),
+        action: 'edit',
+        existingEntryId: String(existingObj._id),
+        currentType,
         guildId: interaction.guild.id,
         channelId: interaction.channelId,
         type: targetType,
@@ -1009,6 +1265,7 @@ export function createListHandlers({ client }) {
         raid: newRaid || existing.raid,
         logsUrl: newLogs || existing.logsUrl || '',
         imageUrl: newImageUrl || existing.imageUrl || '',
+        scope: existingObj.scope || 'global', // preserve existing scope
         requestedByUserId: interaction.user.id,
         requestedByTag: interaction.user.tag,
         requestedByName: interaction.user.username,
@@ -1038,7 +1295,13 @@ export function createListHandlers({ client }) {
   }
 
   async function handleListViewCommand(interaction) {
+    if (!interaction.guild) {
+      await interaction.reply({ content: '❌ This command can only be used in a server.', ephemeral: true });
+      return;
+    }
+
     const type = interaction.options.getString('type', true);
+    const scopeFilter = interaction.options.getString('scope') || '';
     const ITEMS_PER_PAGE = 10;
 
     await interaction.deferReply();
@@ -1046,12 +1309,73 @@ export function createListHandlers({ client }) {
     try {
       await connectDB();
 
-      const types = type === 'all' ? ['black', 'white', 'watch'] : [type];
+      // Handle trusted list separately (different model/schema)
+      if (type === 'trusted') {
+        const trustedEntries = await TrustedUser.find({}).sort({ addedAt: -1 }).lean();
+        if (trustedEntries.length === 0) {
+          await interaction.editReply({ content: '🛡️ Trusted list is empty.' });
+          return;
+        }
+
+        const lines = trustedEntries.map((e, i) => {
+          const parts = [`🛡️ **${e.name}**`];
+          if (e.reason) parts.push(e.reason);
+          const date = e.addedAt ? `<t:${Math.floor(new Date(e.addedAt).getTime() / 1000)}:R>` : '';
+          if (date) parts.push(date);
+          return `${i + 1}. ${parts.join(' — ')}`;
+        });
+
+        const embed = new EmbedBuilder()
+          .setTitle(`🛡️ Trusted Users (${trustedEntries.length})`)
+          .setDescription(lines.join('\n'))
+          .setColor(0x57d6a1)
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        return;
+      }
+
+      // When scope filter is set, only include blacklist (scope only applies to blacklist)
+      let types;
+      if (scopeFilter && type === 'all') {
+        types = ['black'];
+      } else {
+        types = type === 'all' ? ['black', 'white', 'watch'] : [type];
+      }
       const allEntries = [];
+      const viewGuildId = interaction.guild.id;
+      const isOwnerGuild = viewGuildId === config.ownerGuildId;
 
       for (const t of types) {
         const { model, label, color, icon } = getListContext(t);
-        const entries = await model.find({}).sort({ addedAt: -1 }).lean();
+
+        // Blacklist: scope-aware query depending on who's viewing
+        let query = {};
+        if (t === 'black' && viewGuildId) {
+          if (isOwnerGuild && (!scopeFilter || scopeFilter === 'all')) {
+            // Owner server, no filter or "all" → see everything
+            query = {};
+          } else if (scopeFilter === 'global') {
+            query = { $or: [{ scope: 'global' }, { scope: { $exists: false } }] };
+          } else if (scopeFilter === 'server') {
+            if (isOwnerGuild) {
+              // Owner sees all server-scoped entries
+              query = { scope: 'server' };
+            } else {
+              // Other servers see only their own
+              query = { scope: 'server', guildId: viewGuildId };
+            }
+          } else {
+            // Default for non-owner: global + own server entries
+            query = { $or: [
+              { scope: 'global' },
+              { scope: { $exists: false } },
+              { scope: 'server', guildId: viewGuildId },
+            ] };
+          }
+        }
+
+        const entries = await model.find(query).sort({ addedAt: -1 }).lean();
         for (const e of entries) {
           allEntries.push({ ...e, _listType: t, _label: label, _color: color, _icon: icon });
         }
@@ -1065,6 +1389,22 @@ export function createListHandlers({ client }) {
       // Sort all entries by addedAt (newest first)
       allEntries.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0));
 
+      // Resolve guild names for server-scoped entries (owner view shows which server)
+      const guildNameCache = new Map();
+      if (isOwnerGuild) {
+        const serverGuildIds = [...new Set(
+          allEntries.filter((e) => e.scope === 'server' && e.guildId).map((e) => e.guildId)
+        )];
+        await Promise.all(serverGuildIds.map(async (gid) => {
+          try {
+            const guild = await client.guilds.fetch(gid);
+            guildNameCache.set(gid, guild.name);
+          } catch {
+            guildNameCache.set(gid, gid); // fallback to ID if can't resolve
+          }
+        }));
+      }
+
       const totalPages = Math.ceil(allEntries.length / ITEMS_PER_PAGE);
       let currentPage = 0;
 
@@ -1073,12 +1413,21 @@ export function createListHandlers({ client }) {
         const pageEntries = allEntries.slice(start, start + ITEMS_PER_PAGE);
 
         const lines = pageEntries.map((e, i) => {
-          const parts = [`${e._icon} **${e.name}**`];
+          let scopeLabel = '';
+          if (e.scope === 'server') {
+            if (isOwnerGuild && e.guildId) {
+              const gName = guildNameCache.get(e.guildId) || e.guildId;
+              scopeLabel = ` \`[S:${gName}]\``;
+            } else {
+              scopeLabel = ' `[S]`';
+            }
+          }
+          const parts = [`${e._icon} **${e.name}**${scopeLabel}`];
           if (e.reason) parts.push(e.reason);
           if (e.raid) parts.push(`[${e.raid}]`);
           const date = e.addedAt ? `<t:${Math.floor(new Date(e.addedAt).getTime() / 1000)}:R>` : '';
           if (date) parts.push(date);
-          if (e.imageUrl) parts.push('📎');
+          if (e.imageUrl) parts.push(`[📎](${e.imageUrl})`);
           return `${start + i + 1}. ${parts.join(' — ')}`;
         });
 
@@ -1275,6 +1624,7 @@ export function createListHandlers({ client }) {
         raid,
         logsUrl: '',
         imageUrl: '',
+        scope: 'global', // Quick Add defaults to global scope
         requestedByUserId: interaction.user.id,
         requestedByTag: interaction.user.tag,
         requestedByName: interaction.user.username,
@@ -1355,40 +1705,91 @@ export function createListHandlers({ client }) {
       return;
     }
 
-    // Overwrite: delete old entry first
+    // Overwrite: update existing entry in-place (safe — no delete-then-add risk)
     try {
-      const { model } = getListContext(payload.type);
-      const name = normalizeCharacterName(payload.name);
+      const { model, label, icon } = getListContext(payload.type);
 
-      await model.deleteOne({
-        $or: [{ name }, { allCharacters: name }],
-      });
-      console.log(`[list] Overwrite: deleted old ${payload.type} entry for ${name}`);
+      // Find the duplicate entry to update
+      let dupeEntry;
+      if (payload.duplicateEntryId) {
+        dupeEntry = await model.findById(payload.duplicateEntryId);
+      }
+      if (!dupeEntry) {
+        // Fallback: scope-aware find
+        const name = normalizeCharacterName(payload.name);
+        const nameMatch = { $or: [{ name }, { allCharacters: name }] };
+        if (payload.type === 'black') {
+          const entryScope = payload.scope || 'global';
+          const scopeMatch = entryScope === 'server'
+            ? { scope: 'server', guildId: payload.guildId || '' }
+            : { $or: [{ scope: 'global' }, { scope: { $exists: false } }] };
+          dupeEntry = await model.findOne({ $and: [nameMatch, scopeMatch] }).collation({ locale: 'en', strength: 2 });
+        } else {
+          dupeEntry = await model.findOne(nameMatch).collation({ locale: 'en', strength: 2 });
+        }
+      }
 
-      // Now add fresh
-      const result = await executeListAddToDatabase(payload);
+      if (!dupeEntry) {
+        await interaction.editReply({
+          content: '⚠️ Original entry no longer exists — it may have been removed.',
+          embeds: [],
+          components: [buildApprovalResultRow('Failed')],
+        });
+        return;
+      }
 
+      // Update in-place: overwrite fields + refresh roster for new canonical name
+      const newName = normalizeCharacterName(payload.name);
+      const rosterResult = await buildRosterCharacters(newName).catch(() => null);
+
+      dupeEntry.name = newName;
+      // Only update roster if fetch succeeded — preserve old snapshot on failure
+      if (rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0) {
+        dupeEntry.allCharacters = rosterResult.allCharacters;
+      }
+      dupeEntry.reason = payload.reason || dupeEntry.reason;
+      dupeEntry.raid = payload.raid || dupeEntry.raid;
+      dupeEntry.logsUrl = payload.logsUrl || dupeEntry.logsUrl;
+      dupeEntry.imageUrl = payload.imageUrl || dupeEntry.imageUrl;
+      // Preserve existing scope — overwrite should not change global↔server
+      // (scope is a structural property, not metadata)
+      dupeEntry.addedByUserId = payload.requestedByUserId;
+      dupeEntry.addedByTag = payload.requestedByTag;
+      dupeEntry.addedByName = payload.requestedByName;
+      dupeEntry.addedByDisplayName = payload.requestedByDisplayName;
+      dupeEntry.addedAt = new Date();
+      await dupeEntry.save();
+
+      console.log(`[list] Overwrite: updated ${payload.type} entry for ${dupeEntry.name} in-place`);
+
+      const resultMsg = `✅ Overwritten by **${interaction.user.tag}**. Entry updated.`;
       await interaction.editReply({
-        content: result.ok
-          ? `✅ Overwritten by **${interaction.user.tag}**. Old entry replaced.`
-          : `⚠️ Overwrite attempted but: ${result.content}`,
+        content: resultMsg,
         embeds: [],
-        components: [buildApprovalResultRow(result.ok ? 'Overwritten' : 'Failed')],
+        components: [buildApprovalResultRow('Overwritten')],
       });
 
       await syncApproverDmMessages(
         payload,
         {
-          content: result.ok
-            ? `✅ Overwritten by **${interaction.user.tag}**. Old entry replaced.`
-            : `⚠️ Overwrite attempted but: ${result.content}`,
+          content: resultMsg,
           embeds: [],
-          components: [buildApprovalResultRow(result.ok ? 'Overwritten' : 'Failed')],
+          components: [buildApprovalResultRow('Overwritten')],
         },
         { excludeMessageId: interaction.message.id }
       );
 
-      await notifyRequesterAboutDecision(payload, result, false);
+      // Broadcast overwrite (only global-scoped)
+      if (dupeEntry.scope !== 'server') {
+        broadcastListChange('edited', dupeEntry, {
+          type: payload.type,
+          guildId: payload.guildId,
+          requestedByDisplayName: payload.requestedByDisplayName,
+          requestedByTag: payload.requestedByTag,
+        }).catch(() => {});
+      }
+
+      await notifyRequesterAboutDecision(payload, { ok: true, content: resultMsg }, false);
     } catch (err) {
       console.error('[list] Overwrite failed:', err.message);
       await interaction.editReply({
@@ -1399,12 +1800,104 @@ export function createListHandlers({ client }) {
     }
   }
 
+  // ─── Trusted user management ──────────────────────────────────────────────
+
+  async function handleListTrustCommand(interaction) {
+    const userId = interaction.user.id;
+    const isOfficerOrSenior = OFFICER_APPROVER_IDS.includes(userId) || SENIOR_APPROVER_IDS.includes(userId);
+
+    if (!isOfficerOrSenior) {
+      await interaction.reply({ content: '❌ Only officers and seniors can manage the trusted list.', ephemeral: true });
+      return;
+    }
+
+    const rawName = interaction.options.getString('name', true);
+    const name = normalizeCharacterName(rawName);
+    const reason = interaction.options.getString('reason') || '';
+
+    await interaction.deferReply();
+    await connectDB();
+
+    const existing = await TrustedUser.findOne({ name }).collation({ locale: 'en', strength: 2 });
+    if (existing) {
+      await interaction.editReply({ content: `⚠️ **${existing.name}** is already in the trusted list.` });
+      return;
+    }
+
+    // Block trust if character is currently blacklisted (scope-aware)
+    const trustGuildId = interaction.guild?.id || '';
+    const isOwnerGuild = trustGuildId === config.ownerGuildId;
+    const nameMatch = { $or: [{ name }, { allCharacters: name }] };
+    // Owner guild sees all scopes; other guilds see global + own server
+    const scopeFilter = isOwnerGuild
+      ? {} // owner can see all
+      : { $or: [
+          { scope: 'global' },
+          { scope: { $exists: false } },
+          ...(trustGuildId ? [{ scope: 'server', guildId: trustGuildId }] : []),
+        ] };
+    const blackQuery = Object.keys(scopeFilter).length > 0
+      ? { $and: [nameMatch, scopeFilter] }
+      : nameMatch;
+    const blacklisted = await Blacklist.findOne(blackQuery)
+      .collation({ locale: 'en', strength: 2 }).lean();
+    if (blacklisted) {
+      await interaction.editReply({
+        content: `⚠️ **${name}** is currently blacklisted (entry: **${blacklisted.name}**).\nRemove the blacklist entry first before trusting.`,
+      });
+      return;
+    }
+
+    await TrustedUser.create({
+      name,
+      reason,
+      addedByUserId: userId,
+      addedByTag: interaction.user.tag,
+    });
+
+    await interaction.editReply({
+      content: `🛡️ Added **${name}** to the trusted list.${reason ? `\nReason: ${reason}` : ''}\nThis character (and its alts) cannot be blacklisted.`,
+    });
+
+    console.log(`[list] Trusted user added: ${name} by ${interaction.user.tag}`);
+  }
+
+  async function handleListUntrustCommand(interaction) {
+    const userId = interaction.user.id;
+    const isOfficerOrSenior = OFFICER_APPROVER_IDS.includes(userId) || SENIOR_APPROVER_IDS.includes(userId);
+
+    if (!isOfficerOrSenior) {
+      await interaction.reply({ content: '❌ Only officers and seniors can manage the trusted list.', ephemeral: true });
+      return;
+    }
+
+    const rawName = interaction.options.getString('name', true);
+    const name = normalizeCharacterName(rawName);
+
+    await interaction.deferReply();
+    await connectDB();
+
+    const deleted = await TrustedUser.findOneAndDelete({ name }).collation({ locale: 'en', strength: 2 });
+    if (!deleted) {
+      await interaction.editReply({ content: `⚠️ **${name}** is not in the trusted list.` });
+      return;
+    }
+
+    await interaction.editReply({
+      content: `🗑️ Removed **${deleted.name}** from the trusted list.`,
+    });
+
+    console.log(`[list] Trusted user removed: ${deleted.name} by ${interaction.user.tag}`);
+  }
+
   return {
     handleListCheckCommand,
     handleListAddCommand,
     handleListEditCommand,
     handleListRemoveCommand,
     handleListViewCommand,
+    handleListTrustCommand,
+    handleListUntrustCommand,
     handleListAddApprovalButton,
     handleListAddOverwriteButton,
     handleQuickAddSelect,

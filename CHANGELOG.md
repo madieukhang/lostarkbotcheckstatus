@@ -2,6 +2,44 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.0] - 2026-04-08
+
+### Added
+
+- **Server vs Global blacklist**: Blacklist entries now have `scope` field — `global` (shared across all servers) or `server` (per-guild only). Server-scoped entries are not broadcast to other servers.
+  - `/list add` has new `scope` option (global/server) for blacklist entries.
+  - `/list view` has new `scope` filter (all/global/server) — owner server can view all server-scoped entries from every guild with `[S:ServerName]` labels; other servers only see their own.
+  - `OWNER_GUILD_ID` env var identifies the owner/admin server.
+  - Auto-check, roster, and search all scope-aware.
+  - `Blacklist.syncIndexes()` on startup to migrate from old `name`-only index to compound `{name, scope, guildId}` index.
+- **`/lasetup off`**: Toggle global list notifications on/off per server (replaces `/lasetup reset`). Running again re-enables. `/lasetup notifychannel` auto-enables. `/lasetup view` shows 🔔/🔕 status.
+- **Show raid info in auto-check**: When a name is flagged, the raid tag from the entry is now displayed in auto-check results (e.g. `⛔ Name — reason — [G6 Aegir]`).
+- **Clickable evidence 📎**: Evidence icon in `/list view` is now a clickable markdown link that opens the image directly.
+- **Trusted user list**: New `TrustedUser` model — trusted characters cannot be added to the blacklist.
+  - `/list trust name [reason]` — add to trusted list (officer/senior only).
+  - `/list untrust name` — remove from trusted list.
+  - `/list view trusted` — view all trusted users.
+  - Guard checks both exact name and roster alts before allowing blacklist add.
+- Added `GuildConfig.globalNotifyEnabled` field for per-guild notification toggle.
+- Added `TrustedUser` model with officer-only management.
+
+### Changed
+
+- `/lasetup reset` replaced by `/lasetup off` (toggle notifications instead of deleting config).
+- Blacklist model now has `scope` (global/server) and `guildId` fields with compound unique index.
+- All blacklist queries (list check, roster, search, view, edit, remove) are scope-aware.
+- Server-scoped blacklist entries are not broadcast to other servers.
+- Owner guild can view all server-scoped entries from every guild with server name labels.
+- `/list view` scope filter available for blacklist type.
+- All slash commands now have `setDMPermission(false)` — bot commands are hidden in DMs.
+- `PendingApproval` schema expanded: `scope`, `logsUrl`, `action`, `existingEntryId`, `currentType`, `duplicateEntryId` to preserve full context through approval flow.
+- Edit approval uses separate path from add — updates entry by `_id`, preserves scope.
+- Overwrite duplicate is now update-in-place (no delete-then-add risk). Preserves scope, refreshes roster only on valid fetch, shows `[Global]`/`[Server]` scope labels in compare embed.
+- Move list uses create-before-delete order with preflight scope-aware duplicate check.
+- Trusted guard rechecked at approval time; `/list trust` blocks if character already blacklisted (scope-aware).
+- Similar-name cache stores candidate names only — flags recomputed per-request for scope safety.
+- Broadcast query reads all GuildConfigs for opt-out detection (not just notify-configured ones).
+
 ## [v0.4.0] - 2026-03-28
 
 ### Added

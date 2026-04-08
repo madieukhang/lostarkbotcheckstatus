@@ -48,10 +48,21 @@ export async function handleSearchCommand(interaction) {
 
     await connectDB();
 
+    const searchGuildId = interaction.guild?.id || '';
     const results = await Promise.all(
       suggestions.slice(0, 15).map(async (s) => {
+        const blackQuery = {
+          $and: [
+            { $or: [{ name: s.name }, { allCharacters: s.name }] },
+            { $or: [
+              { scope: 'global' },
+              { scope: { $exists: false } },
+              ...(searchGuildId ? [{ scope: 'server', guildId: searchGuildId }] : []),
+            ] },
+          ],
+        };
         const [black, white, watch] = await Promise.all([
-          Blacklist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
+          Blacklist.findOne(blackQuery)
             .collation({ locale: 'en', strength: 2 }).lean(),
           Whitelist.findOne({ $or: [{ name: s.name }, { allCharacters: s.name }] })
             .collation({ locale: 'en', strength: 2 }).lean(),

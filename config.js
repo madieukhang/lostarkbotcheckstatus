@@ -93,6 +93,9 @@ const config = {
     .map((s) => s.trim())
     .filter(Boolean),
 
+  /** Owner guild ID — this server can view all server-scoped blacklist entries from every guild */
+  ownerGuildId: (process.env.OWNER_GUILD_ID || '').trim(),
+
   /** Optional Gemini API key for image-based /listcheck name extraction */
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
 

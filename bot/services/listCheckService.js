@@ -203,15 +203,33 @@ export async function extractNamesFromImage(image) {
  * @param {string[]} names
  * @returns {Promise<Array<object>>} Results with list entries, roster status, similar names
  */
-export async function checkNamesAgainstLists(names) {
+/**
+ * @param {string[]} names
+ * @param {object} [options]
+ * @param {string} [options.guildId] - Guild ID for including server-scoped blacklist entries
+ */
+export async function checkNamesAgainstLists(names, options = {}) {
   await connectDB();
+  const { guildId } = options;
 
   // Phase 1: Batch list check — 3 queries for ALL names instead of 3 × N
   const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
   const collation = { locale: 'en', strength: 2 };
 
+  // Blacklist: include global + server-scoped entries for this guild
+  const blackQuery = {
+    $and: [
+      nameQuery,
+      { $or: [
+        { scope: 'global' },
+        { scope: { $exists: false } }, // backward compat for old entries
+        ...(guildId ? [{ scope: 'server', guildId }] : []),
+      ] },
+    ],
+  };
+
   const [allBlack, allWhite, allWatch] = await Promise.all([
-    Blacklist.find(nameQuery).collation(collation).lean(),
+    Blacklist.find(blackQuery).collation(collation).lean(),
     Whitelist.find(nameQuery).collation(collation).lean(),
     Watchlist.find(nameQuery).collation(collation).lean(),
   ]);
@@ -289,20 +307,46 @@ export async function checkNamesAgainstLists(names) {
     }
 
     // Search for similar names when no roster found (e.g. diacritics mismatch)
-    // Skip if already loaded from cache
-    if (!item.hasRoster && !item.similarNames) {
+    // Cache stores candidate names only (no flags) — flags recomputed per-request for scope safety
+    if (!item.hasRoster) {
       try {
-        const suggestions = await fetchNameSuggestions(item.name);
-        const similarCandidates = suggestions
-          .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== item.name.toLowerCase())
-          .slice(0, 3);
+        // Load candidate names from cache or fetch fresh
+        let candidateNames = cached?.searchSuggestions?.length > 0
+          ? cached.searchSuggestions.map((s) => s.name)
+          : null;
 
-        if (similarCandidates.length > 0) {
-          // Batch list check for all suggestion candidates — 3 queries instead of 3 × N
-          const simNames = similarCandidates.map((s) => s.name);
+        if (!candidateNames) {
+          const suggestions = await fetchNameSuggestions(item.name);
+          const similarCandidates = suggestions
+            .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== item.name.toLowerCase())
+            .slice(0, 3);
+          candidateNames = similarCandidates.map((s) => s.name);
+
+          // Cache candidate names only (flags are scope-dependent, not cacheable)
+          if (candidateNames.length > 0) {
+            RosterCache.findOneAndUpdate(
+              { name: item.name },
+              { $set: { searchSuggestions: candidateNames.map((n) => ({ name: n, flag: '' })) } },
+            ).catch(() => {});
+          }
+        }
+
+        if (candidateNames.length > 0) {
+          // Compute flags per-request (scope-aware for blacklist)
+          const simNames = candidateNames;
           const simQuery = { $or: [{ name: { $in: simNames } }, { allCharacters: { $in: simNames } }] };
+          const simBlackQuery = {
+            $and: [
+              simQuery,
+              { $or: [
+                { scope: 'global' },
+                { scope: { $exists: false } },
+                ...(guildId ? [{ scope: 'server', guildId }] : []),
+              ] },
+            ],
+          };
           const [simBlack, simWhite, simWatch] = await Promise.all([
-            Blacklist.find(simQuery).collation(collation).lean(),
+            Blacklist.find(simBlackQuery).collation(collation).lean(),
             Whitelist.find(simQuery).collation(collation).lean(),
             Watchlist.find(simQuery).collation(collation).lean(),
           ]);
@@ -311,21 +355,15 @@ export async function checkNamesAgainstLists(names) {
           const simWhiteMap = buildEntryMap(simWhite);
           const simWatchMap = buildEntryMap(simWatch);
 
-          item.similarNames = similarCandidates.map((s) => {
-            const lower = s.name.toLowerCase();
+          item.similarNames = candidateNames.map((name) => {
+            const lower = name.toLowerCase();
             let flag = '';
             if (simBlackMap.has(lower)) flag += '⛔';
             if (simWhiteMap.has(lower)) flag += '✅';
             if (simWatchMap.has(lower)) flag += '⚠️';
             if (!flag) flag = '❓';
-            return { name: s.name, flag };
+            return { name, flag };
           });
-
-          // Save suggestions to cache
-          RosterCache.findOneAndUpdate(
-            { name: item.name },
-            { $set: { searchSuggestions: item.similarNames } },
-          ).catch(() => {});
         }
       } catch (err) {
         console.warn(`[listcheck] Similar name search failed for ${item.name}:`, err.message);
@@ -355,13 +393,15 @@ function formatResultLine(item) {
     const details = [];
     if (isRosterMatch) details.push(`via **${entry.name}**`);
     if (entry.reason?.trim()) details.push(entry.reason.trim());
+    if (entry.raid?.trim()) details.push(`[${entry.raid.trim()}]`);
     if (details.length > 0) reasonParts.push(details.join(' — '));
   }
 
   const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
 
   if (isBlack) {
-    return { line: `⛔ **${item.name}**${reasonSuffix}`, priority: 0 };
+    const scopeTag = item.blackEntry?.scope === 'server' ? ' `[S]`' : '';
+    return { line: `⛔ **${item.name}**${scopeTag}${reasonSuffix}`, priority: 0 };
   }
   if (isWatch) {
     return { line: `⚠️ **${item.name}**${reasonSuffix}`, priority: 1 };

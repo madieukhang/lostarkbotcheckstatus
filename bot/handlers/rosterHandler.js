@@ -50,11 +50,16 @@ export async function handleRosterCommand(interaction) {
 
         // Step 2: Quick DB check — are any guild members already in the lists?
         await connectDB();
+        const rosterGuildId = interaction.guild?.id || '';
         const [guildBlackHits, guildWhiteHits] = await Promise.all([
           Blacklist.find({
-            $or: [
-              { name: { $in: memberNames } },
-              { allCharacters: { $in: memberNames } },
+            $and: [
+              { $or: [{ name: { $in: memberNames } }, { allCharacters: { $in: memberNames } }] },
+              { $or: [
+                { scope: 'global' },
+                { scope: { $exists: false } },
+                ...(rosterGuildId ? [{ scope: 'server', guildId: rosterGuildId }] : []),
+              ] },
             ],
           })
             .collation({ locale: 'en', strength: 2 })
@@ -220,7 +225,7 @@ export async function handleRosterCommand(interaction) {
       .map((c) => c.name);
 
     const [blacklistResult, whitelistResult] = await Promise.all([
-      handleRosterBlackListCheck(charNames),
+      handleRosterBlackListCheck(charNames, { guildId: interaction.guild?.id }),
       handleRosterWhiteListCheck(charNames),
     ]);
 

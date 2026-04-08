@@ -106,7 +106,7 @@ export function setupAutoCheck(client) {
         content: `🔍 Extracted **${limitedNames.length}** name(s) — checking lists & roster...`,
       });
 
-      const results = await checkNamesAgainstLists(limitedNames);
+      const results = await checkNamesAgainstLists(limitedNames, { guildId: message.guild.id });
       const lines = formatCheckResults(results);
 
       const content = [

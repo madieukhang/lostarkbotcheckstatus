@@ -143,6 +143,7 @@ async function handleSetupNotifyChannel(interaction) {
     {
       $set: {
         listNotifyChannelId: channel.id,
+        globalNotifyEnabled: true, // auto re-enable when setting a notify channel
         updatedByUserId: interaction.user.id,
         updatedByTag: interaction.user.tag,
       },
@@ -164,34 +165,41 @@ async function handleSetupNotifyChannel(interaction) {
 }
 
 /**
- * Handle /lasetup reset
+ * Handle /lasetup off — toggle global notifications on/off
  */
-async function handleSetupReset(interaction) {
+async function handleSetupOff(interaction) {
   await interaction.deferReply({ ephemeral: true });
   await connectDB();
 
-  const deleted = await GuildConfig.findOneAndDelete({ guildId: interaction.guild.id });
+  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id });
 
-  if (!deleted) {
+  // Current state (default true if no config exists)
+  const currentlyEnabled = existing?.globalNotifyEnabled ?? true;
+  const newState = !currentlyEnabled;
+
+  await GuildConfig.findOneAndUpdate(
+    { guildId: interaction.guild.id },
+    {
+      $set: {
+        globalNotifyEnabled: newState,
+        updatedByUserId: interaction.user.id,
+        updatedByTag: interaction.user.tag,
+      },
+    },
+    { upsert: true, returnDocument: 'after' }
+  );
+
+  if (newState) {
     await interaction.editReply({
-      content: '⚠️ No configuration found for this server. Nothing to reset.',
+      content: '🔔 Global list notifications **enabled** for this server.\nYou will receive broadcast notifications when entries are added/removed/edited on other servers.',
     });
-    return;
+  } else {
+    await interaction.editReply({
+      content: '🔕 Global list notifications **disabled** for this server.\nYou will no longer receive broadcast notifications from other servers.\n\nRun `/lasetup off` again or `/lasetup notifychannel #channel` to re-enable.',
+    });
   }
 
-  const parts = [];
-  if (deleted.autoCheckChannelId) parts.push(`📸 Auto-check: <#${deleted.autoCheckChannelId}>`);
-  if (deleted.listNotifyChannelId) parts.push(`🔔 Notification: <#${deleted.listNotifyChannelId}>`);
-
-  const fallbackNote = config.autoCheckChannelIds.length > 0 || config.listNotifyChannelIds.length > 0
-    ? '\n\nBot will fall back to global env var channels (if configured).'
-    : '';
-
-  await interaction.editReply({
-    content: `🗑️ Configuration reset. Removed:\n${parts.join('\n')}${fallbackNote}`,
-  });
-
-  console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) config reset by ${interaction.user.tag}`);
+  console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) globalNotify → ${newState ? 'ON' : 'OFF'} by ${interaction.user.tag}`);
 }
 
 /**
@@ -234,6 +242,14 @@ async function handleSetupView(interaction) {
     lines.push('  → *Not configured*');
   }
 
+  // Global notification status
+  const notifyEnabled = guildConfig?.globalNotifyEnabled ?? true;
+  lines.push('');
+  lines.push(`**📡 Global notifications:** ${notifyEnabled ? '🔔 Enabled' : '🔕 Disabled'}`);
+  if (!notifyEnabled) {
+    lines.push('  → *This server will not receive broadcast notifications from other servers*');
+  }
+
   if (guildConfig?.updatedAt) {
     lines.push('');
     lines.push(`Last updated: <t:${Math.floor(new Date(guildConfig.updatedAt).getTime() / 1000)}:R> by ${guildConfig.updatedByTag || 'Unknown'}`);
@@ -263,8 +279,8 @@ export async function handleSetupCommand(interaction) {
     await handleSetupAutoChannel(interaction);
   } else if (subcommand === 'notifychannel') {
     await handleSetupNotifyChannel(interaction);
-  } else if (subcommand === 'reset') {
-    await handleSetupReset(interaction);
+  } else if (subcommand === 'off') {
+    await handleSetupOff(interaction);
   } else if (subcommand === 'view') {
     await handleSetupView(interaction);
   }
