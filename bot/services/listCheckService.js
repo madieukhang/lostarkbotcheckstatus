@@ -322,7 +322,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
           : null;
 
         if (!candidateNames) {
-          const suggestions = await fetchNameSuggestions(item.name);
+          const suggestions = await fetchNameSuggestions(item.name) || [];
           const similarCandidates = suggestions
             .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== item.name.toLowerCase())
             .slice(0, 3);

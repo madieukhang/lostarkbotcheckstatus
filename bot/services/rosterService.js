@@ -59,12 +59,19 @@ export function extractRosterClassMapFromHtml(html) {
   return rosterClassMap;
 }
 
+/**
+ * Search for similar character names via lostark.bible API.
+ * @returns {Array|null} Array of suggestions, or null on API error (403/network)
+ */
 export async function fetchNameSuggestions(name) {
   try {
     const payload = Buffer.from(JSON.stringify([{"name":1,"region":2}, name, 'NA'])).toString('base64');
     const targetUrl = `https://lostark.bible/_app/remote/ngsbie/search?payload=${encodeURIComponent(payload)}`;
     const res = await fetchWithFallback(targetUrl);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn(`[search] lostark.bible search API returned HTTP ${res.status} for "${name}"`);
+      return null; // API error — distinct from "no results"
+    }
 
     const json = await res.json();
     if (json.type !== 'result' || !json.result) return [];
@@ -86,8 +93,9 @@ export async function fetchNameSuggestions(name) {
         };
       })
       .filter(Boolean);
-  } catch {
-    return [];
+  } catch (err) {
+    console.warn(`[search] fetchNameSuggestions error for "${name}":`, err.message);
+    return null; // network/parse error
   }
 }
 

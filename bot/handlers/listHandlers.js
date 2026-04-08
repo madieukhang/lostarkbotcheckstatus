@@ -253,7 +253,7 @@ export function createListHandlers({ client }) {
     // Step 1: Check if character exists
     const { hasValidRoster, allCharacters, targetItemLevel } = await buildRosterCharacters(name);
     if (!hasValidRoster) {
-      const suggestions = await fetchNameSuggestions(name);
+      const suggestions = await fetchNameSuggestions(name) || [];
       if (suggestions.length > 0) {
         const suggestionLines = suggestions
           .slice(0, 10)
