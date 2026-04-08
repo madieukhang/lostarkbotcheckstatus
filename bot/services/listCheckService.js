@@ -247,7 +247,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
     for (const e of entries) {
       map.set(e.name.toLowerCase(), e);
       for (const c of (e.allCharacters || [])) {
-        if (!map.has(c.toLowerCase())) map.set(c.toLowerCase(), e);
+        const lower = c.toLowerCase();
+        // Allow overwrite if: key new, or current entry is server-scoped (higher priority)
+        if (!map.has(lower) || e.scope === 'server') map.set(lower, e);
       }
     }
     return map;
