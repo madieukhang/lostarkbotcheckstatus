@@ -7,6 +7,7 @@ virtualConsole.on('error', () => {});
 import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
+import TrustedUser from '../../models/TrustedUser.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import {
   FETCH_HEADERS,
@@ -224,21 +225,27 @@ export async function handleRosterCommand(interaction) {
       .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1700)
       .map((c) => c.name);
 
-    const [blacklistResult, whitelistResult] = await Promise.all([
+    const [blacklistResult, whitelistResult, trustedResult] = await Promise.all([
       handleRosterBlackListCheck(charNames, { guildId: interaction.guild?.id }),
       handleRosterWhiteListCheck(charNames),
+      TrustedUser.findOne({ name: { $in: charNames } }).collation({ locale: 'en', strength: 2 }).lean(),
     ]);
 
+    const embedColor = blacklistResult ? 0xed4245 : whitelistResult ? 0x57f287 : trustedResult ? 0x57d6a1 : 0x5865f2;
     const embed = new EmbedBuilder()
       .setTitle(`Roster – ${name}`)
       .setURL(targetUrl)
       .setDescription(description)
-      .setColor(blacklistResult ? 0xed4245 : whitelistResult ? 0x57f287 : 0x5865f2)
+      .setColor(embedColor)
       .setFooter({ text: `${characters.length} character(s) · lostark.bible` })
       .setTimestamp();
 
     const embeds = [embed];
     const contentLines = [];
+
+    if (trustedResult) {
+      contentLines.push(`🛡️ **${trustedResult.name}** is a trusted user.${trustedResult.reason ? ` — *${trustedResult.reason}*` : ''}`);
+    }
 
     if (blacklistResult) {
       const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';

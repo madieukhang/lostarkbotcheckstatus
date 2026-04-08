@@ -10,6 +10,7 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import RosterCache from '../../models/RosterCache.js';
+import TrustedUser from '../../models/TrustedUser.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
@@ -228,10 +229,11 @@ export async function checkNamesAgainstLists(names, options = {}) {
     ],
   };
 
-  const [allBlack, allWhite, allWatch] = await Promise.all([
+  const [allBlack, allWhite, allWatch, allTrusted] = await Promise.all([
     Blacklist.find(blackQuery).collation(collation).lean(),
     Whitelist.find(nameQuery).collation(collation).lean(),
     Watchlist.find(nameQuery).collation(collation).lean(),
+    TrustedUser.find({ name: { $in: names } }).collation(collation).lean(),
   ]);
 
   // Build O(1) lookup maps from list entries (once per list, not per name)
@@ -249,12 +251,14 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const blackMap = buildEntryMap(allBlack);
   const whiteMap = buildEntryMap(allWhite);
   const watchMap = buildEntryMap(allWatch);
+  const trustedMap = new Map(allTrusted.map((t) => [t.name.toLowerCase(), t]));
 
   const results = names.map((name) => ({
     name,
     blackEntry: blackMap.get(name.toLowerCase()) || null,
     whiteEntry: whiteMap.get(name.toLowerCase()) || null,
     watchEntry: watchMap.get(name.toLowerCase()) || null,
+    trustedEntry: trustedMap.get(name.toLowerCase()) || null,
     hasRoster: false,
     failReason: null,
     similarNames: null,
@@ -399,15 +403,21 @@ function formatResultLine(item) {
 
   const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
 
+  // Trusted indicator (shown alongside other flags)
+  const trustedTag = item.trustedEntry ? ' 🛡️' : '';
+
   if (isBlack) {
     const scopeTag = item.blackEntry?.scope === 'server' ? ' `[S]`' : '';
-    return { line: `⛔ **${item.name}**${scopeTag}${reasonSuffix}`, priority: 0 };
+    return { line: `⛔ **${item.name}**${scopeTag}${trustedTag}${reasonSuffix}`, priority: 0 };
   }
   if (isWatch) {
-    return { line: `⚠️ **${item.name}**${reasonSuffix}`, priority: 1 };
+    return { line: `⚠️ **${item.name}**${trustedTag}${reasonSuffix}`, priority: 1 };
   }
   if (isWhite) {
-    return { line: `✅ **${item.name}**${reasonSuffix}`, priority: 2 };
+    return { line: `✅ **${item.name}**${trustedTag}${reasonSuffix}`, priority: 2 };
+  }
+  if (item.trustedEntry) {
+    return { line: `🛡️ **${item.name}** — trusted`, priority: 2 };
   }
   if (item.hasRoster) {
     return { line: `❓ ${item.name}`, priority: 3 };
@@ -435,11 +445,11 @@ export function formatCheckResults(results) {
   formatted.sort((a, b) => a.priority - b.priority);
 
   // Count by category
-  const counts = { black: 0, watch: 0, white: 0, clean: 0, noRoster: 0 };
+  const counts = { black: 0, watch: 0, white: 0, trusted: 0, clean: 0, noRoster: 0 };
   for (const f of formatted) {
     if (f.priority === 0) counts.black++;
     else if (f.priority === 1) counts.watch++;
-    else if (f.priority === 2) counts.white++;
+    else if (f.priority === 2) { if (f.item?.trustedEntry && !f.item?.whiteEntry) counts.trusted++; else counts.white++; }
     else if (f.priority === 3) counts.clean++;
     else counts.noRoster++;
   }
@@ -449,6 +459,7 @@ export function formatCheckResults(results) {
   if (counts.black) summaryParts.push(`⛔ ${counts.black}`);
   if (counts.watch) summaryParts.push(`⚠️ ${counts.watch}`);
   if (counts.white) summaryParts.push(`✅ ${counts.white}`);
+  if (counts.trusted) summaryParts.push(`🛡️ ${counts.trusted}`);
   if (counts.clean) summaryParts.push(`❓ ${counts.clean}`);
   if (counts.noRoster) summaryParts.push(`⚪ ${counts.noRoster}`);
 
