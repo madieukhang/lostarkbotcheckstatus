@@ -1212,8 +1212,12 @@ export function createListHandlers({ client }) {
     const isOwner = existing.addedByUserId === interaction.user.id;
     const isApprover = isRequesterAutoApprover(interaction.user.id);
     const existingObj = existing.toObject?.() || existing;
-    const editScope = existingObj.scope || editGuildDefaultScope;
-    const isLocalScope = editScope === 'server';
+    // Local auto-approve only for blacklist entries that are server-scoped,
+    // or edits moving to blacklist where target scope is server.
+    // White/watch have no scope — never auto-approve via this rule.
+    const isBlacklistLocal = currentType === 'black' && existingObj.scope === 'server';
+    const isMovingToLocalBlack = isTypeChange && targetType === 'black' && editGuildDefaultScope === 'server';
+    const isLocalScope = isBlacklistLocal || isMovingToLocalBlack;
 
     if (isOwner || isApprover || isLocalScope) {
       // Apply edit immediately
@@ -1939,7 +1943,7 @@ export function createListHandlers({ client }) {
         { name: 'Added by', value: interaction.user.tag, inline: true },
       )
       .setColor(0x57d6a1)
-      .setFooter({ text: 'This character (and its alts) cannot be blacklisted' })
+      .setFooter({ text: 'This character (and its alts) cannot be added to any list' })
       .setTimestamp(new Date());
 
     await interaction.editReply({

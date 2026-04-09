@@ -79,7 +79,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | ✅ | Whitelisted |
 | ⚠️ | Watchlist (under investigation) |
 | ❓ | Not in any list, roster exists |
-| 🛡️ | Trusted user (cannot be blacklisted) |
+| 🛡️ | Trusted user (cannot be added to any list) |
 | `[S]` | Server-scoped blacklist entry |
 | `[S:Name]` | Server-scoped entry with server name (owner view) |
 
@@ -177,7 +177,7 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 │   ├── Blacklist.js                # Blacklist schema (scope: global/server)
 │   ├── Whitelist.js                # Whitelist schema
 │   ├── Watchlist.js                # Watchlist schema (under investigation)
-│   ├── TrustedUser.js              # Trusted users (cannot be blacklisted)
+│   ├── TrustedUser.js              # Trusted users (cannot be added to any list)
 │   ├── PendingApproval.js          # /list add approval requests (24h TTL)
 │   ├── GuildConfig.js              # Per-guild channel + notification config
 │   ├── RosterCache.js              # Cached roster check results (24h TTL)
