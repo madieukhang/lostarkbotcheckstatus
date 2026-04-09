@@ -286,6 +286,15 @@ export async function handleSetupCommand(interaction) {
 
   const subcommand = interaction.options.getSubcommand();
 
+  // Remote is senior-only (checked inside handler). All others need ManageGuild.
+  if (subcommand !== 'remote') {
+    const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+    if (!hasManageGuild) {
+      await interaction.reply({ content: '❌ You need **Manage Server** permission to use this command.', ephemeral: true });
+      return;
+    }
+  }
+
   if (subcommand === 'autochannel') {
     await handleSetupAutoChannel(interaction);
   } else if (subcommand === 'notifychannel') {
@@ -396,7 +405,12 @@ async function handleSetupRemote(interaction) {
     }
 
     // Discord max 10 embeds per message
-    await interaction.editReply({ embeds: embeds.slice(0, 10) });
+    const truncated = embeds.length > 10;
+    const reply = { embeds: embeds.slice(0, 10) };
+    if (truncated) {
+      reply.content = `⚠️ Showing 10 of ${embeds.length} servers. ${embeds.length - 10} hidden due to Discord embed limit.`;
+    }
+    await interaction.editReply(reply);
     return;
   }
 
@@ -414,7 +428,18 @@ async function handleSetupRemote(interaction) {
     return;
   }
 
-  const guildName = (await resolveGuildName(targetGuildId)) || targetGuildId;
+  // Validate target guild — bot must be in it
+  const guildName = await resolveGuildName(targetGuildId);
+  if (!guildName) {
+    const embed = new EmbedBuilder()
+      .setTitle('❌ Guild Not Found')
+      .setDescription(`Bot is not in a server with ID \`${targetGuildId}\`.\nUse \`action:view\` to see valid guild IDs.`)
+      .setColor(0xed4245);
+    await interaction.editReply({ embeds: [embed] });
+    return;
+  }
+
+  const auditFields = { updatedByUserId: interaction.user.id, updatedByTag: interaction.user.tag };
 
   // ── ACTION: off ──────────────────────────────────────────
   if (action === 'off') {
@@ -424,7 +449,7 @@ async function handleSetupRemote(interaction) {
 
     await GuildConfig.findOneAndUpdate(
       { guildId: targetGuildId },
-      { $set: { globalNotifyEnabled: newState } },
+      { $set: { globalNotifyEnabled: newState, ...auditFields } },
       { upsert: true, returnDocument: 'after' }
     );
     invalidateGuildConfig(targetGuildId);
@@ -453,7 +478,7 @@ async function handleSetupRemote(interaction) {
 
     await GuildConfig.findOneAndUpdate(
       { guildId: targetGuildId },
-      { $set: { defaultBlacklistScope: scopeValue } },
+      { $set: { defaultBlacklistScope: scopeValue, ...auditFields } },
       { upsert: true, returnDocument: 'after' }
     );
     invalidateGuildConfig(targetGuildId);
