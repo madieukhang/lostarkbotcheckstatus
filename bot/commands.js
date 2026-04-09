@@ -294,7 +294,8 @@ export function buildCommands() {
       .setName('lasetup')
       .setDescription('Configure bot channels for this server')
       .setDMPermission(false)
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      // NOTE: ManageGuild check temporarily disabled for testing — re-enable after
+      // .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
       .addSubcommand((sub) =>
         sub
           .setName('autochannel')
@@ -322,27 +323,25 @@ export function buildCommands() {
           .setName('view')
           .setDescription('View current bot channel configuration')
       )
-      // NOTE: off + defaultscope temporarily hidden — re-enable after testing
-      // .addSubcommand((sub) =>
-      //   sub
-      //     .setName('off')
-      //     .setDescription('Toggle global list notifications on/off for this server')
-      // )
-      // .addSubcommand((sub) =>
-      //   sub
-      //     .setName('defaultscope')
-      //     .setDescription('Set default blacklist scope for /list add (global or server)')
-      //     .addStringOption((opt) =>
-      //       opt
-      //         .setName('scope')
-      //         .setDescription('Default scope when /list add does not specify scope')
-      //         .setRequired(true)
-      //         .addChoices(
-      //           { name: 'global', value: 'global' },
-      //           { name: 'server', value: 'server' }
-      //         )
-      //     )
-      // )
-      ,
+      .addSubcommand((sub) =>
+        sub
+          .setName('off')
+          .setDescription('Toggle global list notifications on/off for this server')
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('defaultscope')
+          .setDescription('Set default blacklist scope for /list add (global or server)')
+          .addStringOption((opt) =>
+            opt
+              .setName('scope')
+              .setDescription('Default scope when /list add does not specify scope')
+              .setRequired(true)
+              .addChoices(
+                { name: 'global', value: 'global' },
+                { name: 'server', value: 'server' }
+              )
+          )
+      ),
   ].map((cmd) => cmd.toJSON());
 }
