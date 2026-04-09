@@ -5,7 +5,7 @@
  * without needing to modify environment variables.
  */
 
-import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
@@ -362,26 +362,20 @@ export async function handleSetupRemoteCommand(interaction) {
 
   // ── ACTION: view ─────────────────────────────────────────
   if (action === 'view') {
-    // Show ALL guilds the bot is in (not just configured ones)
     const allGuilds = [...interaction.client.guilds.cache.values()];
     const allConfigs = await GuildConfig.find({}).lean();
     const configMap = new Map(allConfigs.map((gc) => [gc.guildId, gc]));
 
     if (allGuilds.length === 0) {
-      const emptyEmbed = new EmbedBuilder()
-        .setTitle('🛰️ Remote Control — Dashboard')
-        .setDescription('*Bot is not in any server.*')
-        .setColor(0x95a5a6)
-        .setTimestamp();
-      await interaction.editReply({ embeds: [emptyEmbed] });
+      await interaction.editReply({ embeds: [
+        new EmbedBuilder().setTitle('🛰️ Remote Control — Dashboard').setDescription('*Bot is not in any server.*').setColor(0x95a5a6),
+      ] });
       return;
     }
 
-    const embeds = [];
-    for (const guild of allGuilds) {
+    function buildServerEmbed(guild) {
       const gc = configMap.get(guild.id);
       const isOwner = guild.id === config.ownerGuildId;
-
       const notify = gc?.globalNotifyEnabled === false ? '🔕 Disabled' : '🔔 Enabled';
       const scope = gc?.defaultBlacklistScope || 'global';
       const scopeDisplay = scope === 'server' ? '🔒 Server (Local)' : '🌐 Global';
@@ -390,7 +384,7 @@ export async function handleSetupRemoteCommand(interaction) {
       const updated = gc?.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '—';
       const configured = gc ? '✅' : '⚪';
 
-      const serverEmbed = new EmbedBuilder()
+      return new EmbedBuilder()
         .setTitle(`${isOwner ? '👑' : '🖥️'} ${guild.name} ${configured}`)
         .setDescription(`\`${guild.id}\`${isOwner ? ' — **Owner Server**' : ''}${!gc ? ' — *No config yet*' : ''}`)
         .addFields(
@@ -402,17 +396,49 @@ export async function handleSetupRemoteCommand(interaction) {
           { name: '👤 Updated By', value: gc?.updatedByTag || '—', inline: true },
         )
         .setColor(isOwner ? 0xf1c40f : gc ? 0x5865f2 : 0x95a5a6);
-
-      embeds.push(serverEmbed);
     }
 
-    // Discord max 10 embeds per message
-    const truncated = embeds.length > 10;
-    const reply = { embeds: embeds.slice(0, 10) };
-    if (truncated) {
-      reply.content = `⚠️ Showing 10 of ${embeds.length} servers. ${embeds.length - 10} hidden due to Discord embed limit.`;
+    // Owner embed always pinned on top
+    const ownerGuild = allGuilds.find((g) => g.id === config.ownerGuildId);
+    const otherGuilds = allGuilds.filter((g) => g.id !== config.ownerGuildId);
+    const ownerEmbed = ownerGuild ? buildServerEmbed(ownerGuild) : null;
+
+    // Paginate other servers (max 9 per page since owner takes 1 slot)
+    const perPage = ownerEmbed ? 9 : 10;
+    const totalPages = Math.max(1, Math.ceil(otherGuilds.length / perPage));
+    let currentPage = 0;
+
+    function buildPage(page) {
+      const start = page * perPage;
+      const pageGuilds = otherGuilds.slice(start, start + perPage);
+      const embeds = ownerEmbed ? [ownerEmbed] : [];
+      for (const guild of pageGuilds) embeds.push(buildServerEmbed(guild));
+      return embeds;
     }
-    await interaction.editReply(reply);
+
+    function buildNav(page) {
+      if (totalPages <= 1) return [];
+      return [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('remote_prev').setLabel('◀ Previous').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+        new ButtonBuilder().setCustomId('remote_page').setLabel(`${page + 1} / ${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('remote_next').setLabel('Next ▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1),
+      )];
+    }
+
+    const msg = await interaction.editReply({ embeds: buildPage(0), components: buildNav(0) });
+
+    if (totalPages <= 1) return;
+
+    const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120_000 });
+    collector.on('collect', async (i) => {
+      if (i.user.id !== interaction.user.id) { await i.reply({ content: '❌', ephemeral: true }); return; }
+      if (i.customId === 'remote_prev') currentPage = Math.max(0, currentPage - 1);
+      else if (i.customId === 'remote_next') currentPage = Math.min(totalPages - 1, currentPage + 1);
+      await i.update({ embeds: buildPage(currentPage), components: buildNav(currentPage) });
+    });
+    collector.on('end', () => {
+      interaction.editReply({ components: [] }).catch(() => {});
+    });
     return;
   }
 
