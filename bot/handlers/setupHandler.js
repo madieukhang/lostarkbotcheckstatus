@@ -348,53 +348,75 @@ async function handleSetupRemote(interaction) {
   await interaction.deferReply({ ephemeral: true });
   await connectDB();
 
-  // ACTION: view — show all guilds' configs
+  // Helper: resolve guild name from ID
+  async function resolveGuildName(gid) {
+    try { return (await interaction.client.guilds.fetch(gid)).name; } catch { return null; }
+  }
+
+  // ── ACTION: view ─────────────────────────────────────────
   if (action === 'view') {
     const allConfigs = await GuildConfig.find({}).lean();
-    const client = interaction.client;
 
     if (allConfigs.length === 0) {
-      await interaction.editReply({ content: 'No guild configs found. Servers haven\'t used `/lasetup` yet.' });
+      const emptyEmbed = new EmbedBuilder()
+        .setTitle('🛰️ Remote Control — Dashboard')
+        .setDescription('*No server has used `/lasetup` yet.*')
+        .setColor(0x95a5a6)
+        .setTimestamp();
+      await interaction.editReply({ embeds: [emptyEmbed] });
       return;
     }
 
-    const lines = [];
+    const embeds = [];
     for (const gc of allConfigs) {
-      let guildName = gc.guildId;
-      try {
-        const guild = await client.guilds.fetch(gc.guildId);
-        guildName = guild.name;
-      } catch { /* can't resolve */ }
+      const guildName = (await resolveGuildName(gc.guildId)) || 'Unknown Server';
+      const isOwner = gc.guildId === config.ownerGuildId;
 
-      const notify = gc.globalNotifyEnabled === false ? '🔕' : '🔔';
+      const notify = gc.globalNotifyEnabled === false ? '🔕 Disabled' : '🔔 Enabled';
       const scope = gc.defaultBlacklistScope || 'global';
-      const scopeIcon = scope === 'server' ? '🔒' : '🌐';
-      const autoCheck = gc.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : '—';
-      const notifyCh = gc.listNotifyChannelId ? `<#${gc.listNotifyChannelId}>` : '—';
+      const scopeDisplay = scope === 'server' ? '🔒 Server (Local)' : '🌐 Global';
+      const autoCheck = gc.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : '*Not set*';
+      const notifyCh = gc.listNotifyChannelId ? `<#${gc.listNotifyChannelId}>` : '*Not set*';
+      const updated = gc.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '—';
 
-      lines.push(
-        `**${guildName}** (\`${gc.guildId}\`)\n` +
-        `  ${notify} Notify · ${scopeIcon} Scope: ${scope} · 📸 ${autoCheck} · 🔔 ${notifyCh}`
-      );
+      const serverEmbed = new EmbedBuilder()
+        .setTitle(`${isOwner ? '👑' : '🖥️'} ${guildName}`)
+        .setDescription(`\`${gc.guildId}\`${isOwner ? ' — **Owner Server**' : ''}`)
+        .addFields(
+          { name: '📡 Global Notify', value: notify, inline: true },
+          { name: '🎯 Default Scope', value: scopeDisplay, inline: true },
+          { name: '📸 Auto-check', value: autoCheck, inline: true },
+          { name: '🔔 Notify Channel', value: notifyCh, inline: true },
+          { name: '🕐 Last Updated', value: updated, inline: true },
+          { name: '👤 Updated By', value: gc.updatedByTag || '—', inline: true },
+        )
+        .setColor(isOwner ? 0xf1c40f : 0x5865f2);
+
+      embeds.push(serverEmbed);
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle('🛰️ Remote — All Server Configs')
-      .setDescription(lines.join('\n\n'))
-      .setColor(0x5865f2)
-      .setFooter({ text: `${allConfigs.length} server(s) configured` })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
+    // Discord max 10 embeds per message
+    await interaction.editReply({ embeds: embeds.slice(0, 10) });
     return;
   }
 
-  // ACTION: off / defaultscope — need target guild ID
+  // ── Need guild ID for off/defaultscope ───────────────────
   if (!targetGuildId) {
-    await interaction.editReply({ content: '❌ Provide `guild` ID for this action. Use `action:view` to see all guild IDs.' });
+    const helpEmbed = new EmbedBuilder()
+      .setTitle('❌ Missing Guild ID')
+      .setDescription('Use `action:view` first to see all guild IDs, then copy the ID here.')
+      .addFields(
+        { name: 'Toggle notify', value: '`/lasetup remote action:off guild:<ID>`', inline: false },
+        { name: 'Set scope', value: '`/lasetup remote action:defaultscope guild:<ID> scope:server`', inline: false },
+      )
+      .setColor(0xed4245);
+    await interaction.editReply({ embeds: [helpEmbed] });
     return;
   }
 
+  const guildName = (await resolveGuildName(targetGuildId)) || targetGuildId;
+
+  // ── ACTION: off ──────────────────────────────────────────
   if (action === 'off') {
     const existing = await GuildConfig.findOne({ guildId: targetGuildId });
     const currentlyEnabled = existing?.globalNotifyEnabled ?? true;
@@ -405,19 +427,24 @@ async function handleSetupRemote(interaction) {
       { $set: { globalNotifyEnabled: newState } },
       { upsert: true, returnDocument: 'after' }
     );
-
     invalidateGuildConfig(targetGuildId);
 
-    let guildName = targetGuildId;
-    try { guildName = (await interaction.client.guilds.fetch(targetGuildId)).name; } catch {}
+    const embed = new EmbedBuilder()
+      .setTitle(`${newState ? '🔔' : '🔕'} Remote — Notify ${newState ? 'Enabled' : 'Disabled'}`)
+      .addFields(
+        { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
+        { name: 'Status', value: newState ? '🔔 Receiving broadcasts' : '🔕 Silent — no broadcasts', inline: true },
+      )
+      .setColor(newState ? 0x2ecc71 : 0xe74c3c)
+      .setFooter({ text: `Changed by ${interaction.user.tag} · silent — server not notified` })
+      .setTimestamp();
 
-    await interaction.editReply({
-      content: `${newState ? '🔔' : '🔕'} **${guildName}** — global notifications ${newState ? 'enabled' : 'disabled'}.`,
-    });
+    await interaction.editReply({ embeds: [embed] });
     console.log(`[lasetup] Remote: ${targetGuildId} globalNotify → ${newState ? 'ON' : 'OFF'} by ${interaction.user.tag}`);
     return;
   }
 
+  // ── ACTION: defaultscope ─────────────────────────────────
   if (action === 'defaultscope') {
     if (!scopeValue) {
       await interaction.editReply({ content: '❌ Provide `scope` value (global/server) for this action.' });
@@ -429,16 +456,20 @@ async function handleSetupRemote(interaction) {
       { $set: { defaultBlacklistScope: scopeValue } },
       { upsert: true, returnDocument: 'after' }
     );
-
     invalidateGuildConfig(targetGuildId);
 
-    let guildName = targetGuildId;
-    try { guildName = (await interaction.client.guilds.fetch(targetGuildId)).name; } catch {}
+    const scopeDisplay = scopeValue === 'server' ? '🔒 Server (Local)' : '🌐 Global';
+    const embed = new EmbedBuilder()
+      .setTitle(`${scopeValue === 'server' ? '🔒' : '🌐'} Remote — Scope Updated`)
+      .addFields(
+        { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
+        { name: 'Default Scope', value: scopeDisplay, inline: true },
+      )
+      .setColor(scopeValue === 'server' ? 0x9b59b6 : 0x3498db)
+      .setFooter({ text: `Changed by ${interaction.user.tag} · silent — server not notified` })
+      .setTimestamp();
 
-    const emoji = scopeValue === 'server' ? '🔒' : '🌐';
-    await interaction.editReply({
-      content: `${emoji} **${guildName}** — default blacklist scope set to **${scopeValue}**.`,
-    });
+    await interaction.editReply({ embeds: [embed] });
     console.log(`[lasetup] Remote: ${targetGuildId} defaultBlacklistScope → ${scopeValue} by ${interaction.user.tag}`);
   }
 }
