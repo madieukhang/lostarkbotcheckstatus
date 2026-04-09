@@ -294,8 +294,7 @@ export function buildCommands() {
       .setName('lasetup')
       .setDescription('Configure bot channels for this server')
       .setDMPermission(false)
-      // NOTE: ManageGuild check temporarily disabled for testing — re-enable after
-      // .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
       .addSubcommand((sub) =>
         sub
           .setName('autochannel')
