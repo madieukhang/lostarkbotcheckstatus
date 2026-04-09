@@ -283,7 +283,17 @@ export function buildCommands() {
     new SlashCommandBuilder()
       .setName('lahelp')
       .setDescription('Show all available Lost Ark bot commands')
-      .setDMPermission(false),
+      .setDMPermission(false)
+      .addStringOption((opt) =>
+        opt
+          .setName('lang')
+          .setDescription('Language (default: en)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'English', value: 'en' },
+            { name: 'Tiếng Việt', value: 'vn' }
+          )
+      ),
 
     new SlashCommandBuilder()
       .setName('lasetup')
