@@ -404,7 +404,7 @@ export async function handleSetupRemoteCommand(interaction) {
     const ownerEmbed = ownerGuild ? buildServerEmbed(ownerGuild) : null;
 
     // Paginate other servers (max 9 per page since owner takes 1 slot)
-    const perPage = ownerEmbed ? 9 : 10;
+    const perPage = 3;
     const totalPages = Math.max(1, Math.ceil(otherGuilds.length / perPage));
     let currentPage = 0;
 
