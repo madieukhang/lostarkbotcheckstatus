@@ -164,7 +164,31 @@ client.on('interactionCreate', async (interaction) => {
     } else if (commandName === 'laremote') {
       await handleSetupRemoteCommand(interaction);
     } else if (commandName === 'lahelp') {
-      const helpLines = [
+      const lang = interaction.options.getString('lang') || 'en';
+
+      const helpLines = lang === 'vn' ? [
+        '**📋 Danh sách lệnh:**',
+        '',
+        '`/status` — Xem trạng thái server Lost Ark',
+        '`/reset` — Reset trạng thái đã lưu',
+        '',
+        '`/roster tên [deep]` — Tra cứu roster + theo dõi ilvl. `deep:true` quét alt qua Stronghold',
+        '`/search tên [min_ilvl] [max_ilvl] [class]` — Tìm tên tương tự với bộ lọc',
+        '',
+        '`/list add type tên lý_do [raid] [logs] [image] [scope]` — Thêm vào blacklist/whitelist/watchlist. Scope: global/server (chỉ blacklist)',
+        '`/list edit tên [reason] [type] [raid] [logs] [image]` — Sửa entry đã có',
+        '`/list remove tên` — Xoá entry khỏi danh sách',
+        '`/list view type [scope]` — Xem danh sách (type: all/black/white/watch/trusted, scope: all/global/server)',
+        '`/list trust action tên [reason]` — Quản lý danh sách uy tín (add/remove, chỉ officer)',
+        '',
+        '`/listcheck image` — Trích tên từ ảnh chụp, kiểm tra với tất cả danh sách',
+        '',
+        '`/lasetup autochannel #channel` — Đặt kênh tự động kiểm tra ảnh',
+        '`/lasetup notifychannel #channel` — Đặt kênh nhận thông báo',
+        '`/lasetup view` — Xem cấu hình hiện tại',
+        '`/lasetup off` — Bật/tắt nhận thông báo từ server khác',
+        '`/lasetup defaultscope global/server` — Đặt scope mặc định cho blacklist',
+      ] : [
         '**📋 Available Commands:**',
         '',
         '`/status` — Show live server status for all monitored servers',
@@ -192,9 +216,9 @@ client.on('interactionCreate', async (interaction) => {
       if (interaction.guild?.id === config.ownerGuildId) {
         helpLines.push(
           '',
-          '**🛰️ Owner Server Only:**',
-          '`/lastats` — Show bot usage statistics',
-          '`/laremote action [guild] [scope]` — Senior: remote config dashboard',
+          lang === 'vn' ? '**🛰️ Chỉ Owner Server:**' : '**🛰️ Owner Server Only:**',
+          '`/lastats` — ' + (lang === 'vn' ? 'Thống kê bot' : 'Show bot usage statistics'),
+          '`/laremote action [guild] [scope]` — ' + (lang === 'vn' ? 'Senior: điều khiển config từ xa' : 'Senior: remote config dashboard'),
         );
       }
 
