@@ -62,14 +62,12 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | `/list view type [scope]` | View entries. `scope`: all/global/server (blacklist filter, owner sees all) |
 | `/list trust action name [reason]` | Manage trusted list — add/remove (officer/senior only) |
 | `/listcheck image` | OCR screenshot → check names against all lists |
-| `/lastats` | Show bot usage statistics — owner server only |
 | `/lahelp` | Show all available commands |
 | `/lasetup autochannel #channel` | Set auto-check channel for this server (Manage Server) |
 | `/lasetup notifychannel #channel` | Set notification channel for this server (Manage Server) |
 | `/lasetup view` | View current channel configuration |
 | `/lasetup off` | Toggle global list notifications on/off for this server |
 | `/lasetup defaultscope global/server` | Set default blacklist scope for `/list add` (default: global) |
-| `/laremote action [guild] [scope]` | Senior: remote config dashboard — owner server only |
 
 ### Status Icons
 
@@ -165,7 +163,7 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 │   │   ├── searchHandler.js        # /search
 │   │   ├── autoCheckHandler.js     # Auto-check channel listener
 │   │   ├── setupHandler.js        # /lasetup (per-guild channel config)
-│   │   └── statsHandler.js       # /lastats (bot usage statistics)
+│   │   └── statsHandler.js       # Bot usage statistics
 │   ├── services/
 │   │   ├── rosterService.js        # lostark.bible scraping, alt detection, list checks
 │   │   └── listCheckService.js     # Shared OCR + name checking + formatting
