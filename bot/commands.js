@@ -281,11 +281,6 @@ export function buildCommands() {
           .setRequired(true)
       ),
     new SlashCommandBuilder()
-      .setName('lastats')
-      .setDescription('Show bot usage statistics')
-      .setDMPermission(false),
-
-    new SlashCommandBuilder()
       .setName('lahelp')
       .setDescription('Show all available Lost Ark bot commands')
       .setDMPermission(false),
@@ -342,36 +337,49 @@ export function buildCommands() {
               )
           )
       )
-      .addSubcommand((sub) =>
-        sub
-          .setName('remote')
-          .setDescription('Senior: view/control bot config for any server (silent)')
-          .addStringOption((opt) =>
-            opt
-              .setName('action')
-              .setDescription('What to do')
-              .setRequired(true)
-              .addChoices(
-                { name: 'view — show all servers', value: 'view' },
-                { name: 'off — toggle notify for a server', value: 'off' },
-                { name: 'defaultscope — set scope for a server', value: 'defaultscope' }
-              )
+      ,
+  ].map((cmd) => cmd.toJSON());
+}
+
+/**
+ * Owner-guild-only commands — registered as guild-specific, invisible to other servers.
+ */
+export function buildOwnerCommands() {
+  return [
+    new SlashCommandBuilder()
+      .setName('lastats')
+      .setDescription('Show bot usage statistics')
+      .setDMPermission(false),
+
+    new SlashCommandBuilder()
+      .setName('laremote')
+      .setDescription('Senior: view/control bot config for any server (silent)')
+      .setDMPermission(false)
+      .addStringOption((opt) =>
+        opt
+          .setName('action')
+          .setDescription('What to do')
+          .setRequired(true)
+          .addChoices(
+            { name: 'view — show all servers', value: 'view' },
+            { name: 'off — toggle notify for a server', value: 'off' },
+            { name: 'defaultscope — set scope for a server', value: 'defaultscope' }
           )
-          .addStringOption((opt) =>
-            opt
-              .setName('guild')
-              .setDescription('Target server ID (required for off/defaultscope)')
-              .setRequired(false)
-          )
-          .addStringOption((opt) =>
-            opt
-              .setName('scope')
-              .setDescription('Scope value (for defaultscope action only)')
-              .setRequired(false)
-              .addChoices(
-                { name: 'global', value: 'global' },
-                { name: 'server', value: 'server' }
-              )
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName('guild')
+          .setDescription('Target server ID (required for off/defaultscope)')
+          .setRequired(false)
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName('scope')
+          .setDescription('Scope value (for defaultscope action only)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'global', value: 'global' },
+            { name: 'server', value: 'server' }
           )
       ),
   ].map((cmd) => cmd.toJSON());

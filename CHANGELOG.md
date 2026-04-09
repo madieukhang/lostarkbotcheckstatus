@@ -51,6 +51,9 @@ All notable changes to this project are documented here.
 - Trusted alt detection: "via **TrustedName**" shown when match is through roster.
 - Extracted `bot/utils/scope.js`: shared `buildBlacklistQuery()`, `isOwnerGuild()`, `getGuildConfig()` (60s cache), `invalidateGuildConfig()`.
 - Default blacklist scope changed to `global` (was `server`).
+- **`/laremote`**: Senior-only command, registered as guild-specific to owner server only (invisible to other servers). View all servers' config, toggle notify, set scope — silently.
+- `/lastats` moved to owner-guild-only command (invisible to other servers).
+- `/lasetup` ManageGuild permission checked in handler (not command-level) to allow all subcommands to be visible.
 
 ## [v0.4.0] - 2026-03-28
 

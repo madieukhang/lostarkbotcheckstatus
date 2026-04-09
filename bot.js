@@ -13,13 +13,13 @@ import {
 
 import config from './config.js';
 import { startMonitor, checkStatus, resetState } from './monitor.js';
-import { buildCommands } from './bot/commands.js';
+import { buildCommands, buildOwnerCommands } from './bot/commands.js';
 import { createSystemHandlers } from './bot/handlers/systemHandlers.js';
 import { handleRosterCommand } from './bot/handlers/rosterHandler.js';
 import { createListHandlers } from './bot/handlers/listHandlers.js';
 import { handleSearchCommand } from './bot/handlers/searchHandler.js';
 import { setupAutoCheck } from './bot/handlers/autoCheckHandler.js';
-import { handleSetupCommand } from './bot/handlers/setupHandler.js';
+import { handleSetupCommand, handleSetupRemoteCommand } from './bot/handlers/setupHandler.js';
 import { handleStatsCommand } from './bot/handlers/statsHandler.js';
 import { connectDB } from './db.js';
 import Blacklist from './models/Blacklist.js';
@@ -46,6 +46,15 @@ async function registerCommands() {
     console.log('[bot] Registering global slash commands…');
     await rest.put(Routes.applicationCommands(client.user.id), { body: buildCommands() });
     console.log('[bot] Global slash commands registered successfully.');
+
+    // Register owner-guild-only commands (guild-specific = instant, invisible to other servers)
+    if (config.ownerGuildId) {
+      await rest.put(
+        Routes.applicationGuildCommands(client.user.id, config.ownerGuildId),
+        { body: buildOwnerCommands() }
+      );
+      console.log(`[bot] Owner guild commands registered for ${config.ownerGuildId}.`);
+    }
   } catch (err) {
     console.error('[bot] Failed to register slash commands:', err.message);
   }
@@ -152,6 +161,8 @@ client.on('interactionCreate', async (interaction) => {
       await handleStatsCommand(interaction);
     } else if (commandName === 'lasetup') {
       await handleSetupCommand(interaction);
+    } else if (commandName === 'laremote') {
+      await handleSetupRemoteCommand(interaction);
     } else if (commandName === 'lahelp') {
       const helpText = [
         '**📋 Available Commands:**',
@@ -177,7 +188,7 @@ client.on('interactionCreate', async (interaction) => {
         '`/lasetup view` — View current channel configuration',
         '`/lasetup off` — Toggle global list notifications on/off',
         '`/lasetup defaultscope global/server` — Set default blacklist scope for /list add',
-        '`/lasetup remote action [guild] [scope]` — Senior: view/control all servers\' config (silent)',
+        '`/laremote action [guild] [scope]` — Senior: view/control all servers\' config (owner server only)',
       ].join('\n');
 
       await interaction.reply({ content: helpText, ephemeral: true });
