@@ -164,7 +164,7 @@ client.on('interactionCreate', async (interaction) => {
     } else if (commandName === 'laremote') {
       await handleSetupRemoteCommand(interaction);
     } else if (commandName === 'lahelp') {
-      const helpText = [
+      const helpLines = [
         '**📋 Available Commands:**',
         '',
         '`/status` — Show live server status for all monitored servers',
@@ -181,17 +181,24 @@ client.on('interactionCreate', async (interaction) => {
         '',
         '`/listcheck image` — Check names from screenshot against all lists',
         '',
-        '`/lastats` — Show bot usage statistics',
-        '',
         '`/lasetup autochannel #channel` — Set auto-check channel for this server',
         '`/lasetup notifychannel #channel` — Set notification channel for this server',
         '`/lasetup view` — View current channel configuration',
         '`/lasetup off` — Toggle global list notifications on/off',
         '`/lasetup defaultscope global/server` — Set default blacklist scope for /list add',
-        '`/laremote action [guild] [scope]` — Senior: view/control all servers\' config (owner server only)',
-      ].join('\n');
+      ];
 
-      await interaction.reply({ content: helpText, ephemeral: true });
+      // Owner-only commands — only show in owner server
+      if (interaction.guild?.id === config.ownerGuildId) {
+        helpLines.push(
+          '',
+          '**🛰️ Owner Server Only:**',
+          '`/lastats` — Show bot usage statistics',
+          '`/laremote action [guild] [scope]` — Senior: remote config dashboard',
+        );
+      }
+
+      await interaction.reply({ content: helpLines.join('\n'), ephemeral: true });
     }
   } catch (err) {
     console.error(`[bot] Unhandled error in /${commandName}:`, err);

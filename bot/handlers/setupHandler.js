@@ -362,12 +362,15 @@ export async function handleSetupRemoteCommand(interaction) {
 
   // ── ACTION: view ─────────────────────────────────────────
   if (action === 'view') {
+    // Show ALL guilds the bot is in (not just configured ones)
+    const allGuilds = [...interaction.client.guilds.cache.values()];
     const allConfigs = await GuildConfig.find({}).lean();
+    const configMap = new Map(allConfigs.map((gc) => [gc.guildId, gc]));
 
-    if (allConfigs.length === 0) {
+    if (allGuilds.length === 0) {
       const emptyEmbed = new EmbedBuilder()
         .setTitle('🛰️ Remote Control — Dashboard')
-        .setDescription('*No server has used `/lasetup` yet.*')
+        .setDescription('*Bot is not in any server.*')
         .setColor(0x95a5a6)
         .setTimestamp();
       await interaction.editReply({ embeds: [emptyEmbed] });
@@ -375,29 +378,30 @@ export async function handleSetupRemoteCommand(interaction) {
     }
 
     const embeds = [];
-    for (const gc of allConfigs) {
-      const guildName = (await resolveGuildName(gc.guildId)) || 'Unknown Server';
-      const isOwner = gc.guildId === config.ownerGuildId;
+    for (const guild of allGuilds) {
+      const gc = configMap.get(guild.id);
+      const isOwner = guild.id === config.ownerGuildId;
 
-      const notify = gc.globalNotifyEnabled === false ? '🔕 Disabled' : '🔔 Enabled';
-      const scope = gc.defaultBlacklistScope || 'global';
+      const notify = gc?.globalNotifyEnabled === false ? '🔕 Disabled' : '🔔 Enabled';
+      const scope = gc?.defaultBlacklistScope || 'global';
       const scopeDisplay = scope === 'server' ? '🔒 Server (Local)' : '🌐 Global';
-      const autoCheck = gc.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : '*Not set*';
-      const notifyCh = gc.listNotifyChannelId ? `<#${gc.listNotifyChannelId}>` : '*Not set*';
-      const updated = gc.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '—';
+      const autoCheck = gc?.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : '*Not set*';
+      const notifyCh = gc?.listNotifyChannelId ? `<#${gc.listNotifyChannelId}>` : '*Not set*';
+      const updated = gc?.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '—';
+      const configured = gc ? '✅' : '⚪';
 
       const serverEmbed = new EmbedBuilder()
-        .setTitle(`${isOwner ? '👑' : '🖥️'} ${guildName}`)
-        .setDescription(`\`${gc.guildId}\`${isOwner ? ' — **Owner Server**' : ''}`)
+        .setTitle(`${isOwner ? '👑' : '🖥️'} ${guild.name} ${configured}`)
+        .setDescription(`\`${guild.id}\`${isOwner ? ' — **Owner Server**' : ''}${!gc ? ' — *No config yet*' : ''}`)
         .addFields(
           { name: '📡 Global Notify', value: notify, inline: true },
           { name: '🎯 Default Scope', value: scopeDisplay, inline: true },
           { name: '📸 Auto-check', value: autoCheck, inline: true },
           { name: '🔔 Notify Channel', value: notifyCh, inline: true },
           { name: '🕐 Last Updated', value: updated, inline: true },
-          { name: '👤 Updated By', value: gc.updatedByTag || '—', inline: true },
+          { name: '👤 Updated By', value: gc?.updatedByTag || '—', inline: true },
         )
-        .setColor(isOwner ? 0xf1c40f : 0x5865f2);
+        .setColor(isOwner ? 0xf1c40f : gc ? 0x5865f2 : 0x95a5a6);
 
       embeds.push(serverEmbed);
     }
@@ -418,8 +422,8 @@ export async function handleSetupRemoteCommand(interaction) {
       .setTitle('❌ Missing Guild ID')
       .setDescription('Use `action:view` first to see all guild IDs, then copy the ID here.')
       .addFields(
-        { name: 'Toggle notify', value: '`/lasetup remote action:off guild:<ID>`', inline: false },
-        { name: 'Set scope', value: '`/lasetup remote action:defaultscope guild:<ID> scope:server`', inline: false },
+        { name: 'Toggle notify', value: '`/laremote action:off guild:<ID>`', inline: false },
+        { name: 'Set scope', value: '`/laremote action:defaultscope guild:<ID> scope:server`', inline: false },
       )
       .setColor(0xed4245);
     await interaction.editReply({ embeds: [helpEmbed] });
