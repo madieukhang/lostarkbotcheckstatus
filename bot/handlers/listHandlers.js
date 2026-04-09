@@ -1208,10 +1208,14 @@ export function createListHandlers({ client }) {
     }
 
     // Check ownership: same person → apply now, different → approval
+    // Server-scoped entries always auto-approve (local = no approval needed)
     const isOwner = existing.addedByUserId === interaction.user.id;
     const isApprover = isRequesterAutoApprover(interaction.user.id);
+    const existingObj = existing.toObject?.() || existing;
+    const editScope = existingObj.scope || editGuildDefaultScope;
+    const isLocalScope = editScope === 'server';
 
-    if (isOwner || isApprover) {
+    if (isOwner || isApprover || isLocalScope) {
       // Apply edit immediately
       try {
         if (isTypeChange) {
