@@ -344,6 +344,11 @@ async function handleSetupDefaultScope(interaction) {
  * Handle /lasetup remote — Senior-only remote config management
  */
 async function handleSetupRemote(interaction) {
+  if (!config.ownerGuildId || interaction.guild.id !== config.ownerGuildId) {
+    await interaction.reply({ content: '❌ This command is only available in the owner server.', ephemeral: true });
+    return;
+  }
+
   const seniorIds = config.seniorApproverIds || [];
   if (!seniorIds.includes(interaction.user.id)) {
     await interaction.reply({ content: '❌ Only seniors can use remote config management.', ephemeral: true });
