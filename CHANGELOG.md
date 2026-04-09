@@ -51,8 +51,6 @@ All notable changes to this project are documented here.
 - Trusted alt detection: "via **TrustedName**" shown when match is through roster.
 - Extracted `bot/utils/scope.js`: shared `buildBlacklistQuery()`, `isOwnerGuild()`, `getGuildConfig()` (60s cache), `invalidateGuildConfig()`.
 - Default blacklist scope changed to `global` (was `server`).
-- **`/laremote`**: Senior-only command, registered as guild-specific to owner server only (invisible to other servers). View all servers' config, toggle notify, set scope — silently.
-- `/lastats` moved to owner-guild-only command (invisible to other servers).
 - `/lasetup` ManageGuild permission checked in handler (not command-level) to allow all subcommands to be visible.
 
 ## [v0.4.0] - 2026-03-28
@@ -61,7 +59,6 @@ All notable changes to this project are documented here.
 
 - Added `/list edit name [reason] [type] [raid] [logs] [image]` — edit existing list entries. Owner or officer can edit immediately; others go through approval flow. Supports moving entries between lists (type change).
 - Added Quick Add from auto-check — dropdown to select unflagged names → Modal (type/reason/raid) → add to list directly from check results.
-- Added `/lastats` command — shows list counts, cache stats, server count, and bot uptime.
 - Added `/roster deep:true` option — runs Stronghold alt detection scan even when roster is visible.
 - Added `/lasetup` command for per-guild channel configuration (requires Manage Server permission):
   - `/lasetup autochannel #channel` — set auto-check channel for this server
