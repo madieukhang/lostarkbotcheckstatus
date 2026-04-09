@@ -296,6 +296,8 @@ export async function handleSetupCommand(interaction) {
     await handleSetupDefaultScope(interaction);
   } else if (subcommand === 'view') {
     await handleSetupView(interaction);
+  } else if (subcommand === 'remote') {
+    await handleSetupRemote(interaction);
   }
 }
 
@@ -327,4 +329,116 @@ async function handleSetupDefaultScope(interaction) {
 
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[lasetup] Guild ${interaction.guild.name} (${interaction.guild.id}) defaultBlacklistScope → ${scope} by ${interaction.user.tag}`);
+}
+
+/**
+ * Handle /lasetup remote — Senior-only remote config management
+ */
+async function handleSetupRemote(interaction) {
+  const seniorIds = config.seniorApproverIds || [];
+  if (!seniorIds.includes(interaction.user.id)) {
+    await interaction.reply({ content: '❌ Only seniors can use remote config management.', ephemeral: true });
+    return;
+  }
+
+  const action = interaction.options.getString('action', true);
+  const targetGuildId = interaction.options.getString('guild') || '';
+  const scopeValue = interaction.options.getString('scope') || '';
+
+  await interaction.deferReply({ ephemeral: true });
+  await connectDB();
+
+  // ACTION: view — show all guilds' configs
+  if (action === 'view') {
+    const allConfigs = await GuildConfig.find({}).lean();
+    const client = interaction.client;
+
+    if (allConfigs.length === 0) {
+      await interaction.editReply({ content: 'No guild configs found. Servers haven\'t used `/lasetup` yet.' });
+      return;
+    }
+
+    const lines = [];
+    for (const gc of allConfigs) {
+      let guildName = gc.guildId;
+      try {
+        const guild = await client.guilds.fetch(gc.guildId);
+        guildName = guild.name;
+      } catch { /* can't resolve */ }
+
+      const notify = gc.globalNotifyEnabled === false ? '🔕' : '🔔';
+      const scope = gc.defaultBlacklistScope || 'global';
+      const scopeIcon = scope === 'server' ? '🔒' : '🌐';
+      const autoCheck = gc.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : '—';
+      const notifyCh = gc.listNotifyChannelId ? `<#${gc.listNotifyChannelId}>` : '—';
+
+      lines.push(
+        `**${guildName}** (\`${gc.guildId}\`)\n` +
+        `  ${notify} Notify · ${scopeIcon} Scope: ${scope} · 📸 ${autoCheck} · 🔔 ${notifyCh}`
+      );
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle('🛰️ Remote — All Server Configs')
+      .setDescription(lines.join('\n\n'))
+      .setColor(0x5865f2)
+      .setFooter({ text: `${allConfigs.length} server(s) configured` })
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
+    return;
+  }
+
+  // ACTION: off / defaultscope — need target guild ID
+  if (!targetGuildId) {
+    await interaction.editReply({ content: '❌ Provide `guild` ID for this action. Use `action:view` to see all guild IDs.' });
+    return;
+  }
+
+  if (action === 'off') {
+    const existing = await GuildConfig.findOne({ guildId: targetGuildId });
+    const currentlyEnabled = existing?.globalNotifyEnabled ?? true;
+    const newState = !currentlyEnabled;
+
+    await GuildConfig.findOneAndUpdate(
+      { guildId: targetGuildId },
+      { $set: { globalNotifyEnabled: newState } },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    invalidateGuildConfig(targetGuildId);
+
+    let guildName = targetGuildId;
+    try { guildName = (await interaction.client.guilds.fetch(targetGuildId)).name; } catch {}
+
+    await interaction.editReply({
+      content: `${newState ? '🔔' : '🔕'} **${guildName}** — global notifications ${newState ? 'enabled' : 'disabled'}.`,
+    });
+    console.log(`[lasetup] Remote: ${targetGuildId} globalNotify → ${newState ? 'ON' : 'OFF'} by ${interaction.user.tag}`);
+    return;
+  }
+
+  if (action === 'defaultscope') {
+    if (!scopeValue) {
+      await interaction.editReply({ content: '❌ Provide `scope` value (global/server) for this action.' });
+      return;
+    }
+
+    await GuildConfig.findOneAndUpdate(
+      { guildId: targetGuildId },
+      { $set: { defaultBlacklistScope: scopeValue } },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    invalidateGuildConfig(targetGuildId);
+
+    let guildName = targetGuildId;
+    try { guildName = (await interaction.client.guilds.fetch(targetGuildId)).name; } catch {}
+
+    const emoji = scopeValue === 'server' ? '🔒' : '🌐';
+    await interaction.editReply({
+      content: `${emoji} **${guildName}** — default blacklist scope set to **${scopeValue}**.`,
+    });
+    console.log(`[lasetup] Remote: ${targetGuildId} defaultBlacklistScope → ${scopeValue} by ${interaction.user.tag}`);
+  }
 }

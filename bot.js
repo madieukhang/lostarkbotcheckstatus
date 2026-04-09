@@ -177,6 +177,7 @@ client.on('interactionCreate', async (interaction) => {
         '`/lasetup view` — View current channel configuration',
         '`/lasetup off` — Toggle global list notifications on/off',
         '`/lasetup defaultscope global/server` — Set default blacklist scope for /list add',
+        '`/lasetup remote action [guild] [scope]` — Senior: view/control all servers\' config (silent)',
       ].join('\n');
 
       await interaction.reply({ content: helpText, ephemeral: true });
