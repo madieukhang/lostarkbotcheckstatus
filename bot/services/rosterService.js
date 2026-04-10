@@ -16,31 +16,108 @@ let directBlockedUntil = 0;
 const BLOCK_CACHE_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
+ * Exhausted/invalid key tracking — skip dead keys for KEY_COOLDOWN_MS.
+ * Status 401/403 (invalid key) or 429 (quota exhausted) marks key as dead.
+ */
+const deadKeysUntil = new Map(); // key → timestamp when can retry
+const KEY_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Try fetching via ScraperAPI with a specific key.
+ * Returns { res, keyDead } — keyDead=true means this key is exhausted/invalid.
+ */
+async function tryScraperApi(url, key, keyIndex) {
+  const proxyUrl = `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(url)}`;
+  try {
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(30000) });
+    // ScraperAPI returns 401/403 for invalid key, 429 for quota exhausted
+    if (res.status === 401 || res.status === 403 || res.status === 429) {
+      const body = await res.text().catch(() => '');
+      console.warn(`[scraperapi] Key #${keyIndex + 1} failed (HTTP ${res.status}): ${body.slice(0, 200)}`);
+      deadKeysUntil.set(key, Date.now() + KEY_COOLDOWN_MS);
+      return { res, keyDead: true };
+    }
+    return { res, keyDead: false };
+  } catch (err) {
+    console.warn(`[scraperapi] Key #${keyIndex + 1} network error: ${err.message}`);
+    return { res: null, keyDead: false, error: err };
+  }
+}
+
+/**
+ * Fetch a URL via ScraperAPI, trying keys in order until one succeeds.
+ * Dead keys (exhausted/invalid) are skipped for KEY_COOLDOWN_MS.
+ */
+async function fetchViaScraperApi(url) {
+  const keys = config.scraperApiKeys || [];
+  if (keys.length === 0) return null;
+
+  const errors = [];
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const deadUntil = deadKeysUntil.get(key) || 0;
+    if (Date.now() < deadUntil) {
+      errors.push(`Key #${i + 1}: skipped (cooling down)`);
+      continue;
+    }
+
+    const { res, keyDead, error } = await tryScraperApi(url, key, i);
+    if (error) { errors.push(`Key #${i + 1}: ${error.message}`); continue; }
+    if (keyDead) { errors.push(`Key #${i + 1}: HTTP ${res.status}`); continue; }
+    if (res.ok) {
+      console.log(`[scraperapi] Key #${i + 1} success`);
+      return res;
+    }
+    // Non-2xx but not a key problem — return as-is (target site error)
+    return res;
+  }
+
+  console.error(`[scraperapi] All ${keys.length} key(s) failed: ${errors.join(' | ')}`);
+  return null;
+}
+
+/**
  * Fetch a URL with automatic ScraperAPI fallback on 403/503.
  * Uses smart cache: if recently blocked, skips direct fetch and goes straight to ScraperAPI.
+ * Multi-key fallback: if key #1 is exhausted, tries key #2, etc.
  *
  * @param {string} url
  * @param {object} [options]
  * @returns {Promise<Response>}
  */
 export async function fetchWithFallback(url, options = {}) {
+  const hasKey = config.scraperApiKeys?.length > 0;
+
   // If recently blocked, skip direct fetch → ScraperAPI immediately
-  if (Date.now() < directBlockedUntil && config.scraperApiKey) {
-    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(url)}`;
-    return fetch(proxyUrl, { signal: AbortSignal.timeout(30000) });
+  if (Date.now() < directBlockedUntil && hasKey) {
+    const res = await fetchViaScraperApi(url);
+    if (res) return res;
+    // All keys dead — fall through to direct fetch as last resort
+    console.warn(`[fetch] All ScraperAPI keys dead, attempting direct fetch despite cache: ${url}`);
   }
 
-  const res = await fetch(url, {
-    headers: FETCH_HEADERS,
-    signal: AbortSignal.timeout(15000),
-    ...options,
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: FETCH_HEADERS,
+      signal: AbortSignal.timeout(15000),
+      ...options,
+    });
+  } catch (err) {
+    console.warn(`[fetch] Direct fetch failed: ${err.message}`);
+    if (hasKey) {
+      const proxyRes = await fetchViaScraperApi(url);
+      if (proxyRes) return proxyRes;
+    }
+    throw err;
+  }
 
-  if ((res.status === 403 || res.status === 503) && config.scraperApiKey) {
+  if ((res.status === 403 || res.status === 503) && hasKey) {
     directBlockedUntil = Date.now() + BLOCK_CACHE_MS;
     console.warn(`[fetch] ${res.status} on direct fetch, caching block for 5min. Falling back to ScraperAPI: ${url}`);
-    const proxyUrl = `https://api.scraperapi.com/?api_key=${config.scraperApiKey}&url=${encodeURIComponent(url)}`;
-    return fetch(proxyUrl, { signal: AbortSignal.timeout(30000) });
+    const proxyRes = await fetchViaScraperApi(url);
+    if (proxyRes) return proxyRes;
+    console.error(`[fetch] All ScraperAPI fallbacks failed for ${url}, returning original ${res.status}`);
   }
 
   return res;
