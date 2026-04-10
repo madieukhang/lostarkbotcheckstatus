@@ -115,7 +115,9 @@ Copy `.env.example` to `.env` and fill in values:
 | `SENIOR_APPROVER_IDS` | Senior approver Discord user IDs (always receive approval DMs) | — |
 | `MEMBER_APPROVER_IDS` | Member approver Discord user IDs | — |
 | `OWNER_GUILD_ID` | Owner/admin Discord server ID — can view all server-scoped blacklist entries | — |
-| `SCRAPERAPI_KEY` | Fallback proxy when lostark.bible blocks direct access (403/503) | — |
+| `SCRAPERAPI_KEY` | Primary ScraperAPI key — fallback proxy on 403/503 | — |
+| `SCRAPERAPI_KEY_2` | Secondary key — used when primary is exhausted (429) or invalid | — |
+| `SCRAPERAPI_KEY_3` | Tertiary key — final fallback | — |
 
 ## Run Locally
 

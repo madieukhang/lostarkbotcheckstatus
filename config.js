@@ -70,8 +70,17 @@ const config = {
   /** MongoDB connection string */
   mongoUri: requireEnv('MONGODB_URI'),
 
-  /** ScraperAPI key (no longer required — lostark.bible is accessible directly) */
-  scraperApiKey: (process.env.SCRAPERAPI_KEY || '').trim(),
+  /** ScraperAPI keys (fallback chain) — SCRAPERAPI_KEY, SCRAPERAPI_KEY_2, SCRAPERAPI_KEY_3... */
+  scraperApiKeys: [
+    process.env.SCRAPERAPI_KEY,
+    process.env.SCRAPERAPI_KEY_2,
+    process.env.SCRAPERAPI_KEY_3,
+  ]
+    .map((k) => (k || '').trim())
+    .filter(Boolean),
+
+  /** @deprecated — use scraperApiKeys[0] instead (kept for backward compat) */
+  get scraperApiKey() { return this.scraperApiKeys[0] || ''; },
 
   /** Approver IDs for /list add approval flow (comma-separated Discord user IDs) */
   officerApproverIds: (process.env.OFFICER_APPROVER_IDS || '')
