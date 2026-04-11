@@ -2051,9 +2051,25 @@ export function createListHandlers({ client }) {
       const totalPages = Math.ceil(allEntries.length / ITEMS_PER_PAGE);
       let currentPage = 0;
 
-      function buildPage(page) {
+      async function buildPage(page) {
         const start = page * ITEMS_PER_PAGE;
         const pageEntries = allEntries.slice(start, start + ITEMS_PER_PAGE);
+
+        // Resolve fresh image URLs for the current page in parallel.
+        // For rehosted entries (imageMessageId set) we fetch the evidence
+        // message to get a freshly-signed URL — this is what makes 📎 link
+        // open the actual image instead of navigating to the storage channel.
+        // Legacy entries fall back to their stored (possibly expired) URL.
+        // Max ~10 parallel fetches per page, completes in <1s typical.
+        const freshUrls = await Promise.all(
+          pageEntries.map(async (e) => {
+            if (e.imageMessageId && e.imageChannelId) {
+              const fresh = await refreshImageUrl(e.imageMessageId, e.imageChannelId, client);
+              return fresh || ''; // empty string if refresh failed
+            }
+            return e.imageUrl || '';
+          })
+        );
 
         const lines = pageEntries.map((e, i) => {
           let scopeLabel = '';
@@ -2070,18 +2086,11 @@ export function createListHandlers({ client }) {
           if (e.raid) parts.push(`[${e.raid}]`);
           const date = e.addedAt ? `<t:${Math.floor(new Date(e.addedAt).getTime() / 1000)}:R>` : '';
           if (date) parts.push(date);
-          // 📎 inline evidence link:
-          //   - Rehosted entries → link to evidence message in owner guild
-          //     (Discord deep-link, opens the message inline in Discord client)
-          //   - Legacy entries → link to original CDN URL (may be expired)
-          //   - Either way, the "Evidence" select dropdown below also works
-          //     and uses lazy refresh for guaranteed-fresh URLs.
-          if (e.imageMessageId && e.imageChannelId && config.ownerGuildId) {
-            const msgLink = `https://discord.com/channels/${config.ownerGuildId}/${e.imageChannelId}/${e.imageMessageId}`;
-            parts.push(`[📎](${msgLink})`);
-          } else if (e.imageUrl) {
-            parts.push(`[📎](${e.imageUrl})`);
-          }
+          // 📎 inline link points to the actual image — fresh URL for rehosted
+          // entries, legacy URL for old entries. Click → preview image in
+          // browser/Discord client (NOT navigate to evidence channel).
+          const imgUrl = freshUrls[i];
+          if (imgUrl) parts.push(`[📎](${imgUrl})`);
           return `${start + i + 1}. ${parts.join(' — ')}`;
         });
 
@@ -2142,7 +2151,7 @@ export function createListHandlers({ client }) {
       const components = buildComponents(0);
 
       await interaction.editReply({
-        embeds: [buildPage(0)],
+        embeds: [await buildPage(0)],
         components,
       });
 
@@ -2160,10 +2169,15 @@ export function createListHandlers({ client }) {
 
         if (i.customId === 'listview_prev') {
           currentPage = Math.max(0, currentPage - 1);
-          await i.update({ embeds: [buildPage(currentPage)], components: buildComponents(currentPage) });
+          // Defer update because buildPage now does up to 10 parallel API
+          // calls to refresh evidence URLs — Discord requires acknowledgment
+          // within 3s and we'd rather show a brief loader than time out.
+          await i.deferUpdate();
+          await i.editReply({ embeds: [await buildPage(currentPage)], components: buildComponents(currentPage) });
         } else if (i.customId === 'listview_next') {
           currentPage = Math.min(totalPages - 1, currentPage + 1);
-          await i.update({ embeds: [buildPage(currentPage)], components: buildComponents(currentPage) });
+          await i.deferUpdate();
+          await i.editReply({ embeds: [await buildPage(currentPage)], components: buildComponents(currentPage) });
         } else if (i.customId === 'listview_evidence') {
           const idx = parseInt(i.values[0]);
           const entry = allEntries[idx];
