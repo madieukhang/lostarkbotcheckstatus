@@ -117,7 +117,7 @@ export function buildCommands() {
       .addSubcommand((sub) =>
         sub
           .setName('edit')
-          .setDescription('Edit an existing list entry (reason, raid, type)')
+          .setDescription('Edit an existing list entry (reason, raid, type, scope)')
           .addStringOption((opt) =>
             opt
               .setName('name')
@@ -164,6 +164,16 @@ export function buildCommands() {
               .setName('image')
               .setDescription('New evidence screenshot')
               .setRequired(false)
+          )
+          .addStringOption((opt) =>
+            opt
+              .setName('scope')
+              .setDescription('Promote local→global or demote global→local — blacklist only')
+              .setRequired(false)
+              .addChoices(
+                { name: 'global', value: 'global' },
+                { name: 'server', value: 'server' }
+              )
           )
       )
       .addSubcommand((sub) =>

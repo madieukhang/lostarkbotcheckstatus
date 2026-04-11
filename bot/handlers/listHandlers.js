@@ -1275,19 +1275,47 @@ export function createListHandlers({ client }) {
             updateFields.imageMessageId = '';
             updateFields.imageChannelId = '';
           }
+          // Scope change in place — only blacklist supports it. Approval flow
+          // only reaches this branch when payload.type === existingEntry's
+          // current type (no cross-list move), so checking type === 'black'
+          // is enough.
+          if (
+            payload.type === 'black'
+            && payload.scope
+            && payload.scope !== (existingEntry.scope || 'global')
+          ) {
+            updateFields.scope = payload.scope;
+            updateFields.guildId = payload.scope === 'server' ? (payload.guildId || '') : '';
+          }
           if (Object.keys(updateFields).length > 0) {
-            await oldModel.updateOne({ _id: existingEntry._id }, { $set: updateFields });
+            try {
+              await oldModel.updateOne({ _id: existingEntry._id }, { $set: updateFields });
+            } catch (err) {
+              // Defense in depth for the unique index race on scope change
+              if (err.code === 11000 && updateFields.scope) {
+                await PendingApproval.deleteOne({ requestId });
+                await interaction.editReply({
+                  content: `⚠️ Cannot apply scope change: another entry with this name already occupies the target scope. Approval aborted.`,
+                  components: [buildApprovalResultRow('Failed')],
+                });
+                return;
+              }
+              throw err;
+            }
           }
         }
 
-        // Broadcast edit: global to all, server-scoped to owner only
-        const entryScope = existingEntry.scope || payload.scope || 'global';
-        broadcastListChange('edited', { ...existingEntry.toObject?.() || existingEntry, reason: payload.reason || existingEntry.reason, raid: payload.raid || existingEntry.raid }, {
+        // Broadcast edit: routing decided by the FINAL scope (after any scope
+        // change applied above). Using payload.scope first ensures that a
+        // demote-to-local edit broadcasts only to owner, and a promote-to-global
+        // edit broadcasts to all opted-in servers.
+        const broadcastScope = payload.scope || existingEntry.scope || 'global';
+        broadcastListChange('edited', { ...existingEntry.toObject?.() || existingEntry, reason: payload.reason || existingEntry.reason, raid: payload.raid || existingEntry.raid, scope: broadcastScope }, {
           type: payload.type,
           guildId: payload.guildId,
           requestedByDisplayName: payload.requestedByDisplayName,
           requestedByTag: payload.requestedByTag,
-        }, { onlyOwner: entryScope === 'server' }).catch(() => {});
+        }, { onlyOwner: broadcastScope === 'server' }).catch(() => {});
 
         await PendingApproval.deleteOne({ requestId });
         const editResult = { ok: true, content: `✅ Edit approved: **${existingEntry.name}**${isTypeChange ? ` moved to ${newLabel}` : ' updated'}.` };
@@ -1828,6 +1856,9 @@ export function createListHandlers({ client }) {
     const newLogs = interaction.options.getString('logs')?.trim() || '';
     const imageAttachment = interaction.options.getAttachment('image');
     const newImageUrl = imageAttachment?.url || '';
+    // Optional scope override — only valid for blacklist entries (validated below).
+    const newScopeRaw = interaction.options.getString('scope') || '';
+    const newScope = newScopeRaw === 'global' || newScopeRaw === 'server' ? newScopeRaw : '';
 
     // Defer FIRST so the rehost (download + upload, can take 1-3s) does not
     // cross Discord's 3-second interaction ack window. Discord keeps the
@@ -1871,13 +1902,63 @@ export function createListHandlers({ client }) {
     const { label: currentLabel } = getListContext(currentType);
 
     // Check if anything is actually changing
-    if (!newReason && !newType && !newRaid && !newLogs && !newImageUrl) {
+    if (!newReason && !newType && !newRaid && !newLogs && !newImageUrl && !newScope) {
       await interaction.editReply({ content: `⚠️ No changes provided. Use options to specify what to edit.` });
       return;
     }
 
     const targetType = newType || currentType;
     const isTypeChange = targetType !== currentType;
+
+    // Scope option validation: only meaningful for blacklist entries.
+    // White/watch lists are always global by design — reject scope on non-blacklist
+    // edits with a clear error rather than silently ignoring.
+    if (newScope && targetType !== 'black') {
+      await interaction.editReply({
+        content: `⚠️ The \`scope\` option only applies to blacklist entries. ${targetType === 'white' ? 'Whitelist' : 'Watchlist'} entries are always global.`,
+      });
+      return;
+    }
+
+    // Resolve target scope:
+    //   - If user provided scope option → use it
+    //   - Else if currently blacklist (no type change) → keep existing scope
+    //   - Else if moving INTO blacklist → use guild default scope
+    //   - Else (white/watch) → always 'global' (scope field unused there)
+    const existingObjForScope = existing.toObject?.() || existing;
+    const targetScope = targetType === 'black'
+      ? (newScope || existingObjForScope.scope || editGuildDefaultScope)
+      : 'global';
+
+    // Detect actual scope change (only meaningful for blacklist→blacklist edits).
+    // Cross-list moves carry their own scope handling in the move branch.
+    const isScopeChange = !isTypeChange
+      && currentType === 'black'
+      && targetScope !== (existingObjForScope.scope || 'global');
+
+    // Conflict detection for in-place scope change: would the new
+    // {name, scope, guildId} combination collide with an existing entry?
+    if (isScopeChange) {
+      const newGuildId = targetScope === 'server' ? editGuildId : '';
+      const conflictQuery = {
+        name: existing.name,
+        scope: targetScope,
+        ...(targetScope === 'server' ? { guildId: newGuildId } : {}),
+        _id: { $ne: existing._id },
+      };
+      const conflict = await Blacklist.findOne(conflictQuery)
+        .collation(collation)
+        .lean();
+      if (conflict) {
+        const conflictDesc = targetScope === 'global'
+          ? 'a global blacklist entry with this name already exists'
+          : 'a server-scoped blacklist entry with this name already exists in this server';
+        await interaction.editReply({
+          content: `⚠️ Cannot change scope: ${conflictDesc}. Remove the conflicting entry first, or merge them manually.`,
+        });
+        return;
+      }
+    }
 
     // Build changes summary
     const changes = [];
@@ -1886,6 +1967,18 @@ export function createListHandlers({ client }) {
     if (newRaid) changes.push(`Raid: "${existing.raid || 'N/A'}" → "${newRaid}"`);
     if (newLogs) changes.push(`Logs: updated`);
     if (newImageUrl) changes.push(`Evidence: updated`);
+    if (isScopeChange) changes.push(`Scope: ${existingObjForScope.scope || 'global'} → ${targetScope}`);
+
+    // Catch the no-op case: user provided scope option but it matches the
+    // existing scope, and no other fields are being changed. Rejecting here
+    // keeps the success message honest (otherwise it'd say "edited" with an
+    // empty change list).
+    if (changes.length === 0) {
+      await interaction.editReply({
+        content: '⚠️ No effective changes — the provided values already match the current entry.',
+      });
+      return;
+    }
 
     // Trusted user guard: block adding/moving trusted users to any list
     if (isTypeChange) {
@@ -1906,16 +1999,17 @@ export function createListHandlers({ client }) {
     }
 
     // Check ownership: same person → apply now, different → approval
-    // Server-scoped entries always auto-approve (local = no approval needed)
+    // Auto-approve rule (final-state aware): if the FINAL state of this edit
+    // results in a server-scoped blacklist entry, auto-approve. This means:
+    //   - Demoting global → server: auto-approves (de-escalation, harmless)
+    //   - Promoting server → global: requires approval (privilege escalation)
+    //   - Editing fields on a local entry without changing scope: auto-approves
+    //   - Moving white/watch → black with default scope=server: auto-approves
+    // White/watch have no scope concept — they never auto-approve via this rule.
     const isOwner = existing.addedByUserId === interaction.user.id;
     const isApprover = isRequesterAutoApprover(interaction.user.id);
     const existingObj = existing.toObject?.() || existing;
-    // Local auto-approve only for blacklist entries that are server-scoped,
-    // or edits moving to blacklist where target scope is server.
-    // White/watch have no scope — never auto-approve via this rule.
-    const isBlacklistLocal = currentType === 'black' && existingObj.scope === 'server';
-    const isMovingToLocalBlack = isTypeChange && targetType === 'black' && editGuildDefaultScope === 'server';
-    const isLocalScope = isBlacklistLocal || isMovingToLocalBlack;
+    const isLocalScope = targetType === 'black' && targetScope === 'server';
 
     if (isOwner || isApprover || isLocalScope) {
       // Apply edit immediately
@@ -1970,8 +2064,10 @@ export function createListHandlers({ client }) {
             addedByDisplayName: existing.addedByDisplayName,
             addedAt: existing.addedAt,
             ...(targetType === 'black' ? (() => {
-              // Resolve scope: keep existing if blacklist→blacklist, else use guild default
-              const moveScope = existingObj.scope || editGuildDefaultScope;
+              // Resolve scope priority: explicit user option → existing entry's
+              // scope → guild default. This lets type-change + scope-change
+              // happen in one command.
+              const moveScope = newScope || existingObj.scope || editGuildDefaultScope;
               return { scope: moveScope, guildId: moveScope === 'server' ? editGuildId : '' };
             })() : {}),
           });
@@ -1998,19 +2094,40 @@ export function createListHandlers({ client }) {
               updateFields.imageChannelId = '';
             }
           }
+          // Scope change in place — only blacklist supports this. Atomic update
+          // of {scope, guildId} so the unique index sees the new combination.
+          if (isScopeChange) {
+            updateFields.scope = targetScope;
+            updateFields.guildId = targetScope === 'server' ? editGuildId : '';
+          }
 
           const { model } = getListContext(currentType);
-          await model.updateOne({ _id: existing._id }, { $set: updateFields });
+          try {
+            await model.updateOne({ _id: existing._id }, { $set: updateFields });
+          } catch (err) {
+            // Defense in depth: catch race-condition E11000 from the unique
+            // index even though preflight should have caught it. Mongoose
+            // wraps the duplicate-key error with code 11000.
+            if (err.code === 11000 && isScopeChange) {
+              await interaction.editReply({
+                content: `⚠️ Cannot change scope: another entry with this name already occupies the target scope (race condition). Try again or remove the conflicting entry.`,
+              });
+              return;
+            }
+            throw err;
+          }
 
           await interaction.editReply({
             content: `✅ **${existing.name}** edited in ${currentLabel}.\n${changes.map((c) => `• ${c}`).join('\n')}`,
           });
         }
 
-        // Only broadcast if editor is NOT the original owner AND entry is not server-scoped
+        // Broadcast routing decided by the FINAL scope (after any scope change).
+        // Skip broadcast for server-scoped entries to avoid spamming other guilds.
         const entryObj = existing.toObject?.() || existing;
-        if (!isOwner && entryObj.scope !== 'server') {
-          broadcastListChange('edited', { ...entryObj, reason: newReason || existing.reason, raid: newRaid || existing.raid }, {
+        const finalScope = targetType === 'black' ? targetScope : 'global';
+        if (!isOwner && finalScope !== 'server') {
+          broadcastListChange('edited', { ...entryObj, reason: newReason || existing.reason, raid: newRaid || existing.raid, scope: finalScope }, {
             type: targetType,
             guildId: interaction.guild.id,
             requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
@@ -2046,7 +2163,10 @@ export function createListHandlers({ client }) {
         raid: newRaid || existing.raid,
         logsUrl: newLogs || existing.logsUrl || '',
         ...editImageFields,
-        scope: existingObj.scope || editGuildDefaultScope, // preserve existing scope, or use guild default
+        // Scope priority: explicit user option → existing entry's scope → guild default.
+        // The approval handler at line ~1206 (cross-list move) and ~1230 (in-place)
+        // both honor payload.scope when persisting the edit.
+        scope: newScope || existingObj.scope || editGuildDefaultScope,
         requestedByUserId: interaction.user.id,
         requestedByTag: interaction.user.tag,
         requestedByName: interaction.user.username,

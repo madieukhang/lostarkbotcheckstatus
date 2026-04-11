@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.5] - 2026-04-11
+
+### Added
+
+- **`/list edit scope:` option** — promote a local blacklist entry to global, or demote a global one to server-only, without losing the entry's history (`addedAt`, `addedBy`, `allCharacters` snapshot, evidence). Previously the only workaround was `/list remove` followed by `/list add` with the new scope, which lost all metadata. Only meaningful for blacklist entries; using `scope:` on whitelist/watchlist edits is rejected with a clear error since those lists are always global by design.
+  - **Auto-approve logic now uses target state, not current state.** Demoting global → server is a privilege de-escalation and auto-approves. Promoting server → global is a privilege escalation and goes through Senior approval (unless the editor is already an officer). Editing a local entry without changing scope continues to auto-approve as before.
+  - **Conflict detection** — preflight query catches the case where the target `{name, scope, guildId}` combination would collide with an existing entry (e.g., demoting "X" from global to local in server A, but a local "X" already exists in server A). Rejects with an actionable error message. The Mongoose unique index also catches race conditions via `E11000`, returning a friendlier message.
+  - **Broadcast routing follows the final scope.** A demote-to-local edit now broadcasts only to the owner guild (no spam to other servers); a promote-to-global edit broadcasts to all opted-in servers, even if the entry was previously local.
+  - **No-effective-changes guard** — if the user provides `scope:` but it matches the current scope and no other fields are being edited, the command rejects rather than silently emitting a misleading "edited" success message.
+  - Available in both auto-approve path (officer/senior/local-scope edits) and approval path (member edits requiring Senior sign-off). The approval payload carries the new scope through `PendingApproval.scope` and the approval handler honors it on apply.
+
 ## [v0.5.4] - 2026-04-11
 
 ### Fixed
