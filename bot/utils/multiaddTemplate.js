@@ -275,10 +275,14 @@ export async function buildMultiaddTemplate() {
     }
   }
 
-  // ---------- Data validation dropdowns on rows 5 to 34 ----------
-  // (5-7 = examples, 8+ = user data; 30 total user-usable rows after examples)
+  // ---------- Data validation dropdowns ----------
+  // Range = rows 5 through (5 + MULTIADD_MAX_ROWS + 3):
+  //   rows 5-7   = three example rows (deleted or replaced by user)
+  //   rows 8+    = user data slots (up to MULTIADD_MAX_ROWS usable)
+  // +3 keeps the full 30-row limit available even if the user only
+  // replaces the examples in place instead of deleting them.
   const FIRST_DATA_ROW = 5;
-  const LAST_DATA_ROW = 5 + MULTIADD_MAX_ROWS + 3; // +3 for examples
+  const LAST_DATA_ROW = 5 + MULTIADD_MAX_ROWS + 3; // examples + user rows
   for (let r = FIRST_DATA_ROW; r <= LAST_DATA_ROW; r++) {
     // type column (B) — black/white/watch
     sheet.getCell(`B${r}`).dataValidation = {
@@ -450,8 +454,8 @@ function buildInstructionsSheet(wb) {
     COLOR_GRAY_50,
     [
       ['Step 1', '/list multiadd action:template  →  downloads this file'],
-      ['Step 2', 'Fill in rows from row 5 onward (below the header)'],
-      ['Step 3', 'DELETE the three colored example rows before uploading'],
+      ['Step 2', 'Replace or delete the three colored example rows (5-7) first'],
+      ['Step 3', 'Fill in your own entries below the header (up to 30 total)'],
       ['Step 4', '/list multiadd action:file file:<your.xlsx>  →  preview'],
       ['Step 5', 'Click Confirm to add, or Cancel to abort'],
     ]
