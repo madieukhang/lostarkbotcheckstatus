@@ -686,18 +686,27 @@ export async function handleSetupRemoteCommand(interaction) {
               // Wait 2s before retry — gives Discord rate-limit a moment to clear
               await new Promise((r) => setTimeout(r, 2000));
             } else {
-              // Both attempts failed — classify by error pattern + URL type
+              // Both attempts failed — classify by error pattern.
+              // Key insight from v0.5.10 live run: Discord garbage-collects
+              // old attachments from the CDN after ~30-90 days even if the
+              // original message still exists. The refresh-urls API can
+              // still return a valid-looking URL for these, but downloading
+              // yields HTTP 404. There's no way to recover these — they are
+              // truly dead, NOT an infrastructure failure. Classify any
+              // download failure (HTTP 4xx/5xx or fetch exception) as
+              // Skipped (dead URLs), regardless of whether the URL was
+              // Discord CDN or external. Only infra-layer errors (channel
+              // send failed, permission denied) stay in Failed.
               const errMsg = err.message;
-              const isExternalUrl = !isDiscordCdnUrl(entry.imageUrl);
-              const isDeadDownload = errMsg.startsWith('download HTTP') || errMsg.startsWith('download fetch threw');
+              const isDownloadFailure =
+                errMsg.startsWith('download HTTP')
+                || errMsg.startsWith('download fetch threw')
+                || errMsg.startsWith('download read body');
 
-              if (isExternalUrl && isDeadDownload) {
-                // External URL that 404s → dead link, expected
+              if (isDownloadFailure) {
                 stats.skippedDead += 1;
-                stats.errors.push(`${entry.name}: ${errMsg} (external URL, likely dead)`);
+                stats.errors.push(`${entry.name}: ${errMsg}`);
               } else {
-                // Discord URL that passed refresh but failed to upload, OR
-                // any other infra issue
                 stats.failed += 1;
                 stats.errors.push(`${entry.name}: ${errMsg}${firstAttemptError && firstAttemptError !== errMsg ? ` (attempt 1: ${firstAttemptError})` : ''}`);
               }

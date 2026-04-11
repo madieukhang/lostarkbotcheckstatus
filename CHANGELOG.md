@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.11] - 2026-04-11
+
+### Fixed
+
+- **`rehostImage()` double-wrapped error messages.** The `fail()` helper used throw-inside-try-catch, so when `throwOnError` was on and a failure happened inside the download try block (e.g., HTTP 404), the throw was immediately re-caught by the same try's catch block and re-wrapped into a nonsense message like `download fetch threw: download HTTP 404 (Not Found)`. Fixed by restructuring the download step into three separate try blocks (fetch / status check / body read) so that the throw from one step doesn't get re-caught by another step's catch.
+- **`/laremote action:syncimages` misclassified HTTP 404 download failures as `Failed`.** Root cause identified from VHT's second production run: Discord garbage-collects old CDN attachments after ~30-90 days even when the original message still exists, and the `attachments/refresh-urls` endpoint can still return a valid-looking URL for these — but the URL 404s on download. There is no way to recover these entries via the bot; the source file is truly gone. Reclassified any download-step failure (HTTP 4xx/5xx, fetch exception, body read exception) as `Skipped (dead URLs)` regardless of whether the URL was Discord CDN or external. `Failed` is now reserved for actual infrastructure errors (channel.send failed, permission denied, file too large, etc.) that could succeed on a later retry.
+
+### Notes
+
+- VHT's 49 entries that failed in v0.5.10 run are unrecoverable via this command — Discord has permanently deleted the underlying files. They will re-appear as `Skipped (dead URLs)` with the clean error message `download HTTP 404 (Not Found)` on the next re-run. No action needed; the entries remain in the blacklist/whitelist/watchlist with their text metadata intact, just without an evidence image. If VHT wants to restore an image for any of them, the workflow is `/list edit name:X image:<re-upload>`.
+
 ## [v0.5.10] - 2026-04-11
 
 ### Fixed
