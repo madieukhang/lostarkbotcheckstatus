@@ -38,6 +38,7 @@ import {
   getInteractionDisplayName,
 } from '../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../utils/scope.js';
+import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
 import {
   buildMultiaddTemplate,
   parseMultiaddFile,
@@ -61,6 +62,8 @@ function getListContext(type) {
 
 /**
  * Build a standardized embed for trusted user block messages.
+ * Wraps the shared buildAlertEmbed with severity:'trusted' so trusted
+ * blocks have consistent styling with the rest of the bot's alerts.
  */
 function buildTrustedBlockEmbed(name, reason, { via } = {}) {
   const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
@@ -68,15 +71,15 @@ function buildTrustedBlockEmbed(name, reason, { via } = {}) {
     ? `**${name}** shares a roster with trusted user **${via}** and cannot be added to any list.`
     : `**${name}** is a trusted user and cannot be added to any list.`;
 
-  return new EmbedBuilder()
-    .setTitle('🛡️ Trusted User — Blocked')
-    .setDescription(description)
-    .addFields(
+  return buildAlertEmbed({
+    severity: AlertSeverity.TRUSTED,
+    title: 'Trusted User — Blocked',
+    description,
+    fields: [
       { name: 'Name', value: `[${name}](${rosterLink})`, inline: true },
       { name: 'Trust reason', value: reason || 'N/A', inline: true },
-    )
-    .setColor(0x57d6a1)
-    .setTimestamp(new Date());
+    ],
+  });
 }
 
 function buildListAddApprovalEmbed(guild, payload, options = {}) {
@@ -407,23 +410,34 @@ export function createListHandlers({ client }) {
           )
           .join('\n');
 
-        const suggEmbed = new EmbedBuilder()
-          .setTitle('No Roster Found')
-          .setDescription(suggestionLines)
-          .setColor(0xfee75c)
-          .setTimestamp();
-
         return {
           ok: false,
           content: `❌ No roster found for **${name}**. Use one of the suggested names.`,
-          embeds: [suggEmbed],
+          embeds: [
+            buildAlertEmbed({
+              severity: AlertSeverity.ERROR,
+              title: 'No Roster Found',
+              description: `No character named **${name}** was found on lostark.bible. Here are some similar names:`,
+              fields: [
+                { name: 'Suggestions', value: suggestionLines.slice(0, 1024), inline: false },
+              ],
+              footer: 'Pick one of the suggested names and re-run the command.',
+            }),
+          ],
         };
       }
 
       return {
         ok: false,
         content: `❌ No roster found for **${name}**. No similar names found.`,
-        embeds: [],
+        embeds: [
+          buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'No Roster Found',
+            description: `No character named **${name}** was found on lostark.bible, and no similar names were suggested.`,
+            footer: 'Check the spelling (Lost Ark names are case-sensitive and include diacritics).',
+          }),
+        ],
       };
     }
 
@@ -432,7 +446,20 @@ export function createListHandlers({ client }) {
       return {
         ok: false,
         content: `❌ **${name}** has item level \`${targetItemLevel.toFixed(2)}\` (below 1700). Cannot add to ${label}.`,
-        embeds: [],
+        embeds: [
+          buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Item Level Too Low',
+            description: `**${name}** does not meet the minimum item level required to be added to any list.`,
+            fields: [
+              { name: 'Character', value: `[${name}](https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster)`, inline: true },
+              { name: 'Item level', value: `\`${targetItemLevel.toFixed(2)}\``, inline: true },
+              { name: 'Minimum required', value: '`1700.00`', inline: true },
+              { name: 'Target list', value: labelCap, inline: true },
+            ],
+            footer: 'ilvl gate prevents spam entries for inactive or unleveled alts.',
+          }),
+        ],
       };
     }
 
@@ -480,12 +507,75 @@ export function createListHandlers({ client }) {
       const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
       const via = isRosterMatch ? ` (roster match: **${existed.name}** is already in ${label})` : '';
       const scopeNote = existed.scope === 'server' ? ' [Server]' : '';
+
+      // Build structured alert embed with all the duplicate's context
+      const existedRosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(existed.name)}/roster`;
+      const dupFields = [];
+      if (isRosterMatch) {
+        dupFields.push({
+          name: 'Match type',
+          value: 'Roster alt',
+          inline: true,
+        });
+        dupFields.push({
+          name: 'Matched name',
+          value: `[${existed.name}](${existedRosterLink})`,
+          inline: true,
+        });
+      } else {
+        dupFields.push({
+          name: 'Match type',
+          value: 'Exact name',
+          inline: true,
+        });
+      }
+      if (existed.scope) {
+        dupFields.push({
+          name: 'Scope',
+          value: existed.scope === 'server' ? '`[Server]`' : '`[Global]`',
+          inline: true,
+        });
+      }
+      if (existed.addedByDisplayName || existed.addedByTag) {
+        dupFields.push({
+          name: 'Added by',
+          value: existed.addedByDisplayName || existed.addedByTag,
+          inline: true,
+        });
+      }
+      if (existed.reason) {
+        dupFields.push({
+          name: 'Existing reason',
+          value: existed.reason.slice(0, 1024),
+          inline: false,
+        });
+      }
+      if (existed.raid) {
+        dupFields.push({
+          name: 'Raid',
+          value: existed.raid,
+          inline: true,
+        });
+      }
+
+      const dupDescription = isRosterMatch
+        ? `**${name}** is already in ${label} via roster match with **${existed.name}**.`
+        : `**${name}** is already in ${label}.`;
+
       return {
         ok: false,
         isDuplicate: true,
         existingEntry: existed,
         content: `⚠️ **${name}** already exists in ${label}.${via}${scopeNote}`,
-        embeds: [],
+        embeds: [
+          buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: `Already in ${labelCap}`,
+            description: dupDescription,
+            fields: dupFields,
+            footer: `Use /list view ${payload.type} to see the full entry, or /list edit to modify it.`,
+          }),
+        ],
       };
     }
 
@@ -1372,8 +1462,11 @@ export function createListHandlers({ client }) {
       // Auto-approve: officers always, OR server-scoped entries (local = no approval needed)
       if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
         const result = await executeListAddToDatabase(payload);
+        // Prefer rich embed when available; fall back to plain content for
+        // simple success messages that don't need a structured alert.
+        const hasEmbed = (result.embeds?.length ?? 0) > 0;
         await interaction.editReply({
-          content: `${result.content}`,
+          content: hasEmbed ? null : result.content,
           embeds: result.embeds ?? [],
         });
         return;
@@ -2107,8 +2200,9 @@ export function createListHandlers({ client }) {
       // Auto-approve: officers always, OR server-scoped (local = free)
       if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
         const result = await executeListAddToDatabase(payload);
+        const hasEmbed = (result.embeds?.length ?? 0) > 0;
         await interaction.editReply({
-          content: result.content,
+          content: hasEmbed ? null : result.content,
           embeds: result.embeds ?? [],
         });
         return;
