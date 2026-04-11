@@ -73,27 +73,39 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     return fail('No evidence channel configured. Use /laremote action:evidencechannel to set one.');
   }
 
-  // Step 1: Download the original image (URL still valid at this point)
-  let buffer;
-  let filename = 'evidence.png';
+  // Step 1: Download the original image (URL still valid at this point).
+  // Separate try blocks per async op so that a thrown error from fail()
+  // inside one try block doesn't get re-caught by an outer catch and
+  // double-wrapped into "download fetch threw: download HTTP 404" style
+  // nonsense messages.
+  let response;
   try {
-    const response = await fetch(originalUrl);
-    if (!response.ok) {
-      return fail(`download HTTP ${response.status} (${response.statusText || 'no statusText'})`);
-    }
-    buffer = Buffer.from(await response.arrayBuffer());
-
-    // Try to extract a sensible filename from the URL path
-    try {
-      const urlPath = new URL(originalUrl).pathname;
-      const lastSegment = urlPath.split('/').pop() || '';
-      if (lastSegment && /\.(png|jpg|jpeg|webp|gif)$/i.test(lastSegment)) {
-        filename = lastSegment;
-      }
-    } catch { /* leave default filename */ }
+    response = await fetch(originalUrl);
   } catch (err) {
     return fail(`download fetch threw: ${err.message}`);
   }
+
+  if (!response.ok) {
+    return fail(`download HTTP ${response.status}${response.statusText ? ` (${response.statusText})` : ''}`);
+  }
+
+  let buffer;
+  try {
+    buffer = Buffer.from(await response.arrayBuffer());
+  } catch (err) {
+    return fail(`download read body failed: ${err.message}`);
+  }
+
+  // Try to extract a sensible filename from the URL path. Failure is
+  // non-fatal — falls back to 'evidence.png'.
+  let filename = 'evidence.png';
+  try {
+    const urlPath = new URL(originalUrl).pathname;
+    const lastSegment = urlPath.split('/').pop() || '';
+    if (lastSegment && /\.(png|jpg|jpeg|webp|gif)$/i.test(lastSegment)) {
+      filename = lastSegment;
+    }
+  } catch { /* leave default filename */ }
 
   // Sanity check size — Discord attachments max 25 MB for bots without nitro
   if (buffer.length > 24 * 1024 * 1024) {
