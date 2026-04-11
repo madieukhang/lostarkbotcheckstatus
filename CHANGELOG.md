@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.2] - 2026-04-11
+
+### Fixed
+
+- **P1: Discord CDN evidence images expired silently after ~24h.** Since 2024, Discord CDN attachment URLs include signed expiry tokens (`?ex=...&hm=...`). The bot was storing those URLs directly, so any `/list add image:` evidence silently 404'd a day later. Confirmed in production: 3 entries (Razed/Veska/Endlessbless) lost evidence ~44h after add. Fixed by introducing an evidence rehost mechanism — bot now re-uploads each image to a dedicated "evidence channel" and stores the message ID instead of the URL. On display, bot fetches the message via Discord API and reads a freshly-signed attachment URL (Discord re-signs on every fetch). Future entries are permanent; legacy entries stay broken (cannot recover expired URLs).
+
+### Added
+
+- **`/laremote action:evidencechannel channel:#...`** — Senior-only command to set the bot-wide evidence channel where rehosted images are stored. Persists to owner guild's `GuildConfig.evidenceChannelId`. Updates instantly without redeploy. Validates that the bot has View/Send/AttachFiles/ReadHistory permissions in the chosen channel before saving. Visible on the `/laremote action:view` dashboard owner card.
+- **`bot/utils/imageRehost.js`** — new zero-dep helper module exporting:
+  - `rehostImage(originalUrl, client, meta)` — downloads URL, uploads to evidence channel with audit metadata in message content (entry name, added by, timestamp), returns `{ messageId, channelId, freshUrl }` or `null` on failure.
+  - `refreshImageUrl(messageId, channelId, client)` — fetches stored message and returns the fresh signed attachment URL.
+  - `resolveDisplayImageUrl(entry, client)` — high-level helper that prefers rehosted refresh, falls back to legacy `entry.imageUrl`.
+- **Schema fields:** `imageMessageId` and `imageChannelId` added to `Blacklist`, `Whitelist`, and `Watchlist`. Legacy `imageUrl` is preserved as fallback for entries created before rehost.
+- **`GuildConfig.evidenceChannelId`** — String field on the owner guild's config record (bot-wide setting, not per-guild).
+
+### Changed
+
+- `/list add` now rehosts the image attachment **immediately** after submission (while the original CDN URL is still valid) and stores the resulting `imageMessageId`/`imageChannelId` instead of the URL. If the evidence channel is not yet configured or rehost fails, falls back to legacy URL storage with a console warning.
+- `/list edit` rehosts new image attachments the same way and properly carries over existing rehost refs when only other fields change.
+- `/list multiadd` parser now rehosts each row's `image` URL during the bulk loop, so bulk uploads also get permanent storage.
+- `broadcastListChange` and `/list view` evidence display use `resolveDisplayImageUrl` to fetch fresh URLs lazily for rehosted entries while gracefully falling back to legacy URLs.
+- `/list view` paginated 📎 inline links now use a Discord message deep-link (`https://discord.com/channels/...`) for rehosted entries, opening the evidence message directly in Discord. Legacy entries still link to the (possibly expired) direct CDN URL.
+- `/list view` evidence dropdown now includes both legacy and rehosted entries; the ephemeral preview embed shows a clear "Image link expired" notice when refresh fails.
+- `/laremote action:view` dashboard now shows the evidence channel setting on the owner guild card (with a warning if unset).
+
 ## [v0.5.1] - 2026-04-11
 
 ### Added

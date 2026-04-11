@@ -392,9 +392,10 @@ export function buildOwnerCommands() {
           .setDescription('What to do')
           .setRequired(true)
           .addChoices(
-            { name: 'view — show all servers', value: 'view' },
+            { name: 'view — show all servers + bot config', value: 'view' },
             { name: 'off — toggle notify for a server', value: 'off' },
-            { name: 'defaultscope — set scope for a server', value: 'defaultscope' }
+            { name: 'defaultscope — set scope for a server', value: 'defaultscope' },
+            { name: 'evidencechannel — set image rehost channel (bot-wide)', value: 'evidencechannel' }
           )
       )
       .addStringOption((opt) =>
@@ -412,6 +413,12 @@ export function buildOwnerCommands() {
             { name: 'global', value: 'global' },
             { name: 'server', value: 'server' }
           )
+      )
+      .addChannelOption((opt) =>
+        opt
+          .setName('channel')
+          .setDescription('Channel to use (required for evidencechannel action)')
+          .setRequired(false)
       ),
   ].map((cmd) => cmd.toJSON());
 }

@@ -34,8 +34,26 @@ const whitelistSchema = new mongoose.Schema({
     trim: true,
   },
 
-  /** Optional attachment image URL from slash command */
+  /**
+   * Optional attachment image URL — legacy field for entries created before
+   * the rehost feature. New entries use imageMessageId/imageChannelId instead
+   * because Discord CDN URLs expire ~24h after issue.
+   */
   imageUrl: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+
+  /** Message ID in evidence channel that holds the rehosted image (rehost-aware entries). */
+  imageMessageId: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+
+  /** Channel ID where the rehosted image lives. */
+  imageChannelId: {
     type: String,
     default: '',
     trim: true,
