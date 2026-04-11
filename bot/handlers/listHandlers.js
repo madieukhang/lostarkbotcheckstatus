@@ -83,6 +83,66 @@ function buildTrustedBlockEmbed(name, reason, { via } = {}) {
   });
 }
 
+/**
+ * Build a rich success embed for /list edit (both auto-approve and approval
+ * paths). Replaces the old plain-text "✅ Name edited in blacklist" reply
+ * with a color-coded, structured response showing the entry's current state,
+ * the changes applied, and (when available) the fresh evidence image.
+ *
+ * @param {Object} entry - The post-edit entry (merged for in-place, the new
+ *   doc for cross-list moves). Must include name, reason, raid, scope.
+ * @param {Object} options
+ * @param {string[]} options.changes - The change summary lines (e.g.
+ *   ['Reason: "old" → "new"', 'Scope: server → global']).
+ * @param {string} options.type - Final list type ('black' / 'white' / 'watch').
+ * @param {string} [options.freshDisplayUrl] - Pre-resolved evidence URL.
+ *   Skipped if empty.
+ * @param {string} [options.requesterDisplayName] - Editor's display name for
+ *   the footer attribution.
+ * @param {boolean} [options.isMove] - True if this edit moved the entry to
+ *   a different list (changes the title from "Edited" to "Edited & Moved").
+ */
+function buildListEditSuccessEmbed(entry, options = {}) {
+  const { changes = [], type, freshDisplayUrl, requesterDisplayName, isMove = false } = options;
+  const { color, label, icon } = getListContext(type);
+  const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+  const scopeTag = entry.scope === 'server' ? ' (Local)' : '';
+  const titleAction = isMove ? 'Edited & Moved' : 'Edited';
+  const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
+
+  const fields = [
+    { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
+    { name: 'Reason', value: entry.reason || 'N/A', inline: true },
+  ];
+  if (entry.raid) {
+    fields.push({ name: 'Raid', value: entry.raid, inline: true });
+  }
+  if (changes.length > 0) {
+    // Discord field value cap is 1024 chars; truncate gracefully on huge edits.
+    const changesText = changes.map((c) => `• ${c}`).join('\n');
+    fields.push({
+      name: `Changes (${changes.length})`,
+      value: changesText.length > 1024 ? changesText.slice(0, 1020) + '…' : changesText,
+      inline: false,
+    });
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle(`✏️ ${icon} ${labelCap}${scopeTag} — ${titleAction}`)
+    .addFields(fields)
+    .setColor(color)
+    .setTimestamp(new Date());
+
+  if (requesterDisplayName) {
+    embed.setFooter({ text: `Edited by ${requesterDisplayName}` });
+  }
+  if (freshDisplayUrl) {
+    embed.setImage(freshDisplayUrl);
+  }
+
+  return embed;
+}
+
 function buildListAddApprovalEmbed(guild, payload, options = {}) {
   const title = options.title || 'List Add — Approval Required';
   const includeRequestedBy = options.includeRequestedBy ?? true;
@@ -1191,6 +1251,9 @@ export function createListHandlers({ client }) {
           return;
         }
 
+        // Captured per-branch for the rich success embed below.
+        let postEditEntry = null;
+
         if (isTypeChange) {
           // Preflight: scope-aware duplicate check on target list
           const nameMatch = { $or: [{ name: existingEntry.name }, { allCharacters: existingEntry.name }] };
@@ -1242,7 +1305,7 @@ export function createListHandlers({ client }) {
             : (payload.imageUrl || existingEntry.imageUrl || '');
 
           // Create first, then delete old (safe order — if create fails, old preserved)
-          await newModel.create({
+          postEditEntry = await newModel.create({
             name: existingEntry.name,
             reason: payload.reason || existingEntry.reason,
             raid: payload.raid || existingEntry.raid,
@@ -1303,6 +1366,9 @@ export function createListHandlers({ client }) {
               throw err;
             }
           }
+          // Capture for the rich success embed below — virtual post-edit
+          // entry is the pre-edit snapshot merged with updateFields.
+          postEditEntry = { ...(existingEntry.toObject?.() || existingEntry), ...updateFields };
         }
 
         // Broadcast edit: routing decided by the FINAL scope (after any scope
@@ -1318,7 +1384,60 @@ export function createListHandlers({ client }) {
         }, { onlyOwner: broadcastScope === 'server' }).catch(() => {});
 
         await PendingApproval.deleteOne({ requestId });
-        const editResult = { ok: true, content: `✅ Edit approved: **${existingEntry.name}**${isTypeChange ? ` moved to ${newLabel}` : ' updated'}.` };
+
+        // Derive changes summary by comparing payload to the pre-edit snapshot.
+        // The original /list edit command's `changes` array doesn't survive
+        // the PendingApproval round trip, so we reconstruct it here for the
+        // rich success embed.
+        const approvalChanges = [];
+        if (payload.reason && payload.reason !== existingEntry.reason) {
+          approvalChanges.push(`Reason: "${existingEntry.reason || ''}" → "${payload.reason}"`);
+        }
+        if (isTypeChange) {
+          const oldLabel = getListContext(payload.currentType).label;
+          approvalChanges.push(`List: ${oldLabel} → ${newLabel}`);
+        }
+        if (payload.raid && payload.raid !== existingEntry.raid) {
+          approvalChanges.push(`Raid: "${existingEntry.raid || 'N/A'}" → "${payload.raid}"`);
+        }
+        if (payload.logsUrl && payload.logsUrl !== (existingEntry.logsUrl || '')) {
+          approvalChanges.push('Logs: updated');
+        }
+        const evidenceChanged =
+          (payload.imageMessageId && payload.imageMessageId !== existingEntry.imageMessageId)
+          || (payload.imageUrl && !payload.imageMessageId && payload.imageUrl !== existingEntry.imageUrl);
+        if (evidenceChanged) {
+          approvalChanges.push('Evidence: updated');
+        }
+        if (
+          payload.type === 'black'
+          && payload.scope
+          && payload.scope !== (existingEntry.scope || 'global')
+        ) {
+          approvalChanges.push(`Scope: ${existingEntry.scope || 'global'} → ${payload.scope}`);
+        }
+
+        // Build the rich success embed for the requester reply. Falls back
+        // to plain text if postEditEntry is somehow null (shouldn't happen
+        // but defensive — null embeds[] is handled by notifyRequester).
+        let approvalSuccessEmbed = null;
+        if (postEditEntry) {
+          const entryForEmbed = postEditEntry.toObject?.() || postEditEntry;
+          const approvalFreshUrl = await resolveDisplayImageUrl(entryForEmbed, client);
+          approvalSuccessEmbed = buildListEditSuccessEmbed(entryForEmbed, {
+            changes: approvalChanges,
+            type: payload.type,
+            freshDisplayUrl: approvalFreshUrl,
+            requesterDisplayName: payload.requestedByDisplayName || payload.requestedByTag || 'Unknown',
+            isMove: isTypeChange,
+          });
+        }
+
+        const editResult = {
+          ok: true,
+          content: `✅ Edit approved: **${existingEntry.name}**${isTypeChange ? ` moved to ${newLabel}` : ' updated'}.`,
+          embeds: approvalSuccessEmbed ? [approvalSuccessEmbed] : [],
+        };
 
         await interaction.editReply({
           content: `✅ Edit approved by **${interaction.user.tag}**.`,
@@ -2052,7 +2171,7 @@ export function createListHandlers({ client }) {
                 : { imageUrl: newImageUrl, imageMessageId: '', imageChannelId: '' })
             : { imageUrl: existing.imageUrl || '', imageMessageId: existing.imageMessageId || '', imageChannelId: existing.imageChannelId || '' };
 
-          await newModel.create({
+          const movedEntry = await newModel.create({
             name: existing.name,
             reason: newReason || existing.reason,
             raid: newRaid || existing.raid,
@@ -2073,8 +2192,22 @@ export function createListHandlers({ client }) {
           });
           await oldModel.deleteOne({ _id: existing._id });
 
+          // Resolve the freshest evidence URL from the just-created entry so
+          // the success embed renders the new image immediately (no broken
+          // CDN snapshots, no extra round trip on re-render).
+          const moveFreshUrl = await resolveDisplayImageUrl(movedEntry, client);
+
           await interaction.editReply({
-            content: `✅ **${existing.name}** edited and moved to ${newLabel}.\n${changes.map((c) => `• ${c}`).join('\n')}`,
+            content: null,
+            embeds: [
+              buildListEditSuccessEmbed(movedEntry.toObject?.() || movedEntry, {
+                changes,
+                type: targetType,
+                freshDisplayUrl: moveFreshUrl,
+                requesterDisplayName: getInteractionDisplayName(interaction),
+                isMove: true,
+              }),
+            ],
           });
         } else {
           // Update in place
@@ -2117,8 +2250,23 @@ export function createListHandlers({ client }) {
             throw err;
           }
 
+          // Build a virtual post-edit entry by merging updateFields onto the
+          // pre-edit snapshot. Avoids an extra round trip to fetch the updated
+          // doc just for the success embed.
+          const editedEntry = { ...(existing.toObject?.() || existing), ...updateFields };
+          const editFreshUrl = await resolveDisplayImageUrl(editedEntry, client);
+
           await interaction.editReply({
-            content: `✅ **${existing.name}** edited in ${currentLabel}.\n${changes.map((c) => `• ${c}`).join('\n')}`,
+            content: null,
+            embeds: [
+              buildListEditSuccessEmbed(editedEntry, {
+                changes,
+                type: currentType,
+                freshDisplayUrl: editFreshUrl,
+                requesterDisplayName: getInteractionDisplayName(interaction),
+                isMove: false,
+              }),
+            ],
           });
         }
 

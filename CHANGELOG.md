@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.6] - 2026-04-11
+
+### Changed
+
+- **`/list edit` success response is now a rich embed instead of plain text.** The previous response was a single line with a bullet list of changes (`✅ Daivuong edited in blacklist. • Scope: server → global`). The new response is a color-coded embed with the list icon in the title (`✏️ ⛔ Blacklist (Local) — Edited`), structured fields for name (with roster link), reason, raid, a `Changes (n)` field, the editor's name in the footer, a timestamp, and the freshly-resolved evidence image when one exists. Matches the visual style of `/list add` success and `/list view` evidence dropdown previews.
+  - **New shared helper:** `buildListEditSuccessEmbed(entry, options)` at module level. Used by both the auto-approve path and the approval execution path so single-add edits and Senior-approved edits look identical to the requester.
+  - **Approval path derives the change list** by comparing the `PendingApproval` payload to the pre-edit snapshot of the entry. The original edit command's `changes` array doesn't survive the round-trip through DB, so the comparison is reconstructed at approval time. Covers reason, raid, logs, evidence, type change, and scope change.
+  - **Resolves a fresh evidence URL** via `resolveDisplayImageUrl(entry, client)` after the entry is materialized (cross-list move) or merged (in-place update). For rehosted entries this fetches a freshly-signed URL from the evidence channel, so the embed image is guaranteed valid even if the user edited the entry hours after the original upload.
+  - **Cross-list move title:** `"Edited & Moved"` instead of `"Edited"` to make the move obvious. In-place edits keep the simpler `"Edited"` title.
+  - **No-changes safety:** if `changes.length === 0` (shouldn't happen given the no-effective-changes guard from v0.5.5, but defensive), the helper omits the `Changes` field rather than rendering an empty bullet list.
+
 ## [v0.5.5] - 2026-04-11
 
 ### Added
