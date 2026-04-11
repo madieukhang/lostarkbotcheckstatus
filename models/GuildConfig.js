@@ -23,6 +23,16 @@ const guildConfigSchema = new mongoose.Schema({
   /** Default blacklist scope for /list add when scope option is not specified */
   defaultBlacklistScope: { type: String, enum: ['global', 'server'], default: 'global' },
 
+  /**
+   * Channel ID where the bot rehosts evidence images for permanent storage.
+   * Only meaningful on the OWNER guild's GuildConfig record — bot reads this
+   * single value to know where to upload images. Configured via /laremote
+   * action:evidencechannel channel:#... by Senior approvers. Without it,
+   * /list add image uploads fall back to legacy direct-URL storage which
+   * expires after ~24h due to Discord CDN policy.
+   */
+  evidenceChannelId: { type: String, default: '' },
+
   /** Who last updated this config */
   updatedByUserId: { type: String, default: '' },
   updatedByTag: { type: String, default: '' },

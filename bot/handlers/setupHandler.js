@@ -351,6 +351,7 @@ export async function handleSetupRemoteCommand(interaction) {
   const action = interaction.options.getString('action', true);
   const targetGuildId = interaction.options.getString('guild') || '';
   const scopeValue = interaction.options.getString('scope') || '';
+  const channelOpt = interaction.options.getChannel('channel');
 
   await interaction.deferReply({ ephemeral: true });
   await connectDB();
@@ -384,7 +385,7 @@ export async function handleSetupRemoteCommand(interaction) {
       const updated = gc?.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '—';
       const configured = gc ? '✅' : '⚪';
 
-      return new EmbedBuilder()
+      const embed = new EmbedBuilder()
         .setTitle(`${isOwner ? '👑' : '🖥️'} ${guild.name} ${configured}`)
         .setDescription(`\`${guild.id}\`${isOwner ? ' — **Owner Server**' : ''}${!gc ? ' — *No config yet*' : ''}`)
         .addFields(
@@ -396,6 +397,20 @@ export async function handleSetupRemoteCommand(interaction) {
           { name: '👤 Updated By', value: gc?.updatedByTag || '—', inline: true },
         )
         .setColor(isOwner ? 0xf1c40f : gc ? 0x5865f2 : 0x95a5a6);
+
+      // Bot-wide settings only shown on owner guild card
+      if (isOwner) {
+        const evidenceCh = gc?.evidenceChannelId
+          ? `<#${gc.evidenceChannelId}>`
+          : '*Not set — images use legacy URL (expire ~24h)*';
+        embed.addFields({
+          name: '🖼️ Evidence Channel (bot-wide)',
+          value: evidenceCh,
+          inline: false,
+        });
+      }
+
+      return embed;
     }
 
     // Owner embed always pinned on top
@@ -442,6 +457,79 @@ export async function handleSetupRemoteCommand(interaction) {
     return;
   }
 
+  // ── ACTION: evidencechannel ──────────────────────────────
+  // Bot-wide setting (not per-guild) — stored on owner GuildConfig.
+  // Sets where the bot rehosts /list add evidence images for permanent storage.
+  if (action === 'evidencechannel') {
+    if (!config.ownerGuildId) {
+      await interaction.editReply({
+        content: '❌ `OWNER_GUILD_ID` is not configured. Set it in env vars first.',
+      });
+      return;
+    }
+
+    if (!channelOpt) {
+      await interaction.editReply({
+        content: '❌ Provide `channel:` option for this action. Pick the hidden channel where evidence images will be stored.',
+      });
+      return;
+    }
+
+    if (!channelOpt.isTextBased?.()) {
+      await interaction.editReply({
+        content: `❌ Channel <#${channelOpt.id}> is not a text channel.`,
+      });
+      return;
+    }
+
+    // Verify bot can post + read in this channel (best-effort permission check)
+    const me = channelOpt.guild?.members?.me;
+    if (me) {
+      const perms = channelOpt.permissionsFor(me);
+      const need = ['ViewChannel', 'SendMessages', 'AttachFiles', 'ReadMessageHistory'];
+      const missing = need.filter((p) => !perms?.has(p));
+      if (missing.length > 0) {
+        await interaction.editReply({
+          content: `❌ Bot is missing permissions in <#${channelOpt.id}>: ${missing.join(', ')}.\nGrant these and try again.`,
+        });
+        return;
+      }
+    }
+
+    // Persist to OWNER guild's GuildConfig
+    await GuildConfig.findOneAndUpdate(
+      { guildId: config.ownerGuildId },
+      {
+        $set: {
+          evidenceChannelId: channelOpt.id,
+          updatedByUserId: interaction.user.id,
+          updatedByTag: interaction.user.tag,
+        },
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+    invalidateGuildConfig(config.ownerGuildId);
+
+    const embed = new EmbedBuilder()
+      .setTitle('🖼️ Evidence Channel Updated')
+      .setDescription(
+        `New /list add image attachments will be rehosted to <#${channelOpt.id}> ` +
+        `for permanent storage. Existing entries are unaffected.`
+      )
+      .addFields(
+        { name: 'Channel', value: `<#${channelOpt.id}>`, inline: true },
+        { name: 'Channel ID', value: `\`${channelOpt.id}\``, inline: true },
+        { name: 'Server', value: channelOpt.guild?.name || '*Unknown*', inline: true },
+      )
+      .setColor(0x5865f2)
+      .setFooter({ text: `Set by ${interaction.user.tag} · bot-wide setting` })
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
+    console.log(`[lasetup] Remote: evidenceChannelId → ${channelOpt.id} by ${interaction.user.tag}`);
+    return;
+  }
+
   // ── Need guild ID for off/defaultscope ───────────────────
   if (!targetGuildId) {
     const helpEmbed = new EmbedBuilder()
@@ -450,6 +538,7 @@ export async function handleSetupRemoteCommand(interaction) {
       .addFields(
         { name: 'Toggle notify', value: '`/laremote action:off guild:<ID>`', inline: false },
         { name: 'Set scope', value: '`/laremote action:defaultscope guild:<ID> scope:server`', inline: false },
+        { name: 'Set evidence channel', value: '`/laremote action:evidencechannel channel:#...`', inline: false },
       )
       .setColor(0xed4245);
     await interaction.editReply({ embeds: [helpEmbed] });

@@ -39,6 +39,7 @@ import {
 } from '../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
+import { rehostImage, resolveDisplayImageUrl } from '../utils/imageRehost.js';
 import {
   buildMultiaddTemplate,
   parseMultiaddFile,
@@ -585,7 +586,10 @@ export function createListHandlers({ client }) {
       reason: payload.reason,
       raid: payload.raid,
       logsUrl: payload.logsUrl || '',
-      imageUrl: payload.imageUrl,
+      // Image storage: prefer rehosted (permanent) over direct URL (legacy/expiring)
+      imageUrl: payload.imageMessageId ? '' : (payload.imageUrl || ''),
+      imageMessageId: payload.imageMessageId || '',
+      imageChannelId: payload.imageChannelId || '',
       allCharacters,
       addedByUserId: payload.requestedByUserId,
       addedByTag: payload.requestedByTag,
@@ -667,7 +671,14 @@ export function createListHandlers({ client }) {
       .setTimestamp(new Date());
 
     if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
-    if (entry.imageUrl) embed.setImage(entry.imageUrl);
+
+    // Resolve display URL via rehost-aware helper: prefers freshly-fetched
+    // URL from evidence channel, falls back to legacy entry.imageUrl.
+    // We also accept payload.imageUrl as a hot-path shortcut for entries we
+    // JUST created (still fresh in this function call).
+    const displayUrl = payload.imageUrl
+      || (await resolveDisplayImageUrl(entry, client));
+    if (displayUrl) embed.setImage(displayUrl);
 
     // Delegate channel routing to the shared resolver — keeps single-add and
     // bulk-add broadcast paths using identical scope/opt-out logic.
@@ -880,6 +891,18 @@ export function createListHandlers({ client }) {
       const effectiveScope =
         row.type === 'black' ? (row.scope || guildDefaultScope) : 'global';
 
+      // Rehost the row's image URL (if any) so the entry has permanent storage.
+      // Best-effort: rehost failure falls back to legacy URL storage. Fetched
+      // sequentially with the row processing because each rehost is small.
+      let rowRehost = null;
+      if (row.image) {
+        rowRehost = await rehostImage(row.image, client, {
+          entryName: row.name,
+          addedBy: meta.requesterDisplayName || meta.requesterTag,
+          listType: row.type,
+        });
+      }
+
       const payload = {
         requestId: randomUUID(),
         guildId: meta.guildId,
@@ -889,7 +912,9 @@ export function createListHandlers({ client }) {
         reason: row.reason,
         raid: row.raid || '',
         logsUrl: row.logs || '',
-        imageUrl: row.image || '',
+        imageUrl: rowRehost?.freshUrl || row.image || '',
+        imageMessageId: rowRehost?.messageId || '',
+        imageChannelId: rowRehost?.channelId || '',
         scope: effectiveScope,
         requestedByUserId: meta.requesterId,
         requestedByTag: meta.requesterTag || '',
@@ -1441,6 +1466,19 @@ export function createListHandlers({ client }) {
 
     try {
       const requestId = randomUUID();
+
+      // Rehost the image NOW (while the Discord CDN URL is still valid).
+      // If rehost fails or no evidence channel is configured, we fall back to
+      // storing the original URL as legacy (which will eventually expire).
+      let rehostResult = null;
+      if (image?.url) {
+        rehostResult = await rehostImage(image.url, client, {
+          entryName: name,
+          addedBy: getInteractionDisplayName(interaction),
+          listType: type,
+        });
+      }
+
       const payload = {
         requestId,
         guildId: interaction.guild.id,
@@ -1450,7 +1488,14 @@ export function createListHandlers({ client }) {
         reason,
         raid,
         logsUrl: logs,
-        imageUrl: image?.url ?? '',
+        // imageUrl carries the CURRENT display URL (fresh at this moment).
+        // If rehosted, use the freshly-signed evidence URL; otherwise the
+        // original attachment URL. Either way it's valid for immediate render.
+        // executeListAddToDatabase decides whether to PERSIST this URL based
+        // on whether imageMessageId is set (rehosted entries don't store URL).
+        imageUrl: rehostResult?.freshUrl || image?.url || '',
+        imageMessageId: rehostResult?.messageId || '',
+        imageChannelId: rehostResult?.channelId || '',
         scope: type === 'black' ? scope : 'global', // scope only applies to blacklist
         requestedByUserId: interaction.user.id,
         requestedByTag: interaction.user.tag,
@@ -1650,6 +1695,18 @@ export function createListHandlers({ client }) {
     const imageAttachment = interaction.options.getAttachment('image');
     const newImageUrl = imageAttachment?.url || '';
 
+    // Rehost the new image NOW (while CDN URL is still valid). Result is used
+    // later in updateFields. If rehost fails or no evidence channel configured,
+    // we fall back to storing the legacy URL (which will eventually expire).
+    let newImageRehost = null;
+    if (newImageUrl) {
+      newImageRehost = await rehostImage(newImageUrl, client, {
+        entryName: name,
+        addedBy: getInteractionDisplayName(interaction),
+        listType: '', // type may change in this edit; leave blank
+      });
+    }
+
     await interaction.deferReply();
     await connectDB();
 
@@ -1754,12 +1811,21 @@ export function createListHandlers({ client }) {
 
           // Safe to move: create first, then delete old (if create fails, old entry preserved)
           const existingObj = existing.toObject?.() || existing;
+          // Image inheritance: if user provided a new image AND it was rehosted,
+          // use the rehost refs; if new image but rehost failed, use legacy URL;
+          // if no new image, carry over the existing entry's image fields.
+          const moveImageFields = newImageUrl
+            ? (newImageRehost
+                ? { imageUrl: '', imageMessageId: newImageRehost.messageId, imageChannelId: newImageRehost.channelId }
+                : { imageUrl: newImageUrl, imageMessageId: '', imageChannelId: '' })
+            : { imageUrl: existing.imageUrl || '', imageMessageId: existing.imageMessageId || '', imageChannelId: existing.imageChannelId || '' };
+
           await newModel.create({
             name: existing.name,
             reason: newReason || existing.reason,
             raid: newRaid || existing.raid,
             logsUrl: newLogs || existing.logsUrl,
-            imageUrl: newImageUrl || existing.imageUrl,
+            ...moveImageFields,
             allCharacters: existing.allCharacters || [],
             addedByUserId: existing.addedByUserId,
             addedByTag: existing.addedByTag,
@@ -1782,7 +1848,18 @@ export function createListHandlers({ client }) {
           if (newReason) updateFields.reason = newReason;
           if (newRaid) updateFields.raid = newRaid;
           if (newLogs) updateFields.logsUrl = newLogs;
-          if (newImageUrl) updateFields.imageUrl = newImageUrl;
+          if (newImageUrl) {
+            // New image provided — use rehost result if successful, else legacy URL
+            if (newImageRehost) {
+              updateFields.imageUrl = '';
+              updateFields.imageMessageId = newImageRehost.messageId;
+              updateFields.imageChannelId = newImageRehost.channelId;
+            } else {
+              updateFields.imageUrl = newImageUrl;
+              updateFields.imageMessageId = '';
+              updateFields.imageChannelId = '';
+            }
+          }
 
           const { model } = getListContext(currentType);
           await model.updateOne({ _id: existing._id }, { $set: updateFields });
@@ -1809,6 +1886,15 @@ export function createListHandlers({ client }) {
     } else {
       // Not owner, not approver → send approval request
       const existingObj = existing.toObject?.() || existing;
+
+      // Image fields for the approval payload: prefer rehosted refs over URL.
+      // The newImageRehost was already attempted at the top of the handler.
+      const editImageFields = newImageUrl
+        ? (newImageRehost
+            ? { imageUrl: newImageRehost.freshUrl || '', imageMessageId: newImageRehost.messageId, imageChannelId: newImageRehost.channelId }
+            : { imageUrl: newImageUrl, imageMessageId: '', imageChannelId: '' })
+        : { imageUrl: existing.imageUrl || '', imageMessageId: existing.imageMessageId || '', imageChannelId: existing.imageChannelId || '' };
+
       const payload = {
         requestId: randomUUID(),
         action: 'edit',
@@ -1821,7 +1907,7 @@ export function createListHandlers({ client }) {
         reason: newReason || existing.reason,
         raid: newRaid || existing.raid,
         logsUrl: newLogs || existing.logsUrl || '',
-        imageUrl: newImageUrl || existing.imageUrl || '',
+        ...editImageFields,
         scope: existingObj.scope || editGuildDefaultScope, // preserve existing scope, or use guild default
         requestedByUserId: interaction.user.id,
         requestedByTag: interaction.user.tag,
@@ -1984,7 +2070,18 @@ export function createListHandlers({ client }) {
           if (e.raid) parts.push(`[${e.raid}]`);
           const date = e.addedAt ? `<t:${Math.floor(new Date(e.addedAt).getTime() / 1000)}:R>` : '';
           if (date) parts.push(date);
-          if (e.imageUrl) parts.push(`[📎](${e.imageUrl})`);
+          // 📎 inline evidence link:
+          //   - Rehosted entries → link to evidence message in owner guild
+          //     (Discord deep-link, opens the message inline in Discord client)
+          //   - Legacy entries → link to original CDN URL (may be expired)
+          //   - Either way, the "Evidence" select dropdown below also works
+          //     and uses lazy refresh for guaranteed-fresh URLs.
+          if (e.imageMessageId && e.imageChannelId && config.ownerGuildId) {
+            const msgLink = `https://discord.com/channels/${config.ownerGuildId}/${e.imageChannelId}/${e.imageMessageId}`;
+            parts.push(`[📎](${msgLink})`);
+          } else if (e.imageUrl) {
+            parts.push(`[📎](${e.imageUrl})`);
+          }
           return `${start + i + 1}. ${parts.join(' — ')}`;
         });
 
@@ -2016,10 +2113,11 @@ export function createListHandlers({ client }) {
         );
         rows.push(navRow);
 
-        // Evidence dropdown for entries with images on current page
+        // Evidence dropdown for entries with images on current page.
+        // Includes both legacy (imageUrl) and rehosted (imageMessageId) entries.
         const start = page * ITEMS_PER_PAGE;
         const pageEntries = allEntries.slice(start, start + ITEMS_PER_PAGE);
-        const withImages = pageEntries.filter((e) => e.imageUrl);
+        const withImages = pageEntries.filter((e) => e.imageUrl || e.imageMessageId);
 
         if (withImages.length > 0) {
           const selectRow = new ActionRowBuilder().addComponents(
@@ -2070,10 +2168,17 @@ export function createListHandlers({ client }) {
           const idx = parseInt(i.values[0]);
           const entry = allEntries[idx];
 
-          if (!entry?.imageUrl) {
+          // Check if entry has ANY image source: rehosted or legacy
+          const hasAnyImage = entry?.imageMessageId || entry?.imageUrl;
+          if (!hasAnyImage) {
             await i.reply({ content: 'No evidence image for this entry.', ephemeral: true });
             return;
           }
+
+          // Resolve fresh URL via rehost-aware helper. For rehosted entries
+          // this fetches a fresh signed URL from the evidence channel; for
+          // legacy entries it returns the (possibly expired) stored URL.
+          const displayUrl = await resolveDisplayImageUrl(entry, client);
 
           const embed = new EmbedBuilder()
             .setTitle(`${entry._icon} ${entry.name}`)
@@ -2082,9 +2187,18 @@ export function createListHandlers({ client }) {
               { name: 'Raid', value: entry.raid || 'N/A', inline: true },
               { name: 'List', value: entry._label, inline: true },
             )
-            .setImage(entry.imageUrl)
             .setColor(entry._color)
             .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : undefined);
+
+          if (displayUrl) {
+            embed.setImage(displayUrl);
+          } else {
+            embed.addFields({
+              name: '⚠️ Evidence',
+              value: 'Image link expired or unavailable. Re-add evidence via `/list edit`.',
+              inline: false,
+            });
+          }
 
           if (entry.logsUrl) {
             embed.addFields({ name: 'Logs', value: `[View Logs](${entry.logsUrl})`, inline: false });

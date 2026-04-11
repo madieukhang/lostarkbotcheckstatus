@@ -38,8 +38,33 @@ const blacklistSchema = new mongoose.Schema({
     trim: true,
   },
 
-  /** Optional attachment image URL from slash command */
+  /**
+   * Optional attachment image URL — legacy field. New entries (from rehost-aware
+   * /list add) leave this empty and use imageMessageId/imageChannelId instead.
+   * Old entries created before the rehost feature still have URL here, but
+   * the URL likely expired due to Discord CDN policy. Kept for backward compat
+   * and graceful display fallback.
+   */
   imageUrl: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+
+  /**
+   * ID of the message in the evidence channel that holds the rehosted image.
+   * Empty for legacy entries (use imageUrl) and entries with no evidence.
+   * Bot fetches this message on demand to get a fresh signed URL since
+   * Discord CDN URLs expire ~24h after issue.
+   */
+  imageMessageId: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+
+  /** ID of the evidence channel where the rehosted image lives. */
+  imageChannelId: {
     type: String,
     default: '',
     trim: true,
