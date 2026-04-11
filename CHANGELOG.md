@@ -2,6 +2,42 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.1] - 2026-04-11
+
+### Added
+
+- **`/list multiadd`**: Bulk add entries via Excel template — anyone can use.
+  - `/list multiadd action:template` — downloads a styled `.xlsx` template with 7 columns (`name`, `type`, `reason`, `raid`, `logs`, `image`, `scope`), dropdown validation for `type` and `scope`, a yellow example row, 5 placeholder rows with borders, frozen header, auto-filter, and an Instructions sheet.
+  - `/list multiadd action:file file:<upload>` — downloads and parses filled template, shows a preview embed with up to 20 valid rows and the first 10 validation errors. Preview has **Confirm / Cancel** buttons that expire after 5 minutes.
+  - Max **30 rows** per file, max **1 MB** file size, `.xlsx` only.
+  - Validation rules: required fields (`name`, `type`, `reason`), type enum (`black`/`white`/`watch`), URL format for `logs`/`image`, scope enum (`global`/`server`), intra-file duplicate detection (case-insensitive), scope auto-stripped for non-blacklist entries.
+  - Reuses existing `/list add` logic (trusted guard, roster fetch, ilvl check, scope-aware duplicate check) — no divergence of rules.
+  - **Bulk approval flow** for members: if requester is not an officer/senior, the batch is sent as a single `PendingApproval` with `action: 'bulk'` to all configured approvers. Senior gets **one DM** with full preview + Approve/Reject buttons (no spam per row). Reject and approve both notify the original requester in the origin channel.
+  - Officer/senior users bypass approval and execute immediately.
+  - **Single bulk broadcast** — one embed summarizing all added entries (grouped by list type), not N separate broadcasts. Global entries broadcast to all notify channels; server-scoped entries broadcast only to owner guild with `(Local)` tag.
+  - Per-row throttle of 200ms to avoid hammering lostark.bible.
+  - Progress updates every 5 rows during direct execution (officer path).
+- `exceljs@^4.4.0` dependency for Excel template generation and parsing.
+- New `bot/utils/multiaddTemplate.js` module — exports `buildMultiaddTemplate`, `parseMultiaddFile`, `MULTIADD_MAX_ROWS`. Zero dependencies on Discord/DB/config so it's independently testable.
+- `PendingApproval.bulkRows` array field — stores parsed multiadd rows for bulk approval flow. `type` and `name` are now conditionally required (only for single add/edit).
+- `PendingApproval.action` enum now includes `'bulk'` alongside `'add'` and `'edit'`.
+
+### Changed
+
+- `executeListAddToDatabase` now honors `payload.skipBroadcast` (used by bulk flow to defer broadcasting) and returns the created `entry` Mongoose doc in the success result so callers can use it for bulk broadcast.
+- `broadcastListChange` channel resolution logic extracted into `resolveBroadcastChannels` helper and reused by the new `broadcastBulkAdd` function. Behavior identical — just factored out to avoid duplication.
+
+### Fixed
+
+- **P1 race condition** in `handleMultiaddApprovalButton`: replaced `findOne` + `deleteOne` with atomic `findOneAndDelete`, preventing double execution when two approvers click Approve simultaneously.
+- **P2 auto-approve scope mismatch**: `/list multiadd` now uses a stricter `isOfficerOrSenior()` check instead of `isRequesterAutoApprover()`, so `MEMBER_APPROVER_IDS` can no longer bypass bulk approval. Matches the README claim that only officers/seniors skip approval. Single `/list add` behavior unchanged.
+- **P2 bulk approval must be Senior-only**: `sendBulkApprovalToApprovers` now uses a new `getSeniorApproverIds()` helper instead of `getApproverRecipientIds()`, so bulk approval DMs go to every Senior (never a random officer). The placeholder `approverIds` in `PendingApproval.create` is also scoped to the same Senior-only list to prevent divergence between DM recipients and the permission check.
+- **P3 stale approver DMs**: after one Senior approves/rejects a bulk batch, `handleMultiaddApprovalButton` now calls `syncApproverDmMessages` in both branches to edit the OTHER approvers' DMs (excluding the clicking approver) so their buttons disappear instead of staying active until a second click reveals the request is gone.
+- **Progress callback logic** in officer bulk add path: `||` → `&&` so the final "N/N rows done" update actually fires at the end of the loop.
+- **Orphan DMs on DB failure** in member bulk approval flow: restructured to (1) look up target approvers, (2) create PendingApproval with full target list up front so early clicks pass permission check, (3) send DMs, (4) trim `approverIds` to only successfully delivered. If 0 deliveries or any step fails, the placeholder record is cleaned up via `deleteOne`.
+- **Missing `requesterName`** in `multiaddPending` entries: now populated from `interaction.user.username` so created entries have non-empty `addedByName` audit field.
+- **Slash command description inconsistency**: `/list multiadd` description updated from "officers/seniors only" (wrong — handler allows everyone) to "officers auto, members via Senior approval" (matches actual behavior).
+
 ## [v0.5.0] - 2026-04-08
 
 ### Added

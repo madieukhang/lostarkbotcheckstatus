@@ -232,6 +232,27 @@ export function buildCommands() {
               .setDescription('Reason for trust (only for add)')
               .setRequired(false)
           )
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('multiadd')
+          .setDescription('Bulk add via Excel template — officers auto, members via Senior approval')
+          .addStringOption((opt) =>
+            opt
+              .setName('action')
+              .setDescription('template = download blank template, file = upload filled template')
+              .setRequired(true)
+              .addChoices(
+                { name: 'template — download blank template', value: 'template' },
+                { name: 'file — upload filled template', value: 'file' }
+              )
+          )
+          .addAttachmentOption((opt) =>
+            opt
+              .setName('file')
+              .setDescription('Filled .xlsx file (max 30 rows, required for action:file)')
+              .setRequired(false)
+          )
       ),
 
     new SlashCommandBuilder()
