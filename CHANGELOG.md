@@ -7,6 +7,7 @@ All notable changes to this project are documented here.
 ### Fixed
 
 - **P1: Discord CDN evidence images expired silently after ~24h.** Since 2024, Discord CDN attachment URLs include signed expiry tokens (`?ex=...&hm=...`). The bot was storing those URLs directly, so any `/list add image:` evidence silently 404'd a day later. Confirmed in production: 3 entries (Razed/Veska/Endlessbless) lost evidence ~44h after add. Fixed by introducing an evidence rehost mechanism — bot now re-uploads each image to a dedicated "evidence channel" and stores the message ID instead of the URL. On display, bot fetches the message via Discord API and reads a freshly-signed attachment URL (Discord re-signs on every fetch). Future entries are permanent; legacy entries stay broken (cannot recover expired URLs).
+- **`/list view` crashed with `ReferenceError: refreshImageUrl is not defined`.** The earlier 📎 link refactor added a call to `refreshImageUrl()` inside `buildPage` but did not add the function to the imports at the top of `bot/handlers/listHandlers.js`. ESM does not validate identifier references until execution, so the file loaded fine and the bug surfaced only when a user actually invoked `/list view`. Fixed by adding `refreshImageUrl` to the existing `imageRehost.js` import line.
 
 ### Added
 
@@ -24,7 +25,7 @@ All notable changes to this project are documented here.
 - `/list edit` rehosts new image attachments the same way and properly carries over existing rehost refs when only other fields change.
 - `/list multiadd` parser now rehosts each row's `image` URL during the bulk loop, so bulk uploads also get permanent storage.
 - `broadcastListChange` and `/list view` evidence display use `resolveDisplayImageUrl` to fetch fresh URLs lazily for rehosted entries while gracefully falling back to legacy URLs.
-- `/list view` paginated 📎 inline links now use a Discord message deep-link (`https://discord.com/channels/...`) for rehosted entries, opening the evidence message directly in Discord. Legacy entries still link to the (possibly expired) direct CDN URL.
+- `/list view` paginated 📎 inline links now resolve a fresh CDN URL per page render. `buildPage` is async and runs `refreshImageUrl` for every rehosted entry on the current page in parallel via `Promise.all` (~10 fetches/page, <1s typical), then injects the fresh signed URL into the markdown link. Click → opens the actual image in browser/Discord viewer instead of jumping to the storage channel. Legacy entries still link to the (possibly expired) direct CDN URL. Pagination handlers `await i.deferUpdate()` before rebuilding to stay inside Discord's 3-second interaction window.
 - `/list view` evidence dropdown now includes both legacy and rehosted entries; the ephemeral preview embed shows a clear "Image link expired" notice when refresh fails.
 - `/laremote action:view` dashboard now shows the evidence channel setting on the owner guild card (with a warning if unset).
 

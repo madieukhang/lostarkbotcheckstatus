@@ -39,7 +39,7 @@ import {
 } from '../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
-import { rehostImage, resolveDisplayImageUrl } from '../utils/imageRehost.js';
+import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../utils/imageRehost.js';
 import {
   buildMultiaddTemplate,
   parseMultiaddFile,
