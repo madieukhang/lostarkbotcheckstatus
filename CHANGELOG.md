@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.9] - 2026-04-11
+
+### Changed
+
+- **`/lahelp` now includes a dedicated detailed embed for `/laremote action:syncimages`** (owner guild only). Mirrors the `multiaddEmbed` pattern: a five-section breakdown explaining the prerequisites, the per-entry flow, the side effects to expect (channel spam, runtime estimate), the result counters and what they mean, and a troubleshooting cheat sheet for each non-success case. Shown in EN or VN matching the user's language preference. Only rendered when `interaction.guild?.id === ownerGuildId` since the command is Senior-only and the embed would just confuse normal users elsewhere.
+- **`syncimages` one-liner in the owner section** updated to mention the prerequisite (`evidencechannel` must be set first) and to point at the new detailed embed below. Previous one-liner was technically correct but didn't surface the prereq, leading to confusion if the senior tried to run the command before configuring the storage channel.
+
 ## [v0.5.8] - 2026-04-11
 
 ### Fixed
