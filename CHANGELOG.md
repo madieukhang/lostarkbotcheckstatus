@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.4] - 2026-04-11
+
+### Fixed
+
+- **P2: Approval-delayed `/list add` reused stale URL snapshot in success embed and broadcast.** When a member submitted an add with an image and Senior approved hours or days later, `executeListAddToDatabase` correctly persisted the entry with rehost refs but the success embed and broadcast embed both still called `setImage(payload.imageUrl)` — using the URL snapshot captured at submit time, not the entry's current rehosted state. If the gap was >24h, requester reply and broadcast embeds showed broken image links even though the underlying DB record was permanent. Fixed by resolving a fresh URL via `resolveDisplayImageUrl(entry, client)` immediately after `Model.create()` and using that for both the result embed and the broadcast. `broadcastListChange` now accepts a pre-resolved `displayUrl` option to avoid double-fetching the same evidence message.
+
+### Added
+
+- **`📎 View Evidence (Fresh)` button on `/list add` and `/list edit` approval DMs.** Approval DMs can sit unread for hours or days, by which time the embed image URL captured at submit time has expired and the inline preview is broken. The new button (only shown when the request has any image attached) re-resolves a freshly-signed URL on click — via the rehosted message for v0.5.2+ entries, or the legacy URL with a "may have expired" footer for older requests — and replies ephemerally with a guaranteed-fresh preview. Restricted to assigned approvers via the same `approverIds` permission check as Approve/Reject. New routing in `bot.js` dispatches `listadd_viewevidence:` button presses to `handleListAddViewEvidenceButton`. Addresses Senko's P3 finding about approval embed UX after the rehost feature.
+
 ## [v0.5.3] - 2026-04-11
 
 ### Fixed

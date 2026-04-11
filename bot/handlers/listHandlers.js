@@ -222,7 +222,11 @@ export function createListHandlers({ client }) {
       return { success: false, reason: 'No approver user IDs configured. Set SENIOR_APPROVER_IDS or OFFICER_APPROVER_IDS in env.' };
     }
 
-    const row = new ActionRowBuilder().addComponents(
+    // The Approve/Reject buttons are persistent — DMs can sit unread for hours
+    // or days. The View Evidence button (only when payload has any image)
+    // resolves a freshly-signed URL on click so the approver can preview the
+    // evidence even after the original embed image link has expired.
+    const buttons = [
       new ButtonBuilder()
         .setCustomId(`listadd_approve:${payload.requestId}`)
         .setLabel('Approve')
@@ -230,8 +234,17 @@ export function createListHandlers({ client }) {
       new ButtonBuilder()
         .setCustomId(`listadd_reject:${payload.requestId}`)
         .setLabel('Reject')
-        .setStyle(ButtonStyle.Danger)
-    );
+        .setStyle(ButtonStyle.Danger),
+    ];
+    if (payload.imageMessageId || payload.imageUrl) {
+      buttons.push(
+        new ButtonBuilder()
+          .setCustomId(`listadd_viewevidence:${payload.requestId}`)
+          .setLabel('📎 View Evidence (Fresh)')
+          .setStyle(ButtonStyle.Secondary)
+      );
+    }
+    const row = new ActionRowBuilder().addComponents(buttons);
 
     const embed = buildListAddApprovalEmbed(guild, payload, options);
     const deliveredApproverIds = [];
@@ -629,15 +642,26 @@ export function createListHandlers({ client }) {
       .setColor(color)
       .setTimestamp(new Date());
 
-    if (payload.imageUrl) {
-      embed.setImage(payload.imageUrl);
+    // Resolve the freshest possible image URL from the just-created entry.
+    // payload.imageUrl is unsafe here because for approval-delayed adds the
+    // payload was snapshotted >24h ago and its URL may be expired. Going
+    // through resolveDisplayImageUrl() guarantees a freshly-signed URL from
+    // the rehosted message at THIS moment, regardless of payload age.
+    const freshDisplayUrl = await resolveDisplayImageUrl(entry, client);
+    if (freshDisplayUrl) {
+      embed.setImage(freshDisplayUrl);
     }
 
     // Global: broadcast to all opted-in servers
     // Server-scoped: broadcast only to owner guild (special privilege)
     // skipBroadcast: used by /list multiadd bulk flow to gather one summary broadcast instead of N spam
     if (!payload.skipBroadcast) {
-      broadcastListChange('added', entry, payload, { onlyOwner: entryScope === 'server' }).catch((err) =>
+      // Pass the already-resolved fresh URL so broadcastListChange does not
+      // re-fetch the same evidence message a second time.
+      broadcastListChange('added', entry, payload, {
+        onlyOwner: entryScope === 'server',
+        displayUrl: freshDisplayUrl,
+      }).catch((err) =>
         console.warn('[list] Broadcast failed:', err.message)
       );
     }
@@ -651,7 +675,7 @@ export function createListHandlers({ client }) {
   }
 
   async function broadcastListChange(action, entry, payload, options = {}) {
-    const { onlyOwner = false } = options;
+    const { onlyOwner = false, displayUrl: preResolvedUrl } = options;
     const { label, color, icon } = getListContext(payload.type);
     const addedBy = payload.requestedByDisplayName || payload.requestedByTag || 'Unknown';
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
@@ -672,12 +696,14 @@ export function createListHandlers({ client }) {
 
     if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
 
-    // Resolve display URL via rehost-aware helper: prefers freshly-fetched
-    // URL from evidence channel, falls back to legacy entry.imageUrl.
-    // We also accept payload.imageUrl as a hot-path shortcut for entries we
-    // JUST created (still fresh in this function call).
-    const displayUrl = payload.imageUrl
-      || (await resolveDisplayImageUrl(entry, client));
+    // Prefer pre-resolved URL from caller (executeListAddToDatabase passes
+    // freshDisplayUrl to avoid double-fetching the same evidence message).
+    // Otherwise resolve fresh from the entry. We deliberately avoid trusting
+    // payload.imageUrl here because it may be a stale snapshot from an
+    // approval-delayed payload.
+    const displayUrl = preResolvedUrl !== undefined
+      ? preResolvedUrl
+      : await resolveDisplayImageUrl(entry, client);
     if (displayUrl) embed.setImage(displayUrl);
 
     // Delegate channel routing to the shared resolver — keeps single-add and
@@ -1376,6 +1402,83 @@ export function createListHandlers({ client }) {
         false
       );
     }
+  }
+
+  /**
+   * Handle the "📎 View Evidence (Fresh)" button on approval DMs.
+   *
+   * Approval DMs can sit unread for hours or days. The original embed image
+   * URL was fresh at submit time but signed with a ~24h expiry, so by the
+   * time an approver opens an old DM the embed image may already be broken.
+   * This handler refreshes the URL on demand by re-fetching the rehosted
+   * evidence message and replies ephemerally with a guaranteed-fresh preview.
+   *
+   * Falls back to the legacy `imageUrl` when the pending approval has no
+   * rehost refs (e.g. evidence channel was unconfigured at submit time).
+   */
+  async function handleListAddViewEvidenceButton(interaction) {
+    const requestId = interaction.customId.split(':')[1];
+    await connectDB();
+
+    // Restrict to assigned approvers only — same permission model as
+    // Approve/Reject. Avoids leaking evidence images to non-approvers who
+    // somehow get hold of the button (shouldn't happen, but defense in depth).
+    const payload = await PendingApproval.findOne({
+      requestId,
+      approverIds: interaction.user.id,
+    }).lean();
+
+    if (!payload) {
+      const stillExists = await PendingApproval.exists({ requestId });
+      if (stillExists) {
+        await interaction.reply({
+          content: '⛔ You are not allowed to view evidence for this request.',
+          ephemeral: true,
+        });
+      } else {
+        await interaction.reply({
+          content: '⚠️ This approval request was already processed or has expired.',
+          ephemeral: true,
+        });
+      }
+      return;
+    }
+
+    // Resolve the freshest possible URL: rehost-aware first, legacy fallback.
+    let freshUrl = null;
+    let isLegacy = false;
+    if (payload.imageMessageId && payload.imageChannelId) {
+      freshUrl = await refreshImageUrl(payload.imageMessageId, payload.imageChannelId, client);
+    }
+    if (!freshUrl && payload.imageUrl) {
+      freshUrl = payload.imageUrl;
+      isLegacy = true;
+    }
+
+    if (!freshUrl) {
+      await interaction.reply({
+        content: '⚠️ No evidence image attached to this request, or the rehosted message was removed.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const evidenceEmbed = new EmbedBuilder()
+      .setTitle(`📎 Evidence — ${payload.name}`)
+      .setDescription(payload.reason ? `*${payload.reason}*` : null)
+      .setImage(freshUrl)
+      .setColor(payload.type === 'black' ? 0xed4245 : payload.type === 'white' ? 0x57f287 : 0xfee75c)
+      .setFooter({
+        text: isLegacy
+          ? 'Legacy image (may have expired) — submitted before evidence rehost'
+          : 'Fresh URL just resolved from evidence channel',
+      })
+      .setTimestamp(payload.createdAt ? new Date(payload.createdAt) : new Date());
+
+    await interaction.reply({
+      embeds: [evidenceEmbed],
+      ephemeral: true,
+    });
   }
 
   async function handleListCheckCommand(interaction) {
@@ -3261,6 +3364,7 @@ export function createListHandlers({ client }) {
     handleMultiaddConfirmButton,
     handleMultiaddApprovalButton,
     handleListAddApprovalButton,
+    handleListAddViewEvidenceButton,
     handleListAddOverwriteButton,
     handleQuickAddSelect,
     handleQuickAddModal,
