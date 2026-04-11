@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.3] - 2026-04-11
+
+### Fixed
+
+- **P1: Approval-backed evidence silently lost rehost permanence.** `PendingApproval` schema only had `imageUrl`, so when `/list add` or `/list edit` flowed through Senior approval, Mongoose silently stripped the `imageMessageId`/`imageChannelId` fields from the saved payload. When the approver later clicked Approve, `executeListAddToDatabase` received undefined refs and fell back to storing only `imageUrl` — exactly the expiring CDN path v0.5.2 was meant to eliminate. Fixed by adding `imageMessageId` and `imageChannelId` to the `PendingApproval` top-level schema and to the `bulkRows` subschema.
+- **P1: `/list multiadd` member approval rehosted at the wrong time.** The bulk loop only rehosted at execution time inside `executeBulkMultiadd`, but the member approval flow persisted only the raw user URL into `bulkRows`. If Senior approved hours later, the user-supplied Discord CDN URLs could already be dead before rehost ran. Fixed by rehosting rows **at submit time** (during the member's Confirm click) inside `handleMultiaddConfirmButton`, persisting refs into `bulkRows`. `executeBulkMultiadd` now skips rehost if a row already carries refs from the submit-time pass.
+- **P2: `/search` and `/roster` did not display rehosted evidence.** Both commands treated `entry.imageUrl` as the only source of truth, but new rehosted entries intentionally store an empty `imageUrl`. Result: evidence images for any post-v0.5.2 entry disappeared from these commands. Fixed by adding `entryHasImage()` detection and `resolveDisplayImageUrl()` resolution in `searchHandler.js`, and by extending `rosterService.js` to return rehost refs and `rosterHandler.js` to call `resolveDisplayImageUrl()` before rendering evidence embeds.
+- **P2: `/list edit` approval/in-place/overwrite paths regressed rehosted entries to URL-only storage.** Three write paths in `listHandlers.js` (cross-list move, in-place update, duplicate overwrite) only persisted `imageUrl`, dropping `imageMessageId`/`imageChannelId` even when the payload carried valid refs. Each path now writes all three image fields atomically: rehost refs preferred, legacy URL as fallback, existing entry's image fields preserved when no new image was supplied.
+- **P2: `/list edit` risked Discord 3-second interaction timeout on image edits.** The handler called `rehostImage()` (download + upload, can take 1-3s) before `deferReply()`. Reordered so `deferReply()` runs first, matching the safer pattern already used by `/list add`.
+
 ## [v0.5.2] - 2026-04-11
 
 ### Fixed

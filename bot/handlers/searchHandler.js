@@ -14,6 +14,12 @@ import TrustedUser from '../../models/TrustedUser.js';
 import { getClassName } from '../../models/Class.js';
 import { fetchNameSuggestions } from '../services/rosterService.js';
 import { normalizeCharacterName } from '../utils/names.js';
+import { resolveDisplayImageUrl } from '../utils/imageRehost.js';
+
+/** Detect whether an entry has any image evidence (rehosted OR legacy). */
+function entryHasImage(entry) {
+  return Boolean(entry?.imageMessageId || entry?.imageUrl);
+}
 
 export async function handleSearchCommand(interaction) {
   const raw = interaction.options.getString('name', true);
@@ -99,7 +105,7 @@ export async function handleSearchCommand(interaction) {
       const cls = getClassName(r.cls);
       const ilvl = Number(r.itemLevel || 0).toFixed(2);
       const entry = r.black || r.white || r.watch;
-      const hasImage = entry?.imageUrl;
+      const hasImage = entryHasImage(entry);
 
       let icon = '';
       if (r.black) icon += '⛔';
@@ -139,10 +145,10 @@ export async function handleSearchCommand(interaction) {
       .setFooter({ text: `${results.length} result(s) · ${filterParts.join(' · ')} · lostark.bible` })
       .setTimestamp();
 
-    // Build evidence dropdown for flagged entries with images
+    // Build evidence dropdown for flagged entries with images (rehosted OR legacy)
     const flaggedWithImages = results
       .map((r, i) => ({ r, i }))
-      .filter(({ r }) => (r.black?.imageUrl || r.white?.imageUrl || r.watch?.imageUrl));
+      .filter(({ r }) => entryHasImage(r.black) || entryHasImage(r.white) || entryHasImage(r.watch));
 
     const components = [];
     if (flaggedWithImages.length > 0) {
@@ -189,8 +195,17 @@ export async function handleSearchCommand(interaction) {
       const r = results[idx];
       const entry = r?.black || r?.white || r?.watch;
 
-      if (!entry?.imageUrl) {
+      if (!entryHasImage(entry)) {
         await sel.reply({ content: 'No evidence image for this entry.', ephemeral: true });
+        return;
+      }
+
+      // Resolve fresh URL: rehosted entries get a freshly-signed URL via the
+      // evidence channel; legacy entries fall back to their stored URL (which
+      // may already have expired).
+      const displayUrl = await resolveDisplayImageUrl(entry, interaction.client);
+      if (!displayUrl) {
+        await sel.reply({ content: '⚠️ Image link expired or evidence message removed.', ephemeral: true });
         return;
       }
 
@@ -204,7 +219,7 @@ export async function handleSearchCommand(interaction) {
           { name: 'Raid', value: entry.raid || 'N/A', inline: true },
           { name: 'List', value: listLabel, inline: true },
         )
-        .setImage(entry.imageUrl)
+        .setImage(displayUrl)
         .setColor(listColor)
         .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : undefined);
 

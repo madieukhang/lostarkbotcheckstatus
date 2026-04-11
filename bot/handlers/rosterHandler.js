@@ -25,6 +25,7 @@ import {
 } from '../services/rosterService.js';
 import { getClassName } from '../../models/Class.js';
 import { getAddedByDisplay, normalizeCharacterName } from '../utils/names.js';
+import { resolveDisplayImageUrl } from '../utils/imageRehost.js';
 
 export async function handleRosterCommand(interaction) {
   const raw = interaction.options.getString('name');
@@ -246,10 +247,12 @@ export async function handleRosterCommand(interaction) {
       const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
       contentLines.push(`⛔ **${name}** is on the blacklist.${raid}${reason}`);
 
-      if (blacklistResult.imageUrl) {
+      // Resolve fresh URL for rehosted entries; legacy entries use stored URL.
+      const blackImageUrl = await resolveDisplayImageUrl(blacklistResult, interaction.client);
+      if (blackImageUrl) {
         const evidenceEmbed = new EmbedBuilder()
           .setTitle('Blacklist Evidence')
-          .setImage(blacklistResult.imageUrl)
+          .setImage(blackImageUrl)
           .setColor(0xed4245);
         embeds.unshift(evidenceEmbed);
       }
@@ -260,10 +263,11 @@ export async function handleRosterCommand(interaction) {
       const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
       contentLines.push(`✅ **${name}** is on the whitelist.${raid}${reason}`);
 
-      if (whitelistResult.imageUrl) {
+      const whiteImageUrl = await resolveDisplayImageUrl(whitelistResult, interaction.client);
+      if (whiteImageUrl) {
         const evidenceEmbed = new EmbedBuilder()
           .setTitle('Whitelist Evidence')
-          .setImage(whitelistResult.imageUrl)
+          .setImage(whiteImageUrl)
           .setColor(0x57f287);
         embeds.unshift(evidenceEmbed);
       }

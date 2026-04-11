@@ -31,6 +31,11 @@ const pendingApprovalSchema = new mongoose.Schema({
   raid: { type: String, default: '' },
   logsUrl: { type: String, default: '' },
   imageUrl: { type: String, default: '' },
+  // Rehost refs — populated when image was rehosted to evidence channel.
+  // If set, the persisted entry will use these instead of imageUrl, so the
+  // approval flow preserves rehost permanence end-to-end.
+  imageMessageId: { type: String, default: '' },
+  imageChannelId: { type: String, default: '' },
 
   /** Blacklist scope: 'global' or 'server' */
   scope: { type: String, enum: ['global', 'server'], default: 'global' },
@@ -62,6 +67,11 @@ const pendingApprovalSchema = new mongoose.Schema({
         raid: { type: String, default: '' },
         logsUrl: { type: String, default: '' },
         imageUrl: { type: String, default: '' },
+        // Rehost refs per row — populated at submit time so member approval
+        // flow does not need to re-download URLs that may have already
+        // expired by the time Senior approves the batch.
+        imageMessageId: { type: String, default: '' },
+        imageChannelId: { type: String, default: '' },
         scope: { type: String, default: '' },
       },
     ],

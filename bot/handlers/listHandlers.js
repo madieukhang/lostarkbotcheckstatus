@@ -892,10 +892,18 @@ export function createListHandlers({ client }) {
         row.type === 'black' ? (row.scope || guildDefaultScope) : 'global';
 
       // Rehost the row's image URL (if any) so the entry has permanent storage.
-      // Best-effort: rehost failure falls back to legacy URL storage. Fetched
-      // sequentially with the row processing because each rehost is small.
+      // Skip rehost if row already carries refs from a prior rehost (e.g.
+      // member submit pre-rehosted before saving to PendingApproval). This
+      // avoids re-downloading URLs that may have expired between submit
+      // and Senior approval.
       let rowRehost = null;
-      if (row.image) {
+      if (row.imageMessageId && row.imageChannelId) {
+        rowRehost = {
+          messageId: row.imageMessageId,
+          channelId: row.imageChannelId,
+          freshUrl: '', // not needed; persisted entry will refresh on display
+        };
+      } else if (row.image) {
         rowRehost = await rehostImage(row.image, client, {
           entryName: row.name,
           addedBy: meta.requesterDisplayName || meta.requesterTag,
@@ -1197,13 +1205,25 @@ export function createListHandlers({ client }) {
             }
           }
 
+          // Image fields: prefer new rehost from payload, fall back to existing
+          // entry's rehost refs, then legacy URL. This preserves rehost
+          // permanence across cross-list moves and avoids regressing rehosted
+          // entries into expiring URLs.
+          const moveImageMessageId = payload.imageMessageId || existingEntry.imageMessageId || '';
+          const moveImageChannelId = payload.imageChannelId || existingEntry.imageChannelId || '';
+          const moveImageUrl = moveImageMessageId
+            ? '' // rehosted entries do not store legacy URL
+            : (payload.imageUrl || existingEntry.imageUrl || '');
+
           // Create first, then delete old (safe order — if create fails, old preserved)
           await newModel.create({
             name: existingEntry.name,
             reason: payload.reason || existingEntry.reason,
             raid: payload.raid || existingEntry.raid,
             logsUrl: payload.logsUrl || existingEntry.logsUrl,
-            imageUrl: payload.imageUrl || existingEntry.imageUrl,
+            imageUrl: moveImageUrl,
+            imageMessageId: moveImageMessageId,
+            imageChannelId: moveImageChannelId,
             allCharacters: existingEntry.allCharacters || [],
             addedByUserId: existingEntry.addedByUserId,
             addedByTag: existingEntry.addedByTag,
@@ -1217,7 +1237,18 @@ export function createListHandlers({ client }) {
           if (payload.reason && payload.reason !== existingEntry.reason) updateFields.reason = payload.reason;
           if (payload.raid && payload.raid !== existingEntry.raid) updateFields.raid = payload.raid;
           if (payload.logsUrl && payload.logsUrl !== existingEntry.logsUrl) updateFields.logsUrl = payload.logsUrl;
-          if (payload.imageUrl && payload.imageUrl !== existingEntry.imageUrl) updateFields.imageUrl = payload.imageUrl;
+          // Image update is atomic across all 3 fields: if a new rehosted
+          // image was provided, replace all 3; if a new legacy URL only,
+          // replace all 3 to clear stale rehost refs; otherwise leave alone.
+          if (payload.imageMessageId && payload.imageMessageId !== existingEntry.imageMessageId) {
+            updateFields.imageUrl = '';
+            updateFields.imageMessageId = payload.imageMessageId;
+            updateFields.imageChannelId = payload.imageChannelId || '';
+          } else if (payload.imageUrl && !payload.imageMessageId && payload.imageUrl !== existingEntry.imageUrl) {
+            updateFields.imageUrl = payload.imageUrl;
+            updateFields.imageMessageId = '';
+            updateFields.imageChannelId = '';
+          }
           if (Object.keys(updateFields).length > 0) {
             await oldModel.updateOne({ _id: existingEntry._id }, { $set: updateFields });
           }
@@ -1695,6 +1726,13 @@ export function createListHandlers({ client }) {
     const imageAttachment = interaction.options.getAttachment('image');
     const newImageUrl = imageAttachment?.url || '';
 
+    // Defer FIRST so the rehost (download + upload, can take 1-3s) does not
+    // cross Discord's 3-second interaction ack window. Discord keeps the
+    // attachment URL valid through the deferred state, so rehost can still
+    // download it after the defer.
+    await interaction.deferReply();
+    await connectDB();
+
     // Rehost the new image NOW (while CDN URL is still valid). Result is used
     // later in updateFields. If rehost fails or no evidence channel configured,
     // we fall back to storing the legacy URL (which will eventually expire).
@@ -1706,9 +1744,6 @@ export function createListHandlers({ client }) {
         listType: '', // type may change in this edit; leave blank
       });
     }
-
-    await interaction.deferReply();
-    await connectDB();
 
     // Find existing entry across all lists (scope-aware for blacklist)
     const collation = { locale: 'en', strength: 2 };
@@ -2445,7 +2480,17 @@ export function createListHandlers({ client }) {
       dupeEntry.reason = payload.reason || dupeEntry.reason;
       dupeEntry.raid = payload.raid || dupeEntry.raid;
       dupeEntry.logsUrl = payload.logsUrl || dupeEntry.logsUrl;
-      dupeEntry.imageUrl = payload.imageUrl || dupeEntry.imageUrl;
+      // Image overwrite: prefer new rehost refs, fall back to new legacy URL,
+      // else preserve existing entry's image fields entirely.
+      if (payload.imageMessageId) {
+        dupeEntry.imageUrl = '';
+        dupeEntry.imageMessageId = payload.imageMessageId;
+        dupeEntry.imageChannelId = payload.imageChannelId || '';
+      } else if (payload.imageUrl) {
+        dupeEntry.imageUrl = payload.imageUrl;
+        dupeEntry.imageMessageId = '';
+        dupeEntry.imageChannelId = '';
+      }
       // Preserve existing scope — overwrite should not change global↔server
       // (scope is a structural property, not metadata)
       dupeEntry.addedByUserId = payload.requestedByUserId;
@@ -2928,14 +2973,43 @@ export function createListHandlers({ client }) {
 
         const guild = interaction.guild || (await client.guilds.fetch(pending.guildId).catch(() => null));
 
-        // Build simplified bulkRows shape for DB (matches schema)
-        const bulkRows = pending.rows.map((r) => ({
+        // Rehost row images NOW (at submit time, while user URLs are still
+        // valid) so the approval flow does not need to re-download URLs that
+        // may have already expired by the time Senior approves the batch.
+        // Sequential with 200ms throttle to avoid hammering Discord upload
+        // API. 30 rows × ~700ms ≈ 21s, well within 15-min interaction window.
+        const rehostedRows = [];
+        for (let i = 0; i < pending.rows.length; i++) {
+          const r = pending.rows[i];
+          let rehost = null;
+          if (r.image) {
+            rehost = await rehostImage(r.image, client, {
+              entryName: r.name,
+              addedBy: pending.requesterDisplayName || pending.requesterTag,
+              listType: r.type,
+            });
+          }
+          rehostedRows.push({
+            ...r,
+            _rehost: rehost, // attached for downstream use
+          });
+          if (i < pending.rows.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 200));
+          }
+        }
+
+        // Build simplified bulkRows shape for DB (matches schema). Persist
+        // rehost refs (imageMessageId/imageChannelId) so the approval flow
+        // bypasses re-rehost when Senior approves later.
+        const bulkRows = rehostedRows.map((r) => ({
           name: r.name,
           type: r.type,
           reason: r.reason,
           raid: r.raid || '',
           logsUrl: r.logs || '',
-          imageUrl: r.image || '',
+          imageUrl: r._rehost?.freshUrl || r.image || '',
+          imageMessageId: r._rehost?.messageId || '',
+          imageChannelId: r._rehost?.channelId || '',
           scope: r.scope || '',
         }));
 
@@ -3113,7 +3187,8 @@ export function createListHandlers({ client }) {
         components: [],
       }).catch(() => {});
 
-      // Re-hydrate rows from DB shape back to parser row shape (logs/image field names differ)
+      // Re-hydrate rows from DB shape back to parser row shape (logs/image field names differ).
+      // Carry rehost refs so executeBulkMultiadd can skip re-rehost (already done at submit time).
       const rows = payload.bulkRows.map((r) => ({
         name: r.name,
         type: r.type,
@@ -3121,6 +3196,8 @@ export function createListHandlers({ client }) {
         raid: r.raid || '',
         logs: r.logsUrl || '',
         image: r.imageUrl || '',
+        imageMessageId: r.imageMessageId || '',
+        imageChannelId: r.imageChannelId || '',
         scope: r.scope || '',
         rowNum: 0,
       }));

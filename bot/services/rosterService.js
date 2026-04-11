@@ -249,6 +249,9 @@ export async function handleRosterBlackListCheck(names, options = {}) {
         reason: entry.reason ?? '',
         raid: entry.raid ?? '',
         imageUrl: entry.imageUrl ?? '',
+        // Rehost refs — handler resolves a fresh URL via imageRehost helpers
+        imageMessageId: entry.imageMessageId ?? '',
+        imageChannelId: entry.imageChannelId ?? '',
         addedByDisplayName: entry.addedByDisplayName ?? '',
         addedByName: entry.addedByName ?? '',
         addedByTag: entry.addedByTag ?? '',
@@ -285,6 +288,9 @@ export async function handleRosterWhiteListCheck(names) {
         reason: entry.reason ?? '',
         raid: entry.raid ?? '',
         imageUrl: entry.imageUrl ?? '',
+        // Rehost refs — handler resolves a fresh URL via imageRehost helpers
+        imageMessageId: entry.imageMessageId ?? '',
+        imageChannelId: entry.imageChannelId ?? '',
         addedByDisplayName: entry.addedByDisplayName ?? '',
         addedByName: entry.addedByName ?? '',
         addedByTag: entry.addedByTag ?? '',
