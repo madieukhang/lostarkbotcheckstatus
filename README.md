@@ -26,6 +26,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 - **`/list remove`**: Remove entries with ownership check.
 - **`/list view`**: View entries with scope filter. Clickable 📎 evidence links. Owner server can filter by scope.
 - **`/list trust action:add/remove`**: Manage trusted user list (officer/senior only).
+- **`/list multiadd`**: Bulk add up to 30 entries via styled Excel template — download template, fill in, upload for preview + confirm. Officer/senior bypass approval; members get single bulk approval DM to Senior (no per-row spam). Single aggregated broadcast for all added entries.
 - **Cross-server broadcast**: Global entries broadcast to all configured channels; server-scoped entries broadcast to owner guild only (with `(Local)` tag).
 - **🛡️ Trusted indicators**: Trusted users shown with 🛡️ in auto-check, `/listcheck`, `/search`, `/roster` results. Alt detection via roster allCharacters ("via **TrustedName**").
 - **Auto-enrich**: When a flagged character is found, background guild scan discovers and links alt characters to `allCharacters`.
@@ -61,6 +62,7 @@ A Discord bot that monitors Lost Ark server status, supports roster lookup, mana
 | `/list remove name` | Remove an entry (ownership check) |
 | `/list view type [scope]` | View entries. `scope`: all/global/server (blacklist filter, owner sees all) |
 | `/list trust action name [reason]` | Manage trusted list — add/remove (officer/senior only) |
+| `/list multiadd action [file]` | Bulk add via Excel template. `action:template` downloads blank template; `action:file file:<xlsx>` uploads filled template (max 30 rows) |
 | `/listcheck image` | OCR screenshot → check names against all lists |
 | `/lahelp` | Show all available commands |
 | `/lasetup autochannel #channel` | Set auto-check channel for this server (Manage Server) |
@@ -171,14 +173,15 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 │   │   └── listCheckService.js     # Shared OCR + name checking + formatting
 │   └── utils/
 │       ├── names.js                # Character name normalization
-│       └── scope.js                # Blacklist scope helpers + GuildConfig cache
+│       ├── scope.js                # Blacklist scope helpers + GuildConfig cache
+│       └── multiaddTemplate.js     # /list multiadd Excel template + parser (zero-dep)
 │
 ├── models/
 │   ├── Blacklist.js                # Blacklist schema (scope: global/server)
 │   ├── Whitelist.js                # Whitelist schema
 │   ├── Watchlist.js                # Watchlist schema (under investigation)
 │   ├── TrustedUser.js              # Trusted users (cannot be added to any list)
-│   ├── PendingApproval.js          # /list add approval requests (24h TTL)
+│   ├── PendingApproval.js          # /list add and /list multiadd approval requests (24h TTL)
 │   ├── GuildConfig.js              # Per-guild channel + notification config
 │   ├── RosterCache.js              # Cached roster check results (24h TTL)
 │   ├── RosterSnapshot.js           # ilvl progression tracking

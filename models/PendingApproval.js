@@ -16,8 +16,17 @@ const pendingApprovalSchema = new mongoose.Schema({
 
   guildId: { type: String, required: true },
   channelId: { type: String, required: true },
-  type: { type: String, required: true },
-  name: { type: String, required: true },
+  // type/name required for single add+edit, optional for bulk (rows carry their own)
+  type: {
+    type: String,
+    required: function () { return this.action !== 'bulk'; },
+    default: '',
+  },
+  name: {
+    type: String,
+    required: function () { return this.action !== 'bulk'; },
+    default: '',
+  },
   reason: { type: String, default: '' },
   raid: { type: String, default: '' },
   logsUrl: { type: String, default: '' },
@@ -26,8 +35,8 @@ const pendingApprovalSchema = new mongoose.Schema({
   /** Blacklist scope: 'global' or 'server' */
   scope: { type: String, enum: ['global', 'server'], default: 'global' },
 
-  /** Action type: 'add' (default) or 'edit' */
-  action: { type: String, enum: ['add', 'edit'], default: 'add' },
+  /** Action type: 'add' (single), 'edit' (single), or 'bulk' (multiadd batch) */
+  action: { type: String, enum: ['add', 'edit', 'bulk'], default: 'add' },
 
   /** For edit actions: _id of the entry being edited */
   existingEntryId: { type: String, default: '' },
@@ -37,6 +46,27 @@ const pendingApprovalSchema = new mongoose.Schema({
 
   /** For overwrite flow: _id of the duplicate entry to delete */
   duplicateEntryId: { type: String, default: '' },
+
+  /**
+   * For action='bulk': parsed rows from /list multiadd upload waiting for approval.
+   * Empty for single add/edit actions. Each row mirrors the payload shape used
+   * by executeListAddToDatabase, minus requester info (which lives on the parent doc).
+   */
+  bulkRows: {
+    type: [
+      {
+        _id: false,
+        name: { type: String, required: true },
+        type: { type: String, required: true },
+        reason: { type: String, default: '' },
+        raid: { type: String, default: '' },
+        logsUrl: { type: String, default: '' },
+        imageUrl: { type: String, default: '' },
+        scope: { type: String, default: '' },
+      },
+    ],
+    default: [],
+  },
 
   requestedByUserId: { type: String, required: true },
   requestedByTag: { type: String, default: '' },

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   StringSelectMenuBuilder,
@@ -37,6 +38,11 @@ import {
   getInteractionDisplayName,
 } from '../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../utils/scope.js';
+import {
+  buildMultiaddTemplate,
+  parseMultiaddFile,
+  MULTIADD_MAX_ROWS,
+} from '../utils/multiaddTemplate.js';
 
 // Approver IDs loaded from environment variables
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
@@ -133,6 +139,37 @@ function isRequesterAutoApprover(userId) {
   return MEMBER_APPROVER_IDS.includes(userId);
 }
 
+/**
+ * Stricter variant used by /list multiadd auto-approve check.
+ * Only senior + officer can bypass bulk approval; MEMBER_APPROVER_IDS
+ * (which gives bypass rights on single /list add for legacy reasons)
+ * does NOT confer bulk-add auto-approval. This matches the README claim
+ * that only officers/seniors auto-approve multiadd batches.
+ */
+function isOfficerOrSenior(userId) {
+  if (!userId) return false;
+  if (SENIOR_APPROVER_IDS.includes(userId)) return true;
+  return OFFICER_APPROVER_IDS.includes(userId);
+}
+
+/**
+ * Senior-only recipient list for /list multiadd bulk approval DMs.
+ * Unlike getApproverRecipientIds (which mixes in a random officer), this
+ * returns exclusively SENIOR_APPROVER_IDS — bulk batches are a high-impact
+ * operation that should always be reviewed by a Senior.
+ */
+function getSeniorApproverIds() {
+  const seen = new Set();
+  const out = [];
+  for (const id of SENIOR_APPROVER_IDS) {
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
+}
+
 function buildApprovalResultRow(actionLabel) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -161,6 +198,19 @@ function buildApprovalProcessingRow(action) {
 }
 
 export function createListHandlers({ client }) {
+  // ---------- /list multiadd in-memory pending store ----------
+  // Keyed by requestId, stores parsed-but-not-yet-confirmed bulk add data.
+  // Entries auto-expire after MULTIADD_PENDING_TTL_MS to avoid stale state
+  // across bot restarts — on restart this Map is empty and users re-upload.
+  const MULTIADD_PENDING_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  const multiaddPending = new Map();
+
+  /** Remove a pending multiadd request and any pending expiry timer. */
+  function clearMultiaddPending(requestId) {
+    const entry = multiaddPending.get(requestId);
+    if (entry?.expiryTimer) clearTimeout(entry.expiryTimer);
+    multiaddPending.delete(requestId);
+  }
 
   async function sendListAddApprovalToApprovers(guild, payload, options = {}) {
     const approverIds = getApproverRecipientIds();
@@ -204,6 +254,99 @@ export function createListHandlers({ client }) {
 
     if (deliveredApproverIds.length === 0) {
       return { success: false, reason: 'Unable to DM configured approvers. Check user IDs/privacy settings.' };
+    }
+
+    return { success: true, deliveredApproverIds, deliveredDmMessages };
+  }
+
+  /**
+   * Send a bulk multiadd batch to approvers for review. Parallel to
+   * sendListAddApprovalToApprovers but for /list multiadd batches — each
+   * approver gets one DM with the full preview + approve/reject buttons.
+   *
+   * @param {Guild} guild - origin guild
+   * @param {Object} pending - { requestId, rows, requesterId, requesterDisplayName, ... }
+   */
+  async function sendBulkApprovalToApprovers(guild, pending) {
+    // Senior-only: bulk batches are high-impact and must always be reviewed by
+    // a Senior, not a random officer (unlike single /list add which picks one).
+    const approverIds = getSeniorApproverIds();
+    if (approverIds.length === 0) {
+      return {
+        success: false,
+        reason: 'No Senior approver user IDs configured. Set SENIOR_APPROVER_IDS in env.',
+      };
+    }
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`multiaddapprove_approve:${pending.requestId}`)
+        .setLabel(`Approve — Add ${pending.rows.length}`)
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('✅'),
+      new ButtonBuilder()
+        .setCustomId(`multiaddapprove_reject:${pending.requestId}`)
+        .setLabel('Reject')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('✖️')
+    );
+
+    const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');
+    const previewLines = pending.rows.slice(0, 20).map((r, i) => {
+      const reasonShort = (r.reason || '').length > 40 ? (r.reason || '').slice(0, 37) + '...' : (r.reason || '');
+      const scopeTag = r.scope === 'server' ? ' `[S]`' : '';
+      return `\`${String(i + 1).padStart(2, ' ')}.\` ${typeIcon(r.type)} **${r.name}**${scopeTag} — ${reasonShort}`;
+    });
+    if (pending.rows.length > 20) {
+      previewLines.push(`*... and ${pending.rows.length - 20} more rows*`);
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle(`📋 Bulk Add Approval — ${pending.rows.length} rows`)
+      .setDescription(previewLines.join('\n').slice(0, 4000))
+      .setColor(0x5865f2)
+      .addFields(
+        {
+          name: 'Requested by',
+          value: `${pending.requesterDisplayName || pending.requesterTag || 'Unknown'} (<@${pending.requesterId}>)`,
+          inline: false,
+        },
+        {
+          name: 'Server',
+          value: guild?.name || pending.guildId || 'Unknown',
+          inline: true,
+        },
+      )
+      .setFooter({ text: `Request ID: ${pending.requestId.slice(0, 8)}` })
+      .setTimestamp(new Date());
+
+    const deliveredApproverIds = [];
+    const deliveredDmMessages = [];
+
+    await Promise.all(
+      approverIds.map(async (approverId) => {
+        try {
+          const user = await client.users.fetch(approverId);
+          if (!user || user.bot) return;
+
+          const sentMessage = await user.send({ embeds: [embed], components: [row] });
+          deliveredApproverIds.push(user.id);
+          deliveredDmMessages.push({
+            approverId: user.id,
+            channelId: sentMessage.channelId,
+            messageId: sentMessage.id,
+          });
+        } catch (err) {
+          console.warn(`[multiadd] Failed to DM approver ${approverId}:`, err.message);
+        }
+      })
+    );
+
+    if (deliveredApproverIds.length === 0) {
+      return {
+        success: false,
+        reason: 'Unable to DM configured approvers. Check user IDs/privacy settings.',
+      };
     }
 
     return { success: true, deliveredApproverIds, deliveredDmMessages };
@@ -398,12 +541,16 @@ export function createListHandlers({ client }) {
 
     // Global: broadcast to all opted-in servers
     // Server-scoped: broadcast only to owner guild (special privilege)
-    broadcastListChange('added', entry, payload, { onlyOwner: entryScope === 'server' }).catch((err) =>
-      console.warn('[list] Broadcast failed:', err.message)
-    );
+    // skipBroadcast: used by /list multiadd bulk flow to gather one summary broadcast instead of N spam
+    if (!payload.skipBroadcast) {
+      broadcastListChange('added', entry, payload, { onlyOwner: entryScope === 'server' }).catch((err) =>
+        console.warn('[list] Broadcast failed:', err.message)
+      );
+    }
 
     return {
       ok: true,
+      entry, // Mongoose doc for callers that need to re-use the created entry (e.g. bulk broadcast)
       content: `${icon} Added **${entry.name}** to ${label}.${scopeTag ? ' *(server only)*' : ''}`,
       embeds: [embed],
     };
@@ -432,66 +579,9 @@ export function createListHandlers({ client }) {
     if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
     if (entry.imageUrl) embed.setImage(entry.imageUrl);
 
-    const originGuildId = payload.guildId || '';
-    const channelIds = new Set();
-
-    // onlyOwner mode: only send to owner guild's notify channel
-    if (onlyOwner) {
-      if (!config.ownerGuildId) return; // no owner configured
-      if (config.ownerGuildId === originGuildId) return; // origin IS owner, already sees reply
-      try {
-        const ownerConfig = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
-        // Respect owner's opt-out
-        if (ownerConfig?.globalNotifyEnabled === false) {
-          // owner opted out — no broadcast
-        } else if (ownerConfig?.listNotifyChannelId) {
-          channelIds.add(ownerConfig.listNotifyChannelId);
-        } else {
-          // Env fallback: find env channel belonging to owner guild
-          for (const envId of config.listNotifyChannelIds) {
-            try {
-              const ch = await client.channels.fetch(envId);
-              if (ch?.guild?.id === config.ownerGuildId) { channelIds.add(envId); break; }
-            } catch { /* skip */ }
-          }
-        }
-      } catch (err) {
-        console.warn('[list] Failed to query owner GuildConfig:', err.message);
-      }
-    } else {
-      // Normal broadcast: collect from all opted-in guilds
-      const disabledGuildIds = new Set();
-      const dbNotifyGuildIds = new Set();
-      try {
-        const guildConfigs = await GuildConfig.find({}).lean();
-        for (const gc of guildConfigs) {
-          if (gc.globalNotifyEnabled === false) disabledGuildIds.add(gc.guildId);
-          if (gc.listNotifyChannelId) dbNotifyGuildIds.add(gc.guildId);
-          if (gc.guildId === originGuildId) continue;
-          if (gc.globalNotifyEnabled === false) continue;
-          if (!gc.listNotifyChannelId) continue;
-          channelIds.add(gc.listNotifyChannelId);
-        }
-      } catch (err) {
-        console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
-      }
-
-      if (config.listNotifyChannelIds.length > 0) {
-        for (const envId of config.listNotifyChannelIds) {
-          if (channelIds.has(envId)) continue;
-          try {
-            const ch = await client.channels.fetch(envId);
-            if (!ch?.isTextBased()) continue;
-            const chGuildId = ch.guild?.id || '';
-            if (chGuildId === originGuildId) continue;
-            if (disabledGuildIds.has(chGuildId)) continue;
-            if (dbNotifyGuildIds.has(chGuildId)) continue;
-          channelIds.add(envId);
-        } catch { /* channel not accessible */ }
-      }
-      }
-    } // end else (normal broadcast)
-
+    // Delegate channel routing to the shared resolver — keeps single-add and
+    // bulk-add broadcast paths using identical scope/opt-out logic.
+    const channelIds = await resolveBroadcastChannels(payload.guildId || '', { onlyOwner });
     if (channelIds.size === 0) return;
 
     await Promise.all(
@@ -506,6 +596,326 @@ export function createListHandlers({ client }) {
         }
       })
     );
+  }
+
+  /**
+   * Resolve broadcast target channels for a given origin guild.
+   * Returns a Set of channel IDs to send to, honoring opt-outs and scope.
+   * Factored out of broadcastListChange so bulk broadcast can reuse it
+   * without duplicating 40 lines of channel routing logic.
+   */
+  async function resolveBroadcastChannels(originGuildId, { onlyOwner = false } = {}) {
+    const channelIds = new Set();
+
+    if (onlyOwner) {
+      if (!config.ownerGuildId) return channelIds;
+      if (config.ownerGuildId === originGuildId) return channelIds;
+      try {
+        const ownerConfig = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
+        if (ownerConfig?.globalNotifyEnabled === false) return channelIds;
+        if (ownerConfig?.listNotifyChannelId) {
+          channelIds.add(ownerConfig.listNotifyChannelId);
+        } else {
+          for (const envId of config.listNotifyChannelIds) {
+            try {
+              const ch = await client.channels.fetch(envId);
+              if (ch?.guild?.id === config.ownerGuildId) {
+                channelIds.add(envId);
+                break;
+              }
+            } catch { /* skip */ }
+          }
+        }
+      } catch (err) {
+        console.warn('[list] Failed to query owner GuildConfig:', err.message);
+      }
+      return channelIds;
+    }
+
+    // Normal broadcast
+    const disabledGuildIds = new Set();
+    const dbNotifyGuildIds = new Set();
+    try {
+      const guildConfigs = await GuildConfig.find({}).lean();
+      for (const gc of guildConfigs) {
+        if (gc.globalNotifyEnabled === false) disabledGuildIds.add(gc.guildId);
+        if (gc.listNotifyChannelId) dbNotifyGuildIds.add(gc.guildId);
+        if (gc.guildId === originGuildId) continue;
+        if (gc.globalNotifyEnabled === false) continue;
+        if (!gc.listNotifyChannelId) continue;
+        channelIds.add(gc.listNotifyChannelId);
+      }
+    } catch (err) {
+      console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
+    }
+
+    if (config.listNotifyChannelIds.length > 0) {
+      for (const envId of config.listNotifyChannelIds) {
+        if (channelIds.has(envId)) continue;
+        try {
+          const ch = await client.channels.fetch(envId);
+          if (!ch?.isTextBased()) continue;
+          const chGuildId = ch.guild?.id || '';
+          if (chGuildId === originGuildId) continue;
+          if (disabledGuildIds.has(chGuildId)) continue;
+          if (dbNotifyGuildIds.has(chGuildId)) continue;
+          channelIds.add(envId);
+        } catch { /* skip */ }
+      }
+    }
+
+    return channelIds;
+  }
+
+  /**
+   * Broadcast a single summary embed for a bulk multiadd batch.
+   * Groups added entries by type (blacklist/whitelist/watchlist) and routes
+   * global vs server-scoped entries separately.
+   *
+   * @param {Array<{ name, type, scope, entry }>} addedResults - rows from executeBulkMultiadd.added
+   * @param {{ guildId, requestedByDisplayName }} meta
+   */
+  async function broadcastBulkAdd(addedResults, meta) {
+    if (!addedResults || addedResults.length === 0) return;
+
+    const globalEntries = addedResults.filter((r) => r.entry?.scope !== 'server');
+    const serverEntries = addedResults.filter((r) => r.entry?.scope === 'server');
+
+    const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');
+
+    const buildBulkEmbed = (entries, isLocal) => {
+      // Group by type so the embed is visually organized
+      const grouped = { black: [], white: [], watch: [] };
+      for (const r of entries) {
+        const t = r.type || r.entry?.type || 'black';
+        if (grouped[t]) grouped[t].push(r);
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(`📢 Bulk Add${isLocal ? ' (Local)' : ''} — ${entries.length} entries`)
+        .setColor(0x5865f2)
+        .setFooter({ text: `By ${meta.requestedByDisplayName || 'Unknown'}` })
+        .setTimestamp(new Date());
+
+      const typeLabels = { black: 'Blacklist', white: 'Whitelist', watch: 'Watchlist' };
+      for (const t of ['black', 'white', 'watch']) {
+        if (grouped[t].length === 0) continue;
+        const lines = grouped[t]
+          .slice(0, 15) // Discord embed field limit
+          .map((r, i) => `${i + 1}. ${typeIcon(t)} **${r.name}** — ${(r.entry?.reason || '').slice(0, 80)}`)
+          .join('\n');
+        const suffix = grouped[t].length > 15 ? `\n*... and ${grouped[t].length - 15} more*` : '';
+        embed.addFields({
+          name: `${typeLabels[t]} (${grouped[t].length})`,
+          value: (lines + suffix).slice(0, 1024),
+        });
+      }
+
+      return embed;
+    };
+
+    const originGuildId = meta.guildId || '';
+
+    // Global broadcast — all opted-in guilds
+    if (globalEntries.length > 0) {
+      const channelIds = await resolveBroadcastChannels(originGuildId, { onlyOwner: false });
+      if (channelIds.size > 0) {
+        const embed = buildBulkEmbed(globalEntries, false);
+        await Promise.all(
+          [...channelIds].map(async (channelId) => {
+            try {
+              const channel = await client.channels.fetch(channelId);
+              if (channel?.isTextBased()) {
+                await channel.send({ embeds: [embed] });
+              }
+            } catch (err) {
+              console.warn(`[multiadd] Bulk broadcast to ${channelId} failed:`, err.message);
+            }
+          })
+        );
+      }
+    }
+
+    // Server-scoped broadcast — owner guild only
+    if (serverEntries.length > 0) {
+      const channelIds = await resolveBroadcastChannels(originGuildId, { onlyOwner: true });
+      if (channelIds.size > 0) {
+        const embed = buildBulkEmbed(serverEntries, true);
+        await Promise.all(
+          [...channelIds].map(async (channelId) => {
+            try {
+              const channel = await client.channels.fetch(channelId);
+              if (channel?.isTextBased()) {
+                await channel.send({ embeds: [embed] });
+              }
+            } catch (err) {
+              console.warn(`[multiadd] Bulk local broadcast to ${channelId} failed:`, err.message);
+            }
+          })
+        );
+      }
+    }
+  }
+
+  /**
+   * Execute a bulk multiadd batch by looping rows through executeListAddToDatabase
+   * with skipBroadcast=true. Handles per-row errors so one bad row doesn't kill
+   * the whole batch. Resolves default scope from guild config once for the batch.
+   *
+   * @param {Array} rows - parsed rows from parseMultiaddFile
+   * @param {Object} meta - { guildId, channelId, requesterId, requesterTag, requesterDisplayName }
+   * @param {Function} [onProgress] - called as (currentIndex, total) periodically
+   * @returns {Promise<{ added: Array, skipped: Array, failed: Array }>}
+   */
+  async function executeBulkMultiadd(rows, meta, onProgress = null) {
+    const results = { added: [], skipped: [], failed: [] };
+
+    // Pre-resolve guild default scope once (cached by getGuildConfig)
+    let guildDefaultScope = 'global';
+    try {
+      await connectDB();
+      const gc = await getGuildConfig(meta.guildId);
+      guildDefaultScope = gc?.defaultBlacklistScope || 'global';
+    } catch (err) {
+      console.warn('[multiadd] Failed to resolve guild default scope:', err.message);
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+
+      // Resolve effective scope for this row:
+      //   - non-blacklist: always 'global' (whitelist/watchlist don't use scope)
+      //   - blacklist with explicit scope: honor it
+      //   - blacklist without scope: fall back to guild default
+      const effectiveScope =
+        row.type === 'black' ? (row.scope || guildDefaultScope) : 'global';
+
+      const payload = {
+        requestId: randomUUID(),
+        guildId: meta.guildId,
+        channelId: meta.channelId,
+        type: row.type,
+        name: row.name,
+        reason: row.reason,
+        raid: row.raid || '',
+        logsUrl: row.logs || '',
+        imageUrl: row.image || '',
+        scope: effectiveScope,
+        requestedByUserId: meta.requesterId,
+        requestedByTag: meta.requesterTag || '',
+        requestedByName: meta.requesterName || '',
+        requestedByDisplayName: meta.requesterDisplayName || '',
+        createdAt: Date.now(),
+        skipBroadcast: true, // bulk uses a single aggregated broadcast at the end
+      };
+
+      try {
+        const result = await executeListAddToDatabase(payload);
+        if (result.ok) {
+          results.added.push({
+            name: row.name,
+            type: row.type,
+            scope: effectiveScope,
+            entry: result.entry,
+          });
+        } else if (result.isDuplicate) {
+          results.skipped.push({
+            name: row.name,
+            reason: 'duplicate (already in list)',
+          });
+        } else {
+          // Strip Discord markdown and trim for summary embed
+          const firstLine = (result.content || 'unknown error').split('\n')[0];
+          const plain = firstLine.replace(/\*\*/g, '').replace(/[⚠️❌🛡️⛔✅]/g, '').trim();
+          results.skipped.push({
+            name: row.name,
+            reason: plain.slice(0, 80),
+          });
+        }
+      } catch (err) {
+        console.error(`[multiadd] Row ${row.rowNum} "${row.name}" failed:`, err);
+        results.failed.push({
+          name: row.name,
+          error: err.message || 'unknown error',
+        });
+      }
+
+      // Progress callback after each row (caller decides cadence)
+      if (onProgress) {
+        try {
+          await onProgress(i + 1, rows.length);
+        } catch { /* progress errors shouldn't stop the batch */ }
+      }
+
+      // Throttle to avoid hammering lostark.bible and Discord API
+      if (i < rows.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Build the final summary embed shown after a bulk multiadd completes.
+   * Used by both direct execution (officer path) and approval path.
+   */
+  function buildBulkSummaryEmbed(results, meta) {
+    const totalAttempted = results.added.length + results.skipped.length + results.failed.length;
+    const hasFailures = results.failed.length > 0;
+    const color = hasFailures ? 0xfee75c : results.added.length > 0 ? 0x57f287 : 0xed4245;
+
+    const embed = new EmbedBuilder()
+      .setTitle('📋 Bulk Add Complete')
+      .setDescription(`Processed **${totalAttempted}** row${totalAttempted === 1 ? '' : 's'}`)
+      .setColor(color)
+      .addFields(
+        { name: '✅ Added', value: String(results.added.length), inline: true },
+        { name: '⚠️ Skipped', value: String(results.skipped.length), inline: true },
+        { name: '❌ Failed', value: String(results.failed.length), inline: true },
+      )
+      .setFooter({ text: `By ${meta.requesterDisplayName || 'Unknown'}` })
+      .setTimestamp(new Date());
+
+    const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');
+
+    if (results.added.length > 0) {
+      const addedLines = results.added
+        .slice(0, 15)
+        .map((r, i) => `${i + 1}. ${typeIcon(r.type)} **${r.name}**`)
+        .join('\n');
+      const suffix = results.added.length > 15 ? `\n*... and ${results.added.length - 15} more*` : '';
+      embed.addFields({
+        name: `Added (${results.added.length})`,
+        value: (addedLines + suffix).slice(0, 1024),
+      });
+    }
+
+    if (results.skipped.length > 0) {
+      const skippedLines = results.skipped
+        .slice(0, 10)
+        .map((r) => `• **${r.name}** — ${r.reason}`)
+        .join('\n');
+      const suffix = results.skipped.length > 10 ? `\n*... and ${results.skipped.length - 10} more*` : '';
+      embed.addFields({
+        name: `Skipped (${results.skipped.length})`,
+        value: (skippedLines + suffix).slice(0, 1024),
+      });
+    }
+
+    if (results.failed.length > 0) {
+      const failedLines = results.failed
+        .slice(0, 10)
+        .map((r) => `• **${r.name}** — ${r.error}`)
+        .join('\n');
+      const suffix = results.failed.length > 10 ? `\n*... and ${results.failed.length - 10} more*` : '';
+      embed.addFields({
+        name: `Failed (${results.failed.length})`,
+        value: (failedLines + suffix).slice(0, 1024),
+      });
+    }
+
+    return embed;
   }
 
   async function notifyRequesterAboutDecision(payload, result, rejected = false) {
@@ -1954,6 +2364,593 @@ export function createListHandlers({ client }) {
     console.log(`[list] Trusted user added: ${name} by ${interaction.user.tag}`);
   }
 
+  /**
+   * /list multiadd action:<template|file> [file:<attachment>]
+   *
+   * Available to all guild members. Two actions:
+   *   - template: sends blank .xlsx template as ephemeral attachment
+   *   - file: (Phase 2+) downloads and parses filled template
+   *
+   * NOTE (Phase 3): non-officer/senior users uploading a file will route
+   * the entire batch through a single bulk approval request to Senior.
+   */
+  async function handleListMultiaddCommand(interaction) {
+    const action = interaction.options.getString('action', true);
+
+    if (!interaction.guild) {
+      await interaction.reply({
+        content: '❌ This command can only be used in a server.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (action === 'template') {
+      await interaction.deferReply({ ephemeral: true });
+      try {
+        const buffer = await buildMultiaddTemplate();
+        const attachment = new AttachmentBuilder(buffer, {
+          name: 'multiadd_template.xlsx',
+          description: 'Lost Ark Bot — bulk add template',
+        });
+
+        const templateEmbed = new EmbedBuilder()
+          .setTitle('📋 Bulk Add Template')
+          .setDescription(
+            `Fill in up to **${MULTIADD_MAX_ROWS} rows**, then upload via:\n` +
+              '`/list multiadd action:file file:<your.xlsx>`'
+          )
+          .setColor(0x5865f2)
+          .addFields(
+            {
+              name: '✅ Required Columns',
+              value: '`name` · `type` · `reason`',
+              inline: true,
+            },
+            {
+              name: '🔹 Optional Columns',
+              value: '`raid` · `logs` · `image` · `scope`',
+              inline: true,
+            },
+            {
+              name: '💡 Tips',
+              value: [
+                '• Use the **dropdown** in the `type` and `scope` columns.',
+                '• Delete the yellow **example row** before uploading.',
+                '• See the *Instructions* sheet inside the file for full details.',
+                '• Upload evidence images to Discord first, then paste the link.',
+              ].join('\n'),
+              inline: false,
+            }
+          )
+          .setFooter({
+            text: `Lost Ark Bot • Max ${MULTIADD_MAX_ROWS} rows • 1 MB file limit`,
+          });
+
+        await interaction.editReply({
+          embeds: [templateEmbed],
+          files: [attachment],
+        });
+      } catch (err) {
+        console.error('[multiadd] Template generation failed:', err);
+        await interaction.editReply({
+          content: `❌ Failed to generate template: \`${err.message}\``,
+        });
+      }
+      return;
+    }
+
+    if (action === 'file') {
+      const file = interaction.options.getAttachment('file');
+
+      // ----- Attachment checks (fast-fail before download) -----
+      if (!file) {
+        await interaction.reply({
+          content: '❌ Attach an `.xlsx` file with `action:file`.',
+          ephemeral: true,
+        });
+        return;
+      }
+      if (!file.name?.toLowerCase().endsWith('.xlsx')) {
+        await interaction.reply({
+          content: `❌ File must be \`.xlsx\` (got \`${file.name}\`).`,
+          ephemeral: true,
+        });
+        return;
+      }
+      if (file.size > 1024 * 1024) {
+        await interaction.reply({
+          content: `❌ File too large: ${(file.size / 1024).toFixed(1)} KB (max 1 MB).`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+
+      // ----- Download file from Discord CDN -----
+      let buffer;
+      try {
+        const response = await fetch(file.url);
+        if (!response.ok) {
+          await interaction.editReply({
+            content: `❌ Failed to download file: HTTP ${response.status}`,
+          });
+          return;
+        }
+        buffer = Buffer.from(await response.arrayBuffer());
+      } catch (err) {
+        console.error('[multiadd] Download failed:', err);
+        await interaction.editReply({
+          content: `❌ Failed to download file: \`${err.message}\``,
+        });
+        return;
+      }
+
+      // ----- Parse file -----
+      const parsed = await parseMultiaddFile(buffer);
+      if (!parsed.ok) {
+        await interaction.editReply({
+          content: `❌ Parse failed: ${parsed.error}`,
+        });
+        return;
+      }
+
+      // ----- No valid rows: show errors only and bail -----
+      if (parsed.rows.length === 0) {
+        const errEmbed = new EmbedBuilder()
+          .setTitle('❌ No Valid Rows Found')
+          .setDescription(
+            parsed.errors.length > 0
+              ? parsed.errors.slice(0, 15).join('\n').slice(0, 4000)
+              : 'The file appears to be empty or has no data rows.'
+          )
+          .setColor(0xed4245)
+          .setFooter({ text: 'Fix the errors and re-upload.' });
+        await interaction.editReply({ embeds: [errEmbed] });
+        return;
+      }
+
+      // ----- Store in pending map with expiry -----
+      const requestId = randomUUID();
+      const expiryTimer = setTimeout(() => {
+        multiaddPending.delete(requestId);
+      }, MULTIADD_PENDING_TTL_MS);
+
+      multiaddPending.set(requestId, {
+        rows: parsed.rows,
+        errors: parsed.errors,
+        requesterId: interaction.user.id,
+        requesterTag: interaction.user.tag,
+        requesterName: interaction.user.username,
+        requesterDisplayName: getInteractionDisplayName(interaction),
+        guildId: interaction.guild.id,
+        channelId: interaction.channelId,
+        createdAt: Date.now(),
+        expiryTimer,
+      });
+
+      // ----- Build preview embed -----
+      const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');
+      const previewLines = parsed.rows.slice(0, 20).map((r, i) => {
+        const reasonShort = r.reason.length > 50 ? r.reason.slice(0, 47) + '...' : r.reason;
+        const scopeTag = r.scope === 'server' ? ' `[S]`' : '';
+        return `\`${String(i + 1).padStart(2, ' ')}.\` ${typeIcon(r.type)} **${r.name}**${scopeTag} — ${reasonShort}`;
+      });
+      if (parsed.rows.length > 20) {
+        previewLines.push(`*... and ${parsed.rows.length - 20} more rows*`);
+      }
+
+      const previewEmbed = new EmbedBuilder()
+        .setTitle(`📋 Bulk Add Preview — ${parsed.rows.length} valid row${parsed.rows.length === 1 ? '' : 's'}`)
+        .setDescription(previewLines.join('\n').slice(0, 4000))
+        .setColor(0x5865f2)
+        .setFooter({
+          text:
+            parsed.errors.length > 0
+              ? `${parsed.errors.length} error${parsed.errors.length === 1 ? '' : 's'} below. Expires in 5 minutes.`
+              : 'Expires in 5 minutes.',
+        })
+        .setTimestamp();
+
+      if (parsed.errors.length > 0) {
+        const errText = parsed.errors.slice(0, 10).join('\n').slice(0, 1024);
+        const suffix = parsed.errors.length > 10 ? `\n*... and ${parsed.errors.length - 10} more*` : '';
+        previewEmbed.addFields({
+          name: `⚠️ Validation Errors (${parsed.errors.length})`,
+          value: (errText + suffix).slice(0, 1024),
+        });
+      }
+
+      const confirmRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`multiadd_confirm:${requestId}`)
+          .setLabel(`Confirm — Add ${parsed.rows.length}`)
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('✅'),
+        new ButtonBuilder()
+          .setCustomId(`multiadd_cancel:${requestId}`)
+          .setLabel('Cancel')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('✖️')
+      );
+
+      await interaction.editReply({
+        embeds: [previewEmbed],
+        components: [confirmRow],
+      });
+      return;
+    }
+
+    await interaction.reply({
+      content: `❌ Unknown action: \`${action}\`.`,
+      ephemeral: true,
+    });
+  }
+
+  /**
+   * Handle Confirm/Cancel button click from the /list multiadd preview.
+   * Cancel drops the pending entry. Confirm (Phase 2 stub) shows a
+   * placeholder; Phase 3 will replace with actual bulk add loop.
+   */
+  async function handleMultiaddConfirmButton(interaction) {
+    const [prefix, requestId] = interaction.customId.split(':');
+    const pending = multiaddPending.get(requestId);
+
+    if (!pending) {
+      await interaction.update({
+        content: '⚠️ Request expired or already processed.',
+        embeds: [],
+        components: [],
+      });
+      return;
+    }
+
+    // Only the original requester can confirm or cancel
+    if (interaction.user.id !== pending.requesterId) {
+      await interaction.reply({
+        content: '❌ Only the original requester can use these buttons.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (prefix === 'multiadd_cancel') {
+      clearMultiaddPending(requestId);
+      await interaction.update({
+        content: '✖️ Bulk add cancelled. No entries were added.',
+        embeds: [],
+        components: [],
+      });
+      return;
+    }
+
+    if (prefix === 'multiadd_confirm') {
+      // Delete from pending immediately to prevent double-click double-run
+      clearMultiaddPending(requestId);
+
+      // ========== Branch A: requester is officer/senior → execute directly ==========
+      // Use the stricter isOfficerOrSenior (not isRequesterAutoApprover) so
+      // MEMBER_APPROVER_IDS doesn't bypass bulk approval — matches README.
+      if (isOfficerOrSenior(pending.requesterId)) {
+        // Update preview to "processing" state before the (potentially long) loop
+        await interaction.update({
+          content: `⏳ Processing ${pending.rows.length} rows... (this may take up to ${Math.ceil(pending.rows.length * 0.7)}s)`,
+          embeds: [],
+          components: [],
+        });
+
+        // Optional progress update (every 5 rows OR on final row)
+        const onProgress = async (current, total) => {
+          // Skip unless this is a multiple-of-5 tick OR the final row
+          if (current % 5 !== 0 && current !== total) return;
+          try {
+            await interaction.editReply({
+              content: `⏳ Processing... ${current}/${total} rows done`,
+            });
+          } catch { /* ignore progress errors */ }
+        };
+
+        const meta = {
+          guildId: pending.guildId,
+          channelId: pending.channelId,
+          requesterId: pending.requesterId,
+          requesterTag: pending.requesterTag,
+          requesterName: pending.requesterName,
+          requesterDisplayName: pending.requesterDisplayName,
+        };
+
+        const results = await executeBulkMultiadd(pending.rows, meta, onProgress);
+
+        // Fire-and-forget bulk broadcast (1 embed for all)
+        broadcastBulkAdd(results.added, {
+          guildId: pending.guildId,
+          requestedByDisplayName: pending.requesterDisplayName,
+        }).catch((err) => console.warn('[multiadd] Bulk broadcast failed:', err.message));
+
+        const summaryEmbed = buildBulkSummaryEmbed(results, pending);
+        await interaction.editReply({
+          content: null,
+          embeds: [summaryEmbed],
+          components: [],
+        });
+        return;
+      }
+
+      // ========== Branch B: member → create PendingApproval + DM seniors ==========
+      //
+      // Ordering matters for crash safety AND race safety:
+      //   1. Look up target approvers (from env config)
+      //   2. Create PendingApproval with approverIds = targetIds up front so
+      //      any early click passes permission check
+      //   3. Send DMs to approvers (some may fail if bot is blocked)
+      //   4. If NO DM was delivered, delete the placeholder
+      //   5. Otherwise, trim approverIds to only those who successfully
+      //      received the DM (so rejected approvers can't click non-existent
+      //      buttons) and attach DM message refs
+      try {
+        await connectDB();
+
+        // Senior-only recipient list for bulk approval. Must match what
+        // sendBulkApprovalToApprovers uses, otherwise placeholder approverIds
+        // would diverge from the actual DM recipients.
+        const targetApproverIds = getSeniorApproverIds();
+        if (targetApproverIds.length === 0) {
+          await interaction.update({
+            content: '⚠️ Failed to send approval request: No Senior approver user IDs configured. Set SENIOR_APPROVER_IDS in env.',
+            embeds: [],
+            components: [],
+          });
+          return;
+        }
+
+        const guild = interaction.guild || (await client.guilds.fetch(pending.guildId).catch(() => null));
+
+        // Build simplified bulkRows shape for DB (matches schema)
+        const bulkRows = pending.rows.map((r) => ({
+          name: r.name,
+          type: r.type,
+          reason: r.reason,
+          raid: r.raid || '',
+          logsUrl: r.logs || '',
+          imageUrl: r.image || '',
+          scope: r.scope || '',
+        }));
+
+        // Step 1+2: Create PendingApproval with the FULL target approver list
+        // BEFORE sending DMs. This closes the race window where an approver
+        // could click during step 3 (DM send) and fail permission check.
+        await PendingApproval.create({
+          requestId,
+          guildId: pending.guildId,
+          channelId: pending.channelId,
+          action: 'bulk',
+          bulkRows,
+          requestedByUserId: pending.requesterId,
+          requestedByTag: pending.requesterTag,
+          requestedByName: pending.requesterName || '',
+          requestedByDisplayName: pending.requesterDisplayName,
+          approverIds: targetApproverIds, // preliminary — trimmed after DMs settle
+          approverDmMessages: [],
+        });
+
+        // Step 3: Send DMs to approvers
+        const approvalPending = {
+          requestId,
+          rows: pending.rows,
+          requesterId: pending.requesterId,
+          requesterTag: pending.requesterTag,
+          requesterDisplayName: pending.requesterDisplayName,
+          guildId: pending.guildId,
+        };
+
+        const sent = await sendBulkApprovalToApprovers(guild, approvalPending);
+
+        // Step 4: If 0 deliveries, clean up placeholder
+        if (!sent.success) {
+          await PendingApproval.deleteOne({ requestId }).catch((err) =>
+            console.warn('[multiadd] Failed to clean up placeholder approval:', err.message)
+          );
+          await interaction.update({
+            content: `⚠️ Failed to send approval request: ${sent.reason}`,
+            embeds: [],
+            components: [],
+          });
+          return;
+        }
+
+        // Step 5: Trim approverIds to only those who actually received DM
+        // and attach the DM message references for reject/cleanup flows.
+        await PendingApproval.updateOne(
+          { requestId },
+          {
+            $set: {
+              approverIds: sent.deliveredApproverIds,
+              approverDmMessages: sent.deliveredDmMessages,
+            },
+          }
+        );
+
+        const waitEmbed = new EmbedBuilder()
+          .setTitle('⏳ Bulk Add — Awaiting Senior Approval')
+          .setDescription(
+            `Your bulk add of **${pending.rows.length} rows** has been sent to Senior for approval.\n\n` +
+              `You'll be notified in this channel when the decision is made.`
+          )
+          .setColor(0xfee75c)
+          .setFooter({ text: `Request ID: ${requestId.slice(0, 8)}` })
+          .setTimestamp();
+
+        await interaction.update({
+          content: null,
+          embeds: [waitEmbed],
+          components: [],
+        });
+      } catch (err) {
+        console.error('[multiadd] Approval request create failed:', err);
+        // Best-effort cleanup of any placeholder left behind
+        await PendingApproval.deleteOne({ requestId }).catch(() => {});
+        await interaction.update({
+          content: `❌ Failed to create approval request: \`${err.message}\``,
+          embeds: [],
+          components: [],
+        }).catch(() => {});
+      }
+      return;
+    }
+  }
+
+  /**
+   * Handle Approve/Reject button click from a Senior's DM for a /list multiadd
+   * batch. Loads the PendingApproval, validates approver permission, executes
+   * the bulk add (on approve) or simply drops it (on reject), then notifies
+   * the original requester in the origin channel.
+   */
+  async function handleMultiaddApprovalButton(interaction) {
+    const [prefix, requestId] = interaction.customId.split(':');
+    await connectDB();
+
+    // Atomic claim: findOneAndDelete returns the document iff it still exists
+    // AND the user is in the approverIds list. If two approvers click
+    // simultaneously, exactly one gets the payload and the other gets null
+    // — preventing double execution of the bulk add.
+    const payload = await PendingApproval.findOneAndDelete({
+      requestId,
+      action: 'bulk',
+      approverIds: interaction.user.id,
+    }).lean();
+
+    if (!payload) {
+      // Distinguish "not authorized" vs "already processed / expired"
+      const stillExists = await PendingApproval.exists({ requestId, action: 'bulk' });
+      if (stillExists) {
+        await interaction.reply({
+          content: '⛔ You are not allowed to approve/reject this request.',
+          ephemeral: true,
+        });
+      } else {
+        await interaction.update({
+          content: '⚠️ This bulk approval request has already been processed or expired.',
+          embeds: [],
+          components: [],
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    const meta = {
+      guildId: payload.guildId,
+      channelId: payload.channelId,
+      requesterId: payload.requestedByUserId,
+      requesterTag: payload.requestedByTag,
+      requesterName: payload.requestedByName,
+      requesterDisplayName: payload.requestedByDisplayName,
+    };
+
+    if (prefix === 'multiaddapprove_reject') {
+      // Update DM to show rejection decision
+      const rejectEmbed = new EmbedBuilder()
+        .setTitle('✖️ Bulk Add Rejected')
+        .setDescription(`Rejected by <@${interaction.user.id}>`)
+        .setColor(0xed4245)
+        .setTimestamp();
+
+      await interaction.update({
+        embeds: [rejectEmbed],
+        components: [],
+      }).catch(() => {});
+
+      // Sync the OTHER approvers' DMs so their buttons disappear too.
+      // Excludes this interaction's message (already updated via .update() above).
+      await syncApproverDmMessages(
+        payload,
+        { embeds: [rejectEmbed], components: [] },
+        { excludeMessageId: interaction.message?.id || '' }
+      ).catch((err) => console.warn('[multiadd] DM sync failed:', err.message));
+
+      // Notify requester in origin channel
+      try {
+        const guild = await client.guilds.fetch(payload.guildId);
+        const channel = await guild.channels.fetch(payload.channelId);
+        if (channel?.isTextBased()) {
+          await channel.send({
+            content: `<@${payload.requestedByUserId}> ❌ Your bulk add of **${payload.bulkRows.length} rows** was rejected by Senior.`,
+          });
+        }
+      } catch (err) {
+        console.warn('[multiadd] Failed to notify requester of rejection:', err.message);
+      }
+      return;
+    }
+
+    if (prefix === 'multiaddapprove_approve') {
+      // Acknowledge immediately (execution can take 10-30s for 30 rows)
+      await interaction.update({
+        content: `⏳ Approved. Processing ${payload.bulkRows.length} rows...`,
+        embeds: [],
+        components: [],
+      }).catch(() => {});
+
+      // Re-hydrate rows from DB shape back to parser row shape (logs/image field names differ)
+      const rows = payload.bulkRows.map((r) => ({
+        name: r.name,
+        type: r.type,
+        reason: r.reason,
+        raid: r.raid || '',
+        logs: r.logsUrl || '',
+        image: r.imageUrl || '',
+        scope: r.scope || '',
+        rowNum: 0,
+      }));
+
+      const results = await executeBulkMultiadd(rows, meta, null);
+
+      // Fire-and-forget bulk broadcast
+      broadcastBulkAdd(results.added, {
+        guildId: payload.guildId,
+        requestedByDisplayName: payload.requestedByDisplayName,
+      }).catch((err) => console.warn('[multiadd] Bulk broadcast failed:', err.message));
+
+      const summaryEmbed = buildBulkSummaryEmbed(results, meta);
+      // Add approver info to the summary for the DM
+      summaryEmbed.addFields({
+        name: 'Approved by',
+        value: `<@${interaction.user.id}>`,
+        inline: false,
+      });
+
+      // Update approver DM with the summary
+      await interaction.editReply({
+        content: null,
+        embeds: [summaryEmbed],
+        components: [],
+      }).catch(() => {});
+
+      // Sync the OTHER approvers' DMs so their buttons disappear too.
+      // Excludes this interaction's message (already updated via editReply above).
+      await syncApproverDmMessages(
+        payload,
+        { embeds: [summaryEmbed], components: [] },
+        { excludeMessageId: interaction.message?.id || '' }
+      ).catch((err) => console.warn('[multiadd] DM sync failed:', err.message));
+
+      // Notify requester in origin channel
+      try {
+        const guild = await client.guilds.fetch(payload.guildId);
+        const channel = await guild.channels.fetch(payload.channelId);
+        if (channel?.isTextBased()) {
+          await channel.send({
+            content: `<@${payload.requestedByUserId}> ✅ Your bulk add was approved by Senior.`,
+            embeds: [summaryEmbed],
+          });
+        }
+      } catch (err) {
+        console.warn('[multiadd] Failed to notify requester of approval:', err.message);
+      }
+      return;
+    }
+  }
+
   return {
     handleListCheckCommand,
     handleListAddCommand,
@@ -1961,6 +2958,9 @@ export function createListHandlers({ client }) {
     handleListRemoveCommand,
     handleListViewCommand,
     handleListTrustCommand,
+    handleListMultiaddCommand,
+    handleMultiaddConfirmButton,
+    handleMultiaddApprovalButton,
     handleListAddApprovalButton,
     handleListAddOverwriteButton,
     handleQuickAddSelect,

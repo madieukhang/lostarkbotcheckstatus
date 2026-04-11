@@ -5,6 +5,7 @@
 
 import {
   Client,
+  EmbedBuilder,
   GatewayIntentBits,
   InteractionType,
   REST,
@@ -104,6 +105,43 @@ client.on('interactionCreate', async (interaction) => {
     return;
   }
 
+  // /list multiadd preview Confirm/Cancel buttons
+  if (
+    interaction.isButton() &&
+    (interaction.customId.startsWith('multiadd_confirm:') || interaction.customId.startsWith('multiadd_cancel:'))
+  ) {
+    try {
+      await listHandlers.handleMultiaddConfirmButton(interaction);
+    } catch (err) {
+      console.error('[multiadd] Button handler error:', err);
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: '❌ Failed to process button action.' }).catch(() => {});
+      } else {
+        await interaction.reply({ content: '❌ Failed to process button action.', ephemeral: true }).catch(() => {});
+      }
+    }
+    return;
+  }
+
+  // /list multiadd bulk approval buttons (DM to Senior)
+  if (
+    interaction.isButton() &&
+    (interaction.customId.startsWith('multiaddapprove_approve:') ||
+      interaction.customId.startsWith('multiaddapprove_reject:'))
+  ) {
+    try {
+      await listHandlers.handleMultiaddApprovalButton(interaction);
+    } catch (err) {
+      console.error('[multiadd] Approval button error:', err);
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: '❌ Failed to process approval action.' }).catch(() => {});
+      } else {
+        await interaction.reply({ content: '❌ Failed to process approval action.', ephemeral: true }).catch(() => {});
+      }
+    }
+    return;
+  }
+
   // Quick Add: select menu → show modal
   if (interaction.isStringSelectMenu() && interaction.customId === 'quickadd_select') {
     try {
@@ -154,6 +192,8 @@ client.on('interactionCreate', async (interaction) => {
         await listHandlers.handleListViewCommand(interaction);
       } else if (subcommand === 'trust') {
         await listHandlers.handleListTrustCommand(interaction);
+      } else if (subcommand === 'multiadd') {
+        await listHandlers.handleListMultiaddCommand(interaction);
       }
     } else if (commandName === 'listcheck') {
       await listHandlers.handleListCheckCommand(interaction);
@@ -180,6 +220,7 @@ client.on('interactionCreate', async (interaction) => {
         '`/list remove tên` — Xoá entry khỏi danh sách',
         '`/list view type [scope]` — Xem danh sách (type: all/black/white/watch/trusted, scope: all/global/server)',
         '`/list trust action tên [reason]` — Quản lý danh sách uy tín (add/remove, chỉ officer)',
+        '`/list multiadd action [file]` — 📦 **Bulk add** qua Excel template (xem chi tiết ở dưới)',
         '',
         '`/listcheck image` — Trích tên từ ảnh chụp, kiểm tra với tất cả danh sách',
         '',
@@ -202,6 +243,7 @@ client.on('interactionCreate', async (interaction) => {
         '`/list remove name` — Remove an entry from a list',
         '`/list view type [scope]` — View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
         '`/list trust action name [reason]` — Manage trusted list (add/remove, officer only)',
+        '`/list multiadd action [file]` — 📦 **Bulk add** via Excel template (see details below)',
         '',
         '`/listcheck image` — Check names from screenshot against all lists',
         '',
@@ -222,7 +264,162 @@ client.on('interactionCreate', async (interaction) => {
         );
       }
 
-      await interaction.reply({ content: helpLines.join('\n'), ephemeral: true });
+      // Detailed /list multiadd embed — separate from the main command list
+      // because this feature has a multi-step flow that needs more explanation
+      // than a one-liner. See CHANGELOG v0.5.1 for the feature spec.
+      const multiaddEmbed = lang === 'vn'
+        ? new EmbedBuilder()
+            .setTitle('📦 /list multiadd — Bulk Add qua Excel')
+            .setDescription(
+              'Thêm **tối đa 30 entries** cùng lúc vào blacklist/whitelist/watchlist ' +
+                'bằng 1 file Excel, thay vì gõ `/list add` từng người một.'
+            )
+            .setColor(0x5865f2)
+            .addFields(
+              {
+                name: '📥 Cách sử dụng (4 bước)',
+                value: [
+                  '**1.** `/list multiadd action:template` → Bot gửi file template trắng',
+                  '**2.** Mở file Excel, xoá dòng ví dụ màu vàng, điền data (tối đa 30 dòng)',
+                  '**3.** `/list multiadd action:file file:<file của bạn>` → Bot hiển thị preview',
+                  '**4.** Click **✅ Confirm** để add, hoặc **✖️ Cancel** để huỷ',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '📋 Các cột của template',
+                value: [
+                  '**Bắt buộc:** `name`, `type`, `reason`',
+                  '**Tuỳ chọn:** `raid`, `logs`, `image`, `scope`',
+                  '• `type` (dropdown): `black` / `white` / `watch`',
+                  '• `scope` (dropdown): `global` / `server` — chỉ cho blacklist',
+                  '• `logs` và `image` phải là URL (`https://...`)',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '🔐 Quyền & Flow duyệt',
+                value: [
+                  '**Officer / Senior** → Confirm xong là batch chạy ngay, có progress bar',
+                  '**Member thường** → batch gửi lên **Senior qua 1 DM duy nhất** (không spam mỗi row 1 DM)',
+                  'Senior click Approve → batch chạy + notify requester trong channel gốc',
+                  'Senior click Reject → requester được báo bị reject',
+                  'Chỉ người upload mới click được Confirm/Cancel',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '📏 Giới hạn & Quy tắc',
+                value: [
+                  '• Tối đa **30 rows** mỗi file',
+                  '• File size ≤ **1 MB**, chỉ `.xlsx`',
+                  '• Preview hết hạn sau **5 phút**',
+                  '• Tái sử dụng luật của `/list add`: ilvl ≥ 1700, trusted bị skip, duplicate check',
+                  '• Rows lỗi được liệt kê ở preview nhưng **không block** các row valid',
+                  '• Duplicate trong cùng file (case-insensitive) sẽ bị reject',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '🤔 Các trường hợp đặc biệt',
+                value: [
+                  '• **Tên đã có trong list** → `⚠️ Skipped` với reason `"duplicate (already in list)"`',
+                  '• **Tên không tồn tại** (no roster) → `⚠️ Skipped` với reason `"No roster found for..."`',
+                  '• **Trusted user** → `⚠️ Skipped` tự động (exact match hoặc alt qua roster)',
+                  '• **ilvl < 1700** → `⚠️ Skipped` với reason `"has item level X (below 1700)"`',
+                  '• **Lỗi runtime** (network/DB) → `❌ Failed` với error message',
+                  '• **Quan trọng:** lỗi 1 row **KHÔNG block** các row khác — batch chạy đến hết',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '🖼️ Ảnh evidence',
+                value:
+                  'Excel **không hỗ trợ** embedded image. Upload screenshot lên Discord trước, ' +
+                  'right-click → Copy Link, rồi paste URL vào cột `image`.',
+                inline: false,
+              }
+            )
+            .setFooter({ text: 'Phần chi tiết riêng — các lệnh khác ở trên' })
+        : new EmbedBuilder()
+            .setTitle('📦 /list multiadd — Bulk Add via Excel')
+            .setDescription(
+              'Add **up to 30 entries** at once to blacklist/whitelist/watchlist ' +
+                'via a single Excel file, instead of running `/list add` one at a time.'
+            )
+            .setColor(0x5865f2)
+            .addFields(
+              {
+                name: '📥 How to use (4 steps)',
+                value: [
+                  '**1.** `/list multiadd action:template` → Bot sends a blank template file',
+                  '**2.** Open in Excel, delete the yellow example row, fill in up to 30 rows',
+                  '**3.** `/list multiadd action:file file:<your file>` → Bot shows a preview',
+                  '**4.** Click **✅ Confirm** to proceed, or **✖️ Cancel** to abort',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '📋 Template columns',
+                value: [
+                  '**Required:** `name`, `type`, `reason`',
+                  '**Optional:** `raid`, `logs`, `image`, `scope`',
+                  '• `type` (dropdown): `black` / `white` / `watch`',
+                  '• `scope` (dropdown): `global` / `server` — blacklist only',
+                  '• `logs` and `image` must be URLs (`https://...`)',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '🔐 Permission & Approval Flow',
+                value: [
+                  '**Officer / Senior** → batch runs immediately after Confirm, with progress updates',
+                  '**Regular member** → batch sent to **Senior as ONE DM** (no spam per row)',
+                  'Senior clicks Approve → batch runs + requester notified in origin channel',
+                  'Senior clicks Reject → requester notified of rejection',
+                  'Only the original uploader can click Confirm/Cancel',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '📏 Limits & Rules',
+                value: [
+                  '• Max **30 rows** per file',
+                  '• File size ≤ **1 MB**, `.xlsx` only',
+                  '• Preview expires after **5 minutes**',
+                  '• Reuses `/list add` rules: ilvl ≥ 1700, trusted users skipped, duplicate check',
+                  '• Failed rows listed in preview but **do not block** valid rows',
+                  '• Duplicate names within the same file (case-insensitive) are rejected',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '🤔 Edge Cases',
+                value: [
+                  '• **Name already in list** → `⚠️ Skipped` with reason `"duplicate (already in list)"`',
+                  '• **Name doesn\'t exist** (no roster) → `⚠️ Skipped` with reason `"No roster found for..."`',
+                  '• **Trusted user** → auto-`⚠️ Skipped` (exact match or alt via roster)',
+                  '• **ilvl < 1700** → `⚠️ Skipped` with reason `"has item level X (below 1700)"`',
+                  '• **Runtime error** (network/DB) → `❌ Failed` with error message',
+                  '• **Important:** one row failing does **NOT block** other rows — batch runs to completion',
+                ].join('\n'),
+                inline: false,
+              },
+              {
+                name: '🖼️ Evidence images',
+                value:
+                  "Excel doesn't support embedded images. Upload the screenshot to Discord first, " +
+                  'right-click → Copy Link, then paste the URL into the `image` column.',
+                inline: false,
+              }
+            )
+            .setFooter({ text: 'Detailed section — see the main command list above' });
+
+      await interaction.reply({
+        content: helpLines.join('\n'),
+        embeds: [multiaddEmbed],
+        ephemeral: true,
+      });
     }
   } catch (err) {
     console.error(`[bot] Unhandled error in /${commandName}:`, err);
