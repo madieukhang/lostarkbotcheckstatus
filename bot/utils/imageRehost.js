@@ -45,18 +45,32 @@ export async function getEvidenceChannelId() {
  * @param {string} [meta.entryName] - Character name (for evidence message text)
  * @param {string} [meta.addedBy] - Display name of the requester
  * @param {string} [meta.listType] - 'black' / 'white' / 'watch'
+ * @param {boolean} [meta.throwOnError] - When true, throws an Error with a
+ *   specific message instead of returning null on any failure path. Used by
+ *   callers (like /laremote action:syncimages) that need the actual error
+ *   text in their reporting. Default behavior (false) preserves backward
+ *   compatibility with the original null-on-failure contract.
  * @returns {Promise<{ messageId: string, channelId: string, freshUrl: string } | null>}
  *   Returns the rehost metadata on success, or null on any failure (caller
- *   should fall back to storing the original URL as legacy).
+ *   should fall back to storing the original URL as legacy). When
+ *   `meta.throwOnError === true`, throws on failure instead of returning null.
  */
 export async function rehostImage(originalUrl, client, meta = {}) {
-  if (!originalUrl) return null;
+  const throwOnError = meta.throwOnError === true;
+  // Local helper: choose between throw and return-null based on the option,
+  // and always log to console for Railway log forensics.
+  const fail = (msg) => {
+    console.warn(`[imageRehost] ${msg}`);
+    if (throwOnError) throw new Error(msg);
+    return null;
+  };
+
+  if (!originalUrl) return fail('originalUrl is empty');
 
   // Resolve evidence channel ID from owner guild's GuildConfig
   const channelId = await getEvidenceChannelId();
   if (!channelId) {
-    console.warn('[imageRehost] No evidence channel configured. Use /laremote action:evidencechannel to set one.');
-    return null;
+    return fail('No evidence channel configured. Use /laremote action:evidencechannel to set one.');
   }
 
   // Step 1: Download the original image (URL still valid at this point)
@@ -65,8 +79,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   try {
     const response = await fetch(originalUrl);
     if (!response.ok) {
-      console.warn(`[imageRehost] Failed to download original (HTTP ${response.status}): ${originalUrl.slice(0, 80)}`);
-      return null;
+      return fail(`download HTTP ${response.status} (${response.statusText || 'no statusText'})`);
     }
     buffer = Buffer.from(await response.arrayBuffer());
 
@@ -79,14 +92,12 @@ export async function rehostImage(originalUrl, client, meta = {}) {
       }
     } catch { /* leave default filename */ }
   } catch (err) {
-    console.warn('[imageRehost] Download failed:', err.message);
-    return null;
+    return fail(`download fetch threw: ${err.message}`);
   }
 
   // Sanity check size — Discord attachments max 25 MB for bots without nitro
   if (buffer.length > 24 * 1024 * 1024) {
-    console.warn(`[imageRehost] Image too large to rehost (${(buffer.length / 1024 / 1024).toFixed(1)} MB)`);
-    return null;
+    return fail(`file too large to rehost (${(buffer.length / 1024 / 1024).toFixed(1)} MB > 24 MB limit)`);
   }
 
   // Step 2: Upload to the evidence channel
@@ -94,13 +105,11 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   try {
     channel = await client.channels.fetch(channelId);
   } catch (err) {
-    console.warn(`[imageRehost] Cannot fetch evidence channel ${channelId}:`, err.message);
-    return null;
+    return fail(`cannot fetch evidence channel ${channelId}: ${err.message}`);
   }
 
   if (!channel || !channel.isTextBased?.()) {
-    console.warn(`[imageRehost] Evidence channel ${channelId} is not a text channel`);
-    return null;
+    return fail(`evidence channel ${channelId} is not a text channel`);
   }
 
   // Step 3: Send the file with metadata in the message content for audit trail
@@ -136,8 +145,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
       freshUrl,
     };
   } catch (err) {
-    console.warn('[imageRehost] Upload to evidence channel failed:', err.message);
-    return null;
+    return fail(`channel.send failed: ${err.code ? `[${err.code}] ` : ''}${err.message}`);
   }
 }
 

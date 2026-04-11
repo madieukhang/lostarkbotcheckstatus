@@ -665,27 +665,46 @@ export async function handleSetupRemoteCommand(interaction) {
         }
 
         // Step 2: Download the URL and rehost to evidence channel.
-        // rehostImage() handles download + upload internally and returns null on failure.
-        const rehosted = await rehostImage(downloadUrl, interaction.client, {
-          entryName: entry.name,
-          addedBy: `Migration by ${interaction.user.tag}`,
-          listType: type,
-        });
+        // Uses throwOnError so we get the actual failure message in stats,
+        // not a generic "rehost returned null". One automatic retry with a
+        // 2s delay handles transient network blips and brief Discord rate
+        // limit windows. The first attempt's error is preserved if both fail.
+        let rehosted = null;
+        let firstAttemptError = null;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            rehosted = await rehostImage(downloadUrl, interaction.client, {
+              entryName: entry.name,
+              addedBy: `Migration by ${interaction.user.tag}`,
+              listType: type,
+              throwOnError: true,
+            });
+            break; // success
+          } catch (err) {
+            if (attempt === 1) {
+              firstAttemptError = err.message;
+              // Wait 2s before retry — gives Discord rate-limit a moment to clear
+              await new Promise((r) => setTimeout(r, 2000));
+            } else {
+              // Both attempts failed — classify by error pattern + URL type
+              const errMsg = err.message;
+              const isExternalUrl = !isDiscordCdnUrl(entry.imageUrl);
+              const isDeadDownload = errMsg.startsWith('download HTTP') || errMsg.startsWith('download fetch threw');
 
-        if (!rehosted) {
-          // Distinguish dead-URL failure from infrastructure failure: if it
-          // was an external URL and rehost failed, the URL is most likely
-          // 404. For Discord URLs we already passed the refresh step, so a
-          // null result here is more likely to be a transient/infra issue.
-          if (!isDiscordCdnUrl(entry.imageUrl)) {
-            stats.skippedDead += 1;
-            stats.errors.push(`${entry.name}: external URL download failed (dead link?)`);
-          } else {
-            stats.failed += 1;
-            stats.errors.push(`${entry.name}: rehost failed after successful URL refresh`);
+              if (isExternalUrl && isDeadDownload) {
+                // External URL that 404s → dead link, expected
+                stats.skippedDead += 1;
+                stats.errors.push(`${entry.name}: ${errMsg} (external URL, likely dead)`);
+              } else {
+                // Discord URL that passed refresh but failed to upload, OR
+                // any other infra issue
+                stats.failed += 1;
+                stats.errors.push(`${entry.name}: ${errMsg}${firstAttemptError && firstAttemptError !== errMsg ? ` (attempt 1: ${firstAttemptError})` : ''}`);
+              }
+            }
           }
-          continue;
         }
+        if (!rehosted) continue;
 
         // Step 3: Compare-and-swap update. The filter requires the entry to
         // STILL match the legacy snapshot we read at the start (same imageUrl,
@@ -725,9 +744,12 @@ export async function handleSetupRemoteCommand(interaction) {
         console.warn(`[syncimages] Entry ${entry.name} failed:`, err.message);
       }
 
-      // Throttle to avoid hammering Discord API (refresh + upload).
+      // Throttle to avoid hammering Discord API (refresh + upload). Bumped
+      // from 200ms to 500ms in v0.5.10 after VHT's first run had 49 entries
+      // fail in a row mid-batch, suggesting we were too close to Discord's
+      // sustained channel rate limit (5 messages / 5 seconds = 1/s).
       if (i < legacyEntries.length - 1) {
-        await new Promise((r) => setTimeout(r, 200));
+        await new Promise((r) => setTimeout(r, 500));
       }
 
       // Progress update every 10 entries (skip very first iteration).
