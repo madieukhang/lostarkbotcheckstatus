@@ -260,7 +260,12 @@ client.on('interactionCreate', async (interaction) => {
           '',
           lang === 'vn' ? '**🛰️ Chỉ Owner Server:**' : '**🛰️ Owner Server Only:**',
           '`/lastats` — ' + (lang === 'vn' ? 'Thống kê bot' : 'Show bot usage statistics'),
-          '`/laremote action [guild] [scope]` — ' + (lang === 'vn' ? 'Senior: điều khiển config từ xa' : 'Senior: remote config dashboard'),
+          '`/laremote action [guild] [scope] [channel]` — ' + (lang === 'vn'
+            ? 'Senior: điều khiển config từ xa (view / off / defaultscope / evidencechannel)'
+            : 'Senior: remote config dashboard (view / off / defaultscope / evidencechannel)'),
+          '`/laremote action:evidencechannel channel:#...` — ' + (lang === 'vn'
+            ? 'Đặt kênh lưu ảnh evidence (bot rehost vào đây để tránh CDN expire ~24h)'
+            : 'Set evidence storage channel (bot rehosts here to defeat CDN ~24h expiry)'),
         );
       }
 
