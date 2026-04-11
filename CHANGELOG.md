@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.10] - 2026-04-11
+
+### Fixed
+
+- **`/laremote action:syncimages` reported generic "rehost failed after successful URL refresh" for every failure.** VHT's first production run on 117 legacy entries hit 68 successes followed by 49 in-a-row failures, all with the same useless error message. Root cause: `rehostImage()` swallowed the actual exception text and returned `null`, so the syncimages caller had no idea whether the failure was a 404, a rate limit, a permission error, or a payload-size issue. Fixed by adding an opt-in `meta.throwOnError` parameter to `rehostImage()` that throws an `Error` with a specific message at every failure point (download HTTP code, fetch exception, file-too-large, channel fetch error, channel.send error code) instead of returning null. The original null-on-failure contract is preserved for all existing callers; only `/laremote action:syncimages` opts in. Future runs surface the real error in both the embed `Errors` field and Railway logs, making post-mortem possible.
+- **`/laremote action:syncimages` had no retry on transient failures.** Single network blip or brief Discord rate-limit window would mark an entry as permanently failed even though a 2-second retry would have succeeded. Added a per-entry retry loop: first attempt → 2s wait → second attempt → only mark failed if both fail. The first attempt's error is preserved in the `errors[]` summary if both attempts fail with different messages, so debugging still has full context.
+- **Throttle bumped from 200ms to 500ms** between entries in the migration loop. Discord's sustained channel rate limit is 5 messages / 5 seconds (1/s average). The previous 200ms gap, combined with each entry's actual operation time of ~1-1.5s, kept us hovering right at the limit, which likely caused VHT's mid-batch failure cliff. The new 500ms gap pushes the effective rate to ~0.5/s, well below the limit. Trade-off: 117 entries now take ~5 minutes instead of ~3, which is acceptable for a one-shot migration.
+
+### Notes
+
+- The 49 entries that failed in VHT's first run are still in legacy state (CAS only writes on rehost success), so re-running `/laremote action:syncimages` is safe and will retry exactly those 49. The new error capture should make the actual failure cause visible.
+
 ## [v0.5.9] - 2026-04-11
 
 ### Changed
