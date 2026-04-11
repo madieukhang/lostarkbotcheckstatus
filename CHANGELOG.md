@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.8] - 2026-04-11
+
+### Fixed
+
+- **P2: `/laremote action:syncimages` could overwrite newer evidence with the legacy snapshot.** The migration loop snapshotted all legacy entries up front, then several seconds (or minutes for large batches) later wrote `imageMessageId/imageChannelId` back keyed only by `_id`. If anyone modified the same entry during that window — another sync run, a `/list edit image:` from a user, or a `/list multiadd` approval landing in the gap — the second write would clobber the newer rehost refs with the older ones. Fixed by switching the final update to a compare-and-swap (CAS) pattern: the filter now requires `imageUrl: entry.imageUrl` and `imageMessageId: ''` to still match. If the entry has been modified since snapshot, `matchedCount === 0` and the update is a no-op. Counted as a new `Skipped (raced)` category in the progress + summary embeds. The orphan rehost message left in the evidence channel is the rare cost of this safety, logged at warn level for manual cleanup if needed.
+- **P2: `/laremote action:syncimages` assumed every legacy `imageUrl` was a Discord CDN URL.** It always called Discord's `attachments/refresh-urls` endpoint, but the `/list multiadd` parser only requires `http(s)://` and never enforces a Discord domain. Pre-rehost (v0.5.1) bulk imports could carry external URLs (Imgur, Postimages, etc.), and those would always come back from `refresh-urls` as failures and be marked `Skipped (dead)` even when the URL was perfectly alive. Now the loop branches by URL host: Discord CDN (`*.discordapp.com` / `*.discordapp.net`) goes through `refresh-urls` first, external URLs are downloaded directly via `rehostImage()`. The `Skipped (dead)` vs `Failed` distinction also became more accurate — external URL download failures now correctly map to `Skipped (dead)` rather than `Failed`, while a Discord URL that passed `refresh-urls` but then failed to upload is properly classified as `Failed` (infrastructure issue).
+- **Embed clarity:** progress and final summary embeds now show four counters — `Synced`, `Skipped (dead URLs)`, `Skipped (raced)`, `Failed` — instead of three. Easier to triage what happened after a large run.
+
 ## [v0.5.7] - 2026-04-11
 
 ### Added

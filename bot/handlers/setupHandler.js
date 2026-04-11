@@ -604,56 +604,105 @@ export async function handleSetupRemoteCommand(interaction) {
       ],
     });
 
-    const stats = { synced: 0, skippedDead: 0, failed: 0, errors: [] };
+    // Detect whether a URL is hosted on Discord's CDN. Discord attachment URLs
+    // need their signature refreshed via the attachments/refresh-urls endpoint
+    // before download; external URLs (Imgur, Postimages, etc.) are downloadable
+    // directly and don't have the ?ex=...&hm=... expiry mechanism.
+    const isDiscordCdnUrl = (url) => {
+      try {
+        const u = new URL(url);
+        return u.hostname.endsWith('discordapp.com') || u.hostname.endsWith('discordapp.net');
+      } catch {
+        return false;
+      }
+    };
+
+    // Stats:
+    //   synced       — CAS update succeeded, entry now has rehost refs
+    //   skippedDead  — refresh API said file is gone, OR external URL 404'd
+    //   skippedRaced — entry was modified between snapshot and CAS write
+    //                  (another sync run, /list edit, or /list multiadd
+    //                  approval landed in the gap). The new state wins.
+    //   failed       — unexpected errors (network, channel down, etc.)
+    const stats = { synced: 0, skippedDead: 0, skippedRaced: 0, failed: 0, errors: [] };
 
     for (let i = 0; i < legacyEntries.length; i++) {
       const { entry, model, type } = legacyEntries[i];
 
       try {
-        // Step 1: Ask Discord to re-sign the original URL via the official
-        // attachments/refresh-urls endpoint. Returns null if the underlying
-        // file no longer exists (message deleted, channel removed, etc.).
-        const refreshResponse = await fetch('https://discord.com/api/v10/attachments/refresh-urls', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bot ${interaction.client.token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ attachment_urls: [entry.imageUrl] }),
-        });
+        // Step 1: Resolve a downloadable URL.
+        //   - Discord CDN URL → refresh signature via attachments/refresh-urls
+        //   - External URL (Imgur, etc.) → use as-is, no refresh needed
+        let downloadUrl = null;
+        if (isDiscordCdnUrl(entry.imageUrl)) {
+          const refreshResponse = await fetch('https://discord.com/api/v10/attachments/refresh-urls', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bot ${interaction.client.token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ attachment_urls: [entry.imageUrl] }),
+          });
 
-        if (!refreshResponse.ok) {
-          stats.skippedDead += 1;
-          stats.errors.push(`${entry.name}: refresh API returned ${refreshResponse.status}`);
-          continue;
+          if (!refreshResponse.ok) {
+            stats.skippedDead += 1;
+            stats.errors.push(`${entry.name}: refresh API returned ${refreshResponse.status}`);
+            continue;
+          }
+
+          const refreshData = await refreshResponse.json();
+          const refreshedUrl = refreshData?.refreshed_urls?.[0]?.refreshed;
+          if (!refreshedUrl) {
+            stats.skippedDead += 1;
+            stats.errors.push(`${entry.name}: refresh returned no URL (file likely deleted)`);
+            continue;
+          }
+          downloadUrl = refreshedUrl;
+        } else {
+          // External URL — try direct download. rehostImage() will fail
+          // gracefully if the URL is dead, and we'll mark as skippedDead below.
+          downloadUrl = entry.imageUrl;
         }
 
-        const refreshData = await refreshResponse.json();
-        const refreshedUrl = refreshData?.refreshed_urls?.[0]?.refreshed;
-        if (!refreshedUrl) {
-          stats.skippedDead += 1;
-          stats.errors.push(`${entry.name}: refresh returned no URL (file likely deleted)`);
-          continue;
-        }
-
-        // Step 2: Download the freshly-signed URL and rehost to evidence channel.
+        // Step 2: Download the URL and rehost to evidence channel.
         // rehostImage() handles download + upload internally and returns null on failure.
-        const rehosted = await rehostImage(refreshedUrl, interaction.client, {
+        const rehosted = await rehostImage(downloadUrl, interaction.client, {
           entryName: entry.name,
           addedBy: `Migration by ${interaction.user.tag}`,
           listType: type,
         });
 
         if (!rehosted) {
-          stats.failed += 1;
-          stats.errors.push(`${entry.name}: rehost failed (network or evidence channel issue)`);
+          // Distinguish dead-URL failure from infrastructure failure: if it
+          // was an external URL and rehost failed, the URL is most likely
+          // 404. For Discord URLs we already passed the refresh step, so a
+          // null result here is more likely to be a transient/infra issue.
+          if (!isDiscordCdnUrl(entry.imageUrl)) {
+            stats.skippedDead += 1;
+            stats.errors.push(`${entry.name}: external URL download failed (dead link?)`);
+          } else {
+            stats.failed += 1;
+            stats.errors.push(`${entry.name}: rehost failed after successful URL refresh`);
+          }
           continue;
         }
 
-        // Step 3: Persist new refs back to the entry. Clear the legacy URL
-        // since rehosted entries always have empty imageUrl per convention.
-        await model.updateOne(
-          { _id: entry._id },
+        // Step 3: Compare-and-swap update. The filter requires the entry to
+        // STILL match the legacy snapshot we read at the start (same imageUrl,
+        // still no imageMessageId). If anyone else modified the entry in the
+        // meantime — another sync run, /list edit, or a /list multiadd
+        // approval — the matchedCount is 0 and we skip without overwriting
+        // the newer state. The orphan rehost message in the evidence channel
+        // is the (rare) cost of this safety.
+        const updateResult = await model.updateOne(
+          {
+            _id: entry._id,
+            imageUrl: entry.imageUrl,
+            $or: [
+              { imageMessageId: '' },
+              { imageMessageId: { $exists: false } },
+            ],
+          },
           {
             $set: {
               imageUrl: '',
@@ -662,7 +711,14 @@ export async function handleSetupRemoteCommand(interaction) {
             },
           }
         );
-        stats.synced += 1;
+
+        if (updateResult.matchedCount === 1) {
+          stats.synced += 1;
+        } else {
+          stats.skippedRaced += 1;
+          stats.errors.push(`${entry.name}: entry changed during sync — orphan rehost left in channel`);
+          console.warn(`[syncimages] Race detected for ${entry.name} — CAS update was no-op, orphan upload at ${rehosted.channelId}/${rehosted.messageId}`);
+        }
       } catch (err) {
         stats.failed += 1;
         stats.errors.push(`${entry.name}: ${err.message}`);
@@ -683,7 +739,8 @@ export async function handleSetupRemoteCommand(interaction) {
               .setDescription(`Processing **${i + 1}/${legacyEntries.length}** entries…`)
               .addFields(
                 { name: '✅ Synced', value: String(stats.synced), inline: true },
-                { name: '⚠️ Skipped (dead)', value: String(stats.skippedDead), inline: true },
+                { name: '⚠️ Dead URLs', value: String(stats.skippedDead), inline: true },
+                { name: '🔀 Raced', value: String(stats.skippedRaced), inline: true },
                 { name: '❌ Failed', value: String(stats.failed), inline: true },
               )
               .setColor(0xfee75c)
@@ -694,13 +751,17 @@ export async function handleSetupRemoteCommand(interaction) {
     }
 
     // Final summary
-    const summaryColor = stats.failed > 0 || stats.skippedDead > 0 ? 0xfee75c : 0x2ecc71;
+    const summaryColor =
+      stats.failed > 0 || stats.skippedDead > 0 || stats.skippedRaced > 0
+        ? 0xfee75c
+        : 0x2ecc71;
     const summaryEmbed = new EmbedBuilder()
       .setTitle('✅ Sync Images — Complete')
       .setDescription(`Processed **${legacyEntries.length}** legacy entries.`)
       .addFields(
         { name: '✅ Synced', value: String(stats.synced), inline: true },
         { name: '⚠️ Skipped (dead URLs)', value: String(stats.skippedDead), inline: true },
+        { name: '🔀 Skipped (raced)', value: String(stats.skippedRaced), inline: true },
         { name: '❌ Failed', value: String(stats.failed), inline: true },
       )
       .setColor(summaryColor)
@@ -719,7 +780,7 @@ export async function handleSetupRemoteCommand(interaction) {
     }
 
     await interaction.editReply({ embeds: [summaryEmbed] });
-    console.log(`[syncimages] Done by ${interaction.user.tag}: ${stats.synced} synced, ${stats.skippedDead} dead, ${stats.failed} failed`);
+    console.log(`[syncimages] Done by ${interaction.user.tag}: ${stats.synced} synced, ${stats.skippedDead} dead, ${stats.skippedRaced} raced, ${stats.failed} failed`);
     return;
   }
 
