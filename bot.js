@@ -283,8 +283,8 @@ client.on('interactionCreate', async (interaction) => {
             ? 'Đặt kênh lưu ảnh evidence (bot rehost vào đây để tránh CDN expire ~24h)'
             : 'Set evidence storage channel (bot rehosts here to defeat CDN ~24h expiry)'),
           '`/laremote action:syncimages` — ' + (lang === 'vn'
-            ? 'Migrate ảnh cũ (chỉ có imageUrl) sang rehost storage. Idempotent, có thể chạy nhiều lần'
-            : 'Migrate legacy entries (imageUrl-only) to rehost storage. Idempotent, safe to re-run'),
+            ? 'Migrate ảnh legacy (pre-v0.5.2) sang rehost storage. Cần set `evidencechannel` trước. Idempotent. Xem chi tiết flow ở dưới'
+            : 'Migrate legacy (pre-v0.5.2) images to rehost storage. Requires `evidencechannel` set first. Idempotent. See detailed flow below'),
         );
       }
 
@@ -439,9 +439,145 @@ client.on('interactionCreate', async (interaction) => {
             )
             .setFooter({ text: 'Detailed section — see the main command list above' });
 
+      // Detailed /laremote action:syncimages embed — only shown when the user
+      // is in the owner guild (since the command is Senior-only). Mirrors the
+      // multiaddEmbed pattern: dedicated explanation for a complex one-shot
+      // operation that has prerequisites and side effects worth understanding
+      // BEFORE the senior runs it.
+      const isOwnerGuild = interaction.guild?.id === config.ownerGuildId;
+      const syncImagesEmbed = isOwnerGuild
+        ? (lang === 'vn'
+            ? new EmbedBuilder()
+                .setTitle('🔄 /laremote action:syncimages — Migrate ảnh legacy')
+                .setDescription(
+                  'One-shot migration cho **entries cũ** có ảnh được lưu dạng URL trực tiếp ' +
+                    '(trước v0.5.2 rehost). Bot tải lại ảnh và upload vào evidence channel ' +
+                    'để URL không bao giờ expire nữa.'
+                )
+                .setColor(0x5865f2)
+                .addFields(
+                  {
+                    name: '✅ Prerequisites',
+                    value: [
+                      '**1.** `/laremote action:evidencechannel channel:#...` đã được set',
+                      '**2.** Bot có quyền `Send Messages` + `Attach Files` trong channel đó',
+                      '**3.** Senior account chạy lệnh (chỉ Senior mới có quyền `/laremote`)',
+                    ].join('\n'),
+                    inline: false,
+                  },
+                  {
+                    name: '🔄 Flow per entry (~1.2-1.5s mỗi cái)',
+                    value: [
+                      '**1.** Detect URL host: Discord CDN hay external (Imgur, etc.)',
+                      '**2.** Discord URL → gọi `attachments/refresh-urls` lấy chữ ký mới',
+                      '       External URL → dùng trực tiếp, không cần refresh',
+                      '**3.** Download file → upload vào evidence channel với audit metadata',
+                      '**4.** Compare-and-swap update DB: clear `imageUrl`, set `imageMessageId/imageChannelId`',
+                    ].join('\n'),
+                    inline: false,
+                  },
+                  {
+                    name: '⚠️ Side effects (đọc trước khi chạy!)',
+                    value: [
+                      '• Evidence channel sẽ nhận **1 message mới mỗi entry** trong vòng vài phút',
+                      '• Với 100 entries → ~2-3 phút runtime + 100 messages spam channel',
+                      '• Khuyến nghị: **mute channel** trước, chạy off-hours nếu nhiều entries',
+                      '• Idempotent: chạy lại an toàn, entries đã migrate sẽ skip tự động',
+                    ].join('\n'),
+                    inline: false,
+                  },
+                  {
+                    name: '📊 Result counters',
+                    value: [
+                      '**✅ Synced** — entry migrate thành công, có rehost refs mới',
+                      '**⚠️ Skipped (dead URLs)** — file gốc đã bị xóa, không recover được',
+                      '**🔀 Skipped (raced)** — entry vừa bị edit/migrate bởi nguồn khác',
+                      '**❌ Failed** — lỗi infra (channel down, rate limit, etc.) — retry được',
+                    ].join('\n'),
+                    inline: false,
+                  },
+                  {
+                    name: '🛟 Khi gặp vấn đề',
+                    value: [
+                      '• `Failed > 0` → check log Railway, có thể retry sau',
+                      '• `Skipped (dead)` → entries không recover được, cân nhắc remove + add lại',
+                      '• `Skipped (raced)` → có orphan upload trong channel, log warn cho biết location',
+                      '• Mọi case đều **không mất data** — entries skipped không bị touch',
+                    ].join('\n'),
+                    inline: false,
+                  }
+                )
+                .setFooter({ text: 'Owner-only · added v0.5.7, race-safe + external URL handling v0.5.8' })
+            : new EmbedBuilder()
+                .setTitle('🔄 /laremote action:syncimages — Legacy Image Migration')
+                .setDescription(
+                  'One-shot migration for **legacy entries** whose evidence is stored as a ' +
+                    'direct URL (created before v0.5.2 rehost). Bot re-downloads each image ' +
+                    'and re-uploads it to the evidence channel so the URL never expires again.'
+                )
+                .setColor(0x5865f2)
+                .addFields(
+                  {
+                    name: '✅ Prerequisites',
+                    value: [
+                      '**1.** `/laremote action:evidencechannel channel:#...` already set',
+                      '**2.** Bot has `Send Messages` + `Attach Files` permission in that channel',
+                      '**3.** Run from a Senior account (only Senior has `/laremote` permission)',
+                    ].join('\n'),
+                    inline: false,
+                  },
+                  {
+                    name: '🔄 Flow per entry (~1.2-1.5s each)',
+                    value: [
+                      '**1.** Detect URL host: Discord CDN vs external (Imgur, etc.)',
+                      '**2.** Discord URL → call `attachments/refresh-urls` for fresh signature',
+                      '       External URL → use as-is, no refresh needed',
+                      '**3.** Download file → upload to evidence channel with audit metadata',
+                      '**4.** Compare-and-swap DB update: clear `imageUrl`, set `imageMessageId/imageChannelId`',
+                    ].join('\n'),
+                    inline: false,
+                  },
+                  {
+                    name: '⚠️ Side effects (read before running!)',
+                    value: [
+                      '• Evidence channel will receive **1 new message per entry** within minutes',
+                      '• 100 entries → ~2-3 min runtime + 100 messages flooding the channel',
+                      '• Recommended: **mute channel** first, run off-hours for large batches',
+                      '• Idempotent: safe to re-run, already-migrated entries are auto-skipped',
+                    ].join('\n'),
+                    inline: false,
+                  },
+                  {
+                    name: '📊 Result counters',
+                    value: [
+                      '**✅ Synced** — entry migrated successfully, has new rehost refs',
+                      '**⚠️ Skipped (dead URLs)** — original file deleted, cannot recover',
+                      '**🔀 Skipped (raced)** — entry was edited/migrated by another source',
+                      '**❌ Failed** — infra error (channel down, rate limit, etc.) — retryable',
+                    ].join('\n'),
+                    inline: false,
+                  },
+                  {
+                    name: '🛟 Troubleshooting',
+                    value: [
+                      '• `Failed > 0` → check Railway logs, can retry later',
+                      '• `Skipped (dead)` → entries unrecoverable, consider remove + re-add',
+                      '• `Skipped (raced)` → orphan upload in channel, warn log shows location',
+                      '• In all cases: **no data loss** — skipped entries are untouched',
+                    ].join('\n'),
+                    inline: false,
+                  }
+                )
+                .setFooter({ text: 'Owner-only · added v0.5.7, race-safe + external URL handling v0.5.8' }))
+        : null;
+
+      // Assemble embeds list: multiaddEmbed always, syncImagesEmbed only for owner guild
+      const helpEmbeds = [multiaddEmbed];
+      if (syncImagesEmbed) helpEmbeds.push(syncImagesEmbed);
+
       await interaction.reply({
         content: helpLines.join('\n'),
-        embeds: [multiaddEmbed],
+        embeds: helpEmbeds,
         ephemeral: true,
       });
     }
