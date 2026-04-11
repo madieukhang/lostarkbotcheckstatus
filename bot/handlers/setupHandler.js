@@ -9,7 +9,11 @@ import { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, Butto
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
+import Blacklist from '../../models/Blacklist.js';
+import Whitelist from '../../models/Whitelist.js';
+import Watchlist from '../../models/Watchlist.js';
 import { invalidateGuildConfig } from '../utils/scope.js';
+import { rehostImage } from '../utils/imageRehost.js';
 
 /**
  * Check if the bot has required permissions in a channel.
@@ -530,6 +534,195 @@ export async function handleSetupRemoteCommand(interaction) {
     return;
   }
 
+  // ── ACTION: syncimages ───────────────────────────────────
+  // One-shot migration: scan all 3 lists for legacy entries (have imageUrl
+  // but no imageMessageId), refresh the original CDN URL via Discord's
+  // attachments/refresh-urls endpoint, download the freshly-signed URL,
+  // re-upload to the evidence channel, and persist rehost refs back to the
+  // entry. Idempotent — re-running skips already-migrated entries because
+  // the query filter requires imageUrl set AND imageMessageId empty.
+  //
+  // Why this works: Discord CDN files persist as long as the original
+  // message exists; only the URL signature expires. The refresh-urls
+  // endpoint asks Discord to issue a new signature for the same file.
+  // This is the same mechanism Discord client uses internally when you
+  // click an old expired URL inside Discord — we just call it explicitly.
+  if (action === 'syncimages') {
+    // Validate evidence channel is configured (otherwise rehost fails for all entries)
+    const ownerCfg = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
+    if (!ownerCfg?.evidenceChannelId) {
+      await interaction.editReply({
+        content: '❌ Evidence channel is not configured. Run `/laremote action:evidencechannel channel:#...` first.',
+      });
+      return;
+    }
+
+    // Scan all 3 lists for legacy entries.
+    // Filter: imageUrl is non-empty AND imageMessageId is empty/missing.
+    const legacyFilter = {
+      imageUrl: { $nin: ['', null] },
+      $or: [{ imageMessageId: '' }, { imageMessageId: { $exists: false } }],
+    };
+    const [blackLegacy, whiteLegacy, watchLegacy] = await Promise.all([
+      Blacklist.find(legacyFilter).lean(),
+      Whitelist.find(legacyFilter).lean(),
+      Watchlist.find(legacyFilter).lean(),
+    ]);
+    const legacyEntries = [
+      ...blackLegacy.map((e) => ({ entry: e, model: Blacklist, type: 'black' })),
+      ...whiteLegacy.map((e) => ({ entry: e, model: Whitelist, type: 'white' })),
+      ...watchLegacy.map((e) => ({ entry: e, model: Watchlist, type: 'watch' })),
+    ];
+
+    if (legacyEntries.length === 0) {
+      await interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('✅ Sync Images — Nothing to do')
+            .setDescription('All entries with images already have rehost refs. Nothing to migrate.')
+            .setColor(0x2ecc71)
+            .setTimestamp(),
+        ],
+      });
+      return;
+    }
+
+    // Initial reply with count, then start the loop.
+    await interaction.editReply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle('🔄 Sync Images — Starting')
+          .setDescription(`Found **${legacyEntries.length}** legacy entries across all lists. Migrating now…`)
+          .addFields(
+            { name: 'Blacklist', value: String(blackLegacy.length), inline: true },
+            { name: 'Whitelist', value: String(whiteLegacy.length), inline: true },
+            { name: 'Watchlist', value: String(watchLegacy.length), inline: true },
+          )
+          .setColor(0xfee75c)
+          .setFooter({ text: 'Each entry: refresh URL → download → rehost. ~1-2s per entry.' })
+          .setTimestamp(),
+      ],
+    });
+
+    const stats = { synced: 0, skippedDead: 0, failed: 0, errors: [] };
+
+    for (let i = 0; i < legacyEntries.length; i++) {
+      const { entry, model, type } = legacyEntries[i];
+
+      try {
+        // Step 1: Ask Discord to re-sign the original URL via the official
+        // attachments/refresh-urls endpoint. Returns null if the underlying
+        // file no longer exists (message deleted, channel removed, etc.).
+        const refreshResponse = await fetch('https://discord.com/api/v10/attachments/refresh-urls', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bot ${interaction.client.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ attachment_urls: [entry.imageUrl] }),
+        });
+
+        if (!refreshResponse.ok) {
+          stats.skippedDead += 1;
+          stats.errors.push(`${entry.name}: refresh API returned ${refreshResponse.status}`);
+          continue;
+        }
+
+        const refreshData = await refreshResponse.json();
+        const refreshedUrl = refreshData?.refreshed_urls?.[0]?.refreshed;
+        if (!refreshedUrl) {
+          stats.skippedDead += 1;
+          stats.errors.push(`${entry.name}: refresh returned no URL (file likely deleted)`);
+          continue;
+        }
+
+        // Step 2: Download the freshly-signed URL and rehost to evidence channel.
+        // rehostImage() handles download + upload internally and returns null on failure.
+        const rehosted = await rehostImage(refreshedUrl, interaction.client, {
+          entryName: entry.name,
+          addedBy: `Migration by ${interaction.user.tag}`,
+          listType: type,
+        });
+
+        if (!rehosted) {
+          stats.failed += 1;
+          stats.errors.push(`${entry.name}: rehost failed (network or evidence channel issue)`);
+          continue;
+        }
+
+        // Step 3: Persist new refs back to the entry. Clear the legacy URL
+        // since rehosted entries always have empty imageUrl per convention.
+        await model.updateOne(
+          { _id: entry._id },
+          {
+            $set: {
+              imageUrl: '',
+              imageMessageId: rehosted.messageId,
+              imageChannelId: rehosted.channelId,
+            },
+          }
+        );
+        stats.synced += 1;
+      } catch (err) {
+        stats.failed += 1;
+        stats.errors.push(`${entry.name}: ${err.message}`);
+        console.warn(`[syncimages] Entry ${entry.name} failed:`, err.message);
+      }
+
+      // Throttle to avoid hammering Discord API (refresh + upload).
+      if (i < legacyEntries.length - 1) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      // Progress update every 10 entries (skip very first iteration).
+      if ((i + 1) % 10 === 0 && i + 1 < legacyEntries.length) {
+        await interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('🔄 Sync Images — In Progress')
+              .setDescription(`Processing **${i + 1}/${legacyEntries.length}** entries…`)
+              .addFields(
+                { name: '✅ Synced', value: String(stats.synced), inline: true },
+                { name: '⚠️ Skipped (dead)', value: String(stats.skippedDead), inline: true },
+                { name: '❌ Failed', value: String(stats.failed), inline: true },
+              )
+              .setColor(0xfee75c)
+              .setTimestamp(),
+          ],
+        }).catch(() => {});
+      }
+    }
+
+    // Final summary
+    const summaryColor = stats.failed > 0 || stats.skippedDead > 0 ? 0xfee75c : 0x2ecc71;
+    const summaryEmbed = new EmbedBuilder()
+      .setTitle('✅ Sync Images — Complete')
+      .setDescription(`Processed **${legacyEntries.length}** legacy entries.`)
+      .addFields(
+        { name: '✅ Synced', value: String(stats.synced), inline: true },
+        { name: '⚠️ Skipped (dead URLs)', value: String(stats.skippedDead), inline: true },
+        { name: '❌ Failed', value: String(stats.failed), inline: true },
+      )
+      .setColor(summaryColor)
+      .setFooter({ text: `Migration by ${interaction.user.tag} · re-runs are safe (idempotent)` })
+      .setTimestamp();
+
+    // Append first 10 errors as a field for debugging
+    if (stats.errors.length > 0) {
+      const errorLines = stats.errors.slice(0, 10).map((e) => `• ${e}`).join('\n');
+      const truncated = stats.errors.length > 10 ? `\n*…and ${stats.errors.length - 10} more*` : '';
+      summaryEmbed.addFields({
+        name: `Errors (${stats.errors.length})`,
+        value: (errorLines + truncated).slice(0, 1024),
+        inline: false,
+      });
+    }
+
+    await interaction.editReply({ embeds: [summaryEmbed] });
+    console.log(`[syncimages] Done by ${interaction.user.tag}: ${stats.synced} synced, ${stats.skippedDead} dead, ${stats.failed} failed`);
+    return;
+  }
+
   // ── Need guild ID for off/defaultscope ───────────────────
   if (!targetGuildId) {
     const helpEmbed = new EmbedBuilder()
@@ -539,6 +732,7 @@ export async function handleSetupRemoteCommand(interaction) {
         { name: 'Toggle notify', value: '`/laremote action:off guild:<ID>`', inline: false },
         { name: 'Set scope', value: '`/laremote action:defaultscope guild:<ID> scope:server`', inline: false },
         { name: 'Set evidence channel', value: '`/laremote action:evidencechannel channel:#...`', inline: false },
+        { name: 'Sync legacy images', value: '`/laremote action:syncimages` (no guild ID needed)', inline: false },
       )
       .setColor(0xed4245);
     await interaction.editReply({ embeds: [helpEmbed] });

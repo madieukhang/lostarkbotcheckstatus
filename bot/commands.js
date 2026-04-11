@@ -405,7 +405,8 @@ export function buildOwnerCommands() {
             { name: 'view — show all servers + bot config', value: 'view' },
             { name: 'off — toggle notify for a server', value: 'off' },
             { name: 'defaultscope — set scope for a server', value: 'defaultscope' },
-            { name: 'evidencechannel — set image rehost channel (bot-wide)', value: 'evidencechannel' }
+            { name: 'evidencechannel — set image rehost channel (bot-wide)', value: 'evidencechannel' },
+            { name: 'syncimages — migrate legacy URLs to rehosted evidence', value: 'syncimages' }
           )
       )
       .addStringOption((opt) =>
