@@ -105,6 +105,22 @@ client.on('interactionCreate', async (interaction) => {
     return;
   }
 
+  // /list add approval — "📎 View Evidence (Fresh)" button on approver DMs
+  if (
+    interaction.isButton() &&
+    interaction.customId.startsWith('listadd_viewevidence:')
+  ) {
+    try {
+      await listHandlers.handleListAddViewEvidenceButton(interaction);
+    } catch (err) {
+      console.error('[list] View evidence button error:', err);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '❌ Failed to load evidence.', ephemeral: true }).catch(() => {});
+      }
+    }
+    return;
+  }
+
   // /list multiadd preview Confirm/Cancel buttons
   if (
     interaction.isButton() &&
