@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.7] - 2026-04-11
+
+### Added
+
+- **`/laremote action:syncimages`** — Senior-only one-shot migration command that walks all blacklist/whitelist/watchlist entries created before the v0.5.2 rehost feature (entries with `imageUrl` set but no `imageMessageId`) and migrates each one into the rehost storage path. For every legacy entry the bot:
+  1. Calls Discord's official `POST /attachments/refresh-urls` endpoint with the original CDN URL. Discord re-issues a fresh signature for the same underlying file as long as the original message still exists. This is the same mechanism Discord client uses internally when you click an old expired URL inside Discord — the file persists on the CDN, only the signature expires.
+  2. Downloads the freshly-signed URL and re-uploads it to the configured evidence channel via the existing `rehostImage()` helper, which writes audit metadata (entry name, list type, "Migration by <senior>") to the rehost message body.
+  3. Persists the new `imageMessageId` and `imageChannelId` back to the entry and clears the legacy `imageUrl` field. From this point on the entry behaves identically to a v0.5.2+ rehosted entry — fresh URL on every display, immune to CDN expiry.
+- **Idempotent by design** — the query filter requires both `imageUrl !== ''` AND `imageMessageId === ''`, so re-running the command is safe and skips already-migrated entries. If the original message has been deleted (refresh API returns 404 / no URL), the entry is counted as `Skipped (dead URLs)` and left untouched for manual handling.
+- **Progress reporting** — initial reply shows the per-list legacy count, then a progress embed updates every 10 entries with running tallies of `Synced`, `Skipped (dead)`, `Failed`. Final summary embed includes up to 10 errors for debugging.
+- **Throttled** at 200ms between entries to avoid Discord API rate limits. With ~1.2s per entry (refresh + download + upload + DB update + throttle), 500 entries finish well within Discord's 15-minute interaction window after defer.
+- **Validation** — aborts immediately with a clear error if the evidence channel is not yet configured (`/laremote action:evidencechannel` must be run first).
+- **`/lahelp` and `/laremote` help embed** updated to surface the new action in both the owner-only command list (EN + VN) and the missing-guild help fallback.
+
 ## [v0.5.6] - 2026-04-11
 
 ### Changed
