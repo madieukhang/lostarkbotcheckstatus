@@ -5,7 +5,7 @@
  * without needing to modify environment variables.
  */
 
-import { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
+import { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } from 'discord.js';
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
@@ -810,7 +810,30 @@ export async function handleSetupRemoteCommand(interaction) {
       });
     }
 
-    await interaction.editReply({ embeds: [summaryEmbed] });
+    // If there are many errors, attach a full-detail .txt file so the user
+    // can view/search/share all of them instead of just the first 10 in the
+    // embed. The embed keeps the quick-glance summary; the file has everything.
+    const replyPayload = { embeds: [summaryEmbed] };
+    if (stats.errors.length > 10) {
+      const errorLines = stats.errors.map((e, i) => `${i + 1}. ${e}`).join('\n');
+      const header = [
+        `Sync Images — Full Error Report`,
+        `Date: ${new Date().toISOString()}`,
+        `By: ${interaction.user.tag}`,
+        `Total entries: ${legacyEntries.length}`,
+        `Synced: ${stats.synced} | Dead: ${stats.skippedDead} | Raced: ${stats.skippedRaced} | Failed: ${stats.failed}`,
+        `${'─'.repeat(60)}`,
+        '',
+      ].join('\n');
+      const fullReport = header + errorLines;
+      replyPayload.files = [
+        new AttachmentBuilder(
+          Buffer.from(fullReport, 'utf-8'),
+          { name: `syncimages_errors_${new Date().toISOString().slice(0, 10)}.txt` }
+        ),
+      ];
+    }
+    await interaction.editReply(replyPayload);
     console.log(`[syncimages] Done by ${interaction.user.tag}: ${stats.synced} synced, ${stats.skippedDead} dead, ${stats.skippedRaced} raced, ${stats.failed} failed`);
     return;
   }
