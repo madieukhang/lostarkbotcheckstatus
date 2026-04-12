@@ -954,7 +954,10 @@ export function createListHandlers({ client }) {
    * @returns {Promise<{ added: Array, skipped: Array, failed: Array }>}
    */
   async function executeBulkMultiadd(rows, meta, onProgress = null) {
-    const results = { added: [], skipped: [], failed: [] };
+    // rehostWarnings: rows where image was provided but rehostImage failed.
+    // The entry still gets added (with legacy imageUrl) but the user should
+    // know the image will expire in ~24h unless manually re-added.
+    const results = { added: [], skipped: [], failed: [], rehostWarnings: [] };
 
     // Pre-resolve guild default scope once (cached by getGuildConfig)
     let guildDefaultScope = 'global';
@@ -989,11 +992,25 @@ export function createListHandlers({ client }) {
           freshUrl: '', // not needed; persisted entry will refresh on display
         };
       } else if (row.image) {
-        rowRehost = await rehostImage(row.image, client, {
-          entryName: row.name,
-          addedBy: meta.requesterDisplayName || meta.requesterTag,
-          listType: row.type,
-        });
+        try {
+          rowRehost = await rehostImage(row.image, client, {
+            entryName: row.name,
+            addedBy: meta.requesterDisplayName || meta.requesterTag,
+            listType: row.type,
+            throwOnError: true,
+          });
+        } catch (rehostErr) {
+          // Rehost failed — entry will still be added but with a legacy
+          // imageUrl that expires in ~24h. Track the failure so the summary
+          // embed can warn the user. The entry itself is NOT considered
+          // "failed" — only the image storage is degraded.
+          results.rehostWarnings.push({
+            name: row.name,
+            error: rehostErr.message,
+          });
+          console.warn(`[multiadd] Row "${row.name}" image rehost failed:`, rehostErr.message);
+          // rowRehost stays null → payload falls back to legacy imageUrl
+        }
       }
 
       const payload = {
@@ -1120,6 +1137,27 @@ export function createListHandlers({ client }) {
       embed.addFields({
         name: `Failed (${results.failed.length})`,
         value: (failedLines + suffix).slice(0, 1024),
+      });
+    }
+
+    // Rehost warnings: rows added successfully BUT their image could not be
+    // rehosted to the evidence channel. The entries are stored with a legacy
+    // imageUrl that will expire in ~24h. Surface these prominently so the
+    // user knows to re-add images via /list edit if needed.
+    if (results.rehostWarnings?.length > 0) {
+      const warnLines = results.rehostWarnings
+        .slice(0, 10)
+        .map((r) => `• **${r.name}** — ${r.error}`)
+        .join('\n');
+      const suffix = results.rehostWarnings.length > 10
+        ? `\n*... and ${results.rehostWarnings.length - 10} more*`
+        : '';
+      embed.addFields({
+        name: `🖼️ Image rehost failed (${results.rehostWarnings.length})`,
+        value: (
+          warnLines + suffix +
+          '\n*Entries added OK but images stored as legacy URLs — will expire in ~24h.*'
+        ).slice(0, 1024),
       });
     }
 
