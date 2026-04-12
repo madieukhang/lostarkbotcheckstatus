@@ -881,7 +881,6 @@ export function createListHandlers({ client }) {
       const embed = new EmbedBuilder()
         .setTitle(`📢 Bulk Add${isLocal ? ' (Local)' : ''} — ${entries.length} entries`)
         .setColor(0x5865f2)
-        .setFooter({ text: `By ${meta.requestedByDisplayName || 'Unknown'}` })
         .setTimestamp(new Date());
 
       const typeLabels = { black: 'Blacklist', white: 'Whitelist', watch: 'Watchlist' };
