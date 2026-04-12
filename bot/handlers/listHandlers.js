@@ -794,9 +794,21 @@ export function createListHandlers({ client }) {
   async function resolveBroadcastChannels(originGuildId, { onlyOwner = false } = {}) {
     const channelIds = new Set();
 
+    // Owner guild exemption: always include the owner guild in broadcast
+    // targets even when it is the origin. The notify channel serves as an
+    // audit log for the whole team, and skipping it when the command
+    // originates from the owner server creates a gap in the log. Non-owner
+    // guilds are still excluded when they are the origin to avoid duplicate
+    // notifications (the command user already sees the reply in their
+    // command channel, and for non-owner servers the notify channel is
+    // often the same channel or close enough).
+    const isOwnerOrigin = originGuildId === config.ownerGuildId;
+
     if (onlyOwner) {
       if (!config.ownerGuildId) return channelIds;
-      if (config.ownerGuildId === originGuildId) return channelIds;
+      // Owner guild's notify channel always receives broadcasts (even
+      // when origin = owner) — audit log completeness. The old guard
+      // `if (owner === origin) return` was removed for this reason.
       try {
         const ownerConfig = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
         if (ownerConfig?.globalNotifyEnabled === false) return channelIds;
@@ -827,7 +839,8 @@ export function createListHandlers({ client }) {
       for (const gc of guildConfigs) {
         if (gc.globalNotifyEnabled === false) disabledGuildIds.add(gc.guildId);
         if (gc.listNotifyChannelId) dbNotifyGuildIds.add(gc.guildId);
-        if (gc.guildId === originGuildId) continue;
+        // Skip origin guild UNLESS it's the owner guild (audit log exemption).
+        if (gc.guildId === originGuildId && !isOwnerOrigin) continue;
         if (gc.globalNotifyEnabled === false) continue;
         if (!gc.listNotifyChannelId) continue;
         channelIds.add(gc.listNotifyChannelId);
@@ -843,7 +856,8 @@ export function createListHandlers({ client }) {
           const ch = await client.channels.fetch(envId);
           if (!ch?.isTextBased()) continue;
           const chGuildId = ch.guild?.id || '';
-          if (chGuildId === originGuildId) continue;
+          // Skip origin guild UNLESS it's the owner guild.
+          if (chGuildId === originGuildId && !isOwnerOrigin) continue;
           if (disabledGuildIds.has(chGuildId)) continue;
           if (dbNotifyGuildIds.has(chGuildId)) continue;
           channelIds.add(envId);
