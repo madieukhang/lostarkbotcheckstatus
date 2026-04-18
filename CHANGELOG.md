@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## [v0.5.14] - 2026-04-12
+
+### Added
+
+- **Secra raid added to `/list add` / `/list edit` / `/list multiadd` raid dropdown.** Three difficulty tiers mirroring the existing convention: `Secra Nor`, `Secra Hard`, `Secra NM` (Nightmare). Single-source-of-truth pattern — all 3 commands, the Excel template dropdown, parser validation, and error messages pick up the new entries automatically from `RAIDS` in `models/Raid.js`. Abbreviations match the existing `Nor` / `Hard` style; if the in-game community uses different shorthand (e.g., `Normal` or `Nightmare` spelled out, or `Night` instead of `NM`), a 1-line rename is enough.
+
+## [v0.5.13] - 2026-04-12
+
+### Fixed
+
+- **Broadcasts from the owner server skipped the owner's own notify channel.** `resolveBroadcastChannels` always excluded the origin guild from broadcast targets on the assumption that "the origin user already sees the reply", but the reply goes to the *command* channel while the broadcast goes to the *notify* channel — they serve different purposes. When an officer ran `/list add`, `/list edit`, `/list remove`, or `/list multiadd` from the owner server, the owner server's notify channel audit log was silently missing every action. Fixed by exempting the owner guild from the origin exclusion. Non-owner guilds keep the old behavior (excluded when origin = self) to avoid duplicate notifications. Affects all four broadcast triggers since they share the same channel resolver.
+
+## [v0.5.12] - 2026-04-12
+
+### Fixed
+
+- **`/list multiadd` silently dropped images when `rehostImage()` failed.** The bulk loop called `rehostImage()` in default mode (null-on-failure), then silently fell back to storing the legacy `imageUrl` without any warning. Users saw rows marked as "Added" with no indication that the image would expire in ~24h, and discovered the missing evidence only when running `/laremote action:syncimages` days later. Fixed by switching `executeBulkMultiadd` to `throwOnError: true` and tracking per-row rehost failures in a new `results.rehostWarnings` array. The summary embed surfaces these prominently as `🖼️ Image rehost failed (N)` with the actual error message per row and a footer warning: "Entries added OK but images stored as legacy URLs — will expire in ~24h." This made it possible to diagnose the real root cause (bot missing `Attach Files` permission in evidence channel — error `[50013] Missing Permissions`) which was completely invisible before.
+- **Removed `By <user>` footer from `/list multiadd` bulk broadcast embed.** The footer was inconsistent with the single `/list add` broadcast (which has no such footer). User feedback: the author info felt noisy in the shared audit channel. Timestamp is preserved via `setTimestamp()`.
+- **`/laremote action:syncimages` truncated its error list at "and 39 more" when there were more than 10 errors.** Full error report now attaches as a downloadable `syncimages_errors_<date>.txt` whenever the error count exceeds 10. The embed keeps the quick-glance first-10 inline; the file has every error numbered, plus a header with date, user, and stats breakdown. Rationale: pagination with buttons + collector is overkill for a one-time debug list — a text file the user can search, share, and archive is more practical.
+
 ## [v0.5.11] - 2026-04-11
 
 ### Fixed

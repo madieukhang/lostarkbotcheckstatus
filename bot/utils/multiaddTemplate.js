@@ -28,9 +28,11 @@ export const MULTIADD_MAX_ROWS = 30;
 const VALID_RAIDS = new Set(RAIDS);
 
 // Inline-formula form for ExcelJS dropdown data validation.
-// Format: `"Act4 Nor,Act4 Hard,Kazeros Nor,Kazeros Hard,Mordum Hard"`
-// Excel limits inline validation formulae to 255 chars; a 10-raid future
-// would still fit, but if it ever grows beyond that switch to a named range.
+// Auto-derived from the RAIDS enum in models/Raid.js — single source of truth.
+// Current raids (v0.5.14): Act4 Nor/Hard, Kazeros Nor/Hard, Mordum Hard,
+// Secra Nor/Hard/NM. Excel limits inline validation formulae to 255 chars,
+// so we have plenty of headroom (~10-12 more raids); if it ever grows beyond
+// that switch to a named range instead of inline quoted CSV.
 const RAID_DROPDOWN_FORMULA = `"${RAIDS.join(',')}"`;
 
 /**
