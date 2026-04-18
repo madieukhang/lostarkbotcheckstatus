@@ -7,6 +7,9 @@ export const RAIDS = [
   'Kazeros Nor',
   'Kazeros Hard',
   'Mordum Hard',
+  'Secra Nor',
+  'Secra Hard',
+  'Secra NM',
 ];
 
 /**
