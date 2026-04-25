@@ -1,0 +1,141 @@
+import { randomUUID } from 'node:crypto';
+import {
+  ActionRowBuilder,
+  AttachmentBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  EmbedBuilder,
+  ModalBuilder,
+  StringSelectMenuBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} from 'discord.js';
+
+import { connectDB } from '../../db.js';
+import config from '../../config.js';
+import Blacklist from '../../models/Blacklist.js';
+import Whitelist from '../../models/Whitelist.js';
+import Watchlist from '../../models/Watchlist.js';
+import GuildConfig from '../../models/GuildConfig.js';
+import PendingApproval from '../../models/PendingApproval.js';
+import TrustedUser from '../../models/TrustedUser.js';
+import { getClassName } from '../../models/Class.js';
+import {
+  buildRosterCharacters,
+  fetchNameSuggestions,
+  fetchCharacterMeta,
+  detectAltsViaStronghold,
+} from '../../services/rosterService.js';
+import {
+  extractNamesFromImage,
+  checkNamesAgainstLists,
+  formatCheckResults,
+} from '../../services/listCheckService.js';
+import {
+  normalizeCharacterName,
+  getAddedByDisplay,
+  getInteractionDisplayName,
+} from '../../utils/names.js';
+import { buildBlacklistQuery, getGuildConfig } from '../../utils/scope.js';
+import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../utils/imageRehost.js';
+import {
+  buildMultiaddTemplate,
+  parseMultiaddFile,
+  MULTIADD_MAX_ROWS,
+} from '../../services/multiaddTemplateService.js';
+import {
+  getListContext,
+  buildTrustedBlockEmbed,
+  buildListEditSuccessEmbed,
+  buildListAddApprovalEmbed,
+  getApproverRecipientIds,
+  isRequesterAutoApprover,
+  isOfficerOrSenior,
+  getSeniorApproverIds,
+  buildApprovalResultRow,
+  buildApprovalProcessingRow,
+} from './helpers.js';
+
+const OFFICER_APPROVER_IDS = config.officerApproverIds;
+const SENIOR_APPROVER_IDS = config.seniorApproverIds;
+
+export function createCheckHandlers({ client }) {
+  async function handleListCheckCommand(interaction) {
+    const image = interaction.options.getAttachment('image', true);
+    let names = [];
+
+    await interaction.deferReply();
+
+    try {
+      names = await extractNamesFromImage(image);
+    } catch (err) {
+      await interaction.editReply({
+        content: `⚠️ Failed to extract names from image: \`${err.message}\``,
+      });
+      return;
+    }
+
+    if (names.length === 0) {
+      await interaction.editReply({
+        content: '⚠️ No valid names found in the uploaded image. Please use a clearer screenshot.',
+      });
+      return;
+    }
+
+    const limitedNames = names.slice(0, 8);
+
+    try {
+      const results = await checkNamesAgainstLists(limitedNames, { guildId: interaction.guild?.id });
+      const lines = formatCheckResults(results);
+
+      const sections = [
+        `Checked: **${limitedNames.length}** name(s)`,
+        limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: 8)` : null,
+        '',
+        ...lines,
+      ].filter((line) => line !== null);
+
+      await interaction.editReply({
+        content: sections.join('\n'),
+      });
+
+      // Fire-and-forget: enrich allCharacters in background for flagged entries
+      const flaggedItems = results.filter((item) => item.blackEntry || item.whiteEntry || item.watchEntry);
+      if (flaggedItems.length > 0) {
+        (async () => {
+          for (const item of flaggedItems) {
+            const listEntry = item.blackEntry || item.whiteEntry || item.watchEntry;
+            try {
+              const altResult = await detectAltsViaStronghold(item.name);
+              if (altResult && altResult.alts.length > 0) {
+                const newAltNames = altResult.alts.map((a) => a.name);
+                const existingAlts = listEntry.allCharacters || [];
+                const merged = [...new Set([...existingAlts, item.name, ...newAltNames])];
+
+                if (merged.length > existingAlts.length) {
+                  const model = item.blackEntry ? Blacklist : item.whiteEntry ? Whitelist : Watchlist;
+                  await model.updateOne(
+                    { _id: listEntry._id },
+                    { $set: { allCharacters: merged } }
+                  );
+                  console.log(`[listcheck] Enriched ${listEntry.name} allCharacters: ${existingAlts.length} → ${merged.length}`);
+                }
+              }
+            } catch (err) {
+              console.warn(`[listcheck] Alt enrichment failed for ${item.name}:`, err.message);
+            }
+          }
+        })().catch((err) => console.error('[listcheck] Background enrichment error:', err.message));
+      }
+    } catch (err) {
+      console.error('[listcheck] ❌ Check failed:', err.message);
+      await interaction.editReply({
+        content: `⚠️ Failed to run list check: \`${err.message}\``,
+      });
+    }
+  }
+
+  return { handleListCheckCommand };
+}
