@@ -2,6 +2,14 @@
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates in the local calendar of the release.
 
+## [v0.5.18] - 2026-04-25
+
+### Changed
+
+- Started splitting `bot/handlers/listHandlers.js` (was 3691 lines, single file). Step 1 of 3: extracted the 10 pure module-level helpers (no closure on `client`) into `bot/handlers/list/helpers.js`. Behavior identical; imports added back.
+  - Extracted: `getListContext`, `buildTrustedBlockEmbed`, `buildListEditSuccessEmbed`, `buildListAddApprovalEmbed`, `getApproverRecipientIds`, `isRequesterAutoApprover`, `isOfficerOrSenior`, `getSeniorApproverIds`, `buildApprovalResultRow`, `buildApprovalProcessingRow`.
+  - listHandlers.js: 3691 -> 3494 lines.
+
 ## [v0.5.17] - 2026-04-25
 
 ### Fixed
