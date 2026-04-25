@@ -142,7 +142,18 @@ LostArk_LoaLogs/
 │   │   └── serverStatus.js         # Scrape playlostark.com for server state
 │   ├── handlers/                   # One file per command family
 │   │   ├── autoCheckHandler.js     # Auto-check channel listener (screenshot OCR)
-│   │   ├── listHandlers.js         # /list add / edit / remove / view / multiadd / trust + /listcheck
+│   │   ├── listHandlers.js         # Thin orchestrator (~60 lines) wiring `list/` factories
+│   │   ├── list/                   # /list * + /listcheck families (split for navigability)
+│   │   │   ├── helpers.js          # Pure module-level helpers (no closure on client)
+│   │   │   ├── services.js         # Shared closure services (broadcast, approval, persistence, bulk)
+│   │   │   ├── add.js              # /list add + 3 button handlers (approval/viewevidence/overwrite)
+│   │   │   ├── edit.js             # /list edit
+│   │   │   ├── remove.js           # /list remove
+│   │   │   ├── view.js             # /list view (paginated browse)
+│   │   │   ├── check.js            # /listcheck (OCR screenshot)
+│   │   │   ├── trust.js            # /list trust
+│   │   │   ├── quickadd.js         # quick-add select + modal (used by /listcheck flow)
+│   │   │   └── multiadd.js         # /list multiadd + 2 button handlers (confirm/approval)
 │   │   ├── rosterHandler.js        # /roster + Stronghold alt detection + progression
 │   │   ├── searchHandler.js        # /search (similar-name scan)
 │   │   ├── setupHandler.js         # /lasetup (per-guild config)
@@ -178,11 +189,12 @@ LostArk_LoaLogs/
 └── package.json                    # ESM, Node ≥ 20, discord.js 14, mongoose 8
 ```
 
-Three compose principles:
+Four compose principles:
 
-1. **One handler file per command family.** `listHandlers.js` owns every `/list *` subcommand + `/listcheck`; `rosterHandler.js` owns `/roster`. Keeps command-specific state adjacent.
+1. **One handler file per command family.** `rosterHandler.js` owns `/roster`, `searchHandler.js` owns `/search`, etc. The `/list *` family is large enough to warrant its own subdirectory (`handlers/list/`) split per subcommand; `listHandlers.js` is a thin orchestrator that wires shared services into each subcommand factory.
 2. **Services wrap external I/O.** `rosterService.js` is the only file that touches `lostark.bible`; `listCheckService.js` is the only file that calls Gemini. Tests and fallback paths have one swap point.
 3. **Scope resolved once, cached.** `utils/scope.js` reads `GuildConfig` with a 60s in-memory cache; every command path goes through it instead of re-querying per invocation.
+4. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` (e.g. `list/services.js`, `list/add.js`) export a `create*({ client, ... })` factory rather than top-level functions. The orchestrator calls each factory once at startup and the returned closures are wired into the interaction router.
 
 Interaction flow:
 
