@@ -2,6 +2,15 @@
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates in the local calendar of the release.
 
+## [v0.5.19] - 2026-04-25
+
+### Changed
+
+- Step 2 of 3 in splitting `listHandlers.js`: extracted the 10 shared closure services into `bot/handlers/list/services.js`. These functions all close over the Discord `client`, so they live in a `createSharedServices({ client })` factory that the main file wires in once and destructures.
+  - Extracted: `sendListAddApprovalToApprovers`, `sendBulkApprovalToApprovers`, `syncApproverDmMessages`, `executeListAddToDatabase`, `broadcastListChange`, `resolveBroadcastChannels`, `broadcastBulkAdd`, `executeBulkMultiadd`, `buildBulkSummaryEmbed`, `notifyRequesterAboutDecision`.
+  - Removed 7 imports from `listHandlers.js` that were only used by the now-extracted services (`GuildConfig`, `getClassName`, `fetchNameSuggestions`, `fetchCharacterMeta`, `getAddedByDisplay`, `buildAlertEmbed`, `AlertSeverity`).
+  - `listHandlers.js`: 3494 -> 2570 lines (-924, -26%).
+
 ## [v0.5.18] - 2026-04-25
 
 ### Changed
