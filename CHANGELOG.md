@@ -2,6 +2,23 @@
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates in the local calendar of the release.
 
+## [v0.5.20] - 2026-04-25
+
+### Changed
+
+- Step 3 of 3 in splitting `listHandlers.js`: extracted all 14 command handlers into 8 per-family factory modules under `bot/handlers/list/`. `listHandlers.js` is now a thin orchestrator that wires shared services into each factory and exposes the unified handler object.
+  - **listHandlers.js: 3691 -> 60 lines (-98%)** across the 3-step refactor.
+  - New per-family files (each `create*Handlers` factory):
+    - `add.js` (811 lines): handleListAddCommand + 3 button handlers (approval, viewevidence, overwrite)
+    - `multiadd.js` (689 lines): handleListMultiaddCommand + 2 button handlers (confirm, approval) + multiaddPending state
+    - `edit.js` (450 lines): handleListEditCommand
+    - `view.js` (375 lines): handleListViewCommand (paginated browse)
+    - `remove.js` (190 lines): handleListRemoveCommand
+    - `quickadd.js` (184 lines): handleQuickAddSelect + handleQuickAddModal
+    - `trust.js` (160 lines): handleListTrustCommand
+    - `check.js` (141 lines): handleListCheckCommand
+- Fat imports per family file (each imports the same superset). Future cleanup can prune per-file unused imports; functional behavior is unchanged.
+
 ## [v0.5.19] - 2026-04-25
 
 ### Changed
