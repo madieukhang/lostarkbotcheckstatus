@@ -2,6 +2,13 @@
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates in the local calendar of the release.
 
+## [v0.5.16] - 2026-04-25
+
+### Changed
+
+- Final pass on source-tree consolidation: `config.js` and `db.js` moved from root into `bot/`. Root now holds only the entry point (`bot.js`), meta files (package.json, Dockerfile, railway.toml, etc.), and gitignored runtime dirs. All source code lives under `bot/`.
+- All relative imports rewritten; resolver script confirms every import target exists.
+
 ## [v0.5.15] - 2026-04-25
 
 ### Changed

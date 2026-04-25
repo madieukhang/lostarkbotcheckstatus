@@ -1,7 +1,7 @@
 import { JSDOM } from 'jsdom';
 
-import config from '../../config.js';
-import { connectDB } from '../../db.js';
+import config from '../config.js';
+import { connectDB } from '../db.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import { getClassName } from '../models/Class.js';
