@@ -8,7 +8,7 @@
  *   2. Fallback to AUTO_CHECK_CHANNEL_IDS env var (global)
  */
 
-import { ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
+import { ActionRowBuilder, Events, StringSelectMenuBuilder } from 'discord.js';
 import config from '../config.js';
 import GuildConfig from '../models/GuildConfig.js';
 import Blacklist from '../models/Blacklist.js';
@@ -67,7 +67,7 @@ export function setupAutoCheck(client) {
   }
   console.log('[auto-check] Listener active (checks DB GuildConfig + env fallback per message).');
 
-  client.on('messageCreate', async (message) => {
+  client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return;
     if (!message.guild) return;
 

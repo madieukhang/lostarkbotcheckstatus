@@ -2,6 +2,12 @@
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates in the local calendar of the release.
 
+## [v0.5.17] - 2026-04-25
+
+### Fixed
+
+- Silenced `DeprecationWarning: The ready event has been renamed to clientReady` on bot startup. Migrated all `client.on` / `client.once` listeners from string literals to the `Events` enum (`Events.ClientReady`, `Events.InteractionCreate`, `Events.MessageCreate`), matching the pattern already used by LostArk_RaidManage. Future-proofs for discord.js v15 and removes the noisy stderr line that Railway was flagging as `level: error`.
+
 ## [v0.5.16] - 2026-04-25
 
 ### Changed
