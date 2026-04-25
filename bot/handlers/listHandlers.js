@@ -14,13 +14,13 @@ import {
 
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import Watchlist from '../../models/Watchlist.js';
-import GuildConfig from '../../models/GuildConfig.js';
-import PendingApproval from '../../models/PendingApproval.js';
-import TrustedUser from '../../models/TrustedUser.js';
-import { getClassName } from '../../models/Class.js';
+import Blacklist from '../models/Blacklist.js';
+import Whitelist from '../models/Whitelist.js';
+import Watchlist from '../models/Watchlist.js';
+import GuildConfig from '../models/GuildConfig.js';
+import PendingApproval from '../models/PendingApproval.js';
+import TrustedUser from '../models/TrustedUser.js';
+import { getClassName } from '../models/Class.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
@@ -44,7 +44,7 @@ import {
   buildMultiaddTemplate,
   parseMultiaddFile,
   MULTIADD_MAX_ROWS,
-} from '../utils/multiaddTemplate.js';
+} from '../services/multiaddTemplateService.js';
 
 // Approver IDs loaded from environment variables
 const OFFICER_APPROVER_IDS = config.officerApproverIds;

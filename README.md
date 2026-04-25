@@ -133,12 +133,13 @@ LostArk_LoaLogs/
 ├── bot.js                          # Discord client, command routing, entry point
 ├── config.js                       # Env var loading + validation
 ├── db.js                           # Mongoose lazy singleton connect
-├── monitor.js                      # Status polling loop + notification dispatch
-├── serverStatus.js                 # Scrape playlostark.com for server state
 ├── dusk-check.js                   # Diagnostic helper (local dev only)
 │
 ├── bot/
 │   ├── commands.js                 # SlashCommandBuilder registry
+│   ├── monitor/
+│   │   ├── monitor.js              # Status polling loop + notification dispatch
+│   │   └── serverStatus.js         # Scrape playlostark.com for server state
 │   ├── handlers/                   # One file per command family
 │   │   ├── autoCheckHandler.js     # Auto-check channel listener (screenshot OCR)
 │   │   ├── listHandlers.js         # /list add / edit / remove / view / multiadd / trust + /listcheck
@@ -148,24 +149,25 @@ LostArk_LoaLogs/
 │   │   ├── statsHandler.js         # Bot usage statistics
 │   │   └── systemHandlers.js       # /status, /reset
 │   ├── services/
-│   │   ├── listCheckService.js     # Shared OCR + name matching + embed formatting
-│   │   └── rosterService.js        # lostark.bible scrape + alt detection + list cross-check
-│   └── utils/
-│       ├── multiaddTemplate.js     # Excel template generator + parser (zero-dep)
-│       ├── names.js                # Case-insensitive normalization
-│       └── scope.js                # GuildConfig cache + scope helpers
-│
-├── models/                         # Mongoose schemas + indexes
-│   ├── Blacklist.js                # scope: global / server, compound unique index
-│   ├── Whitelist.js
-│   ├── Watchlist.js
-│   ├── TrustedUser.js
-│   ├── PendingApproval.js          # 24h TTL
-│   ├── GuildConfig.js
-│   ├── RosterCache.js              # 24h TTL on check results
-│   ├── RosterSnapshot.js           # iLvl progression timeline
-│   ├── Class.js                    # Bible class ID → display name
-│   └── Raid.js                     # Raid tag choices for /list add
+│   │   ├── listCheckService.js          # Shared OCR + name matching + embed formatting
+│   │   ├── multiaddTemplateService.js   # Excel template generator + parser (zero-dep)
+│   │   └── rosterService.js             # lostark.bible scrape + alt detection + list cross-check
+│   ├── utils/
+│   │   ├── alertEmbed.js           # Shared alert-embed builder
+│   │   ├── imageRehost.js          # Discord CDN image rehosting + URL refresh
+│   │   ├── names.js                # Case-insensitive normalization
+│   │   └── scope.js                # GuildConfig cache + scope helpers
+│   └── models/                     # Mongoose schemas + indexes
+│       ├── Blacklist.js            # scope: global / server, compound unique index
+│       ├── Whitelist.js
+│       ├── Watchlist.js
+│       ├── TrustedUser.js
+│       ├── PendingApproval.js      # 24h TTL
+│       ├── GuildConfig.js
+│       ├── RosterCache.js          # 24h TTL on check results
+│       ├── RosterSnapshot.js       # iLvl progression timeline
+│       ├── Class.js                # Bible class ID -> display name
+│       └── Raid.js                 # Raid tag choices for /list add
 │
 ├── exports/                        # Historical CSV/XLSX drops (gitignored)
 ├── data/
@@ -197,7 +199,7 @@ flowchart LR
   AC --> S
 ```
 
-Server monitor runs out-of-band: `monitor.js` polls `serverStatus.js` every `CHECK_INTERVAL` seconds, persists state to `data/status.json`, and posts transitions directly via the Discord client without going through the handler layer.
+Server monitor runs out-of-band: `bot/monitor/monitor.js` polls `bot/monitor/serverStatus.js` every `CHECK_INTERVAL` seconds, persists state to `data/status.json`, and posts transitions directly via the Discord client without going through the handler layer.
 
 ## Requirements
 

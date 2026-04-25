@@ -7,11 +7,11 @@ import {
 
 import { connectDB } from '../../db.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import Watchlist from '../../models/Watchlist.js';
-import TrustedUser from '../../models/TrustedUser.js';
-import { getClassName } from '../../models/Class.js';
+import Blacklist from '../models/Blacklist.js';
+import Whitelist from '../models/Whitelist.js';
+import Watchlist from '../models/Watchlist.js';
+import TrustedUser from '../models/TrustedUser.js';
+import { getClassName } from '../models/Class.js';
 import { fetchNameSuggestions } from '../services/rosterService.js';
 import { normalizeCharacterName } from '../utils/names.js';
 import { resolveDisplayImageUrl } from '../utils/imageRehost.js';

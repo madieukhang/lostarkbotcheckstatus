@@ -1,6 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 
-import { STATUS } from '../../serverStatus.js';
+import { STATUS } from '../monitor/serverStatus.js';
 
 function formatStatus(status) {
   switch (status) {

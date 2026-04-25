@@ -7,10 +7,10 @@ virtualConsole.on('error', () => {});
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import TrustedUser from '../../models/TrustedUser.js';
-import RosterSnapshot from '../../models/RosterSnapshot.js';
+import Blacklist from '../models/Blacklist.js';
+import Whitelist from '../models/Whitelist.js';
+import TrustedUser from '../models/TrustedUser.js';
+import RosterSnapshot from '../models/RosterSnapshot.js';
 import {
   FETCH_HEADERS,
   fetchWithFallback,
@@ -23,7 +23,7 @@ import {
   fetchCharacterMeta,
   fetchGuildMembers,
 } from '../services/rosterService.js';
-import { getClassName } from '../../models/Class.js';
+import { getClassName } from '../models/Class.js';
 import { getAddedByDisplay, normalizeCharacterName } from '../utils/names.js';
 import { resolveDisplayImageUrl } from '../utils/imageRehost.js';
 

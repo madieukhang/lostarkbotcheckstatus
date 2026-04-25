@@ -5,11 +5,11 @@
 
 import { EmbedBuilder } from 'discord.js';
 import { connectDB } from '../../db.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import Watchlist from '../../models/Watchlist.js';
-import RosterCache from '../../models/RosterCache.js';
-import GuildConfig from '../../models/GuildConfig.js';
+import Blacklist from '../models/Blacklist.js';
+import Whitelist from '../models/Whitelist.js';
+import Watchlist from '../models/Watchlist.js';
+import RosterCache from '../models/RosterCache.js';
+import GuildConfig from '../models/GuildConfig.js';
 
 export async function handleStatsCommand(interaction) {
   await interaction.deferReply({ ephemeral: true });

@@ -10,10 +10,10 @@
 
 import { ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
 import config from '../../config.js';
-import GuildConfig from '../../models/GuildConfig.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import Watchlist from '../../models/Watchlist.js';
+import GuildConfig from '../models/GuildConfig.js';
+import Blacklist from '../models/Blacklist.js';
+import Whitelist from '../models/Whitelist.js';
+import Watchlist from '../models/Watchlist.js';
 import { detectAltsViaStronghold } from '../services/rosterService.js';
 import {
   extractNamesFromImage,

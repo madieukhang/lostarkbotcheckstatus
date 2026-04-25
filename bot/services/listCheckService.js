@@ -6,11 +6,11 @@
 
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import Watchlist from '../../models/Watchlist.js';
-import RosterCache from '../../models/RosterCache.js';
-import TrustedUser from '../../models/TrustedUser.js';
+import Blacklist from '../models/Blacklist.js';
+import Whitelist from '../models/Whitelist.js';
+import Watchlist from '../models/Watchlist.js';
+import RosterCache from '../models/RosterCache.js';
+import TrustedUser from '../models/TrustedUser.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,

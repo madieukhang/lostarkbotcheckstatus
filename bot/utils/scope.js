@@ -4,7 +4,7 @@
  */
 
 import config from '../../config.js';
-import GuildConfig from '../../models/GuildConfig.js';
+import GuildConfig from '../models/GuildConfig.js';
 
 /**
  * Build a MongoDB scope filter for blacklist queries.

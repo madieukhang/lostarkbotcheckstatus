@@ -2,6 +2,16 @@
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates in the local calendar of the release.
 
+## [v0.5.15] - 2026-04-25
+
+### Changed
+
+- File layout reorganized for clarity. No behavior change. Entry point (`bot.js`) stays at root for Dockerfile / Railway compatibility; everything else moved under `bot/`:
+  - `monitor.js` + `serverStatus.js` -> `bot/monitor/` (paired status-polling module)
+  - `models/` -> `bot/models/` (consistency with the rest of the bot tree)
+  - `bot/utils/multiaddTemplate.js` -> `bot/services/multiaddTemplateService.js` (it was a feature module misfiled under utils)
+- All relative imports rewritten to match. Architecture diagram in README refreshed.
+
 ## [v0.5.14] - 2026-04-12
 
 ### Added
