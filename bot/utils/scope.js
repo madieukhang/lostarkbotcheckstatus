@@ -3,7 +3,7 @@
  * Shared utilities for blacklist scope filtering and GuildConfig caching.
  */
 
-import config from '../../config.js';
+import config from '../config.js';
 import GuildConfig from '../models/GuildConfig.js';
 
 /**

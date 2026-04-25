@@ -28,7 +28,7 @@
 
 import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
-import config from '../../config.js';
+import config from '../config.js';
 
 // ─── Status constants ─────────────────────────────────────────────────────────
 

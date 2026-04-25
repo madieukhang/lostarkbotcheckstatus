@@ -5,7 +5,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 
-import { connectDB } from '../../db.js';
+import { connectDB } from '../db.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';

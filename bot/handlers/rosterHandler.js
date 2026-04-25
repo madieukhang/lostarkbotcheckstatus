@@ -4,8 +4,8 @@ import { JSDOM, VirtualConsole } from 'jsdom';
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('error', () => {});
 
-import { connectDB } from '../../db.js';
-import config from '../../config.js';
+import { connectDB } from '../db.js';
+import config from '../config.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';

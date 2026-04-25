@@ -130,12 +130,12 @@ Sample blacklist document:
 
 ```
 LostArk_LoaLogs/
-├── bot.js                          # Discord client, command routing, entry point
-├── config.js                       # Env var loading + validation
-├── db.js                           # Mongoose lazy singleton connect
-├── dusk-check.js                   # Diagnostic helper (local dev only)
+├── bot.js                          # Discord client, command routing, entry point (root because Dockerfile/Railway start with `node bot.js`)
+├── dusk-check.js                   # Diagnostic helper (local dev only, gitignored)
 │
 ├── bot/
+│   ├── config.js                   # Env var loading + validation
+│   ├── db.js                       # Mongoose lazy singleton connect
 │   ├── commands.js                 # SlashCommandBuilder registry
 │   ├── monitor/
 │   │   ├── monitor.js              # Status polling loop + notification dispatch

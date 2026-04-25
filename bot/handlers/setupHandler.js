@@ -6,8 +6,8 @@
  */
 
 import { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } from 'discord.js';
-import { connectDB } from '../../db.js';
-import config from '../../config.js';
+import { connectDB } from '../db.js';
+import config from '../config.js';
 import GuildConfig from '../models/GuildConfig.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
