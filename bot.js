@@ -6,6 +6,7 @@
 import {
   Client,
   EmbedBuilder,
+  Events,
   GatewayIntentBits,
   InteractionType,
   REST,
@@ -61,7 +62,7 @@ async function registerCommands() {
   }
 }
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
   console.log(`[bot] Logged in as ${client.user.tag}`);
   await connectDB();
 
@@ -75,7 +76,7 @@ client.once('ready', async () => {
   setupAutoCheck(client);
 });
 
-client.on('interactionCreate', async (interaction) => {
+client.on(Events.InteractionCreate, async (interaction) => {
   if (
     interaction.isButton() &&
     (interaction.customId.startsWith('listadd_overwrite:') || interaction.customId.startsWith('listadd_keep:'))
