@@ -3,8 +3,8 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 
-import { getRaidChoices } from '../models/Raid.js';
-import { CLASS_NAMES } from '../models/Class.js';
+import { getRaidChoices } from './models/Raid.js';
+import { CLASS_NAMES } from './models/Class.js';
 
 /** Build class choices for slash command (unique display names only) */
 function getClassChoices() {

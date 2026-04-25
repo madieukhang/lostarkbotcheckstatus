@@ -8,7 +8,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { EmbedBuilder } from 'discord.js';
-import config from './config.js';
+import config from '../../config.js';
 import { getServerStatus, getMultiServerStatus, STATUS } from './serverStatus.js';
 
 // ─── State helpers ────────────────────────────────────────────────────────────

@@ -13,7 +13,7 @@ import {
 } from 'discord.js';
 
 import config from './config.js';
-import { startMonitor, checkStatus, resetState } from './monitor.js';
+import { startMonitor, checkStatus, resetState } from './bot/monitor/monitor.js';
 import { buildCommands, buildOwnerCommands } from './bot/commands.js';
 import { createSystemHandlers } from './bot/handlers/systemHandlers.js';
 import { handleRosterCommand } from './bot/handlers/rosterHandler.js';
@@ -23,7 +23,7 @@ import { setupAutoCheck } from './bot/handlers/autoCheckHandler.js';
 import { handleSetupCommand, handleSetupRemoteCommand } from './bot/handlers/setupHandler.js';
 import { handleStatsCommand } from './bot/handlers/statsHandler.js';
 import { connectDB } from './db.js';
-import Blacklist from './models/Blacklist.js';
+import Blacklist from './bot/models/Blacklist.js';
 
 const client = new Client({
   intents: [

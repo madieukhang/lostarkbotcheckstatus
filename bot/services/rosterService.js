@@ -2,9 +2,9 @@ import { JSDOM } from 'jsdom';
 
 import config from '../../config.js';
 import { connectDB } from '../../db.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import { getClassName } from '../../models/Class.js';
+import Blacklist from '../models/Blacklist.js';
+import Whitelist from '../models/Whitelist.js';
+import { getClassName } from '../models/Class.js';
 import { getAddedByDisplay } from '../utils/names.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
 

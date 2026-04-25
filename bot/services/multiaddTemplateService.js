@@ -1,5 +1,5 @@
 /**
- * multiaddTemplate.js
+ * multiaddTemplateService.js
  *
  * Standalone .xlsx template generator + parser for /list multiadd.
  * Kept in its own module so it has zero dependencies on config/db/discord,
@@ -19,7 +19,7 @@
  *   Row 9-13: blank placeholder rows with subtle borders + zebra stripes
  */
 
-import { RAIDS } from '../../models/Raid.js';
+import { RAIDS } from '../models/Raid.js';
 
 // Max rows allowed in /list multiadd Excel file (excluding header)
 export const MULTIADD_MAX_ROWS = 30;
