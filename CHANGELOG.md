@@ -1,290 +1,215 @@
 # Changelog
 
-Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates in the local calendar of the release.
+Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates use the local calendar of each release.
+
+This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
 ## [v0.5.20] - 2026-04-25
 
 ### Changed
-
-- Step 3 of 3 in splitting `listHandlers.js`: extracted all 14 command handlers into 8 per-family factory modules under `bot/handlers/list/`. `listHandlers.js` is now a thin orchestrator that wires shared services into each factory and exposes the unified handler object.
-  - **listHandlers.js: 3691 -> 60 lines (-98%)** across the 3-step refactor.
-  - New per-family files (each `create*Handlers` factory):
-    - `add.js` (811 lines): handleListAddCommand + 3 button handlers (approval, viewevidence, overwrite)
-    - `multiadd.js` (689 lines): handleListMultiaddCommand + 2 button handlers (confirm, approval) + multiaddPending state
-    - `edit.js` (450 lines): handleListEditCommand
-    - `view.js` (375 lines): handleListViewCommand (paginated browse)
-    - `remove.js` (190 lines): handleListRemoveCommand
-    - `quickadd.js` (184 lines): handleQuickAddSelect + handleQuickAddModal
-    - `trust.js` (160 lines): handleListTrustCommand
-    - `check.js` (141 lines): handleListCheckCommand
-- Fat imports per family file (each imports the same superset). Future cleanup can prune per-file unused imports; functional behavior is unchanged.
+- Finished the `listHandlers.js` breakup. The old monolithic handler file is now a thin orchestrator that wires shared services into per-family factories under `bot/handlers/list/`.
+- Command logic is now split by responsibility: `add`, `multiadd`, `edit`, `view`, `remove`, `quickadd`, `trust`, and `check`.
+- This closes the 3-step refactor that moved pure helpers, shared closure services, and command-family handlers out of one giant file.
 
 ## [v0.5.19] - 2026-04-25
 
 ### Changed
-
-- Step 2 of 3 in splitting `listHandlers.js`: extracted the 10 shared closure services into `bot/handlers/list/services.js`. These functions all close over the Discord `client`, so they live in a `createSharedServices({ client })` factory that the main file wires in once and destructures.
-  - Extracted: `sendListAddApprovalToApprovers`, `sendBulkApprovalToApprovers`, `syncApproverDmMessages`, `executeListAddToDatabase`, `broadcastListChange`, `resolveBroadcastChannels`, `broadcastBulkAdd`, `executeBulkMultiadd`, `buildBulkSummaryEmbed`, `notifyRequesterAboutDecision`.
-  - Removed 7 imports from `listHandlers.js` that were only used by the now-extracted services (`GuildConfig`, `getClassName`, `fetchNameSuggestions`, `fetchCharacterMeta`, `getAddedByDisplay`, `buildAlertEmbed`, `AlertSeverity`).
-  - `listHandlers.js`: 3494 -> 2570 lines (-924, -26%).
+- Step 2 of the `listHandlers.js` refactor: extracted shared closure-based services into `bot/handlers/list/services.js`.
+- Broadcast, approval, DM sync, and bulk execution helpers now live in one shared service factory instead of being embedded in the main handler file.
 
 ## [v0.5.18] - 2026-04-25
 
 ### Changed
-
-- Started splitting `bot/handlers/listHandlers.js` (was 3691 lines, single file). Step 1 of 3: extracted the 10 pure module-level helpers (no closure on `client`) into `bot/handlers/list/helpers.js`. Behavior identical; imports added back.
-  - Extracted: `getListContext`, `buildTrustedBlockEmbed`, `buildListEditSuccessEmbed`, `buildListAddApprovalEmbed`, `getApproverRecipientIds`, `isRequesterAutoApprover`, `isOfficerOrSenior`, `getSeniorApproverIds`, `buildApprovalResultRow`, `buildApprovalProcessingRow`.
-  - listHandlers.js: 3691 -> 3494 lines.
+- Step 1 of the `listHandlers.js` refactor: extracted pure module-level helpers into `bot/handlers/list/helpers.js`.
+- Behavior is unchanged; this release mainly set up cleaner boundaries for the later split.
 
 ## [v0.5.17] - 2026-04-25
 
 ### Fixed
-
-- Silenced `DeprecationWarning: The ready event has been renamed to clientReady` on bot startup. Migrated all `client.on` / `client.once` listeners from string literals to the `Events` enum (`Events.ClientReady`, `Events.InteractionCreate`, `Events.MessageCreate`), matching the pattern already used by LostArk_RaidManage. Future-proofs for discord.js v15 and removes the noisy stderr line that Railway was flagging as `level: error`.
+- Migrated Discord client listeners to the `Events` enum, removing the `ready` deprecation warning on startup and aligning the bot with modern discord.js event naming.
 
 ## [v0.5.16] - 2026-04-25
 
 ### Changed
-
-- Final pass on source-tree consolidation: `config.js` and `db.js` moved from root into `bot/`. Root now holds only the entry point (`bot.js`), meta files (package.json, Dockerfile, railway.toml, etc.), and gitignored runtime dirs. All source code lives under `bot/`.
-- All relative imports rewritten; resolver script confirms every import target exists.
+- Completed source-tree consolidation: `config.js` and `db.js` moved under `bot/`, leaving the repo root mostly for entrypoint and deployment metadata.
+- Relative imports were rewritten so the codebase matches the new layout cleanly.
 
 ## [v0.5.15] - 2026-04-25
 
 ### Changed
-
-- File layout reorganized for clarity. No behavior change. Entry point (`bot.js`) stays at root for Dockerfile / Railway compatibility; everything else moved under `bot/`:
-  - `monitor.js` + `serverStatus.js` -> `bot/monitor/` (paired status-polling module)
-  - `models/` -> `bot/models/` (consistency with the rest of the bot tree)
-  - `bot/utils/multiaddTemplate.js` -> `bot/services/multiaddTemplateService.js` (it was a feature module misfiled under utils)
-- All relative imports rewritten to match. Architecture diagram in README refreshed.
+- Reorganized file layout for clarity. Monitoring modules, models, and template services were moved into more appropriate `bot/` subfolders.
+- No behavior change; this release was about project structure and maintainability.
 
 ## [v0.5.14] - 2026-04-12
 
 ### Added
-
-- Secra raid entries (`Secra Nor`, `Secra Hard`, `Secra NM`) in the `/list add` / `/list edit` / `/list multiadd` raid dropdown, picked up automatically by the Excel template + parser via `RAIDS` in `models/Raid.js`.
+- Added Secra raid variants (`Secra Nor`, `Secra Hard`, `Secra NM`) to `/list add`, `/list edit`, and `/list multiadd`.
 
 ## [v0.5.13] - 2026-04-12
 
 ### Fixed
-
-- Broadcasts from the owner server now hit the owner's own notify channel. `resolveBroadcastChannels` previously excluded the origin guild for all broadcasts; exempting the owner guild from that exclusion restores the audit trail.
+- Broadcasts from the owner server now also reach the owner server's own notify channel, restoring the expected audit trail.
 
 ## [v0.5.12] - 2026-04-12
 
 ### Fixed
-
-- `/list multiadd` no longer silently stores a legacy `imageUrl` when `rehostImage()` fails. Bulk flow now uses `throwOnError: true` and surfaces per-row rehost errors in the summary embed (`🖼️ Image rehost failed (N)`) with a footer warning about 24h CDN expiry.
-- Removed the redundant `By <user>` footer from `/list multiadd` bulk broadcasts (matches `/list add` style).
-- `/laremote action:syncimages` attaches a full `syncimages_errors_<date>.txt` file whenever the error count exceeds 10 instead of truncating to "and 39 more".
+- `/list multiadd` now fails loudly on image rehost problems instead of silently storing a fragile legacy `imageUrl`.
+- Bulk summary output now reports image-rehost failures explicitly.
+- `/laremote action:syncimages` now attaches a full error file when the failure list is large.
 
 ## [v0.5.11] - 2026-04-11
 
 ### Fixed
-
-- `rehostImage()` no longer double-wraps error messages (e.g. `download fetch threw: download HTTP 404`). Download step split into three separate try blocks so a thrown error doesn't get re-caught by a sibling catch.
-- `/laremote action:syncimages` reclassifies HTTP 4xx/5xx download failures as `Skipped (dead URLs)`. Discord permanently removes some attachment files ~30-90 days after message post; those are unrecoverable. `Failed` is now reserved for genuine infra errors.
+- `rehostImage()` no longer double-wraps nested errors, making sync and evidence failures much easier to understand.
+- `/laremote action:syncimages` now classifies dead legacy URLs as skipped instead of failed, reserving `Failed` for real infra issues.
 
 ## [v0.5.10] - 2026-04-11
 
 ### Fixed
-
-- `/laremote action:syncimages` now surfaces the real error per entry instead of a generic "rehost failed after successful URL refresh". `rehostImage()` gained an opt-in `meta.throwOnError` parameter; legacy callers are unaffected.
-- Added a per-entry retry (first attempt → 2s wait → second attempt) so transient rate-limit blips don't mark an entry permanently failed.
-- Throttle bumped 200ms → 500ms between entries; stays comfortably below Discord's 5-msg/5-sec channel limit at the cost of a longer one-shot migration runtime.
+- `/laremote action:syncimages` now surfaces the real per-entry error instead of a generic rehost failure.
+- Added one retry per entry and increased throttling to reduce false failures from transient rate limits.
 
 ## [v0.5.9] - 2026-04-11
 
 ### Changed
-
-- `/lahelp` now includes a dedicated detailed embed for `/laremote action:syncimages` (owner guild only), mirroring the `multiaddEmbed` pattern: prerequisites, per-entry flow, result counters, troubleshooting.
+- `/lahelp` gained a dedicated detailed help embed for `/laremote action:syncimages`.
 
 ## [v0.5.8] - 2026-04-11
 
 ### Fixed
-
-- `/laremote action:syncimages` now uses a compare-and-swap write so a concurrent `/list edit` or `/list multiadd` can't overwrite newer evidence refs with the migration loop's stale snapshot. Races count as a new `Skipped (raced)` bucket.
-- Legacy external (non-Discord) URLs now go straight through `rehostImage()` instead of `attachments/refresh-urls`, fixing the false-positive "dead URL" classification for alive Imgur/Postimages links.
-- Summary embed gained a four-counter layout (`Synced`, `Skipped (dead)`, `Skipped (raced)`, `Failed`).
+- `/laremote action:syncimages` now uses compare-and-swap writes so concurrent edits cannot overwrite fresher evidence references.
+- Legacy non-Discord image URLs now go through the correct rehost path instead of being misclassified as dead.
+- Sync summary now breaks outcomes into `Synced`, `Skipped (dead)`, `Skipped (raced)`, and `Failed`.
 
 ## [v0.5.7] - 2026-04-11
 
 ### Added
-
-- `/laremote action:syncimages` — Senior-only one-shot migration that walks every pre-v0.5.2 entry (legacy `imageUrl` only, no rehost refs) and migrates them into the rehost storage path via Discord's `POST /attachments/refresh-urls` + reupload.
-- Idempotent (query filter requires `imageMessageId === ''`), 200ms throttle, progress embed every 10 entries, final summary with up to 10 errors inline.
-- Aborts with a clear error if the evidence channel isn't configured yet.
+- Added `/laremote action:syncimages`, a Senior-only one-shot migration for legacy evidence images.
+- The migration is idempotent, throttled, and reports progress plus final errors.
 
 ## [v0.5.6] - 2026-04-11
 
 ### Changed
-
-- `/list edit` success response is now a rich embed matching `/list add` style (color, title, fields, editor footer, fresh evidence image resolution). Both auto-approve and approval-execution paths render identically via a new shared `buildListEditSuccessEmbed` helper.
+- `/list edit` success output now uses a richer embed that matches `/list add` style, including fresh evidence resolution and unified success rendering.
 
 ## [v0.5.5] - 2026-04-11
 
 ### Added
-
-- `/list edit scope:` option promotes a local blacklist entry to `global` or demotes a global one to server-only, preserving `addedAt` / `addedBy` / `allCharacters` / evidence.
-- Auto-approve uses target state (demote = auto, promote = Senior approval); conflict detection catches collisions before writing; broadcast routing follows the final scope; no-effective-changes guard rejects scope-only noise.
+- `/list edit scope:` now supports promoting local blacklist entries to `global` and demoting global ones to server-only.
+- Scope changes preserve audit metadata and existing evidence.
 
 ## [v0.5.4] - 2026-04-11
 
-### Fixed
-
-- Approval-delayed `/list add` now resolves a fresh evidence URL after `Model.create()` instead of reusing the snapshot from submit time; prevents broken images in the success + broadcast embeds when approval gaps stretch past 24h.
-
 ### Added
+- Approval DMs for `/list add` and `/list edit` now include a `View Evidence (Fresh)` button for approvers.
 
-- `📎 View Evidence (Fresh)` button on `/list add` and `/list edit` approval DMs. Re-resolves a freshly-signed URL on click (rehost message for v0.5.2+ entries, legacy URL with "may have expired" footer otherwise). Assigned approvers only.
+### Fixed
+- Approval-delayed `/list add` now resolves fresh evidence at execution time, preventing stale image URLs after long approval gaps.
 
 ## [v0.5.3] - 2026-04-11
 
 ### Fixed
-
-- `PendingApproval` now carries `imageMessageId` + `imageChannelId` through the approval round-trip. The schema previously only had `imageUrl`, so approved adds/edits silently lost rehost permanence and fell back to the expiring URL path.
-- `/list multiadd` member approval rehosts rows **at submit time** (Confirm click) instead of at execution; prevents bulk imports from dying if approval sits for a day.
-- `/search` and `/roster` now display rehosted evidence via `entryHasImage` + `resolveDisplayImageUrl` — post-v0.5.2 entries previously showed no image in these commands.
-- `/list edit` write paths (cross-list move, in-place, duplicate overwrite) persist all three image fields atomically instead of dropping rehost refs.
-- `/list edit` now `deferReply()` before calling `rehostImage()` so slow uploads don't trip Discord's 3s interaction timeout.
+- Approval records now keep rehost metadata all the way through the approval round-trip.
+- `/list multiadd` rehosts member-submitted evidence at submit time instead of waiting for approval execution.
+- `/search` and `/roster` now show rehosted evidence correctly for post-v0.5.2 entries.
+- `/list edit` no longer drops image metadata during writes and now defers before slow rehost work to avoid Discord's 3-second timeout.
 
 ## [v0.5.2] - 2026-04-11
 
 ### Added
-
-- Evidence rehost feature: bot re-uploads every `/list add` / `/list edit` / `/list multiadd` image to a dedicated evidence channel and stores `imageMessageId` + `imageChannelId` instead of the original CDN URL. Fresh signed URLs resolved on display.
-- `/laremote action:evidencechannel` — Senior-only command to set the evidence channel (persists to owner `GuildConfig.evidenceChannelId`, bot-wide).
-- New `bot/utils/imageRehost.js` with `rehostImage` / `refreshImageUrl` / `resolveDisplayImageUrl`.
-- Schema fields `imageMessageId` / `imageChannelId` on Blacklist / Whitelist / Watchlist. Legacy `imageUrl` kept as fallback.
+- Introduced evidence rehost storage: images are re-uploaded to a dedicated evidence channel and stored by message/channel reference instead of raw CDN URL.
+- Added `/laremote action:evidencechannel` for setting the shared evidence channel.
+- Added image rehost utilities and schema support for `imageMessageId` / `imageChannelId`.
 
 ### Fixed
-
-- Discord CDN evidence images no longer expire silently after ~24h. Root cause: signed expiry tokens on CDN URLs introduced in 2024. Legacy entries (pre-rehost) stay broken — use `/laremote action:syncimages` to migrate them.
-- `/list view` ReferenceError from a missing `refreshImageUrl` import — ESM only validates identifiers at execution time so the bug surfaced only when a user invoked the command.
+- Evidence images no longer break after Discord CDN signed URLs expire.
+- `/list view` no longer crashes on a missing `refreshImageUrl` import.
 
 ### Changed
-
-- `/list view` paginated 📎 links resolve a fresh CDN URL per page render (parallel `Promise.all`, ~10 fetches/page, < 1s typical). Pagination handlers `deferUpdate()` before rebuilding.
-- `/list view` evidence dropdown preview shows "Image link expired" when refresh fails (legacy entries only).
+- `/list view` now resolves fresh evidence URLs per page render and shows clearer fallback copy when refresh fails for legacy entries.
 
 ## [v0.5.1] - 2026-04-11
 
 ### Added
-
-- `/list multiadd` — bulk add up to 30 entries via a styled Excel template with dropdown validation, example row, frozen header, and an Instructions sheet.
-- `action:template` downloads the template; `action:file` uploads a filled sheet, shows preview embed with ≤20 valid rows + first 10 errors + Confirm/Cancel buttons (5-min expiry).
-- Validation: required fields, type/scope enum, URL format, intra-file dedup (case-insensitive), ilvl ≥ 1700, reuses `/list add` rules.
-- Member flow: single `PendingApproval` batch with one aggregated DM to Senior (no per-row spam); single aggregated broadcast on approval.
-- Officer/Senior bypass approval; progress updates every 5 rows during direct execution.
-- `exceljs@^4.4.0` dependency; new `bot/utils/multiaddTemplate.js` (zero Discord/DB coupling, independently testable).
+- Added `/list multiadd`, supporting bulk add of up to 30 entries from a styled Excel template.
+- Member flow submits one batch approval instead of spamming approvers row by row.
+- Officers and Seniors can bypass approval and execute directly with progress updates.
 
 ### Fixed
-
-- P1 race: atomic `findOneAndDelete` in the multiadd approval handler prevents double execution when two approvers click simultaneously.
-- P2 auto-approve scope: members can no longer bypass bulk approval via `MEMBER_APPROVER_IDS` (bulk is Senior-only now).
-- P3 stale approver DMs: `syncApproverDmMessages` edits the other approvers' DMs after one approver clicks, so buttons disappear instead of lingering.
-- Orphan DMs on DB failure: approval record cleaned up if zero deliveries or any step fails.
-- Command description fixed to match handler behavior.
+- Bulk approval now uses atomic delete-on-approve to prevent double execution.
+- Members can no longer bypass Senior-only approval through mis-scoped approver IDs.
+- Approver DMs now sync after a decision so stale buttons disappear.
+- Failure cleanup is stricter when approval delivery or execution breaks.
 
 ## [v0.5.0] - 2026-04-08
 
 ### Added
-
-- **Server vs Global blacklist**: `scope` field (`global` / `server`) with compound unique index `{name, scope, guildId}`. Server-scoped entries stay local to their guild; owner guild sees all server-scoped entries with `(Local: GuildName)` labels.
-- `/lasetup off` toggles global-list notifications on/off per server.
-- `/lasetup defaultscope` sets the default blacklist scope per guild.
-- `TrustedUser` model + `/list trust action` (add/remove) — trusted characters and their alts cannot be added to any list (officer/senior only).
-- 🛡️ trusted indicator in auto-check, `/listcheck`, `/search`, `/roster`. Alt match via roster displays "via **TrustedName**".
-- Raid tag shown in auto-check flagged output.
-- Clickable 📎 evidence links in `/list view`.
+- Introduced server-vs-global blacklist scope with guild-aware uniqueness and owner-guild visibility for local entries.
+- Added `/lasetup off` and `/lasetup defaultscope`.
+- Added `TrustedUser` plus `/list trust action` to protect trusted characters and their alts from being added to any list.
+- Trusted indicators now appear in auto-check, `/listcheck`, `/search`, and `/roster`.
+- Evidence links became clickable in `/list view`.
 
 ### Changed
-
-- All slash commands now use `setDMPermission(false)`.
-- Scope priority `server > global` applied consistently across read paths.
-- `/search` uses `$in` batch queries (~4 queries instead of ~60 for 15 results).
-- Approval payload carries scope + logs + action + duplicate context through the full round-trip.
-- `/list edit` uses cross-list move (create-before-delete with preflight dedup) + duplicate overwrite is update-in-place.
-- Similar-name cache stores candidate names only; flags recomputed per-request for scope safety.
-- Default blacklist scope: `global` (was `server`).
+- All slash commands now disable DM permission by default.
+- Scope precedence (`server > global`) is now applied consistently.
+- `/search` moved to batched queries for much lower DB round-trip count.
+- Approval and edit flows now carry richer context through the full round-trip.
+- Default blacklist scope changed from `server` to `global`.
 
 ## [v0.4.0] - 2026-03-28
 
 ### Added
-
-- `/list edit` for existing entries (owner/officer instant, members via approval); supports moving between lists.
-- Quick Add dropdown + modal on auto-check results to add unflagged names directly.
-- `/roster deep:true` runs Stronghold alt detection even when roster is visible.
-- `/lasetup autochannel` / `notifychannel` / `view` / `reset` — per-guild channel config (`GuildConfig` model).
-- `RosterCache` model (TTL 24h) to cache roster check results.
-- Smart ScraperAPI fallback cache — remembers Cloudflare blocks for 5 minutes.
-- Progress "Checking N name(s)…" message on auto-check.
-- Gemini non-JSON + 404 model failover; thinking parts filter.
-- Batch DB queries for list check (~35 → ~7 queries / check, ~80% reduction).
-- Per-user 10s auto-check spam cooldown.
+- Added `/list edit` for existing entries, including move-across-list support.
+- Added Quick Add from auto-check results.
+- Added deeper roster / alt-detection support, guild config commands, roster cache, and smarter scraper fallback cache.
+- Added progress messaging for auto-check and stronger Gemini failover handling.
+- Added per-user auto-check spam cooldown.
 
 ### Changed
-
-- Auto-check resolves channels dynamically per message (`GuildConfig` → env fallback).
-- Broadcast notifications skip the origin server.
-- Side-by-side duplicate compare embed with Overwrite / Keep Existing buttons.
-- Display sort priority: ⛔ → ⚠️ → ✅ → ❓ → ⚪.
+- Auto-check now resolves channels dynamically per message.
+- Broadcasts skip the origin server.
+- Duplicate handling became more interactive with side-by-side compare and overwrite controls.
+- Display sorting was adjusted for clearer priority.
 
 ### Fixed
-
-- `/roster` alt detection now checks `allCharacters` (not just `name`).
-- Pending `/list add` approvals survive bot restart (persisted via `PendingApproval`).
-- `lostark.bible` search API payload format compatibility.
+- `/roster` alt detection now checks `allCharacters`, not just the main name.
+- Pending approvals now survive bot restart.
+- Updated compatibility for the `lostark.bible` search API payload shape.
 
 ## [v0.3.0] - 2026-03-20
 
 ### Added
-
-- `/search name [min_ilvl] [max_ilvl] [class]` — similar-name scan on lostark.bible with cross-check.
-- Cross-server list notification broadcasts on add / remove.
-- `/list view` pagination (10/page) + 📎 evidence dropdown.
-- `/lahelp` command listing.
-- Watchlist (`/list add type:watch`) — ⚠️ "under investigation" list.
-- `ilvl >= 1700` validation on `/list add`.
-- Auto-check channel feature with multi-channel / multi-server support via `AUTO_CHECK_CHANNEL_IDS`.
-- Multi-server monitoring via `TARGET_SERVERS` with a single page fetch.
-- Stronghold-based alt detection when roster is hidden.
-- Guild-member-list cross-check when roster is hidden.
-- `RosterSnapshot` model for iLvl progression; `/roster` shows iLvl delta since last check.
-- Auto-enrich `allCharacters` via background guild scan after a flagged hit.
-- OCR similar-name suggestions for diacritic misreads.
-- Fail reason displayed on roster lookup failure.
+- Added `/search` with optional filters and cross-check support.
+- Added cross-server broadcast notifications on add/remove.
+- Added `/list view` pagination and evidence dropdown.
+- Added `/lahelp`.
+- Added watchlist support, `ilvl >= 1700` validation, multi-server monitoring, stronger hidden-roster fallback checks, roster snapshots, and OCR name-suggestion help.
 
 ### Changed
-
-- Approver IDs moved to env vars (`OFFICER_APPROVER_IDS`, `SENIOR_APPROVER_IDS`, `MEMBER_APPROVER_IDS`).
-- Merged `/check` into `/status` (live check, removed cached command).
-- `/lahelp` renamed from `/help` to avoid conflict with other bots.
-- Replaced ScraperAPI primary with direct fetch + ScraperAPI fallback on 403/503.
-- Sequential `findOne` loops replaced with `$in` batches across roster cross-checks.
+- Approver IDs moved to environment configuration.
+- `/check` was merged into `/status`.
+- `/help` was renamed to `/lahelp` to avoid conflicts.
+- Fetch flow switched to direct requests first, with ScraperAPI as fallback.
+- Replaced sequential DB lookups with batched `$in` queries where possible.
 
 ## [v0.2.0] - 2026-03-19
 
 ### Added
-
-- Image-driven `/listcheck` flow via Gemini OCR (hard limit 8 names).
-- Gemini model failover priority list via `GEMINI_MODELS`.
-- Approver-ID workflow for `/list add` proposals (DM Approve/Reject buttons) with auto-approve for officer/senior.
-- Requester preview embed; synchronized DM state across approvers on approve/reject.
-- `addedByDisplayName` audit field.
+- Added image-driven `/listcheck` via Gemini OCR.
+- Added Gemini model failover support.
+- Added approver-ID workflow for `/list add`, including DM approve/reject buttons and auto-approve for officer/senior roles.
+- Added requester preview embeds and synchronized approver-DM state.
+- Added `addedByDisplayName` audit field.
 
 ### Changed
-
-- Refactored from monolithic `bot.js` into `bot/handlers/*` + `bot/services/*` + `bot/utils/*`.
-- Roster output lines now include class info.
-- Fixed weekly maintenance window: Wed 07:00 UTC → Thu 07:00 UTC.
+- Refactored from a monolithic `bot.js` into `bot/handlers/*`, `bot/services/*`, and `bot/utils/*`.
+- Roster output now includes class info.
+- Corrected the weekly maintenance window.
 
 ## [v0.1.0] - 2026-03-17
 
 ### Added
-
-- First tagged release. `/list add`, `/list remove`, `/listcheck` (text names, hard limit 7).
-- `raid` option on `/list add` with predefined choices.
-- `addedByUserId` / `addedByTag` audit fields.
-- `allCharacters` roster snapshot on entries for cross-match.
+- First tagged release with `/list add`, `/list remove`, and `/listcheck`.
+- Added the `raid` option on `/list add`.
+- Added `addedByUserId`, `addedByTag`, and `allCharacters` audit / roster snapshot fields.
