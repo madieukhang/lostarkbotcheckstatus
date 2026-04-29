@@ -85,6 +85,12 @@ export function createCheckHandlers({ client }) {
     }
 
     const limitedNames = names.slice(0, 8);
+    await interaction.editReply({
+      content: [
+        `🔍 Extracted **${limitedNames.length}** name(s) — checking lists & roster...`,
+        limitedNames.length < names.length ? `Ignored **${names.length - limitedNames.length}** extra name(s) (limit: 8).` : null,
+      ].filter(Boolean).join('\n'),
+    });
 
     try {
       const results = await checkNamesAgainstLists(limitedNames, { guildId: interaction.guild?.id });
