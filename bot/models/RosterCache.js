@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 
 const rosterCacheSchema = new mongoose.Schema({
   /** Character name (case-insensitive lookup via collation) */
-  name: { type: String, required: true, unique: true },
+  name: { type: String, required: true, trim: true },
 
   /** Whether the character has a visible roster on lostark.bible */
   hasRoster: { type: Boolean, default: false },
@@ -26,5 +26,10 @@ const rosterCacheSchema = new mongoose.Schema({
   /** When this cache entry was created — TTL index expires after 24h */
   cachedAt: { type: Date, default: Date.now, expires: 86400 },
 });
+
+rosterCacheSchema.index(
+  { name: 1 },
+  { unique: true, collation: { locale: 'en', strength: 2 } }
+);
 
 export default mongoose.model('RosterCache', rosterCacheSchema);

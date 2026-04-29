@@ -25,6 +25,8 @@ import { handleSetupCommand, handleSetupRemoteCommand } from './bot/handlers/set
 import { handleStatsCommand } from './bot/handlers/statsHandler.js';
 import { connectDB } from './bot/db.js';
 import Blacklist from './bot/models/Blacklist.js';
+import RosterCache from './bot/models/RosterCache.js';
+import { getClassAutocompleteChoices } from './bot/models/Class.js';
 
 const client = new Client({
   intents: [
@@ -69,6 +71,9 @@ client.once(Events.ClientReady, async () => {
   // Sync blacklist indexes (drops old name-only unique, creates compound name+scope+guildId)
   Blacklist.syncIndexes().catch((err) =>
     console.warn('[bot] Blacklist syncIndexes:', err.message)
+  );
+  RosterCache.syncIndexes().catch((err) =>
+    console.warn('[bot] RosterCache syncIndexes:', err.message)
   );
 
   await registerCommands();
@@ -180,6 +185,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
       } else {
         await interaction.reply({ content: `⚠️ Failed: \`${err.message}\``, ephemeral: true }).catch(() => {});
       }
+    }
+    return;
+  }
+
+  if (interaction.isAutocomplete()) {
+    try {
+      if (interaction.commandName === 'search') {
+        const focused = interaction.options.getFocused(true);
+        if (focused?.name === 'class') {
+          await interaction.respond(getClassAutocompleteChoices(focused.value));
+          return;
+        }
+      }
+      await interaction.respond([]);
+    } catch (err) {
+      console.error('[bot] Autocomplete error:', err.message);
+      await interaction.respond([]).catch(() => {});
     }
     return;
   }

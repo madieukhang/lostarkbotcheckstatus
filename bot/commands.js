@@ -4,20 +4,6 @@ import {
 } from 'discord.js';
 
 import { getRaidChoices } from './models/Raid.js';
-import { CLASS_NAMES } from './models/Class.js';
-
-/** Build class choices for slash command (unique display names only) */
-function getClassChoices() {
-  const seen = new Set();
-  const choices = [];
-  for (const [id, name] of Object.entries(CLASS_NAMES)) {
-    if (seen.has(name)) continue;
-    seen.add(name);
-    choices.push({ name, value: id });
-  }
-  // Discord limit: 25 choices max
-  return choices.slice(0, 25);
-}
 
 export function buildCommands() {
   return [
@@ -288,16 +274,11 @@ export function buildCommands() {
           .setRequired(false)
       )
       .addStringOption((opt) => {
-        opt
+        return opt
           .setName('class')
           .setDescription('Filter by class')
-          .setRequired(false);
-
-        for (const choice of getClassChoices()) {
-          opt.addChoices(choice);
-        }
-
-        return opt;
+          .setRequired(false)
+          .setAutocomplete(true);
       })
       .setDMPermission(false),
 
