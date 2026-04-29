@@ -20,6 +20,7 @@ import {
   checkNamesAgainstLists,
   formatCheckResults,
 } from '../services/listCheckService.js';
+import { truncateDiscordContent } from '../utils/discordText.js';
 
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);
@@ -109,11 +110,11 @@ export function setupAutoCheck(client) {
       const results = await checkNamesAgainstLists(limitedNames, { guildId: message.guild.id });
       const lines = formatCheckResults(results);
 
-      const content = [
+      const content = truncateDiscordContent([
         `🔍 Auto-check: **${limitedNames.length}** name(s)`,
         '',
         ...lines,
-      ].join('\n');
+      ].join('\n'));
 
       // Build quick-add select menu for unflagged names (❓ or ⚪)
       const unflaggedNames = results.filter(

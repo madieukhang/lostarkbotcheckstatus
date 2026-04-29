@@ -37,6 +37,7 @@ import {
   getAddedByDisplay,
   getInteractionDisplayName,
 } from '../../utils/names.js';
+import { truncateDiscordContent } from '../../utils/discordText.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../utils/imageRehost.js';
@@ -104,7 +105,7 @@ export function createCheckHandlers({ client }) {
       ].filter((line) => line !== null);
 
       await interaction.editReply({
-        content: sections.join('\n'),
+        content: truncateDiscordContent(sections.join('\n')),
       });
 
       // Fire-and-forget: enrich allCharacters in background for flagged entries
