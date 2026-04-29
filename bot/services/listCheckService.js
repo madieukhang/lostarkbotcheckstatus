@@ -20,6 +20,10 @@ import {
   getAddedByDisplay,
 } from '../utils/names.js';
 import { buildBlacklistQuery, isOwnerGuild as checkOwner } from '../utils/scope.js';
+import { mapWithConcurrency, sleep } from '../utils/async.js';
+
+const ROSTER_LOOKUP_CONCURRENCY = 2;
+const ROSTER_LOOKUP_START_SPACING_MS = 250;
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -211,6 +215,7 @@ export async function extractNamesFromImage(image) {
  * @param {string} [options.guildId] - Guild ID for including server-scoped blacklist entries
  */
 export async function checkNamesAgainstLists(names, options = {}) {
+  const startedAt = Date.now();
   await connectDB();
   const { guildId } = options;
 
@@ -261,8 +266,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
     similarNames: null,
   }));
 
-  // Phase 2: Sequential roster check for unflagged names
-  // Batch read all RosterCache entries at once, then process
+  // Phase 2: roster check for unflagged names. Batch-read cache first, then
+  // resolve misses with bounded concurrency so screenshots with many clean
+  // names do not wait on 8 fully sequential lostark.bible round-trips.
   const unflaggedNames = results
     .filter((r) => !r.blackEntry && !r.whiteEntry && !r.watchEntry)
     .map((r) => r.name);
@@ -272,6 +278,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     : [];
   const cacheMap = new Map(cachedEntries.map((c) => [c.name.toLowerCase(), c]));
 
+  const cacheMissItems = [];
   for (const item of results) {
     if (item.blackEntry || item.whiteEntry || item.watchEntry) continue;
 
@@ -283,14 +290,94 @@ export async function checkNamesAgainstLists(names, options = {}) {
       item._allCharacters = cached.allCharacters || [];
       if (cached.searchSuggestions?.length > 0) {
         item.similarNames = cached.searchSuggestions;
+        item._cachedSearchSuggestions = cached.searchSuggestions;
       }
       console.log(`[listcheck] Cache hit: ${item.name} (hasRoster: ${cached.hasRoster})`);
     } else {
-      // Cache miss → fetch from lostark.bible
+      cacheMissItems.push(item);
+      continue;
+    }
+  }
+
+  let nextLookupStartAt = Date.now();
+  async function waitForRosterLookupSlot() {
+    const now = Date.now();
+    const startAt = Math.max(now, nextLookupStartAt);
+    nextLookupStartAt = startAt + ROSTER_LOOKUP_START_SPACING_MS;
+    const waitMs = startAt - now;
+    if (waitMs > 0) await sleep(waitMs);
+  }
+
+  async function attachSimilarNames(item) {
+    try {
+      let candidateNames = item._cachedSearchSuggestions?.length > 0
+        ? item._cachedSearchSuggestions.map((s) => s.name)
+        : null;
+
+      if (!candidateNames) {
+        await waitForRosterLookupSlot();
+        const suggestions = await fetchNameSuggestions(item.name) || [];
+        const similarCandidates = suggestions
+          .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== item.name.toLowerCase())
+          .slice(0, 3);
+        candidateNames = similarCandidates.map((s) => s.name);
+
+        if (candidateNames.length > 0) {
+          RosterCache.findOneAndUpdate(
+            { name: item.name },
+            {
+              $set: {
+                name: item.name,
+                searchSuggestions: candidateNames.map((n) => ({ name: n, flag: '' })),
+                cachedAt: new Date(),
+              },
+            },
+            { upsert: true, collation }
+          ).catch(() => {});
+        }
+      }
+
+      if (candidateNames.length > 0) {
+        const simQuery = { $or: [{ name: { $in: candidateNames } }, { allCharacters: { $in: candidateNames } }] };
+        const simBlackQuery = buildBlacklistQuery(simQuery, guildId);
+        const [simBlack, simWhite, simWatch] = await Promise.all([
+          Blacklist.find(simBlackQuery).collation(collation).lean(),
+          Whitelist.find(simQuery).collation(collation).lean(),
+          Watchlist.find(simQuery).collation(collation).lean(),
+        ]);
+
+        const simBlackMap = buildEntryMap(simBlack);
+        const simWhiteMap = buildEntryMap(simWhite);
+        const simWatchMap = buildEntryMap(simWatch);
+
+        item.similarNames = candidateNames.map((name) => {
+          const lower = name.toLowerCase();
+          let flag = '';
+          if (simBlackMap.has(lower)) flag += '⛔';
+          if (simWhiteMap.has(lower)) flag += '✅';
+          if (simWatchMap.has(lower)) flag += '⚠️';
+          if (!flag) flag = '❓';
+          return { name, flag };
+        });
+      }
+    } catch (err) {
+      console.warn(`[listcheck] Similar name search failed for ${item.name}:`, err.message);
+    }
+  }
+
+  await mapWithConcurrency(
+    cacheMissItems,
+    ROSTER_LOOKUP_CONCURRENCY,
+    async (item) => {
+      await waitForRosterLookupSlot();
+      const rosterStartedAt = Date.now();
       const rosterResult = await buildRosterCharacters(item.name);
       item.hasRoster = rosterResult.hasValidRoster;
       item.failReason = rosterResult.failReason;
       item._allCharacters = rosterResult.allCharacters || [];
+      console.log(
+        `[listcheck] Roster lookup: ${item.name} (hasRoster: ${item.hasRoster}) in ${Date.now() - rosterStartedAt}ms`
+      );
 
       try {
         await RosterCache.findOneAndUpdate(
@@ -310,72 +397,13 @@ export async function checkNamesAgainstLists(names, options = {}) {
         console.warn(`[listcheck] Cache save failed for ${item.name}:`, err.message);
       }
 
-      // Delay between lostark.bible requests to avoid 429
-      await new Promise((r) => setTimeout(r, 500));
     }
+  );
 
-    // Search for similar names when no roster found (e.g. diacritics mismatch)
-    // Cache stores candidate names only (no flags) — flags recomputed per-request for scope safety
-    if (!item.hasRoster) {
-      try {
-        // Load candidate names from cache or fetch fresh
-        let candidateNames = cached?.searchSuggestions?.length > 0
-          ? cached.searchSuggestions.map((s) => s.name)
-          : null;
-
-        if (!candidateNames) {
-          const suggestions = await fetchNameSuggestions(item.name) || [];
-          const similarCandidates = suggestions
-            .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== item.name.toLowerCase())
-            .slice(0, 3);
-          candidateNames = similarCandidates.map((s) => s.name);
-
-          // Cache candidate names only (flags are scope-dependent, not cacheable)
-          if (candidateNames.length > 0) {
-            RosterCache.findOneAndUpdate(
-              { name: item.name },
-              {
-                $set: {
-                  name: item.name,
-                  searchSuggestions: candidateNames.map((n) => ({ name: n, flag: '' })),
-                  cachedAt: new Date(),
-                },
-              },
-              { upsert: true, collation }
-            ).catch(() => {});
-          }
-        }
-
-        if (candidateNames.length > 0) {
-          // Compute flags per-request (scope-aware for blacklist)
-          const simNames = candidateNames;
-          const simQuery = { $or: [{ name: { $in: simNames } }, { allCharacters: { $in: simNames } }] };
-          const simBlackQuery = buildBlacklistQuery(simQuery, guildId);
-          const [simBlack, simWhite, simWatch] = await Promise.all([
-            Blacklist.find(simBlackQuery).collation(collation).lean(),
-            Whitelist.find(simQuery).collation(collation).lean(),
-            Watchlist.find(simQuery).collation(collation).lean(),
-          ]);
-
-          const simBlackMap = buildEntryMap(simBlack);
-          const simWhiteMap = buildEntryMap(simWhite);
-          const simWatchMap = buildEntryMap(simWatch);
-
-          item.similarNames = candidateNames.map((name) => {
-            const lower = name.toLowerCase();
-            let flag = '';
-            if (simBlackMap.has(lower)) flag += '⛔';
-            if (simWhiteMap.has(lower)) flag += '✅';
-            if (simWatchMap.has(lower)) flag += '⚠️';
-            if (!flag) flag = '❓';
-            return { name, flag };
-          });
-        }
-      } catch (err) {
-        console.warn(`[listcheck] Similar name search failed for ${item.name}:`, err.message);
-      }
-    }
-  }
+  const noRosterItems = results.filter(
+    (item) => !item.blackEntry && !item.whiteEntry && !item.watchEntry && !item.hasRoster
+  );
+  await mapWithConcurrency(noRosterItems, ROSTER_LOOKUP_CONCURRENCY, attachSimilarNames);
 
   // Phase 3: Resolve trusted status via allCharacters (alt detection)
   // Collect all roster names from list entries + roster results to check against TrustedUser
@@ -423,6 +451,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
     }
   }
 
+  console.log(
+    `[listcheck] Checked ${names.length} name(s) in ${Date.now() - startedAt}ms (cacheMiss=${cacheMissItems.length})`
+  );
   return results;
 }
 
