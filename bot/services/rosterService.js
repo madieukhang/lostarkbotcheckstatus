@@ -184,7 +184,7 @@ export async function buildRosterCharacters(name) {
   let targetItemLevel = null;
 
   try {
-    const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
+    const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
     const response = await fetchWithFallback(targetUrl);
 
     if (!response.ok) {
