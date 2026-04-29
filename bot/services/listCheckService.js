@@ -292,18 +292,23 @@ export async function checkNamesAgainstLists(names, options = {}) {
       item.failReason = rosterResult.failReason;
       item._allCharacters = rosterResult.allCharacters || [];
 
-      // Save to cache (fire-and-forget)
-      RosterCache.findOneAndUpdate(
-        { name: item.name },
-        {
-          name: item.name,
-          hasRoster: rosterResult.hasValidRoster,
-          allCharacters: rosterResult.allCharacters || [],
-          failReason: rosterResult.failReason || '',
-          cachedAt: new Date(),
-        },
-        { upsert: true, returnDocument: 'after' }
-      ).catch((err) => console.warn(`[listcheck] Cache save failed for ${item.name}:`, err.message));
+      try {
+        await RosterCache.findOneAndUpdate(
+          { name: item.name },
+          {
+            $set: {
+              name: item.name,
+              hasRoster: rosterResult.hasValidRoster,
+              allCharacters: rosterResult.allCharacters || [],
+              failReason: rosterResult.failReason || '',
+              cachedAt: new Date(),
+            },
+          },
+          { upsert: true, returnDocument: 'after', collation }
+        );
+      } catch (err) {
+        console.warn(`[listcheck] Cache save failed for ${item.name}:`, err.message);
+      }
 
       // Delay between lostark.bible requests to avoid 429
       await new Promise((r) => setTimeout(r, 500));
@@ -329,7 +334,14 @@ export async function checkNamesAgainstLists(names, options = {}) {
           if (candidateNames.length > 0) {
             RosterCache.findOneAndUpdate(
               { name: item.name },
-              { $set: { searchSuggestions: candidateNames.map((n) => ({ name: n, flag: '' })) } },
+              {
+                $set: {
+                  name: item.name,
+                  searchSuggestions: candidateNames.map((n) => ({ name: n, flag: '' })),
+                  cachedAt: new Date(),
+                },
+              },
+              { upsert: true, collation }
             ).catch(() => {});
           }
         }

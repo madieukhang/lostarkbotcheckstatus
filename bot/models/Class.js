@@ -57,3 +57,55 @@ export function getClassName(clsId) {
   if (!clsId) return '';
   return CLASS_NAMES[clsId] ?? clsId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+function normalizeClassSearch(value) {
+  return String(value || '').toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+/**
+ * Resolve either an internal class ID or display name to the internal ID used
+ * by lostark.bible search results.
+ * @param {string} value
+ * @returns {string|null}
+ */
+export function resolveClassId(value) {
+  const needle = normalizeClassSearch(value);
+  if (!needle) return null;
+
+  for (const [id, name] of Object.entries(CLASS_NAMES)) {
+    if (normalizeClassSearch(id) === needle || normalizeClassSearch(name) === needle) {
+      return id;
+    }
+  }
+
+  return value;
+}
+
+/**
+ * Build autocomplete choices for Discord's 25-result cap without losing
+ * classes beyond the first 25 static choices.
+ * @param {string} focusedValue
+ * @returns {Array<{name: string, value: string}>}
+ */
+export function getClassAutocompleteChoices(focusedValue = '') {
+  const needle = normalizeClassSearch(focusedValue);
+  const seenNames = new Set();
+  const choices = [];
+
+  for (const [id, name] of Object.entries(CLASS_NAMES)) {
+    if (seenNames.has(name)) continue;
+    seenNames.add(name);
+
+    if (
+      needle &&
+      !normalizeClassSearch(name).includes(needle) &&
+      !normalizeClassSearch(id).includes(needle)
+    ) {
+      continue;
+    }
+
+    choices.push({ name, value: id });
+  }
+
+  return choices.slice(0, 25);
+}

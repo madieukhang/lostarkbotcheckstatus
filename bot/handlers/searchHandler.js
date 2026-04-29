@@ -11,7 +11,7 @@ import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import Watchlist from '../models/Watchlist.js';
 import TrustedUser from '../models/TrustedUser.js';
-import { getClassName } from '../models/Class.js';
+import { getClassName, resolveClassId } from '../models/Class.js';
 import { fetchNameSuggestions } from '../services/rosterService.js';
 import { normalizeCharacterName } from '../utils/names.js';
 import { resolveDisplayImageUrl } from '../utils/imageRehost.js';
@@ -26,7 +26,7 @@ export async function handleSearchCommand(interaction) {
   const name = normalizeCharacterName(raw);
   const minIlvl = interaction.options.getInteger('min_ilvl') ?? 1700;
   const maxIlvl = interaction.options.getInteger('max_ilvl') ?? null;
-  const classFilter = interaction.options.getString('class') ?? null;
+  const classFilter = resolveClassId(interaction.options.getString('class'));
 
   await interaction.deferReply();
 
