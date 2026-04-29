@@ -34,7 +34,7 @@ export async function handleRosterCommand(interaction) {
   await interaction.deferReply();
 
   try {
-    const targetUrl = `https://lostark.bible/character/NA/${name}/roster`;
+    const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
     const response = await fetchWithFallback(targetUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
