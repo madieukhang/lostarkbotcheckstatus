@@ -241,6 +241,8 @@ Copy `.env.example` to `.env` and fill in values.
 | `TARGET_SERVERS` | `Brelshaza` | Comma-separated server names to monitor |
 | `GEMINI_API_KEY` | — | Gemini API key for OCR |
 | `GEMINI_MODELS` | `gemini-2.5-flash,...` | Comma-separated model priority list (failover) |
+| `LISTCHECK_ALT_ENRICHMENT` | `false` | Run background Stronghold alt scan after OCR hits; keep off to avoid request spikes |
+| `LISTCHECK_ALT_ENRICHMENT_LIMIT` | `1` | Max flagged OCR names to enrich per screenshot when enrichment is enabled |
 | `AUTO_CHECK_CHANNEL_IDS` | — | Global fallback for auto-check (prefer per-server `/lasetup`) |
 | `LIST_NOTIFY_CHANNEL_IDS` | — | Global fallback for list notifications |
 | `OFFICER_APPROVER_IDS` | — | Officer Discord user IDs (instant approval on `/list add`) |

@@ -16,6 +16,10 @@ import {
   fetchNameSuggestions,
 } from './rosterService.js';
 import {
+  buildRosterCacheLookupMap,
+  getRosterCacheMatch,
+} from './rosterCacheLookup.js';
+import {
   normalizeCharacterName,
   getAddedByDisplay,
 } from '../utils/names.js';
@@ -274,15 +278,20 @@ export async function checkNamesAgainstLists(names, options = {}) {
     .map((r) => r.name);
 
   const cachedEntries = unflaggedNames.length > 0
-    ? await RosterCache.find({ name: { $in: unflaggedNames } }).collation(collation).lean()
+    ? await RosterCache.find({
+        $or: [
+          { name: { $in: unflaggedNames } },
+          { allCharacters: { $in: unflaggedNames } },
+        ],
+      }).collation(collation).lean()
     : [];
-  const cacheMap = new Map(cachedEntries.map((c) => [c.name.toLowerCase(), c]));
+  const cacheMap = buildRosterCacheLookupMap(cachedEntries);
 
   const cacheMissItems = [];
   for (const item of results) {
     if (item.blackEntry || item.whiteEntry || item.watchEntry) continue;
 
-    const cached = cacheMap.get(item.name.toLowerCase());
+    const cached = getRosterCacheMatch(cacheMap, item.name);
 
     if (cached) {
       item.hasRoster = cached.hasRoster;

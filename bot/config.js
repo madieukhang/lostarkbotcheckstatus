@@ -54,6 +54,17 @@ function parseInterval() {
   return raw * 1000; // convert to milliseconds
 }
 
+function parseBooleanEnv(key, defaultValue = false) {
+  const raw = process.env[key];
+  if (!raw || raw.trim() === '') return defaultValue;
+  return ['1', 'true', 'yes', 'y', 'on'].includes(raw.trim().toLowerCase());
+}
+
+function parsePositiveIntEnv(key, defaultValue) {
+  const raw = parseInt(process.env[key], 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : defaultValue;
+}
+
 const config = {
   /** Discord bot token */
   token: requireEnv('DISCORD_TOKEN'),
@@ -113,6 +124,14 @@ const config = {
     .split(',')
     .map((m) => m.trim())
     .filter(Boolean),
+
+  /**
+   * Optional post-check Stronghold scan for flagged OCR names.
+   * Disabled by default because it can fan out into many lostark.bible requests
+   * after a single screenshot check.
+   */
+  listcheckAltEnrichmentEnabled: parseBooleanEnv('LISTCHECK_ALT_ENRICHMENT', false),
+  listcheckAltEnrichmentLimit: parsePositiveIntEnv('LISTCHECK_ALT_ENRICHMENT_LIMIT', 1),
 
   /** Lost Ark server status page URL */
   statusUrl: 'https://www.playlostark.com/en-gb/support/server-status',

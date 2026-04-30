@@ -11,15 +11,12 @@
 import { ActionRowBuilder, Events, StringSelectMenuBuilder } from 'discord.js';
 import config from '../config.js';
 import GuildConfig from '../models/GuildConfig.js';
-import Blacklist from '../models/Blacklist.js';
-import Whitelist from '../models/Whitelist.js';
-import Watchlist from '../models/Watchlist.js';
-import { detectAltsViaStronghold } from '../services/rosterService.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
   formatCheckResults,
 } from '../services/listCheckService.js';
+import { queueFlaggedListEntryEnrichment } from '../services/listCheckEnrichment.js';
 import { truncateDiscordContent } from '../utils/discordText.js';
 
 /** Env-based channel set (global fallback) */
@@ -144,34 +141,7 @@ export function setupAutoCheck(client) {
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
       await message.react('✅').catch(() => {});
 
-      // Background enrichment for flagged entries
-      const flaggedItems = results.filter((item) => item.blackEntry || item.whiteEntry || item.watchEntry);
-      if (flaggedItems.length > 0) {
-        (async () => {
-          for (const item of flaggedItems) {
-            const listEntry = item.blackEntry || item.whiteEntry || item.watchEntry;
-            try {
-              const altResult = await detectAltsViaStronghold(item.name);
-              if (altResult && altResult.alts.length > 0) {
-                const newAltNames = altResult.alts.map((a) => a.name);
-                const existingAlts = listEntry.allCharacters || [];
-                const merged = [...new Set([...existingAlts, item.name, ...newAltNames])];
-
-                if (merged.length > existingAlts.length) {
-                  const model = item.blackEntry ? Blacklist : item.whiteEntry ? Whitelist : Watchlist;
-                  await model.updateOne(
-                    { _id: listEntry._id },
-                    { $set: { allCharacters: merged } }
-                  );
-                  console.log(`[auto-check] Enriched ${listEntry.name} allCharacters: ${existingAlts.length} → ${merged.length}`);
-                }
-              }
-            } catch (err) {
-              console.warn(`[auto-check] Alt enrichment failed for ${item.name}:`, err.message);
-            }
-          }
-        })().catch((err) => console.error('[auto-check] Background enrichment error:', err.message));
-      }
+      queueFlaggedListEntryEnrichment(results, { logPrefix: 'auto-check' });
     } catch (err) {
       console.error('[auto-check] Error processing image:', err.message);
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
