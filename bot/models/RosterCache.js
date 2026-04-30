@@ -32,4 +32,6 @@ rosterCacheSchema.index(
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 
+rosterCacheSchema.index({ allCharacters: 1 });
+
 export default mongoose.model('RosterCache', rosterCacheSchema);
