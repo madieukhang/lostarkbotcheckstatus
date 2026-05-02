@@ -40,12 +40,6 @@ export function buildCommands() {
           .setRequired(false)
           .setMinValue(0)
           .setMaxValue(500)
-      )
-      .addBooleanOption((opt) =>
-        opt
-          .setName('deep_scraperapi')
-          .setDescription('Allow ScraperAPI during candidate scan (uses quota; default off)')
-          .setRequired(false)
       ),
 
     new SlashCommandBuilder()

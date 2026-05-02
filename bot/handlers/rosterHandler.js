@@ -53,10 +53,16 @@ export async function handleRosterCommand(interaction) {
   const name = normalizeCharacterName(raw);
   const deep = interaction.options.getBoolean('deep') ?? false;
   const deepLimit = interaction.options.getInteger('deep_limit');
-  const deepScraperApi = interaction.options.getBoolean('deep_scraperapi');
+  // ScraperAPI is intentionally locked off for /roster deep candidate
+  // scans: team policy (per Dusk's review) is to never burn ScraperAPI
+  // quota on the per-candidate fetch fan-out, since it can blow through
+  // the daily cap on a single large guild like Bullet Shell. The user-
+  // facing `deep_scraperapi` slash option was removed for the same
+  // reason. The env override `STRONGHOLD_DEEP_USE_SCRAPERAPI` still
+  // exists in config.js as an emergency ops escape hatch but defaults
+  // to false and should stay false in production.
   const deepOptions = {
     ...(deepLimit !== null ? { candidateLimit: deepLimit } : {}),
-    ...(deepScraperApi !== null ? { useScraperApiForCandidates: deepScraperApi } : {}),
   };
   await interaction.deferReply();
 
