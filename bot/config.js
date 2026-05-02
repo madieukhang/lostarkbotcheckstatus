@@ -137,9 +137,25 @@ const config = {
    * Stronghold deep scans are intentionally bounded. Matching alts requires
    * fetching each guild candidate profile, so an unbounded scan can burn
    * ScraperAPI quota and take a long time on large guilds.
+   *
+   * Cap bumped 30 -> 300 after a real-data scan against Bullet Shell guild
+   * (820 members, 437 candidates >= 1700 ilvl) showed the target's 5 alts
+   * spread from candidate #70 down to #267 in the absolute ilvl-desc sort.
+   * The legacy cap of 30 caught zero alts because the top of a large guild
+   * is dominated by other accounts' multi-character whale clusters; the
+   * target's own alts sit much further down the sort. Cap 300 covers any
+   * plausible alt distribution in similarly large guilds; smaller guilds
+   * simply finish early when candidates run out.
+   *
+   * Concurrency lowered 6 -> 3 because the scanWorker has no internal
+   * throttle and concurrency 6 triggered immediate 429 storms on bible
+   * (verified in smoke runs: 30/30 candidates failing back-to-back).
+   * Concurrency 3 halves the burst rate and lets bible's rate limiter
+   * recover between fan-outs. Wall-clock impact at the new cap: roughly
+   * 5-7 min for a full 300-candidate scan in production.
    */
-  strongholdDeepCandidateLimit: parsePositiveIntEnv('STRONGHOLD_DEEP_CANDIDATE_LIMIT', 30),
-  strongholdDeepConcurrency: parsePositiveIntEnv('STRONGHOLD_DEEP_CONCURRENCY', 6),
+  strongholdDeepCandidateLimit: parsePositiveIntEnv('STRONGHOLD_DEEP_CANDIDATE_LIMIT', 300),
+  strongholdDeepConcurrency: parsePositiveIntEnv('STRONGHOLD_DEEP_CONCURRENCY', 3),
   strongholdDeepCandidateTimeoutMs: parsePositiveIntEnv('STRONGHOLD_DEEP_CANDIDATE_TIMEOUT_MS', 8000),
   strongholdDeepUseScraperApi: parseBooleanEnv('STRONGHOLD_DEEP_USE_SCRAPERAPI', false),
 
