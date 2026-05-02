@@ -1,4 +1,4 @@
-import { JSDOM } from 'jsdom';
+import { JSDOM, VirtualConsole } from 'jsdom';
 
 import config from '../config.js';
 import { connectDB } from '../db.js';
@@ -7,6 +7,13 @@ import Whitelist from '../models/Whitelist.js';
 import { getClassName } from '../models/Class.js';
 import { getAddedByDisplay } from '../utils/names.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
+
+const virtualConsole = new VirtualConsole();
+virtualConsole.on('error', () => {});
+virtualConsole.on('jsdomError', (err) => {
+  if (err?.type === 'css parsing') return;
+  console.warn('[jsdom] Parse warning:', err?.message || err);
+});
 
 /**
  * Smart fallback cache — remembers when direct fetch is blocked by Cloudflare.
@@ -86,7 +93,19 @@ async function fetchViaScraperApi(url) {
  * @returns {Promise<Response>}
  */
 export async function fetchWithFallback(url, options = {}) {
-  const hasKey = config.scraperApiKeys?.length > 0;
+  const {
+    allowScraperApi = true,
+    preferScraperApi = false,
+    fallbackOnRateLimit = false,
+    ...fetchOptions
+  } = options;
+  const hasKey = allowScraperApi && config.scraperApiKeys?.length > 0;
+
+  if (preferScraperApi && hasKey) {
+    const proxyRes = await fetchViaScraperApi(url);
+    if (proxyRes) return proxyRes;
+    console.warn(`[fetch] ScraperAPI preferred but unavailable, falling back to direct fetch: ${url}`);
+  }
 
   // If recently blocked, skip direct fetch → ScraperAPI immediately
   if (Date.now() < directBlockedUntil && hasKey) {
@@ -101,7 +120,7 @@ export async function fetchWithFallback(url, options = {}) {
     res = await fetch(url, {
       headers: FETCH_HEADERS,
       signal: AbortSignal.timeout(15000),
-      ...options,
+      ...fetchOptions,
     });
   } catch (err) {
     console.warn(`[fetch] Direct fetch failed: ${err.message}`);
@@ -112,9 +131,11 @@ export async function fetchWithFallback(url, options = {}) {
     throw err;
   }
 
-  if ((res.status === 403 || res.status === 503) && hasKey) {
-    directBlockedUntil = Date.now() + BLOCK_CACHE_MS;
-    console.warn(`[fetch] ${res.status} on direct fetch, caching block for 5min. Falling back to ScraperAPI: ${url}`);
+  if ((res.status === 403 || res.status === 503 || (res.status === 429 && fallbackOnRateLimit)) && hasKey) {
+    if (res.status === 403 || res.status === 503) {
+      directBlockedUntil = Date.now() + BLOCK_CACHE_MS;
+    }
+    console.warn(`[fetch] ${res.status} on direct fetch. Falling back to ScraperAPI: ${url}`);
     const proxyRes = await fetchViaScraperApi(url);
     if (proxyRes) return proxyRes;
     console.error(`[fetch] All ScraperAPI fallbacks failed for ${url}, returning original ${res.status}`);
@@ -177,11 +198,47 @@ export async function fetchNameSuggestions(name) {
   }
 }
 
-export async function buildRosterCharacters(name) {
+function parseItemLevelValue(value) {
+  const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function extractCharacterItemLevelFromHtml(html) {
+  const patterns = [
+    /itemLevel:(\d+(?:\.\d+)?)/,
+    /itemLevel:"([\d,.]+)"/,
+    /"itemLevel":(\d+(?:\.\d+)?)/,
+    /"itemLevel":"([\d,.]+)"/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (!match) continue;
+
+    const itemLevel = parseItemLevelValue(match[1]);
+    if (itemLevel !== null) return itemLevel;
+  }
+
+  return null;
+}
+
+async function inferHiddenRosterItemLevel(name) {
+  const suggestions = await fetchNameSuggestions(name);
+  const exact = suggestions?.find((s) => s.name?.toLowerCase() === name.toLowerCase());
+  return exact ? parseItemLevelValue(exact.itemLevel) : null;
+}
+
+export async function buildRosterCharacters(name, options = {}) {
+  const {
+    hiddenRosterFallback = false,
+    includeHiddenRosterAlts = false,
+  } = options;
+
   let allCharacters = [name];
   let hasValidRoster = false;
   let failReason = null;
   let targetItemLevel = null;
+  let rosterVisibility = 'missing';
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
@@ -191,7 +248,7 @@ export async function buildRosterCharacters(name) {
       failReason = response.status === 429 ? 'Rate limited — try again later' : `HTTP ${response.status}`;
     } else {
       const html = await response.text();
-      const { document } = new JSDOM(html).window;
+      const { document } = new JSDOM(html, { virtualConsole }).window;
       const links = document.querySelectorAll('a[href^="/character/NA/"]');
       const rosterChars = [];
 
@@ -219,7 +276,22 @@ export async function buildRosterCharacters(name) {
 
       if (rosterChars.length > 0) {
         hasValidRoster = true;
+        rosterVisibility = 'visible';
         allCharacters = [...new Set(rosterChars)];
+      } else if (hiddenRosterFallback) {
+        const meta = await fetchCharacterMeta(name);
+        if (meta) {
+          hasValidRoster = true;
+          rosterVisibility = 'hidden';
+          targetItemLevel = await inferHiddenRosterItemLevel(name) ?? meta.itemLevel;
+          allCharacters = [name];
+
+          if (includeHiddenRosterAlts && meta.guildName) {
+            const altResult = await detectAltsViaStronghold(name, { targetMeta: meta });
+            const altNames = altResult?.alts?.map((alt) => alt.name).filter(Boolean) ?? [];
+            allCharacters = [...new Set([name, ...altNames])];
+          }
+        }
       }
     }
   } catch (err) {
@@ -227,7 +299,7 @@ export async function buildRosterCharacters(name) {
     console.warn('[list] Failed to fetch roster characters:', err.message);
   }
 
-  return { hasValidRoster, allCharacters, failReason, targetItemLevel };
+  return { hasValidRoster, allCharacters, failReason, targetItemLevel, rosterVisibility };
 }
 
 export async function handleRosterBlackListCheck(names, options = {}) {
@@ -344,16 +416,24 @@ export const FETCH_HEADERS = {
  * @param {string} name
  * @returns {Promise<object|null>}
  */
-export async function fetchCharacterMeta(name) {
+export async function fetchCharacterMeta(name, options = {}) {
   try {
     const url = `https://lostark.bible/character/NA/${encodeURIComponent(name)}`;
-    let res = await fetchWithFallback(url);
+    const fetchOptions = {
+      allowScraperApi: options.allowScraperApi !== false,
+      preferScraperApi: options.preferScraperApi === true,
+      fallbackOnRateLimit: options.fallbackOnRateLimit === true,
+    };
+    if (options.timeoutMs) {
+      fetchOptions.signal = AbortSignal.timeout(options.timeoutMs);
+    }
+    let res = await fetchWithFallback(url, fetchOptions);
 
     // Handle rate limit: wait and retry once
-    if (res.status === 429) {
+    if (res.status === 429 && options.retryOnRateLimit !== false) {
       console.warn(`[alt-detect] 429 rate-limited on ${name}, waiting 5s to retry...`);
       await new Promise((r) => setTimeout(r, 5000));
-      res = await fetchWithFallback(url);
+      res = await fetchWithFallback(url, fetchOptions);
     }
 
     if (!res.ok) return null;
@@ -363,6 +443,7 @@ export async function fetchCharacterMeta(name) {
     const rlMatch = html.match(/rosterLevel:(\d+)/);
     const shMatch = html.match(/stronghold:\{[^}]*level:(\d+),name:"([^"]+)"\}/);
     const guildMatch = html.match(/guild:\{name:"([^"]+)",grade:"([^"]+)"\}/);
+    const itemLevel = extractCharacterItemLevelFromHtml(html);
 
     // Extract class from near rosterLevel position (avoid matching roster alt data)
     let classId = '';
@@ -381,6 +462,7 @@ export async function fetchCharacterMeta(name) {
       guildName: guildMatch ? guildMatch[1] : null,
       guildGrade: guildMatch ? guildMatch[2] : null,
       classId,
+      itemLevel,
     };
   } catch (err) {
     console.warn(`[alt-detect] Failed to fetch meta for ${name}:`, err.message);
@@ -422,11 +504,15 @@ export async function fetchGuildMembers(name) {
  * @param {string} name - Target character name
  * @returns {Promise<{target, alts[], totalMembers}|null>}
  */
-export async function detectAltsViaStronghold(name) {
+async function detectAltsViaStrongholdLegacy(name, options = {}) {
   console.log(`[alt-detect] Starting alt detection for ${name}...`);
+  const candidateLimit = options.candidateLimit ?? config.strongholdDeepCandidateLimit;
+  const concurrency = Math.max(1, Math.min(options.concurrency ?? config.strongholdDeepConcurrency, 12));
+  const candidateTimeoutMs = options.candidateTimeoutMs ?? config.strongholdDeepCandidateTimeoutMs;
+  const useScraperApiForCandidates = options.useScraperApiForCandidates ?? config.strongholdDeepUseScraperApi;
 
   // Step 1: Get target's Stronghold + Guild info
-  const meta = await fetchCharacterMeta(name);
+  const meta = options.targetMeta || await fetchCharacterMeta(name);
   if (!meta) {
     console.log('[alt-detect] No character meta found.');
     return null;
@@ -440,6 +526,8 @@ export async function detectAltsViaStronghold(name) {
     return null;
   }
 
+  const targetItemLevel = options.targetItemLevel ?? await inferHiddenRosterItemLevel(name) ?? meta.itemLevel;
+
   console.log(`[alt-detect] Target: SH "${meta.strongholdName}" Lv.${meta.strongholdLevel}, RL ${meta.rosterLevel}, Guild "${meta.guildName}"`);
 
   // Step 2: Get guild member list
@@ -452,20 +540,30 @@ export async function detectAltsViaStronghold(name) {
   console.log(`[alt-detect] Guild has ${members.length} members. Checking for Stronghold matches...`);
 
   // Step 3: Filter to ilvl >= 1700 (endgame relevant) and exclude the target
-  const candidates = members.filter((m) => m.name !== name && m.ilvl >= 1700);
-  console.log(`[alt-detect] ${candidates.length} candidate(s) after filtering ilvl >= 1700.`);
+  const candidates = members
+    .filter((m) => m.name !== name && m.ilvl >= 1700)
+    .sort((a, b) => (b.ilvl || 0) - (a.ilvl || 0));
+  const limitedCandidates = candidateLimit > 0 ? candidates.slice(0, candidateLimit) : candidates;
+  const skippedCandidates = Math.max(0, candidates.length - limitedCandidates.length);
+  console.log(
+    `[alt-detect] ${candidates.length} candidate(s) after filtering ilvl >= 1700; scanning ${limitedCandidates.length}`
+    + (skippedCandidates > 0 ? `, skipping ${skippedCandidates} by limit` : '')
+    + `. Candidate ScraperAPI: ${useScraperApiForCandidates ? 'on' : 'off'}. Concurrency: ${concurrency}.`
+  );
   const alts = [];
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // ── Scan candidates with adaptive delay ──
   // Start fast, slow down when rate-limited.
-  console.log(`[alt-detect] Scanning ${candidates.length} candidate(s)...`);
+  console.log(`[alt-detect] Scanning ${limitedCandidates.length} candidate(s)...`);
   let currentDelay = 300;
 
-  for (let i = 0; i < candidates.length; i++) {
-    const cand = candidates[i];
-    const candMeta = await fetchCharacterMeta(cand.name);
+  for (let i = 0; i < limitedCandidates.length; i++) {
+    const cand = limitedCandidates[i];
+    const candMeta = await fetchCharacterMeta(cand.name, {
+      allowScraperApi: useScraperApiForCandidates,
+    });
 
     if (candMeta === null) {
       // fetchCharacterMeta already retried on 429, so if still null → slow down more
@@ -480,7 +578,7 @@ export async function detectAltsViaStronghold(name) {
       });
     }
 
-    if (i < candidates.length - 1) await delay(currentDelay);
+    if (i < limitedCandidates.length - 1) await delay(currentDelay);
   }
 
   console.log(`[alt-detect] Found ${alts.length} alt(s) for ${name}.`);
@@ -490,7 +588,7 @@ export async function detectAltsViaStronghold(name) {
       name,
       classId: meta.classId,
       className: getClassName(meta.classId),
-      itemLevel: meta.itemLevel,
+      itemLevel: targetItemLevel,
       rosterLevel: meta.rosterLevel,
       strongholdName: meta.strongholdName,
       strongholdLevel: meta.strongholdLevel,
@@ -499,6 +597,122 @@ export async function detectAltsViaStronghold(name) {
     },
     alts,
     totalMembers: members.length,
+    scannedCandidates: limitedCandidates.length,
+    skippedCandidates,
+    candidateLimit,
+    usedScraperApiForCandidates: useScraperApiForCandidates,
+  };
+}
+
+export async function detectAltsViaStronghold(name, options = {}) {
+  console.log(`[alt-detect] Starting alt detection for ${name}...`);
+  const candidateLimit = options.candidateLimit ?? config.strongholdDeepCandidateLimit;
+  const concurrency = Math.max(1, Math.min(options.concurrency ?? config.strongholdDeepConcurrency, 12));
+  const candidateTimeoutMs = options.candidateTimeoutMs ?? config.strongholdDeepCandidateTimeoutMs;
+  const useScraperApiForCandidates = options.useScraperApiForCandidates ?? config.strongholdDeepUseScraperApi;
+
+  const meta = options.targetMeta || await fetchCharacterMeta(name);
+  if (!meta) {
+    console.log('[alt-detect] No character meta found.');
+    return null;
+  }
+  if (!meta.guildName) {
+    console.log('[alt-detect] Character has no guild.');
+    return null;
+  }
+  if (!meta.strongholdName) {
+    console.log('[alt-detect] No stronghold data.');
+    return null;
+  }
+
+  const targetItemLevel = options.targetItemLevel ?? await inferHiddenRosterItemLevel(name) ?? meta.itemLevel;
+
+  console.log(`[alt-detect] Target: SH "${meta.strongholdName}" Lv.${meta.strongholdLevel}, RL ${meta.rosterLevel}, Guild "${meta.guildName}"`);
+
+  const members = await fetchGuildMembers(name);
+  if (members.length === 0) {
+    console.log('[alt-detect] No guild members found.');
+    return null;
+  }
+
+  console.log(`[alt-detect] Guild has ${members.length} members. Checking for Stronghold matches...`);
+
+  const candidates = members
+    .filter((m) => m.name !== name && m.ilvl >= 1700)
+    .sort((a, b) => (b.ilvl || 0) - (a.ilvl || 0));
+  const limitedCandidates = candidateLimit > 0 ? candidates.slice(0, candidateLimit) : candidates;
+  const skippedCandidates = Math.max(0, candidates.length - limitedCandidates.length);
+  console.log(
+    `[alt-detect] ${candidates.length} candidate(s) after filtering ilvl >= 1700; scanning ${limitedCandidates.length}`
+    + (skippedCandidates > 0 ? `, skipping ${skippedCandidates} by limit` : '')
+    + `. Candidate ScraperAPI: ${useScraperApiForCandidates ? 'on' : 'off'}. Concurrency: ${concurrency}.`
+  );
+
+  const alts = [];
+  let failedCandidates = 0;
+  let scannedCandidates = 0;
+  let nextCandidateIndex = 0;
+
+  console.log(`[alt-detect] Scanning ${limitedCandidates.length} candidate(s)...`);
+
+  async function scanWorker() {
+    while (nextCandidateIndex < limitedCandidates.length) {
+      const cand = limitedCandidates[nextCandidateIndex++];
+      const candMeta = await fetchCharacterMeta(cand.name, {
+        allowScraperApi: useScraperApiForCandidates,
+        preferScraperApi: useScraperApiForCandidates,
+        fallbackOnRateLimit: useScraperApiForCandidates,
+        retryOnRateLimit: false,
+        timeoutMs: candidateTimeoutMs,
+      });
+
+      scannedCandidates++;
+      if (candMeta === null) {
+        failedCandidates++;
+      } else if (candMeta.strongholdName === meta.strongholdName && candMeta.rosterLevel === meta.rosterLevel) {
+        alts.push({
+          name: cand.name,
+          classId: cand.cls,
+          className: getClassName(cand.cls),
+          itemLevel: cand.ilvl,
+          rank: cand.rank,
+        });
+        console.log(`[alt-detect] Match found: ${cand.name}`);
+      }
+
+      if (scannedCandidates % 25 === 0 || scannedCandidates === limitedCandidates.length) {
+        console.log(`[alt-detect] Progress ${scannedCandidates}/${limitedCandidates.length}; failed ${failedCandidates}; alts ${alts.length}`);
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, limitedCandidates.length) }, () => scanWorker())
+  );
+
+  console.log(`[alt-detect] Found ${alts.length} alt(s) for ${name}.`);
+
+  return {
+    target: {
+      name,
+      classId: meta.classId,
+      className: getClassName(meta.classId),
+      itemLevel: targetItemLevel,
+      rosterLevel: meta.rosterLevel,
+      strongholdName: meta.strongholdName,
+      strongholdLevel: meta.strongholdLevel,
+      guildName: meta.guildName,
+      guildGrade: meta.guildGrade,
+    },
+    alts,
+    totalMembers: members.length,
+    scannedCandidates,
+    skippedCandidates,
+    failedCandidates,
+    candidateLimit,
+    concurrency,
+    candidateTimeoutMs,
+    usedScraperApiForCandidates: useScraperApiForCandidates,
   };
 }
 

@@ -3,6 +3,10 @@ import { JSDOM, VirtualConsole } from 'jsdom';
 
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('error', () => {});
+virtualConsole.on('jsdomError', (err) => {
+  if (err?.type === 'css parsing') return;
+  console.warn('[jsdom] Parse warning:', err?.message || err);
+});
 
 import { connectDB } from '../db.js';
 import config from '../config.js';
@@ -27,10 +31,33 @@ import { getClassName } from '../models/Class.js';
 import { getAddedByDisplay, normalizeCharacterName } from '../utils/names.js';
 import { resolveDisplayImageUrl } from '../utils/imageRehost.js';
 
+function formatDeepScanStats(altResult) {
+  if (!altResult) return '';
+
+  const parts = [`scanned ${altResult.scannedCandidates ?? 0}`];
+  if ((altResult.skippedCandidates ?? 0) > 0) {
+    parts.push(`skipped ${altResult.skippedCandidates} by limit`);
+  }
+  if ((altResult.failedCandidates ?? 0) > 0) {
+    parts.push(`failed ${altResult.failedCandidates}`);
+  }
+  if (altResult.concurrency) {
+    parts.push(`concurrency ${altResult.concurrency}`);
+  }
+  parts.push(`ScraperAPI ${altResult.usedScraperApiForCandidates ? 'on' : 'off'}`);
+  return parts.join(' · ');
+}
+
 export async function handleRosterCommand(interaction) {
   const raw = interaction.options.getString('name');
   const name = normalizeCharacterName(raw);
   const deep = interaction.options.getBoolean('deep') ?? false;
+  const deepLimit = interaction.options.getInteger('deep_limit');
+  const deepScraperApi = interaction.options.getBoolean('deep_scraperapi');
+  const deepOptions = {
+    ...(deepLimit !== null ? { candidateLimit: deepLimit } : {}),
+    ...(deepScraperApi !== null ? { useScraperApiForCandidates: deepScraperApi } : {}),
+  };
   await interaction.deferReply();
 
   try {
@@ -71,8 +98,9 @@ export async function handleRosterCommand(interaction) {
         ]);
 
         // Step 3: Stronghold fingerprint scan for same-account alts
-        const altResult = await detectAltsViaStronghold(name);
+        const altResult = await detectAltsViaStronghold(name, deepOptions);
         const alts = altResult?.alts ?? [];
+        const deepStats = formatDeepScanStats(altResult);
 
         // Build response
         const descriptionParts = [];
@@ -122,7 +150,7 @@ export async function handleRosterCommand(interaction) {
           .setURL(`https://lostark.bible/character/NA/${encodeURIComponent(name)}`)
           .setDescription(description.length > 4000 ? description.slice(0, 4000) + '\n…' : description)
           .setColor(color)
-          .setFooter({ text: `${alts.length} alt(s) · ${guildMembers.length} guild members · lostark.bible` })
+          .setFooter({ text: `${alts.length} alt(s) · ${guildMembers.length} guild members${deepStats ? ` · ${deepStats}` : ''} · lostark.bible` })
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
@@ -276,20 +304,21 @@ export async function handleRosterCommand(interaction) {
     // Deep scan: Stronghold alt detection even when roster is visible
     if (deep) {
       try {
-        const altResult = await detectAltsViaStronghold(name);
+        const altResult = await detectAltsViaStronghold(name, deepOptions);
+        const deepStats = formatDeepScanStats(altResult);
         if (altResult && altResult.alts.length > 0) {
           const altLines = altResult.alts.map(
             (a, i) => `${i + 1}. [${a.name}](https://lostark.bible/character/NA/${encodeURIComponent(a.name)}/roster) · ${a.className || '?'} · \`${a.itemLevel}\``
           );
           embed.addFields({
             name: `🔎 Deep Scan — Alts via Stronghold (${altResult.alts.length})`,
-            value: altLines.join('\n').slice(0, 1024),
+            value: [...altLines, deepStats ? `\n${deepStats}` : null].filter(Boolean).join('\n').slice(0, 1024),
             inline: false,
           });
         } else {
           embed.addFields({
             name: '🔎 Deep Scan',
-            value: 'No additional alts found via Stronghold fingerprint.',
+            value: `No additional alts found via Stronghold fingerprint.${deepStats ? `\n${deepStats}` : ''}`,
             inline: false,
           });
         }

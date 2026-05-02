@@ -32,6 +32,20 @@ export function buildCommands() {
           .setName('deep')
           .setDescription('Run Stronghold alt detection scan (slower, finds hidden alts)')
           .setRequired(false)
+      )
+      .addIntegerOption((opt) =>
+        opt
+          .setName('deep_limit')
+          .setDescription('Stronghold scan limit: default env limit, 0 = scan all candidates')
+          .setRequired(false)
+          .setMinValue(0)
+          .setMaxValue(500)
+      )
+      .addBooleanOption((opt) =>
+        opt
+          .setName('deep_scraperapi')
+          .setDescription('Allow ScraperAPI during candidate scan (uses quota; default off)')
+          .setRequired(false)
       ),
 
     new SlashCommandBuilder()
