@@ -734,7 +734,9 @@ export function createAddHandlers({ client, services }) {
 
       // Update in-place: overwrite fields + refresh roster for new canonical name
       const newName = normalizeCharacterName(payload.name);
-      const rosterResult = await buildRosterCharacters(newName).catch(() => null);
+      const rosterResult = await buildRosterCharacters(newName, {
+        hiddenRosterFallback: true,
+      }).catch(() => null);
 
       dupeEntry.name = newName;
       // Only update roster if fetch succeeded — preserve old snapshot on failure

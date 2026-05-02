@@ -71,6 +71,27 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
   }
 });
 
+test('buildRosterCharacters keeps hidden roster fallback opt-in', async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls = [];
+
+  globalThis.fetch = async (url) => {
+    requestedUrls.push(String(url));
+    return new Response('<html><body><h1>Hidden roster</h1></body></html>', { status: 200 });
+  };
+
+  try {
+    const result = await buildRosterCharacters('Ainslinn');
+
+    assert.equal(result.hasValidRoster, false);
+    assert.deepEqual(result.allCharacters, ['Ainslinn']);
+    assert.equal(result.rosterVisibility, 'missing');
+    assert.deepEqual(requestedUrls, ['https://lostark.bible/character/NA/Ainslinn/roster']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('extractCharacterItemLevelFromHtml supports common SSR item level shapes', () => {
   assert.equal(extractCharacterItemLevelFromHtml('itemLevel:1723.33'), 1723.33);
   assert.equal(extractCharacterItemLevelFromHtml('"itemLevel":"1,723.33"'), 1723.33);

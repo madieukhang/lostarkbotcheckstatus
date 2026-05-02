@@ -380,7 +380,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
     async (item) => {
       await waitForRosterLookupSlot();
       const rosterStartedAt = Date.now();
-      const rosterResult = await buildRosterCharacters(item.name);
+      const rosterResult = await buildRosterCharacters(item.name, {
+        hiddenRosterFallback: true,
+      });
       item.hasRoster = rosterResult.hasValidRoster;
       item.failReason = rosterResult.failReason;
       item._allCharacters = rosterResult.allCharacters || [];
