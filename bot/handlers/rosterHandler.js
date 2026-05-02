@@ -183,22 +183,6 @@ export async function handleRosterCommand(interaction) {
       return;
     }
 
-    // Fetch titles via direct access (no ScraperAPI needed)
-    await Promise.all(
-      characters.slice(0, 10).map(async (c) => {
-        try {
-          const charUrl = `https://lostark.bible/character/NA/${encodeURIComponent(c.name)}`;
-          const res = await fetchWithFallback(charUrl);
-          if (!res.ok) return;
-          const charHtml = await res.text();
-          const titleMatch = charHtml.match(/<span[^>]*style[^>]*color[^>]*>([^<]+)<\/span>/);
-          c.title = titleMatch?.[1]?.trim() ?? null;
-        } catch {
-          c.title = null;
-        }
-      })
-    );
-
     // Load previous snapshots for progression delta
     await connectDB();
     const prevSnapshots = new Map();
@@ -222,7 +206,7 @@ export async function handleRosterCommand(interaction) {
         else if (diff < 0) delta = ` *(${diff.toFixed(2)})*`;
       }
 
-      return `**${i + 1}.** ${c.name} · ${c.className || 'Unknown'} · \`${c.itemLevel}\`${delta}${c.title ? ` — *${c.title}*` : ''} · ${c.combatScore}`;
+      return `**${i + 1}.** ${c.name} · ${c.className || 'Unknown'} · \`${c.itemLevel}\`${delta} · ${c.combatScore}`;
     });
 
     let description = lines.join('\n');
