@@ -7,6 +7,7 @@ import Whitelist from '../models/Whitelist.js';
 import { getClassName } from '../models/Class.js';
 import { getAddedByDisplay } from '../utils/names.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
+import { decodeBibleData, findBibleNode } from '../utils/bibleData.js';
 
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('error', () => {});
@@ -416,9 +417,66 @@ export const FETCH_HEADERS = {
  * @param {string} name
  * @returns {Promise<object|null>}
  */
+/**
+ * Last-resort fallback parser used when the JSON endpoint format
+ * shifts under us. Mirrors the legacy regex behavior exactly so
+ * callers downstream see the same shape they did before the JSON
+ * migration.
+ */
+function parseCharacterMetaFromHtml(html) {
+  const rlMatch = html.match(/rosterLevel:(\d+)/);
+  const shMatch = html.match(/stronghold:\{[^}]*level:(\d+),name:"([^"]+)"\}/);
+  const guildMatch = html.match(/guild:\{name:"([^"]+)",grade:"([^"]+)"\}/);
+  const itemLevel = extractCharacterItemLevelFromHtml(html);
+  let classId = '';
+  if (rlMatch) {
+    const beforeRL = html.substring(Math.max(0, rlMatch.index - 500), rlMatch.index);
+    const classMatch = beforeRL.match(/class:"([^"]+)"/);
+    if (classMatch) classId = classMatch[1];
+  }
+  if (!rlMatch || !shMatch) return null;
+  return {
+    rosterLevel: parseInt(rlMatch[1]),
+    strongholdLevel: parseInt(shMatch[1]),
+    strongholdName: shMatch[2],
+    guildName: guildMatch ? guildMatch[1] : null,
+    guildGrade: guildMatch ? guildMatch[2] : null,
+    classId,
+    itemLevel,
+  };
+}
+
+/**
+ * Map the SvelteKit `header` payload into the legacy meta shape used
+ * by alt-detect callers. Returns null when the header lacks the
+ * load-bearing fields so the caller can fall back to HTML.
+ */
+function shapeCharacterMetaFromHeader(header) {
+  if (!header || typeof header.rosterLevel !== 'number') return null;
+  const stronghold = header.stronghold || {};
+  const guild = header.guild || null;
+  if (typeof stronghold.level !== 'number' || !stronghold.name) return null;
+  return {
+    rosterLevel: header.rosterLevel,
+    strongholdLevel: stronghold.level,
+    strongholdName: stronghold.name,
+    guildName: guild?.name ?? null,
+    guildGrade: guild?.grade ?? null,
+    classId: typeof header.class === 'string' ? header.class : '',
+    itemLevel: typeof header.ilvl === 'number' ? header.ilvl : null,
+  };
+}
+
 export async function fetchCharacterMeta(name, options = {}) {
+  // Migrated from regex-on-HTML to SvelteKit `__data.json` parsing.
+  // Same network shape (single GET per character) so 429 surface and
+  // ScraperAPI fallback semantics are unchanged - the change is in
+  // parse path only: structured JSON instead of fragile regex on
+  // hydration script. HTML scrape kept as a defensive fallback because
+  // bible's __data.json layout is internal and could shift on a deploy.
   try {
-    const url = `https://lostark.bible/character/NA/${encodeURIComponent(name)}`;
+    const jsonUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/__data.json`;
+    const htmlUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}`;
     const fetchOptions = {
       allowScraperApi: options.allowScraperApi !== false,
       preferScraperApi: options.preferScraperApi === true,
@@ -427,43 +485,39 @@ export async function fetchCharacterMeta(name, options = {}) {
     if (options.timeoutMs) {
       fetchOptions.signal = AbortSignal.timeout(options.timeoutMs);
     }
-    let res = await fetchWithFallback(url, fetchOptions);
+    let res = await fetchWithFallback(jsonUrl, fetchOptions);
 
-    // Handle rate limit: wait and retry once
+    // Handle rate limit: wait and retry once. Same policy as the
+    // legacy regex path - one retry with a 5s pause covers transient
+    // bursts without piling on the limiter.
     if (res.status === 429 && options.retryOnRateLimit !== false) {
       console.warn(`[alt-detect] 429 rate-limited on ${name}, waiting 5s to retry...`);
       await new Promise((r) => setTimeout(r, 5000));
-      res = await fetchWithFallback(url, fetchOptions);
+      res = await fetchWithFallback(jsonUrl, fetchOptions);
     }
 
-    if (!res.ok) return null;
-
-    const html = await res.text();
-
-    const rlMatch = html.match(/rosterLevel:(\d+)/);
-    const shMatch = html.match(/stronghold:\{[^}]*level:(\d+),name:"([^"]+)"\}/);
-    const guildMatch = html.match(/guild:\{name:"([^"]+)",grade:"([^"]+)"\}/);
-    const itemLevel = extractCharacterItemLevelFromHtml(html);
-
-    // Extract class from near rosterLevel position (avoid matching roster alt data)
-    let classId = '';
-    if (rlMatch) {
-      const beforeRL = html.substring(Math.max(0, rlMatch.index - 500), rlMatch.index);
-      const classMatch = beforeRL.match(/class:"([^"]+)"/);
-      if (classMatch) classId = classMatch[1];
+    if (res.ok) {
+      try {
+        const parsed = await res.json();
+        const payload = findBibleNode(parsed, 'header');
+        const shaped = shapeCharacterMetaFromHeader(payload?.header);
+        if (shaped) return shaped;
+        console.warn(
+          `[alt-detect] __data.json for ${name} did not contain expected header shape; falling back to HTML.`
+        );
+      } catch (jsonErr) {
+        console.warn(
+          `[alt-detect] __data.json parse failed for ${name}: ${jsonErr.message}; falling back to HTML.`
+        );
+      }
     }
 
-    if (!rlMatch || !shMatch) return null;
-
-    return {
-      rosterLevel: parseInt(rlMatch[1]),
-      strongholdLevel: parseInt(shMatch[1]),
-      strongholdName: shMatch[2],
-      guildName: guildMatch ? guildMatch[1] : null,
-      guildGrade: guildMatch ? guildMatch[2] : null,
-      classId,
-      itemLevel,
-    };
+    // HTML fallback: the JSON endpoint either returned a non-2xx, an
+    // unparseable body, or a payload missing the expected fields.
+    const htmlRes = await fetchWithFallback(htmlUrl, fetchOptions);
+    if (!htmlRes.ok) return null;
+    const html = await htmlRes.text();
+    return parseCharacterMetaFromHtml(html);
   } catch (err) {
     console.warn(`[alt-detect] Failed to fetch meta for ${name}:`, err.message);
     return null;
@@ -471,25 +525,80 @@ export async function fetchCharacterMeta(name, options = {}) {
 }
 
 /**
+ * Last-resort HTML fallback for guild member extraction. Same regex as
+ * the pre-migration legacy path so the alt-detect contract survives a
+ * bible JSON layout shift untouched.
+ */
+function parseGuildMembersFromHtml(html) {
+  const memberPattern = /\["([^"]+)","([^"]+)",([\d.]+),"([^"]+)"/g;
+  const out = [];
+  let m;
+  while ((m = memberPattern.exec(html)) !== null) {
+    out.push({ name: m[1], cls: m[2], ilvl: parseFloat(m[3]), rank: m[4] });
+  }
+  return out;
+}
+
+/**
  * Fetch guild member list from a character's guild tab on lostark.bible.
+ *
+ * Migrated to consume `__data.json` instead of regex-scraping the page
+ * HTML. The structured payload exposes the member list as a flat
+ * tuple-array `[name, classId, ilvl, rank, combatPower|null]` under
+ * `nodes[2].guild.members`. This is the same data the legacy regex
+ * was reaching into the hydration blob to retrieve, just no longer
+ * dependent on the surrounding HTML staying byte-stable.
+ *
+ * Bonus over the legacy path: `combatPower` is now surfaced (the regex
+ * only captured the first four positional fields). Callers that ignore
+ * the field continue to work because it is appended, not interleaved.
+ *
  * @param {string} name - Character name (must be in a guild)
- * @returns {Promise<Array<{name, cls, ilvl, rank}>>}
+ * @returns {Promise<Array<{name, cls, ilvl, rank, combatPower}>>}
  */
 export async function fetchGuildMembers(name) {
   try {
-    const url = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild`;
-    const res = await fetchWithFallback(url);
-    if (!res.ok) return [];
-
-    const html = await res.text();
-    const memberPattern = /\["([^"]+)","([^"]+)",([\d.]+),"([^"]+)"/g;
-    const members = [];
-    let m;
-    while ((m = memberPattern.exec(html)) !== null) {
-      members.push({ name: m[1], cls: m[2], ilvl: parseFloat(m[3]), rank: m[4] });
+    const jsonUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild/__data.json`;
+    const htmlUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild`;
+    const res = await fetchWithFallback(jsonUrl);
+    if (res.ok) {
+      try {
+        const parsed = await res.json();
+        const payload = findBibleNode(parsed, 'guild');
+        const members = payload?.guild?.members;
+        if (Array.isArray(members)) {
+          return members
+            .map((entry) => {
+              if (!Array.isArray(entry) || entry.length < 4) return null;
+              const [memberName, cls, ilvl, rank, combatPower] = entry;
+              if (typeof memberName !== 'string' || typeof cls !== 'string') return null;
+              return {
+                name: memberName,
+                cls,
+                ilvl: typeof ilvl === 'number' ? ilvl : parseFloat(ilvl),
+                rank: typeof rank === 'string' ? rank : '',
+                combatPower: combatPower && typeof combatPower === 'object' ? combatPower : null,
+              };
+            })
+            .filter(Boolean);
+        }
+        console.warn(
+          `[alt-detect] /guild/__data.json for ${name} missing members array; falling back to HTML.`
+        );
+      } catch (jsonErr) {
+        console.warn(
+          `[alt-detect] /guild/__data.json parse failed for ${name}: ${jsonErr.message}; falling back to HTML.`
+        );
+      }
     }
 
-    return members;
+    // HTML fallback path - same regex behavior as the pre-migration
+    // implementation. Returns [] on any error so deep scan can short
+    // circuit to "no candidates" rather than throwing.
+    const htmlRes = await fetchWithFallback(htmlUrl);
+    if (!htmlRes.ok) return [];
+    const html = await htmlRes.text();
+    return parseGuildMembersFromHtml(html);
   } catch (err) {
     console.warn('[alt-detect] Failed to fetch guild members:', err.message);
     return [];
