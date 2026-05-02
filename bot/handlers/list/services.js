@@ -242,7 +242,9 @@ export function createSharedServices({ client }) {
     }
 
     // Step 1: Check if character exists
-    const { hasValidRoster, allCharacters, targetItemLevel } = await buildRosterCharacters(name);
+    const { hasValidRoster, allCharacters, targetItemLevel, rosterVisibility } = await buildRosterCharacters(name, {
+      hiddenRosterFallback: true,
+    });
     if (!hasValidRoster) {
       const suggestions = await fetchNameSuggestions(name) || [];
       if (suggestions.length > 0) {
@@ -460,6 +462,7 @@ export function createSharedServices({ client }) {
       : allCharacters.slice(0, 6).join(', ') + ` +${allCharacters.length - 6} more`;
 
     const scopeTag = (payload.type === 'black' && entryScope === 'server') ? ' [Server]' : '';
+    const rosterSource = rosterVisibility === 'hidden' ? 'Hidden roster fallback' : 'Visible roster';
     const embed = new EmbedBuilder()
       .setTitle(`${labelCap}${scopeTag} — Entry Added`)
       .addFields(
@@ -467,6 +470,7 @@ export function createSharedServices({ client }) {
         { name: 'Reason', value: payload.reason || 'N/A', inline: true },
         { name: 'Raid', value: payload.raid || 'N/A', inline: true },
         { name: `All Characters (${allCharacters.length})`, value: allCharsDisplay, inline: false },
+        { name: 'Roster source', value: rosterSource, inline: true },
         { name: 'Links', value: linkParts.join(' · '), inline: false }
       )
       .setColor(color)

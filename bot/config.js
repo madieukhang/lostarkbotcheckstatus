@@ -133,6 +133,16 @@ const config = {
   listcheckAltEnrichmentEnabled: parseBooleanEnv('LISTCHECK_ALT_ENRICHMENT', false),
   listcheckAltEnrichmentLimit: parsePositiveIntEnv('LISTCHECK_ALT_ENRICHMENT_LIMIT', 1),
 
+  /**
+   * Stronghold deep scans are intentionally bounded. Matching alts requires
+   * fetching each guild candidate profile, so an unbounded scan can burn
+   * ScraperAPI quota and take a long time on large guilds.
+   */
+  strongholdDeepCandidateLimit: parsePositiveIntEnv('STRONGHOLD_DEEP_CANDIDATE_LIMIT', 30),
+  strongholdDeepConcurrency: parsePositiveIntEnv('STRONGHOLD_DEEP_CONCURRENCY', 6),
+  strongholdDeepCandidateTimeoutMs: parsePositiveIntEnv('STRONGHOLD_DEEP_CANDIDATE_TIMEOUT_MS', 8000),
+  strongholdDeepUseScraperApi: parseBooleanEnv('STRONGHOLD_DEEP_USE_SCRAPERAPI', false),
+
   /** Lost Ark server status page URL */
   statusUrl: 'https://www.playlostark.com/en-gb/support/server-status',
 
