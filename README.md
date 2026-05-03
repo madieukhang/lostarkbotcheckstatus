@@ -173,7 +173,16 @@ LostArk_LoaLogs/
 │   ├── services/
 │   │   ├── listCheckService.js          # Shared OCR + name matching + embed formatting
 │   │   ├── multiaddTemplateService.js   # Excel template generator + parser (zero-dep)
-│   │   └── rosterService.js             # lostark.bible scrape + alt detection + list cross-check
+│   │   ├── rosterService.js             # Public facade for roster modules
+│   │   └── roster/                      # lostark.bible fetch/search/parse/deep-scan internals
+│   │       ├── bibleFetch.js            # Direct fetch + ScraperAPI fallback
+│   │       ├── search.js                # Similar-name search helpers
+│   │       ├── parsers.js               # Bible HTML/SvelteKit payload parsers
+│   │       ├── characterMeta.js         # Stronghold/roster-level meta cache
+│   │       ├── guildMembers.js          # Guild member fetch + cache
+│   │       ├── altDetection.js          # Stronghold fingerprint scan
+│   │       ├── buildRosterCharacters.js # Roster visibility + hidden fallback
+│   │       └── listChecks.js            # Roster blacklist/whitelist checks
 │   ├── utils/
 │   │   ├── alertEmbed.js           # Shared alert-embed builder
 │   │   ├── imageRehost.js          # Discord CDN image rehosting + URL refresh
@@ -203,7 +212,7 @@ LostArk_LoaLogs/
 Four compose principles:
 
 1. **One handler file per command family.** `rosterHandler.js` owns `/la-roster`, `searchHandler.js` owns `/la-search`, etc. The `/la-list *` family is large enough to warrant its own subdirectory (`handlers/list/`) split per subcommand; `listHandlers.js` is a thin orchestrator that wires shared services into each subcommand factory.
-2. **Services wrap external I/O.** `rosterService.js` is the only file that touches `lostark.bible`; `listCheckService.js` is the only file that calls Gemini. Tests and fallback paths have one swap point.
+2. **Services wrap external I/O.** `services/rosterService.js` is the public roster facade; `services/roster/*` owns `lostark.bible` fetch/search/parse/deep-scan internals. `listCheckService.js` is the only file that calls Gemini. Tests and fallback paths still have one stable swap point.
 3. **Scope resolved once, cached.** `utils/scope.js` reads `GuildConfig` with a 60s in-memory cache; every command path goes through it instead of re-querying per invocation.
 4. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` (e.g. `list/services.js`, `list/add.js`) export a `create*({ client, ... })` factory rather than top-level functions. The orchestrator calls each factory once at startup and the returned closures are wired into the interaction router.
 
@@ -305,7 +314,7 @@ Slash commands register through Discord's global endpoint on boot (`ClientReady`
 
 ## Known Limitations
 
-- `/la-roster` and `/la-search` scrape `lostark.bible` HTML. Layout changes upstream will break `rosterService.js` regex + DOM selectors.
+- `/la-roster` and `/la-search` scrape `lostark.bible` HTML/SvelteKit payloads. Layout changes upstream will break parsers under `services/roster/`.
 - Discord CDN URLs on `imageUrl` (legacy entries) expire around 24h after upload. New entries use the `imageMessageId` + `imageChannelId` rehosting path; old entries may show a broken image.
 - Gemini OCR quality on diacritic names depends heavily on screenshot resolution. Similar-name suggestion is the fallback when OCR misreads (`Lùnaria` vs `Lunaria`).
 - ScraperAPI falls back on 403/503 but not on soft blocks that return 200 with empty HTML. If upstream silently cloaks, `/la-roster` returns "no roster found".
