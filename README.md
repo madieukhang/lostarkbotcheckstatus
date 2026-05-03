@@ -147,7 +147,8 @@ LostArk_LoaLogs/
 │   │   ├── list/                   # /la-list * + /la-check families
 │   │   │   ├── helpers.js          # Pure shared helpers
 │   │   │   ├── services/           # Shared closure services
-│   │   │   │   ├── index.js        # Service factory + persistence
+│   │   │   │   ├── index.js        # Service factory wiring
+│   │   │   │   ├── addExecutor.js  # /la-list add persistence + guards
 │   │   │   │   ├── approvals.js    # Approval DM dispatch + sync
 │   │   │   │   ├── broadcasts.js   # Broadcast channel routing
 │   │   │   │   └── bulk.js         # Bulk multiadd execution + summary
