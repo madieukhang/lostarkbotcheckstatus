@@ -4,6 +4,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.43] - 2026-05-03
+
+### Changed
+- `detectAltsViaStronghold` (powering `/la-list enrich` + `/la-roster deep:true`) defaults the per-candidate scan to **gentle** mode now, matching the Phase 1 verification scan parameters that successfully found Ainslinn's 5 alts. Concrete defaults:
+  - **concurrency = 1** (sequential, was 3)
+  - **backoff floor = 1500ms** (was `config.scanBackoffMinMs` = 300ms)
+  - **retryOnRateLimit = true** (was false). 429s now wait 5s and retry once at the `fetchCharacterMeta` layer instead of immediately counting as failed.
+- The original "fast" preset (concurrency 3, no retry, 300ms floor) is preserved as opt-in via `mode: 'fast'`. Fast is appreciably faster when bible is cool but had a 100% failure rate during peak hours on Bao's 2026-05-03 4:30 PM scan, which is what motivated this default flip.
+- The detector's return now exposes `mode` and `retryOnRateLimit` so progress / preview embeds can render the actual run config, not just the request.
+
+### Why
+- The Phase 1 verification POC that found Ainslinn's 5 alts at #70/#109/#154/#188/#267 ran sequentially with a 1.5s throttle and observed a 25.8% failure rate — high but workable. The current production fast preset hit 100% failure at peak hours because bible blanket-rejects bursty traffic and there is no retry to give a second chance. Making gentle the default brings production parity with the POC that the memory anchor data was collected from.
+
+### Notes
+- Wall-clock estimate for `/la-list enrich` shifts from "~5-7 min" to **"~10-15 min"** in the embed copy. The Discord webhook reply ceiling is 15 min so cap 300 + gentle pace fits with a slim margin; cap 250 is a safer bet on hot bible days. Officers can override per invocation via `deep_limit`.
+- `bot/handlers/list/enrich/index.js` and `bot/handlers/rosterHandler.js` initial progress embeds now seed `currentBackoffMs: 1500` so the very first paint shows the gentle pace correctly before the scan has emitted its first onProgress tick.
+- 41/41 tests pass.
+
 ## [v0.5.42] - 2026-05-03
 
 ### Added
