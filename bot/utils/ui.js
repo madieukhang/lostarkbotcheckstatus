@@ -126,3 +126,19 @@ export function buildSessionFooter(minutes, ownerNote = 'only you can act') {
 export function buildCooldownLines(...lines) {
   return lines.filter(Boolean).join('\n');
 }
+
+/**
+ * Build a text-based progress bar of the form `█████░░░░░░░░░░░░░░░`.
+ * Used in the long-running scan progress embeds (`/la-list enrich`,
+ * `/la-roster deep:true`) so officers can see the worker is alive
+ * without hitting a chart or spawning an animated GIF.
+ *
+ * @param {number} percent - 0..100
+ * @param {number} [width=20] - Total bar character width
+ * @returns {string}
+ */
+export function buildProgressBar(percent, width = 20) {
+  const clamped = Math.max(0, Math.min(100, percent || 0));
+  const filled = Math.max(0, Math.min(width, Math.round((clamped / 100) * width)));
+  return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
