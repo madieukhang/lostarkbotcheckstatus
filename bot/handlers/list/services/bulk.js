@@ -117,17 +117,27 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     const totalAttempted = results.added.length + results.skipped.length + results.failed.length;
     const hasFailures = results.failed.length > 0;
     const color = hasFailures ? COLORS.warning : results.added.length > 0 ? COLORS.success : COLORS.danger;
+    const successRate = totalAttempted > 0
+      ? Math.round((results.added.length / totalAttempted) * 100)
+      : 0;
+
+    // Headline summary tells the operator the outcome at a glance:
+    // "12 of 15 added (80%)". Per-list-type breakdown stays in the
+    // Added/Skipped/Failed fields below.
+    const headline = totalAttempted === 0
+      ? 'No rows processed.'
+      : `**${results.added.length}** of **${totalAttempted}** rows added (${successRate}%)`;
 
     const embed = new EmbedBuilder()
       .setTitle('📋 Bulk Add Complete')
-      .setDescription(`Processed **${totalAttempted}** row${totalAttempted === 1 ? '' : 's'}`)
+      .setDescription(headline)
       .setColor(color)
       .addFields(
         { name: '✅ Added', value: String(results.added.length), inline: true },
         { name: '⚠️ Skipped', value: String(results.skipped.length), inline: true },
         { name: '❌ Failed', value: String(results.failed.length), inline: true },
       )
-      .setFooter({ text: `By ${meta.requesterDisplayName || 'Unknown'}` })
+      .setFooter({ text: `Submitted by ${meta.requesterDisplayName || 'Unknown'}` })
       .setTimestamp(new Date());
 
     const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');

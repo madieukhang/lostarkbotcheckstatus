@@ -10,7 +10,8 @@ import {
   buildMultiaddTemplate,
   MULTIADD_MAX_ROWS,
 } from '../../../services/multiaddTemplateService.js';
-import { COLORS } from '../../../utils/ui.js';
+import { COLORS, ICONS, buildSessionFooter } from '../../../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 
 export async function buildTemplateReply() {
   const buffer = await buildMultiaddTemplate();
@@ -49,7 +50,7 @@ export async function buildTemplateReply() {
       }
     )
     .setFooter({
-      text: `Lost Ark Bot • Max ${MULTIADD_MAX_ROWS} rows • 1 MB file limit`,
+      text: `Max ${MULTIADD_MAX_ROWS} rows · 1 MB file limit · .xlsx only`,
     });
 
   return {
@@ -59,15 +60,14 @@ export async function buildTemplateReply() {
 }
 
 export function buildNoValidRowsEmbed(errors) {
-  return new EmbedBuilder()
-    .setTitle('❌ No Valid Rows Found')
-    .setDescription(
-      errors.length > 0
-        ? errors.slice(0, 15).join('\n').slice(0, 4000)
-        : 'The file appears to be empty or has no data rows.'
-    )
-    .setColor(COLORS.danger)
-    .setFooter({ text: 'Fix the errors and re-upload.' });
+  return buildAlertEmbed({
+    severity: AlertSeverity.ERROR,
+    title: 'No Valid Rows Found',
+    description: errors.length > 0
+      ? errors.slice(0, 15).join('\n').slice(0, 4000)
+      : 'The file appears to be empty or has no data rows.',
+    footer: 'Fix the errors and re-upload.',
+  });
 }
 
 function typeIcon(type) {
@@ -86,16 +86,15 @@ export function buildPreviewReply(parsed, requestId) {
     previewLines.push(`*... and ${parsed.rows.length - 20} more rows*`);
   }
 
+  const headerLine = parsed.errors.length > 0
+    ? `**${parsed.rows.length}** valid row${parsed.rows.length === 1 ? '' : 's'} · **${parsed.errors.length}** error${parsed.errors.length === 1 ? '' : 's'} (see field below)`
+    : `**${parsed.rows.length}** valid row${parsed.rows.length === 1 ? '' : 's'} ready to add`;
+
   const previewEmbed = new EmbedBuilder()
-    .setTitle(`📋 Bulk Add Preview · ${parsed.rows.length} valid row${parsed.rows.length === 1 ? '' : 's'}`)
-    .setDescription(previewLines.join('\n').slice(0, 4000))
+    .setTitle(`📋 Bulk Add Preview`)
+    .setDescription([headerLine, '', previewLines.join('\n')].join('\n').slice(0, 4096))
     .setColor(COLORS.info)
-    .setFooter({
-      text:
-        parsed.errors.length > 0
-          ? `${parsed.errors.length} error${parsed.errors.length === 1 ? '' : 's'} below. Expires in 5 minutes.`
-          : 'Expires in 5 minutes.',
-    })
+    .setFooter({ text: buildSessionFooter(5, 'only the uploader can confirm') })
     .setTimestamp();
 
   if (parsed.errors.length > 0) {

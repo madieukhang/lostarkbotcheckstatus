@@ -4,6 +4,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.51] - 2026-05-03
+
+### Changed
+- Wave 2 polish batch · prettier visual hierarchy across four more result embeds:
+  - **`/la-search` results card**: title now `🔍 Search · "<query>"`. New top-of-description summary breaks down list-status counts (`⛔ 3 · ⚠️ 2 · ✅ 1 · ❓ 5 clean`) so officers see triage at a glance before scanning the result list. Footer reorganised: filters first, source-of-truth second.
+  - **`/la-list * broadcast` cross-server card**: title becomes `📩 List <action> broadcast`; description leads with a single headline `⛔ [Name] was added to Blacklist by Officer.` so recipients absorb the change in one read instead of parsing fields. Reason promoted to full-width field; raid + relative-time stay inline. Footer cites `/la-setup off` as the mute path.
+  - **`/la-list multiadd` template + preview embeds**: footer text uses middot separators, preview uses `buildSessionFooter(5, 'only the uploader can confirm')` for consistency with the enrich preview. `buildNoValidRowsEmbed` migrated to `buildAlertEmbed` for severity color match. Preview description gets a one-line headline instead of footnote-only error count.
+  - **Bulk add summary embed**: description headline shows success rate `12 of 15 added (80%)`. Footer cites submitter explicitly with "Submitted by X".
+
+### Notes
+- 42/42 tests pass. No handler signatures changed; pure UI polish.
+- ACTION_VERB lookup table in broadcasts replaces the inline `actionCap` string so `added/edited/removed` map to grammatically clean prepositions in the headline ("added to" / "edited in" / "removed from").
+
 ## [v0.5.50] - 2026-05-03
 
 ### Fixed
