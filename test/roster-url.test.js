@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 
 import {
   buildRosterCharacters,
+  clearGuildMembersCache,
   detectAltsViaStronghold,
   extractCharacterItemLevelFromHtml,
   fetchCharacterMeta,
+  fetchGuildMembers,
   fetchWithFallback,
 } from '../bot/services/rosterService.js';
 import config from '../bot/config.js';
@@ -199,5 +201,62 @@ test('fetchWithFallback can disable ScraperAPI fallback for bounded deep scans',
   } finally {
     config.scraperApiKeys.splice(0, config.scraperApiKeys.length, ...originalKeys);
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('fetchGuildMembers can disable ScraperAPI fallback and cache guild member lists', async () => {
+  clearGuildMembersCache();
+  const originalFetch = globalThis.fetch;
+  const originalKeys = [...config.scraperApiKeys];
+  const requestedUrls = [];
+
+  config.scraperApiKeys.splice(0, config.scraperApiKeys.length, 'fake-scraper-key');
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    requestedUrls.push(requestedUrl);
+    assert.equal(requestedUrl.includes('api.scraperapi.com'), false);
+
+    if (requestedUrl.endsWith('/guild/__data.json')) {
+      return Response.json({
+        nodes: [
+          {
+            data: [
+              { guild: 1 },
+              { members: 2 },
+              [6],
+              'Guildmate',
+              'bard',
+              'Member',
+              [3, 4, 7, 5, -1],
+              1700,
+            ],
+          },
+        ],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const first = await fetchGuildMembers('Ainslinn', {
+      allowScraperApi: false,
+      cacheKey: 'AinsGuild',
+    });
+    const second = await fetchGuildMembers('OtherAlt', {
+      allowScraperApi: false,
+      cacheKey: 'AinsGuild',
+    });
+
+    assert.deepEqual(first, second);
+    assert.equal(first.length, 1);
+    assert.equal(first[0].name, 'Guildmate');
+    assert.deepEqual(requestedUrls, [
+      'https://lostark.bible/character/NA/Ainslinn/guild/__data.json',
+    ]);
+  } finally {
+    config.scraperApiKeys.splice(0, config.scraperApiKeys.length, ...originalKeys);
+    globalThis.fetch = originalFetch;
+    clearGuildMembersCache();
   }
 });
