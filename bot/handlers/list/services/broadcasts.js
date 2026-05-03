@@ -3,8 +3,14 @@ import { EmbedBuilder } from 'discord.js';
 import config from '../../../config.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
-import { COLORS } from '../../../utils/ui.js';
+import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
+
+const ACTION_VERB = Object.freeze({
+  added:   'added to',
+  removed: 'removed from',
+  edited:  'edited in',
+});
 
 export function createBroadcastServices({ client }) {
   async function broadcastListChange(action, entry, payload, options = {}) {
@@ -13,19 +19,31 @@ export function createBroadcastServices({ client }) {
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
 
     const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
-    const actionCap = action.charAt(0).toUpperCase() + action.slice(1);
-    const scopeTag = entry.scope === 'server' ? ' (Local)' : '';
+    const verb = ACTION_VERB[action] || action;
+    const scopeTag = entry.scope === 'server' ? ' `[Local]`' : '';
+
+    // Description leads with a one-line headline so the recipient
+    // sees "What changed in which list" without parsing the fields.
+    const requesterPart = payload.requestedByDisplayName
+      ? ` by **${payload.requestedByDisplayName}**`
+      : '';
+    const headline = `${icon} **[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}${requesterPart}.`;
+
+    const fields = [
+      { name: 'Reason', value: entry.reason || 'N/A', inline: false },
+    ];
+    if (entry.raid) fields.push({ name: 'Raid', value: `\`${entry.raid}\``, inline: true });
+    if (entry.addedAt) {
+      fields.push({ name: action === 'added' ? 'Added' : 'Edited', value: relativeTime(entry.addedAt), inline: true });
+    }
 
     const embed = new EmbedBuilder()
-      .setTitle(`📢 ${icon} ${labelCap}${scopeTag} · ${actionCap}`)
-      .addFields(
-        { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
-        { name: 'Reason', value: entry.reason || 'N/A', inline: true },
-      )
+      .setTitle(`${ICONS.dm} List ${verb.split(' ')[0]} broadcast`)
+      .setDescription(headline)
+      .addFields(fields)
       .setColor(color)
+      .setFooter({ text: '/la-setup off to mute cross-server list broadcasts' })
       .setTimestamp(new Date());
-
-    if (entry.raid) embed.addFields({ name: 'Raid', value: entry.raid, inline: true });
 
     const displayUrl = preResolvedUrl !== undefined
       ? preResolvedUrl

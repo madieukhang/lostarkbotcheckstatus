@@ -150,20 +150,42 @@ export async function handleSearchCommand(interaction) {
     });
 
     const description = lines.join('\n');
-    const hasBlack = results.some((r) => r.black);
-    const hasWatch = results.some((r) => r.watch);
-    const hasWhite = results.some((r) => r.white);
+    const blackCount = results.filter((r) => r.black).length;
+    const watchCount = results.filter((r) => r.watch).length;
+    const whiteCount = results.filter((r) => r.white).length;
+    const trustedCount = results.filter((r) => r.trusted).length;
+    const cleanCount = results.length - blackCount - watchCount - whiteCount - trustedCount;
+    const hasBlack = blackCount > 0;
+    const hasWatch = watchCount > 0;
+    const hasWhite = whiteCount > 0;
     const color = hasBlack ? COLORS.danger : hasWatch ? COLORS.warning : hasWhite ? COLORS.success : COLORS.info;
 
     const filterParts = [`ilvl ≥ ${minIlvl}`];
     if (maxIlvl !== null) filterParts.push(`ilvl ≤ ${maxIlvl}`);
     if (classFilter) filterParts.push(getClassName(classFilter));
 
+    // Top-of-description summary breaks down list-status counts so an
+    // officer can see "3 blacklisted, 2 watch, 5 clean" at a glance
+    // before scanning the full result list.
+    const breakdown = [];
+    if (hasBlack) breakdown.push(`⛔ **${blackCount}**`);
+    if (hasWatch) breakdown.push(`⚠️ **${watchCount}**`);
+    if (hasWhite) breakdown.push(`✅ **${whiteCount}**`);
+    if (trustedCount > 0) breakdown.push(`🛡️ **${trustedCount}**`);
+    if (cleanCount > 0) breakdown.push(`❓ **${cleanCount}** clean`);
+    const summaryLine = breakdown.length > 0
+      ? `Found **${results.length}** match${results.length === 1 ? '' : 'es'}: ${breakdown.join(' · ')}`
+      : `Found **${results.length}** match${results.length === 1 ? '' : 'es'}`;
+
+    const fullDescription = `${summaryLine}\n\n${description}`.slice(0, 4096);
+
     const embed = new EmbedBuilder()
-      .setTitle(`Search: "${name}"`)
-      .setDescription(description.length > 4000 ? description.slice(0, 4000) + '\n…' : description)
+      .setTitle(`🔍 Search · "${name}"`)
+      .setDescription(fullDescription)
       .setColor(color)
-      .setFooter({ text: `${results.length} result(s) · ${filterParts.join(' · ')} · lostark.bible` })
+      .setFooter({
+        text: `Filters: ${filterParts.join(' · ')} · Source: lostark.bible`,
+      })
       .setTimestamp();
 
     // Build evidence dropdown for flagged entries with images (rehosted OR legacy)
