@@ -17,7 +17,7 @@ export function createBroadcastServices({ client }) {
     const scopeTag = entry.scope === 'server' ? ' (Local)' : '';
 
     const embed = new EmbedBuilder()
-      .setTitle(`📢 ${icon} ${labelCap}${scopeTag} — ${actionCap}`)
+      .setTitle(`📢 ${icon} ${labelCap}${scopeTag} · ${actionCap}`)
       .addFields(
         { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: entry.reason || 'N/A', inline: true },
@@ -127,7 +127,7 @@ export function createBroadcastServices({ client }) {
       }
 
       const embed = new EmbedBuilder()
-        .setTitle(`📢 Bulk Add${isLocal ? ' (Local)' : ''} — ${entries.length} entries`)
+        .setTitle(`📢 Bulk Add${isLocal ? ' (Local)' : ''} · ${entries.length} entries`)
         .setColor(COLORS.info)
         .setTimestamp(new Date());
 
@@ -136,7 +136,7 @@ export function createBroadcastServices({ client }) {
         if (grouped[t].length === 0) continue;
         const lines = grouped[t]
           .slice(0, 15)
-          .map((r, i) => `${i + 1}. ${typeIcon(t)} **${r.name}** — ${(r.entry?.reason || '').slice(0, 80)}`)
+          .map((r, i) => `${i + 1}. ${typeIcon(t)} **${r.name}** · ${(r.entry?.reason || '').slice(0, 80)}`)
           .join('\n');
         const suffix = grouped[t].length > 15 ? `\n*... and ${grouped[t].length - 15} more*` : '';
         embed.addFields({

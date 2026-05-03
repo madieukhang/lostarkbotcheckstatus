@@ -20,7 +20,7 @@ export async function connectDB() {
   connected = true;
 
   const { host, port, name } = mongoose.connection;
-  console.log(`[db] ✅ Connected to MongoDB — host: ${host}:${port}, database: ${name}`);
+  console.log(`[db] ✅ Connected to MongoDB · host: ${host}:${port}, database: ${name}`);
 
   mongoose.connection.on('disconnected', () => {
     connected = false;

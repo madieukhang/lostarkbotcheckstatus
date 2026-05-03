@@ -134,14 +134,14 @@ export function createRemoveHandlers({ client, services }) {
         return `${icon} Removed **${entry.name}** from ${label}.${scopeNote}`;
       };
 
-      // Single entry — remove directly
+      // Single entry · remove directly
       if (found.length === 1) {
         const message = await removeOne(found[0].entry, found[0].type);
         await interaction.editReply({ content: message });
         return;
       }
 
-      // Multiple entries — show selection buttons
+      // Multiple entries · show selection buttons
       const buttonStyles = { black: ButtonStyle.Danger, white: ButtonStyle.Success, watch: ButtonStyle.Secondary };
       const row = new ActionRowBuilder().addComponents(
         ...found.map((f, i) => {

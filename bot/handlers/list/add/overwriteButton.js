@@ -35,7 +35,7 @@ export function createListAddOverwriteButtonHandler({
     await interaction.deferUpdate();
 
     if (!isOverwrite) {
-      // Keep existing — just clean up
+      // Keep existing · just clean up
       await interaction.editReply({
         content: `✅ Kept existing entry. New request for **${payload.name}** discarded.`,
         embeds: [],
@@ -56,7 +56,7 @@ export function createListAddOverwriteButtonHandler({
       return;
     }
 
-    // Overwrite: update existing entry in-place (safe — no delete-then-add risk)
+    // Overwrite: update existing entry in-place (safe · no delete-then-add risk)
     try {
       const { model } = getListContext(payload.type);
 
@@ -101,7 +101,7 @@ export function createListAddOverwriteButtonHandler({
       }).catch(() => null);
 
       dupeEntry.name = newName;
-      // Only update roster if fetch succeeded — preserve old snapshot on failure
+      // Only update roster if fetch succeeded · preserve old snapshot on failure
       if (rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0) {
         dupeEntry.allCharacters = rosterResult.allCharacters;
       }
@@ -119,7 +119,7 @@ export function createListAddOverwriteButtonHandler({
         dupeEntry.imageMessageId = '';
         dupeEntry.imageChannelId = '';
       }
-      // Preserve existing scope — overwrite should not change global↔server
+      // Preserve existing scope · overwrite should not change global↔server
       // (scope is a structural property, not metadata)
       dupeEntry.addedByUserId = payload.requestedByUserId;
       dupeEntry.addedByTag = payload.requestedByTag;

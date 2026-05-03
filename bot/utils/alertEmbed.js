@@ -3,7 +3,7 @@
  *
  * Shared helper for building consistent "alert" embeds across the bot.
  * Before this existed, warning/error/info messages were a mix of plain-text
- * replies, ad-hoc embeds, and handler-specific helpers — which made the UX
+ * replies, ad-hoc embeds, and handler-specific helpers · which made the UX
  * inconsistent and made color-coded severity impossible to read at a glance.
  *
  * Tokens live in `bot/utils/ui.js`. This module is the thin builder that
@@ -38,11 +38,11 @@ import { COLORS, ICONS } from './ui.js';
  * icon so users can tell severity at a glance without reading the title.
  */
 export const AlertSeverity = Object.freeze({
-  ERROR: 'error',       // Red    — operation failed, user action required
-  WARNING: 'warning',   // Yellow — operation blocked but recoverable
-  INFO: 'info',         // Blue   — neutral information, no action required
-  SUCCESS: 'success',   // Green  — operation completed successfully
-  TRUSTED: 'trusted',   // Navy   — special case for trusted user blocks
+  ERROR: 'error',       // Red    · operation failed, user action required
+  WARNING: 'warning',   // Yellow · operation blocked but recoverable
+  INFO: 'info',         // Blue   · neutral information, no action required
+  SUCCESS: 'success',   // Green  · operation completed successfully
+  TRUSTED: 'trusted',   // Navy   · special case for trusted user blocks
 });
 
 const SEVERITY_CONFIG = Object.freeze({
@@ -94,7 +94,7 @@ export function buildAlertEmbed({
   }
 
   if (fields.length > 0) {
-    // Filter out fields with empty values — Discord rejects them
+    // Filter out fields with empty values · Discord rejects them
     const cleanFields = fields.filter((f) => f.value !== undefined && f.value !== null && String(f.value).trim() !== '');
     if (cleanFields.length > 0) {
       embed.addFields(cleanFields);

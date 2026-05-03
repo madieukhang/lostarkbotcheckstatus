@@ -10,78 +10,78 @@ export async function handleHelpCommand(interaction) {
     '**📋 Danh sách lệnh:**',
     '*(Tất cả lệnh bot dùng prefix `/la-` để Discord gom vào nhóm `/la` autocomplete.)*',
     '',
-    '`/la-status` — Xem trạng thái server Lost Ark',
-    '`/la-reset` — Reset trạng thái đã lưu',
+    '`/la-status` · Xem trạng thái server Lost Ark',
+    '`/la-reset` · Reset trạng thái đã lưu',
     '',
-    '`/la-roster tên [deep]` — Tra cứu roster + theo dõi ilvl. `deep:true` quét alt qua Stronghold',
-    '`/la-search tên [min_ilvl] [max_ilvl] [class]` — Tìm tên tương tự với bộ lọc',
+    '`/la-roster tên [deep]` · Tra cứu roster + theo dõi ilvl. `deep:true` quét alt qua Stronghold',
+    '`/la-search tên [min_ilvl] [max_ilvl] [class]` · Tìm tên tương tự với bộ lọc',
     '',
-    '`/la-list add type tên lý_do [raid] [logs] [image] [scope]` — Thêm vào blacklist/whitelist/watchlist. Scope: global/server (chỉ blacklist)',
-    '`/la-list edit tên [reason] [type] [raid] [logs] [image] [scope]` — Sửa entry đã có. Scope chỉ áp dụng cho blacklist (promote/demote local↔global)',
-    '`/la-list remove tên` — Xoá entry khỏi danh sách',
-    '`/la-list view type [scope]` — Xem danh sách (type: all/black/white/watch/trusted, scope: all/global/server)',
-    '`/la-list trust action tên [reason]` — Quản lý danh sách uy tín (add/remove, chỉ officer)',
-    '`/la-list enrich tên [deep_limit]` — 🔍 Stronghold deep-scan entry đã có và append alts khám phá được (officer only, ~5-7 phút)',
-    '`/la-list multiadd action [file]` — 📦 **Bulk add** qua Excel template (xem chi tiết ở dưới)',
+    '`/la-list add type tên lý_do [raid] [logs] [image] [scope]` · Thêm vào blacklist/whitelist/watchlist. Scope: global/server (chỉ blacklist)',
+    '`/la-list edit tên [reason] [type] [raid] [logs] [image] [scope]` · Sửa entry đã có. Scope chỉ áp dụng cho blacklist (promote/demote local↔global)',
+    '`/la-list remove tên` · Xoá entry khỏi danh sách',
+    '`/la-list view type [scope]` · Xem danh sách (type: all/black/white/watch/trusted, scope: all/global/server)',
+    '`/la-list trust action tên [reason]` · Quản lý danh sách uy tín (add/remove, chỉ officer)',
+    '`/la-list enrich tên [deep_limit]` · 🔍 Stronghold deep-scan entry đã có và append alts khám phá được (officer only, ~5-7 phút)',
+    '`/la-list multiadd action [file]` · 📦 **Bulk add** qua Excel template (xem chi tiết ở dưới)',
     '',
-    '`/la-check image` — Trích tên từ ảnh chụp, kiểm tra với tất cả danh sách',
+    '`/la-check image` · Trích tên từ ảnh chụp, kiểm tra với tất cả danh sách',
     '',
-    '`/la-setup autochannel #channel` — Đặt kênh tự động kiểm tra ảnh',
-    '`/la-setup notifychannel #channel` — Đặt kênh nhận thông báo',
-    '`/la-setup view` — Xem cấu hình hiện tại',
-    '`/la-setup off` — Bật/tắt nhận thông báo từ server khác',
-    '`/la-setup defaultscope global/server` — Đặt scope mặc định cho blacklist',
+    '`/la-setup autochannel #channel` · Đặt kênh tự động kiểm tra ảnh',
+    '`/la-setup notifychannel #channel` · Đặt kênh nhận thông báo',
+    '`/la-setup view` · Xem cấu hình hiện tại',
+    '`/la-setup off` · Bật/tắt nhận thông báo từ server khác',
+    '`/la-setup defaultscope global/server` · Đặt scope mặc định cho blacklist',
   ] : [
     '**📋 Available Commands:**',
     '*(All bot commands use the `/la-` prefix so Discord groups them under `/la` autocomplete.)*',
     '',
-    '`/la-status` — Show live server status for all monitored servers',
-    '`/la-reset` — Reset the stored status state',
+    '`/la-status` · Show live server status for all monitored servers',
+    '`/la-reset` · Reset the stored status state',
     '',
-    '`/la-roster name [deep]` — Fetch roster + progression tracking + list check. `deep:true` for Stronghold alt scan',
-    '`/la-search name [min_ilvl] [max_ilvl] [class]` — Search similar names with filters',
+    '`/la-roster name [deep]` · Fetch roster + progression tracking + list check. `deep:true` for Stronghold alt scan',
+    '`/la-search name [min_ilvl] [max_ilvl] [class]` · Search similar names with filters',
     '',
-    '`/la-list add type name reason [raid] [logs] [image] [scope]` — Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only)',
-    '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope]` — Edit an existing entry. Scope only applies to blacklist (promote/demote local↔global)',
-    '`/la-list remove name` — Remove an entry from a list',
-    '`/la-list view type [scope]` — View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
-    '`/la-list trust action name [reason]` — Manage trusted list (add/remove, officer only)',
-    '`/la-list enrich name [deep_limit]` — 🔍 Stronghold deep-scan an existing entry and append discovered alts (officer only, ~5-7 min)',
-    '`/la-list multiadd action [file]` — 📦 **Bulk add** via Excel template (see details below)',
+    '`/la-list add type name reason [raid] [logs] [image] [scope]` · Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only)',
+    '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope]` · Edit an existing entry. Scope only applies to blacklist (promote/demote local↔global)',
+    '`/la-list remove name` · Remove an entry from a list',
+    '`/la-list view type [scope]` · View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
+    '`/la-list trust action name [reason]` · Manage trusted list (add/remove, officer only)',
+    '`/la-list enrich name [deep_limit]` · 🔍 Stronghold deep-scan an existing entry and append discovered alts (officer only, ~5-7 min)',
+    '`/la-list multiadd action [file]` · 📦 **Bulk add** via Excel template (see details below)',
     '',
-    '`/la-check image` — Check names from screenshot against all lists',
+    '`/la-check image` · Check names from screenshot against all lists',
     '',
-    '`/la-setup autochannel #channel` — Set auto-check channel for this server',
-    '`/la-setup notifychannel #channel` — Set notification channel for this server',
-    '`/la-setup view` — View current channel configuration',
-    '`/la-setup off` — Toggle global list notifications on/off',
-    '`/la-setup defaultscope global/server` — Set default blacklist scope for /la-list add',
+    '`/la-setup autochannel #channel` · Set auto-check channel for this server',
+    '`/la-setup notifychannel #channel` · Set notification channel for this server',
+    '`/la-setup view` · View current channel configuration',
+    '`/la-setup off` · Toggle global list notifications on/off',
+    '`/la-setup defaultscope global/server` · Set default blacklist scope for /la-list add',
   ];
 
-  // Owner-only commands — only show in owner server
+  // Owner-only commands · only show in owner server
   if (interaction.guild?.id === config.ownerGuildId) {
     helpLines.push(
       '',
       lang === 'vn' ? '**🛰️ Chỉ Owner Server:**' : '**🛰️ Owner Server Only:**',
-      '`/la-stats` — ' + (lang === 'vn' ? 'Thống kê bot' : 'Show bot usage statistics'),
-      '`/la-remote action [guild] [scope] [channel]` — ' + (lang === 'vn'
+      '`/la-stats` · ' + (lang === 'vn' ? 'Thống kê bot' : 'Show bot usage statistics'),
+      '`/la-remote action [guild] [scope] [channel]` · ' + (lang === 'vn'
         ? 'Senior: điều khiển config từ xa (view / off / defaultscope / evidencechannel / syncimages)'
         : 'Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)'),
-      '`/la-remote action:evidencechannel channel:#...` — ' + (lang === 'vn'
+      '`/la-remote action:evidencechannel channel:#...` · ' + (lang === 'vn'
         ? 'Đặt kênh lưu ảnh evidence (bot rehost vào đây để tránh CDN expire ~24h)'
         : 'Set evidence storage channel (bot rehosts here to defeat CDN ~24h expiry)'),
-      '`/la-remote action:syncimages` — ' + (lang === 'vn'
+      '`/la-remote action:syncimages` · ' + (lang === 'vn'
         ? 'Migrate ảnh legacy (pre-v0.5.2) sang rehost storage. Cần set `evidencechannel` trước. Idempotent. Xem chi tiết flow ở dưới'
         : 'Migrate legacy (pre-v0.5.2) images to rehost storage. Requires `evidencechannel` set first. Idempotent. See detailed flow below'),
     );
   }
 
-  // Detailed /la-list multiadd embed — separate from the main command list
+  // Detailed /la-list multiadd embed · separate from the main command list
   // because this feature has a multi-step flow that needs more explanation
   // than a one-liner. See CHANGELOG v0.5.1 for the feature spec.
   const multiaddEmbed = lang === 'vn'
     ? new EmbedBuilder()
-        .setTitle('📦 /la-list multiadd — Bulk Add qua Excel')
+        .setTitle('📦 /la-list multiadd · Bulk Add qua Excel')
         .setDescription(
           'Thêm **tối đa 30 entries** cùng lúc vào blacklist/whitelist/watchlist ' +
             'bằng 1 file Excel, thay vì gõ `/la-list add` từng người một.'
@@ -104,7 +104,7 @@ export async function handleHelpCommand(interaction) {
               '**Bắt buộc:** `name`, `type`, `reason`',
               '**Tuỳ chọn:** `raid`, `logs`, `image`, `scope`',
               '• `type` (dropdown): `black` / `white` / `watch`',
-              '• `scope` (dropdown): `global` / `server` — chỉ cho blacklist',
+              '• `scope` (dropdown): `global` / `server` · chỉ cho blacklist',
               '• `logs` và `image` phải là URL (`https://...`)',
             ].join('\n'),
             inline: false,
@@ -140,7 +140,7 @@ export async function handleHelpCommand(interaction) {
               '• **Trusted user** → `⚠️ Skipped` tự động (exact match hoặc alt qua roster)',
               '• **ilvl < 1700** → `⚠️ Skipped` với reason `"has item level X (below 1700)"`',
               '• **Lỗi runtime** (network/DB) → `❌ Failed` với error message',
-              '• **Quan trọng:** lỗi 1 row **KHÔNG block** các row khác — batch chạy đến hết',
+              '• **Quan trọng:** lỗi 1 row **KHÔNG block** các row khác · batch chạy đến hết',
             ].join('\n'),
             inline: false,
           },
@@ -152,9 +152,9 @@ export async function handleHelpCommand(interaction) {
             inline: false,
           }
         )
-        .setFooter({ text: 'Phần chi tiết riêng — các lệnh khác ở trên' })
+        .setFooter({ text: 'Phần chi tiết riêng · các lệnh khác ở trên' })
     : new EmbedBuilder()
-        .setTitle('📦 /la-list multiadd — Bulk Add via Excel')
+        .setTitle('📦 /la-list multiadd · Bulk Add via Excel')
         .setDescription(
           'Add **up to 30 entries** at once to blacklist/whitelist/watchlist ' +
             'via a single Excel file, instead of running `/la-list add` one at a time.'
@@ -177,7 +177,7 @@ export async function handleHelpCommand(interaction) {
               '**Required:** `name`, `type`, `reason`',
               '**Optional:** `raid`, `logs`, `image`, `scope`',
               '• `type` (dropdown): `black` / `white` / `watch`',
-              '• `scope` (dropdown): `global` / `server` — blacklist only',
+              '• `scope` (dropdown): `global` / `server` · blacklist only',
               '• `logs` and `image` must be URLs (`https://...`)',
             ].join('\n'),
             inline: false,
@@ -213,7 +213,7 @@ export async function handleHelpCommand(interaction) {
               '• **Trusted user** → auto-`⚠️ Skipped` (exact match or alt via roster)',
               '• **ilvl < 1700** → `⚠️ Skipped` with reason `"has item level X (below 1700)"`',
               '• **Runtime error** (network/DB) → `❌ Failed` with error message',
-              '• **Important:** one row failing does **NOT block** other rows — batch runs to completion',
+              '• **Important:** one row failing does **NOT block** other rows · batch runs to completion',
             ].join('\n'),
             inline: false,
           },
@@ -225,9 +225,9 @@ export async function handleHelpCommand(interaction) {
             inline: false,
           }
         )
-        .setFooter({ text: 'Detailed section — see the main command list above' });
+        .setFooter({ text: 'Detailed section · see the main command list above' });
 
-  // Detailed /la-remote action:syncimages embed — only shown when the user
+  // Detailed /la-remote action:syncimages embed · only shown when the user
   // is in the owner guild (since the command is Senior-only). Mirrors the
   // multiaddEmbed pattern: dedicated explanation for a complex one-shot
   // operation that has prerequisites and side effects worth understanding
@@ -236,7 +236,7 @@ export async function handleHelpCommand(interaction) {
   const syncImagesEmbed = isOwnerGuild
     ? (lang === 'vn'
         ? new EmbedBuilder()
-            .setTitle('🔄 /la-remote action:syncimages — Migrate ảnh legacy')
+            .setTitle('🔄 /la-remote action:syncimages · Migrate ảnh legacy')
             .setDescription(
               'One-shot migration cho **entries cũ** có ảnh được lưu dạng URL trực tiếp ' +
                 '(trước v0.5.2 rehost). Bot tải lại ảnh và upload vào evidence channel ' +
@@ -277,10 +277,10 @@ export async function handleHelpCommand(interaction) {
               {
                 name: '📊 Result counters',
                 value: [
-                  '**✅ Synced** — entry migrate thành công, có rehost refs mới',
-                  '**⚠️ Skipped (dead URLs)** — file gốc đã bị xóa, không recover được',
-                  '**🔀 Skipped (raced)** — entry vừa bị edit/migrate bởi nguồn khác',
-                  '**❌ Failed** — lỗi infra (channel down, rate limit, etc.) — retry được',
+                  '**✅ Synced** · entry migrate thành công, có rehost refs mới',
+                  '**⚠️ Skipped (dead URLs)** · file gốc đã bị xóa, không recover được',
+                  '**🔀 Skipped (raced)** · entry vừa bị edit/migrate bởi nguồn khác',
+                  '**❌ Failed** · lỗi infra (channel down, rate limit, etc.) · retry được',
                 ].join('\n'),
                 inline: false,
               },
@@ -290,14 +290,14 @@ export async function handleHelpCommand(interaction) {
                   '• `Failed > 0` → check log Railway, có thể retry sau',
                   '• `Skipped (dead)` → entries không recover được, cân nhắc remove + add lại',
                   '• `Skipped (raced)` → có orphan upload trong channel, log warn cho biết location',
-                  '• Mọi case đều **không mất data** — entries skipped không bị touch',
+                  '• Mọi case đều **không mất data** · entries skipped không bị touch',
                 ].join('\n'),
                 inline: false,
               }
             )
             .setFooter({ text: 'Owner-only · added v0.5.7, race-safe + external URL handling v0.5.8' })
         : new EmbedBuilder()
-            .setTitle('🔄 /la-remote action:syncimages — Legacy Image Migration')
+            .setTitle('🔄 /la-remote action:syncimages · Legacy Image Migration')
             .setDescription(
               'One-shot migration for **legacy entries** whose evidence is stored as a ' +
                 'direct URL (created before v0.5.2 rehost). Bot re-downloads each image ' +
@@ -338,10 +338,10 @@ export async function handleHelpCommand(interaction) {
               {
                 name: '📊 Result counters',
                 value: [
-                  '**✅ Synced** — entry migrated successfully, has new rehost refs',
-                  '**⚠️ Skipped (dead URLs)** — original file deleted, cannot recover',
-                  '**🔀 Skipped (raced)** — entry was edited/migrated by another source',
-                  '**❌ Failed** — infra error (channel down, rate limit, etc.) — retryable',
+                  '**✅ Synced** · entry migrated successfully, has new rehost refs',
+                  '**⚠️ Skipped (dead URLs)** · original file deleted, cannot recover',
+                  '**🔀 Skipped (raced)** · entry was edited/migrated by another source',
+                  '**❌ Failed** · infra error (channel down, rate limit, etc.) · retryable',
                 ].join('\n'),
                 inline: false,
               },
@@ -351,7 +351,7 @@ export async function handleHelpCommand(interaction) {
                   '• `Failed > 0` → check Railway logs, can retry later',
                   '• `Skipped (dead)` → entries unrecoverable, consider remove + re-add',
                   '• `Skipped (raced)` → orphan upload in channel, warn log shows location',
-                  '• In all cases: **no data loss** — skipped entries are untouched',
+                  '• In all cases: **no data loss** · skipped entries are untouched',
                 ].join('\n'),
                 inline: false,
               }

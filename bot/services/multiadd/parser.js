@@ -78,7 +78,7 @@ export async function parseMultiaddFile(buffer) {
     if (reason.startsWith(EXAMPLE_REASON_PREFIX)) return;
 
     if (acceptedCount >= MULTIADD_MAX_ROWS) {
-      errors.push(`Row ${rowNum}: exceeds ${MULTIADD_MAX_ROWS}-row limit — skipped.`);
+      errors.push(`Row ${rowNum}: exceeds ${MULTIADD_MAX_ROWS}-row limit · skipped.`);
       return;
     }
 

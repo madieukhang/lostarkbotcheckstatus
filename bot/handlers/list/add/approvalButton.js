@@ -29,7 +29,7 @@ export function createListAddApprovalButtonHandler({
     const requestId = customParts[1];
     await connectDB();
 
-    // Find but don't delete yet — need to keep for duplicate overwrite flow
+    // Find but don't delete yet · need to keep for duplicate overwrite flow
     const payload = await PendingApproval.findOne({
       requestId,
       approverIds: interaction.user.id,
@@ -106,7 +106,7 @@ export function createListAddApprovalButtonHandler({
     }
 
     try {
-      // Edit approval — update/move existing entry by _id (not add new)
+      // Edit approval · update/move existing entry by _id (not add new)
       if (payload.action === 'edit' && payload.existingEntryId) {
         await handleApprovedEditRequest({
           client,
@@ -122,7 +122,7 @@ export function createListAddApprovalButtonHandler({
 
       const result = await executeListAddToDatabase(payload);
 
-      // Duplicate found — show comparison and overwrite option
+      // Duplicate found · show comparison and overwrite option
       if (!result.ok && result.isDuplicate) {
         const existing = result.existingEntry;
         const { label } = getListContext(payload.type);
@@ -136,7 +136,7 @@ export function createListAddApprovalButtonHandler({
         const existingScopeTag = existing.scope === 'server' ? ' [Server]' : ' [Global]';
         const requestScopeTag = payload.scope === 'server' ? ' [Server]' : ' [Global]';
         const compareEmbed = new EmbedBuilder()
-          .setTitle('⚠️ Duplicate Found — Compare')
+          .setTitle('⚠️ Duplicate Found · Compare')
           .addFields(
             { name: `📌 Existing Entry${existingScopeTag}`, value: `**${existing.name}**\nReason: ${existing.reason || 'N/A'}\nRaid: ${existing.raid || 'N/A'}\nAdded: <t:${Math.floor(new Date(existing.addedAt || 0).getTime() / 1000)}:R>`, inline: true },
             { name: `🆕 New Request${requestScopeTag}`, value: `**${payload.name}**\nReason: ${payload.reason || 'N/A'}\nRaid: ${payload.raid || 'N/A'}\nBy: ${payload.requestedByDisplayName || 'Unknown'}`, inline: true },
@@ -169,11 +169,11 @@ export function createListAddApprovalButtonHandler({
           },
           { excludeMessageId: interaction.message.id }
         );
-        // Don't delete PendingApproval — needed for overwrite flow
+        // Don't delete PendingApproval · needed for overwrite flow
         return;
       }
 
-      // Success or non-duplicate error — clean up
+      // Success or non-duplicate error · clean up
       await PendingApproval.deleteOne({ requestId });
 
       await interaction.editReply({

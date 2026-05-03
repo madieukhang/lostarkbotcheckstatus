@@ -46,6 +46,6 @@ export async function inferHiddenRosterItemLevel(name, options = {}) {
 
 export function formatSuggestionLines(suggestions) {
   return suggestions
-    .map((s) => `[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) — \`${Number(s.itemLevel).toFixed(2)}\` — ${getClassName(s.cls)}`)
+    .map((s) => `[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) · \`${Number(s.itemLevel).toFixed(2)}\` · ${getClassName(s.cls)}`)
     .join('\n');
 }

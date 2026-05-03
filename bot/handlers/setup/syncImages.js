@@ -121,7 +121,7 @@ async function sendProgress(interaction, current, total, stats) {
   await interaction.editReply({
     embeds: [
       new EmbedBuilder()
-        .setTitle('🔄 Sync Images — In Progress')
+        .setTitle('🔄 Sync Images · In Progress')
         .setDescription(`Processing **${current}/${total}** entries…`)
         .addFields(
           { name: '✅ Synced', value: String(stats.synced), inline: true },
@@ -142,7 +142,7 @@ function buildSummaryPayload(interaction, total, stats) {
       : COLORS.success;
 
   const summaryEmbed = new EmbedBuilder()
-    .setTitle('✅ Sync Images — Complete')
+    .setTitle('✅ Sync Images · Complete')
     .setDescription(`Processed **${total}** legacy entries.`)
     .addFields(
       { name: '✅ Synced', value: String(stats.synced), inline: true },
@@ -221,7 +221,7 @@ export async function handleSyncImagesAction(interaction) {
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()
-          .setTitle('✅ Sync Images — Nothing to do')
+          .setTitle('✅ Sync Images · Nothing to do')
           .setDescription('All entries with images already have rehost refs. Nothing to migrate.')
           .setColor(0x2ecc71)
           .setTimestamp(),
@@ -233,7 +233,7 @@ export async function handleSyncImagesAction(interaction) {
   await interaction.editReply({
     embeds: [
       new EmbedBuilder()
-        .setTitle('🔄 Sync Images — Starting')
+        .setTitle('🔄 Sync Images · Starting')
         .setDescription(`Found **${legacyEntries.length}** legacy entries across all lists. Migrating now…`)
         .addFields(
           { name: 'Blacklist', value: String(blackLegacy.length), inline: true },

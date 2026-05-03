@@ -136,12 +136,12 @@ export async function handleSearchCommand(interaction) {
       if (icon) icon += ' ';
 
       const link = `[${r.name}](https://lostark.bible/character/NA/${encodeURIComponent(r.name)}/roster)`;
-      let line = `**${i + 1}.** ${icon}${link} — ${cls || '?'} · \`${ilvl}\`${hasImage ? ' — 📎' : ''}`;
+      let line = `**${i + 1}.** ${icon}${link} · ${cls || '?'} · \`${ilvl}\`${hasImage ? ' · 📎' : ''}`;
 
       for (const [entry, label] of [[r.black, '⛔'], [r.white, '✅'], [r.watch, '⚠️']]) {
         if (!entry) continue;
         const isRosterMatch = entry.name.toLowerCase() !== r.name.toLowerCase();
-        const via = isRosterMatch ? `via **${entry.name}** — ` : '';
+        const via = isRosterMatch ? `via **${entry.name}** · ` : '';
         line += `\n    ↳ ${via}*${entry.reason || 'no reason'}*`;
         if (entry.raid) line += ` [${entry.raid}]`;
       }

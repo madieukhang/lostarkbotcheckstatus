@@ -97,7 +97,7 @@ export function createCheckHandlers({ client }) {
     const limitedNames = names.slice(0, maxNames);
     await interaction.editReply({
       content: [
-        `🔍 Extracted **${limitedNames.length}** name(s) — checking lists & roster...`,
+        `🔍 Extracted **${limitedNames.length}** name(s) · checking lists & roster...`,
         limitedNames.length < names.length ? `Ignored **${names.length - limitedNames.length}** extra name(s) (limit: ${maxNames}).` : null,
       ].filter(Boolean).join('\n'),
     });

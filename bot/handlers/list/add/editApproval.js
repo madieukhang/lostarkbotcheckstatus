@@ -96,7 +96,7 @@ export async function handleApprovedEditRequest({
       ? '' // rehosted entries do not store legacy URL
       : (payload.imageUrl || existingEntry.imageUrl || '');
 
-    // Create first, then delete old (safe order — if create fails, old preserved)
+    // Create first, then delete old (safe order · if create fails, old preserved)
     postEditEntry = await newModel.create({
       name: existingEntry.name,
       reason: payload.reason || existingEntry.reason,
@@ -130,7 +130,7 @@ export async function handleApprovedEditRequest({
       updateFields.imageMessageId = '';
       updateFields.imageChannelId = '';
     }
-    // Scope change in place — only blacklist supports it. Approval flow
+    // Scope change in place · only blacklist supports it. Approval flow
     // only reaches this branch when payload.type === existingEntry's
     // current type (no cross-list move), so checking type === 'black'
     // is enough.
@@ -164,7 +164,7 @@ export async function handleApprovedEditRequest({
         throw err;
       }
     }
-    // Capture for the rich success embed below — virtual post-edit
+    // Capture for the rich success embed below · virtual post-edit
     // entry is the pre-edit snapshot merged with updateFields.
     postEditEntry = { ...(existingEntry.toObject?.() || existingEntry), ...updateFields };
   }
@@ -217,7 +217,7 @@ export async function handleApprovedEditRequest({
 
   // Build the rich success embed for the requester reply. Falls back
   // to plain text if postEditEntry is somehow null (shouldn't happen
-  // but defensive — null embeds[] is handled by notifyRequester).
+  // but defensive · null embeds[] is handled by notifyRequester).
   let approvalSuccessEmbed = null;
   if (postEditEntry) {
     const entryForEmbed = postEditEntry.toObject?.() || postEditEntry;

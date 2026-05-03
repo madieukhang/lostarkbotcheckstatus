@@ -17,7 +17,7 @@ export function buildTrustedListEmbed(entries) {
     if (entry.reason) parts.push(entry.reason);
     const date = entry.addedAt ? `<t:${Math.floor(new Date(entry.addedAt).getTime() / 1000)}:R>` : '';
     if (date) parts.push(date);
-    return `${index + 1}. ${parts.join(' — ')}`;
+    return `${index + 1}. ${parts.join(' · ')}`;
   });
 
   return new EmbedBuilder()
@@ -69,7 +69,7 @@ export async function buildListPageEmbed(options) {
     if (date) parts.push(date);
     const imgUrl = freshUrls[index];
     if (imgUrl) parts.push(`[📎](${imgUrl})`);
-    return `${start + index + 1}. ${parts.join(' — ')}`;
+    return `${start + index + 1}. ${parts.join(' · ')}`;
   });
 
   return new EmbedBuilder()

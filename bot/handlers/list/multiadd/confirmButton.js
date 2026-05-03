@@ -216,7 +216,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
       );
 
       const waitEmbed = new EmbedBuilder()
-        .setTitle('⏳ Bulk Add — Awaiting Senior Approval')
+        .setTitle('⏳ Bulk Add · Awaiting Senior Approval')
         .setDescription(
           `Your bulk add of **${pending.rows.length} rows** has been sent to Senior for approval.\n\n` +
             `You'll be notified in this channel when the decision is made.`

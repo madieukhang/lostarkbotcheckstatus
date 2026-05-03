@@ -123,14 +123,14 @@ export async function handleRosterCommand(interaction) {
       const hasGuild = meta && meta.guildName;
 
       if (hasGuild) {
-        // Step 1: Get guild member list (fast, single request — ScraperAPI eligible)
+        // Step 1: Get guild member list (fast, single request · ScraperAPI eligible)
         const guildMembers = await fetchGuildMembers(name, {
           timeoutMs: config.strongholdDeepCandidateTimeoutMs,
           cacheKey: meta.guildName,
         });
         const memberNames = guildMembers.map((m) => m.name);
 
-        // Step 2: Quick DB check — are any guild members already in the lists?
+        // Step 2: Quick DB check · are any guild members already in the lists?
         await connectDB();
         const rosterGuildId = interaction.guild?.id || '';
         const memberNameQuery = { $or: [{ name: { $in: memberNames } }, { allCharacters: { $in: memberNames } }] };
@@ -222,7 +222,7 @@ export async function handleRosterCommand(interaction) {
             '',
             `**⛔ Blacklisted guild members (${guildBlackHits.length}):**`,
             ...guildBlackHits.map(
-              (e) => `⛔ **${e.name}** — ${e.reason || 'no reason'}${e.raid ? ' [' + e.raid + ']' : ''}`
+              (e) => `⛔ **${e.name}** · ${e.reason || 'no reason'}${e.raid ? ' [' + e.raid + ']' : ''}`
             ),
           );
         }
@@ -232,7 +232,7 @@ export async function handleRosterCommand(interaction) {
             '',
             `**✅ Whitelisted guild members (${guildWhiteHits.length}):**`,
             ...guildWhiteHits.map(
-              (e) => `✅ **${e.name}** — ${e.reason || 'no reason'}${e.raid ? ' [' + e.raid + ']' : ''}`
+              (e) => `✅ **${e.name}** · ${e.reason || 'no reason'}${e.raid ? ' [' + e.raid + ']' : ''}`
             ),
           );
         }
@@ -254,7 +254,7 @@ export async function handleRosterCommand(interaction) {
         return;
       }
 
-      // No guild — show suggestions as before
+      // No guild · show suggestions as before
       const suggestions = await fetchNameSuggestions(name) || [];
       const filtered = suggestions.filter((s) => s.itemLevel > 1700);
       if (filtered.length > 0) {
@@ -354,11 +354,11 @@ export async function handleRosterCommand(interaction) {
     const contentLines = [];
 
     if (trustedResult) {
-      contentLines.push(`🛡️ **${trustedResult.name}** is a trusted user.${trustedResult.reason ? ` — *${trustedResult.reason}*` : ''}`);
+      contentLines.push(`🛡️ **${trustedResult.name}** is a trusted user.${trustedResult.reason ? ` · *${trustedResult.reason}*` : ''}`);
     }
 
     if (blacklistResult) {
-      const reason = blacklistResult.reason ? ` — *${blacklistResult.reason}*` : '';
+      const reason = blacklistResult.reason ? ` · *${blacklistResult.reason}*` : '';
       const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
       contentLines.push(`⛔ **${name}** is on the blacklist.${raid}${reason}`);
 
@@ -374,7 +374,7 @@ export async function handleRosterCommand(interaction) {
     }
 
     if (whitelistResult) {
-      const reason = whitelistResult.reason ? ` — *${whitelistResult.reason}*` : '';
+      const reason = whitelistResult.reason ? ` · *${whitelistResult.reason}*` : '';
       const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
       contentLines.push(`✅ **${name}** is on the whitelist.${raid}${reason}`);
 
@@ -456,7 +456,7 @@ export async function handleRosterCommand(interaction) {
             (a, i) => `${i + 1}. [${a.name}](https://lostark.bible/character/NA/${encodeURIComponent(a.name)}/roster) · ${a.className || '?'} · \`${a.itemLevel}\``
           );
           embed.addFields({
-            name: `🔎 Deep Scan — Alts via Stronghold (${altResult.alts.length})`,
+            name: `🔎 Deep Scan · Alts via Stronghold (${altResult.alts.length})`,
             value: [...altLines, deepStats ? `\n${deepStats}` : null].filter(Boolean).join('\n').slice(0, 1024),
             inline: false,
           });

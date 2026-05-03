@@ -147,7 +147,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     if (results.skipped.length > 0) {
       const skippedLines = results.skipped
         .slice(0, 10)
-        .map((r) => `• **${r.name}** — ${r.reason}`)
+        .map((r) => `• **${r.name}** · ${r.reason}`)
         .join('\n');
       const suffix = results.skipped.length > 10 ? `\n*... and ${results.skipped.length - 10} more*` : '';
       embed.addFields({
@@ -159,7 +159,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     if (results.failed.length > 0) {
       const failedLines = results.failed
         .slice(0, 10)
-        .map((r) => `• **${r.name}** — ${r.error}`)
+        .map((r) => `• **${r.name}** · ${r.error}`)
         .join('\n');
       const suffix = results.failed.length > 10 ? `\n*... and ${results.failed.length - 10} more*` : '';
       embed.addFields({
@@ -171,7 +171,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     if (results.rehostWarnings?.length > 0) {
       const warnLines = results.rehostWarnings
         .slice(0, 10)
-        .map((r) => `• **${r.name}** — ${r.error}`)
+        .map((r) => `• **${r.name}** · ${r.error}`)
         .join('\n');
       const suffix = results.rehostWarnings.length > 10
         ? `\n*... and ${results.rehostWarnings.length - 10} more*`
@@ -180,7 +180,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         name: `🖼️ Image rehost failed (${results.rehostWarnings.length})`,
         value: (
           warnLines + suffix +
-          '\n*Entries added OK but images stored as legacy URLs — will expire in ~24h.*'
+          '\n*Entries added OK but images stored as legacy URLs · will expire in ~24h.*'
         ).slice(0, 1024),
       });
     }

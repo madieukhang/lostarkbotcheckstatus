@@ -5,14 +5,14 @@
  *
  * Background: as of 2024, Discord CDN attachment URLs include signed expiry
  * tokens (`?ex=...&hm=...`) that invalidate after ~24 hours. Storing the URL
- * directly means the image silently 404s after a day or two — which is bad
+ * directly means the image silently 404s after a day or two · which is bad
  * for evidence data that's supposed to live as long as the entry does.
  *
  * Solution: when a user attaches an image to /la-list add (or similar), the bot
  * immediately re-uploads it to a dedicated "evidence channel" in the owner
  * guild. The bot then stores the rehosted message ID + channel ID instead of
  * the URL. When the image needs to be displayed later, the bot fetches the
- * stored message via the Discord API — Discord re-signs the attachment URL
+ * stored message via the Discord API · Discord re-signs the attachment URL
  * with a fresh expiry on every fetch, so the link is always valid.
  *
  * The evidence channel is configured via /la-remote action:evidencechannel
@@ -26,7 +26,7 @@ import { getGuildConfig } from './scope.js';
 
 /**
  * Resolve the configured evidence channel ID, or null if not configured.
- * Always reads from the OWNER guild's GuildConfig (not per-guild) — there
+ * Always reads from the OWNER guild's GuildConfig (not per-guild) · there
  * is one bot-wide evidence channel.
  */
 export async function getEvidenceChannelId() {
@@ -97,7 +97,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   }
 
   // Try to extract a sensible filename from the URL path. Failure is
-  // non-fatal — falls back to 'evidence.png'.
+  // non-fatal · falls back to 'evidence.png'.
   let filename = 'evidence.png';
   try {
     const urlPath = new URL(originalUrl).pathname;
@@ -107,7 +107,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     }
   } catch { /* leave default filename */ }
 
-  // Sanity check size — Discord attachments max 25 MB for bots without nitro
+  // Sanity check size · Discord attachments max 25 MB for bots without nitro
   if (buffer.length > 24 * 1024 * 1024) {
     return fail(`file too large to rehost (${(buffer.length / 1024 / 1024).toFixed(1)} MB > 24 MB limit)`);
   }
@@ -129,7 +129,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     const attachment = new AttachmentBuilder(buffer, { name: filename });
 
     // Audit metadata so a human looking at #evidence-archive can see what each
-    // image is for. Plain text only — no embed, no mentions, no spam pings.
+    // image is for. Plain text only · no embed, no mentions, no spam pings.
     const auditLines = [];
     if (meta.entryName) {
       const icon = meta.listType === 'black' ? '⛔'
@@ -184,7 +184,7 @@ export async function refreshImageUrl(messageId, channelId, client) {
     const attachment = message.attachments?.first();
     return attachment?.url || null;
   } catch (err) {
-    // Message deleted, channel removed, bot lost access — all acceptable
+    // Message deleted, channel removed, bot lost access · all acceptable
     // failure modes. Caller falls back to legacy URL or shows nothing.
     if (err.code !== 10008 /* Unknown Message */ && err.code !== 10003 /* Unknown Channel */) {
       console.warn(`[imageRehost] Refresh failed for ${channelId}/${messageId}:`, err.message);
@@ -207,13 +207,13 @@ export async function refreshImageUrl(messageId, channelId, client) {
 export async function resolveDisplayImageUrl(entry, client) {
   if (!entry) return '';
 
-  // Path 1: rehosted image — fetch fresh URL
+  // Path 1: rehosted image · fetch fresh URL
   if (entry.imageMessageId && entry.imageChannelId) {
     const fresh = await refreshImageUrl(entry.imageMessageId, entry.imageChannelId, client);
     if (fresh) return fresh;
-    // Refresh failed (message deleted etc.) — fall through to legacy
+    // Refresh failed (message deleted etc.) · fall through to legacy
   }
 
-  // Path 2: legacy direct URL — may be expired but try anyway
+  // Path 2: legacy direct URL · may be expired but try anyway
   return entry.imageUrl || '';
 }

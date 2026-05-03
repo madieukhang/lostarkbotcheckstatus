@@ -82,7 +82,7 @@ export function createApprovalServices({ client }) {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`multiaddapprove_approve:${pending.requestId}`)
-        .setLabel(`Approve — Add ${pending.rows.length}`)
+        .setLabel(`Approve · Add ${pending.rows.length}`)
         .setStyle(ButtonStyle.Success)
         .setEmoji('✅'),
       new ButtonBuilder()
@@ -96,14 +96,14 @@ export function createApprovalServices({ client }) {
     const previewLines = pending.rows.slice(0, 20).map((r, i) => {
       const reasonShort = (r.reason || '').length > 40 ? (r.reason || '').slice(0, 37) + '...' : (r.reason || '');
       const scopeTag = r.scope === 'server' ? ' `[S]`' : '';
-      return `\`${String(i + 1).padStart(2, ' ')}.\` ${typeIcon(r.type)} **${r.name}**${scopeTag} — ${reasonShort}`;
+      return `\`${String(i + 1).padStart(2, ' ')}.\` ${typeIcon(r.type)} **${r.name}**${scopeTag} · ${reasonShort}`;
     });
     if (pending.rows.length > 20) {
       previewLines.push(`*... and ${pending.rows.length - 20} more rows*`);
     }
 
     const embed = new EmbedBuilder()
-      .setTitle(`📋 Bulk Add Approval — ${pending.rows.length} rows`)
+      .setTitle(`📋 Bulk Add Approval · ${pending.rows.length} rows`)
       .setDescription(previewLines.join('\n').slice(0, 4000))
       .setColor(COLORS.info)
       .addFields(

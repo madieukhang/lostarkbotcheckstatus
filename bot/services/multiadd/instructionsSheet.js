@@ -33,7 +33,7 @@ export function buildInstructionsSheet(wb, options) {
 
   ins.mergeCells('A1:B1');
   const titleCell = ins.getCell('A1');
-  titleCell.value = '📖  INSTRUCTIONS — /la-list multiadd';
+  titleCell.value = '📖  INSTRUCTIONS · /la-list multiadd';
   titleCell.font = {
     name: 'Segoe UI Semibold',
     bold: true,
@@ -146,7 +146,7 @@ export function buildInstructionsSheet(wb, options) {
     COLOR_SEC_PURPLE_TEXT,
     COLOR_GRAY_50,
     [
-      ['name', 'Character name — roster must exist on lostark.bible'],
+      ['name', 'Character name · roster must exist on lostark.bible'],
       ['type', 'Dropdown: black / white / watch'],
       ['reason', 'Why this entry is added (free text)'],
     ]
@@ -158,9 +158,9 @@ export function buildInstructionsSheet(wb, options) {
     COLOR_SEC_GREEN_TEXT,
     COLOR_GRAY_50,
     [
-      ['raid', `Dropdown — one of: ${raids.join(', ')}`],
-      ['logs', 'URL to lostark.bible logs page — must start with https://'],
-      ['image', 'URL to evidence screenshot — upload to Discord first'],
+      ['raid', `Dropdown · one of: ${raids.join(', ')}`],
+      ['logs', 'URL to lostark.bible logs page · must start with https://'],
+      ['image', 'URL to evidence screenshot · upload to Discord first'],
       ['scope', 'Blacklist only: global (shared) or server (this guild)'],
     ]
   );
@@ -190,7 +190,7 @@ export function buildInstructionsSheet(wb, options) {
       ['1.', 'Drag & drop the screenshot into any Discord channel'],
       ['2.', 'Right-click the uploaded image → Copy Link'],
       ['3.', 'Paste the link into the "image" column'],
-      ['Note', "Excel doesn't support embedded images — URLs only"],
+      ['Note', "Excel doesn't support embedded images · URLs only"],
     ]
   );
 }

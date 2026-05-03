@@ -2,7 +2,7 @@
  * RosterCache.js
  * Caches roster check results from lostark.bible to avoid repeated HTTP requests.
  * Same character appearing in multiple screenshots will hit cache instead of fetching again.
- * TTL 24h — auto-expires so data stays reasonably fresh.
+ * TTL 24h · auto-expires so data stays reasonably fresh.
  */
 
 import mongoose from 'mongoose';
@@ -23,7 +23,7 @@ const rosterCacheSchema = new mongoose.Schema({
   /** Cached search suggestions for names without roster (diacritics correction) */
   searchSuggestions: { type: [{ name: String, flag: String }], default: [] },
 
-  /** When this cache entry was created — TTL index expires after 24h */
+  /** When this cache entry was created · TTL index expires after 24h */
   cachedAt: { type: Date, default: Date.now, expires: 86400 },
 });
 

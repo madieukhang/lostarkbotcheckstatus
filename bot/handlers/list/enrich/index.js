@@ -130,7 +130,7 @@ export function createEnrichHandlers({ client, services }) {
 
     // Surface scan-in-progress to the channel so the officer knows the
     // command is alive during the long fetch fan-out. Single update,
-    // no streaming — Discord webhook edits are cheap and Operations
+    // no streaming · Discord webhook edits are cheap and Operations
     // already monitor server logs for the per-25 progress lines.
     // Guild member fetch is one request, so ScraperAPI fallback is on
     // (cheap) when bible direct flaps. Per-candidate scan below stays
@@ -474,7 +474,7 @@ export function createEnrichHandlers({ client, services }) {
     clearEnrichSession(sessionId);
 
     await interaction.update({
-      content: 'Cancelled — no changes made to the entry.',
+      content: 'Cancelled · no changes made to the entry.',
       embeds: [],
       components: [],
     });

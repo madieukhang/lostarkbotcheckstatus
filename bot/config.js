@@ -81,7 +81,7 @@ const config = {
   /** MongoDB connection string */
   mongoUri: requireEnv('MONGODB_URI'),
 
-  /** ScraperAPI keys (fallback chain) — SCRAPERAPI_KEY, SCRAPERAPI_KEY_2, SCRAPERAPI_KEY_3... */
+  /** ScraperAPI keys (fallback chain) · SCRAPERAPI_KEY, SCRAPERAPI_KEY_2, SCRAPERAPI_KEY_3... */
   scraperApiKeys: [
     process.env.SCRAPERAPI_KEY,
     process.env.SCRAPERAPI_KEY_2,
@@ -90,7 +90,7 @@ const config = {
     .map((k) => (k || '').trim())
     .filter(Boolean),
 
-  /** @deprecated — use scraperApiKeys[0] instead (kept for backward compat) */
+  /** @deprecated · use scraperApiKeys[0] instead (kept for backward compat) */
   get scraperApiKey() { return this.scraperApiKeys[0] || ''; },
 
   /** Approver IDs for /la-list add approval flow (comma-separated Discord user IDs) */
@@ -113,7 +113,7 @@ const config = {
     .map((s) => s.trim())
     .filter(Boolean),
 
-  /** Owner guild ID — this server can view all server-scoped blacklist entries from every guild */
+  /** Owner guild ID · this server can view all server-scoped blacklist entries from every guild */
   ownerGuildId: (process.env.OWNER_GUILD_ID || '').trim(),
 
   /** Optional Gemini API key for image-based /la-check name extraction */

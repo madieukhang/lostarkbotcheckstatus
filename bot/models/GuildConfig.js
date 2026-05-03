@@ -8,7 +8,7 @@
 import mongoose from 'mongoose';
 
 const guildConfigSchema = new mongoose.Schema({
-  /** Discord guild (server) ID — one config per guild */
+  /** Discord guild (server) ID · one config per guild */
   guildId: { type: String, required: true, unique: true },
 
   /** Channel ID where screenshots are auto-checked (OCR → list check) */
@@ -25,7 +25,7 @@ const guildConfigSchema = new mongoose.Schema({
 
   /**
    * Channel ID where the bot rehosts evidence images for permanent storage.
-   * Only meaningful on the OWNER guild's GuildConfig record — bot reads this
+   * Only meaningful on the OWNER guild's GuildConfig record · bot reads this
    * single value to know where to upload images. Configured via /la-remote
    * action:evidencechannel channel:#... by Senior approvers. Without it,
    * /la-list add image uploads fall back to legacy direct-URL storage which

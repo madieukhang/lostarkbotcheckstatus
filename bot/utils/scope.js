@@ -33,7 +33,7 @@ export function buildBlacklistScopeFilter(guildId) {
  */
 export function buildBlacklistQuery(nameQuery, guildId) {
   const scopeFilter = buildBlacklistScopeFilter(guildId);
-  if (!scopeFilter) return nameQuery; // owner — no scope restriction
+  if (!scopeFilter) return nameQuery; // owner · no scope restriction
   return { $and: [nameQuery, scopeFilter] };
 }
 

@@ -55,7 +55,7 @@ export async function sendListEditApprovalRequest({
   };
 
   const sent = await sendListAddApprovalToApprovers(interaction.guild, payload, {
-    title: 'List Edit — Approval Required',
+    title: 'List Edit · Approval Required',
   });
 
   if (!sent.success) {
