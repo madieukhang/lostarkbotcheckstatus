@@ -32,19 +32,8 @@
  * before commit; cancel discards.
  */
 
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  EmbedBuilder,
-} from 'discord.js';
-
 import { connectDB } from '../../../db.js';
 import config from '../../../config.js';
-import Blacklist from '../../../models/Blacklist.js';
-import Whitelist from '../../../models/Whitelist.js';
-import Watchlist from '../../../models/Watchlist.js';
-import { getClassName } from '../../../models/Class.js';
 import {
   fetchCharacterMeta,
   fetchGuildMembers,
@@ -52,42 +41,22 @@ import {
 } from '../../../services/rosterService.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { isOfficerOrSenior } from '../helpers.js';
-
-const ENRICH_COOLDOWN_MS = 30 * 1000;
-const SESSION_TTL_MS = 5 * 60 * 1000;
-
-// In-memory state. Both maps are cleared on bot restart, which is
-// acceptable: cooldowns reset and any pending session expires.
-const enrichCooldown = new Map(); // normalized name -> Date.now() of last run
-const sessions = new Map();        // sessionId -> { callerId, type, entryId, ... }
-
-function newSessionId() {
-  return Math.random().toString(36).slice(2, 12);
-}
-
-const COLLATION = { locale: 'en', strength: 2 };
-
-const LIST_LABELS = {
-  black: { label: 'blacklist', icon: '⛔', color: 0xed4245 },
-  white: { label: 'whitelist', icon: '✅', color: 0x57f287 },
-  watch: { label: 'watchlist', icon: '👁️', color: 0xfee75c },
-};
-
-const MODELS_BY_TYPE = {
-  black: Blacklist,
-  white: Whitelist,
-  watch: Watchlist,
-};
-
-async function findEntryByName(name) {
-  const black = await Blacklist.findOne({ name }).collation(COLLATION).lean();
-  if (black) return { type: 'black', entry: black };
-  const white = await Whitelist.findOne({ name }).collation(COLLATION).lean();
-  if (white) return { type: 'white', entry: white };
-  const watch = await Watchlist.findOne({ name }).collation(COLLATION).lean();
-  if (watch) return { type: 'watch', entry: watch };
-  return null;
-}
+import {
+  findEntryByName,
+  LIST_LABELS,
+  MODELS_BY_TYPE,
+} from './data.js';
+import {
+  clearEnrichSession,
+  createEnrichSession,
+  getCooldownWaitSeconds,
+  getEnrichSession,
+  markCooldown,
+} from './state.js';
+import {
+  buildEnrichPreviewReply,
+  buildEnrichSuccessEmbed,
+} from './ui.js';
 
 export function createEnrichHandlers({ client, services }) {
   // services may grow Phase 3.5 broadcast support later; not used today.
@@ -107,18 +76,15 @@ export function createEnrichHandlers({ client, services }) {
     const name = normalizeCharacterName(rawName);
     const cap = interaction.options.getInteger('deep_limit') ?? config.strongholdDeepCandidateLimit;
 
-    // In-memory cooldown gate keyed by case-insensitive name.
-    const cooldownKey = name.toLowerCase();
-    const lastRun = enrichCooldown.get(cooldownKey);
-    if (lastRun && Date.now() - lastRun < ENRICH_COOLDOWN_MS) {
-      const wait = Math.ceil((ENRICH_COOLDOWN_MS - (Date.now() - lastRun)) / 1000);
+    const cooldownWait = getCooldownWaitSeconds(name);
+    if (cooldownWait > 0) {
       await interaction.reply({
-        content: `⏳ Please wait ${wait}s before re-enriching **${name}**.`,
+        content: `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`,
         ephemeral: true,
       });
       return;
     }
-    enrichCooldown.set(cooldownKey, Date.now());
+    markCooldown(name);
 
     await interaction.deferReply();
     await connectDB();
@@ -213,10 +179,7 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
 
-    const sessionId = newSessionId();
-    const expireTimer = setTimeout(() => sessions.delete(sessionId), SESSION_TTL_MS);
-    sessions.set(sessionId, {
-      sessionId,
+    const session = createEnrichSession({
       callerId: interaction.user.id,
       type: found.type,
       entryId: String(found.entry._id),
@@ -232,54 +195,21 @@ export function createEnrichHandlers({ client, services }) {
         totalAlts: result.alts.length,
         guildName: meta.guildName,
       },
-      createdAt: Date.now(),
-      expireTimer,
     });
 
-    const ctx = LIST_LABELS[found.type];
-    const altLines = newAlts
-      .map((a, i) => {
-        const cls = getClassName(a.classId) || a.classId || 'Unknown';
-        const ilvl = typeof a.itemLevel === 'number' ? a.itemLevel.toFixed(2) : a.itemLevel;
-        return `**${i + 1}.** ${a.name} · ${cls} · \`${ilvl}\``;
-      })
-      .join('\n');
-
-    const embed = new EmbedBuilder()
-      .setTitle(`${ctx.icon} Enrich preview — ${found.entry.name}`)
-      .setDescription(
-        `Stronghold scan in **${meta.guildName}** matched ${result.alts.length} alt(s). ` +
-        `${newAlts.length} are not yet in this ${ctx.label} entry.\n\n${altLines}\n\n` +
-        `Click **Confirm** to append all ${newAlts.length} to \`allCharacters\`, or **Cancel** to discard.`
-      )
-      .setColor(ctx.color)
-      .setFooter({
-        text:
-          `Scanned ${result.scannedCandidates} candidates, ` +
-          `${result.failedCandidates} failed · Session expires in 5 min`,
-      });
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`list-enrich:confirm:${sessionId}`)
-        .setLabel(`Confirm Add ${newAlts.length}`)
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId(`list-enrich:cancel:${sessionId}`)
-        .setLabel('Cancel')
-        .setStyle(ButtonStyle.Secondary)
-    );
-
-    await interaction.editReply({
-      content: '',
-      embeds: [embed],
-      components: [row],
-    });
+    await interaction.editReply(buildEnrichPreviewReply({
+      entry: found.entry,
+      foundType: found.type,
+      meta,
+      newAlts,
+      result,
+      sessionId: session.sessionId,
+    }));
   }
 
   async function handleListEnrichConfirmButton(interaction) {
     const sessionId = interaction.customId.split(':')[2];
-    const session = sessions.get(sessionId);
+    const session = getEnrichSession(sessionId);
     if (!session) {
       await interaction.reply({
         content: '⚠️ This enrich session has expired. Re-run `/la-list enrich` to try again.',
@@ -314,32 +244,18 @@ export function createEnrichHandlers({ client, services }) {
       { $addToSet: { allCharacters: { $each: altNames } } }
     );
 
-    clearTimeout(session.expireTimer);
-    sessions.delete(sessionId);
-
-    const ctx = LIST_LABELS[session.type];
-    const embed = new EmbedBuilder()
-      .setTitle(`${ctx.icon} Enriched ${session.entryName}`)
-      .setDescription(
-        `Appended ${altNames.length} alt(s) to ${ctx.label} entry's \`allCharacters\`:\n\n` +
-        altNames.map((n, i) => `${i + 1}. ${n}`).join('\n')
-      )
-      .setColor(ctx.color)
-      .setFooter({
-        text: `matched=${updateResult.matchedCount} modified=${updateResult.modifiedCount}`,
-      })
-      .setTimestamp(new Date());
+    clearEnrichSession(sessionId);
 
     await interaction.editReply({
       content: '',
-      embeds: [embed],
+      embeds: [buildEnrichSuccessEmbed(session, updateResult)],
       components: [],
     });
   }
 
   async function handleListEnrichCancelButton(interaction) {
     const sessionId = interaction.customId.split(':')[2];
-    const session = sessions.get(sessionId);
+    const session = getEnrichSession(sessionId);
     if (!session) {
       await interaction.update({
         content: '⚠️ Session expired.',
@@ -356,8 +272,7 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
 
-    clearTimeout(session.expireTimer);
-    sessions.delete(sessionId);
+    clearEnrichSession(sessionId);
 
     await interaction.update({
       content: 'Cancelled — no changes made to the entry.',

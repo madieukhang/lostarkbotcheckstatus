@@ -152,13 +152,29 @@ LostArk_LoaLogs/
 │   │   │   │   ├── broadcasts.js   # Broadcast channel routing
 │   │   │   │   └── bulk.js         # Bulk multiadd execution + summary
 │   │   │   ├── add/                # /la-list add + approval/view evidence/overwrite
+│   │   │   │   ├── index.js        # factory wiring
+│   │   │   │   ├── command.js      # slash command proposal flow
+│   │   │   │   ├── approvalButton.js # approver approve/reject router
+│   │   │   │   ├── editApproval.js # approved edit request executor
+│   │   │   │   ├── evidenceButton.js # ephemeral evidence viewer
+│   │   │   │   └── overwriteButton.js # duplicate overwrite/keep flow
 │   │   │   ├── edit/               # /la-list edit
+│   │   │   │   ├── index.js        # factory wiring
+│   │   │   │   ├── command.js      # validation + routing
+│   │   │   │   ├── applyNow.js     # owner/officer/local immediate edit
+│   │   │   │   └── approvalRequest.js # member edit approval proposal
 │   │   │   ├── remove/             # /la-list remove
 │   │   │   ├── view/               # /la-list view (paginated browse)
+│   │   │   │   ├── index.js        # query + interaction router
+│   │   │   │   └── ui.js           # page/evidence/trusted embeds
 │   │   │   ├── check/              # /la-check (OCR screenshot)
 │   │   │   ├── trust/              # /la-list trust
 │   │   │   ├── quickadd/           # quick-add select + modal (used by /la-check)
 │   │   │   ├── enrich/             # /la-list enrich
+│   │   │   │   ├── index.js        # command + confirm/cancel flow
+│   │   │   │   ├── data.js         # list lookup/model mapping
+│   │   │   │   ├── state.js        # cooldown + temporary sessions
+│   │   │   │   └── ui.js           # preview/success embeds
 │   │   │   └── multiadd/           # /la-list multiadd command + scoped helpers
 │   │   │       ├── index.js        # command router + pending upload state
 │   │   │       ├── attachment.js   # file validation + CDN download
