@@ -11,6 +11,11 @@ data/
 dusk-check.js
 exports/
 
+# Design docs / writing-plans (Traine: design lives outside the
+# Railway deploy artifact - keep this folder untracked so future plan
+# documents do not ship to production).
+docs/
+
 # OS / editor junk
 .DS_Store
 Thumbs.db
