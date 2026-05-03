@@ -13,6 +13,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 - **Approval flow** — members submit, officers instant-approve; senior approver always receives the DM
 - **Evidence rehosting** — images uploaded with an entry are rehosted into a pinned evidence channel so Discord's 24h CDN expiry doesn't rot the reference
 - **ScraperAPI fallback** — direct fetch to `lostark.bible` first, auto-fallback through up to 3 ScraperAPI keys on 403/503; high-fanout roster/list/OCR paths keep ScraperAPI off by default
+- **ScraperAPI usage visibility** — `/la-stats` shows process-lifetime ScraperAPI request totals, success/failure split, network errors, and per-key counts
 - **Guild-only commands** — `setDMPermission(false)` on every slash command; nothing runs in DMs
 
 ## Commands
@@ -354,6 +355,7 @@ Slash commands register through Discord's global endpoint on boot (`ClientReady`
 - Discord CDN URLs on `imageUrl` (legacy entries) expire around 24h after upload. New entries use the `imageMessageId` + `imageChannelId` rehosting path; old entries may show a broken image.
 - Gemini OCR quality on diacritic names depends heavily on screenshot resolution. Similar-name suggestion is the fallback when OCR misreads (`Lùnaria` vs `Lunaria`).
 - ScraperAPI falls back on 403/503 but not on soft blocks that return 200 with empty HTML. If upstream silently cloaks, `/la-roster` returns "no roster found".
+- ScraperAPI usage stats are in-memory process counters. They reset on bot restart/redeploy and estimate bot-side requests, not ScraperAPI billing-plan credits.
 - One Mongo cluster, no sharding. List entries are small (≤ a few KB each) so this scales comfortably for a single-guild deployment.
 - Approval TTL is 24h (`PendingApproval`). Members who submit and never get senior action see their request auto-expire instead of sitting forever.
 - Auto-check has a 10s per-user cooldown to prevent screenshot spam from wedging Gemini quota.

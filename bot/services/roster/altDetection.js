@@ -1,10 +1,18 @@
 import config from '../../config.js';
 import { getClassName } from '../../models/Class.js';
+import {
+  getCurrentScraperApiUsageScopeSnapshot,
+  runWithScraperApiUsageScope,
+} from '../../utils/scraperApiUsage.js';
 import { fetchCharacterMeta } from './characterMeta.js';
 import { fetchGuildMembers } from './guildMembers.js';
 import { inferHiddenRosterItemLevel } from './search.js';
 
 export async function detectAltsViaStronghold(name, options = {}) {
+  return runWithScraperApiUsageScope(() => detectAltsViaStrongholdInScope(name, options));
+}
+
+async function detectAltsViaStrongholdInScope(name, options = {}) {
   console.log(`[alt-detect] Starting alt detection for ${name}...`);
   const candidateLimit = options.candidateLimit ?? config.strongholdDeepCandidateLimit;
   const candidateTimeoutMs = options.candidateTimeoutMs ?? config.strongholdDeepCandidateTimeoutMs;
@@ -217,6 +225,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
   );
 
   console.log(`[alt-detect] Found ${alts.length} alt(s) for ${name}.`);
+  const scraperApiUsage = getCurrentScraperApiUsageScopeSnapshot();
 
   return {
     target: {
@@ -250,6 +259,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
     concurrency,
     candidateTimeoutMs,
     usedScraperApiForCandidates: useScraperApiForCandidates,
+    scraperApiRequests: scraperApiUsage.totalRequests,
     mode,
     retryOnRateLimit,
     cancelled: cancelledByFlag,

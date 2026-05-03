@@ -92,16 +92,25 @@ export async function sendScanCompletionDm(opts) {
     lines.push(`Guild: **${guildName}**`);
   }
 
+  const statFields = [
+    { name: 'Scanned', value: String(result.scannedCandidates ?? 0), inline: true },
+    { name: 'Found', value: String(alts.length), inline: true },
+    { name: 'Failed', value: String(result.failedCandidates ?? 0), inline: true },
+  ];
+  if ((result.scraperApiRequests ?? 0) > 0) {
+    statFields.push({
+      name: 'ScraperAPI',
+      value: String(result.scraperApiRequests),
+      inline: true,
+    });
+  }
+
   const embed = new EmbedBuilder()
     .setAuthor({ name: 'Lost Ark Check · Scan notification' })
     .setTitle(`${style.icon} Scan ${style.suffix} · ${scanTargetName}`)
     .setDescription(lines.join('\n') + altsBlock)
     .setColor(pickColor(style.color))
-    .addFields(
-      { name: 'Scanned',    value: String(result.scannedCandidates ?? 0),    inline: true },
-      { name: 'Found',      value: String(alts.length),                       inline: true },
-      { name: 'Failed',     value: String(result.failedCandidates ?? 0),      inline: true },
-    )
+    .addFields(...statFields)
     .setFooter({ text: 'You ran the command, so you got the heads-up. Block the bot if these DMs are unwanted.' })
     .setTimestamp();
 
