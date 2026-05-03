@@ -33,6 +33,10 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
   const originalFetch = globalThis.fetch;
   const requestedUrls = [];
 
+  // Post-Phase-1 (commit 2908724) fetchCharacterMeta probes
+  // `/__data.json` first and falls back to HTML on parse failure. The
+  // mock here returns non-JSON content for the data.json probe so the
+  // fallback path runs, exercising both legs in a single test.
   globalThis.fetch = async (url) => {
     const requestedUrl = String(url);
     requestedUrls.push(requestedUrl);
@@ -46,6 +50,11 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
         type: 'result',
         result: JSON.stringify([[1], [2, 3, 4], 'Ainslinn', 'bard', 1723.33]),
       });
+    }
+
+    if (requestedUrl.endsWith('/__data.json')) {
+      // Force a JSON parse failure so the HTML fallback runs.
+      return new Response('not-json', { status: 200 });
     }
 
     return new Response(
@@ -64,8 +73,9 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
     assert.equal(result.targetItemLevel, 1723.33);
     assert.equal(result.rosterVisibility, 'hidden');
     assert.equal(requestedUrls[0], 'https://lostark.bible/character/NA/Ainslinn/roster');
-    assert.equal(requestedUrls[1], 'https://lostark.bible/character/NA/Ainslinn');
-    assert.match(requestedUrls[2], /^https:\/\/lostark\.bible\/_app\/remote\/ngsbie\/search\?payload=/);
+    assert.equal(requestedUrls[1], 'https://lostark.bible/character/NA/Ainslinn/__data.json');
+    assert.equal(requestedUrls[2], 'https://lostark.bible/character/NA/Ainslinn');
+    assert.match(requestedUrls[3], /^https:\/\/lostark\.bible\/_app\/remote\/ngsbie\/search\?payload=/);
   } finally {
     globalThis.fetch = originalFetch;
   }
