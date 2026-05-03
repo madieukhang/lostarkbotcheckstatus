@@ -23,6 +23,7 @@ import { createSharedServices } from './list/services.js';
 import { createAddHandlers } from './list/add.js';
 import { createCheckHandlers } from './list/check.js';
 import { createEditHandlers } from './list/edit.js';
+import { createEnrichHandlers } from './list/enrich.js';
 import { createMultiaddHandlers } from './list/multiadd.js';
 import { createQuickAddHandlers } from './list/quickadd.js';
 import { createRemoveHandlers } from './list/remove.js';
@@ -35,6 +36,7 @@ export function createListHandlers({ client }) {
   const add = createAddHandlers({ client, services });
   const check = createCheckHandlers({ client });
   const edit = createEditHandlers({ client, services });
+  const enrich = createEnrichHandlers({ client, services });
   const multiadd = createMultiaddHandlers({ client, services });
   const quickadd = createQuickAddHandlers({ client, services });
   const remove = createRemoveHandlers({ client, services });
@@ -45,6 +47,7 @@ export function createListHandlers({ client }) {
     handleListCheckCommand: check.handleListCheckCommand,
     handleListAddCommand: add.handleListAddCommand,
     handleListEditCommand: edit.handleListEditCommand,
+    handleListEnrichCommand: enrich.handleListEnrichCommand,
     handleListRemoveCommand: remove.handleListRemoveCommand,
     handleListViewCommand: view.handleListViewCommand,
     handleListTrustCommand: trust.handleListTrustCommand,
@@ -54,6 +57,8 @@ export function createListHandlers({ client }) {
     handleListAddApprovalButton: add.handleListAddApprovalButton,
     handleListAddViewEvidenceButton: add.handleListAddViewEvidenceButton,
     handleListAddOverwriteButton: add.handleListAddOverwriteButton,
+    handleListEnrichConfirmButton: enrich.handleListEnrichConfirmButton,
+    handleListEnrichCancelButton: enrich.handleListEnrichCancelButton,
     handleQuickAddSelect: quickadd.handleQuickAddSelect,
     handleQuickAddModal: quickadd.handleQuickAddModal,
   };

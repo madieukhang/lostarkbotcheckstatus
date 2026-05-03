@@ -239,6 +239,25 @@ export function buildCommands() {
       )
       .addSubcommand((sub) =>
         sub
+          .setName('enrich')
+          .setDescription('Stronghold deep-scan an existing list entry and append discovered alts (officer only)')
+          .addStringOption((opt) =>
+            opt
+              .setName('name')
+              .setDescription('Character name with an existing list entry')
+              .setRequired(true)
+          )
+          .addIntegerOption((opt) =>
+            opt
+              .setName('deep_limit')
+              .setDescription('Override candidate cap (default = STRONGHOLD_DEEP_CANDIDATE_LIMIT)')
+              .setRequired(false)
+              .setMinValue(0)
+              .setMaxValue(500)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
           .setName('multiadd')
           .setDescription('Bulk add via Excel template — officers auto, members via Senior approval')
           .addStringOption((opt) =>
