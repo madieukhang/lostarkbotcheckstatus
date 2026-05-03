@@ -4,6 +4,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.30] - 2026-05-03
+
+### Removed (BREAKING)
+- Phase 4c hard cutover: legacy slash command names (`/status`, `/reset`, `/roster`, `/search`, `/list`, `/listcheck`, `/lahelp`, `/lasetup`, `/lastats`, `/laremote`) are no longer registered with Discord and no longer dispatch in `bot.js`. Every bot command now lives under the `/la-` prefix exclusively. Originally targeted 2026-05-17 (2-week soft-deprecation window); pulled forward to 2026-05-03 by Traine to wrap Phase 4 in a single sitting.
+- `bot/commands.js` `PUBLIC_COMMAND_DEFS` and `OWNER_COMMAND_DEFS` are now single-name arrays; `buildCommands` and `buildOwnerCommands` register one command per entry (no more flatMap dual-registration).
+- `/la-help` text drops the 2-week transition notice; line replaced with a one-liner explaining the `/la-` autocomplete grouping.
+- `/la-setup defaultscope` description text updated from `/list add` to `/la-list add`.
+
+### Notes
+- Deprecation banner from Phase 4b (`bot/utils/deprecation.js` + `bot.js` finally block) intentionally kept this commit. It is now defensive only - covers the window where Discord may still cache a stale legacy registration after the deploy. Phase 4d will remove it next.
+
 ## [v0.5.29] - 2026-05-03
 
 ### Added

@@ -5,9 +5,9 @@ import { buildCommands } from '../bot/commands.js';
 import { getClassAutocompleteChoices, resolveClassId } from '../bot/models/Class.js';
 import RosterCache from '../bot/models/RosterCache.js';
 
-test('/search class option uses autocomplete instead of capped static choices', () => {
+test('/la-search class option uses autocomplete instead of capped static choices', () => {
   const commands = buildCommands();
-  const searchCommand = commands.find((cmd) => cmd.name === 'search');
+  const searchCommand = commands.find((cmd) => cmd.name === 'la-search');
   const classOption = searchCommand.options.find((opt) => opt.name === 'class');
 
   assert.equal(classOption.autocomplete, true);
