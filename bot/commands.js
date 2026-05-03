@@ -6,14 +6,14 @@ import {
 import { getRaidChoices } from './models/Raid.js';
 
 /**
- * Phase 4 (2026-05-03) introduced a `la-` prefix on every bot command so
+ * Phase 4 (2026-05-03) put every bot command under the `la-` prefix so
  * Discord autocomplete groups all of them under `/la`. Each command
- * builder is now a function that takes the slash command name; we call
- * it twice per command — once with the legacy name (e.g. `status`,
- * `list`, `lahelp`) and once with the modern name (`la-status`,
- * `la-list`, `la-help`). Both names are registered as aliases pointing
- * at the same handler in bot.js. The legacy aliases stay live during
- * the soft-deprecation window, then come out in Phase 4c.
+ * builder takes the slash command name; we call it once per command
+ * with the `la-` name (e.g. `la-status`, `la-list`, `la-help`).
+ *
+ * Phase 4a registered both legacy + `la-` names as aliases; Phase 4c
+ * (this commit) removed the legacy halves once the soft-deprecation
+ * banner had been live long enough.
  */
 
 function statusCommand(name) {
@@ -399,11 +399,11 @@ function setupCommand(name) {
     .addSubcommand((sub) =>
       sub
         .setName('defaultscope')
-        .setDescription('Set default blacklist scope for /list add (global or server)')
+        .setDescription('Set default blacklist scope for /la-list add (global or server)')
         .addStringOption((opt) =>
           opt
             .setName('scope')
-            .setDescription('Default scope when /list add does not specify scope')
+            .setDescription('Default scope when /la-list add does not specify scope')
             .setRequired(true)
             .addChoices(
               { name: 'global', value: 'global' },
@@ -462,39 +462,29 @@ function remoteCommand(name) {
     );
 }
 
-/**
- * Public-guild command name pairs. First element is the legacy name
- * still being honored during the soft-deprecation window; second is
- * the modern `la-` prefixed name. Both are registered with Discord
- * and route to the same handler in bot.js.
- */
 const PUBLIC_COMMAND_DEFS = [
-  ['status', 'la-status', statusCommand],
-  ['reset', 'la-reset', resetCommand],
-  ['roster', 'la-roster', rosterCommand],
-  ['list', 'la-list', listCommand],
-  ['search', 'la-search', searchCommand],
-  ['listcheck', 'la-check', listCheckCommand],
-  ['lahelp', 'la-help', helpCommand],
-  ['lasetup', 'la-setup', setupCommand],
+  ['la-status', statusCommand],
+  ['la-reset', resetCommand],
+  ['la-roster', rosterCommand],
+  ['la-list', listCommand],
+  ['la-search', searchCommand],
+  ['la-check', listCheckCommand],
+  ['la-help', helpCommand],
+  ['la-setup', setupCommand],
 ];
 
 const OWNER_COMMAND_DEFS = [
-  ['lastats', 'la-stats', statsCommand],
-  ['laremote', 'la-remote', remoteCommand],
+  ['la-stats', statsCommand],
+  ['la-remote', remoteCommand],
 ];
 
 export function buildCommands() {
-  return PUBLIC_COMMAND_DEFS
-    .flatMap(([legacy, modern, builder]) => [builder(legacy), builder(modern)])
-    .map((cmd) => cmd.toJSON());
+  return PUBLIC_COMMAND_DEFS.map(([name, builder]) => builder(name).toJSON());
 }
 
 /**
  * Owner-guild-only commands - registered as guild-specific, invisible to other servers.
  */
 export function buildOwnerCommands() {
-  return OWNER_COMMAND_DEFS
-    .flatMap(([legacy, modern, builder]) => [builder(legacy), builder(modern)])
-    .map((cmd) => cmd.toJSON());
+  return OWNER_COMMAND_DEFS.map(([name, builder]) => builder(name).toJSON());
 }

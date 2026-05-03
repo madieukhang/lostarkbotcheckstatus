@@ -217,7 +217,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.isAutocomplete()) {
     try {
-      if (interaction.commandName === 'search' || interaction.commandName === 'la-search') {
+      if (interaction.commandName === 'la-search') {
         const focused = interaction.options.getFocused(true);
         if (focused?.name === 'class') {
           await interaction.respond(getClassAutocompleteChoices(focused.value));
@@ -236,27 +236,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   const { commandName } = interaction;
 
-  // Phase 4 alias map: each legacy slash-command name routes to the
-  // same handler as its `la-` prefixed twin. Both names are registered
-  // with Discord during the soft-deprecation window so existing user
-  // habit (`/status`, `/la-list add`, `/lahelp`, etc.) keeps working
-  // while the new names take over the autocomplete grouping under `/la`.
-  //
-  // Phase 4b: when the user invoked the legacy name we send a one-line
-  // ephemeral followUp pointing at the modern name + cutover date.
-  // The followUp fires after the handler responds (success or error)
-  // so it never races with the primary reply.
+  // Phase 4c (2026-05-03): legacy command aliases removed. Every bot
+  // command now lives under the `la-` prefix exclusively. The
+  // deprecation banner from Phase 4b still fires defensively in case
+  // Discord caches a stale registration of a legacy name during the
+  // first deploy after this commit; Phase 4d will remove that helper
+  // once the rollout is confirmed clean.
   const usedLegacyName = isLegacyCommandName(commandName);
   try {
-    if (commandName === 'status' || commandName === 'la-status') {
+    if (commandName === 'la-status') {
       await systemHandlers.handleStatusCommand(interaction);
-    } else if (commandName === 'reset' || commandName === 'la-reset') {
+    } else if (commandName === 'la-reset') {
       await systemHandlers.handleResetCommand(interaction);
-    } else if (commandName === 'roster' || commandName === 'la-roster') {
+    } else if (commandName === 'la-roster') {
       await handleRosterCommand(interaction);
-    } else if (commandName === 'search' || commandName === 'la-search') {
+    } else if (commandName === 'la-search') {
       await handleSearchCommand(interaction);
-    } else if (commandName === 'list' || commandName === 'la-list') {
+    } else if (commandName === 'la-list') {
       const subcommand = interaction.options.getSubcommand();
       if (subcommand === 'add') {
         await listHandlers.handleListAddCommand(interaction);
@@ -273,20 +269,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
       } else if (subcommand === 'enrich') {
         await listHandlers.handleListEnrichCommand(interaction);
       }
-    } else if (commandName === 'listcheck' || commandName === 'la-check') {
+    } else if (commandName === 'la-check') {
       await listHandlers.handleListCheckCommand(interaction);
-    } else if (commandName === 'lastats' || commandName === 'la-stats') {
+    } else if (commandName === 'la-stats') {
       await handleStatsCommand(interaction);
-    } else if (commandName === 'lasetup' || commandName === 'la-setup') {
+    } else if (commandName === 'la-setup') {
       await handleSetupCommand(interaction);
-    } else if (commandName === 'laremote' || commandName === 'la-remote') {
+    } else if (commandName === 'la-remote') {
       await handleSetupRemoteCommand(interaction);
-    } else if (commandName === 'lahelp' || commandName === 'la-help') {
+    } else if (commandName === 'la-help') {
       const lang = interaction.options.getString('lang') || 'en';
 
       const helpLines = lang === 'vn' ? [
         '**📋 Danh sách lệnh:**',
-        '*(Tên cũ `/status`, `/la-list add`, `/lahelp` ... vẫn dùng được trong giai đoạn chuyển tiếp 2 tuần. Dùng tên mới `/la-...` để Discord gom hết command bot vào nhóm `/la`.)*',
+        '*(Tất cả lệnh bot dùng prefix `/la-` để Discord gom vào nhóm `/la` autocomplete.)*',
         '',
         '`/la-status` — Xem trạng thái server Lost Ark',
         '`/la-reset` — Reset trạng thái đã lưu',
@@ -311,7 +307,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         '`/la-setup defaultscope global/server` — Đặt scope mặc định cho blacklist',
       ] : [
         '**📋 Available Commands:**',
-        '*(Legacy names like `/status`, `/la-list add`, `/lahelp` still work during the 2-week transition window. Use the new `/la-...` names so Discord groups every bot command under `/la` autocomplete.)*',
+        '*(All bot commands use the `/la-` prefix so Discord groups them under `/la` autocomplete.)*',
         '',
         '`/la-status` — Show live server status for all monitored servers',
         '`/la-reset` — Reset the stored status state',
