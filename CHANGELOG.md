@@ -4,6 +4,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.47] - 2026-05-03
+
+### Changed
+- `/la-stats` dashboard polished. Author line + descriptive intro replace the bare title; uptime now formatted as `2d 4h 13m` instead of bare hours/minutes; new "Started <relative>" line under the bot stats; new "Activity (last 7 days)" field showing recent blacklist additions as a growth pulse.
+- Field icons pulled from `ICONS` token instead of inline glyphs. Empty separator field (`​`) inserted between the top stat row and the activity field for visual grouping.
+- Footer adds "Officer-only command · ephemeral reply" so observers know the embed is invisible to non-callers.
+
+### Notes
+- 42/42 tests pass.
+
+## [v0.5.46] - 2026-05-03
+
+### Fixed
+- `fetchCharacterMeta` now builds fresh fetch options for each JSON retry and HTML fallback instead of reusing the same `AbortSignal.timeout(...)`. This removes a hidden failure mode where the 5s retry wait left the second request with a nearly-expired timeout, causing recoverable candidate probes to count as failed.
+- Candidate meta retry now treats transient bible `502/503/504` responses like `429`: in gentle scans it waits and retries once before falling back or counting the candidate as failed. This applies to both `/la-list enrich` and `/la-roster deep:true` because both use the same stronghold detector.
+- Guild member JSON -> HTML fallback now also gets a fresh timeout signal.
+
+### Changed
+- Help/runtime comments now describe the gentle scan as ~10-15 minutes instead of the old fast-scan ~5-7 minute estimate.
+
+### Notes
+- Added a regression test proving transient profile failures retry against a fresh timeout signal.
+
 ## [v0.5.45] - 2026-05-03
 
 ### Changed
