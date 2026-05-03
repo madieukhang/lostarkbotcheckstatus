@@ -4,6 +4,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.27] - 2026-05-03
+
+### Docs
+- `docs/phase4-command-surface-refactor.md`: Phase 4 writing-plan covering current command surface audit (11 top-level commands, 7 `/list` subcommands), three refactor directions (verb-based / entity-based / mode-flag merge) with pros/cons, recommendation (entity-based), and a four-step migration strategy with a soft-deprecation window. Document is design-only - no code changes shipped here. Phase 4 code execution waits on Traine answering the six open questions in section 5 of the doc.
+
 ## [v0.5.26] - 2026-05-03
 
 ### Added
