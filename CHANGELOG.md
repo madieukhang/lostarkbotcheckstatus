@@ -4,6 +4,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.58] - 2026-05-04
+
+### Added
+- `/la-stats` now includes process-lifetime ScraperAPI usage: total requests, success/failure split, network errors, last-used time, and per-key counts. Long stronghold scan result/DM cards also show how many ScraperAPI requests that scan consumed when non-zero.
+
+### Notes
+- Counts are bot-side in-memory counters and reset on restart/redeploy. They are meant to catch accidental quota burn during LoaLogs scans, not replace ScraperAPI's account dashboard.
+
 ## [v0.5.57] - 2026-05-03
 
 ### Changed

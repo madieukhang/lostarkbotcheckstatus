@@ -176,6 +176,9 @@ export function buildScanResultEmbed({
   if ((result.rateLimitRetries ?? 0) > 0) {
     statsParts.push(`**429 retries** ${result.rateLimitRetries}`);
   }
+  if ((result.scraperApiRequests ?? 0) > 0) {
+    statsParts.push(`**ScraperAPI** ${result.scraperApiRequests}`);
+  }
   if (state.remaining > 0) {
     statsParts.push(`**Remaining** ${state.remaining}`);
   }

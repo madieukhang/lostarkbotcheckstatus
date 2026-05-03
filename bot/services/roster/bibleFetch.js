@@ -1,4 +1,5 @@
 import config from '../../config.js';
+import { recordScraperApiRequest } from '../../utils/scraperApiUsage.js';
 
 export const FETCH_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -34,6 +35,7 @@ async function tryScraperApi(url, key, keyIndex) {
   const proxyUrl = `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(url)}`;
   try {
     const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(30000) });
+    recordScraperApiRequest({ keyIndex, status: res.status, ok: res.ok });
     if (res.status === 401 || res.status === 403 || res.status === 429) {
       const body = await res.text().catch(() => '');
       console.warn(`[scraperapi] Key #${keyIndex + 1} failed (HTTP ${res.status}): ${body.slice(0, 200)}`);
@@ -42,6 +44,7 @@ async function tryScraperApi(url, key, keyIndex) {
     }
     return { res, keyDead: false };
   } catch (err) {
+    recordScraperApiRequest({ keyIndex, error: err });
     console.warn(`[scraperapi] Key #${keyIndex + 1} network error: ${err.message}`);
     return { res: null, keyDead: false, error: err };
   }
