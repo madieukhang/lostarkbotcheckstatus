@@ -27,10 +27,6 @@ import { connectDB } from './bot/db.js';
 import Blacklist from './bot/models/Blacklist.js';
 import RosterCache from './bot/models/RosterCache.js';
 import { getClassAutocompleteChoices } from './bot/models/Class.js';
-import {
-  isLegacyCommandName,
-  getLegacyDeprecationBanner,
-} from './bot/utils/deprecation.js';
 
 const client = new Client({
   intents: [
@@ -236,13 +232,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   const { commandName } = interaction;
 
-  // Phase 4c (2026-05-03): legacy command aliases removed. Every bot
-  // command now lives under the `la-` prefix exclusively. The
-  // deprecation banner from Phase 4b still fires defensively in case
-  // Discord caches a stale registration of a legacy name during the
-  // first deploy after this commit; Phase 4d will remove that helper
-  // once the rollout is confirmed clean.
-  const usedLegacyName = isLegacyCommandName(commandName);
+  // Phase 4c+4d (2026-05-03): every bot command lives under the
+  // `la-` prefix. Legacy aliases and the soft-deprecation banner are
+  // both gone; Discord drops unregistered slash names on its side, so
+  // any stale legacy invocation never reaches this dispatch.
   try {
     if (commandName === 'la-status') {
       await systemHandlers.handleStatusCommand(interaction);
@@ -651,25 +644,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.editReply(reply).catch(() => {});
     } else {
       await interaction.reply(reply).catch(() => {});
-    }
-  } finally {
-    // Phase 4b deprecation banner. Fired only when the user invoked a
-    // legacy name. We use followUp (not a content prefix) so handlers
-    // stay untouched and the banner shape is uniform across every
-    // command, regardless of whether the handler replied with content,
-    // embeds, files, or all three.
-    if (usedLegacyName) {
-      const banner = getLegacyDeprecationBanner(interaction);
-      if (banner && (interaction.replied || interaction.deferred)) {
-        await interaction
-          .followUp({ content: banner, ephemeral: true })
-          .catch((err) => {
-            console.warn(
-              `[bot] Failed to send deprecation banner for /${commandName}:`,
-              err.message
-            );
-          });
-      }
     }
   }
 });
