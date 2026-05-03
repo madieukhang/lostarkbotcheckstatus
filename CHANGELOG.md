@@ -4,6 +4,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.37] - 2026-05-03
+
+### Changed
+- Wave 1 alert sweep extended to top-level handlers + setup. Plain-text replies migrated to `buildAlertEmbed`:
+  - `autoCheckHandler.js`: auto-check-failed.
+  - `rosterHandler.js`: no-roster-with-suggestions, no-roster-bare, roster-fetch-failed.
+  - `searchHandler.js`: bible-unavailable, no-results, no-results-with-filters, not-your-session, evidence-unavailable, search-failed.
+  - `systemHandlers.js`: status-fetch-failed, state-reset (success card).
+  - `setup/guildSetup.js`: wrong-channel-type, missing-permissions (used by both autochannel + notifychannel via replace_all), server-only, manage-server-required.
+  - `setup/syncImages.js`: evidence-channel-missing.
+  - `setup/remote.js`: senior-only, not-your-session, owner-guild-id-missing, channel-option-required, wrong-channel-type, missing-permissions, scope-required.
+
+### Notes
+- The "✅ Bot connected!" test message in `setup/guildSetup.js` (sent into the configured channel itself, then auto-deleted after 30s) intentionally stays as plain content - it's a brief one-liner meant to be visible inline in the channel as a connection confirmation, not a structured alert.
+- 41/41 tests pass.
+
 ## [v0.5.36] - 2026-05-03
 
 ### Changed

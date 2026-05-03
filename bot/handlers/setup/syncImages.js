@@ -2,6 +2,7 @@ import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
 
 import config from '../../config.js';
 import { COLORS } from '../../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
@@ -191,7 +192,12 @@ export async function handleSyncImagesAction(interaction) {
   const ownerCfg = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
   if (!ownerCfg?.evidenceChannelId) {
     await interaction.editReply({
-      content: '❌ Evidence channel is not configured. Run `/la-remote action:evidencechannel channel:#...` first.',
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.ERROR,
+        title: 'Evidence Channel Missing',
+        description: 'Evidence channel is not configured.',
+        footer: 'Run /la-remote action:evidencechannel channel:#... first, then retry.',
+      })],
     });
     return;
   }

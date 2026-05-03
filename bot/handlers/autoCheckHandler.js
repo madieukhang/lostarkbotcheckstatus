@@ -18,6 +18,7 @@ import {
 import { queueFlaggedListEntryEnrichment } from '../services/listCheckEnrichment.js';
 import { truncateDiscordContent } from '../utils/discordText.js';
 import { getGuildConfig } from '../utils/scope.js';
+import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
 
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);
@@ -147,7 +148,12 @@ export function setupAutoCheck(client) {
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
       await message.react('❌').catch(() => {});
       await message.reply({
-        content: `❌ Auto-check failed: ${err.message}`,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Auto-Check Failed',
+          description: 'Could not run the automatic list check on this image.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        })],
       }).catch(() => {});
     }
   });

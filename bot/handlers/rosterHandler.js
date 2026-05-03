@@ -12,6 +12,7 @@ import { connectDB } from '../db.js';
 import config from '../config.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
 import { COLORS } from '../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import TrustedUser from '../models/TrustedUser.js';
@@ -188,17 +189,23 @@ export async function handleRosterCommand(interaction) {
       const suggestions = await fetchNameSuggestions(name) || [];
       const filtered = suggestions.filter((s) => s.itemLevel > 1700);
       if (filtered.length > 0) {
-        const embed = new EmbedBuilder()
-          .setDescription(formatSuggestionLines(filtered))
-          .setColor(COLORS.danger)
-          .setTimestamp();
         await interaction.editReply({
-          content: `❌ No roster found for **${name}**. Rosters similar to **${name}**:`,
-          embeds: [embed],
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'No Roster Found',
+            description: `No character named **${name}** was found on lostark.bible. Similar names:`,
+            fields: [{ name: 'Suggestions', value: formatSuggestionLines(filtered).slice(0, 1024), inline: false }],
+            footer: 'Pick one of the suggested names and re-run the command.',
+          })],
         });
       } else {
         await interaction.editReply({
-          content: `❌ No roster found for **${name}**. Check the name and try again.`,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'No Roster Found',
+            description: `No character named **${name}** was found on lostark.bible.`,
+            footer: 'Check the spelling (LA names are case-sensitive and may include diacritics).',
+          })],
         });
       }
       return;
@@ -347,7 +354,12 @@ export async function handleRosterCommand(interaction) {
     await interaction.editReply({ content, embeds });
   } catch (err) {
     await interaction.editReply({
-      content: `⚠️ Failed to fetch roster: \`${err.message}\``,
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        title: 'Roster Fetch Failed',
+        description: 'Could not fetch the roster from lostark.bible.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+      })],
     });
   }
 }
