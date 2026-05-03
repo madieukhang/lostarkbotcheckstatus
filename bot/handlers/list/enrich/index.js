@@ -162,7 +162,11 @@ export function createEnrichHandlers({ client, services }) {
       ),
       failedCandidates: 0,
       altsFound: 0,
-      currentBackoffMs: config.scanBackoffMinMs,
+      // Gentle mode (the default) walks one candidate at a time on a
+      // 1.5s throttle. Surface that as the initial backoff value so the
+      // progress embed reads correctly even on its very first paint
+      // before the scan has ramped its adaptive backoff.
+      currentBackoffMs: 1500,
       totalMembers: guildMembers.length,
       startedAt,
     };

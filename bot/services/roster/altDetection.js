@@ -7,11 +7,28 @@ import { inferHiddenRosterItemLevel } from './search.js';
 export async function detectAltsViaStronghold(name, options = {}) {
   console.log(`[alt-detect] Starting alt detection for ${name}...`);
   const candidateLimit = options.candidateLimit ?? config.strongholdDeepCandidateLimit;
-  const concurrency = Math.max(1, Math.min(options.concurrency ?? config.strongholdDeepConcurrency, 12));
   const candidateTimeoutMs = options.candidateTimeoutMs ?? config.strongholdDeepCandidateTimeoutMs;
   const useScraperApiForCandidates = options.useScraperApiForCandidates ?? config.strongholdDeepUseScraperApi;
   const allowScraperApiForTarget = options.allowScraperApiForTarget !== false;
   const allowScraperApiForGuild = options.allowScraperApiForGuild !== false;
+
+  // Mode selection. The Phase 1 verification scan that found Ainslinn's
+  // 5 alts ran in 'gentle' mode (sequential, 1.5s throttle, retry-on-429).
+  // 'fast' mode (concurrency 3, no retry, 300ms backoff floor) was the
+  // original production default; Bao's 2026-05-03 peak-hour run on
+  // Ainslinn hit 100% failure with fast mode because bible was
+  // blanket-rejecting requests. Default switched to 'gentle' so Bao's
+  // case recovers.
+  //
+  // Power users can opt back into fast mode via `mode: 'fast'`. They
+  // should only do that off-peak, when bible is cool.
+  const mode = options.mode === 'fast' ? 'fast' : 'gentle';
+  const isGentle = mode === 'gentle';
+  const concurrency = isGentle
+    ? 1
+    : Math.max(1, Math.min(options.concurrency ?? config.strongholdDeepConcurrency, 12));
+  const retryOnRateLimit = options.retryOnRateLimit ?? isGentle;
+  const backoffFloorMs = isGentle ? 1500 : config.scanBackoffMinMs;
 
   const meta = options.targetMeta || await fetchCharacterMeta(name, {
     allowScraperApi: allowScraperApiForTarget,
@@ -57,7 +74,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
   console.log(
     `[alt-detect] ${candidates.length} candidate(s) after filtering ilvl >= 1700; scanning ${limitedCandidates.length}`
     + (skippedCandidates > 0 ? `, skipping ${skippedCandidates} by limit` : '')
-    + `. Candidate ScraperAPI: ${useScraperApiForCandidates ? 'on' : 'off'}. Concurrency: ${concurrency}.`
+    + `. Mode: ${mode}. Candidate ScraperAPI: ${useScraperApiForCandidates ? 'on' : 'off'}. Concurrency: ${concurrency}. Retry-on-429: ${retryOnRateLimit ? 'on' : 'off'}.`
   );
 
   const alts = [];
@@ -67,9 +84,12 @@ export async function detectAltsViaStronghold(name, options = {}) {
 
   console.log(`[alt-detect] Scanning ${limitedCandidates.length} candidate(s)...`);
 
+  // Backoff floor matches mode: gentle = 1500ms (POC pace), fast = env
+  // default (300ms). Both modes ramp up to scanBackoffMaxMs (3000ms)
+  // on consecutive failures, recovering 100ms per success.
   const backoff = {
-    current: config.scanBackoffMinMs,
-    min: config.scanBackoffMinMs,
+    current: backoffFloorMs,
+    min: backoffFloorMs,
     max: config.scanBackoffMaxMs,
     step: 500,
     recover: 100,
@@ -82,7 +102,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
         allowScraperApi: useScraperApiForCandidates,
         preferScraperApi: useScraperApiForCandidates,
         fallbackOnRateLimit: useScraperApiForCandidates,
-        retryOnRateLimit: false,
+        retryOnRateLimit,
         timeoutMs: candidateTimeoutMs,
       });
 
@@ -159,5 +179,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
     concurrency,
     candidateTimeoutMs,
     usedScraperApiForCandidates: useScraperApiForCandidates,
+    mode,
+    retryOnRateLimit,
   };
 }
