@@ -44,8 +44,12 @@ export function buildScanProgressEmbed({
   const total = Math.max(1, progress.totalCandidates || 1);
   const pct = Math.round((progress.scannedCandidates / total) * 100);
   const bar = buildProgressBar(pct);
+  // Discord renders <t:UNIX:R> tokens only inside message content +
+  // embed description, NOT inside footers or titles. Putting "started
+  // X ago" in the description keeps the relative-time ticker live; the
+  // footer is reserved for static config (backoff value).
   const startedLine = progress.startedAt
-    ? ` · started ${relativeTime(progress.startedAt)}`
+    ? `\n*Started ${relativeTime(progress.startedAt)}*`
     : '';
 
   return buildAlertEmbed({
@@ -58,8 +62,9 @@ export function buildScanProgressEmbed({
       `\`${bar}\` ${pct}%\n\n` +
       `Scanned **${progress.scannedCandidates}** / ${progress.totalCandidates} candidates · ` +
       `Found **${progress.altsFound}** match · ` +
-      `Failed **${progress.failedCandidates}**`,
-    footer: `Backoff ${progress.currentBackoffMs}ms${startedLine}`,
+      `Failed **${progress.failedCandidates}**` +
+      startedLine,
+    footer: `Backoff ${progress.currentBackoffMs}ms · 30s update interval`,
     timestamp: false,
   });
 }
