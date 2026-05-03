@@ -29,7 +29,7 @@ import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCom
 import { createRosterDeepSession } from '../../utils/rosterDeepSession.js';
 import { makeRosterScanProgressCallback, formatDeepScanStats } from './progress.js';
 
-export async function handleHiddenRosterResult({ interaction, name, deep, deepOptions }) {
+export async function handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions }) {
       // ── Hidden roster: try guild-based detection ──
       // Single-request probes (meta + guild list) allow ScraperAPI
       // fallback because they are 1 request each and bible direct can
@@ -86,7 +86,7 @@ export async function handleHiddenRosterResult({ interaction, name, deep, deepOp
             startedAt: startedAtRef.value,
             label: `${name} (roster deep · hidden)`,
           });
-          await interaction.editReply({
+          await replyEditor.edit({
             content: '',
             embeds: [buildScanProgressEmbed({
               title: `Stronghold scan in progress · ${name}`,
@@ -113,6 +113,7 @@ export async function handleHiddenRosterResult({ interaction, name, deep, deepOp
               cancelFlag,
               onProgress: makeRosterScanProgressCallback({
                 interaction,
+                replyEditor,
                 name,
                 meta,
                 totalMembers: guildMembers.length,
@@ -207,6 +208,7 @@ export async function handleHiddenRosterResult({ interaction, name, deep, deepOp
               cap: deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit,
               scanStats: {
                 failed: altResult.failedCandidates || 0,
+                rateLimitRetries: altResult.rateLimitRetries || 0,
               },
               primaryEmbedJSON: primaryEmbed.toJSON(),
               contentText: '',
@@ -221,12 +223,12 @@ export async function handleHiddenRosterResult({ interaction, name, deep, deepOp
           }
         }
 
-        await interaction.editReply({ embeds: replyEmbeds, components: replyComponents });
+        await replyEditor.edit({ embeds: replyEmbeds, components: replyComponents });
 
         // DM the caller when deep scan was run (long-running). Skip
         // for plain /la-roster which finishes in seconds.
         if (deep && altResult) {
-          const replyMsg = await interaction.fetchReply().catch(() => null);
+          const replyMsg = replyEditor.getMessage();
           let outcome;
           if (altResult.cancelled) {
             outcome = altResult.alts.length > 0 ? 'stopped-with-alts' : 'stopped-no-alts';
@@ -251,7 +253,7 @@ export async function handleHiddenRosterResult({ interaction, name, deep, deepOp
       const suggestions = await fetchNameSuggestions(name) || [];
       const filtered = suggestions.filter((s) => s.itemLevel > 1700);
       if (filtered.length > 0) {
-        await interaction.editReply({
+        await replyEditor.edit({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.ERROR,
             title: 'No Roster Found',
@@ -261,7 +263,7 @@ export async function handleHiddenRosterResult({ interaction, name, deep, deepOp
           })],
         });
       } else {
-        await interaction.editReply({
+        await replyEditor.edit({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.ERROR,
             title: 'No Roster Found',

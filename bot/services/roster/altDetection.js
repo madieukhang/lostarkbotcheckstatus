@@ -29,6 +29,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
     : Math.max(1, Math.min(options.concurrency ?? config.strongholdDeepConcurrency, 12));
   const retryOnRateLimit = options.retryOnRateLimit ?? isGentle;
   const backoffFloorMs = isGentle ? 1500 : config.scanBackoffMinMs;
+  const rateLimitRetryDelayMs = options.rateLimitRetryDelayMs ?? (isGentle ? 8000 : undefined);
 
   const meta = options.targetMeta || await fetchCharacterMeta(name, {
     allowScraperApi: allowScraperApiForTarget,
@@ -97,6 +98,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
   let failedCandidates = 0;
   let scannedCandidates = 0;
   let nextCandidateIndex = 0;
+  let rateLimitRetries = 0;
 
   console.log(`[alt-detect] Scanning ${limitedCandidates.length} candidate(s)...`);
 
@@ -106,8 +108,9 @@ export async function detectAltsViaStronghold(name, options = {}) {
   const backoff = {
     current: backoffFloorMs,
     min: backoffFloorMs,
-    max: config.scanBackoffMaxMs,
+    max: isGentle ? Math.max(config.scanBackoffMaxMs, 8000) : config.scanBackoffMaxMs,
     step: 500,
+    rateLimitStep: 1500,
     recover: 100,
   };
 
@@ -125,20 +128,37 @@ export async function detectAltsViaStronghold(name, options = {}) {
       }
       const cand = limitedCandidates[nextCandidateIndex++];
       scannedNames.push(cand.name);
+      let candidateRateLimitRetries = 0;
       const candMeta = await fetchCharacterMeta(cand.name, {
         allowScraperApi: useScraperApiForCandidates,
         preferScraperApi: useScraperApiForCandidates,
         fallbackOnRateLimit: useScraperApiForCandidates,
         retryOnRateLimit,
+        rateLimitRetryDelayMs,
+        suppressRetryWarnings: isGentle,
+        onRetryableStatus: ({ status }) => {
+          if (status === 429) {
+            candidateRateLimitRetries++;
+            rateLimitRetries++;
+          }
+        },
         timeoutMs: candidateTimeoutMs,
       });
 
       scannedCandidates++;
+      if (candidateRateLimitRetries > 0) {
+        backoff.current = Math.min(
+          backoff.current + backoff.rateLimitStep * candidateRateLimitRetries,
+          backoff.max
+        );
+      }
       if (candMeta === null) {
         failedCandidates++;
         backoff.current = Math.min(backoff.current + backoff.step, backoff.max);
       } else {
-        backoff.current = Math.max(backoff.current - backoff.recover, backoff.min);
+        if (candidateRateLimitRetries === 0) {
+          backoff.current = Math.max(backoff.current - backoff.recover, backoff.min);
+        }
         if (candMeta.strongholdName === meta.strongholdName && candMeta.rosterLevel === meta.rosterLevel) {
           alts.push({
             name: cand.name,
@@ -157,7 +177,8 @@ export async function detectAltsViaStronghold(name, options = {}) {
       if (scannedCandidates % 25 === 0 || scannedCandidates === limitedCandidates.length) {
         console.log(
           `[alt-detect] Progress ${scannedCandidates}/${limitedCandidates.length};` +
-          ` failed ${failedCandidates}; alts ${alts.length}; backoff ${backoff.current}ms`
+          ` failed ${failedCandidates}; alts ${alts.length};` +
+          ` rate-limit retries ${rateLimitRetries}; backoff ${backoff.current}ms`
         );
       }
       if (
@@ -178,6 +199,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
             altsFound: alts.length,
             alts: alts.slice(),
             currentBackoffMs: backoff.current,
+            rateLimitRetries,
           })).catch((err) => {
             console.warn('[alt-detect] onProgress callback threw:', err?.message || err);
           });
@@ -223,6 +245,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
     skippedCandidates,
     excludedCandidates,
     failedCandidates,
+    rateLimitRetries,
     candidateLimit,
     concurrency,
     candidateTimeoutMs,

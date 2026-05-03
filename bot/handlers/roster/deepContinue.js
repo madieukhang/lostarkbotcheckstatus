@@ -16,6 +16,7 @@ import {
   unregisterScan,
 } from '../../utils/scanSession.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
+import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
 import {
   getRosterDeepSession,
   refreshRosterDeepSession,
@@ -70,6 +71,7 @@ export async function handleRosterDeepContinueButton(interaction) {
   }
 
   await interaction.deferUpdate();
+  const replyEditor = createLongRunningReplyEditor(interaction);
   session.inProgress = true;
   refreshRosterDeepSession(session);
 
@@ -109,7 +111,7 @@ export async function handleRosterDeepContinueButton(interaction) {
   });
 
   const primaryEmbed = EmbedBuilder.from(session.primaryEmbedJSON);
-  await interaction.editReply({
+  await replyEditor.edit({
     content: session.contentText || '',
     embeds: [primaryEmbed, progressEmbed],
     components: [buildStopButtonRow(scanSessionId)],
@@ -126,6 +128,7 @@ export async function handleRosterDeepContinueButton(interaction) {
       cancelFlag,
       onProgress: makeRosterScanProgressCallback({
         interaction,
+        replyEditor,
         name: session.targetName,
         meta: session.meta,
         totalMembers: session.guildMembers.length,
@@ -142,7 +145,7 @@ export async function handleRosterDeepContinueButton(interaction) {
   }
 
   if (!altResult) {
-    await interaction.editReply({
+    await replyEditor.edit({
       content: session.contentText || '',
       embeds: [primaryEmbed],
       components: [],
@@ -161,6 +164,7 @@ export async function handleRosterDeepContinueButton(interaction) {
   session.scanStats = {
     ...(session.scanStats || {}),
     failed: (session.scanStats?.failed ?? 0) + (altResult.failedCandidates || 0),
+    rateLimitRetries: (session.scanStats?.rateLimitRetries ?? 0) + (altResult.rateLimitRetries || 0),
   };
 
   // Cumulative result for display: invariants from the latest pass,
@@ -169,6 +173,7 @@ export async function handleRosterDeepContinueButton(interaction) {
     ...altResult,
     scannedCandidates: mergedScannedNames.length,
     failedCandidates: session.scanStats.failed,
+    rateLimitRetries: session.scanStats.rateLimitRetries,
     alts: mergedAlts,
     scannedNames: mergedScannedNames,
   };
@@ -196,7 +201,7 @@ export async function handleRosterDeepContinueButton(interaction) {
     clearRosterDeepSession(session.sessionId);
   }
 
-  await interaction.editReply({
+  await replyEditor.edit({
     content: session.contentText || '',
     embeds: [primaryEmbed, resultEmbed],
     components,
@@ -211,7 +216,7 @@ export async function handleRosterDeepContinueButton(interaction) {
     outcome = mergedAlts.length > 0 ? 'completed' : 'no-alts';
   }
   if (outcome) {
-    const replyMsg = await interaction.fetchReply().catch(() => null);
+    const replyMsg = replyEditor.getMessage();
     sendScanCompletionDm({
       user: interaction.user,
       commandLabel: '/la-roster deep · resume',
