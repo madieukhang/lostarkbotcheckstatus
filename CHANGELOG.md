@@ -4,6 +4,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.50] - 2026-05-03
+
+### Fixed
+- Scan progress embed (`/la-list enrich` + `/la-roster deep:true`) now renders the elapsed-time line as a live Discord-native relative timestamp instead of leaking the raw `<t:UNIX:R>` token. Discord parses timestamp tokens only inside message content + embed description, NOT inside footers / titles, so the "started X ago" line moved from footer to description. Footer now carries the static `Backoff Xms · 30s update interval` info instead.
+
+### Notes
+- Visual: officers watching a long scan now see an elapsed-time ticker that updates every minute as Discord re-renders the embed client-side, without needing the bot to push edits for each tick.
+- 42/42 tests pass.
+
 ## [v0.5.49] - 2026-05-03
 
 ### Changed
