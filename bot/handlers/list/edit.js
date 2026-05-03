@@ -36,6 +36,7 @@ import {
   normalizeCharacterName,
   getAddedByDisplay,
   getInteractionDisplayName,
+  parseAdditionalNames,
 } from '../../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
@@ -81,6 +82,10 @@ export function createEditHandlers({ client, services }) {
     // Optional scope override — only valid for blacklist entries (validated below).
     const newScopeRaw = interaction.options.getString('scope') || '';
     const newScope = newScopeRaw === 'global' || newScopeRaw === 'server' ? newScopeRaw : '';
+    // Manual alt append: officer/senior or entry owner only. Designed to
+    // fill the gap where /la-list enrich cant run (target has hidden
+    // roster AND no guild = no candidate pool to walk).
+    const additionalNamesRaw = interaction.options.getString('additional_names') || '';
 
     // Defer FIRST so the rehost (download + upload, can take 1-3s) does not
     // cross Discord's 3-second interaction ack window. Discord keeps the
@@ -123,8 +128,29 @@ export function createEditHandlers({ client, services }) {
     const currentType = blackEntry ? 'black' : whiteEntry ? 'white' : 'watch';
     const { label: currentLabel } = getListContext(currentType);
 
+    // Permission gate for additional_names: officer/senior or entry
+    // owner only. The approval flow used for member edits does not
+    // carry allCharacters changes through to the apply step, so reject
+    // up front rather than silently dropping the option.
+    if (additionalNamesRaw) {
+      const isOwnerForAdd = existing.addedByUserId === interaction.user.id;
+      const isApproverForAdd = isOfficerOrSenior(interaction.user.id);
+      if (!isOwnerForAdd && !isApproverForAdd) {
+        await interaction.editReply({
+          content: '🛡️ The `additional_names` option is officer-only (or the entry owner). Ask an officer to append the alts for you.',
+        });
+        return;
+      }
+    }
+
+    const additionalNamesParsed = parseAdditionalNames(
+      additionalNamesRaw,
+      existing.allCharacters || [],
+      existing.name
+    );
+
     // Check if anything is actually changing
-    if (!newReason && !newType && !newRaid && !newLogs && !newImageUrl && !newScope) {
+    if (!newReason && !newType && !newRaid && !newLogs && !newImageUrl && !newScope && !additionalNamesRaw) {
       await interaction.editReply({ content: `⚠️ No changes provided. Use options to specify what to edit.` });
       return;
     }
@@ -190,6 +216,12 @@ export function createEditHandlers({ client, services }) {
     if (newLogs) changes.push(`Logs: updated`);
     if (newImageUrl) changes.push(`Evidence: updated`);
     if (isScopeChange) changes.push(`Scope: ${existingObjForScope.scope || 'global'} → ${targetScope}`);
+    if (additionalNamesParsed.added.length > 0) {
+      const line = additionalNamesParsed.duplicates.length > 0
+        ? `Append alts: ${additionalNamesParsed.added.join(', ')} (skipped duplicates: ${additionalNamesParsed.duplicates.join(', ')})`
+        : `Append alts: ${additionalNamesParsed.added.join(', ')}`;
+      changes.push(line);
+    }
 
     // Catch the no-op case: user provided scope option but it matches the
     // existing scope, and no other fields are being changed. Rejecting here
@@ -280,7 +312,10 @@ export function createEditHandlers({ client, services }) {
             raid: newRaid || existing.raid,
             logsUrl: newLogs || existing.logsUrl,
             ...moveImageFields,
-            allCharacters: existing.allCharacters || [],
+            allCharacters: [
+              ...(existing.allCharacters || []),
+              ...additionalNamesParsed.added,
+            ],
             addedByUserId: existing.addedByUserId,
             addedByTag: existing.addedByTag,
             addedByDisplayName: existing.addedByDisplayName,
@@ -338,8 +373,14 @@ export function createEditHandlers({ client, services }) {
           }
 
           const { model } = getListContext(currentType);
+          const updateOps = { $set: updateFields };
+          if (additionalNamesParsed.added.length > 0) {
+            updateOps.$addToSet = {
+              allCharacters: { $each: additionalNamesParsed.added },
+            };
+          }
           try {
-            await model.updateOne({ _id: existing._id }, { $set: updateFields });
+            await model.updateOne({ _id: existing._id }, updateOps);
           } catch (err) {
             // Defense in depth: catch race-condition E11000 from the unique
             // index even though preflight should have caught it. Mongoose
@@ -355,8 +396,15 @@ export function createEditHandlers({ client, services }) {
 
           // Build a virtual post-edit entry by merging updateFields onto the
           // pre-edit snapshot. Avoids an extra round trip to fetch the updated
-          // doc just for the success embed.
+          // doc just for the success embed. allCharacters is merged separately
+          // because the persisted update used $addToSet, not $set.
           const editedEntry = { ...(existing.toObject?.() || existing), ...updateFields };
+          if (additionalNamesParsed.added.length > 0) {
+            editedEntry.allCharacters = [
+              ...(existing.allCharacters || []),
+              ...additionalNamesParsed.added,
+            ];
+          }
           const editFreshUrl = await resolveDisplayImageUrl(editedEntry, client);
 
           await interaction.editReply({

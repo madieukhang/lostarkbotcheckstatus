@@ -4,6 +4,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.32] - 2026-05-03
+
+### Added
+- `/la-list edit` gains an `additional_names` option: comma-separated alts to append to the entry's `allCharacters`. Officer/senior or entry owner only. Members with the option set get a clear reject (the approval flow does not carry `allCharacters` deltas through to the apply step, so silent dropping was the alternative). Designed to fill the gap where `/la-list enrich` cannot run, namely a target with hidden roster AND no guild (no candidate pool to walk).
+- `bot/utils/names.js` exports a pure `parseAdditionalNames` helper (split, trim, title-case, dedupe within input + against existing roster + entry's primary name). Returns `{ added, duplicates }` so the success message can surface skipped duplicates without confusing the officer.
+- `test/parse-additional-names.test.js`: 9 tests covering empty input, dedupe within input, dedupe against existing/primary, mixed partition, non-string input.
+
+### Notes
+- Persisted via `$addToSet` with `$each` for in-place edits; merged into the new `allCharacters` array for cross-list moves so `name` stays the primary identifier and the appended alts ride along.
+- Help text in `/la-help` does not yet surface the new option (parallel work in progress on `bot/handlers/helpHandler.js`); the option still appears in Discord's slash-command UI auto-help.
+
 ## [v0.5.31] - 2026-05-03
 
 ### Removed
