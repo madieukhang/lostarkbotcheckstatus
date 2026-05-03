@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import PendingApproval from '../../../models/PendingApproval.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 
 export async function sendListEditApprovalRequest({
   interaction,
@@ -58,7 +59,14 @@ export async function sendListEditApprovalRequest({
   });
 
   if (!sent.success) {
-    await interaction.editReply({ content: `⚠️ ${sent.reason}` });
+    await interaction.editReply({
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        title: 'Approval Delivery Failed',
+        description: sent.reason || 'Could not deliver the approval request.',
+        footer: 'No edit was applied. Try again or contact an officer directly.',
+      })],
+    });
     return;
   }
 
@@ -69,6 +77,16 @@ export async function sendListEditApprovalRequest({
   });
 
   await interaction.editReply({
-    content: `📨 Edit request sent for approval.\nChanges:\n${changes.map((c) => `• ${c}`).join('\n')}`,
+    embeds: [buildAlertEmbed({
+      severity: AlertSeverity.INFO,
+      titleIcon: '📨',
+      title: 'Edit Request Sent',
+      description: 'An approver has been notified. The edit will apply once approved.',
+      fields: [{
+        name: `Pending changes (${changes.length})`,
+        value: changes.map((c) => `• ${c}`).join('\n').slice(0, 1024),
+        inline: false,
+      }],
+    })],
   });
 }

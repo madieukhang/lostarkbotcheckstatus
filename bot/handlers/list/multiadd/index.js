@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { parseMultiaddFile } from '../../../services/multiaddTemplateService.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   downloadMultiaddAttachment,
   validateMultiaddAttachment,
@@ -38,7 +39,11 @@ export function createMultiaddHandlers({ client, services }) {
 
     if (!interaction.guild) {
       await interaction.reply({
-        content: '❌ This command can only be used in a server.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Server-Only Command',
+          description: 'This command can only be used inside a Discord server, not in DMs.',
+        })],
         ephemeral: true,
       });
       return;
@@ -51,7 +56,12 @@ export function createMultiaddHandlers({ client, services }) {
       } catch (err) {
         console.error('[multiadd] Template generation failed:', err);
         await interaction.editReply({
-          content: `❌ Failed to generate template: \`${err.message}\``,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Template Generation Failed',
+            description: 'Could not produce the bulk-add template file.',
+            fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+          })],
         });
       }
       return;
@@ -62,7 +72,11 @@ export function createMultiaddHandlers({ client, services }) {
       const validationError = validateMultiaddAttachment(file);
       if (validationError) {
         await interaction.reply({
-          content: validationError,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Invalid Attachment',
+            description: validationError,
+          })],
           ephemeral: true,
         });
         return;
@@ -72,14 +86,26 @@ export function createMultiaddHandlers({ client, services }) {
 
       const download = await downloadMultiaddAttachment(file);
       if (!download.ok) {
-        await interaction.editReply({ content: download.content });
+        await interaction.editReply({
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Download Failed',
+            description: download.content,
+          })],
+        });
         return;
       }
 
       const parsed = await parseMultiaddFile(download.buffer);
       if (!parsed.ok) {
         await interaction.editReply({
-          content: `❌ Parse failed: ${parsed.error}`,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Parse Failed',
+            description: 'Could not read the uploaded file.',
+            fields: [{ name: 'Error', value: parsed.error || 'unknown', inline: false }],
+            footer: 'Make sure the file is the unmodified template, .xlsx format.',
+          })],
         });
         return;
       }
@@ -112,7 +138,12 @@ export function createMultiaddHandlers({ client, services }) {
     }
 
     await interaction.reply({
-      content: `❌ Unknown action: \`${action}\`.`,
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.ERROR,
+        title: 'Unknown Action',
+        description: `\`${action}\` is not a valid multiadd action.`,
+        footer: 'Valid actions: template (download blank), file (upload filled).',
+      })],
       ephemeral: true,
     });
   }

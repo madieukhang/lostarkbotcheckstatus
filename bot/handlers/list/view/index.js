@@ -2,6 +2,7 @@ import config from '../../../config.js';
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { getListContext } from '../helpers.js';
 import {
   buildEvidenceEmbed,
@@ -77,7 +78,14 @@ async function buildGuildNameCache({ allEntries, client, isOwnerGuild }) {
 export function createViewHandlers({ client }) {
   async function handleListViewCommand(interaction) {
     if (!interaction.guild) {
-      await interaction.reply({ content: '❌ This command can only be used in a server.', ephemeral: true });
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Server-Only Command',
+          description: 'This command can only be used inside a Discord server, not in DMs.',
+        })],
+        ephemeral: true,
+      });
       return;
     }
 
@@ -92,7 +100,15 @@ export function createViewHandlers({ client }) {
       if (type === 'trusted') {
         const trustedEntries = await TrustedUser.find({}).sort({ addedAt: -1 }).lean();
         if (trustedEntries.length === 0) {
-          await interaction.editReply({ content: '🛡️ Trusted list is empty.' });
+          await interaction.editReply({
+            embeds: [buildAlertEmbed({
+              severity: AlertSeverity.INFO,
+              titleIcon: '🛡️',
+              title: 'Trusted List Empty',
+              description: 'No trusted users yet.',
+              footer: 'Use /la-list trust action:add to mark a character trusted (officer-only).',
+            })],
+          });
           return;
         }
         await interaction.editReply({ embeds: [buildTrustedListEmbed(trustedEntries)] });
@@ -104,10 +120,16 @@ export function createViewHandlers({ client }) {
       const allEntries = await loadListEntries({ isOwnerGuild, scopeFilter, type, viewGuildId });
 
       if (allEntries.length === 0) {
+        const ctx = type === 'all' ? null : getListContext(type);
         await interaction.editReply({
-          content: type === 'all'
-            ? 'All lists are empty.'
-            : `${getListContext(type).icon} ${getListContext(type).label} is empty.`,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.INFO,
+            titleIcon: ctx?.icon,
+            title: type === 'all' ? 'All Lists Empty' : `${ctx.label.charAt(0).toUpperCase() + ctx.label.slice(1)} Empty`,
+            description: type === 'all'
+              ? 'No entries in any list yet.'
+              : `No entries in the ${ctx.label} yet.`,
+          })],
         });
         return;
       }
@@ -144,7 +166,14 @@ export function createViewHandlers({ client }) {
 
       collector.on('collect', async (componentInteraction) => {
         if (componentInteraction.user.id !== interaction.user.id) {
-          await componentInteraction.reply({ content: '⛔ Only the command user can navigate.', ephemeral: true });
+          await componentInteraction.reply({
+            embeds: [buildAlertEmbed({
+              severity: AlertSeverity.ERROR,
+              title: 'Not Your Session',
+              description: 'Only the command user can navigate this list view.',
+            })],
+            ephemeral: true,
+          });
           return;
         }
 
@@ -180,13 +209,19 @@ export function createViewHandlers({ client }) {
 
       collector.on('end', async () => {
         await interaction.editReply({
-          content: '⏱️ Session expired. Use `/la-list view` again to browse.',
           components: buildExpiredComponents(),
         }).catch(() => {});
       });
     } catch (err) {
       console.error('[list] View failed:', err.message);
-      await interaction.editReply({ content: `⚠️ Failed to load list: \`${err.message}\`` });
+      await interaction.editReply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'View Failed',
+          description: 'Could not load the list.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        })],
+      });
     }
   }
 

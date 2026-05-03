@@ -3,6 +3,7 @@ import { EmbedBuilder } from 'discord.js';
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { COLORS } from '../../../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 
 export function createMultiaddApprovalButtonHandler(deps) {
   const {
@@ -27,13 +28,21 @@ export function createMultiaddApprovalButtonHandler(deps) {
       const stillExists = await PendingApproval.exists({ requestId, action: 'bulk' });
       if (stillExists) {
         await interaction.reply({
-          content: '⛔ You are not allowed to approve/reject this request.',
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Not Authorised',
+            description: 'You are not on the approver list for this request.',
+          })],
           ephemeral: true,
         });
       } else {
         await interaction.update({
-          content: '⚠️ This bulk approval request has already been processed or expired.',
-          embeds: [],
+          content: '',
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Request Expired',
+            description: 'This bulk-approval request has already been processed or expired.',
+          })],
           components: [],
         }).catch(() => {});
       }

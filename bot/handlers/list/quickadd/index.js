@@ -113,7 +113,13 @@ export function createQuickAddHandlers({ client, services }) {
     await interaction.deferReply({ ephemeral: true });
 
     if (!reason) {
-      await interaction.editReply({ content: '❌ Reason cannot be empty.' });
+      await interaction.editReply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Reason Required',
+          description: 'Every list entry needs a reason.',
+        })],
+      });
       return;
     }
 
@@ -158,7 +164,13 @@ export function createQuickAddHandlers({ client, services }) {
       // Non-approver → send approval request
       const sent = await sendListAddApprovalToApprovers(interaction.guild, payload);
       if (!sent.success) {
-        await interaction.editReply({ content: `⚠️ ${sent.reason}` });
+        await interaction.editReply({
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Approval Delivery Failed',
+            description: sent.reason || 'Could not deliver the approval request.',
+          })],
+        });
         return;
       }
 
@@ -170,12 +182,22 @@ export function createQuickAddHandlers({ client, services }) {
       });
 
       await interaction.editReply({
-        content: `📨 Approval request sent for **${name}** → ${type}list.`,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.INFO,
+          titleIcon: '📨',
+          title: 'Approval Request Sent',
+          description: `Request to add **${name}** to **${type}list** is awaiting approval.`,
+        })],
       });
     } catch (err) {
       console.error('[quickadd] Failed:', err.message);
       await interaction.editReply({
-        content: `⚠️ Failed: \`${err.message}\``,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Quick Add Failed',
+          description: 'Could not process the quick-add request.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        })],
       });
     }
   }

@@ -71,7 +71,14 @@ export function createTrustHandlers({ client }) {
     const isOfficerOrSenior = OFFICER_APPROVER_IDS.includes(userId) || SENIOR_APPROVER_IDS.includes(userId);
 
     if (!isOfficerOrSenior) {
-      await interaction.reply({ content: '❌ Only officers and seniors can manage the trusted list.', ephemeral: true });
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Officer-Only Command',
+          description: 'Only officers and seniors can manage the trusted list.',
+        })],
+        ephemeral: true,
+      });
       return;
     }
 
@@ -86,26 +93,31 @@ export function createTrustHandlers({ client }) {
     if (action === 'remove') {
       const deleted = await TrustedUser.findOneAndDelete({ name }).collation({ locale: 'en', strength: 2 });
       if (!deleted) {
-        await interaction.editReply({ content: `⚠️ **${name}** is not in the trusted list.` });
+        await interaction.editReply({
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Not Trusted',
+            description: `**${name}** is not in the trusted list, so there's nothing to remove.`,
+          })],
+        });
         return;
       }
 
       const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(deleted.name)}/roster`;
-      const embed = new EmbedBuilder()
-        .setTitle('🛡️ Trusted — Entry Removed')
-        .addFields(
+      const embed = buildAlertEmbed({
+        severity: AlertSeverity.SUCCESS,
+        titleIcon: '🛡️',
+        color: COLORS.danger,
+        title: 'Trusted · Entry Removed',
+        fields: [
           { name: 'Name', value: `[${deleted.name}](${rosterLink})`, inline: true },
           { name: 'Was trusted for', value: deleted.reason || 'N/A', inline: true },
           { name: 'Removed by', value: interaction.user.tag, inline: true },
-        )
-        .setColor(COLORS.danger)
-        .setFooter({ text: 'This character can now be blacklisted' })
-        .setTimestamp(new Date());
-
-      await interaction.editReply({
-        content: `🗑️ Removed **${deleted.name}** from the trusted list.`,
-        embeds: [embed],
+        ],
+        footer: 'This character can now be blacklisted.',
       });
+
+      await interaction.editReply({ embeds: [embed] });
 
       console.log(`[list] Trusted user removed: ${deleted.name} by ${interaction.user.tag}`);
       return;
@@ -114,7 +126,13 @@ export function createTrustHandlers({ client }) {
     // action === 'add'
     const existing = await TrustedUser.findOne({ name }).collation({ locale: 'en', strength: 2 });
     if (existing) {
-      await interaction.editReply({ content: `⚠️ **${existing.name}** is already in the trusted list.` });
+      await interaction.editReply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Already Trusted',
+          description: `**${existing.name}** is already in the trusted list.`,
+        })],
+      });
       return;
     }
 
@@ -125,7 +143,12 @@ export function createTrustHandlers({ client }) {
     ).collation({ locale: 'en', strength: 2 }).lean();
     if (blacklisted) {
       await interaction.editReply({
-        content: `⚠️ **${name}** is currently blacklisted (entry: **${blacklisted.name}**).\nRemove the blacklist entry first before trusting.`,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Blacklisted Character',
+          description: `**${name}** is currently blacklisted (entry: **${blacklisted.name}**).`,
+          footer: 'Remove the blacklist entry first before trusting this character.',
+        })],
       });
       return;
     }
@@ -138,21 +161,20 @@ export function createTrustHandlers({ client }) {
     });
 
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
-    const embed = new EmbedBuilder()
-      .setTitle('🛡️ Trusted — Entry Added')
-      .addFields(
+    const embed = buildAlertEmbed({
+      severity: AlertSeverity.SUCCESS,
+      titleIcon: '🛡️',
+      color: COLORS.trustedSoft,
+      title: 'Trusted · Entry Added',
+      fields: [
         { name: 'Name', value: `[${name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: reason || 'N/A', inline: true },
         { name: 'Added by', value: interaction.user.tag, inline: true },
-      )
-      .setColor(COLORS.trustedSoft)
-      .setFooter({ text: 'This character (and its alts) cannot be added to any list' })
-      .setTimestamp(new Date());
-
-    await interaction.editReply({
-      content: `🛡️ Added **${name}** to the trusted list.`,
-      embeds: [embed],
+      ],
+      footer: 'This character (and its alts) cannot be added to any list.',
     });
+
+    await interaction.editReply({ embeds: [embed] });
 
     console.log(`[list] Trusted user added: ${name} by ${interaction.user.tag}`);
   }
