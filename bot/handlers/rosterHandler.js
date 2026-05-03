@@ -33,19 +33,27 @@ import { getClassName } from '../models/Class.js';
 import { getAddedByDisplay, normalizeCharacterName } from '../utils/names.js';
 import { resolveDisplayImageUrl } from '../utils/imageRehost.js';
 import { buildScanProgressEmbed } from '../utils/scanProgressEmbed.js';
+import {
+  buildStopButtonRow,
+  newScanSessionId,
+  registerScan,
+  unregisterScan,
+} from '../utils/scanSession.js';
 
-// Discord webhook edits are rate-limited (5 per 5s). 30s throttle gives
-// ~10-14 progress updates over a typical 5-7 minute deep scan; well
-// under the rate-limit ceiling and matches /la-list enrich.
-const PROGRESS_EDIT_THROTTLE_MS = 30 * 1000;
+// Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
+// ~40-60 progress updates over a typical 10-15 minute gentle-mode
+// scan; well under the rate-limit ceiling. Tightened from 30s after
+// users reported the embed felt frozen between ticks.
+const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
 
 /**
  * Build the onProgress callback used by both the hidden-roster and the
- * visible-roster deep-scan paths. Wraps Discord editReply with a 30s
- * throttle and skips the final 100% tick because the post-scan branch
- * overwrites the embed immediately afterwards (would flicker for ms).
+ * visible-roster deep-scan paths. Wraps Discord editReply with a 15s
+ * throttle, preserves the Stop button row, and skips the final 100%
+ * tick because the post-scan branch overwrites the embed immediately
+ * afterwards (would flicker for ms).
  */
-function makeRosterScanProgressCallback({ interaction, name, meta, totalMembers, startedAtRef, lastEditRef }) {
+function makeRosterScanProgressCallback({ interaction, name, meta, totalMembers, startedAtRef, lastEditRef, cancelFlag, sessionId }) {
   return (progress) => {
     const now = Date.now();
     const isFinal = progress.scannedCandidates >= progress.totalCandidates;
@@ -54,6 +62,9 @@ function makeRosterScanProgressCallback({ interaction, name, meta, totalMembers,
     }
     lastEditRef.value = now;
     if (isFinal) return;
+    const buttonRow = cancelFlag?.cancelled
+      ? buildStopButtonRow(sessionId, { disabled: true, label: 'Stopping...' })
+      : buildStopButtonRow(sessionId);
     interaction.editReply({
       content: '',
       embeds: [buildScanProgressEmbed({
@@ -63,6 +74,7 @@ function makeRosterScanProgressCallback({ interaction, name, meta, totalMembers,
         color: COLORS.info,
         progress: { ...progress, totalMembers, startedAt: startedAtRef.value },
       })],
+      components: [buttonRow],
     }).catch((err) => {
       console.warn('[roster] Progress edit failed:', err?.message || err);
     });
@@ -153,12 +165,21 @@ export async function handleRosterCommand(interaction) {
         // into hundreds of lostark.bible profile requests on large guilds.
         let altResult = null;
         if (deep) {
-          // Send a 0% progress embed immediately so the officer knows the
-          // scan started. onProgress edits this same message every 30s.
+          // Send a 0% progress embed + Stop button immediately so the
+          // officer knows the scan started and has a way out if bible
+          // is hot. onProgress edits the same message every 15s.
           const startedAtRef = { value: Date.now() };
           const lastEditRef = { value: startedAtRef.value };
           const filteredCount = guildMembers.filter((m) => m.name !== name && m.ilvl >= 1700).length;
           const cap = deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit;
+          const sessionId = newScanSessionId();
+          const cancelFlag = { cancelled: false };
+          registerScan(sessionId, {
+            cancelFlag,
+            callerId: interaction.user.id,
+            startedAt: startedAtRef.value,
+            label: `${name} (roster deep · hidden)`,
+          });
           await interaction.editReply({
             content: '',
             embeds: [buildScanProgressEmbed({
@@ -175,21 +196,29 @@ export async function handleRosterCommand(interaction) {
                 startedAt: startedAtRef.value,
               },
             })],
+            components: [buildStopButtonRow(sessionId)],
           }).catch(() => {});
 
-          altResult = await detectAltsViaStronghold(name, {
-            ...deepOptions,
-            targetMeta: meta,
-            guildMembers,
-            onProgress: makeRosterScanProgressCallback({
-              interaction,
-              name,
-              meta,
-              totalMembers: guildMembers.length,
-              startedAtRef,
-              lastEditRef,
-            }),
-          });
+          try {
+            altResult = await detectAltsViaStronghold(name, {
+              ...deepOptions,
+              targetMeta: meta,
+              guildMembers,
+              cancelFlag,
+              onProgress: makeRosterScanProgressCallback({
+                interaction,
+                name,
+                meta,
+                totalMembers: guildMembers.length,
+                startedAtRef,
+                lastEditRef,
+                cancelFlag,
+                sessionId,
+              }),
+            });
+          } finally {
+            unregisterScan(sessionId);
+          }
         }
         const alts = altResult?.alts ?? [];
         const deepStats = formatDeepScanStats(altResult);
@@ -430,7 +459,16 @@ export async function handleRosterCommand(interaction) {
         // scan addFields). User trade-off: loses the in-progress glimpse
         // of the main roster card, but it was never rendered before the
         // scan anyway so nothing is actually lost.
-        if (visMeta?.guildName && visGuildMembers.length > 0) {
+        const hasGuildContext = visMeta?.guildName && visGuildMembers.length > 0;
+        const sessionId = hasGuildContext ? newScanSessionId() : null;
+        const cancelFlag = hasGuildContext ? { cancelled: false } : null;
+        if (hasGuildContext) {
+          registerScan(sessionId, {
+            cancelFlag,
+            callerId: interaction.user.id,
+            startedAt: startedAtRef.value,
+            label: `${name} (roster deep · visible)`,
+          });
           await interaction.editReply({
             content: '',
             embeds: [buildScanProgressEmbed({
@@ -447,24 +485,33 @@ export async function handleRosterCommand(interaction) {
                 startedAt: startedAtRef.value,
               },
             })],
+            components: [buildStopButtonRow(sessionId)],
           }).catch(() => {});
         }
 
-        const altResult = await detectAltsViaStronghold(name, {
-          ...deepOptions,
-          ...(visMeta ? { targetMeta: visMeta } : {}),
-          ...(visGuildMembers.length > 0 ? { guildMembers: visGuildMembers } : {}),
-          onProgress: visMeta?.guildName && visGuildMembers.length > 0
-            ? makeRosterScanProgressCallback({
-                interaction,
-                name,
-                meta: visMeta,
-                totalMembers: visGuildMembers.length,
-                startedAtRef,
-                lastEditRef,
-              })
-            : undefined,
-        });
+        let altResult;
+        try {
+          altResult = await detectAltsViaStronghold(name, {
+            ...deepOptions,
+            ...(visMeta ? { targetMeta: visMeta } : {}),
+            ...(visGuildMembers.length > 0 ? { guildMembers: visGuildMembers } : {}),
+            ...(cancelFlag ? { cancelFlag } : {}),
+            onProgress: hasGuildContext
+              ? makeRosterScanProgressCallback({
+                  interaction,
+                  name,
+                  meta: visMeta,
+                  totalMembers: visGuildMembers.length,
+                  startedAtRef,
+                  lastEditRef,
+                  cancelFlag,
+                  sessionId,
+                })
+              : undefined,
+          });
+        } finally {
+          if (sessionId) unregisterScan(sessionId);
+        }
         const deepStats = formatDeepScanStats(altResult);
         if (altResult && altResult.alts.length > 0) {
           const altLines = altResult.alts.map(

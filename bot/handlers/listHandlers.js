@@ -60,6 +60,7 @@ export function createListHandlers({ client }) {
     handleListEnrichConfirmButton: enrich.handleListEnrichConfirmButton,
     handleListEnrichCancelButton: enrich.handleListEnrichCancelButton,
     handleListAddEnrichHiddenButton: enrich.handleListAddEnrichHiddenButton,
+    handleScanCancelButton: enrich.handleScanCancelButton,
     handleQuickAddSelect: quickadd.handleQuickAddSelect,
     handleQuickAddModal: quickadd.handleQuickAddModal,
   };
