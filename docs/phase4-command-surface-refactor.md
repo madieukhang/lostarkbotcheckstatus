@@ -1,7 +1,9 @@
 # Phase 4 — Command Surface Refactor (Design Document)
 
-> **Status:** Pending review. NOT executed.
+> **Status:** Direction D approved (la- prefix universal rename, keep /list namespace). NOT executed.
 > **Drafted:** 2026-05-03 by Senko, based on Traine's flag "list list nhiều quá".
+> **Updated 2026-05-03 (am):** Traine added the `la-` prefix directive — every bot command must carry it so Discord autocomplete groups them under `/la`.
+> **Updated 2026-05-03 (pm):** Direction B (entity split) **rejected** by Traine — users are already used to the `/list ...` prefix and splitting blacklist/whitelist/watchlist into top-level entity commands would break that habit. Pivoted to Direction D: keep the `/list` subcommand tree structurally identical, just rename to `/la-list` and rename every other top-level command to add `la-`.
 > **Predecessor work:** Item 2 Phases 1-3 shipped 2026-05-03 (commits `2908724`, `e5220db`, `30b64d7`, `9722c20`).
 
 This document is the writing-plan for Phase 4. It does not change code. Once Traine picks a direction and answers the open questions at the bottom, a follow-up session executes the refactor.
@@ -78,34 +80,90 @@ Promote each verb out of the `/list` namespace to a top-level command. Type/list
 
 **Migration cost:** Highest — every command renamed, help/welcome/docs all rewritten, users have to relearn the entire surface.
 
-### Direction B — Entity-based top-level (Senko's recommendation)
+### Direction B — Entity-based top-level (REJECTED 2026-05-03 pm)
 
-Each list type gets its own command tree with the verbs nested under it.
+Rejected because users are already familiar with the `/list ...` prefix and splitting it into per-entity top-level commands (`/la-blacklist`, `/la-whitelist`, `/la-watchlist`) breaks that habit. The cognitive-load benefit is real but does not outweigh the disruption of established workflows. Direction kept in this document for historical context.
+
+### Direction B (rejected) — original proposal
+
+Each list type gets its own command tree with the verbs nested under it. **All commands carry the `la-` prefix** (Traine's directive 2026-05-03) so Discord autocomplete groups every bot command under `/la`. This unifies the existing `/lahelp` / `/lasetup` / `/lastats` / `/laremote` surface with the new entity commands and folds in the legacy non-prefixed commands (`/status`, `/reset`, `/roster`, `/search`, `/listcheck`, `/list *`).
+
+**New entity-based command tree:**
 
 ```
-/blacklist add name:... reason:...
-/blacklist edit name:...
-/blacklist remove name:...
-/blacklist view [scope:...]
-/blacklist enrich name:...
-/blacklist bulk action:<template|file>
+/la-blacklist add name:... reason:...
+/la-blacklist edit name:...
+/la-blacklist remove name:...
+/la-blacklist view [scope:...]
+/la-blacklist enrich name:...
+/la-blacklist bulk action:<template|file>
 
-/whitelist add name:... reason:...
-/whitelist edit name:...
-/whitelist remove name:...
-/whitelist view
+/la-whitelist add name:... reason:...
+/la-whitelist edit name:...
+/la-whitelist remove name:...
+/la-whitelist view
 
-/watchlist add name:... reason:...
-/watchlist edit name:...
-/watchlist remove name:...
-/watchlist view
+/la-watchlist add name:... reason:...
+/la-watchlist edit name:...
+/la-watchlist remove name:...
+/la-watchlist view
 
-/trust add name:... reason:...   (separate, not under any list)
-/trust remove name:...
-/trust view
+/la-trust add name:... reason:...    (separate, not under any list)
+/la-trust remove name:...
+/la-trust view
 
-/check image:...                 (OCR cross-list, replaces /listcheck)
+/la-check image:...                  (OCR cross-list, replaces /listcheck)
 ```
+
+**Renames of existing non-list commands** (to fit the unified `la-` prefix):
+
+| Old | New |
+|-----|-----|
+| `/status` | `/la-status` |
+| `/reset` | `/la-reset` |
+| `/roster` | `/la-roster` |
+| `/search` | `/la-search` |
+| `/listcheck` | `/la-check` (also moves into the entity-aware namespace conceptually) |
+| `/lahelp` | `/la-help` |
+| `/lasetup` | `/la-setup` |
+| `/lastats` | `/la-stats` |
+| `/laremote` | `/la-remote` |
+
+**Final surface count (under rejected Direction B):** 13 top-level commands, all `la-` prefixed. Discord autocomplete on `/la` surfaces every one of them in a single grouped list. Rejected — see top of section for reasoning.
+
+### Direction D — Universal `la-` prefix, keep `/list` namespace (APPROVED)
+
+Smallest behavioral change while still hitting the autocomplete-grouping goal. Every top-level command is renamed to add the `la-` prefix; the `/list` subcommand tree keeps its structure exactly as it is today.
+
+**New surface:**
+
+```
+/la-list add type:<black|white|watch> name:... reason:...
+/la-list edit name:...
+/la-list remove name:...
+/la-list view type:...
+/la-list trust action:<add|remove> name:...
+/la-list enrich name:...
+/la-list multiadd action:<template|file>
+
+/la-status
+/la-reset
+/la-roster <name> [deep] [deep_limit]
+/la-search <name> [filters]
+/la-check image:...                  (renamed from /listcheck)
+/la-help [lang]                      (renamed from /lahelp)
+/la-setup ...                        (renamed from /lasetup)
+/la-stats                            (renamed from /lastats)
+/la-remote ...                       (renamed from /laremote)
+```
+
+**Rationale:**
+- Preserves established `/list <verb>` muscle memory for daily users — they only learn the `la-` prefix, the verbs and option layouts stay identical.
+- Adds the autocomplete-grouping benefit Traine wanted: typing `/la` in Discord surfaces every bot command as a grouped suggestion list.
+- Touches every command file but in a uniform mechanical way (rename + register both old and new aliases during the soft-deprecation window).
+- Open: do we ALSO merge `add` + `multiadd` into `/la-list add mode:<single|bulk>` while we are renaming? See open question 5 below.
+
+**Final surface count under Direction D:** 10 top-level commands (one `/la-list` parent with 7 subcommands + 9 other top-level commands), every name `la-` prefixed.
 
 **Pros:**
 - Maps onto how users think: "I want to blacklist this guy" -> `/blacklist add`. Type is primary, verb is secondary.
@@ -149,44 +207,51 @@ Keep the `/list` prefix; merge the add variants into one subcommand with a mode 
 
 ---
 
-## 3. Recommendation: Direction B (entity-based)
+## 3. Decision: Direction D — universal `la-` prefix, keep `/list` namespace (approved)
 
-Senko's call. Reasoning:
+**Approved by Traine 2026-05-03 pm.** Decision path:
 
-1. **It directly addresses the "list list nhiều quá" complaint** by making the entity the primary identifier instead of the verb. Users no longer scan 7 subcommands to find the one they want.
-2. **It matches the underlying data model.** Each list is already a separate Mongoose model with its own collection and its own scope rules (only blacklist supports `server` scope). Surfacing this in the command tree makes the model visible to users instead of hidden behind a `type:` option.
-3. **It is the only direction that lets `/blacklist` and `/whitelist` diverge cleanly.** Today they share `/list add` but blacklist has scope/image/approval flow that whitelist does not. After the split, each entity command can carry exactly the options it needs.
-4. **Migration is one-shot, but well-scoped.** Users learn three new prefixes (`/blacklist`, `/whitelist`, `/watchlist`) plus `/trust` and `/check`. After the rollout window, the mental model is permanent.
+1. Original draft recommended Direction B (entity-based split into `/la-blacklist`, `/la-whitelist`, `/la-watchlist`). Rejected because users are already used to the `/list ...` prefix and splitting it breaks established habit.
+2. Pivot to Direction D: keep the `/list` subcommand tree intact, just rename to `/la-list` and rename every other top-level command to add `la-`.
 
-Direction A (verb-based) was tempting for typing brevity, but Senko vetoed it because top-level generic verbs (`/add`, `/edit`, `/view`) are too easy to collide with future commands and the result reads less self-describing.
+**Why this is the right call:**
 
-Direction C (mode-flag merge) is the smallest change but leaves the deeper structural problem alone.
+1. **Preserves user habit.** Daily users keep typing `/list add`, `/list view`, `/list edit` exactly as before — only the prefix changes. Cognitive load of relearning is the smallest of the three remaining options.
+2. **Hits the autocomplete-grouping goal.** Typing `/la` in Discord surfaces every bot command as one grouped suggestion list. That was the explicit Traine directive and the main UX win.
+3. **Mechanical execution.** Every command file is touched but in a uniform rename pattern. Low risk of behavior change during the rename pass.
+4. **Soft-deprecation friendly.** During the rollout window, both old and new names can be registered as aliases pointing at the same handler. Users see both in autocomplete with the new one preferred; old name redirects with a deprecation banner.
+
+Direction A (verb-based, no prefix) — rejected: too generic, prone to collision with other bots' commands.
+Direction B (entity split) — rejected: breaks user habit (Traine 2026-05-03 pm).
+Direction C (mode-flag merge inside `/list`) — partial overlap with D. The merge piece (`add` + `multiadd` -> `add mode:single|bulk`) is now an open sub-question (#5) rather than a separate direction; if Traine wants it, we fold it into the Direction D rename pass.
 
 ---
 
-## 4. Migration strategy (if Direction B is approved)
+## 4. Migration strategy (Direction D)
 
-1. **Phase 4a — implement new commands behind a flag.** Add the new `/blacklist`, `/whitelist`, `/watchlist`, `/trust`, `/check` command tree alongside the existing `/list *` and `/listcheck`. Both surfaces work, share handlers via a thin adapter that translates the new args into the existing handler signatures. No DB schema change.
-2. **Phase 4b — soft deprecate.** Add a one-line deprecation notice on every `/list <subcommand>` reply: "*Note: `/list add` will be replaced by `/blacklist add` on YYYY-MM-DD. The new commands are live now — try them out.*" Help text shows both surfaces with the new one starred.
-3. **Phase 4c — hard deprecate.** Remove `/list *` and `/listcheck` from the slash command registration. Discord drops them on next deploy. Help text shows only the new surface. Welcome embed updated.
-4. **Phase 4d — cleanup.** Delete the adapter layer; handlers are called directly from the new dispatch.
+1. **Phase 4a — register both old and new names.** Each command (top-level and the `/list` subcommand parent) is registered twice in `commands.js` with the same handler: the old name (`status`, `roster`, `list`, `lahelp`, etc.) plus the new name (`la-status`, `la-roster`, `la-list`, `la-help`, etc.). Both work. No internal logic change. Help text starts showing only the new names.
+2. **Phase 4b — soft deprecate.** Every reply from an old-name invocation prepends a one-line banner: "*Note: `/list add` is now `/la-list add`. The old name will stop working on YYYY-MM-DD. Try `/la-list add`.*" Help/welcome embed list only the new names.
+3. **Phase 4c — hard deprecate.** Remove the old aliases from `commands.js`. Discord drops them on next deploy. Help text shows only the new surface; welcome embed updated.
+4. **Phase 4d — cleanup.** Remove any leftover banner code introduced in 4b.
 
-Each phase is its own commit. Phases 4a and 4b can ship in the same release; 4c is the breaking change and gets its own commit with a clear CHANGELOG entry. Phase 4d is bookkeeping.
+Each phase is its own commit. 4a and 4b can ship in the same release; 4c is the breaking change and gets its own commit with a clear CHANGELOG entry. 4d is bookkeeping.
 
-Suggested deprecation window: **2 weeks** between 4b ship and 4c ship. Long enough for daily users to see the deprecation notice at least once.
+Suggested deprecation window: **2 weeks** between 4b ship and 4c ship. Long enough for daily users to see the deprecation banner at least once on every command they use regularly.
+
+**Optional add-on (open question 5):** if Traine wants `/list add` and `/list multiadd` merged into `/la-list add mode:<single|bulk>`, that change folds into Phase 4a — same rename pass, plus the merge logic in the add handler. Recommend deciding before 4a starts so we don't ship a rename and then a structural change back-to-back.
 
 ---
 
 ## 5. Open questions for Traine
 
-These are the decisions Senko cannot make alone. Phase 4 execution is blocked on them.
+Direction D is approved. These remaining decisions still need answers before Phase 4a code execution.
 
-1. **Pick a direction (A / B / C).** Senko recommends B but the call is yours.
-2. **Should `/list trust` move to a new top-level `/trust`, or stay nested under one of the new commands?** Senko proposes top-level `/trust` because it is conceptually orthogonal. But if users always think of it as "the fourth list," nesting it (e.g. `/trust add`) is fine.
-3. **Rename `/listcheck` to `/check`?** Both are short. `/check` is more general. Possible collision with future "check server status" command — but `/status` already covers that.
-4. **Soft-deprecation window length** (1 week / 2 weeks / 1 month). Longer = friendlier to users, shorter = less time maintaining two surfaces.
-5. **Should `bulk` (current `/list multiadd`) live under `/blacklist` only, or under each list type?** Senko's read: blacklist is the only list that benefits from xlsx bulk import (whitelist and watchlist are typically small + curated). Default to blacklist-only.
-6. **Welcome / pinned embed updates** are part of the rollout — does the bot have an existing welcome embed flow we need to update too? (Senko did not see one in the LoaLogs side; only `/lasetup` for channel config.)
+1. ~~Pick a direction (A / B / C).~~ **Answered: Direction D.**
+2. **Soft-deprecation window length** (1 week / 2 weeks / 1 month). Longer = friendlier to users, shorter = less time maintaining two surfaces. Senko default: 2 weeks.
+3. **Should `/list multiadd` merge into `/la-list add mode:<single|bulk>` during the rename?** Pros: cleaner subcommand tree (6 instead of 7), aligns with how users think (one "add" entry point). Cons: changes both name AND structure in the same pass — slightly more user disruption. Senko leans **no merge** to keep Phase 4 pure rename, leave merge as a separate later proposal if still wanted.
+4. **Should `/listcheck` rename to `/la-check` or `/la-listcheck`?** `/la-check` is shorter; `/la-listcheck` preserves the "list-related verb" association. Senko leans `/la-check` since the OCR cross-list lookup is the "check" verb conceptually.
+5. **Should we ALSO standardize the existing `/lahelp` / `/lasetup` / `/lastats` / `/laremote` to the dashed form `/la-help` etc.?** Required for consistency under Direction D. The cost is breaking those existing four commands too; they currently work without a dash. Senko recommends **yes, standardize** so the entire `la-` family is uniform.
+6. **Welcome / pinned embed updates** — does LoaLogs have an existing welcome embed flow we need to refresh, or only the help text? Senko did not see one; only `/lasetup` for channel config. If a welcome surface exists, point Senko at it for Phase 4b.
 
 ---
 
