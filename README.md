@@ -267,7 +267,7 @@ Copy `.env.example` to `.env` and fill in values.
 | `STRONGHOLD_DEEP_CANDIDATE_LIMIT` | `300` | Max guild candidates checked by `/la-roster deep:true` |
 | `STRONGHOLD_DEEP_CONCURRENCY` | `3` | Parallel candidate profile fetches in Stronghold deep scans |
 | `STRONGHOLD_DEEP_CANDIDATE_TIMEOUT_MS` | `8000` | Timeout per Stronghold candidate lookup |
-| `STRONGHOLD_DEEP_USE_SCRAPERAPI` | `false` | Enable ScraperAPI for deep candidate fan-out only when explicitly needed |
+| `STRONGHOLD_DEEP_USE_SCRAPERAPI` | `false` | Low-level default for detector callers that do not override it; command handlers keep high-fanout scans off |
 | `AUTO_CHECK_CHANNEL_IDS` | — | Global fallback for auto-check (prefer per-server `/la-setup`) |
 | `LIST_NOTIFY_CHANNEL_IDS` | — | Global fallback for list notifications |
 | `OFFICER_APPROVER_IDS` | — | Officer Discord user IDs (instant approval on `/la-list add`) |
