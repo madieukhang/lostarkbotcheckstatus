@@ -8,6 +8,18 @@ import { getClassName } from '../models/Class.js';
 import { getAddedByDisplay } from '../utils/names.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
 import { decodeBibleData, findBibleNode } from '../utils/bibleData.js';
+import {
+  configureMetaCache,
+  getCachedMeta,
+  setCachedMeta,
+} from '../utils/metaCache.js';
+
+// Boot-time configuration so the cache picks up env-driven TTL/size
+// before any fetchCharacterMeta caller runs.
+configureMetaCache({
+  ttlMs: config.metaCacheTtlMs,
+  maxSize: config.metaCacheMaxSize,
+});
 
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('error', () => {});
@@ -474,6 +486,16 @@ export async function fetchCharacterMeta(name, options = {}) {
   // parse path only: structured JSON instead of fragile regex on
   // hydration script. HTML scrape kept as a defensive fallback because
   // bible's __data.json layout is internal and could shift on a deploy.
+  //
+  // Cache layer (Phase 2): successful results are cached in a 30-min
+  // LRU+TTL store so back-to-back /roster deep and /list enrich on the
+  // same character cluster do not refetch. Caller can opt out with
+  // `useCache: false`. Transient failures (null results) are NOT
+  // cached to avoid pinning a 429 outage into the cache.
+  if (options.useCache !== false) {
+    const cached = getCachedMeta(name);
+    if (cached !== undefined) return cached;
+  }
   try {
     const jsonUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/__data.json`;
     const htmlUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}`;
@@ -656,6 +678,20 @@ export async function detectAltsViaStronghold(name, options = {}) {
 
   console.log(`[alt-detect] Scanning ${limitedCandidates.length} candidate(s)...`);
 
+  // Shared adaptive backoff state across all workers in this scan.
+  // Each iteration pauses `current` ms before the next fetch. When any
+  // worker observes a transient failure (null result), `current` grows
+  // by `step` up to `max` so all workers slow down together. A clean
+  // success shrinks it by `recover` down to `min` for gradual recovery.
+  // Starts at the minimum so a healthy bible runs at the floor pace.
+  const backoff = {
+    current: config.scanBackoffMinMs,
+    min: config.scanBackoffMinMs,
+    max: config.scanBackoffMaxMs,
+    step: 500,
+    recover: 100,
+  };
+
   async function scanWorker() {
     while (nextCandidateIndex < limitedCandidates.length) {
       const cand = limitedCandidates[nextCandidateIndex++];
@@ -670,19 +706,33 @@ export async function detectAltsViaStronghold(name, options = {}) {
       scannedCandidates++;
       if (candMeta === null) {
         failedCandidates++;
-      } else if (candMeta.strongholdName === meta.strongholdName && candMeta.rosterLevel === meta.rosterLevel) {
-        alts.push({
-          name: cand.name,
-          classId: cand.cls,
-          className: getClassName(cand.cls),
-          itemLevel: cand.ilvl,
-          rank: cand.rank,
-        });
-        console.log(`[alt-detect] Match found: ${cand.name}`);
+        backoff.current = Math.min(backoff.current + backoff.step, backoff.max);
+      } else {
+        backoff.current = Math.max(backoff.current - backoff.recover, backoff.min);
+        if (candMeta.strongholdName === meta.strongholdName && candMeta.rosterLevel === meta.rosterLevel) {
+          alts.push({
+            name: cand.name,
+            classId: cand.cls,
+            className: getClassName(cand.cls),
+            itemLevel: cand.ilvl,
+            rank: cand.rank,
+          });
+          console.log(`[alt-detect] Match found: ${cand.name}`);
+        }
       }
 
       if (scannedCandidates % 25 === 0 || scannedCandidates === limitedCandidates.length) {
-        console.log(`[alt-detect] Progress ${scannedCandidates}/${limitedCandidates.length}; failed ${failedCandidates}; alts ${alts.length}`);
+        console.log(
+          `[alt-detect] Progress ${scannedCandidates}/${limitedCandidates.length};` +
+          ` failed ${failedCandidates}; alts ${alts.length}; backoff ${backoff.current}ms`
+        );
+      }
+
+      // Inter-iteration pause to give bible breathing room. Skip on the
+      // last candidate so the worker exits promptly instead of waiting
+      // for nothing.
+      if (nextCandidateIndex < limitedCandidates.length) {
+        await new Promise((r) => setTimeout(r, backoff.current));
       }
     }
   }
