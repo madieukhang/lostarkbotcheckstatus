@@ -8,14 +8,14 @@
  * directly means the image silently 404s after a day or two — which is bad
  * for evidence data that's supposed to live as long as the entry does.
  *
- * Solution: when a user attaches an image to /list add (or similar), the bot
+ * Solution: when a user attaches an image to /la-list add (or similar), the bot
  * immediately re-uploads it to a dedicated "evidence channel" in the owner
  * guild. The bot then stores the rehosted message ID + channel ID instead of
  * the URL. When the image needs to be displayed later, the bot fetches the
  * stored message via the Discord API — Discord re-signs the attachment URL
  * with a fresh expiry on every fetch, so the link is always valid.
  *
- * The evidence channel is configured via /laremote action:evidencechannel
+ * The evidence channel is configured via /la-remote action:evidencechannel
  * (Senior-only) and stored on the owner guild's GuildConfig.evidenceChannelId.
  * If unset, the bot falls back to legacy direct-URL storage with a warning.
  */
@@ -47,7 +47,7 @@ export async function getEvidenceChannelId() {
  * @param {string} [meta.listType] - 'black' / 'white' / 'watch'
  * @param {boolean} [meta.throwOnError] - When true, throws an Error with a
  *   specific message instead of returning null on any failure path. Used by
- *   callers (like /laremote action:syncimages) that need the actual error
+ *   callers (like /la-remote action:syncimages) that need the actual error
  *   text in their reporting. Default behavior (false) preserves backward
  *   compatibility with the original null-on-failure contract.
  * @returns {Promise<{ messageId: string, channelId: string, freshUrl: string } | null>}
@@ -70,7 +70,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   // Resolve evidence channel ID from owner guild's GuildConfig
   const channelId = await getEvidenceChannelId();
   if (!channelId) {
-    return fail('No evidence channel configured. Use /laremote action:evidencechannel to set one.');
+    return fail('No evidence channel configured. Use /la-remote action:evidencechannel to set one.');
   }
 
   // Step 1: Download the original image (URL still valid at this point).

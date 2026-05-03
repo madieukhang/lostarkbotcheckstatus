@@ -1,7 +1,7 @@
 /**
  * multiaddTemplateService.js
  *
- * Standalone .xlsx template generator + parser for /list multiadd.
+ * Standalone .xlsx template generator + parser for /la-list multiadd.
  * Kept in its own module so it has zero dependencies on config/db/discord,
  * making it trivially importable and testable in isolation. The only
  * internal import is the RAIDS enum, which is a pure data module.
@@ -21,7 +21,7 @@
 
 import { RAIDS } from '../models/Raid.js';
 
-// Max rows allowed in /list multiadd Excel file (excluding header)
+// Max rows allowed in /la-list multiadd Excel file (excluding header)
 export const MULTIADD_MAX_ROWS = 30;
 
 // Pre-computed set for fast raid validation in parseMultiaddFile
@@ -100,7 +100,7 @@ function gradientBlurple() {
 }
 
 /**
- * Build an .xlsx template buffer for /list multiadd.
+ * Build an .xlsx template buffer for /la-list multiadd.
  * Returns a Buffer suitable for AttachmentBuilder.
  */
 export async function buildMultiaddTemplate() {
@@ -344,7 +344,7 @@ function buildInstructionsSheet(wb) {
   // ---------- Row 1: Title banner ----------
   ins.mergeCells('A1:B1');
   const titleCell = ins.getCell('A1');
-  titleCell.value = '📖  INSTRUCTIONS — /list multiadd';
+  titleCell.value = '📖  INSTRUCTIONS — /la-list multiadd';
   titleCell.font = {
     name: 'Segoe UI Semibold',
     bold: true,
@@ -455,10 +455,10 @@ function buildInstructionsSheet(wb) {
     COLOR_SEC_BLUE_TEXT,
     COLOR_GRAY_50,
     [
-      ['Step 1', '/list multiadd action:template  →  downloads this file'],
+      ['Step 1', '/la-list multiadd action:template  →  downloads this file'],
       ['Step 2', 'Replace or delete the three colored example rows (5-7) first'],
       ['Step 3', 'Fill in your own entries below the header (up to 30 total)'],
-      ['Step 4', '/list multiadd action:file file:<your.xlsx>  →  preview'],
+      ['Step 4', '/la-list multiadd action:file file:<your.xlsx>  →  preview'],
       ['Step 5', 'Click Confirm to add, or Cancel to abort'],
     ]
   );
@@ -499,7 +499,7 @@ function buildInstructionsSheet(wb) {
       ['File type', '.xlsx only'],
       ['Preview TTL', '5 minutes, then you must re-upload'],
       ['ilvl gate', 'Characters below ilvl 1700 are rejected'],
-      ['Trusted', 'Trusted users (/list trust) are auto-skipped'],
+      ['Trusted', 'Trusted users (/la-list trust) are auto-skipped'],
       ['Duplicates', 'Existing entries are reported as Skipped, not re-added'],
     ]
   );

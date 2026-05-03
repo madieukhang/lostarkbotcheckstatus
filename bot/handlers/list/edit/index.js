@@ -12,40 +12,40 @@ import {
   TextInputStyle,
 } from 'discord.js';
 
-import { connectDB } from '../../db.js';
-import config from '../../config.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import Watchlist from '../../models/Watchlist.js';
-import GuildConfig from '../../models/GuildConfig.js';
-import PendingApproval from '../../models/PendingApproval.js';
-import TrustedUser from '../../models/TrustedUser.js';
-import { getClassName } from '../../models/Class.js';
+import { connectDB } from '../../../db.js';
+import config from '../../../config.js';
+import Blacklist from '../../../models/Blacklist.js';
+import Whitelist from '../../../models/Whitelist.js';
+import Watchlist from '../../../models/Watchlist.js';
+import GuildConfig from '../../../models/GuildConfig.js';
+import PendingApproval from '../../../models/PendingApproval.js';
+import TrustedUser from '../../../models/TrustedUser.js';
+import { getClassName } from '../../../models/Class.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
   fetchCharacterMeta,
   detectAltsViaStronghold,
-} from '../../services/rosterService.js';
+} from '../../../services/rosterService.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
   formatCheckResults,
-} from '../../services/listCheckService.js';
+} from '../../../services/listCheckService.js';
 import {
   normalizeCharacterName,
   getAddedByDisplay,
   getInteractionDisplayName,
   parseAdditionalNames,
-} from '../../utils/names.js';
-import { buildBlacklistQuery, getGuildConfig } from '../../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
-import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../utils/imageRehost.js';
+} from '../../../utils/names.js';
+import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import {
   buildMultiaddTemplate,
   parseMultiaddFile,
   MULTIADD_MAX_ROWS,
-} from '../../services/multiaddTemplateService.js';
+} from '../../../services/multiaddTemplateService.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -57,7 +57,7 @@ import {
   getSeniorApproverIds,
   buildApprovalResultRow,
   buildApprovalProcessingRow,
-} from './helpers.js';
+} from '../helpers.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
@@ -277,7 +277,7 @@ export function createEditHandlers({ client, services }) {
           const nameMatch = { $or: [{ name: existing.name }, { allCharacters: existing.name }] };
           let preflightQuery;
           if (targetType === 'black') {
-            // Blacklist: only check global + own server entries (same as /list add)
+            // Blacklist: only check global + own server entries (same as /la-list add)
             preflightQuery = { $and: [nameMatch, { $or: [
               { scope: 'global' },
               { scope: { $exists: false } },

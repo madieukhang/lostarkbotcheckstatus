@@ -20,7 +20,7 @@ const whitelistSchema = new mongoose.Schema({
     trim: true,
   },
 
-  /** Optional raid tag selected from /list add */
+  /** Optional raid tag selected from /la-list add */
   raid: {
     type: String,
     default: '',
@@ -106,7 +106,7 @@ whitelistSchema.index(
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 
-// Index on allCharacters for fast $in lookups during roster/listcheck cross-checks
+// Index on allCharacters for fast $in lookups during roster/la-check cross-checks
 whitelistSchema.index({ allCharacters: 1 });
 
 export default mongoose.model('whitelist', whitelistSchema, 'whitelist');

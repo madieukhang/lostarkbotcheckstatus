@@ -72,7 +72,7 @@ export async function getGuildConfig(guildId) {
 }
 
 /**
- * Invalidate cache for a guild (call after /lasetup changes).
+ * Invalidate cache for a guild (call after /la-setup changes).
  * @param {string} guildId
  */
 export function invalidateGuildConfig(guildId) {

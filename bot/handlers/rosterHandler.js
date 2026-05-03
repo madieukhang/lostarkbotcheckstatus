@@ -53,7 +53,7 @@ export async function handleRosterCommand(interaction) {
   const name = normalizeCharacterName(raw);
   const deep = interaction.options.getBoolean('deep') ?? false;
   const deepLimit = interaction.options.getInteger('deep_limit');
-  // ScraperAPI is intentionally locked off for /roster deep candidate
+  // ScraperAPI is intentionally locked off for /la-roster deep candidate
   // scans: team policy (per Dusk's review) is to never burn ScraperAPI
   // quota on the per-candidate fetch fan-out, since it can blow through
   // the daily cap on a single large guild like Bullet Shell. The user-
@@ -103,8 +103,16 @@ export async function handleRosterCommand(interaction) {
             .lean(),
         ]);
 
-        // Step 3: Stronghold fingerprint scan for same-account alts
-        const altResult = await detectAltsViaStronghold(name, deepOptions);
+        // Step 3: Stronghold fingerprint scan for same-account alts.
+        // This is intentionally gated behind deep:true because it can fan out
+        // into hundreds of lostark.bible profile requests on large guilds.
+        const altResult = deep
+          ? await detectAltsViaStronghold(name, {
+              ...deepOptions,
+              targetMeta: meta,
+              guildMembers,
+            })
+          : null;
         const alts = altResult?.alts ?? [];
         const deepStats = formatDeepScanStats(altResult);
 
@@ -123,6 +131,11 @@ export async function handleRosterCommand(interaction) {
             ...alts.map(
               (a, i) => `${i + 1}. [${a.name}](https://lostark.bible/character/NA/${encodeURIComponent(a.name)}/roster) · ${a.className || '?'} · \`${a.itemLevel}\``
             ),
+          );
+        } else if (!deep) {
+          descriptionParts.push(
+            '',
+            'Stronghold deep scan was not run. Use `deep:true` to scan same-account alts.',
           );
         }
 
@@ -156,7 +169,7 @@ export async function handleRosterCommand(interaction) {
           .setURL(`https://lostark.bible/character/NA/${encodeURIComponent(name)}`)
           .setDescription(description.length > 4000 ? description.slice(0, 4000) + '\n…' : description)
           .setColor(color)
-          .setFooter({ text: `${alts.length} alt(s) · ${guildMembers.length} guild members${deepStats ? ` · ${deepStats}` : ''} · lostark.bible` })
+          .setFooter({ text: `${deep ? `${alts.length} alt(s) · ` : ''}${guildMembers.length} guild members${deepStats ? ` · ${deepStats}` : ''} · lostark.bible` })
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });

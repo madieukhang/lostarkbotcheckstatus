@@ -21,6 +21,28 @@ configureMetaCache({
   maxSize: config.metaCacheMaxSize,
 });
 
+const inFlightMetaFetches = new Map();
+
+function normalizeMetaFetchKey(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function buildMetaInflightKey(name, options = {}) {
+  return JSON.stringify({
+    name: normalizeMetaFetchKey(name),
+    allowScraperApi: options.allowScraperApi !== false,
+    preferScraperApi: options.preferScraperApi === true,
+    fallbackOnRateLimit: options.fallbackOnRateLimit === true,
+    retryOnRateLimit: options.retryOnRateLimit !== false,
+    timeoutMs: options.timeoutMs || 0,
+  });
+}
+
+function cacheMetaResult(name, meta) {
+  if (meta) setCachedMeta(name, meta);
+  return meta;
+}
+
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('error', () => {});
 virtualConsole.on('jsdomError', (err) => {
@@ -296,11 +318,11 @@ export async function buildRosterCharacters(name, options = {}) {
         if (meta) {
           hasValidRoster = true;
           rosterVisibility = 'hidden';
-          targetItemLevel = await inferHiddenRosterItemLevel(name) ?? meta.itemLevel;
+          targetItemLevel = meta.itemLevel ?? await inferHiddenRosterItemLevel(name);
           allCharacters = [name];
 
           if (includeHiddenRosterAlts && meta.guildName) {
-            const altResult = await detectAltsViaStronghold(name, { targetMeta: meta });
+            const altResult = await detectAltsViaStronghold(name, { targetMeta: meta, targetItemLevel });
             const altNames = altResult?.alts?.map((alt) => alt.name).filter(Boolean) ?? [];
             allCharacters = [...new Set([name, ...altNames])];
           }
@@ -479,7 +501,7 @@ function shapeCharacterMetaFromHeader(header) {
   };
 }
 
-export async function fetchCharacterMeta(name, options = {}) {
+async function fetchCharacterMetaUncached(name, options = {}) {
   // Migrated from regex-on-HTML to SvelteKit `__data.json` parsing.
   // Same network shape (single GET per character) so 429 surface and
   // ScraperAPI fallback semantics are unchanged - the change is in
@@ -488,14 +510,10 @@ export async function fetchCharacterMeta(name, options = {}) {
   // bible's __data.json layout is internal and could shift on a deploy.
   //
   // Cache layer (Phase 2): successful results are cached in a 30-min
-  // LRU+TTL store so back-to-back /roster deep and /list enrich on the
+    // LRU+TTL store so back-to-back /la-roster deep and /la-list enrich on the
   // same character cluster do not refetch. Caller can opt out with
   // `useCache: false`. Transient failures (null results) are NOT
   // cached to avoid pinning a 429 outage into the cache.
-  if (options.useCache !== false) {
-    const cached = getCachedMeta(name);
-    if (cached !== undefined) return cached;
-  }
   try {
     const jsonUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/__data.json`;
     const htmlUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}`;
@@ -544,6 +562,30 @@ export async function fetchCharacterMeta(name, options = {}) {
     console.warn(`[alt-detect] Failed to fetch meta for ${name}:`, err.message);
     return null;
   }
+}
+
+export async function fetchCharacterMeta(name, options = {}) {
+  const useCache = options.useCache !== false;
+
+  if (!useCache) {
+    return fetchCharacterMetaUncached(name, options);
+  }
+
+  const cached = getCachedMeta(name);
+  if (cached !== undefined) return cached;
+
+  const inFlightKey = buildMetaInflightKey(name, options);
+  const inFlight = inFlightMetaFetches.get(inFlightKey);
+  if (inFlight) return inFlight;
+
+  const fetchPromise = fetchCharacterMetaUncached(name, options)
+    .then((meta) => cacheMetaResult(name, meta))
+    .finally(() => {
+      inFlightMetaFetches.delete(inFlightKey);
+    });
+
+  inFlightMetaFetches.set(inFlightKey, fetchPromise);
+  return fetchPromise;
 }
 
 /**
@@ -648,11 +690,13 @@ export async function detectAltsViaStronghold(name, options = {}) {
     return null;
   }
 
-  const targetItemLevel = options.targetItemLevel ?? await inferHiddenRosterItemLevel(name) ?? meta.itemLevel;
+  const targetItemLevel = options.targetItemLevel ?? meta.itemLevel ?? await inferHiddenRosterItemLevel(name);
 
   console.log(`[alt-detect] Target: SH "${meta.strongholdName}" Lv.${meta.strongholdLevel}, RL ${meta.rosterLevel}, Guild "${meta.guildName}"`);
 
-  const members = await fetchGuildMembers(name);
+  const members = Array.isArray(options.guildMembers)
+    ? options.guildMembers
+    : await fetchGuildMembers(name);
   if (members.length === 0) {
     console.log('[alt-detect] No guild members found.');
     return null;

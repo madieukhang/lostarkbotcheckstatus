@@ -4,11 +4,11 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 
 ## Features
 
-- **Server monitoring** — polls one or more servers (default Brelshaza), posts `@here` on offline-to-online transitions, `/status` for live check
-- **Roster lookup** — `/roster` scrapes `lostark.bible`, tracks iLvl progression, cross-checks every list; alt detection via Stronghold name + Roster Level when roster is hidden
+- **Server monitoring** — polls one or more servers (default Brelshaza), posts `@here` on offline-to-online transitions, `/la-status` for live check
+- **Roster lookup** — `/la-roster` scrapes `lostark.bible`, tracks iLvl progression, cross-checks every list; `deep:true` runs Stronghold alt detection
 - **List management** — blacklist / whitelist / watchlist (`⛔` / `✅` / `⚠️`), global or server-scoped, trusted users protected from any list
-- **Bulk add** — `/list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast
-- **Screenshot OCR** — `/listcheck` or drop in an auto-check channel, Gemini extracts ≤ 8 names and cross-checks; auto-failover across Gemini models on quota
+- **Bulk add** — `/la-list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast
+- **Screenshot OCR** — `/la-check` or drop in an auto-check channel, Gemini extracts ≤ 8 names and cross-checks; auto-failover across Gemini models on quota
 - **Quick Add** — after auto-check, dropdown adds unflagged names straight to blacklist/watchlist via modal
 - **Approval flow** — members submit, officers instant-approve; senior approver always receives the DM
 - **Evidence rehosting** — images uploaded with an entry are rehosted into a pinned evidence channel so Discord's 24h CDN expiry doesn't rot the reference
@@ -19,23 +19,24 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 
 | Command | Description |
 |---|---|
-| `/status` | Live server status |
-| `/reset` | Reset the stored server status state |
-| `/roster name [deep]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan |
-| `/search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists |
-| `/list add type name reason [raid] [logs] [image] [scope]` | Add to blacklist/whitelist/watchlist. `scope`: `global` / `server` (blacklist only) |
-| `/list edit name [reason] [type] [raid] [logs] [image]` | Edit existing entry (owner/officer instant, members via approval) |
-| `/list remove name` | Remove an entry (ownership check) |
-| `/list view type [scope]` | View entries. `scope`: `all` / `global` / `server` |
-| `/list trust action name [reason]` | Manage trusted list — `add` / `remove` (officer/senior only) |
-| `/list multiadd action [file]` | Bulk add via Excel template (≤ 30 rows). `action:template` downloads, `action:file` uploads |
-| `/listcheck image` | OCR a screenshot → cross-check names against all lists |
-| `/lahelp` | Show all commands |
-| `/lasetup autochannel #channel` | Set auto-check channel (Manage Server) |
-| `/lasetup notifychannel #channel` | Set notification channel (Manage Server) |
-| `/lasetup view` | View current channel config |
-| `/lasetup off` | Toggle global-list notifications on/off for this server |
-| `/lasetup defaultscope global/server` | Set default scope for `/list add` |
+| `/la-status` | Live server status |
+| `/la-reset` | Reset the stored server status state |
+| `/la-roster name [deep] [deep_limit]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan |
+| `/la-search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists |
+| `/la-list add type name reason [raid] [logs] [image] [scope]` | Add to blacklist/whitelist/watchlist. `scope`: `global` / `server` (blacklist only) |
+| `/la-list edit name [reason] [type] [raid] [logs] [image] [scope]` | Edit existing entry (owner/officer instant, members via approval) |
+| `/la-list remove name` | Remove an entry (ownership check) |
+| `/la-list view type [scope]` | View entries. `scope`: `all` / `global` / `server` |
+| `/la-list trust action name [reason]` | Manage trusted list — `add` / `remove` (officer/senior only) |
+| `/la-list enrich name [deep_limit]` | Stronghold deep-scan an existing entry and append discovered alts |
+| `/la-list multiadd action [file]` | Bulk add via Excel template (≤ 30 rows). `action:template` downloads, `action:file` uploads |
+| `/la-check image` | OCR a screenshot → cross-check names against all lists |
+| `/la-help` | Show all commands |
+| `/la-setup autochannel #channel` | Set auto-check channel (Manage Server) |
+| `/la-setup notifychannel #channel` | Set notification channel (Manage Server) |
+| `/la-setup view` | View current channel config |
+| `/la-setup off` | Toggle global-list notifications on/off for this server |
+| `/la-setup defaultscope global/server` | Set default scope for `/la-list add` |
 
 ### Status Icons
 
@@ -104,7 +105,7 @@ erDiagram
     }
 ```
 
-Blacklist / Whitelist / Watchlist share the same shape; only the collection name and the list-semantics icon differ. TrustedUser is a subset (no scope, no raid/logs — just name + reason). `allCharacters[]` on every list entry holds the known alt names from a Stronghold-based roster scan, indexed for fast `$in` cross-checks during `/listcheck` and auto-check.
+Blacklist / Whitelist / Watchlist share the same shape; only the collection name and the list-semantics icon differ. TrustedUser is a subset (no scope, no raid/logs — just name + reason). `allCharacters[]` on every list entry holds the known alt names from a Stronghold-based roster scan, indexed for fast `$in` cross-checks during `/la-check` and auto-check.
 
 Sample blacklist document:
 
@@ -143,22 +144,32 @@ LostArk_LoaLogs/
 │   ├── handlers/                   # One file per command family
 │   │   ├── autoCheckHandler.js     # Auto-check channel listener (screenshot OCR)
 │   │   ├── listHandlers.js         # Thin orchestrator (~60 lines) wiring `list/` factories
-│   │   ├── list/                   # /list * + /listcheck families (split for navigability)
-│   │   │   ├── helpers.js          # Pure module-level helpers (no closure on client)
-│   │   │   ├── services.js         # Shared closure services (broadcast, approval, persistence, bulk)
-│   │   │   ├── add.js              # /list add + 3 button handlers (approval/viewevidence/overwrite)
-│   │   │   ├── edit.js             # /list edit
-│   │   │   ├── remove.js           # /list remove
-│   │   │   ├── view.js             # /list view (paginated browse)
-│   │   │   ├── check.js            # /listcheck (OCR screenshot)
-│   │   │   ├── trust.js            # /list trust
-│   │   │   ├── quickadd.js         # quick-add select + modal (used by /listcheck flow)
-│   │   │   └── multiadd.js         # /list multiadd + 2 button handlers (confirm/approval)
-│   │   ├── rosterHandler.js        # /roster + Stronghold alt detection + progression
-│   │   ├── searchHandler.js        # /search (similar-name scan)
-│   │   ├── setupHandler.js         # /lasetup (per-guild config)
+│   │   ├── list/                   # /la-list * + /la-check families
+│   │   │   ├── helpers.js          # Pure shared helpers
+│   │   │   ├── services/           # Shared closure services
+│   │   │   │   ├── index.js        # Service factory + persistence
+│   │   │   │   ├── approvals.js    # Approval DM dispatch + sync
+│   │   │   │   ├── broadcasts.js   # Broadcast channel routing
+│   │   │   │   └── bulk.js         # Bulk multiadd execution + summary
+│   │   │   ├── add/                # /la-list add + approval/view evidence/overwrite
+│   │   │   ├── edit/               # /la-list edit
+│   │   │   ├── remove/             # /la-list remove
+│   │   │   ├── view/               # /la-list view (paginated browse)
+│   │   │   ├── check/              # /la-check (OCR screenshot)
+│   │   │   ├── trust/              # /la-list trust
+│   │   │   ├── quickadd/           # quick-add select + modal (used by /la-check)
+│   │   │   ├── enrich/             # /la-list enrich
+│   │   │   └── multiadd/           # /la-list multiadd + confirm/approval
+│   │   ├── rosterHandler.js        # /la-roster + Stronghold alt detection + progression
+│   │   ├── searchHandler.js        # /la-search (similar-name scan)
+│   │   ├── setupHandler.js         # Thin exports for /la-setup + /la-remote
+│   │   ├── setup/                  # Setup command handlers split by workflow
+│   │   │   ├── guildSetup.js       # /la-setup per-guild config
+│   │   │   ├── remote.js           # /la-remote Senior router
+│   │   │   └── syncImages.js       # Legacy evidence image migration
+│   │   ├── helpHandler.js          # /la-help embed content
 │   │   ├── statsHandler.js         # Bot usage statistics
-│   │   └── systemHandlers.js       # /status, /reset
+│   │   └── systemHandlers.js       # /la-status, /la-reset
 │   ├── services/
 │   │   ├── listCheckService.js          # Shared OCR + name matching + embed formatting
 │   │   ├── multiaddTemplateService.js   # Excel template generator + parser (zero-dep)
@@ -178,7 +189,7 @@ LostArk_LoaLogs/
 │       ├── RosterCache.js          # 24h TTL on check results
 │       ├── RosterSnapshot.js       # iLvl progression timeline
 │       ├── Class.js                # Bible class ID -> display name
-│       └── Raid.js                 # Raid tag choices for /list add
+│       └── Raid.js                 # Raid tag choices for /la-list add
 │
 ├── exports/                        # Historical CSV/XLSX drops (gitignored)
 ├── data/
@@ -191,7 +202,7 @@ LostArk_LoaLogs/
 
 Four compose principles:
 
-1. **One handler file per command family.** `rosterHandler.js` owns `/roster`, `searchHandler.js` owns `/search`, etc. The `/list *` family is large enough to warrant its own subdirectory (`handlers/list/`) split per subcommand; `listHandlers.js` is a thin orchestrator that wires shared services into each subcommand factory.
+1. **One handler file per command family.** `rosterHandler.js` owns `/la-roster`, `searchHandler.js` owns `/la-search`, etc. The `/la-list *` family is large enough to warrant its own subdirectory (`handlers/list/`) split per subcommand; `listHandlers.js` is a thin orchestrator that wires shared services into each subcommand factory.
 2. **Services wrap external I/O.** `rosterService.js` is the only file that touches `lostark.bible`; `listCheckService.js` is the only file that calls Gemini. Tests and fallback paths have one swap point.
 3. **Scope resolved once, cached.** `utils/scope.js` reads `GuildConfig` with a 60s in-memory cache; every command path goes through it instead of re-querying per invocation.
 4. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` (e.g. `list/services.js`, `list/add.js`) export a `create*({ client, ... })` factory rather than top-level functions. The orchestrator calls each factory once at startup and the returned closures are wired into the interaction router.
@@ -218,7 +229,7 @@ Server monitor runs out-of-band: `bot/monitor/monitor.js` polls `bot/monitor/ser
 - Node.js ≥ 20
 - MongoDB (Atlas or self-hosted)
 - Discord bot token + channel ID
-- Gemini API key (optional — only needed for `/listcheck` + auto-check)
+- Gemini API key (optional — only needed for `/la-check` + auto-check)
 - Discord Privileged Intent: **Message Content Intent** (needed for auto-check)
 
 ## Environment Variables
@@ -243,9 +254,9 @@ Copy `.env.example` to `.env` and fill in values.
 | `GEMINI_MODELS` | `gemini-2.5-flash,...` | Comma-separated model priority list (failover) |
 | `LISTCHECK_ALT_ENRICHMENT` | `false` | Run background Stronghold alt scan after OCR hits; keep off to avoid request spikes |
 | `LISTCHECK_ALT_ENRICHMENT_LIMIT` | `1` | Max flagged OCR names to enrich per screenshot when enrichment is enabled |
-| `AUTO_CHECK_CHANNEL_IDS` | — | Global fallback for auto-check (prefer per-server `/lasetup`) |
+| `AUTO_CHECK_CHANNEL_IDS` | — | Global fallback for auto-check (prefer per-server `/la-setup`) |
 | `LIST_NOTIFY_CHANNEL_IDS` | — | Global fallback for list notifications |
-| `OFFICER_APPROVER_IDS` | — | Officer Discord user IDs (instant approval on `/list add`) |
+| `OFFICER_APPROVER_IDS` | — | Officer Discord user IDs (instant approval on `/la-list add`) |
 | `SENIOR_APPROVER_IDS` | — | Senior approvers (always receive approval DMs) |
 | `MEMBER_APPROVER_IDS` | — | Member approvers |
 | `OWNER_GUILD_ID` | — | Owner/admin Discord server ID — can view every server-scoped blacklist entry |
@@ -280,10 +291,10 @@ Slash commands register through Discord's global endpoint on boot (`ClientReady`
 
 ## Known Limitations
 
-- `/roster` and `/search` scrape `lostark.bible` HTML. Layout changes upstream will break `rosterService.js` regex + DOM selectors.
+- `/la-roster` and `/la-search` scrape `lostark.bible` HTML. Layout changes upstream will break `rosterService.js` regex + DOM selectors.
 - Discord CDN URLs on `imageUrl` (legacy entries) expire around 24h after upload. New entries use the `imageMessageId` + `imageChannelId` rehosting path; old entries may show a broken image.
 - Gemini OCR quality on diacritic names depends heavily on screenshot resolution. Similar-name suggestion is the fallback when OCR misreads (`Lùnaria` vs `Lunaria`).
-- ScraperAPI falls back on 403/503 but not on soft blocks that return 200 with empty HTML. If upstream silently cloaks, `/roster` returns "no roster found".
+- ScraperAPI falls back on 403/503 but not on soft blocks that return 200 with empty HTML. If upstream silently cloaks, `/la-roster` returns "no roster found".
 - One Mongo cluster, no sharding. List entries are small (≤ a few KB each) so this scales comfortably for a single-guild deployment.
 - Approval TTL is 24h (`PendingApproval`). Members who submit and never get senior action see their request auto-expire instead of sitting forever.
 - Auto-check has a 10s per-user cooldown to prevent screenshot spam from wedging Gemini quota.

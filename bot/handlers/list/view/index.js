@@ -12,39 +12,39 @@ import {
   TextInputStyle,
 } from 'discord.js';
 
-import { connectDB } from '../../db.js';
-import config from '../../config.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import Watchlist from '../../models/Watchlist.js';
-import GuildConfig from '../../models/GuildConfig.js';
-import PendingApproval from '../../models/PendingApproval.js';
-import TrustedUser from '../../models/TrustedUser.js';
-import { getClassName } from '../../models/Class.js';
+import { connectDB } from '../../../db.js';
+import config from '../../../config.js';
+import Blacklist from '../../../models/Blacklist.js';
+import Whitelist from '../../../models/Whitelist.js';
+import Watchlist from '../../../models/Watchlist.js';
+import GuildConfig from '../../../models/GuildConfig.js';
+import PendingApproval from '../../../models/PendingApproval.js';
+import TrustedUser from '../../../models/TrustedUser.js';
+import { getClassName } from '../../../models/Class.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
   fetchCharacterMeta,
   detectAltsViaStronghold,
-} from '../../services/rosterService.js';
+} from '../../../services/rosterService.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
   formatCheckResults,
-} from '../../services/listCheckService.js';
+} from '../../../services/listCheckService.js';
 import {
   normalizeCharacterName,
   getAddedByDisplay,
   getInteractionDisplayName,
-} from '../../utils/names.js';
-import { buildBlacklistQuery, getGuildConfig } from '../../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
-import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../utils/imageRehost.js';
+} from '../../../utils/names.js';
+import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import {
   buildMultiaddTemplate,
   parseMultiaddFile,
   MULTIADD_MAX_ROWS,
-} from '../../services/multiaddTemplateService.js';
+} from '../../../services/multiaddTemplateService.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -56,7 +56,7 @@ import {
   getSeniorApproverIds,
   buildApprovalResultRow,
   buildApprovalProcessingRow,
-} from './helpers.js';
+} from '../helpers.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
@@ -335,7 +335,7 @@ export function createViewHandlers({ client }) {
           } else {
             embed.addFields({
               name: '⚠️ Evidence',
-              value: 'Image link expired or unavailable. Re-add evidence via `/list edit`.',
+              value: 'Image link expired or unavailable. Re-add evidence via `/la-list edit`.',
               inline: false,
             });
           }
@@ -361,7 +361,7 @@ export function createViewHandlers({ client }) {
           new ButtonBuilder().setCustomId('listview_next_disabled').setLabel('Next ▶').setStyle(ButtonStyle.Secondary).setDisabled(true),
         );
         await interaction.editReply({
-          content: '⏱️ Session expired. Use `/list view` again to browse.',
+          content: '⏱️ Session expired. Use `/la-list view` again to browse.',
           components: [disabledNav],
         }).catch(() => {});
       });

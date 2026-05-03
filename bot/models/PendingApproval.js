@@ -1,6 +1,6 @@
 /**
  * models/PendingApproval.js
- * Mongoose schema for persisting /list add approval requests.
+ * Mongoose schema for persisting /la-list add approval requests.
  * Documents auto-expire after 24 hours via TTL index.
  */
 
@@ -53,7 +53,7 @@ const pendingApprovalSchema = new mongoose.Schema({
   duplicateEntryId: { type: String, default: '' },
 
   /**
-   * For action='bulk': parsed rows from /list multiadd upload waiting for approval.
+   * For action='bulk': parsed rows from /la-list multiadd upload waiting for approval.
    * Empty for single add/edit actions. Each row mirrors the payload shape used
    * by executeListAddToDatabase, minus requester info (which lives on the parent doc).
    */

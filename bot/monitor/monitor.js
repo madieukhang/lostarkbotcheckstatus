@@ -149,7 +149,7 @@ export async function checkStatus(client) {
     serverState.lastStatus = currentStatus;
   }
 
-  // Backward compat: keep top-level lastStatus for /status command
+  // Backward compat: keep top-level lastStatus for /la-status command
   state.lastStatus = statusMap.get(servers[0]) ?? null;
   state.lastCheckTime = now;
   await saveState(state);

@@ -24,7 +24,7 @@ const blacklistSchema = new mongoose.Schema({
     trim: true,
   },
 
-  /** Optional raid tag selected from /list add */
+  /** Optional raid tag selected from /la-list add */
   raid: {
     type: String,
     default: '',
@@ -40,7 +40,7 @@ const blacklistSchema = new mongoose.Schema({
 
   /**
    * Optional attachment image URL — legacy field. New entries (from rehost-aware
-   * /list add) leave this empty and use imageMessageId/imageChannelId instead.
+   * /la-list add) leave this empty and use imageMessageId/imageChannelId instead.
    * Old entries created before the rehost feature still have URL here, but
    * the URL likely expired due to Discord CDN policy. Kept for backward compat
    * and graceful display fallback.
@@ -130,7 +130,7 @@ blacklistSchema.index(
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 
-// Index on allCharacters for fast $in lookups during roster/listcheck cross-checks
+// Index on allCharacters for fast $in lookups during roster/la-check cross-checks
 blacklistSchema.index({ allCharacters: 1 });
 
 export default mongoose.model('blacklist', blacklistSchema, 'blacklist');

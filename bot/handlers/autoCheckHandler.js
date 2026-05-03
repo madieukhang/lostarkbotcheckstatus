@@ -10,7 +10,6 @@
 
 import { ActionRowBuilder, Events, StringSelectMenuBuilder } from 'discord.js';
 import config from '../config.js';
-import GuildConfig from '../models/GuildConfig.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
@@ -18,6 +17,7 @@ import {
 } from '../services/listCheckService.js';
 import { queueFlaggedListEntryEnrichment } from '../services/listCheckEnrichment.js';
 import { truncateDiscordContent } from '../utils/discordText.js';
+import { getGuildConfig } from '../utils/scope.js';
 
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);
@@ -37,7 +37,7 @@ async function isAutoCheckChannel(channelId, guildId) {
   // DB config takes priority for this guild
   if (guildId) {
     try {
-      const guildConfig = await GuildConfig.findOne({ guildId }).lean();
+      const guildConfig = await getGuildConfig(guildId);
       if (guildConfig?.autoCheckChannelId) {
         return guildConfig.autoCheckChannelId === channelId;
       }

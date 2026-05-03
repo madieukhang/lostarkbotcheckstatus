@@ -17,7 +17,7 @@
  *       { name: 'Matched name', value: 'Gauchaneqa', inline: true },
  *       { name: 'Scope', value: '[Global]', inline: true },
  *     ],
- *     footer: 'Use /list view black to see the full entry',
+ *     footer: 'Use /la-list view black to see the full entry',
  *   });
  *
  * Returns an EmbedBuilder so callers can still chain .setImage(), .setThumbnail(),
@@ -74,7 +74,7 @@ const SEVERITY_CONFIG = {
  * @param {string} options.title - Short title, shown with severity icon prefix
  * @param {string} [options.description] - Body text, markdown allowed
  * @param {Array<{name: string, value: string, inline?: boolean}>} [options.fields] - Structured data fields
- * @param {string} [options.footer] - Footer hint (e.g. "Use /list view ...")
+ * @param {string} [options.footer] - Footer hint (e.g. "Use /la-list view ...")
  * @param {boolean} [options.timestamp=true] - Include a timestamp (default true)
  * @returns {EmbedBuilder}
  */

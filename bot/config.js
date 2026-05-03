@@ -93,7 +93,7 @@ const config = {
   /** @deprecated — use scraperApiKeys[0] instead (kept for backward compat) */
   get scraperApiKey() { return this.scraperApiKeys[0] || ''; },
 
-  /** Approver IDs for /list add approval flow (comma-separated Discord user IDs) */
+  /** Approver IDs for /la-list add approval flow (comma-separated Discord user IDs) */
   officerApproverIds: (process.env.OFFICER_APPROVER_IDS || '')
     .split(',').map((s) => s.trim()).filter(Boolean),
   seniorApproverIds: (process.env.SENIOR_APPROVER_IDS || '')
@@ -116,7 +116,7 @@ const config = {
   /** Owner guild ID — this server can view all server-scoped blacklist entries from every guild */
   ownerGuildId: (process.env.OWNER_GUILD_ID || '').trim(),
 
-  /** Optional Gemini API key for image-based /listcheck name extraction */
+  /** Optional Gemini API key for image-based /la-check name extraction */
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
 
   /** Gemini model priority list for image parsing with auto-failover on quota limits */
@@ -162,7 +162,7 @@ const config = {
    * In-memory meta cache for fetchCharacterMeta results. Stronghold +
    * rosterLevel are roster-account properties that drift on the order
    * of days, so a 30-minute TTL is well below their natural change
-   * cadence while still letting back-to-back /roster deep + /list
+   * cadence while still letting back-to-back /la-roster deep + /la-list
    * enrich invocations hit warm cache. Max-size cap is a memory guard;
    * 5000 entries at ~200 bytes each is ~1 MB.
    */

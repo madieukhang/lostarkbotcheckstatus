@@ -3,10 +3,13 @@ import assert from 'node:assert/strict';
 
 import {
   buildRosterCharacters,
+  detectAltsViaStronghold,
   extractCharacterItemLevelFromHtml,
+  fetchCharacterMeta,
   fetchWithFallback,
 } from '../bot/services/rosterService.js';
 import config from '../bot/config.js';
+import { clearMetaCache } from '../bot/utils/metaCache.js';
 
 test('buildRosterCharacters encodes character names in roster URLs', async () => {
   const originalFetch = globalThis.fetch;
@@ -45,20 +48,13 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
       return new Response('<html><body><h1>Hidden roster</h1></body></html>', { status: 200 });
     }
 
-    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
-      return Response.json({
-        type: 'result',
-        result: JSON.stringify([[1], [2, 3, 4], 'Ainslinn', 'bard', 1723.33]),
-      });
-    }
-
     if (requestedUrl.endsWith('/__data.json')) {
       // Force a JSON parse failure so the HTML fallback runs.
       return new Response('not-json', { status: 200 });
     }
 
     return new Response(
-      'class:"bard",itemLevel:1686.66,rosterLevel:300,stronghold:{level:70,name:"AinsHome"},guild:{name:"AinsGuild",grade:"Member"}',
+      'class:"bard",itemLevel:1723.33,rosterLevel:300,stronghold:{level:70,name:"AinsHome"},guild:{name:"AinsGuild",grade:"Member"}',
       { status: 200 }
     );
   };
@@ -75,7 +71,7 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
     assert.equal(requestedUrls[0], 'https://lostark.bible/character/NA/Ainslinn/roster');
     assert.equal(requestedUrls[1], 'https://lostark.bible/character/NA/Ainslinn/__data.json');
     assert.equal(requestedUrls[2], 'https://lostark.bible/character/NA/Ainslinn');
-    assert.match(requestedUrls[3], /^https:\/\/lostark\.bible\/_app\/remote\/ngsbie\/search\?payload=/);
+    assert.equal(requestedUrls.length, 3);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -99,6 +95,80 @@ test('buildRosterCharacters keeps hidden roster fallback opt-in', async () => {
     assert.deepEqual(requestedUrls, ['https://lostark.bible/character/NA/Ainslinn/roster']);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('fetchCharacterMeta caches successful profile meta by character name', async () => {
+  clearMetaCache();
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return Response.json({
+      nodes: [
+        {
+          data: [
+            { header: 1 },
+            { rosterLevel: 2, stronghold: 3, guild: 6, class: 9, ilvl: 10 },
+            300,
+            { level: 4, name: 5 },
+            70,
+            'CacheHome',
+            { name: 7, grade: 8 },
+            'CacheGuild',
+            'Member',
+            'bard',
+            1725.55,
+          ],
+        },
+      ],
+    });
+  };
+
+  try {
+    const first = await fetchCharacterMeta('CacheName');
+    const second = await fetchCharacterMeta('cachename');
+
+    assert.equal(fetchCalls, 1);
+    assert.deepEqual(second, first);
+    assert.equal(first.rosterLevel, 300);
+    assert.equal(first.itemLevel, 1725.55);
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearMetaCache();
+  }
+});
+
+test('detectAltsViaStronghold reuses provided meta and guild members without target lookups', async () => {
+  clearMetaCache();
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error('unexpected fetch');
+  };
+
+  try {
+    const result = await detectAltsViaStronghold('Ainslinn', {
+      targetMeta: {
+        rosterLevel: 300,
+        strongholdLevel: 70,
+        strongholdName: 'AinsHome',
+        guildName: 'AinsGuild',
+        guildGrade: 'Member',
+        classId: 'bard',
+        itemLevel: 1723.33,
+      },
+      guildMembers: [],
+    });
+
+    assert.equal(result, null);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearMetaCache();
   }
 });
 
