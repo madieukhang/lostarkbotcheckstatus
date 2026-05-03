@@ -4,6 +4,7 @@ import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { refreshImageUrl } from '../../../utils/imageRehost.js';
 import { COLORS } from '../../../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 
 export function createListAddViewEvidenceButtonHandler({ client }) {
   async function handleListAddViewEvidenceButton(interaction) {
@@ -22,12 +23,20 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
       const stillExists = await PendingApproval.exists({ requestId });
       if (stillExists) {
         await interaction.reply({
-          content: '⛔ You are not allowed to view evidence for this request.',
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Not Authorised',
+            description: 'You are not on the approver list for this request, so you cannot view its evidence.',
+          })],
           ephemeral: true,
         });
       } else {
         await interaction.reply({
-          content: '⚠️ This approval request was already processed or has expired.',
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Request Expired',
+            description: 'This approval request was already processed or has expired.',
+          })],
           ephemeral: true,
         });
       }
@@ -47,7 +56,11 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
 
     if (!freshUrl) {
       await interaction.reply({
-        content: '⚠️ No evidence image attached to this request, or the rehosted message was removed.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'No Evidence Available',
+          description: 'No evidence image attached to this request, or the rehosted message was removed.',
+        })],
         ephemeral: true,
       });
       return;

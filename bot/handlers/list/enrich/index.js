@@ -67,7 +67,11 @@ export function createEnrichHandlers({ client, services }) {
   async function handleListEnrichCommand(interaction) {
     if (!isOfficerOrSenior(interaction.user.id)) {
       await interaction.reply({
-        content: '⛔ Only officers/senior approvers can run `/la-list enrich`.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Officer-Only Command',
+          description: 'Only officers and senior approvers can run `/la-list enrich`.',
+        })],
         ephemeral: true,
       });
       return;

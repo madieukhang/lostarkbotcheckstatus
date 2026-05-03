@@ -4,6 +4,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.38] - 2026-05-03
+
+### Changed
+- Wave 1 alert sweep finishing pass on the `/la-list add` approval flow files. Failure / guard alerts that are NOT pure state-change audit lines were converted to `buildAlertEmbed`:
+  - `list/add/approvalButton.js`: approval-execution-failed (also threaded through syncApproverDmMessages + notifyRequesterAboutDecision so requester sees the same structured failure card the seniors do).
+  - `list/add/overwriteButton.js`: request-expired, original-entry-missing, overwrite-failed.
+  - `list/add/editApproval.js`: original-entry-missing, move-blocked, scope-change-raced. Trusted-block branch dropped its redundant content prefix in favour of the existing trusted block embed.
+  - `list/add/evidenceButton.js`: not-authorised, request-expired, no-evidence-available.
+  - `list/enrich/index.js`: officer-only-command guard.
+
+### Notes
+- Pure status-change messages paired with `buildApprovalResultRow(...)` button rows stay as plain `content` strings (e.g. "Approved by X" / "Rejected by X" / "Kept existing entry" / "Overwritten by X" / "Edit approved by X"). These are audit-trail metadata lines, one short sentence each, and the button row carries the visual semantic. Mixing embeds for status + buttons would add ceremony without info gain.
+- The "Bot connected" channel test message in `setup/guildSetup.js` (auto-deletes after 30s) likewise stays as plain content; it's an inline channel confirmation, not a reply.
+- 41/41 tests pass.
+
 ## [v0.5.37] - 2026-05-03
 
 ### Changed

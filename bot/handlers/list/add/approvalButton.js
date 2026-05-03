@@ -198,15 +198,24 @@ export function createListAddApprovalButtonHandler({
     } catch (err) {
       await PendingApproval.deleteOne({ requestId });
 
+      const failureEmbed = buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        title: 'Approval Execution Failed',
+        description: `Approval was confirmed by **${interaction.user.tag}** but the executor threw.`,
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+      });
+
       await interaction.editReply({
-        content: `⚠️ Approval executed by **${interaction.user.tag}** but failed: \`${err.message}\``,
+        content: '',
+        embeds: [failureEmbed],
         components: [buildApprovalResultRow('Failed')],
       });
 
       await syncApproverDmMessages(
         payload,
         {
-          content: `⚠️ Approval executed by **${interaction.user.tag}** but failed: \`${err.message}\``,
+          content: '',
+          embeds: [failureEmbed],
           components: [buildApprovalResultRow('Failed')],
         },
         { excludeMessageId: interaction.message.id }
@@ -214,7 +223,16 @@ export function createListAddApprovalButtonHandler({
 
       await notifyRequesterAboutDecision(
         payload,
-        { content: `⚠️ Failed to execute approved request: \`${err.message}\``, embeds: [] },
+        {
+          content: `Approval ran but the executor threw: \`${err.message}\``,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Approval Execution Failed',
+            description: 'The senior approved your request, but persisting it threw.',
+            fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+            footer: 'No entry was created. Try resubmitting, or contact a senior.',
+          })],
+        },
         false
       );
     }
