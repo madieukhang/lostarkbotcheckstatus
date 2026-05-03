@@ -108,10 +108,11 @@ export function createEnrichHandlers({ client, services }) {
     }
 
     // Up-front bible probe so we can fail fast on no-guild / no-stronghold
-    // before paying the multi-minute candidate fan-out.
+    // before paying the multi-minute candidate fan-out. ScraperAPI is
+    // allowed for this single-request probe because bible direct can flap
+    // 429/503 and a one-off fallback is cheap quota-wise; the high-fanout
+    // candidate scan below stays direct-only via useScraperApiForCandidates.
     const meta = await fetchCharacterMeta(name, {
-      allowScraperApi: false,
-      fallbackOnRateLimit: false,
       timeoutMs: config.strongholdDeepCandidateTimeoutMs,
     });
     if (!meta) {
@@ -141,8 +142,10 @@ export function createEnrichHandlers({ client, services }) {
     // command is alive during the long fetch fan-out. Single update,
     // no streaming — Discord webhook edits are cheap and Operations
     // already monitor server logs for the per-25 progress lines.
+    // Guild member fetch is one request, so ScraperAPI fallback is on
+    // (cheap) when bible direct flaps. Per-candidate scan below stays
+    // direct-only.
     const guildMembers = await fetchGuildMembers(name, {
-      allowScraperApi: false,
       timeoutMs: config.strongholdDeepCandidateTimeoutMs,
       cacheKey: meta.guildName,
     });
@@ -151,8 +154,8 @@ export function createEnrichHandlers({ client, services }) {
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: 'Guild Member List Unavailable',
-          description: `Could not fetch the guild member list for **${name}** without ScraperAPI.`,
-          footer: 'Bible may be rate-limiting; try again in a few minutes.',
+          description: `Could not fetch the guild member list for **${name}** even with ScraperAPI fallback.`,
+          footer: 'Bible may be down or the guild is empty; try again in a few minutes.',
         })],
       });
       return;
@@ -161,17 +164,19 @@ export function createEnrichHandlers({ client, services }) {
     await interaction.editReply({
       content:
         `🔍 Running stronghold deep scan for **${name}** in guild **${meta.guildName}**` +
-        ` (${guildMembers.length} guild members, cap ${cap}, concurrency ${config.strongholdDeepConcurrency}, ScraperAPI off). ` +
+        ` (${guildMembers.length} guild members, cap ${cap}, concurrency ${config.strongholdDeepConcurrency}, candidate ScraperAPI off). ` +
         `Expect roughly 5-7 minutes; do not click anything.`,
     });
 
+    // Per-candidate scan stays direct-only to protect ScraperAPI quota
+    // (this is the high-fanout path the .env warning is about). targetMeta
+    // and guildMembers are pre-supplied above so allowScraperApiForTarget /
+    // allowScraperApiForGuild inside the detector are no-ops here.
     const result = await detectAltsViaStronghold(name, {
       targetMeta: meta,
       guildMembers,
       candidateLimit: cap,
       useScraperApiForCandidates: false,
-      allowScraperApiForTarget: false,
-      allowScraperApiForGuild: false,
     });
 
     if (!result || !Array.isArray(result.alts) || result.alts.length === 0) {

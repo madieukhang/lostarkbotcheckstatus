@@ -55,15 +55,14 @@ export async function handleRosterCommand(interaction) {
   const name = normalizeCharacterName(raw);
   const deep = interaction.options.getBoolean('deep') ?? false;
   const deepLimit = interaction.options.getInteger('deep_limit');
-  // ScraperAPI is intentionally locked off for /la-roster deep candidate
-  // scans. The shared detector still has a low-level env default for
-  // non-command callers, but this command always protects quota on the
-  // per-candidate fetch fan-out.
+  // ScraperAPI is intentionally locked off for the per-candidate scan
+  // because that is the high-fanout (300+ requests) path that would burn
+  // quota fast. Single-request meta + guild fetches inside the detector
+  // (when targetMeta / guildMembers are NOT pre-supplied) still allow
+  // ScraperAPI fallback - same rationale as the pre-flight probes below.
   const deepOptions = {
     ...(deepLimit !== null ? { candidateLimit: deepLimit } : {}),
     useScraperApiForCandidates: false,
-    allowScraperApiForTarget: false,
-    allowScraperApiForGuild: false,
   };
   await interaction.deferReply();
 
@@ -78,17 +77,18 @@ export async function handleRosterCommand(interaction) {
 
     if (characters.length === 0) {
       // ── Hidden roster: try guild-based detection ──
+      // Single-request probes (meta + guild list) allow ScraperAPI
+      // fallback because they are 1 request each and bible direct can
+      // flap; the high-fanout candidate scan downstream still keeps
+      // ScraperAPI off via useScraperApiForCandidates.
       const meta = await fetchCharacterMeta(name, {
-        allowScraperApi: false,
-        fallbackOnRateLimit: false,
         timeoutMs: config.strongholdDeepCandidateTimeoutMs,
       });
       const hasGuild = meta && meta.guildName;
 
       if (hasGuild) {
-        // Step 1: Get guild member list (fast, single request)
+        // Step 1: Get guild member list (fast, single request — ScraperAPI eligible)
         const guildMembers = await fetchGuildMembers(name, {
-          allowScraperApi: false,
           timeoutMs: config.strongholdDeepCandidateTimeoutMs,
           cacheKey: meta.guildName,
         });

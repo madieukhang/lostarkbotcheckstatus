@@ -4,6 +4,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.39] - 2026-05-03
+
+### Fixed
+- `/la-list enrich` and `/la-roster deep:true` regressed after the v0.5.x ScraperAPI hardening: the gate was too coarse and disabled ScraperAPI fallback even on the **single-request** meta + guild member probes, not just the high-fanout candidate scan. When bible was rate-limiting (very common during peak hours), the single fetch returned empty and there was no fallback, so officers saw `Guild Member List Unavailable` immediately, never reaching the actual scan. Reproduced by Bao on Ainslinn (which previously found 5 alts cleanly).
+- Both call sites (`bot/handlers/list/enrich/index.js`, `bot/handlers/rosterHandler.js`) now omit `allowScraperApi: false` on the pre-flight `fetchCharacterMeta` + `fetchGuildMembers` calls. ScraperAPI is still hard-locked OFF for the per-candidate scan (`useScraperApiForCandidates: false`); that is the actual high-fanout path the .env warning is about.
+
+### Notes
+- Updated the in-progress message text on `/la-list enrich` from "ScraperAPI off" to "candidate ScraperAPI off" to reflect the more precise gate.
+- Dead `allowScraperApiForTarget` / `allowScraperApiForGuild` options dropped from both call sites since `targetMeta` and `guildMembers` are pre-supplied (the detector's own internal fetches never run when callers pass these in).
+- 41/41 tests pass.
+
 ## [v0.5.38] - 2026-05-03
 
 ### Changed
