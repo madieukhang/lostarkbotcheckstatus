@@ -342,12 +342,27 @@ export async function handleRosterCommand(interaction) {
     ]);
 
     const embedColor = blacklistResult ? COLORS.danger : whitelistResult ? COLORS.success : trustedResult ? COLORS.trustedSoft : COLORS.info;
+
+    // Top-of-description summary: highest ilvl + total CP if available.
+    // Gives the reader an at-a-glance read on the roster's max gear
+    // without parsing the full character list.
+    const topChar = characters[0];
+    const topIlvl = topChar?.itemLevel || '?';
+    const topClass = topChar?.className || topChar?.classId || '?';
+    const summaryLine = topChar
+      ? `Top character: **${topChar.name}** · ${topClass} · \`${topIlvl}\``
+      : '';
+
+    const fullDescription = summaryLine
+      ? `${summaryLine}\n\n${description}`.slice(0, 4096)
+      : description;
+
     const embed = new EmbedBuilder()
-      .setTitle(`Roster – ${name}`)
+      .setTitle(`🛡️ ${name}'s Roster · ${characters.length} character${characters.length === 1 ? '' : 's'}`)
       .setURL(targetUrl)
-      .setDescription(description)
+      .setDescription(fullDescription)
       .setColor(embedColor)
-      .setFooter({ text: `${characters.length} character(s) · lostark.bible` })
+      .setFooter({ text: 'Source: lostark.bible · re-run /la-roster to refresh' })
       .setTimestamp();
 
     const embeds = [embed];

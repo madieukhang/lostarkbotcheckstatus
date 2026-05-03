@@ -4,6 +4,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.49] - 2026-05-03
+
+### Changed
+- `/la-roster` visible-roster card polish:
+  - Title now reads `🛡️ <Name>'s Roster · N characters` instead of `Roster - <Name>`. Character count up front gives an at-a-glance read.
+  - Description gets a top-line summary `Top character: <Name> · <Class> · <ilvl>` so the highest-geared char is visible without scanning the full list.
+  - Footer changes from `N character(s) · lostark.bible` to `Source: lostark.bible · re-run /la-roster to refresh` (count moved to title, replaced with a refresh hint).
+
+### Notes
+- 42/42 tests pass.
+
 ## [v0.5.48] - 2026-05-03
 
 ### Changed
