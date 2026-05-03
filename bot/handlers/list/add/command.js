@@ -153,7 +153,7 @@ export function createListAddCommandHandler({
       await interaction.editReply({
         embeds: [
           buildListAddApprovalEmbed(interaction.guild, payload, {
-            title: 'List Add — Proposal Submitted',
+            title: 'List Add · Proposal Submitted',
             includeRequestedBy: false,
           }),
         ],

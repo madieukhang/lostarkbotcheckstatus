@@ -10,7 +10,7 @@
 import mongoose from 'mongoose';
 
 const blacklistSchema = new mongoose.Schema({
-  /** Character name — unique index defined via schema.index() below (case-insensitive) */
+  /** Character name · unique index defined via schema.index() below (case-insensitive) */
   name: {
     type: String,
     required: true,
@@ -39,7 +39,7 @@ const blacklistSchema = new mongoose.Schema({
   },
 
   /**
-   * Optional attachment image URL — legacy field. New entries (from rehost-aware
+   * Optional attachment image URL · legacy field. New entries (from rehost-aware
    * /la-list add) leave this empty and use imageMessageId/imageChannelId instead.
    * Old entries created before the rehost feature still have URL here, but
    * the URL likely expired due to Discord CDN policy. Kept for backward compat
@@ -117,7 +117,7 @@ const blacklistSchema = new mongoose.Schema({
     default: 'global',
   },
 
-  /** Guild ID — only set when scope is 'server' */
+  /** Guild ID · only set when scope is 'server' */
   guildId: {
     type: String,
     default: '',

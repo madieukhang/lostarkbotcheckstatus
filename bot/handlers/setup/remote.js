@@ -8,7 +8,7 @@ import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { handleSyncImagesAction } from './syncImages.js';
 /**
- * Handle /la-remote — Senior-only remote config management
+ * Handle /la-remote · Senior-only remote config management
  */
 export async function handleSetupRemoteCommand(interaction) {
   const seniorIds = config.seniorApproverIds || [];
@@ -45,7 +45,7 @@ export async function handleSetupRemoteCommand(interaction) {
 
     if (allGuilds.length === 0) {
       await interaction.editReply({ embeds: [
-        new EmbedBuilder().setTitle('🛰️ Remote Control — Dashboard').setDescription('*Bot is not in any server.*').setColor(COLORS.greyDark),
+        new EmbedBuilder().setTitle('🛰️ Remote Control · Dashboard').setDescription('*Bot is not in any server.*').setColor(COLORS.greyDark),
       ] });
       return;
     }
@@ -58,19 +58,19 @@ export async function handleSetupRemoteCommand(interaction) {
       const scopeDisplay = scope === 'server' ? '🔒 Server (Local)' : '🌐 Global';
       const autoCheck = gc?.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : '*Not set*';
       const notifyCh = gc?.listNotifyChannelId ? `<#${gc.listNotifyChannelId}>` : '*Not set*';
-      const updated = gc?.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '—';
+      const updated = gc?.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '-';
       const configured = gc ? '✅' : '⚪';
 
       const embed = new EmbedBuilder()
         .setTitle(`${isOwner ? '👑' : '🖥️'} ${guild.name} ${configured}`)
-        .setDescription(`\`${guild.id}\`${isOwner ? ' — **Owner Server**' : ''}${!gc ? ' — *No config yet*' : ''}`)
+        .setDescription(`\`${guild.id}\`${isOwner ? ' · **Owner Server**' : ''}${!gc ? ' · *No config yet*' : ''}`)
         .addFields(
           { name: '📡 Global Notify', value: notify, inline: true },
           { name: '🎯 Default Scope', value: scopeDisplay, inline: true },
           { name: '📸 Auto-check', value: autoCheck, inline: true },
           { name: '🔔 Notify Channel', value: notifyCh, inline: true },
           { name: '🕐 Last Updated', value: updated, inline: true },
-          { name: '👤 Updated By', value: gc?.updatedByTag || '—', inline: true },
+          { name: '👤 Updated By', value: gc?.updatedByTag || '-', inline: true },
         )
         .setColor(isOwner ? COLORS.gold : gc ? COLORS.info : COLORS.greyDark);
 
@@ -78,7 +78,7 @@ export async function handleSetupRemoteCommand(interaction) {
       if (isOwner) {
         const evidenceCh = gc?.evidenceChannelId
           ? `<#${gc.evidenceChannelId}>`
-          : '*Not set — images use legacy URL (expire ~24h)*';
+          : '*Not set · images use legacy URL (expire ~24h)*';
         embed.addFields({
           name: '🖼️ Evidence Channel (bot-wide)',
           value: evidenceCh,
@@ -144,7 +144,7 @@ export async function handleSetupRemoteCommand(interaction) {
   }
 
   // ── ACTION: evidencechannel ──────────────────────────────
-  // Bot-wide setting (not per-guild) — stored on owner GuildConfig.
+  // Bot-wide setting (not per-guild) · stored on owner GuildConfig.
   // Sets where the bot rehosts /la-list add evidence images for permanent storage.
   if (action === 'evidencechannel') {
     if (!config.ownerGuildId) {
@@ -258,7 +258,7 @@ export async function handleSetupRemoteCommand(interaction) {
     return;
   }
 
-  // Validate target guild — bot must be in it
+  // Validate target guild · bot must be in it
   const guildName = await resolveGuildName(targetGuildId);
   if (!guildName) {
     const embed = new EmbedBuilder()
@@ -285,13 +285,13 @@ export async function handleSetupRemoteCommand(interaction) {
     invalidateGuildConfig(targetGuildId);
 
     const embed = new EmbedBuilder()
-      .setTitle(`${newState ? '🔔' : '🔕'} Remote — Notify ${newState ? 'Enabled' : 'Disabled'}`)
+      .setTitle(`${newState ? '🔔' : '🔕'} Remote · Notify ${newState ? 'Enabled' : 'Disabled'}`)
       .addFields(
         { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
-        { name: 'Status', value: newState ? '🔔 Receiving broadcasts' : '🔕 Silent — no broadcasts', inline: true },
+        { name: 'Status', value: newState ? '🔔 Receiving broadcasts' : '🔕 Silent · no broadcasts', inline: true },
       )
       .setColor(newState ? 0x2ecc71 : 0xe74c3c)
-      .setFooter({ text: `Changed by ${interaction.user.tag} · silent — server not notified` })
+      .setFooter({ text: `Changed by ${interaction.user.tag} · silent · server not notified` })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
@@ -321,13 +321,13 @@ export async function handleSetupRemoteCommand(interaction) {
 
     const scopeDisplay = scopeValue === 'server' ? '🔒 Server (Local)' : '🌐 Global';
     const embed = new EmbedBuilder()
-      .setTitle(`${scopeValue === 'server' ? '🔒' : '🌐'} Remote — Scope Updated`)
+      .setTitle(`${scopeValue === 'server' ? '🔒' : '🌐'} Remote · Scope Updated`)
       .addFields(
         { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
         { name: 'Default Scope', value: scopeDisplay, inline: true },
       )
       .setColor(scopeValue === 'server' ? 0x9b59b6 : 0x3498db)
-      .setFooter({ text: `Changed by ${interaction.user.tag} · silent — server not notified` })
+      .setFooter({ text: `Changed by ${interaction.user.tag} · silent · server not notified` })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });

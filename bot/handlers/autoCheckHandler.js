@@ -57,7 +57,7 @@ async function isAutoCheckChannel(channelId, guildId) {
  */
 export function setupAutoCheck(client) {
   if (!config.geminiApiKey) {
-    console.log('[auto-check] GEMINI_API_KEY not set — disabled.');
+    console.log('[auto-check] GEMINI_API_KEY not set · disabled.');
     return;
   }
 
@@ -102,7 +102,7 @@ export function setupAutoCheck(client) {
 
       // Send progress message immediately after OCR
       const progressMsg = await message.reply({
-        content: `🔍 Extracted **${limitedNames.length}** name(s) — checking lists & roster...`,
+        content: `🔍 Extracted **${limitedNames.length}** name(s) · checking lists & roster...`,
       });
 
       const results = await checkNamesAgainstLists(limitedNames, { guildId: message.guild.id });
@@ -124,7 +124,7 @@ export function setupAutoCheck(client) {
         const selectRow = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId('quickadd_select')
-            .setPlaceholder('⚡ Quick Add to List — select a name')
+            .setPlaceholder('⚡ Quick Add to List · select a name')
             .addOptions(
               unflaggedNames.slice(0, 25).map((r) => ({
                 label: r.name,

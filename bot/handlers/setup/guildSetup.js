@@ -113,12 +113,12 @@ async function handleSetupAutoChannel(interaction) {
   // Send test message to verify channel works
   const testOk = await sendTestMessage(channel, 'auto-check');
 
-  const warning = sameAsNotify ? '\n⚠️ This is the same channel as notifications — consider using separate channels to avoid clutter.' : '';
+  const warning = sameAsNotify ? '\n⚠️ This is the same channel as notifications · consider using separate channels to avoid clutter.' : '';
 
   await interaction.editReply({
     content: testOk
-      ? `✅ Auto-check channel set to <#${channel.id}>.\nBot will automatically check screenshots posted in this channel.${warning}\n\n*A test message was sent to verify — it will auto-delete in 30s.*`
-      : `✅ Auto-check channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message — please verify bot permissions.`,
+      ? `✅ Auto-check channel set to <#${channel.id}>.\nBot will automatically check screenshots posted in this channel.${warning}\n\n*A test message was sent to verify · it will auto-delete in 30s.*`
+      : `✅ Auto-check channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message · please verify bot permissions.`,
   });
 
   invalidateGuildConfig(interaction.guild.id);
@@ -185,12 +185,12 @@ async function handleSetupNotifyChannel(interaction) {
 
   // Send test message to verify channel works
   const testOk = await sendTestMessage(channel, 'notification');
-  const warning = sameAsAutoCheck ? '\n⚠️ This is the same channel as auto-check — consider using separate channels to avoid clutter.' : '';
+  const warning = sameAsAutoCheck ? '\n⚠️ This is the same channel as auto-check · consider using separate channels to avoid clutter.' : '';
 
   await interaction.editReply({
     content: testOk
-      ? `✅ Notification channel set to <#${channel.id}>.\nList add/remove actions will be broadcast here.${warning}\n\n*A test message was sent to verify — it will auto-delete in 30s.*`
-      : `✅ Notification channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message — please verify bot permissions.`,
+      ? `✅ Notification channel set to <#${channel.id}>.\nList add/remove actions will be broadcast here.${warning}\n\n*A test message was sent to verify · it will auto-delete in 30s.*`
+      : `✅ Notification channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message · please verify bot permissions.`,
   });
 
   invalidateGuildConfig(interaction.guild.id);
@@ -198,7 +198,7 @@ async function handleSetupNotifyChannel(interaction) {
 }
 
 /**
- * Handle /la-setup off — toggle global notifications on/off
+ * Handle /la-setup off · toggle global notifications on/off
  */
 async function handleSetupOff(interaction) {
   await interaction.deferReply({ ephemeral: true });

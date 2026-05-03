@@ -4,6 +4,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.44] - 2026-05-03
+
+### Changed
+- Bot-wide em-dash purge per the no-em-dash project rule. ~220 occurrences swept across 36 files (handlers, services, models, utils, config). Spaced em-dashes (` — `) collapsed to middot (` · `) so user-facing copy and bullet-list separators read consistently with the existing list-view / progress-embed style. Bare em-dashes inside identifiers and ranges fell back to regular hyphen (`-`).
+- Files touched: `bot/handlers/helpHandler.js` (the heaviest, 61 occurrences in the help text), all `bot/handlers/list/**` files, top-level handlers, `bot/handlers/setup/**`, `bot/services/**`, `bot/models/**`, `bot/utils/**`. Comments + docstrings included since the project rule applies bot-wide.
+
+### Notes
+- 41/41 tests pass.
+- This is the cleanup pass before the broader "prettier embed" rework Traine asked for; consistent typography is foundation for the visual polish that follows.
+
 ## [v0.5.43] - 2026-05-03
 
 ### Changed

@@ -69,7 +69,7 @@ export function createQuickAddHandlers({ client, services }) {
 
     const modal = new ModalBuilder()
       .setCustomId(`quickadd_modal:${name}`)
-      .setTitle(`Quick Add — ${name}`)
+      .setTitle(`Quick Add · ${name}`)
       .addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()

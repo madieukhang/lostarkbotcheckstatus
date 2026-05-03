@@ -93,7 +93,7 @@ const GEMINI_PROMPT = [
 // ─── Gemini OCR ─────────────────────────────────────────────────────────────
 
 function shouldFailoverGeminiModel(status, bodyText) {
-  // 404 = model not found, 429 = rate limit, 503 = overloaded — all should try next model
+  // 404 = model not found, 429 = rate limit, 503 = overloaded · all should try next model
   if (status === 404 || status === 429 || status === 503) return true;
   const text = (bodyText || '').toLowerCase();
   return (
@@ -207,7 +207,7 @@ export async function extractNamesFromImage(image) {
     const candidate = payload?.candidates?.[0];
     const finishReason = candidate?.finishReason;
 
-    // Filter out thinking parts (thought: true) — only keep actual response text
+    // Filter out thinking parts (thought: true) · only keep actual response text
     const parts = candidate?.content?.parts || [];
     const text = parts
       .filter((part) => !part.thought)
@@ -269,7 +269,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   await connectDB();
   const { guildId } = options;
 
-  // Phase 1: Batch list check — 3 queries for ALL names instead of 3 × N
+  // Phase 1: Batch list check · 3 queries for ALL names instead of 3 × N
   const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
   const collation = { locale: 'en', strength: 2 };
 
@@ -577,10 +577,10 @@ function formatResultLine(item) {
     if (isRosterMatch) details.push(`via **${entry.name}**`);
     if (entry.reason?.trim()) details.push(entry.reason.trim());
     if (entry.raid?.trim()) details.push(`[${entry.raid.trim()}]`);
-    if (details.length > 0) reasonParts.push(details.join(' — '));
+    if (details.length > 0) reasonParts.push(details.join(' · '));
   }
 
-  const reasonSuffix = reasonParts.length > 0 ? ` — ${reasonParts.join(' | ')}` : '';
+  const reasonSuffix = reasonParts.length > 0 ? ` · ${reasonParts.join(' | ')}` : '';
 
   // Trusted indicator (shown alongside other flags)
   const trustedTag = item.trustedEntry ? ' 🛡️' : '';
@@ -597,8 +597,8 @@ function formatResultLine(item) {
   }
   if (item.trustedEntry) {
     const isVia = item.trustedEntry.name.toLowerCase() !== item.name.toLowerCase();
-    const via = isVia ? ` — via **${item.trustedEntry.name}**` : '';
-    return { line: `🛡️ **${item.name}**${via} — trusted`, priority: 2 };
+    const via = isVia ? ` · via **${item.trustedEntry.name}**` : '';
+    return { line: `🛡️ **${item.name}**${via} · trusted`, priority: 2 };
   }
   if (item.hasRoster) {
     return { line: `❓ ${item.name}`, priority: 3 };
@@ -606,7 +606,7 @@ function formatResultLine(item) {
 
   const reason = item.failReason ? ` *(${item.failReason})*` : '';
   const similar = item.similarNames?.length > 0
-    ? ` — Similar: ${item.similarNames.map((s) => `${s.flag} ${s.name}`).join(', ')}`
+    ? ` · Similar: ${item.similarNames.map((s) => `${s.flag} ${s.name}`).join(', ')}`
     : '';
   return { line: `⚪ ${item.name}${reason}${similar}`, priority: 4 };
 }
@@ -646,7 +646,7 @@ export function formatCheckResults(results) {
 
   const lines = [];
 
-  // Only show summary when there are flagged entries — otherwise it's just noise
+  // Only show summary when there are flagged entries · otherwise it's just noise
   const hasFlagged = counts.black > 0 || counts.watch > 0;
   if (hasFlagged) {
     lines.push(summaryParts.join(' · '));

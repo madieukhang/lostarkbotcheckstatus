@@ -26,11 +26,11 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
     const name = normalizeCharacterName(payload.name);
 
-    // Step 0: Trusted user guard (exact name check — fast, before roster fetch)
+    // Step 0: Trusted user guard (exact name check · fast, before roster fetch)
     //
     // Note on `content` strings in non-ok returns: the user-facing reply
     // suppresses content when an embed is present (see add/command.js
-    // line ~110). The string is kept for log-style consumers — bulk
+    // line ~110). The string is kept for log-style consumers · bulk
     // results and approval-flow error fallbacks read result.content for
     // a one-line description of why the executor refused.
     {
@@ -56,7 +56,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
           .slice(0, 10)
           .map(
             (s, idx) =>
-              `**${idx + 1}.** [${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) — \`${Number(s.itemLevel || 0).toFixed(2)}\` — ${getClassName(s.cls)}`
+              `**${idx + 1}.** [${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) · \`${Number(s.itemLevel || 0).toFixed(2)}\` · ${getClassName(s.cls)}`
           )
           .join('\n');
 
@@ -113,7 +113,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       };
     }
 
-    // Step 2b: Trusted user guard (alt check — after roster gives us allCharacters)
+    // Step 2b: Trusted user guard (alt check · after roster gives us allCharacters)
     if (allCharacters.length > 0) {
       const trustedAlt = await TrustedUser.findOne({ name: { $in: allCharacters } })
         .collation({ locale: 'en', strength: 2 }).lean();

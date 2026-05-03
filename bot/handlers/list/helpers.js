@@ -45,7 +45,7 @@ export function buildTrustedBlockEmbed(name, reason, { via } = {}) {
 
   return buildAlertEmbed({
     severity: AlertSeverity.TRUSTED,
-    title: 'Trusted User — Blocked',
+    title: 'Trusted User · Blocked',
     description,
     fields: [
       { name: 'Name', value: `[${name}](${rosterLink})`, inline: true },
@@ -101,7 +101,7 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
 }
 
 export function buildListAddApprovalEmbed(guild, payload, options = {}) {
-  const title = options.title || 'List Add — Approval Required';
+  const title = options.title || 'List Add · Approval Required';
   const includeRequestedBy = options.includeRequestedBy ?? true;
   const fields = [
     { name: 'Request ID', value: payload.requestId, inline: false },

@@ -11,7 +11,7 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     const requestId = interaction.customId.split(':')[1];
     await connectDB();
 
-    // Restrict to assigned approvers only — same permission model as
+    // Restrict to assigned approvers only · same permission model as
     // Approve/Reject. Avoids leaking evidence images to non-approvers who
     // somehow get hold of the button (shouldn't happen, but defense in depth).
     const payload = await PendingApproval.findOne({
@@ -67,13 +67,13 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     }
 
     const evidenceEmbed = new EmbedBuilder()
-      .setTitle(`📎 Evidence — ${payload.name}`)
+      .setTitle(`📎 Evidence · ${payload.name}`)
       .setDescription(payload.reason ? `*${payload.reason}*` : null)
       .setImage(freshUrl)
       .setColor(payload.type === 'black' ? COLORS.danger : payload.type === 'white' ? COLORS.success : COLORS.warning)
       .setFooter({
         text: isLegacy
-          ? 'Legacy image (may have expired) — submitted before evidence rehost'
+          ? 'Legacy image (may have expired) · submitted before evidence rehost'
           : 'Fresh URL just resolved from evidence channel',
       })
       .setTimestamp(payload.createdAt ? new Date(payload.createdAt) : new Date());

@@ -123,7 +123,7 @@ export async function applyListEditNow({
       if (newRaid) updateFields.raid = newRaid;
       if (newLogs) updateFields.logsUrl = newLogs;
       if (newImageUrl) {
-        // New image provided — use rehost result if successful, else legacy URL
+        // New image provided · use rehost result if successful, else legacy URL
         if (newImageRehost) {
           updateFields.imageUrl = '';
           updateFields.imageMessageId = newImageRehost.messageId;
@@ -134,7 +134,7 @@ export async function applyListEditNow({
           updateFields.imageChannelId = '';
         }
       }
-      // Scope change in place — only blacklist supports this. Atomic update
+      // Scope change in place · only blacklist supports this. Atomic update
       // of {scope, guildId} so the unique index sees the new combination.
       if (isScopeChange) {
         updateFields.scope = targetScope;

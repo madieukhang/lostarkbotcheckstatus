@@ -46,7 +46,7 @@ export function createListEditCommandHandler({
     const newLogs = interaction.options.getString('logs')?.trim() || '';
     const imageAttachment = interaction.options.getAttachment('image');
     const newImageUrl = imageAttachment?.url || '';
-    // Optional scope override — only valid for blacklist entries (validated below).
+    // Optional scope override · only valid for blacklist entries (validated below).
     const newScopeRaw = interaction.options.getString('scope') || '';
     const newScope = newScopeRaw === 'global' || newScopeRaw === 'server' ? newScopeRaw : '';
     // Manual alt append: officer/senior or entry owner only. Designed to
@@ -145,7 +145,7 @@ export function createListEditCommandHandler({
     const isTypeChange = targetType !== currentType;
 
     // Scope option validation: only meaningful for blacklist entries.
-    // White/watch lists are always global by design — reject scope on non-blacklist
+    // White/watch lists are always global by design · reject scope on non-blacklist
     // edits with a clear error rather than silently ignoring.
     if (newScope && targetType !== 'black') {
       await interaction.editReply({
@@ -258,7 +258,7 @@ export function createListEditCommandHandler({
     //   - Promoting server → global: requires approval (privilege escalation)
     //   - Editing fields on a local entry without changing scope: auto-approves
     //   - Moving white/watch → black with default scope=server: auto-approves
-    // White/watch have no scope concept — they never auto-approve via this rule.
+    // White/watch have no scope concept · they never auto-approve via this rule.
     const isOwner = existing.addedByUserId === interaction.user.id;
     const isApprover = isRequesterAutoApprover(interaction.user.id);
     const isLocalScope = targetType === 'black' && targetScope === 'server';

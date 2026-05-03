@@ -10,10 +10,10 @@
  *   Row 1: gradient title banner (merged)
  *   Row 2: subtitle / quick-start hint (merged)
  *   Row 3: spacer
- *   Row 4: column header (the "real" table header — parser finds this by
+ *   Row 4: column header (the "real" table header · parser finds this by
  *          scanning for "name" in column A)
  *   Row 5-7: three color-coded example rows (black / white / watch) with
- *          reason prefixed "⚠️ EXAMPLE —" so the parser can safely skip
+ *          reason prefixed "⚠️ EXAMPLE -" so the parser can safely skip
  *          them if the user forgets to delete.
  *   Row 8: spacer
  *   Row 9-13: blank placeholder rows with subtle borders + zebra stripes
@@ -26,7 +26,7 @@ import { buildInstructionsSheet } from './instructionsSheet.js';
 export const MULTIADD_MAX_ROWS = 30;
 
 // Inline-formula form for ExcelJS dropdown data validation.
-// Auto-derived from the RAIDS enum in models/Raid.js — single source of truth.
+// Auto-derived from the RAIDS enum in models/Raid.js · single source of truth.
 // Current raids (v0.5.14): Act4 Nor/Hard, Kazeros Nor/Hard, Mordum Hard,
 // Secra Nor/Hard/NM. Excel limits inline validation formulae to 255 chars,
 // so we have plenty of headroom (~10-12 more raids); if it ever grows beyond
@@ -38,7 +38,7 @@ const RAID_DROPDOWN_FORMULA = `"${RAIDS.join(',')}"`;
  * skips the row so forgetful users don't accidentally add "ExampleName"
  * to the database. Keep in sync with buildMultiaddTemplate below.
  */
-export const EXAMPLE_REASON_PREFIX = '⚠️ EXAMPLE —';
+export const EXAMPLE_REASON_PREFIX = '⚠️ EXAMPLE -';
 
 // ---------- Palette (ARGB with FF alpha) ----------
 // Core brand
@@ -48,7 +48,7 @@ const COLOR_BLURPLE_LIGHT = 'FF7289DA';
 const COLOR_BLURPLE_BG = 'FFEEF0FC';
 const COLOR_WHITE = 'FFFFFFFF';
 
-// Example row tints — each list type gets its own color family
+// Example row tints · each list type gets its own color family
 // Matches Discord's own black/white/watch accent colors (⛔/✅/⚠️)
 const COLOR_EX_RED_BG = 'FFFEE2E2';
 const COLOR_EX_RED_TEXT = 'FF991B1B';
@@ -65,7 +65,7 @@ const COLOR_GRAY_500 = 'FF6B7280';
 const COLOR_GRAY_700 = 'FF374151';
 const COLOR_BORDER = 'FFE5E7EB';
 
-// Instructions sheet section colors — each section gets its own accent
+// Instructions sheet section colors · each section gets its own accent
 const COLOR_SEC_BLUE_BG = 'FFDBEAFE';
 const COLOR_SEC_BLUE_TEXT = 'FF1E40AF';
 const COLOR_SEC_PURPLE_BG = 'FFE9D5FF';
@@ -129,7 +129,7 @@ export async function buildMultiaddTemplate() {
   const titleRow = sheet.getRow(1);
   titleRow.height = 48;
   const titleCell = sheet.getCell('A1');
-  titleCell.value = '📋  LOST ARK BOT — BULK ADD TEMPLATE';
+  titleCell.value = '📋  LOST ARK BOT · BULK ADD TEMPLATE';
   titleCell.font = {
     name: 'Segoe UI Semibold',
     bold: true,
@@ -208,7 +208,7 @@ export async function buildMultiaddTemplate() {
     {
       name: 'ExamplePlayer2',
       type: 'white',
-      reason: `${EXAMPLE_REASON_PREFIX} Trusted static mate — 6 months (delete this row)`,
+      reason: `${EXAMPLE_REASON_PREFIX} Trusted static mate · 6 months (delete this row)`,
       raid: 'Kazeros Nor',
       logs: '',
       image: '',
@@ -284,7 +284,7 @@ export async function buildMultiaddTemplate() {
   const FIRST_DATA_ROW = 5;
   const LAST_DATA_ROW = 5 + MULTIADD_MAX_ROWS + 3; // examples + user rows
   for (let r = FIRST_DATA_ROW; r <= LAST_DATA_ROW; r++) {
-    // type column (B) — black/white/watch
+    // type column (B) · black/white/watch
     sheet.getCell(`B${r}`).dataValidation = {
       type: 'list',
       allowBlank: false,
@@ -294,7 +294,7 @@ export async function buildMultiaddTemplate() {
       errorTitle: 'Invalid type',
       error: 'type must be one of: black, white, watch',
     };
-    // raid column (D) — enum from models/Raid.js, optional
+    // raid column (D) · enum from models/Raid.js, optional
     sheet.getCell(`D${r}`).dataValidation = {
       type: 'list',
       allowBlank: true,
@@ -304,7 +304,7 @@ export async function buildMultiaddTemplate() {
       errorTitle: 'Invalid raid',
       error: `raid must be one of: ${RAIDS.join(', ')}`,
     };
-    // scope column (G) — global/server (blacklist only, optional)
+    // scope column (G) · global/server (blacklist only, optional)
     sheet.getCell(`G${r}`).dataValidation = {
       type: 'list',
       allowBlank: true,

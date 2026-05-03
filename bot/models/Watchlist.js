@@ -12,7 +12,7 @@ const watchlistSchema = new mongoose.Schema({
   reason: { type: String, default: '', trim: true },
   raid: { type: String, default: '', trim: true },
   logsUrl: { type: String, default: '', trim: true },
-  // Legacy URL field — replaced by imageMessageId/imageChannelId for new entries
+  // Legacy URL field · replaced by imageMessageId/imageChannelId for new entries
   imageUrl: { type: String, default: '', trim: true },
   imageMessageId: { type: String, default: '', trim: true },
   imageChannelId: { type: String, default: '', trim: true },

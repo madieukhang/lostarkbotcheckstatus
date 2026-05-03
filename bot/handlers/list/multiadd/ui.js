@@ -16,7 +16,7 @@ export async function buildTemplateReply() {
   const buffer = await buildMultiaddTemplate();
   const attachment = new AttachmentBuilder(buffer, {
     name: 'multiadd_template.xlsx',
-    description: 'Lost Ark Bot — bulk add template',
+    description: 'Lost Ark Bot · bulk add template',
   });
 
   const templateEmbed = new EmbedBuilder()
@@ -80,14 +80,14 @@ export function buildPreviewReply(parsed, requestId) {
   const previewLines = parsed.rows.slice(0, 20).map((row, index) => {
     const reasonShort = row.reason.length > 50 ? `${row.reason.slice(0, 47)}...` : row.reason;
     const scopeTag = row.scope === 'server' ? ' `[S]`' : '';
-    return `\`${String(index + 1).padStart(2, ' ')}.\` ${typeIcon(row.type)} **${row.name}**${scopeTag} — ${reasonShort}`;
+    return `\`${String(index + 1).padStart(2, ' ')}.\` ${typeIcon(row.type)} **${row.name}**${scopeTag} · ${reasonShort}`;
   });
   if (parsed.rows.length > 20) {
     previewLines.push(`*... and ${parsed.rows.length - 20} more rows*`);
   }
 
   const previewEmbed = new EmbedBuilder()
-    .setTitle(`📋 Bulk Add Preview — ${parsed.rows.length} valid row${parsed.rows.length === 1 ? '' : 's'}`)
+    .setTitle(`📋 Bulk Add Preview · ${parsed.rows.length} valid row${parsed.rows.length === 1 ? '' : 's'}`)
     .setDescription(previewLines.join('\n').slice(0, 4000))
     .setColor(COLORS.info)
     .setFooter({
@@ -110,7 +110,7 @@ export function buildPreviewReply(parsed, requestId) {
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`multiadd_confirm:${requestId}`)
-      .setLabel(`Confirm — Add ${parsed.rows.length}`)
+      .setLabel(`Confirm · Add ${parsed.rows.length}`)
       .setStyle(ButtonStyle.Success)
       .setEmoji('✅'),
     new ButtonBuilder()

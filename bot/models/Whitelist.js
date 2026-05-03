@@ -6,7 +6,7 @@
 import mongoose from 'mongoose';
 
 const whitelistSchema = new mongoose.Schema({
-  /** Character name — unique index defined via schema.index() below (case-insensitive) */
+  /** Character name · unique index defined via schema.index() below (case-insensitive) */
   name: {
     type: String,
     required: true,
@@ -35,7 +35,7 @@ const whitelistSchema = new mongoose.Schema({
   },
 
   /**
-   * Optional attachment image URL — legacy field for entries created before
+   * Optional attachment image URL · legacy field for entries created before
    * the rehost feature. New entries use imageMessageId/imageChannelId instead
    * because Discord CDN URLs expire ~24h after issue.
    */
