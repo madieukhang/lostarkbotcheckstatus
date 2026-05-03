@@ -4,6 +4,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.36] - 2026-05-03
+
+### Changed
+- Wave 1 alert-to-embed sweep across the `/la-list *` command surface. Plain-text replies that carried severity icons (❌/⚠️/✅/🛡️) are migrated to `buildAlertEmbed` calls so the alert family reads consistently: severity-coded color, icon prefix, structured fields, optional footer hints. Files touched in this commit:
+  - `list/add/command.js`: 5 guard alerts (server-only, reason-required, invalid-attachment, approval-delivery-failed, proposal-failed).
+  - `list/edit/command.js`: 6 guards (server-only, entry-not-found, officer-only-option, no-changes, scope-not-applicable, scope-change-blocked, no-effective-changes, trusted-block).
+  - `list/edit/applyNow.js`: move-blocked + scope-change-raced + edit-failed.
+  - `list/edit/approvalRequest.js`: approval-delivery-failed + edit-request-sent (info-styled).
+  - `list/enrich/index.js`: 7 guards (no-list-entry, profile-not-found, no-guild, guild-list-unavailable, session-expired, not-your-session × 2, internal-error).
+  - `list/multiadd/index.js`: 4 guards (server-only, template-failed, invalid-attachment, parse-failed, unknown-action).
+  - `list/multiadd/attachment.js`: returns clean reason strings (icon prefix moved to caller's embed).
+  - `list/multiadd/confirmButton.js`: 5 alerts (request-expired, not-your-request, bulk-cancelled, approval-routing, delivery-failed, request-failed).
+  - `list/multiadd/approvalButton.js`: 2 guards (not-authorised, request-expired).
+  - `list/quickadd/index.js`: 3 alerts (reason-required, approval-delivery, quick-add-failed).
+  - `list/trust/index.js`: 5 alerts (officer-only, not-trusted, blacklisted, already-trusted, success cards via buildAlertEmbed with titleIcon/color overrides).
+  - `list/remove/index.js`: not-found + remove-failed.
+  - `list/view/index.js`: 5 alerts (server-only, trusted-empty, all-empty / list-empty, not-your-session, view-failed).
+  - `list/check/index.js`: ocr-failed, no-names-detected, check-failed.
+
+### Notes
+- Approval-flow status messages ("Approved by X" / "Rejected by X") in `add/approvalButton.js` and `add/editApproval.js` are intentionally kept as plain `content` strings because they pair with `buildApprovalResultRow(...)` button rows; the status header + button row pattern is the approval audit trail and each status line is one short metadata sentence, not a multi-field alert.
+- 41/41 tests pass. No handler signatures changed.
+
 ## [v0.5.35] - 2026-05-03
 
 ### Changed

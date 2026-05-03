@@ -99,7 +99,12 @@ export function createRemoveHandlers({ client, services }) {
 
       if (found.length === 0) {
         await interaction.editReply({
-          content: `⚠️ No list entry found for **${name}**.`,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Not Found',
+            description: `**${name}** is not in any list, so there's nothing to remove.`,
+            footer: 'Use /la-list view to browse existing entries.',
+          })],
         });
         return;
       }
@@ -181,7 +186,12 @@ export function createRemoveHandlers({ client, services }) {
     } catch (err) {
       console.error('[list] ❌ Remove failed:', err.message);
       await interaction.editReply({
-        content: `⚠️ Failed to remove entry: \`${err.message}\``,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Remove Failed',
+          description: 'Could not remove the entry.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        })],
       });
     }
   }

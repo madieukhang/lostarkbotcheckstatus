@@ -2,6 +2,7 @@ import {
   getInteractionDisplayName,
 } from '../../../utils/names.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   getListContext,
   buildListEditSuccessEmbed,
@@ -53,7 +54,12 @@ export async function applyListEditNow({
         .collation({ locale: 'en', strength: 2 }).lean();
       if (targetDupe) {
         await interaction.editReply({
-          content: `⚠️ **${existing.name}** already exists in ${newLabel}. Remove it first before moving.`,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Move Blocked',
+            description: `**${existing.name}** already exists in ${newLabel}.`,
+            footer: 'Remove the conflicting target entry first, then retry the move.',
+          })],
         });
         return;
       }
@@ -150,7 +156,12 @@ export async function applyListEditNow({
         // wraps the duplicate-key error with code 11000.
         if (err.code === 11000 && isScopeChange) {
           await interaction.editReply({
-            content: `⚠️ Cannot change scope: another entry with this name already occupies the target scope (race condition). Try again or remove the conflicting entry.`,
+            embeds: [buildAlertEmbed({
+              severity: AlertSeverity.WARNING,
+              title: 'Scope Change Raced',
+              description: 'Another entry with this name claimed the target scope between the preflight check and the persist step.',
+              footer: 'Retry the command, or remove the conflicting entry first.',
+            })],
           });
           return;
         }
@@ -198,6 +209,13 @@ export async function applyListEditNow({
     }
 
   } catch (err) {
-    await interaction.editReply({ content: `⚠️ Edit failed: \`${err.message}\`` });
+    await interaction.editReply({
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        title: 'Edit Failed',
+        description: 'Could not apply the edit.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+      })],
+    });
   }
 }

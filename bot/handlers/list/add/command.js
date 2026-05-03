@@ -8,6 +8,7 @@ import {
 } from '../../../utils/names.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   buildListAddApprovalEmbed,
   isRequesterAutoApprover,
@@ -32,7 +33,11 @@ export function createListAddCommandHandler({
 
     if (!interaction.guild) {
       await interaction.editReply({
-        content: '❌ This command can only be used in a server.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Server-Only Command',
+          description: 'This command can only be used inside a Discord server, not in DMs.',
+        })],
       });
       return;
     }
@@ -48,14 +53,22 @@ export function createListAddCommandHandler({
 
     if (!reason) {
       await interaction.editReply({
-        content: '❌ Reason cannot be empty.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Reason Required',
+          description: 'Every list entry needs a reason. Re-run the command and fill the `reason` option.',
+        })],
       });
       return;
     }
 
     if (image?.contentType && !image.contentType.startsWith('image/')) {
       await interaction.editReply({
-        content: '❌ Attachment must be an image file.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Invalid Attachment',
+          description: `The \`image\` option only accepts image files. Detected content type: \`${image.contentType}\`.`,
+        })],
       });
       return;
     }
@@ -116,7 +129,13 @@ export function createListAddCommandHandler({
       const sent = await sendListAddApprovalToApprovers(interaction.guild, payload);
       if (!sent.success) {
         await interaction.editReply({
-          content: `⚠️ Failed to send approval request to approvers: ${sent.reason}`,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Approval Request Failed',
+            description: `Could not deliver the approval request to approvers.`,
+            fields: [{ name: 'Reason', value: sent.reason || 'unknown', inline: false }],
+            footer: 'No entry was created. Try again or contact an officer directly.',
+          })],
         });
         return;
       }
@@ -149,7 +168,13 @@ export function createListAddCommandHandler({
     } catch (err) {
       console.error('[list] ❌ Proposal create/send failed:', err.message);
       await interaction.editReply({
-        content: `⚠️ Failed to create approval request: \`${err.message}\``,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Proposal Failed',
+          description: 'Could not create the approval request.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+          footer: 'No entry was created. Retry the command; if the error persists, contact an officer.',
+        })],
       });
     }
   }

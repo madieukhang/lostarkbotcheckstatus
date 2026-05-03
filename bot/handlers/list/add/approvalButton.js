@@ -8,6 +8,7 @@ import {
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { COLORS } from '../../../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   getListContext,
   buildApprovalResultRow,
@@ -39,14 +40,22 @@ export function createListAddApprovalButtonHandler({
 
       if (stillExists) {
         await interaction.reply({
-          content: '⛔ You are not allowed to approve/reject this request.',
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Not Authorised',
+            description: 'You are not on the approver list for this request.',
+          })],
           ephemeral: true,
         });
         return;
       }
 
       await interaction.reply({
-        content: '⚠️ This approval request was already processed or has expired.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Request Expired',
+          description: 'This approval request was already processed or has expired.',
+        })],
         ephemeral: true,
       });
       return;

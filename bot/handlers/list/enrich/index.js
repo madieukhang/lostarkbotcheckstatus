@@ -40,6 +40,7 @@ import {
   detectAltsViaStronghold,
 } from '../../../services/rosterService.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { isOfficerOrSenior } from '../helpers.js';
 import {
   findEntryByName,
@@ -92,7 +93,12 @@ export function createEnrichHandlers({ client, services }) {
     const found = await findEntryByName(name);
     if (!found) {
       await interaction.editReply({
-        content: `❌ No list entry found for **${name}**. Use \`/la-list add\` to create one first.`,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'No List Entry',
+          description: `**${name}** has no entry in any list.`,
+          footer: 'Use /la-list add to create the entry first; enrich only appends to existing entries.',
+        })],
       });
       return;
     }
@@ -106,13 +112,23 @@ export function createEnrichHandlers({ client, services }) {
     });
     if (!meta) {
       await interaction.editReply({
-        content: `❌ Could not fetch character meta for **${name}** from lostark.bible. Profile may be hidden or the name may be misspelled.`,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Profile Not Found',
+          description: `Could not fetch character meta for **${name}** from lostark.bible.`,
+          footer: 'Profile may be hidden, the name may be misspelled, or bible may be temporarily down.',
+        })],
       });
       return;
     }
     if (!meta.guildName) {
       await interaction.editReply({
-        content: `❌ **${name}** has no guild on bible. Stronghold deep scan requires a guild member list to walk.`,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'No Guild on Bible',
+          description: `**${name}** has no guild listed on lostark.bible. Stronghold deep scan requires a guild member list to walk.`,
+          footer: 'Use /la-list edit additional_names to manually append known alts when auto-discovery is impossible.',
+        })],
       });
       return;
     }
@@ -128,7 +144,12 @@ export function createEnrichHandlers({ client, services }) {
     });
     if (guildMembers.length === 0) {
       await interaction.editReply({
-        content: `❌ Could not fetch guild member list for **${name}** without ScraperAPI. Try again later.`,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Guild Member List Unavailable',
+          description: `Could not fetch the guild member list for **${name}** without ScraperAPI.`,
+          footer: 'Bible may be rate-limiting; try again in a few minutes.',
+        })],
       });
       return;
     }
@@ -212,14 +233,23 @@ export function createEnrichHandlers({ client, services }) {
     const session = getEnrichSession(sessionId);
     if (!session) {
       await interaction.reply({
-        content: '⚠️ This enrich session has expired. Re-run `/la-list enrich` to try again.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Session Expired',
+          description: 'This enrich preview is older than the 5-minute session window.',
+          footer: 'Re-run /la-list enrich to start a fresh scan.',
+        })],
         ephemeral: true,
       });
       return;
     }
     if (session.callerId !== interaction.user.id) {
       await interaction.reply({
-        content: '⛔ Only the officer who started this enrich session can confirm it.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Not Your Session',
+          description: 'Only the officer who started this enrich session can confirm it.',
+        })],
         ephemeral: true,
       });
       return;
@@ -230,8 +260,12 @@ export function createEnrichHandlers({ client, services }) {
     const Model = MODELS_BY_TYPE[session.type];
     if (!Model) {
       await interaction.editReply({
-        content: `❌ Internal error: unknown list type "${session.type}".`,
-        embeds: [],
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Internal Error',
+          description: `Unknown list type "${session.type}".`,
+          footer: 'Report this to an officer; the entry was not modified.',
+        })],
         components: [],
       });
       return;
@@ -258,15 +292,23 @@ export function createEnrichHandlers({ client, services }) {
     const session = getEnrichSession(sessionId);
     if (!session) {
       await interaction.update({
-        content: '⚠️ Session expired.',
-        embeds: [],
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Session Expired',
+          description: 'This enrich preview is older than the 5-minute session window.',
+        })],
         components: [],
       });
       return;
     }
     if (session.callerId !== interaction.user.id) {
       await interaction.reply({
-        content: '⛔ Only the officer who started this enrich session can cancel it.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Not Your Session',
+          description: 'Only the officer who started this enrich session can cancel it.',
+        })],
         ephemeral: true,
       });
       return;

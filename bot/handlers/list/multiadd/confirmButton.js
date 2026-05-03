@@ -4,6 +4,7 @@ import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { COLORS } from '../../../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   getSeniorApproverIds,
   isOfficerOrSenior,
@@ -26,8 +27,13 @@ export function createMultiaddConfirmButtonHandler(deps) {
 
     if (!pending) {
       await interaction.update({
-        content: '⚠️ Request expired or already processed.',
-        embeds: [],
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Request Expired',
+          description: 'This bulk-add preview has expired or was already processed.',
+          footer: 'Re-upload the file with /la-list multiadd action:file to start over.',
+        })],
         components: [],
       });
       return;
@@ -35,7 +41,11 @@ export function createMultiaddConfirmButtonHandler(deps) {
 
     if (interaction.user.id !== pending.requesterId) {
       await interaction.reply({
-        content: '❌ Only the original requester can use these buttons.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Not Your Request',
+          description: 'Only the original uploader can use these buttons.',
+        })],
         ephemeral: true,
       });
       return;
@@ -44,8 +54,13 @@ export function createMultiaddConfirmButtonHandler(deps) {
     if (prefix === 'multiadd_cancel') {
       clearMultiaddPending(requestId);
       await interaction.update({
-        content: '✖️ Bulk add cancelled. No entries were added.',
-        embeds: [],
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.INFO,
+          titleIcon: '✖️',
+          title: 'Bulk Add Cancelled',
+          description: 'No entries were added.',
+        })],
         components: [],
       });
       return;
@@ -102,7 +117,12 @@ export function createMultiaddConfirmButtonHandler(deps) {
       const targetApproverIds = getSeniorApproverIds();
       if (targetApproverIds.length === 0) {
         await interaction.update({
-          content: '⚠️ Failed to send approval request: No Senior approver user IDs configured. Set SENIOR_APPROVER_IDS in env.',
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Approval Routing Misconfigured',
+            description: 'No Senior approver user IDs are configured.',
+            footer: 'Set SENIOR_APPROVER_IDS in the bot env, then retry the upload.',
+          })],
           embeds: [],
           components: [],
         });
@@ -172,7 +192,13 @@ export function createMultiaddConfirmButtonHandler(deps) {
           console.warn('[multiadd] Failed to clean up placeholder approval:', err.message)
         );
         await interaction.update({
-          content: `⚠️ Failed to send approval request: ${sent.reason}`,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Approval Delivery Failed',
+            description: 'Could not deliver the bulk-approval request.',
+            fields: [{ name: 'Reason', value: sent.reason || 'unknown', inline: false }],
+            footer: 'No entries were added. Try again or contact a senior directly.',
+          })],
           embeds: [],
           components: [],
         });
@@ -208,7 +234,13 @@ export function createMultiaddConfirmButtonHandler(deps) {
       console.error('[multiadd] Approval request create failed:', err);
       await PendingApproval.deleteOne({ requestId }).catch(() => {});
       await interaction.update({
-        content: `❌ Failed to create approval request: \`${err.message}\``,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Approval Request Failed',
+          description: 'Could not create the bulk-approval request.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+          footer: 'No entries were added. Retry the upload; if it persists, contact a senior.',
+        })],
         embeds: [],
         components: [],
       }).catch(() => {});

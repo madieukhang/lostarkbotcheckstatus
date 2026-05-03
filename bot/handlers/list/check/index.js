@@ -70,14 +70,25 @@ export function createCheckHandlers({ client }) {
       names = await extractNamesFromImage(image);
     } catch (err) {
       await interaction.editReply({
-        content: `⚠️ Failed to extract names from image: \`${err.message}\``,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'OCR Failed',
+          description: 'Could not extract names from the uploaded image.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+          footer: 'Try a clearer screenshot, or check that the image is the raid waiting room.',
+        })],
       });
       return;
     }
 
     if (names.length === 0) {
       await interaction.editReply({
-        content: '⚠️ No valid names found in the uploaded image. Please use a clearer screenshot.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'No Names Detected',
+          description: 'OCR ran but found no valid names in the image.',
+          footer: 'Try a clearer screenshot of the raid waiting room.',
+        })],
       });
       return;
     }
@@ -110,7 +121,12 @@ export function createCheckHandlers({ client }) {
     } catch (err) {
       console.error('[listcheck] ❌ Check failed:', err.message);
       await interaction.editReply({
-        content: `⚠️ Failed to run list check: \`${err.message}\``,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Check Failed',
+          description: 'Could not run the list check after OCR succeeded.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        })],
       });
     }
   }
