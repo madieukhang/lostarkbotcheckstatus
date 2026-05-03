@@ -8,6 +8,7 @@ import {
 import { connectDB } from '../db.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
 import { COLORS } from '../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import Watchlist from '../models/Watchlist.js';
@@ -35,12 +36,24 @@ export async function handleSearchCommand(interaction) {
     let suggestions = await fetchNameSuggestions(name);
 
     if (suggestions === null) {
-      await interaction.editReply({ content: `⚠️ lostark.bible is currently unavailable. Please try again later.` });
+      await interaction.editReply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Bible Unavailable',
+          description: 'lostark.bible is currently unavailable. Please try again later.',
+        })],
+      });
       return;
     }
 
     if (suggestions.length === 0) {
-      await interaction.editReply({ content: `❌ No results found for **${name}**.` });
+      await interaction.editReply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'No Results',
+          description: `No characters matching **${name}** were found.`,
+        })],
+      });
       return;
     }
 
@@ -56,7 +69,14 @@ export async function handleSearchCommand(interaction) {
       const filterDesc = [`ilvl ≥ ${minIlvl}`];
       if (maxIlvl !== null) filterDesc.push(`ilvl ≤ ${maxIlvl}`);
       if (classFilter) filterDesc.push(`class: ${getClassName(classFilter)}`);
-      await interaction.editReply({ content: `❌ No results for **${name}** with filters: ${filterDesc.join(', ')}` });
+      await interaction.editReply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'No Results With Filters',
+          description: `No characters matching **${name}** with the applied filters.`,
+          fields: [{ name: 'Filters', value: filterDesc.join(', '), inline: false }],
+        })],
+      });
       return;
     }
 
@@ -188,7 +208,14 @@ export async function handleSearchCommand(interaction) {
 
     collector.on('collect', async (sel) => {
       if (sel.user.id !== interaction.user.id) {
-        await sel.reply({ content: '⛔ Only the command user can view evidence.', ephemeral: true });
+        await sel.reply({
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Not Your Session',
+            description: 'Only the command user can view evidence on this search.',
+          })],
+          ephemeral: true,
+        });
         return;
       }
 
@@ -206,7 +233,15 @@ export async function handleSearchCommand(interaction) {
       // may already have expired).
       const displayUrl = await resolveDisplayImageUrl(entry, interaction.client);
       if (!displayUrl) {
-        await sel.reply({ content: '⚠️ Image link expired or evidence message removed.', ephemeral: true });
+        await sel.reply({
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Evidence Unavailable',
+            description: 'The evidence image link expired or the rehosted message was removed.',
+            footer: 'Re-upload via /la-list edit name:<entry> image:<file>.',
+          })],
+          ephemeral: true,
+        });
         return;
       }
 
@@ -236,6 +271,13 @@ export async function handleSearchCommand(interaction) {
     });
   } catch (err) {
     console.error('[search] ❌ Search failed:', err.message);
-    await interaction.editReply({ content: `⚠️ Search failed: \`${err.message}\`` });
+    await interaction.editReply({
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        title: 'Search Failed',
+        description: 'Could not run the name search.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+      })],
+    });
   }
 }

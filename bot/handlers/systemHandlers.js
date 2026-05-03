@@ -2,6 +2,7 @@ import { EmbedBuilder } from 'discord.js';
 
 import { STATUS } from '../monitor/serverStatus.js';
 import { COLORS } from '../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
 
 function formatStatus(status) {
   switch (status) {
@@ -41,7 +42,12 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
       await interaction.editReply({
-        content: `⚠️ Failed to fetch server status: \`${err.message}\``,
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Status Fetch Failed',
+          description: 'Could not fetch server status.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        })],
       });
     }
   }
@@ -50,7 +56,11 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
     await interaction.deferReply();
     await resetState();
     await interaction.editReply({
-      content: '✅ State has been reset. The bot will start tracking from the next check.',
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.SUCCESS,
+        title: 'State Reset',
+        description: 'The stored server status was cleared. The bot will start tracking from the next monitor cycle.',
+      })],
     });
   }
 

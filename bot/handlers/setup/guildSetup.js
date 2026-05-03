@@ -11,6 +11,7 @@ import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
 import { COLORS } from '../../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 
 /**
  * Check if the bot has required permissions in a channel.
@@ -60,7 +61,11 @@ async function handleSetupAutoChannel(interaction) {
 
   if (channel.type !== ChannelType.GuildText) {
     await interaction.reply({
-      content: '❌ Please select a **text channel**.',
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.ERROR,
+        title: 'Wrong Channel Type',
+        description: 'Please select a **text channel**.',
+      })],
       ephemeral: true,
     });
     return;
@@ -70,7 +75,17 @@ async function handleSetupAutoChannel(interaction) {
   const { ok, missing } = checkBotPermissions(channel, interaction.guild);
   if (!ok) {
     await interaction.reply({
-      content: `❌ Bot is missing permissions in <#${channel.id}>:\n${missing.map((m) => `• ${m}`).join('\n')}\n\nPlease fix channel permissions and try again.`,
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.ERROR,
+        title: 'Missing Permissions',
+        description: `Bot is missing permissions in <#${channel.id}>.`,
+        fields: [{
+          name: 'Missing',
+          value: missing.map((m) => `• ${m}`).join('\n'),
+          inline: false,
+        }],
+        footer: 'Fix the channel permissions and re-run the command.',
+      })],
       ephemeral: true,
     });
     return;
@@ -118,7 +133,11 @@ async function handleSetupNotifyChannel(interaction) {
 
   if (channel.type !== ChannelType.GuildText) {
     await interaction.reply({
-      content: '❌ Please select a **text channel**.',
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.ERROR,
+        title: 'Wrong Channel Type',
+        description: 'Please select a **text channel**.',
+      })],
       ephemeral: true,
     });
     return;
@@ -128,7 +147,17 @@ async function handleSetupNotifyChannel(interaction) {
   const { ok, missing } = checkBotPermissions(channel, interaction.guild);
   if (!ok) {
     await interaction.reply({
-      content: `❌ Bot is missing permissions in <#${channel.id}>:\n${missing.map((m) => `• ${m}`).join('\n')}\n\nPlease fix channel permissions and try again.`,
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.ERROR,
+        title: 'Missing Permissions',
+        description: `Bot is missing permissions in <#${channel.id}>.`,
+        fields: [{
+          name: 'Missing',
+          value: missing.map((m) => `• ${m}`).join('\n'),
+          inline: false,
+        }],
+        footer: 'Fix the channel permissions and re-run the command.',
+      })],
       ephemeral: true,
     });
     return;
@@ -279,7 +308,11 @@ async function handleSetupView(interaction) {
 export async function handleSetupCommand(interaction) {
   if (!interaction.guild) {
     await interaction.reply({
-      content: '❌ This command can only be used in a server.',
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.ERROR,
+        title: 'Server-Only Command',
+        description: 'This command can only be used inside a Discord server, not in DMs.',
+      })],
       ephemeral: true,
     });
     return;
@@ -291,7 +324,14 @@ export async function handleSetupCommand(interaction) {
   if (subcommand !== 'remote') {
     const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
     if (!hasManageGuild) {
-      await interaction.reply({ content: '❌ You need **Manage Server** permission to use this command.', ephemeral: true });
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Permission Required',
+          description: 'You need the **Manage Server** permission to use this command.',
+        })],
+        ephemeral: true,
+      });
       return;
     }
   }
