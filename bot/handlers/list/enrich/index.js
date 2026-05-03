@@ -60,11 +60,20 @@ import {
   buildEnrichProgressEmbed,
   buildEnrichSuccessEmbed,
 } from './ui.js';
+import {
+  buildStopButtonRow,
+  newScanSessionId,
+  registerScan,
+  unregisterScan,
+  getScan,
+} from '../../../utils/scanSession.js';
 
-// Discord webhook edits are rate-limited (5 per 5s). Throttle progress
-// updates so the scan worker isn't bottlenecked on Discord; 30s gives
-// ~10-30 updates over a 10-15 minute scan, plenty for live signal.
-const PROGRESS_EDIT_THROTTLE_MS = 30 * 1000;
+// Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
+// ~40-60 updates over a 10-15 minute gentle-mode scan; well under the
+// rate-limit ceiling and tight enough that progress feels live rather
+// than batched. Tightened from 30s after users reported the embed
+// felt frozen between ticks.
+const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
 
 export function createEnrichHandlers({ client, services }) {
   // services may grow Phase 3.5 broadcast support later; not used today.
@@ -151,8 +160,22 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
 
-    // Initial scan-started embed. The onProgress callback below will edit
-    // this same message with live progress every 30s as the scan runs.
+    // Register a scan session so the Stop button can find this scan's
+    // cancel flag without leaking the interaction reference outside
+    // this closure. SessionId is short-lived (cleaned up in `finally`
+    // when the scan completes or throws).
+    const sessionId = newScanSessionId();
+    const cancelFlag = { cancelled: false };
+    registerScan(sessionId, {
+      cancelFlag,
+      callerId: interaction.user.id,
+      startedAt: Date.now(),
+      label: `${name} (enrich)`,
+    });
+
+    // Initial scan-started embed plus Stop button row. onProgress edits
+    // below preserve the same components array so the Stop button stays
+    // clickable for the duration of the scan.
     const startedAt = Date.now();
     const initialProgress = {
       scannedCandidates: 0,
@@ -170,6 +193,7 @@ export function createEnrichHandlers({ client, services }) {
       totalMembers: guildMembers.length,
       startedAt,
     };
+    const stopRow = buildStopButtonRow(sessionId);
     await interaction.editReply({
       content: '',
       embeds: [buildEnrichProgressEmbed({
@@ -178,6 +202,7 @@ export function createEnrichHandlers({ client, services }) {
         meta,
         progress: initialProgress,
       })],
+      components: [stopRow],
     });
 
     let lastProgressEdit = startedAt;
@@ -192,6 +217,12 @@ export function createEnrichHandlers({ client, services }) {
       // overwrites the embed with either preview-with-alts or
       // no-alts-matched immediately afterwards.
       if (isFinal) return;
+      // After cancel: render the embed once with the Stop button greyed
+      // out so the user sees their click took effect even before the
+      // worker drops out of its current candidate.
+      const buttonRow = cancelFlag.cancelled
+        ? buildStopButtonRow(sessionId, { disabled: true, label: 'Stopping...' })
+        : stopRow;
       interaction.editReply({
         content: '',
         embeds: [buildEnrichProgressEmbed({
@@ -200,6 +231,7 @@ export function createEnrichHandlers({ client, services }) {
           meta,
           progress: { ...progress, totalMembers: guildMembers.length, startedAt },
         })],
+        components: [buttonRow],
       }).catch((err) => {
         console.warn('[enrich] Progress edit failed:', err?.message || err);
       });
@@ -209,13 +241,47 @@ export function createEnrichHandlers({ client, services }) {
     // (this is the high-fanout path the .env warning is about). targetMeta
     // and guildMembers are pre-supplied above so allowScraperApiForTarget /
     // allowScraperApiForGuild inside the detector are no-ops here.
-    const result = await detectAltsViaStronghold(name, {
-      targetMeta: meta,
-      guildMembers,
-      candidateLimit: cap,
-      useScraperApiForCandidates: false,
-      onProgress,
-    });
+    let result;
+    try {
+      result = await detectAltsViaStronghold(name, {
+        targetMeta: meta,
+        guildMembers,
+        candidateLimit: cap,
+        useScraperApiForCandidates: false,
+        onProgress,
+        cancelFlag,
+      });
+    } finally {
+      unregisterScan(sessionId);
+    }
+
+    // Cancelled scan: bail out with a dedicated embed. result.alts may
+    // still hold partial matches (any alt found before cancel) but we
+    // don't auto-append; officer can re-run the scan later.
+    if (result?.cancelled) {
+      const ctx = LIST_LABELS[found.type];
+      await interaction.editReply({
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          titleIcon: '🛑',
+          color: ctx.color,
+          title: `Scan stopped · ${name}`,
+          description:
+            `Scan was cancelled mid-run.` +
+            (result.alts.length > 0
+              ? ` Found **${result.alts.length}** match${result.alts.length === 1 ? '' : 'es'} before stopping (not appended).`
+              : ' No matches recorded before stop.'),
+          fields: [
+            { name: 'Scanned', value: `${result.scannedCandidates} / ${result.candidateLimit}`, inline: true },
+            { name: 'Failed', value: `${result.failedCandidates}`, inline: true },
+          ],
+          footer: 'Re-run /la-list enrich to start a fresh scan when bible is calmer.',
+        })],
+        components: [],
+      });
+      return;
+    }
 
     if (!result || !Array.isArray(result.alts) || result.alts.length === 0) {
       const ctx = LIST_LABELS[found.type];
@@ -245,6 +311,7 @@ export function createEnrichHandlers({ client, services }) {
               ? 'High failure count usually means bible was rate-limiting; retry in a few minutes.'
               : 'Either the target has no alts in this guild, or all alts are below ilvl 1700.',
         })],
+        components: [],
       });
       return;
     }
@@ -261,10 +328,18 @@ export function createEnrichHandlers({ client, services }) {
     );
 
     if (newAlts.length === 0) {
+      const ctx = LIST_LABELS[found.type];
       await interaction.editReply({
-        content:
-          `✅ Scan complete. All ${result.alts.length} discovered alts are already in ` +
-          `**${name}**'s ${LIST_LABELS[found.type].label} entry. Nothing to add.`,
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.SUCCESS,
+          titleIcon: ICONS.search,
+          color: ctx.color,
+          title: `Scan complete · ${name}`,
+          description:
+            `All **${result.alts.length}** discovered alts are already on the ${ctx.label} entry. Nothing new to append.`,
+        })],
+        components: [],
       });
       return;
     }
@@ -480,10 +555,75 @@ export function createEnrichHandlers({ client, services }) {
     });
   }
 
+  /**
+   * Stop button handler. Posted on long-running scan progress embeds
+   * (enrich + roster deep:true) so the officer can interrupt a stuck
+   * scan without waiting for the 15-min Discord webhook timeout.
+   *
+   * customId: `scan-cancel:<sessionId>` where sessionId came from
+   * `newScanSessionId()` in the scan-start path. The flag flip is
+   * picked up by the detector at the top of its next candidate loop;
+   * the worker may still complete its in-flight fetchCharacterMeta
+   * before exiting, so the user sees a brief "Stopping..." state.
+   */
+  async function handleScanCancelButton(interaction) {
+    const sessionId = interaction.customId.split(':')[1];
+    const scan = getScan(sessionId);
+    if (!scan) {
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Scan Already Finished',
+          description: 'This scan has already completed or was cancelled. Re-run the command if you want a fresh scan.',
+        })],
+        ephemeral: true,
+      });
+      return;
+    }
+    if (!isOfficerOrSenior(interaction.user.id) && scan.callerId !== interaction.user.id) {
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Not Authorised',
+          description: 'Only the officer who started this scan (or any senior) can stop it.',
+        })],
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (scan.cancelFlag.cancelled) {
+      // Idempotent: second click while worker is still draining its
+      // current candidate. Acknowledge ephemerally so the user knows
+      // the click landed without spawning a duplicate edit.
+      await interaction.reply({
+        content: 'Already stopping...',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    scan.cancelFlag.cancelled = true;
+
+    // Acknowledge with a fresh ephemeral so we don't race the scan's
+    // own onProgress edit. The next onProgress tick will replace the
+    // active Stop button with the disabled "Stopping..." version.
+    await interaction.reply({
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.INFO,
+        titleIcon: '🛑',
+        title: 'Stop signal sent',
+        description: 'The scan worker will exit at the end of its current candidate fetch (a few seconds at most).',
+      })],
+      ephemeral: true,
+    });
+  }
+
   return {
     handleListEnrichCommand,
     handleListAddEnrichHiddenButton,
     handleListEnrichConfirmButton,
     handleListEnrichCancelButton,
+    handleScanCancelButton,
   };
 }

@@ -4,6 +4,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.52] - 2026-05-03
+
+### Added
+- **Stop button** on every long-running stronghold scan (`/la-list enrich`, `/la-roster deep:true` hidden + visible). Officers can interrupt a scan that's clearly stuck (e.g. bible blanket-rejecting requests) without waiting for the 15-min Discord webhook timeout. Click feedback is immediate ephemeral ack ("Stop signal sent · worker exits at end of current candidate"); the embed flips its button to disabled "Stopping..." on the next progress tick. Final post-scan card on cancel reads `🛑 Scan stopped · Ainslinn` with scanned/failed counts and a hint to retry off-peak.
+- `bot/utils/scanSession.js` (new): module-level Map keyed by short sessionId tracks active scans. `registerScan` / `unregisterScan` lifecycle is wrapped in `try/finally` so a thrown scan still releases its slot. `buildStopButtonRow(sessionId, opts)` ships the standard Stop-scan button row used by both progress embeds.
+
+### Changed
+- Scan worker now emits `onProgress` every **5 candidates** instead of every 25, so the embed has fresher progress data between throttled UI edits. Console log stays at per-25 (operator-facing).
+- Progress UI throttle tightened **30s → 15s** in both enrich and roster handlers. Math: 15s × ~60 ticks over a 15-min scan = well under Discord's 5 edits/5s rate-limit ceiling. Users reported the 30s gap felt frozen between updates.
+- `detectAltsViaStronghold` accepts a shared `cancelFlag = { cancelled: false }` option; the scan worker checks it at the top of each candidate iteration and exits early. Result includes `cancelled: true/false` so callers can render a distinct "stopped" embed.
+- Hidden-roster + visible-roster paths in `rosterHandler.js` both wire the cancelFlag through `detectAltsViaStronghold` and present the Stop button identical to enrich.
+
+### Notes
+- Cancellation auth: the user who started the scan can always stop it; any officer/senior can stop any scan.
+- Worker may still complete its in-flight `fetchCharacterMeta` (a few seconds) before exiting because we don't pass an AbortSignal yet · acceptable trade-off vs the complexity of wiring abort through the rate-limit retry layer.
+- 42/42 tests pass.
+
 ## [v0.5.51] - 2026-05-03
 
 ### Changed

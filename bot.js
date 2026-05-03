@@ -167,6 +167,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  // Stop-scan button on the live progress embed for /la-list enrich and
+  // /la-roster deep:true. Flips the shared cancel flag; the detector
+  // exits on its next candidate loop check.
+  if (
+    interaction.isButton() &&
+    interaction.customId.startsWith('scan-cancel:')
+  ) {
+    try {
+      await listHandlers.handleScanCancelButton(interaction);
+    } catch (err) {
+      console.error('[scan] cancel button error:', err);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '❌ Failed to send stop signal.', ephemeral: true }).catch(() => {});
+      }
+    }
+    return;
+  }
+
   // /la-list multiadd preview Confirm/Cancel buttons
   if (
     interaction.isButton() &&

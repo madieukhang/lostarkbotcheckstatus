@@ -95,8 +95,18 @@ export async function detectAltsViaStronghold(name, options = {}) {
     recover: 100,
   };
 
+  // Cancel flag is mutated externally (e.g. by a Stop button click).
+  // Worker checks at the top of each candidate loop and exits early
+  // when set, so the caller gets a partial-result return.
+  const cancelFlag = options.cancelFlag || { cancelled: false };
+  let cancelledByFlag = false;
+
   async function scanWorker() {
     while (nextCandidateIndex < limitedCandidates.length) {
+      if (cancelFlag.cancelled) {
+        cancelledByFlag = true;
+        break;
+      }
       const cand = limitedCandidates[nextCandidateIndex++];
       const candMeta = await fetchCharacterMeta(cand.name, {
         allowScraperApi: useScraperApiForCandidates,
@@ -124,15 +134,20 @@ export async function detectAltsViaStronghold(name, options = {}) {
         }
       }
 
+      // Console log stays per-25 (operator-facing). UI progress emits
+      // per-5 so the embed can pulse faster between throttled edits;
+      // the caller decides how often to actually push to Discord.
       if (scannedCandidates % 25 === 0 || scannedCandidates === limitedCandidates.length) {
         console.log(
           `[alt-detect] Progress ${scannedCandidates}/${limitedCandidates.length};` +
           ` failed ${failedCandidates}; alts ${alts.length}; backoff ${backoff.current}ms`
         );
-        // Surface progress to caller (e.g. Discord embed update). Fire-and-
-        // forget so a slow / rate-limited UI edit does not block the next
-        // candidate fetch. The caller is expected to throttle its own
-        // edits if it needs to respect external rate limits.
+      }
+      if (
+        scannedCandidates % 5 === 0
+        || scannedCandidates === limitedCandidates.length
+        || alts.length > 0 && scannedCandidates % 1 === 0
+      ) {
         if (typeof options.onProgress === 'function') {
           Promise.resolve(options.onProgress({
             scannedCandidates,
@@ -181,5 +196,6 @@ export async function detectAltsViaStronghold(name, options = {}) {
     usedScraperApiForCandidates: useScraperApiForCandidates,
     mode,
     retryOnRateLimit,
+    cancelled: cancelledByFlag,
   };
 }
