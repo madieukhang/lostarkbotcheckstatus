@@ -4,6 +4,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.53] - 2026-05-03
+
+### Added
+- Live progress embed for `/la-list enrich` and `/la-roster deep:true` now lists the **alt names found so far** instead of just a count. Each match shows `• <Name> · <Class> · <ilvl>` so the officer can confirm the scan is finding real targets in real time. Cap of 12 visible names with `... and N more` overflow line keeps the description well under Discord's 4096-char limit.
+- `detectAltsViaStronghold` `onProgress` payload now includes a shallow-copied `alts` array. The detector emits per 5 candidates so name list updates within 7-8 seconds of a new match (vs every 25 candidates / 37+s before).
+
+### Changed
+- Progress embed footer label shifted from "30s update interval" to "15s update interval" to match the throttle change shipped in `d811c18`.
+
+### Notes
+- 42/42 tests pass.
+
 ## [v0.5.52] - 2026-05-03
 
 ### Added

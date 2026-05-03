@@ -34,6 +34,29 @@ import { ICONS, buildProgressBar, relativeTime } from './ui.js';
  * @param {ScanProgress} options.progress
  * @returns {import('discord.js').EmbedBuilder}
  */
+/**
+ * Render the live "matches so far" block. Cap at 12 lines so the
+ * description stays well under Discord's 4096-char cap even when
+ * combined with subtitle + progress bar + stats.
+ *
+ * Each line: `• <Name> · <Class> · \`<ilvl>\``
+ */
+function buildAltsBlock(alts) {
+  if (!Array.isArray(alts) || alts.length === 0) return '';
+  const visible = alts.slice(0, 12);
+  const lines = visible.map((alt) => {
+    const cls = alt.className || alt.classId || 'Unknown';
+    const ilvl = typeof alt.itemLevel === 'number'
+      ? alt.itemLevel.toFixed(2)
+      : (alt.itemLevel || '?');
+    return `• **${alt.name}** · ${cls} · \`${ilvl}\``;
+  });
+  const extra = alts.length > visible.length
+    ? `\n*... and ${alts.length - visible.length} more*`
+    : '';
+  return `\n\n**Matches so far (${alts.length}):**\n${lines.join('\n')}${extra}`;
+}
+
 export function buildScanProgressEmbed({
   title,
   subtitle,
@@ -51,20 +74,23 @@ export function buildScanProgressEmbed({
   const startedLine = progress.startedAt
     ? `\n*Started ${relativeTime(progress.startedAt)}*`
     : '';
+  const altsBlock = buildAltsBlock(progress.alts);
 
   return buildAlertEmbed({
     severity: AlertSeverity.INFO,
     titleIcon: titleIcon || ICONS.search,
     color,
     title,
-    description:
+    description: (
       (subtitle ? `${subtitle}\n\n` : '') +
       `\`${bar}\` ${pct}%\n\n` +
       `Scanned **${progress.scannedCandidates}** / ${progress.totalCandidates} candidates · ` +
       `Found **${progress.altsFound}** match · ` +
       `Failed **${progress.failedCandidates}**` +
-      startedLine,
-    footer: `Backoff ${progress.currentBackoffMs}ms · 30s update interval`,
+      altsBlock +
+      startedLine
+    ).slice(0, 4096),
+    footer: `Backoff ${progress.currentBackoffMs}ms · 15s update interval`,
     timestamp: false,
   });
 }
