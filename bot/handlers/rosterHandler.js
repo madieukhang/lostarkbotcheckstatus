@@ -32,6 +32,42 @@ import {
 import { getClassName } from '../models/Class.js';
 import { getAddedByDisplay, normalizeCharacterName } from '../utils/names.js';
 import { resolveDisplayImageUrl } from '../utils/imageRehost.js';
+import { buildScanProgressEmbed } from '../utils/scanProgressEmbed.js';
+
+// Discord webhook edits are rate-limited (5 per 5s). 30s throttle gives
+// ~10-14 progress updates over a typical 5-7 minute deep scan; well
+// under the rate-limit ceiling and matches /la-list enrich.
+const PROGRESS_EDIT_THROTTLE_MS = 30 * 1000;
+
+/**
+ * Build the onProgress callback used by both the hidden-roster and the
+ * visible-roster deep-scan paths. Wraps Discord editReply with a 30s
+ * throttle and skips the final 100% tick because the post-scan branch
+ * overwrites the embed immediately afterwards (would flicker for ms).
+ */
+function makeRosterScanProgressCallback({ interaction, name, meta, totalMembers, startedAtRef, lastEditRef }) {
+  return (progress) => {
+    const now = Date.now();
+    const isFinal = progress.scannedCandidates >= progress.totalCandidates;
+    if (!isFinal && now - lastEditRef.value < PROGRESS_EDIT_THROTTLE_MS) {
+      return;
+    }
+    lastEditRef.value = now;
+    if (isFinal) return;
+    interaction.editReply({
+      content: '',
+      embeds: [buildScanProgressEmbed({
+        title: `Stronghold scan in progress · ${name}`,
+        subtitle: `Guild **${meta.guildName}**` +
+          (totalMembers ? ` (${totalMembers} members)` : ''),
+        color: COLORS.info,
+        progress: { ...progress, totalMembers, startedAt: startedAtRef.value },
+      })],
+    }).catch((err) => {
+      console.warn('[roster] Progress edit failed:', err?.message || err);
+    });
+  };
+}
 
 function formatDeepScanStats(altResult) {
   if (!altResult) return '';
@@ -115,13 +151,46 @@ export async function handleRosterCommand(interaction) {
         // Step 3: Stronghold fingerprint scan for same-account alts.
         // This is intentionally gated behind deep:true because it can fan out
         // into hundreds of lostark.bible profile requests on large guilds.
-        const altResult = deep
-          ? await detectAltsViaStronghold(name, {
-              ...deepOptions,
-              targetMeta: meta,
-              guildMembers,
-            })
-          : null;
+        let altResult = null;
+        if (deep) {
+          // Send a 0% progress embed immediately so the officer knows the
+          // scan started. onProgress edits this same message every 30s.
+          const startedAtRef = { value: Date.now() };
+          const lastEditRef = { value: startedAtRef.value };
+          const filteredCount = guildMembers.filter((m) => m.name !== name && m.ilvl >= 1700).length;
+          const cap = deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit;
+          await interaction.editReply({
+            content: '',
+            embeds: [buildScanProgressEmbed({
+              title: `Stronghold scan in progress · ${name}`,
+              subtitle: `Guild **${meta.guildName}** (${guildMembers.length} members) · hidden roster`,
+              color: COLORS.info,
+              progress: {
+                scannedCandidates: 0,
+                totalCandidates: Math.min(filteredCount, cap || filteredCount),
+                altsFound: 0,
+                failedCandidates: 0,
+                currentBackoffMs: config.scanBackoffMinMs,
+                totalMembers: guildMembers.length,
+                startedAt: startedAtRef.value,
+              },
+            })],
+          }).catch(() => {});
+
+          altResult = await detectAltsViaStronghold(name, {
+            ...deepOptions,
+            targetMeta: meta,
+            guildMembers,
+            onProgress: makeRosterScanProgressCallback({
+              interaction,
+              name,
+              meta,
+              totalMembers: guildMembers.length,
+              startedAtRef,
+              lastEditRef,
+            }),
+          });
+        }
         const alts = altResult?.alts ?? [];
         const deepStats = formatDeepScanStats(altResult);
 
@@ -322,7 +391,65 @@ export async function handleRosterCommand(interaction) {
     // Deep scan: Stronghold alt detection even when roster is visible
     if (deep) {
       try {
-        const altResult = await detectAltsViaStronghold(name, deepOptions);
+        // Pre-fetch meta + guild members so we can render an initial
+        // progress embed with guild context (member count, name) before
+        // the candidate fan-out starts. The detector skips its own
+        // internal target/guild fetches when both are pre-supplied.
+        const visMeta = await fetchCharacterMeta(name, {
+          timeoutMs: config.strongholdDeepCandidateTimeoutMs,
+        });
+        const visGuildMembers = visMeta?.guildName
+          ? await fetchGuildMembers(name, {
+              timeoutMs: config.strongholdDeepCandidateTimeoutMs,
+              cacheKey: visMeta.guildName,
+            })
+          : [];
+
+        const startedAtRef = { value: Date.now() };
+        const lastEditRef = { value: startedAtRef.value };
+        const visFilteredCount = visGuildMembers.filter((m) => m.name !== name && m.ilvl >= 1700).length;
+        const visCap = deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit;
+        // Single progress embed during the scan; the final editReply at
+        // the bottom of this branch replaces it with the full
+        // content + embeds payload (main roster card + evidence + deep
+        // scan addFields). User trade-off: loses the in-progress glimpse
+        // of the main roster card, but it was never rendered before the
+        // scan anyway so nothing is actually lost.
+        if (visMeta?.guildName && visGuildMembers.length > 0) {
+          await interaction.editReply({
+            content: '',
+            embeds: [buildScanProgressEmbed({
+              title: `Stronghold scan in progress · ${name}`,
+              subtitle: `Guild **${visMeta.guildName}** (${visGuildMembers.length} members) · visible roster`,
+              color: COLORS.info,
+              progress: {
+                scannedCandidates: 0,
+                totalCandidates: Math.min(visFilteredCount, visCap || visFilteredCount),
+                altsFound: 0,
+                failedCandidates: 0,
+                currentBackoffMs: config.scanBackoffMinMs,
+                totalMembers: visGuildMembers.length,
+                startedAt: startedAtRef.value,
+              },
+            })],
+          }).catch(() => {});
+        }
+
+        const altResult = await detectAltsViaStronghold(name, {
+          ...deepOptions,
+          ...(visMeta ? { targetMeta: visMeta } : {}),
+          ...(visGuildMembers.length > 0 ? { guildMembers: visGuildMembers } : {}),
+          onProgress: visMeta?.guildName && visGuildMembers.length > 0
+            ? makeRosterScanProgressCallback({
+                interaction,
+                name,
+                meta: visMeta,
+                totalMembers: visGuildMembers.length,
+                startedAtRef,
+                lastEditRef,
+              })
+            : undefined,
+        });
         const deepStats = formatDeepScanStats(altResult);
         if (altResult && altResult.alts.length > 0) {
           const altLines = altResult.alts.map(

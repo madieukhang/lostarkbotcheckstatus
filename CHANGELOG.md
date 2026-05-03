@@ -4,6 +4,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.41] - 2026-05-03
+
+### Added
+- `/la-roster deep:true` now shows the same live progress embed as `/la-list enrich`. Both deep-scan paths (visible-roster fallback + hidden-roster fallback) emit a 0% progress embed when the candidate fan-out begins, then update via the shared 30s-throttled `onProgress` callback. Progress bar, scanned/total count, alts found, failed count, current backoff, relative timestamp, all consistent across the two commands.
+- `bot/utils/scanProgressEmbed.js` (new): generic `buildScanProgressEmbed({ title, subtitle, color, titleIcon, progress })` shared by enrich + roster. Wraps `buildAlertEmbed` with a 20-character progress bar plus the standard "Backoff Xms · started <relative>" footer.
+- `bot/utils/ui.js` exports `buildProgressBar(percent, width)` so any future scan-style UI can reuse the same glyph treatment.
+
+### Changed
+- `bot/handlers/list/enrich/ui.js` `buildEnrichProgressEmbed` is now a thin wrapper that adds the list-type icon + color (blacklist/whitelist/watchlist context) on top of the shared embed builder.
+- `bot/handlers/rosterHandler.js`:
+  - Hidden-roster path: replaces the previously-static intermediate state with the progress embed; onProgress wires through `makeRosterScanProgressCallback`.
+  - Visible-roster path: pre-fetches `meta` + `guildMembers` so the initial 0% embed has guild context, then passes them to `detectAltsViaStronghold` (the detector skips its own internal target/guild fetches when both are pre-supplied). The final editReply at the bottom of the branch overwrites the progress embed with the full roster card + evidence + deep-scan addFields.
+- The visible-roster trade-off: during the 5-7 minute scan the user sees only the progress embed (not the partial roster card with progression / char list). The roster card was being built in memory but never rendered before the scan anyway, so nothing is actually lost; the final reply renders the complete card.
+
+### Notes
+- 41/41 tests pass. No handler signatures changed; both deep-scan call sites still accept all the same options.
+- Discord webhook 5-edits-per-5s ceiling: 30s throttle = ~10-14 edits over a typical scan, well clear.
+
 ## [v0.5.40] - 2026-05-03
 
 ### Added

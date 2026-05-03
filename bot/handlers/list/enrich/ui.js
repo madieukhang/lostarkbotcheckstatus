@@ -18,47 +18,26 @@ import {
 import { getClassName } from '../../../models/Class.js';
 import { LIST_LABELS } from './data.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { ICONS, buildSessionFooter, relativeTime } from '../../../utils/ui.js';
+import { ICONS, buildSessionFooter } from '../../../utils/ui.js';
+import { buildScanProgressEmbed } from '../../../utils/scanProgressEmbed.js';
 
 const ENRICH_SESSION_MINUTES = 5;
-const PROGRESS_BAR_WIDTH = 20;
-
-function buildProgressBar(percent) {
-  const clamped = Math.max(0, Math.min(100, percent));
-  const filled = Math.round((clamped / 100) * PROGRESS_BAR_WIDTH);
-  return '█'.repeat(filled) + '░'.repeat(PROGRESS_BAR_WIDTH - filled);
-}
 
 /**
- * In-progress embed for the long-running stronghold scan. Replaces the
- * old plain-text "Running stronghold deep scan..." one-liner so the
- * officer can see the worker is still alive during the 5-7 minute fan
- * out. Caller is responsible for throttling edits (Discord webhook
- * rate-limit is 5 edits per 5s).
+ * Enrich-flavoured wrapper around `buildScanProgressEmbed`. Carries the
+ * list-type icon + color so blacklist/whitelist/watchlist enrichments
+ * stay visually consistent with the rest of the alert family while
+ * sharing the generic progress-bar layout with `/la-roster deep:true`.
  */
 export function buildEnrichProgressEmbed({ entry, foundType, meta, progress }) {
   const ctx = LIST_LABELS[foundType];
-  const total = Math.max(1, progress.totalCandidates || 1);
-  const pct = Math.round((progress.scannedCandidates / total) * 100);
-  const bar = buildProgressBar(pct);
-  const startedLine = progress.startedAt
-    ? ` · started ${relativeTime(progress.startedAt)}`
-    : '';
-
-  return buildAlertEmbed({
-    severity: AlertSeverity.INFO,
-    titleIcon: ICONS.search,
-    color: ctx.color,
+  return buildScanProgressEmbed({
     title: `Stronghold scan in progress · ${entry.name}`,
-    description:
-      `Guild **${meta.guildName}**` +
-      (progress.totalMembers ? ` (${progress.totalMembers} members)` : '') +
-      `\n\n\`${bar}\` ${pct}%\n\n` +
-      `Scanned **${progress.scannedCandidates}** / ${progress.totalCandidates} candidates · ` +
-      `Found **${progress.altsFound}** match · ` +
-      `Failed **${progress.failedCandidates}**`,
-    footer: `Backoff ${progress.currentBackoffMs}ms${startedLine}`,
-    timestamp: false,
+    subtitle: `Guild **${meta.guildName}**` +
+      (progress.totalMembers ? ` (${progress.totalMembers} members)` : ''),
+    color: ctx.color,
+    titleIcon: ICONS.search,
+    progress,
   });
 }
 
