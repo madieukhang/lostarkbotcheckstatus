@@ -127,6 +127,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  // /list enrich confirm/cancel buttons
+  if (
+    interaction.isButton() &&
+    (interaction.customId.startsWith('list-enrich:confirm:') ||
+      interaction.customId.startsWith('list-enrich:cancel:'))
+  ) {
+    try {
+      const isConfirm = interaction.customId.startsWith('list-enrich:confirm:');
+      if (isConfirm) {
+        await listHandlers.handleListEnrichConfirmButton(interaction);
+      } else {
+        await listHandlers.handleListEnrichCancelButton(interaction);
+      }
+    } catch (err) {
+      console.error('[list] Enrich button error:', err);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '❌ Failed to process enrich action.', ephemeral: true }).catch(() => {});
+      }
+    }
+    return;
+  }
+
   // /list multiadd preview Confirm/Cancel buttons
   if (
     interaction.isButton() &&
@@ -233,6 +255,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await listHandlers.handleListTrustCommand(interaction);
       } else if (subcommand === 'multiadd') {
         await listHandlers.handleListMultiaddCommand(interaction);
+      } else if (subcommand === 'enrich') {
+        await listHandlers.handleListEnrichCommand(interaction);
       }
     } else if (commandName === 'listcheck') {
       await listHandlers.handleListCheckCommand(interaction);
@@ -259,6 +283,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         '`/list remove tên` — Xoá entry khỏi danh sách',
         '`/list view type [scope]` — Xem danh sách (type: all/black/white/watch/trusted, scope: all/global/server)',
         '`/list trust action tên [reason]` — Quản lý danh sách uy tín (add/remove, chỉ officer)',
+        '`/list enrich tên [deep_limit]` — 🔍 Stronghold deep-scan entry đã có và append alts khám phá được (officer only, ~5-7 phút)',
         '`/list multiadd action [file]` — 📦 **Bulk add** qua Excel template (xem chi tiết ở dưới)',
         '',
         '`/listcheck image` — Trích tên từ ảnh chụp, kiểm tra với tất cả danh sách',
@@ -282,6 +307,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         '`/list remove name` — Remove an entry from a list',
         '`/list view type [scope]` — View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
         '`/list trust action name [reason]` — Manage trusted list (add/remove, officer only)',
+        '`/list enrich name [deep_limit]` — 🔍 Stronghold deep-scan an existing entry and append discovered alts (officer only, ~5-7 min)',
         '`/list multiadd action [file]` — 📦 **Bulk add** via Excel template (see details below)',
         '',
         '`/listcheck image` — Check names from screenshot against all lists',

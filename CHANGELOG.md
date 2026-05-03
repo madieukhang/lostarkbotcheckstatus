@@ -4,6 +4,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.26] - 2026-05-03
+
+### Added
+- `/list enrich <name>` subcommand. Officer-only. Runs a stronghold deep scan against an existing list entry (blacklist / whitelist / watchlist), surfaces a confirm-dialog embed with discovered alts that are NOT yet in the entry's `allCharacters`, and on confirm appends them with `$addToSet`. Deep scan respects `STRONGHOLD_DEEP_CANDIDATE_LIMIT` (default 300, override via `deep_limit` option). Reuses the meta cache + adaptive backoff shipped in v0.5.25 so back-to-back `/list enrich` invocations on the same guild hit warm cache instead of refetching.
+- 30-second per-entry cooldown to prevent accidental double-runs from doubling bible quota burn. 5-minute confirm session TTL.
+
+### Notes
+- Permission gate: officers/seniors only. The original entry already passed approval; enrichment only appends mechanically-matched alts (same stronghold name + roster level on bible), so no additional approval flow is needed.
+- No cross-guild broadcast on enrich (Phase 3 MVP). The original `/list add` already broadcast the entry; enrichment is treated as an internal cleanup. Can be added later if audit trail is desired.
+
 ## [v0.5.25] - 2026-05-03
 
 ### Added
