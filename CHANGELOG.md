@@ -4,6 +4,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.42] - 2026-05-03
+
+### Added
+- `/la-list add` success card now ships with an **Enrich now** button when the entry was created against a hidden roster. Officers / entry owners can hit the button to kick off the same stronghold scan as `/la-list enrich` without re-typing the name. Members landing on the card cannot bypass the gate; the button click re-validates officer permission + the 30s per-entry cooldown server-side.
+- New embed field "Hidden roster detected" added to the success card explaining what the button does and the expected wall-clock (5-7 min). Field is only attached when `rosterVisibility === 'hidden'`.
+- `bot/handlers/list/enrich/index.js` `handleListAddEnrichHiddenButton` extracted as the button handler. Shares the post-validation pipeline with `handleListEnrichCommand` via a new private `runEnrichFlow(interaction, { name, cap })` helper, so slash + button paths emit identical progress + preview embeds.
+
+### Changed
+- `bot/handlers/list/services/addExecutor.js` `executeListAddToDatabase` return now includes a `components` array (empty when roster is visible). Three consumers updated to relay `result.components ?? []` to Discord:
+  - `list/add/command.js` (auto-approve path)
+  - `list/quickadd/index.js` (modal-driven add)
+  - `list/services/approvals.js#notifyRequesterAboutDecision` (approval-flow requester ping)
+- `bot.js` dispatch grows a new branch for the `list-add:enrich-hidden:<encodedName>` button customId family.
+
+### Notes
+- 41/41 tests pass. No DB schema change; the button is computed from the existing `rosterVisibility` field returned by `buildRosterCharacters`.
+- Bulk add (`/la-list multiadd`) intentionally does NOT attach the button per-row; it ships a single aggregate summary embed where per-entry buttons would clutter.
+
 ## [v0.5.41] - 2026-05-03
 
 ### Added

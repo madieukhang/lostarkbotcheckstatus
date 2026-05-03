@@ -118,10 +118,13 @@ export function createListAddCommandHandler({
         const result = await executeListAddToDatabase(payload);
         // Prefer rich embed when available; fall back to plain content for
         // simple success messages that don't need a structured alert.
+        // Components carry the optional "Enrich now" button on hidden-
+        // roster success cards (see addExecutor.js).
         const hasEmbed = (result.embeds?.length ?? 0) > 0;
         await interaction.editReply({
           content: hasEmbed ? null : result.content,
           embeds: result.embeds ?? [],
+          components: result.components ?? [],
         });
         return;
       }

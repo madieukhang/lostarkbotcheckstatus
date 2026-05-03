@@ -71,34 +71,17 @@ export function createEnrichHandlers({ client, services }) {
   // eslint-disable-next-line no-unused-vars
   const _services = services;
 
-  async function handleListEnrichCommand(interaction) {
-    if (!isOfficerOrSenior(interaction.user.id)) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Officer-Only Command',
-          description: 'Only officers and senior approvers can run `/la-list enrich`.',
-        })],
-        ephemeral: true,
-      });
-      return;
-    }
-
-    const rawName = interaction.options.getString('name', true).trim();
-    const name = normalizeCharacterName(rawName);
-    const cap = interaction.options.getInteger('deep_limit') ?? config.strongholdDeepCandidateLimit;
-
-    const cooldownWait = getCooldownWaitSeconds(name);
-    if (cooldownWait > 0) {
-      await interaction.reply({
-        content: `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`,
-        ephemeral: true,
-      });
-      return;
-    }
-    markCooldown(name);
-
-    await interaction.deferReply();
+  /**
+   * Runs the enrich pipeline post-validation. Caller is responsible for:
+   *   - permission gate (officer/senior)
+   *   - cooldown gate + markCooldown
+   *   - deferReply (this function only does editReply afterwards)
+   *
+   * Used by both the slash command (handleListEnrichCommand) and the
+   * "Enrich now" button shipped on the /la-list add success card when
+   * the entry was created against a hidden roster.
+   */
+  async function runEnrichFlow(interaction, { name, cap }) {
     await connectDB();
 
     const found = await findEntryByName(name);
@@ -310,6 +293,94 @@ export function createEnrichHandlers({ client, services }) {
     }));
   }
 
+  async function handleListEnrichCommand(interaction) {
+    if (!isOfficerOrSenior(interaction.user.id)) {
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Officer-Only Command',
+          description: 'Only officers and senior approvers can run `/la-list enrich`.',
+        })],
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const rawName = interaction.options.getString('name', true).trim();
+    const name = normalizeCharacterName(rawName);
+    const cap = interaction.options.getInteger('deep_limit') ?? config.strongholdDeepCandidateLimit;
+
+    const cooldownWait = getCooldownWaitSeconds(name);
+    if (cooldownWait > 0) {
+      await interaction.reply({
+        content: `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`,
+        ephemeral: true,
+      });
+      return;
+    }
+    markCooldown(name);
+
+    await interaction.deferReply();
+    await runEnrichFlow(interaction, { name, cap });
+  }
+
+  /**
+   * Triggered by the "Enrich now" button posted on a /la-list add
+   * success card when the entry was created against a hidden roster.
+   * customId shape: `list-add:enrich-hidden:<encodedName>`
+   *
+   * Same officer + cooldown gating as the slash command, but seeded
+   * from the button's customId instead of slash options. Default cap.
+   */
+  async function handleListAddEnrichHiddenButton(interaction) {
+    if (!isOfficerOrSenior(interaction.user.id)) {
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Officer-Only Action',
+          description: 'Only officers and senior approvers can trigger an enrich scan.',
+        })],
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const parts = interaction.customId.split(':');
+    const encoded = parts.slice(2).join(':');
+    const rawName = decodeURIComponent(encoded || '').trim();
+    if (!rawName) {
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Invalid Button',
+          description: 'Could not read the entry name from the button. Use `/la-list enrich` directly.',
+        })],
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const name = normalizeCharacterName(rawName);
+    const cap = config.strongholdDeepCandidateLimit;
+
+    const cooldownWait = getCooldownWaitSeconds(name);
+    if (cooldownWait > 0) {
+      await interaction.reply({
+        content: `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`,
+        ephemeral: true,
+      });
+      return;
+    }
+    markCooldown(name);
+
+    // Reply (not update) so the original add success card stays
+    // intact; the progress embed posts as a new message in the same
+    // channel and the officer can scroll back to the add card if
+    // they need the entry context.
+    await interaction.deferReply();
+    await runEnrichFlow(interaction, { name, cap });
+  }
+
   async function handleListEnrichConfirmButton(interaction) {
     const sessionId = interaction.customId.split(':')[2];
     const session = getEnrichSession(sessionId);
@@ -407,6 +478,7 @@ export function createEnrichHandlers({ client, services }) {
 
   return {
     handleListEnrichCommand,
+    handleListAddEnrichHiddenButton,
     handleListEnrichConfirmButton,
     handleListEnrichCancelButton,
   };

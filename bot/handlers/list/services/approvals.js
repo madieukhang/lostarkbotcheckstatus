@@ -192,6 +192,7 @@ export function createApprovalServices({ client }) {
       const decisionPayload = {
         content: decisionContent,
         embeds: rejected ? [] : (result.embeds ?? []),
+        components: rejected ? [] : (result.components ?? []),
       };
 
       if (payload.requestMessageId && 'messages' in channel) {
