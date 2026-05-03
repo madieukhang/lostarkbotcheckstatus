@@ -66,9 +66,20 @@ export async function detectAltsViaStronghold(name, options = {}) {
 
   console.log(`[alt-detect] Guild has ${members.length} members. Checking for Stronghold matches...`);
 
-  const candidates = members
+  // excludeNames lets a Continue-scan resume skip already-scanned candidates
+  // from the prior pass. Stored case-insensitive on the input side so callers
+  // don't have to match bible's capitalisation exactly.
+  const excludeSet = new Set(
+    (Array.isArray(options.excludeNames) ? options.excludeNames : [])
+      .map((n) => String(n).toLowerCase())
+  );
+  const baseCandidates = members
     .filter((m) => m.name !== name && m.ilvl >= 1700)
     .sort((a, b) => (b.ilvl || 0) - (a.ilvl || 0));
+  const candidates = excludeSet.size > 0
+    ? baseCandidates.filter((m) => !excludeSet.has(String(m.name).toLowerCase()))
+    : baseCandidates;
+  const excludedCandidates = baseCandidates.length - candidates.length;
   const limitedCandidates = candidateLimit > 0 ? candidates.slice(0, candidateLimit) : candidates;
   const skippedCandidates = Math.max(0, candidates.length - limitedCandidates.length);
   console.log(
@@ -78,6 +89,11 @@ export async function detectAltsViaStronghold(name, options = {}) {
   );
 
   const alts = [];
+  // scannedNames captures the bible-cased names of candidates the worker
+  // actually visited (regardless of match outcome). Continue-scan reads
+  // this back via the result envelope to seed excludeNames for the next
+  // pass, so a resume never re-fetches the same profile twice.
+  const scannedNames = [];
   let failedCandidates = 0;
   let scannedCandidates = 0;
   let nextCandidateIndex = 0;
@@ -108,6 +124,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
         break;
       }
       const cand = limitedCandidates[nextCandidateIndex++];
+      scannedNames.push(cand.name);
       const candMeta = await fetchCharacterMeta(cand.name, {
         allowScraperApi: useScraperApiForCandidates,
         preferScraperApi: useScraperApiForCandidates,
@@ -192,10 +209,19 @@ export async function detectAltsViaStronghold(name, options = {}) {
       guildGrade: meta.guildGrade,
     },
     alts,
+    scannedNames,
     totalMembers: members.length,
+    // totalEligibleInGuild is invariant across multiple Continue passes
+    // (it counts every guild member ilvl >= 1700 minus the target) so
+    // a cumulative remaining-count stays correct across passes.
+    // eligibleCandidates is per-pass (after exclude) and is what the
+    // scanner actually had to choose from in THIS run.
+    totalEligibleInGuild: baseCandidates.length,
+    eligibleCandidates: candidates.length,
     totalCandidates: limitedCandidates.length,
     scannedCandidates,
     skippedCandidates,
+    excludedCandidates,
     failedCandidates,
     candidateLimit,
     concurrency,

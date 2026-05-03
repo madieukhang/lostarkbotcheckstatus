@@ -59,6 +59,7 @@ export function createListHandlers({ client }) {
     handleListAddOverwriteButton: add.handleListAddOverwriteButton,
     handleListEnrichConfirmButton: enrich.handleListEnrichConfirmButton,
     handleListEnrichCancelButton: enrich.handleListEnrichCancelButton,
+    handleListEnrichContinueButton: enrich.handleListEnrichContinueButton,
     handleListAddEnrichHiddenButton: enrich.handleListAddEnrichHiddenButton,
     handleScanCancelButton: enrich.handleScanCancelButton,
     handleQuickAddSelect: quickadd.handleQuickAddSelect,

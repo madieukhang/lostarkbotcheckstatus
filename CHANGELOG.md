@@ -4,6 +4,35 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.55] - 2026-05-03
+
+### Fixed
+- `/la-search` evidence dropdown picked the wrong entry when a result was on multiple lists but only some carried an image. Old logic `r.black || r.white || r.watch` returned the first truthy entry regardless of whether it had evidence; clicking the dropdown then surfaced "No evidence" even though the option existed. Both dropdown construction and the on-click handler now pick the entry with the image (priority black → white → watch). Embed label/color/title-emoji follow the picked entry too.
+- `/la-help lang:en` in the owner server exceeded Discord's 2000-char message-content cap (~2106 chars EN, ~1964 VN). Discord rejected the reply silently. Help text now ships as an embed description (4096-char ceiling) instead of message content; smoke-test shows EN owner at 2270 chars, well under the new limit.
+- Help text for `/la-roster` was missing the `[deep_limit]` option (added in v0.5.x); `/la-list edit` was missing the `[additional_names]` option. Help, README, and smoke test now all list both.
+
+### Notes
+- 42/42 tests pass.
+- Synced README's `/la-list edit` row with the new option per `feedback_sync_help_docs` rule.
+
+## [v0.5.54] - 2026-05-03
+
+### Added
+- **Continue scan** button on `/la-list enrich` and `/la-roster deep:true` result cards. When a scan stops early (Stop button) or hits the candidate cap, the result card now offers Continue alongside Save/Discard. Continue resumes the same scan with prior `scannedNames` fed back as `excludeNames`, so the next pass walks only fresh candidates without re-fetching already-visited profiles.
+- **Hidden roster notice** block on the unified result card. When the target's roster is hidden on bible, the embed renders a `🔒` notice explaining stronghold-fingerprint detection mechanics (matches by SH name + roster level, only sees alts in the same guild). Detected once at the start of an enrich pass via `buildRosterCharacters({ hiddenRosterFallback: true })`, then cached on the session so Continue passes don't re-probe.
+- `bot/utils/scanResultEmbed.js` (new): unified post-scan embed + button matrix for both commands. State machine derives `completed` / `stopped` / `cap-hit` from the result envelope; button row picks Confirm / Continue / Save partial / Discard based on (kind, hasAlts, hasRemaining).
+- `bot/utils/rosterDeepSession.js` (new): 5-min TTL session store for `/la-roster` Continue. Caches `meta` + `guildMembers` + `primaryEmbedJSON` so a resume click doesn't re-scrape the visible roster page or the blacklist/whitelist match.
+
+### Changed
+- `detectAltsViaStronghold` accepts a new `excludeNames: string[]` option that filters base candidates BEFORE applying `candidateLimit`. Result envelope adds `scannedNames`, `totalEligibleInGuild`, and `excludedCandidates` so a cumulative remaining-count stays correct across multiple resume passes.
+- Enrich post-scan flow consolidated: four branch-specific embed builds (completed-with-alts, completed-no-alts, stopped-with-alts, stopped-no-alts) collapse into a single `buildScanResultEmbed` call. Session lifecycle moves earlier so Continue button has access regardless of new-alt count.
+- `/la-roster deep:true` result moves the alt list off the main roster card into a dedicated second embed. Visible-roster callers see `[main roster card] [scan result card]` stacked; hidden-roster callers see `[hidden roster + list hits] [scan result card]`.
+
+### Notes
+- 42/42 tests pass.
+- Continue across multiple passes accumulates `allDiscoveredAlts` and `scannedNames` on the session; Confirm at any point saves whatever is currently in `newAlts` (cumulative diff vs `entry.allCharacters`).
+- `buildEnrichPreviewReply` removed from `enrich/ui.js` since `buildScanResultEmbed` now handles all post-scan paths.
+
 ## [v0.5.53] - 2026-05-03
 
 ### Added

@@ -1,13 +1,5 @@
-import {
-  ActionRowBuilder,
-  StringSelectMenuBuilder,
-  ComponentType,
-  EmbedBuilder,
-} from 'discord.js';
-
 import { connectDB } from '../db.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
-import { COLORS } from '../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
@@ -16,12 +8,13 @@ import TrustedUser from '../models/TrustedUser.js';
 import { getClassName, resolveClassId } from '../models/Class.js';
 import { fetchNameSuggestions } from '../services/rosterService.js';
 import { normalizeCharacterName } from '../utils/names.js';
-import { resolveDisplayImageUrl } from '../utils/imageRehost.js';
-
-/** Detect whether an entry has any image evidence (rehosted OR legacy). */
-function entryHasImage(entry) {
-  return Boolean(entry?.imageMessageId || entry?.imageUrl);
-}
+import {
+  attachSearchEvidenceCollector,
+  buildSearchEvidenceComponents,
+  getFlaggedResultsWithImages,
+} from './search/evidence.js';
+import { buildEntryMap, sortBlacklistForScopePriority } from './search/matches.js';
+import { buildSearchResultEmbed } from './search/ui.js';
 
 export async function handleSearchCommand(interaction) {
   const raw = interaction.options.getString('name', true);
@@ -96,20 +89,7 @@ export async function handleSearchCommand(interaction) {
       TrustedUser.find({ name: { $in: allNames } }).collation(collation).lean(),
     ]);
 
-    // Build O(1) lookup maps
-    function buildEntryMap(entries) {
-      const map = new Map();
-      for (const e of entries) {
-        map.set(e.name.toLowerCase(), e);
-        for (const c of (e.allCharacters || [])) {
-          const lower = c.toLowerCase();
-          if (!map.has(lower) || e.scope === 'server') map.set(lower, e);
-        }
-      }
-      return map;
-    }
-    allBlack.sort((a, b) => (a.scope === 'server' ? 1 : 0) - (b.scope === 'server' ? 1 : 0));
-    const blackMap = buildEntryMap(allBlack);
+    const blackMap = buildEntryMap(sortBlacklistForScopePriority(allBlack));
     const whiteMap = buildEntryMap(allWhite);
     const watchMap = buildEntryMap(allWatch);
     const trustedMap = new Map(allTrusted.map((t) => [t.name.toLowerCase(), t]));
@@ -122,175 +102,14 @@ export async function handleSearchCommand(interaction) {
       trusted: trustedMap.get(s.name.toLowerCase()) || null,
     }));
 
-    const lines = results.map((r, i) => {
-      const cls = getClassName(r.cls);
-      const ilvl = Number(r.itemLevel || 0).toFixed(2);
-      const entry = r.black || r.white || r.watch;
-      const hasImage = entryHasImage(entry);
-
-      let icon = '';
-      if (r.black) icon += '⛔';
-      if (r.white) icon += '✅';
-      if (r.watch) icon += '⚠️';
-      if (r.trusted) icon += '🛡️';
-      if (icon) icon += ' ';
-
-      const link = `[${r.name}](https://lostark.bible/character/NA/${encodeURIComponent(r.name)}/roster)`;
-      let line = `**${i + 1}.** ${icon}${link} · ${cls || '?'} · \`${ilvl}\`${hasImage ? ' · 📎' : ''}`;
-
-      for (const [entry, label] of [[r.black, '⛔'], [r.white, '✅'], [r.watch, '⚠️']]) {
-        if (!entry) continue;
-        const isRosterMatch = entry.name.toLowerCase() !== r.name.toLowerCase();
-        const via = isRosterMatch ? `via **${entry.name}** · ` : '';
-        line += `\n    ↳ ${via}*${entry.reason || 'no reason'}*`;
-        if (entry.raid) line += ` [${entry.raid}]`;
-      }
-
-      return line;
-    });
-
-    const description = lines.join('\n');
-    const blackCount = results.filter((r) => r.black).length;
-    const watchCount = results.filter((r) => r.watch).length;
-    const whiteCount = results.filter((r) => r.white).length;
-    const trustedCount = results.filter((r) => r.trusted).length;
-    const cleanCount = results.length - blackCount - watchCount - whiteCount - trustedCount;
-    const hasBlack = blackCount > 0;
-    const hasWatch = watchCount > 0;
-    const hasWhite = whiteCount > 0;
-    const color = hasBlack ? COLORS.danger : hasWatch ? COLORS.warning : hasWhite ? COLORS.success : COLORS.info;
-
-    const filterParts = [`ilvl ≥ ${minIlvl}`];
-    if (maxIlvl !== null) filterParts.push(`ilvl ≤ ${maxIlvl}`);
-    if (classFilter) filterParts.push(getClassName(classFilter));
-
-    // Top-of-description summary breaks down list-status counts so an
-    // officer can see "3 blacklisted, 2 watch, 5 clean" at a glance
-    // before scanning the full result list.
-    const breakdown = [];
-    if (hasBlack) breakdown.push(`⛔ **${blackCount}**`);
-    if (hasWatch) breakdown.push(`⚠️ **${watchCount}**`);
-    if (hasWhite) breakdown.push(`✅ **${whiteCount}**`);
-    if (trustedCount > 0) breakdown.push(`🛡️ **${trustedCount}**`);
-    if (cleanCount > 0) breakdown.push(`❓ **${cleanCount}** clean`);
-    const summaryLine = breakdown.length > 0
-      ? `Found **${results.length}** match${results.length === 1 ? '' : 'es'}: ${breakdown.join(' · ')}`
-      : `Found **${results.length}** match${results.length === 1 ? '' : 'es'}`;
-
-    const fullDescription = `${summaryLine}\n\n${description}`.slice(0, 4096);
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🔍 Search · "${name}"`)
-      .setDescription(fullDescription)
-      .setColor(color)
-      .setFooter({
-        text: `Filters: ${filterParts.join(' · ')} · Source: lostark.bible`,
-      })
-      .setTimestamp();
+    const embed = buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter });
 
     // Build evidence dropdown for flagged entries with images (rehosted OR legacy)
-    const flaggedWithImages = results
-      .map((r, i) => ({ r, i }))
-      .filter(({ r }) => entryHasImage(r.black) || entryHasImage(r.white) || entryHasImage(r.watch));
-
-    const components = [];
-    if (flaggedWithImages.length > 0) {
-      components.push(
-        new ActionRowBuilder().addComponents(
-          new StringSelectMenuBuilder()
-            .setCustomId('search_evidence')
-            .setPlaceholder('📎 View evidence for...')
-            .addOptions(
-              flaggedWithImages.slice(0, 25).map(({ r, i }) => {
-                const entry = r.black || r.white || r.watch;
-                let emoji = '⛔';
-                if (r.white && !r.black) emoji = '✅';
-                if (r.watch && !r.black && !r.white) emoji = '⚠️';
-                return {
-                  label: r.name,
-                  description: (entry.reason || 'No reason').slice(0, 100),
-                  value: String(i),
-                  emoji,
-                };
-              })
-            )
-        )
-      );
-    }
+    const flaggedWithImages = getFlaggedResultsWithImages(results);
+    const components = buildSearchEvidenceComponents(flaggedWithImages);
 
     await interaction.editReply({ embeds: [embed], components });
-
-    if (flaggedWithImages.length === 0) return;
-
-    const reply = await interaction.fetchReply();
-    const collector = reply.createMessageComponentCollector({
-      componentType: ComponentType.StringSelect,
-      time: 300000,
-    });
-
-    collector.on('collect', async (sel) => {
-      if (sel.user.id !== interaction.user.id) {
-        await sel.reply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.ERROR,
-            title: 'Not Your Session',
-            description: 'Only the command user can view evidence on this search.',
-          })],
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const idx = parseInt(sel.values[0]);
-      const r = results[idx];
-      const entry = r?.black || r?.white || r?.watch;
-
-      if (!entryHasImage(entry)) {
-        await sel.reply({ content: 'No evidence image for this entry.', ephemeral: true });
-        return;
-      }
-
-      // Resolve fresh URL: rehosted entries get a freshly-signed URL via the
-      // evidence channel; legacy entries fall back to their stored URL (which
-      // may already have expired).
-      const displayUrl = await resolveDisplayImageUrl(entry, interaction.client);
-      if (!displayUrl) {
-        await sel.reply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Evidence Unavailable',
-            description: 'The evidence image link expired or the rehosted message was removed.',
-            footer: 'Re-upload via /la-list edit name:<entry> image:<file>.',
-          })],
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const listLabel = r.black ? 'blacklist' : r.white ? 'whitelist' : 'watchlist';
-      const listColor = r.black ? COLORS.danger : r.white ? COLORS.success : COLORS.warning;
-
-      const evidenceEmbed = new EmbedBuilder()
-        .setTitle(`${r.black ? '⛔' : r.white ? '✅' : '⚠️'} ${r.name}`)
-        .addFields(
-          { name: 'Reason', value: entry.reason || 'N/A', inline: true },
-          { name: 'Raid', value: entry.raid || 'N/A', inline: true },
-          { name: 'List', value: listLabel, inline: true },
-        )
-        .setImage(displayUrl)
-        .setColor(listColor)
-        .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : undefined);
-
-      if (entry.logsUrl) {
-        evidenceEmbed.addFields({ name: 'Logs', value: `[View Logs](${entry.logsUrl})`, inline: false });
-      }
-
-      await sel.reply({ embeds: [evidenceEmbed], ephemeral: true });
-    });
-
-    collector.on('end', async () => {
-      await interaction.editReply({ components: [] }).catch(() => {});
-    });
+    await attachSearchEvidenceCollector({ interaction, results, flaggedWithImages });
   } catch (err) {
     console.error('[search] ❌ Search failed:', err.message);
     await interaction.editReply({
