@@ -4,6 +4,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.29] - 2026-05-03
+
+### Added
+- `bot/utils/deprecation.js`: Phase 4b deprecation banner helper. Maps each legacy command name (`status`, `list`, `lahelp`, ...) to its modern `la-` twin and includes the hard cutover date (2026-05-17). For `/list ...` the banner appends the active subcommand so the note is directly actionable.
+- `bot.js` dispatch wraps the legacy-name branch with a `finally` block that fires a single ephemeral `followUp` carrying the banner string. Banner is suppressed for modern names and skipped if the handler never replied or deferred.
+
+### Notes
+- Approach choice: followUp instead of prepending content. Decoupled from every handler's reply shape (content / embeds / files / mixed) so the banner appears uniformly without touching ~10 handler files.
+- followUp is ephemeral and fires once per legacy invocation; modern `/la-*` invocations stay silent. Phase 4c (2026-05-17) removes both the legacy aliases and this banner code (Phase 4d).
+
 ## [v0.5.28] - 2026-05-03
 
 ### Changed
