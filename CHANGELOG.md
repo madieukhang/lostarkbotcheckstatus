@@ -4,6 +4,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.57] - 2026-05-03
+
+### Changed
+- Cross-server list broadcast headlines no longer include the requester display name. Notifications now read like `Name was added to Blacklist` instead of `Name was added to Blacklist by Officer`, while internal audit fields remain stored for permission checks and owner review.
+
 ## [v0.5.56] - 2026-05-03
 
 ### Fixed

@@ -24,10 +24,7 @@ export function createBroadcastServices({ client }) {
 
     // Description leads with a one-line headline so the recipient
     // sees "What changed in which list" without parsing the fields.
-    const requesterPart = payload.requestedByDisplayName
-      ? ` by **${payload.requestedByDisplayName}**`
-      : '';
-    const headline = `${icon} **[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}${requesterPart}.`;
+    const headline = `${icon} **[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}.`;
 
     const fields = [
       { name: 'Reason', value: entry.reason || 'N/A', inline: false },
