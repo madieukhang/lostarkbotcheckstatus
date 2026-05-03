@@ -33,6 +33,33 @@ export function createEnrichSession(payload) {
   return session;
 }
 
+/**
+ * Refresh the TTL on an existing session so a Continue-scan resume does
+ * not race the 5-minute expiry that started when the original scan
+ * landed. Mutates the session in-place; returns the session for chain.
+ */
+export function touchEnrichSession(sessionId) {
+  const session = sessions.get(sessionId);
+  if (!session) return null;
+  if (session.expireTimer) clearTimeout(session.expireTimer);
+  session.expireTimer = setTimeout(() => sessions.delete(sessionId), SESSION_TTL_MS);
+  return session;
+}
+
+/**
+ * Keep a long-running Continue pass alive while the worker is active.
+ * `touchEnrichSession()` only works while the session is still in the
+ * map; a 10-15 minute resume can otherwise outlive the 5-minute action
+ * TTL and render fresh buttons backed by an expired session.
+ */
+export function refreshEnrichSession(session) {
+  if (!session?.sessionId) return null;
+  if (session.expireTimer) clearTimeout(session.expireTimer);
+  session.expireTimer = setTimeout(() => sessions.delete(session.sessionId), SESSION_TTL_MS);
+  sessions.set(session.sessionId, session);
+  return session;
+}
+
 export function getEnrichSession(sessionId) {
   return sessions.get(sessionId) || null;
 }

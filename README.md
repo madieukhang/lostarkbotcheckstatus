@@ -24,7 +24,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 | `/la-roster name [deep] [deep_limit]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan |
 | `/la-search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists |
 | `/la-list add type name reason [raid] [logs] [image] [scope]` | Add to blacklist/whitelist/watchlist. `scope`: `global` / `server` (blacklist only) |
-| `/la-list edit name [reason] [type] [raid] [logs] [image] [scope]` | Edit existing entry (owner/officer instant, members via approval) |
+| `/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` | Edit existing entry (owner/officer instant, members via approval). `additional_names` appends alts manually for hidden-roster + no-guild edge case |
 | `/la-list remove name` | Remove an entry (ownership check) |
 | `/la-list view type [scope]` | View entries. `scope`: `all` / `global` / `server` |
 | `/la-list trust action name [reason]` | Manage trusted list — `add` / `remove` (officer/senior only) |
@@ -182,8 +182,18 @@ LostArk_LoaLogs/
 │   │   │       ├── ui.js           # template/preview embeds + buttons
 │   │   │       ├── confirmButton.js # requester confirm/cancel execution flow
 │   │   │       └── approvalButton.js # Senior approve/reject flow
-│   │   ├── rosterHandler.js        # /la-roster + Stronghold alt detection + progression
-│   │   ├── searchHandler.js        # /la-search (similar-name scan)
+│   │   ├── rosterHandler.js        # Thin exports for /la-roster command + Continue button
+│   │   ├── roster/                 # /la-roster command internals
+│   │   │   ├── command.js           # roster lookup orchestration + visible roster card
+│   │   │   ├── hiddenRoster.js      # hidden-roster guild lookup + deep scan path
+│   │   │   ├── visibleDeepScan.js   # visible-roster deep scan path
+│   │   │   ├── deepContinue.js      # roster-deep Continue button resume flow
+│   │   │   └── progress.js          # shared scan progress/stat helpers
+│   │   ├── searchHandler.js        # Thin orchestration for /la-search
+│   │   ├── search/                 # /la-search UI + evidence helpers
+│   │   │   ├── evidence.js          # evidence dropdown + ephemeral evidence embeds
+│   │   │   ├── matches.js           # list-entry lookup maps
+│   │   │   └── ui.js                # search result embed rendering
 │   │   ├── setupHandler.js         # Thin exports for /la-setup + /la-remote
 │   │   ├── setup/                  # Setup command handlers split by workflow
 │   │   │   ├── guildSetup.js       # /la-setup per-guild config
@@ -237,7 +247,7 @@ LostArk_LoaLogs/
 
 Four compose principles:
 
-1. **One handler file per command family.** `rosterHandler.js` owns `/la-roster`, `searchHandler.js` owns `/la-search`, etc. The `/la-list *` family is large enough to warrant its own subdirectory (`handlers/list/`) split per subcommand; `listHandlers.js` is a thin orchestrator that wires shared services into each subcommand factory.
+1. **Thin route facades for large command families.** Small families stay in one handler file, while large flows move internals into a subdirectory. `rosterHandler.js` now re-exports `handlers/roster/`, and `listHandlers.js` wires the split `/la-list *` modules.
 2. **Services wrap external I/O.** `services/rosterService.js` is the public roster facade; `services/roster/*` owns `lostark.bible` fetch/search/parse/deep-scan internals. `listCheckService.js` is the only file that calls Gemini. Tests and fallback paths still have one stable swap point.
 3. **Scope resolved once, cached.** `utils/scope.js` reads `GuildConfig` with a 60s in-memory cache; every command path goes through it instead of re-querying per invocation.
 4. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` (e.g. `list/services.js`, `list/add.js`) export a `create*({ client, ... })` factory rather than top-level functions. The orchestrator calls each factory once at startup and the returned closures are wired into the interaction router.

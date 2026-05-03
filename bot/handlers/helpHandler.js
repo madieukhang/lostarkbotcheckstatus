@@ -13,11 +13,11 @@ export async function handleHelpCommand(interaction) {
     '`/la-status` · Xem trạng thái server Lost Ark',
     '`/la-reset` · Reset trạng thái đã lưu',
     '',
-    '`/la-roster tên [deep]` · Tra cứu roster + theo dõi ilvl. `deep:true` quét alt qua Stronghold',
+    '`/la-roster tên [deep] [deep_limit]` · Tra cứu roster + theo dõi ilvl. `deep:true` quét alt qua Stronghold; `deep_limit` cap số candidate quét (mặc định 300)',
     '`/la-search tên [min_ilvl] [max_ilvl] [class]` · Tìm tên tương tự với bộ lọc',
     '',
     '`/la-list add type tên lý_do [raid] [logs] [image] [scope]` · Thêm vào blacklist/whitelist/watchlist. Scope: global/server (chỉ blacklist)',
-    '`/la-list edit tên [reason] [type] [raid] [logs] [image] [scope]` · Sửa entry đã có. Scope chỉ áp dụng cho blacklist (promote/demote local↔global)',
+    '`/la-list edit tên [reason] [type] [raid] [logs] [image] [scope] [additional_names]` · Sửa entry đã có. `additional_names` append alts thủ công (case hidden roster + no-guild). Scope chỉ áp dụng cho blacklist (promote/demote local↔global)',
     '`/la-list remove tên` · Xoá entry khỏi danh sách',
     '`/la-list view type [scope]` · Xem danh sách (type: all/black/white/watch/trusted, scope: all/global/server)',
     '`/la-list trust action tên [reason]` · Quản lý danh sách uy tín (add/remove, chỉ officer)',
@@ -38,11 +38,11 @@ export async function handleHelpCommand(interaction) {
     '`/la-status` · Show live server status for all monitored servers',
     '`/la-reset` · Reset the stored status state',
     '',
-    '`/la-roster name [deep]` · Fetch roster + progression tracking + list check. `deep:true` for Stronghold alt scan',
+    '`/la-roster name [deep] [deep_limit]` · Fetch roster + progression tracking + list check. `deep:true` runs Stronghold alt scan; `deep_limit` caps candidates scanned (default 300)',
     '`/la-search name [min_ilvl] [max_ilvl] [class]` · Search similar names with filters',
     '',
     '`/la-list add type name reason [raid] [logs] [image] [scope]` · Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only)',
-    '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope]` · Edit an existing entry. Scope only applies to blacklist (promote/demote local↔global)',
+    '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` · Edit an existing entry. `additional_names` appends alts manually (hidden-roster + no-guild edge case). Scope only applies to blacklist (promote/demote local↔global)',
     '`/la-list remove name` · Remove an entry from a list',
     '`/la-list view type [scope]` · View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
     '`/la-list trust action name [reason]` · Manage trusted list (add/remove, officer only)',
@@ -359,12 +359,32 @@ export async function handleHelpCommand(interaction) {
             .setFooter({ text: 'Owner-only · added v0.5.7, race-safe + external URL handling v0.5.8' }))
     : null;
 
-  // Assemble embeds list: multiaddEmbed always, syncImagesEmbed only for owner guild
-  const helpEmbeds = [multiaddEmbed];
+  // Wrap the command list in an embed so we don't run into Discord's
+  // 2000-char message-content cap. Owner-server EN had already crept
+  // past the limit (~2106 chars) and Discord rejected the reply; the
+  // VN owner copy was at 1964, two added options away from the same
+  // failure. Embed description ceiling is 4096, plenty of headroom for
+  // future commands. Title carries the language tag so users see at a
+  // glance which copy they got.
+  const overviewTitle = lang === 'vn'
+    ? '📋 Lost Ark Check · Help (VN)'
+    : '📋 Lost Ark Check · Help (EN)';
+  const overviewFooter = lang === 'vn'
+    ? 'Đổi ngôn ngữ: /la-help lang:en · Phần chi tiết multiadd / syncimages ở các embed dưới'
+    : 'Switch language: /la-help lang:vn · Detailed multiadd / syncimages sections in the embeds below';
+  const overviewEmbed = new EmbedBuilder()
+    .setTitle(overviewTitle)
+    .setDescription(helpLines.join('\n').slice(0, 4096))
+    .setColor(COLORS.info)
+    .setFooter({ text: overviewFooter });
+
+  // Assemble embeds list: overview first, multiaddEmbed always,
+  // syncImagesEmbed only for owner guild. Discord allows up to 10
+  // embeds per reply so 2 (or 3 in owner guild) is well under.
+  const helpEmbeds = [overviewEmbed, multiaddEmbed];
   if (syncImagesEmbed) helpEmbeds.push(syncImagesEmbed);
 
   await interaction.reply({
-    content: helpLines.join('\n'),
     embeds: helpEmbeds,
     ephemeral: true,
   });

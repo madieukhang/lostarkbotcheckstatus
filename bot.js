@@ -16,7 +16,7 @@ import config from './bot/config.js';
 import { startMonitor, checkStatus, resetState } from './bot/monitor/monitor.js';
 import { buildCommands, buildOwnerCommands } from './bot/commands.js';
 import { createSystemHandlers } from './bot/handlers/systemHandlers.js';
-import { handleRosterCommand } from './bot/handlers/rosterHandler.js';
+import { handleRosterCommand, handleRosterDeepContinueButton } from './bot/handlers/rosterHandler.js';
 import { createListHandlers } from './bot/handlers/listHandlers.js';
 import { handleSearchCommand } from './bot/handlers/searchHandler.js';
 import { setupAutoCheck } from './bot/handlers/autoCheckHandler.js';
@@ -127,16 +127,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  // /list enrich confirm/cancel buttons
+  // /list enrich confirm/cancel/continue buttons. Continue resumes the
+  // scan with prior scanned-names fed back as excludeNames so the next
+  // pass walks only fresh candidates without re-checking already-visited
+  // profiles.
   if (
     interaction.isButton() &&
     (interaction.customId.startsWith('list-enrich:confirm:') ||
-      interaction.customId.startsWith('list-enrich:cancel:'))
+      interaction.customId.startsWith('list-enrich:cancel:') ||
+      interaction.customId.startsWith('list-enrich:continue:'))
   ) {
     try {
-      const isConfirm = interaction.customId.startsWith('list-enrich:confirm:');
-      if (isConfirm) {
+      if (interaction.customId.startsWith('list-enrich:confirm:')) {
         await listHandlers.handleListEnrichConfirmButton(interaction);
+      } else if (interaction.customId.startsWith('list-enrich:continue:')) {
+        await listHandlers.handleListEnrichContinueButton(interaction);
       } else {
         await listHandlers.handleListEnrichCancelButton(interaction);
       }
@@ -144,6 +149,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
       console.error('[list] Enrich button error:', err);
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: '❌ Failed to process enrich action.', ephemeral: true }).catch(() => {});
+      }
+    }
+    return;
+  }
+
+  // /la-roster deep:true Continue button. Resumes a deep scan that was
+  // stopped early (Stop button) or hit the candidate cap, picking up
+  // from where the prior pass left off without re-fetching meta or
+  // guild members.
+  if (
+    interaction.isButton() &&
+    interaction.customId.startsWith('roster-deep:continue:')
+  ) {
+    try {
+      await handleRosterDeepContinueButton(interaction);
+    } catch (err) {
+      console.error('[roster] deep continue button error:', err);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '❌ Failed to continue deep scan.', ephemeral: true }).catch(() => {});
       }
     }
     return;

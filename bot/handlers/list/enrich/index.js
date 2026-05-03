@@ -25,11 +25,11 @@
  * quota; the cooldown prevents an accidental double-click from
  * doubling the request count.
  *
- * Confirm dialog: stronghold matching has rare false positives when
- * two unrelated rosters happen to share both stronghold name and
- * roster level (collision rate observed at ~0% in real scans, but
- * non-zero in principle). The officer reviews the discovered list
- * before commit; cancel discards.
+ * Result card: a single unified `buildScanResultEmbed` is rendered for
+ * every terminal branch (completed, stopped, cap-hit, no-alts). The
+ * matrix of buttons (Confirm / Continue / Discard) is selected from the
+ * post-scan state so officers can resume a partial scan without
+ * re-running the slash command from scratch.
  */
 
 import { connectDB } from '../../../db.js';
@@ -38,10 +38,14 @@ import {
   fetchCharacterMeta,
   fetchGuildMembers,
   detectAltsViaStronghold,
+  buildRosterCharacters,
 } from '../../../services/rosterService.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { ICONS } from '../../../utils/ui.js';
+import {
+  buildScanResultEmbed,
+  buildScanResultButtons,
+} from '../../../utils/scanResultEmbed.js';
 import { isOfficerOrSenior } from '../helpers.js';
 import {
   findEntryByName,
@@ -54,12 +58,10 @@ import {
   getCooldownWaitSeconds,
   getEnrichSession,
   markCooldown,
+  refreshEnrichSession,
+  touchEnrichSession,
 } from './state.js';
-import {
-  buildEnrichPreviewReply,
-  buildEnrichProgressEmbed,
-  buildEnrichSuccessEmbed,
-} from './ui.js';
+import { buildEnrichProgressEmbed, buildEnrichSuccessEmbed } from './ui.js';
 import {
   buildStopButtonRow,
   newScanSessionId,
@@ -72,9 +74,20 @@ import { sendScanCompletionDm, buildResultMessageUrl } from '../../../utils/scan
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
 // ~40-60 updates over a 10-15 minute gentle-mode scan; well under the
 // rate-limit ceiling and tight enough that progress feels live rather
-// than batched. Tightened from 30s after users reported the embed
-// felt frozen between ticks.
+// than batched.
 const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
+
+/**
+ * Merge two alt arrays case-insensitively by name. Later entries win
+ * on tie (so a Continue-pass match with fresher class/ilvl data
+ * overwrites the prior pass's record).
+ */
+function mergeAltsByName(prior = [], next = []) {
+  const byName = new Map();
+  for (const alt of prior) byName.set(String(alt.name).toLowerCase(), alt);
+  for (const alt of next) byName.set(String(alt.name).toLowerCase(), alt);
+  return Array.from(byName.values());
+}
 
 export function createEnrichHandlers({ client, services }) {
   // services may grow Phase 3.5 broadcast support later; not used today.
@@ -85,14 +98,20 @@ export function createEnrichHandlers({ client, services }) {
    * Runs the enrich pipeline post-validation. Caller is responsible for:
    *   - permission gate (officer/senior)
    *   - cooldown gate + markCooldown
-   *   - deferReply (this function only does editReply afterwards)
+   *   - deferReply / deferUpdate (this function only does editReply)
    *
-   * Used by both the slash command (handleListEnrichCommand) and the
-   * "Enrich now" button shipped on the /la-list add success card when
-   * the entry was created against a hidden roster.
+   * @param {object} interaction
+   * @param {object} options
+   * @param {string} options.name
+   * @param {number} [options.cap]
+   * @param {object} [options.existingSession] - When set, this is a Continue-scan
+   *   resume: the session's scannedNames feed excludeNames so the next pass
+   *   skips already-visited candidates, and the result is merged into
+   *   session.allDiscoveredAlts rather than starting fresh.
    */
-  async function runEnrichFlow(interaction, { name, cap }) {
+  async function runEnrichFlow(interaction, { name, cap, existingSession = null }) {
     await connectDB();
+    const resolvedCap = cap ?? config.strongholdDeepCandidateLimit;
 
     const found = await findEntryByName(name);
     if (!found) {
@@ -103,16 +122,42 @@ export function createEnrichHandlers({ client, services }) {
           description: `**${name}** has no entry in any list.`,
           footer: 'Use /la-list add to create the entry first; enrich only appends to existing entries.',
         })],
+        components: [],
       });
       return;
+    }
+
+    // Roster visibility probe. Drives the "hidden roster notice" block
+    // in the result card so officers know whether the alt list came
+    // from a fingerprint match (stronger constraint) or a direct
+    // roster scan. Skip the probe on Continue passes since the answer
+    // is cached on the session and a re-probe would burn an extra
+    // bible request per Continue click.
+    let targetIsHidden;
+    if (existingSession?.targetIsHidden !== undefined) {
+      targetIsHidden = existingSession.targetIsHidden;
+    } else {
+      const probe = await buildRosterCharacters(name, { hiddenRosterFallback: true });
+      if (!probe.hasValidRoster) {
+        await interaction.editReply({
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            title: 'Profile Not Found',
+            description: `Could not load lostark.bible profile for **${name}**.`,
+            footer: 'Profile may be hidden behind a private flag, the name may be misspelled, or bible may be down.',
+          })],
+          components: [],
+        });
+        return;
+      }
+      targetIsHidden = probe.rosterVisibility === 'hidden';
     }
 
     // Up-front bible probe so we can fail fast on no-guild / no-stronghold
     // before paying the multi-minute candidate fan-out. ScraperAPI is
     // allowed for this single-request probe because bible direct can flap
-    // 429/503 and a one-off fallback is cheap quota-wise; the high-fanout
-    // candidate scan below stays direct-only via useScraperApiForCandidates.
-    const meta = await fetchCharacterMeta(name, {
+    // 429/503 and a one-off fallback is cheap quota-wise.
+    const meta = existingSession?.meta || await fetchCharacterMeta(name, {
       timeoutMs: config.strongholdDeepCandidateTimeoutMs,
     });
     if (!meta) {
@@ -123,6 +168,7 @@ export function createEnrichHandlers({ client, services }) {
           description: `Could not fetch character meta for **${name}** from lostark.bible.`,
           footer: 'Profile may be hidden, the name may be misspelled, or bible may be temporarily down.',
         })],
+        components: [],
       });
       return;
     }
@@ -134,14 +180,11 @@ export function createEnrichHandlers({ client, services }) {
           description: `**${name}** has no guild listed on lostark.bible. Stronghold deep scan requires a guild member list to walk.`,
           footer: 'Use /la-list edit additional_names to manually append known alts when auto-discovery is impossible.',
         })],
+        components: [],
       });
       return;
     }
 
-    // Surface scan-in-progress to the channel so the officer knows the
-    // command is alive during the long fetch fan-out. Single update,
-    // no streaming · Discord webhook edits are cheap and Operations
-    // already monitor server logs for the per-25 progress lines.
     // Guild member fetch is one request, so ScraperAPI fallback is on
     // (cheap) when bible direct flaps. Per-candidate scan below stays
     // direct-only.
@@ -157,39 +200,36 @@ export function createEnrichHandlers({ client, services }) {
           description: `Could not fetch the guild member list for **${name}** even with ScraperAPI fallback.`,
           footer: 'Bible may be down or the guild is empty; try again in a few minutes.',
         })],
+        components: [],
       });
       return;
     }
 
-    // Register a scan session so the Stop button can find this scan's
-    // cancel flag without leaking the interaction reference outside
-    // this closure. SessionId is short-lived (cleaned up in `finally`
-    // when the scan completes or throws).
     const sessionId = newScanSessionId();
     const cancelFlag = { cancelled: false };
     registerScan(sessionId, {
       cancelFlag,
       callerId: interaction.user.id,
       startedAt: Date.now(),
-      label: `${name} (enrich)`,
+      label: `${name} (enrich${existingSession ? ' · resume' : ''})`,
     });
 
-    // Initial scan-started embed plus Stop button row. onProgress edits
-    // below preserve the same components array so the Stop button stays
-    // clickable for the duration of the scan.
+    // Pre-compute the per-pass candidate count for the initial 0%
+    // progress embed. We subtract the already-scanned set so the
+    // progress bar reads correctly on a Continue resume.
+    const excludeSet = new Set(
+      (existingSession?.scannedNames ?? []).map((n) => String(n).toLowerCase())
+    );
+    const passEligible = guildMembers
+      .filter((m) => m.name !== name && m.ilvl >= 1700 && !excludeSet.has(String(m.name).toLowerCase()))
+      .length;
+    const passLimit = resolvedCap || passEligible;
     const startedAt = Date.now();
     const initialProgress = {
       scannedCandidates: 0,
-      totalCandidates: Math.min(
-        guildMembers.filter((m) => m.name !== name && m.ilvl >= 1700).length,
-        cap || guildMembers.length
-      ),
+      totalCandidates: Math.min(passEligible, passLimit),
       failedCandidates: 0,
       altsFound: 0,
-      // Gentle mode (the default) walks one candidate at a time on a
-      // 1.5s throttle. Surface that as the initial backoff value so the
-      // progress embed reads correctly even on its very first paint
-      // before the scan has ramped its adaptive backoff.
       currentBackoffMs: 1500,
       totalMembers: guildMembers.length,
       startedAt,
@@ -210,17 +250,9 @@ export function createEnrichHandlers({ client, services }) {
     const onProgress = (progress) => {
       const now = Date.now();
       const isFinal = progress.scannedCandidates >= progress.totalCandidates;
-      if (!isFinal && now - lastProgressEdit < PROGRESS_EDIT_THROTTLE_MS) {
-        return; // throttled; next tick will catch up
-      }
+      if (!isFinal && now - lastProgressEdit < PROGRESS_EDIT_THROTTLE_MS) return;
       lastProgressEdit = now;
-      // Skip the final "100%" tick because the post-scan branch below
-      // overwrites the embed with either preview-with-alts or
-      // no-alts-matched immediately afterwards.
       if (isFinal) return;
-      // After cancel: render the embed once with the Stop button greyed
-      // out so the user sees their click took effect even before the
-      // worker drops out of its current candidate.
       const buttonRow = cancelFlag.cancelled
         ? buildStopButtonRow(sessionId, { disabled: true, label: 'Stopping...' })
         : stopRow;
@@ -238,174 +270,189 @@ export function createEnrichHandlers({ client, services }) {
       });
     };
 
-    // DM notifier closure: fires after a terminal scan branch renders
-    // its final embed. Common args (caller, channel, command label,
-    // target name, guild) are captured once; the call sites only have
-    // to pass `outcome` + `result` + optional `alts` (when filtered).
-    async function notifyCompletion({ outcome, scanResult, altsForDm }) {
-      try {
-        const reply = await interaction.fetchReply().catch(() => null);
-        const resultMessageUrl = buildResultMessageUrl(interaction, reply);
-        await sendScanCompletionDm({
-          user: interaction.user,
-          commandLabel: '/la-list enrich',
-          scanTargetName: name,
-          guildName: meta?.guildName,
-          channelMention: interaction.channelId ? `<#${interaction.channelId}>` : undefined,
-          resultMessageUrl,
-          outcome,
-          result: scanResult,
-          alts: altsForDm,
-        });
-      } catch (err) {
-        console.warn('[enrich] notifyCompletion failed:', err?.message || err);
-      }
-    }
-
-    // Per-candidate scan stays direct-only to protect ScraperAPI quota
-    // (this is the high-fanout path the .env warning is about). targetMeta
-    // and guildMembers are pre-supplied above so allowScraperApiForTarget /
-    // allowScraperApiForGuild inside the detector are no-ops here.
     let result;
     try {
       result = await detectAltsViaStronghold(name, {
         targetMeta: meta,
         guildMembers,
-        candidateLimit: cap,
+        candidateLimit: resolvedCap,
         useScraperApiForCandidates: false,
         onProgress,
         cancelFlag,
+        excludeNames: existingSession?.scannedNames ?? [],
       });
     } finally {
       unregisterScan(sessionId);
     }
 
-    // Cancelled scan with NO matches: dedicated "stopped" embed.
-    // Cancelled scan WITH matches: fall through to the normal preview
-    // path with `stoppedEarly` flag set. Officer can choose to save
-    // the partial result or discard via the Confirm/Cancel buttons.
-    const wasCancelled = result?.cancelled === true;
-    if (wasCancelled && (!result.alts || result.alts.length === 0)) {
-      const ctx = LIST_LABELS[found.type];
+    // Defensive: detectAltsViaStronghold can return null on early-exit
+    // failure modes (no meta / no guild / no stronghold). At this point
+    // we already validated meta + guild upstream so null is unexpected,
+    // but render a clean error rather than crashing the editReply.
+    if (!result) {
       await interaction.editReply({
-        content: '',
         embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          titleIcon: '🛑',
-          color: ctx.color,
-          title: `Scan stopped · ${name}`,
-          description: 'Scan was cancelled before any matches were recorded.',
-          fields: [
-            { name: 'Scanned', value: `${result.scannedCandidates} / ${result.totalCandidates ?? result.scannedCandidates}`, inline: true },
-            { name: 'Failed', value: `${result.failedCandidates}`, inline: true },
-          ],
-          footer: 'Re-run /la-list enrich to start a fresh scan when bible is calmer.',
+          severity: AlertSeverity.ERROR,
+          title: `Scan failed · ${name}`,
+          description: 'The detector returned no result. Bible may have rejected the meta probe mid-scan.',
+          footer: 'Re-run /la-list enrich; the cooldown will pass in 30s.',
         })],
         components: [],
       });
-      notifyCompletion({ outcome: 'stopped-no-alts', scanResult: result, altsForDm: [] });
       return;
     }
 
-    if (!result || !Array.isArray(result.alts) || result.alts.length === 0) {
-      const ctx = LIST_LABELS[found.type];
-      await interaction.editReply({
-        content: '',
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.INFO,
-          titleIcon: ICONS.search,
-          color: ctx.color,
-          title: `Scan complete · ${name}`,
-          description:
-            `No alts matched the target stronghold in **${meta.guildName}**.`,
-          fields: [
-            {
-              name: 'Scanned',
-              value: `${result?.scannedCandidates ?? 0} candidates`,
-              inline: true,
-            },
-            {
-              name: 'Failed',
-              value: `${result?.failedCandidates ?? 0}`,
-              inline: true,
-            },
-          ],
-          footer:
-            (result?.failedCandidates ?? 0) > 0
-              ? 'High failure count usually means bible was rate-limiting; retry in a few minutes.'
-              : 'Either the target has no alts in this guild, or all alts are below ilvl 1700.',
-        })],
-        components: [],
-      });
-      notifyCompletion({ outcome: 'no-alts', scanResult: result || {}, altsForDm: [] });
-      return;
-    }
+    // Merge this pass into the cumulative session state. On a fresh run
+    // existingSession is null and the merge degrades to "use this pass".
+    const cumulativeAlts = mergeAltsByName(
+      existingSession?.allDiscoveredAlts ?? [],
+      result.alts || []
+    );
+    const cumulativeScannedNames = [
+      ...(existingSession?.scannedNames ?? []),
+      ...(result.scannedNames || []),
+    ];
+    const cumulativeScanned = (existingSession?.scanStats?.scanned ?? 0) + (result.scannedCandidates || 0);
+    const cumulativeFailed = (existingSession?.scanStats?.failed ?? 0) + (result.failedCandidates || 0);
 
     // Diff against entry.allCharacters to surface only NEW alts. Names
     // are stored case-sensitive in the DB so we lowercase both sides
-    // for the membership check; what we actually push is bible's saved
-    // case from the scan result.
+    // for the membership check.
     const existingChars = new Set(
       (found.entry.allCharacters || []).map((n) => String(n).toLowerCase())
     );
-    const newAlts = result.alts.filter(
+    const newAlts = cumulativeAlts.filter(
       (alt) => !existingChars.has(String(alt.name).toLowerCase())
     );
 
-    if (newAlts.length === 0) {
-      const ctx = LIST_LABELS[found.type];
-      await interaction.editReply({
-        content: '',
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.SUCCESS,
-          titleIcon: ICONS.search,
-          color: ctx.color,
-          title: `Scan complete · ${name}`,
-          description:
-            `All **${result.alts.length}** discovered alts are already on the ${ctx.label} entry. Nothing new to append.`,
-        })],
-        components: [],
+    // Reuse or create the enrich session that backs the Confirm /
+    // Continue / Discard buttons. Continue paths refresh the TTL so
+    // the 5-minute expiry doesn't fire between pass 1 and pass 2.
+    let session;
+    if (existingSession) {
+      Object.assign(existingSession, {
+        allDiscoveredAlts: cumulativeAlts,
+        newAlts: newAlts.map((a) => ({ name: a.name, classId: a.classId, itemLevel: a.itemLevel })),
+        scannedNames: cumulativeScannedNames,
+        scanStats: {
+          scanned: cumulativeScanned,
+          failed: cumulativeFailed,
+          totalAlts: cumulativeAlts.length,
+          guildName: meta.guildName,
+        },
       });
-      notifyCompletion({
-        outcome: wasCancelled ? 'stopped-with-alts' : 'completed',
-        scanResult: result,
-        altsForDm: result.alts,
+      session = touchEnrichSession(existingSession.sessionId) || existingSession;
+    } else {
+      session = createEnrichSession({
+        callerId: interaction.user.id,
+        type: found.type,
+        entryId: String(found.entry._id),
+        entryName: found.entry.name,
+        meta: {
+          guildName: meta.guildName,
+          strongholdName: meta.strongholdName,
+          rosterLevel: meta.rosterLevel,
+        },
+        targetIsHidden,
+        cap: resolvedCap,
+        allDiscoveredAlts: cumulativeAlts,
+        newAlts: newAlts.map((a) => ({ name: a.name, classId: a.classId, itemLevel: a.itemLevel })),
+        scannedNames: cumulativeScannedNames,
+        scanStats: {
+          scanned: cumulativeScanned,
+          failed: cumulativeFailed,
+          totalAlts: cumulativeAlts.length,
+          guildName: meta.guildName,
+        },
       });
-      return;
     }
 
-    const session = createEnrichSession({
-      callerId: interaction.user.id,
-      type: found.type,
-      entryId: String(found.entry._id),
-      entryName: found.entry.name,
-      newAlts: newAlts.map((a) => ({
-        name: a.name,
-        classId: a.classId,
-        itemLevel: a.itemLevel,
-      })),
-      scanStats: {
-        scanned: result.scannedCandidates,
-        failed: result.failedCandidates,
-        totalAlts: result.alts.length,
+    // Build the cumulative result envelope for the embed renderer:
+    // counts that should grow across passes (scanned, failed) come from
+    // the session, while invariants (totalEligibleInGuild, candidateLimit)
+    // and per-pass-only flags (cancelled) come from the latest pass.
+    const cumulativeResult = {
+      ...result,
+      scannedCandidates: cumulativeScanned,
+      failedCandidates: cumulativeFailed,
+      alts: cumulativeAlts,
+      scannedNames: cumulativeScannedNames,
+    };
+    if (existingSession) {
+      refreshEnrichSession(existingSession);
+    }
+
+    const ctx = LIST_LABELS[found.type];
+    const newAltsSet = new Set(newAlts.map((a) => String(a.name).toLowerCase()));
+    const profileUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+
+    const summaryLine =
+      `I scanned **${meta.guildName}** for stronghold matches with **${name}**` +
+      (existingSession ? ' (resumed from prior pass).' : '.');
+
+    let actionHint = '';
+    if (cumulativeAlts.length === 0) {
+      actionHint = 'No alts matched the target stronghold yet.';
+    } else if (newAlts.length === 0) {
+      actionHint = `All ${cumulativeAlts.length} discovered alt(s) are already on this ${ctx.label} entry.`;
+    } else {
+      actionHint = `**${newAlts.length}** of ${cumulativeAlts.length} discovered alt(s) are not on this ${ctx.label} entry yet. ` +
+        `Confirm to append them to \`allCharacters\`.`;
+    }
+
+    const { embed, state } = buildScanResultEmbed({
+      target: {
+        name,
+        isHidden: targetIsHidden,
         guildName: meta.guildName,
+        profileUrl,
       },
+      result: cumulativeResult,
+      alts: cumulativeAlts,
+      newAltsSet,
+      kind: 'enrich',
+      contextStyle: { icon: ctx.icon, color: ctx.color },
+      summaryLine,
+      actionHint,
     });
 
-    await interaction.editReply(buildEnrichPreviewReply({
-      entry: found.entry,
-      foundType: found.type,
-      meta,
-      newAlts,
-      result,
+    const buttonRow = buildScanResultButtons({
+      kind: 'enrich',
       sessionId: session.sessionId,
-      stoppedEarly: wasCancelled,
-    }));
-    notifyCompletion({
-      outcome: wasCancelled ? 'stopped-with-alts' : 'completed',
-      scanResult: result,
-      altsForDm: newAlts,
+      hasAlts: newAlts.length > 0,
+      hasRemaining: state.hasRemaining,
+      newAltsCount: newAlts.length,
     });
+
+    await interaction.editReply({
+      content: '',
+      embeds: [embed],
+      components: buttonRow ? [buttonRow] : [],
+    });
+
+    // DM the caller so they don't have to keep the channel open during
+    // a multi-minute scan. Outcome is derived from state + alt count.
+    let outcome;
+    if (state.stopReason === 'stopped' && cumulativeAlts.length === 0) outcome = 'stopped-no-alts';
+    else if (state.stopReason === 'stopped') outcome = 'stopped-with-alts';
+    else if (cumulativeAlts.length === 0) outcome = 'no-alts';
+    else outcome = 'completed';
+    try {
+      const reply = await interaction.fetchReply().catch(() => null);
+      sendScanCompletionDm({
+        user: interaction.user,
+        commandLabel: '/la-list enrich',
+        scanTargetName: name,
+        guildName: meta.guildName,
+        channelMention: interaction.channelId ? `<#${interaction.channelId}>` : undefined,
+        resultMessageUrl: buildResultMessageUrl(interaction, reply),
+        outcome,
+        result: cumulativeResult,
+        alts: newAlts,
+      }).catch(() => {});
+    } catch (err) {
+      console.warn('[enrich] DM dispatch failed:', err?.message || err);
+    }
   }
 
   async function handleListEnrichCommand(interaction) {
@@ -443,9 +490,6 @@ export function createEnrichHandlers({ client, services }) {
    * Triggered by the "Enrich now" button posted on a /la-list add
    * success card when the entry was created against a hidden roster.
    * customId shape: `list-add:enrich-hidden:<encodedName>`
-   *
-   * Same officer + cooldown gating as the slash command, but seeded
-   * from the button's customId instead of slash options. Default cap.
    */
   async function handleListAddEnrichHiddenButton(interaction) {
     if (!isOfficerOrSenior(interaction.user.id)) {
@@ -488,12 +532,71 @@ export function createEnrichHandlers({ client, services }) {
     }
     markCooldown(name);
 
-    // Reply (not update) so the original add success card stays
-    // intact; the progress embed posts as a new message in the same
-    // channel and the officer can scroll back to the add card if
-    // they need the entry context.
     await interaction.deferReply();
     await runEnrichFlow(interaction, { name, cap });
+  }
+
+  /**
+   * Continue-scan button: resume the same enrich session with the prior
+   * pass's scanned-names fed back as excludeNames so the next pass walks
+   * only fresh candidates. Re-uses officer + cooldown gates and refreshes
+   * the session TTL.
+   */
+  async function handleListEnrichContinueButton(interaction) {
+    const sessionId = interaction.customId.split(':')[2];
+    const session = getEnrichSession(sessionId);
+    if (!session) {
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Session Expired',
+          description: 'This enrich preview is older than the 5-minute session window.',
+          footer: 'Re-run /la-list enrich to start a fresh scan.',
+        })],
+        ephemeral: true,
+      });
+      return;
+    }
+    if (session.callerId !== interaction.user.id) {
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Not Your Session',
+          description: 'Only the officer who started this enrich session can continue it.',
+        })],
+        ephemeral: true,
+      });
+      return;
+    }
+    if (!isOfficerOrSenior(interaction.user.id)) {
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: 'Officer-Only Action',
+          description: 'Only officers and senior approvers can continue an enrich scan.',
+        })],
+        ephemeral: true,
+      });
+      return;
+    }
+    refreshEnrichSession(session);
+
+    const cooldownWait = getCooldownWaitSeconds(session.entryName);
+    if (cooldownWait > 0) {
+      await interaction.reply({
+        content: `⏳ Please wait ${cooldownWait}s before continuing the scan for **${session.entryName}**.`,
+        ephemeral: true,
+      });
+      return;
+    }
+    markCooldown(session.entryName);
+
+    await interaction.deferUpdate();
+    await runEnrichFlow(interaction, {
+      name: session.entryName,
+      cap: session.cap,
+      existingSession: session,
+    });
   }
 
   async function handleListEnrichConfirmButton(interaction) {
@@ -540,7 +643,21 @@ export function createEnrichHandlers({ client, services }) {
     }
 
     await connectDB();
-    const altNames = session.newAlts.map((a) => a.name);
+    const altNames = (session.newAlts || []).map((a) => a.name);
+    if (altNames.length === 0) {
+      await interaction.editReply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Nothing to Save',
+          description: 'No new alts were discovered, so the entry was not modified.',
+          footer: 'Re-run /la-list enrich if bible has cooled down and you want a fresh pass.',
+        })],
+        components: [],
+      });
+      clearEnrichSession(sessionId);
+      return;
+    }
+
     const updateResult = await Model.updateOne(
       { _id: session.entryId },
       { $addToSet: { allCharacters: { $each: altNames } } }
@@ -595,12 +712,6 @@ export function createEnrichHandlers({ client, services }) {
    * Stop button handler. Posted on long-running scan progress embeds
    * (enrich + roster deep:true) so the officer can interrupt a stuck
    * scan without waiting for the 15-min Discord webhook timeout.
-   *
-   * customId: `scan-cancel:<sessionId>` where sessionId came from
-   * `newScanSessionId()` in the scan-start path. The flag flip is
-   * picked up by the detector at the top of its next candidate loop;
-   * the worker may still complete its in-flight fetchCharacterMeta
-   * before exiting, so the user sees a brief "Stopping..." state.
    */
   async function handleScanCancelButton(interaction) {
     const sessionId = interaction.customId.split(':')[1];
@@ -629,9 +740,6 @@ export function createEnrichHandlers({ client, services }) {
     }
 
     if (scan.cancelFlag.cancelled) {
-      // Idempotent: second click while worker is still draining its
-      // current candidate. Acknowledge ephemerally so the user knows
-      // the click landed without spawning a duplicate edit.
       await interaction.reply({
         content: 'Already stopping...',
         ephemeral: true,
@@ -641,9 +749,6 @@ export function createEnrichHandlers({ client, services }) {
 
     scan.cancelFlag.cancelled = true;
 
-    // Acknowledge with a fresh ephemeral so we don't race the scan's
-    // own onProgress edit. The next onProgress tick will replace the
-    // active Stop button with the disabled "Stopping..." version.
     await interaction.reply({
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.INFO,
@@ -660,6 +765,7 @@ export function createEnrichHandlers({ client, services }) {
     handleListAddEnrichHiddenButton,
     handleListEnrichConfirmButton,
     handleListEnrichCancelButton,
+    handleListEnrichContinueButton,
     handleScanCancelButton,
   };
 }
