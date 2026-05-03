@@ -4,6 +4,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.40] - 2026-05-03
+
+### Added
+- `/la-list enrich` now surfaces **live progress** during the 5-7 minute stronghold scan instead of leaving the officer staring at a static "Running stronghold deep scan..." line. The embed updates every ~30s with a 20-character text progress bar, scanned/total candidate count, alts-found count, failed count, current adaptive backoff value, and a Discord-native relative timestamp showing when the scan started.
+- `bot/handlers/list/enrich/ui.js` exports `buildEnrichProgressEmbed` and a small `buildProgressBar` helper.
+- `bot/services/roster/altDetection.js` `detectAltsViaStronghold` accepts an `onProgress` callback. The hook fires at the same per-25 cadence as the existing console log, with a fire-and-forget call so a slow / rate-limited UI edit cannot bottleneck the scan worker.
+
+### Changed
+- `enrich/index.js` initial reply switches from a one-liner to the structured progress embed (0% bar, ready to update). Throttled to one Discord edit every 30s (10-14 updates over a typical 5-7 min scan; well under Discord's 5-edits-per-5s webhook ceiling).
+- The "no alts matched" post-scan reply migrated from plain content to an INFO embed with scanned / failed counts as fields and a contextual footer ("rate-limit retry hint" if failures > 0, "below 1700 ilvl or no alts in guild" otherwise).
+
+### Notes
+- The final 100% progress tick is intentionally suppressed because the post-scan branch (preview-with-alts or no-alts-matched) overwrites the embed immediately afterwards; emitting "100%" would flicker for milliseconds before being replaced.
+- 41/41 tests pass.
+
 ## [v0.5.39] - 2026-05-03
 
 ### Fixed

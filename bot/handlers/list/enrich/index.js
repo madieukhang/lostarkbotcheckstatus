@@ -41,6 +41,7 @@ import {
 } from '../../../services/rosterService.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { ICONS } from '../../../utils/ui.js';
 import { isOfficerOrSenior } from '../helpers.js';
 import {
   findEntryByName,
@@ -56,8 +57,14 @@ import {
 } from './state.js';
 import {
   buildEnrichPreviewReply,
+  buildEnrichProgressEmbed,
   buildEnrichSuccessEmbed,
 } from './ui.js';
+
+// Discord webhook edits are rate-limited (5 per 5s). Throttle progress
+// updates so the scan worker isn't bottlenecked on Discord; 30s gives
+// ~10-14 updates over a 5-7 minute scan, plenty for live signal.
+const PROGRESS_EDIT_THROTTLE_MS = 30 * 1000;
 
 export function createEnrichHandlers({ client, services }) {
   // services may grow Phase 3.5 broadcast support later; not used today.
@@ -161,12 +168,55 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
 
+    // Initial scan-started embed. The onProgress callback below will edit
+    // this same message with live progress every 30s as the scan runs.
+    const startedAt = Date.now();
+    const initialProgress = {
+      scannedCandidates: 0,
+      totalCandidates: Math.min(
+        guildMembers.filter((m) => m.name !== name && m.ilvl >= 1700).length,
+        cap || guildMembers.length
+      ),
+      failedCandidates: 0,
+      altsFound: 0,
+      currentBackoffMs: config.scanBackoffMinMs,
+      totalMembers: guildMembers.length,
+      startedAt,
+    };
     await interaction.editReply({
-      content:
-        `🔍 Running stronghold deep scan for **${name}** in guild **${meta.guildName}**` +
-        ` (${guildMembers.length} guild members, cap ${cap}, concurrency ${config.strongholdDeepConcurrency}, candidate ScraperAPI off). ` +
-        `Expect roughly 5-7 minutes; do not click anything.`,
+      content: '',
+      embeds: [buildEnrichProgressEmbed({
+        entry: found.entry,
+        foundType: found.type,
+        meta,
+        progress: initialProgress,
+      })],
     });
+
+    let lastProgressEdit = startedAt;
+    const onProgress = (progress) => {
+      const now = Date.now();
+      const isFinal = progress.scannedCandidates >= progress.totalCandidates;
+      if (!isFinal && now - lastProgressEdit < PROGRESS_EDIT_THROTTLE_MS) {
+        return; // throttled; next tick will catch up
+      }
+      lastProgressEdit = now;
+      // Skip the final "100%" tick because the post-scan branch below
+      // overwrites the embed with either preview-with-alts or
+      // no-alts-matched immediately afterwards.
+      if (isFinal) return;
+      interaction.editReply({
+        content: '',
+        embeds: [buildEnrichProgressEmbed({
+          entry: found.entry,
+          foundType: found.type,
+          meta,
+          progress: { ...progress, totalMembers: guildMembers.length, startedAt },
+        })],
+      }).catch((err) => {
+        console.warn('[enrich] Progress edit failed:', err?.message || err);
+      });
+    };
 
     // Per-candidate scan stays direct-only to protect ScraperAPI quota
     // (this is the high-fanout path the .env warning is about). targetMeta
@@ -177,14 +227,37 @@ export function createEnrichHandlers({ client, services }) {
       guildMembers,
       candidateLimit: cap,
       useScraperApiForCandidates: false,
+      onProgress,
     });
 
     if (!result || !Array.isArray(result.alts) || result.alts.length === 0) {
+      const ctx = LIST_LABELS[found.type];
       await interaction.editReply({
-        content:
-          `🔍 Scan complete for **${name}** in **${meta.guildName}**. ` +
-          `No alts matched (scanned ${result?.scannedCandidates ?? 0} candidates, ` +
-          `${result?.failedCandidates ?? 0} failed).`,
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.INFO,
+          titleIcon: ICONS.search,
+          color: ctx.color,
+          title: `Scan complete · ${name}`,
+          description:
+            `No alts matched the target stronghold in **${meta.guildName}**.`,
+          fields: [
+            {
+              name: 'Scanned',
+              value: `${result?.scannedCandidates ?? 0} candidates`,
+              inline: true,
+            },
+            {
+              name: 'Failed',
+              value: `${result?.failedCandidates ?? 0}`,
+              inline: true,
+            },
+          ],
+          footer:
+            (result?.failedCandidates ?? 0) > 0
+              ? 'High failure count usually means bible was rate-limiting; retry in a few minutes.'
+              : 'Either the target has no alts in this guild, or all alts are below ilvl 1700.',
+        })],
       });
       return;
     }
