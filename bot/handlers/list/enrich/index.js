@@ -67,6 +67,7 @@ import {
   unregisterScan,
   getScan,
 } from '../../../utils/scanSession.js';
+import { sendScanCompletionDm, buildResultMessageUrl } from '../../../utils/scanCompletionDm.js';
 
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
 // ~40-60 updates over a 10-15 minute gentle-mode scan; well under the
@@ -237,6 +238,30 @@ export function createEnrichHandlers({ client, services }) {
       });
     };
 
+    // DM notifier closure: fires after a terminal scan branch renders
+    // its final embed. Common args (caller, channel, command label,
+    // target name, guild) are captured once; the call sites only have
+    // to pass `outcome` + `result` + optional `alts` (when filtered).
+    async function notifyCompletion({ outcome, scanResult, altsForDm }) {
+      try {
+        const reply = await interaction.fetchReply().catch(() => null);
+        const resultMessageUrl = buildResultMessageUrl(interaction, reply);
+        await sendScanCompletionDm({
+          user: interaction.user,
+          commandLabel: '/la-list enrich',
+          scanTargetName: name,
+          guildName: meta?.guildName,
+          channelMention: interaction.channelId ? `<#${interaction.channelId}>` : undefined,
+          resultMessageUrl,
+          outcome,
+          result: scanResult,
+          alts: altsForDm,
+        });
+      } catch (err) {
+        console.warn('[enrich] notifyCompletion failed:', err?.message || err);
+      }
+    }
+
     // Per-candidate scan stays direct-only to protect ScraperAPI quota
     // (this is the high-fanout path the .env warning is about). targetMeta
     // and guildMembers are pre-supplied above so allowScraperApiForTarget /
@@ -255,10 +280,12 @@ export function createEnrichHandlers({ client, services }) {
       unregisterScan(sessionId);
     }
 
-    // Cancelled scan: bail out with a dedicated embed. result.alts may
-    // still hold partial matches (any alt found before cancel) but we
-    // don't auto-append; officer can re-run the scan later.
-    if (result?.cancelled) {
+    // Cancelled scan with NO matches: dedicated "stopped" embed.
+    // Cancelled scan WITH matches: fall through to the normal preview
+    // path with `stoppedEarly` flag set. Officer can choose to save
+    // the partial result or discard via the Confirm/Cancel buttons.
+    const wasCancelled = result?.cancelled === true;
+    if (wasCancelled && (!result.alts || result.alts.length === 0)) {
       const ctx = LIST_LABELS[found.type];
       await interaction.editReply({
         content: '',
@@ -267,19 +294,16 @@ export function createEnrichHandlers({ client, services }) {
           titleIcon: '🛑',
           color: ctx.color,
           title: `Scan stopped · ${name}`,
-          description:
-            `Scan was cancelled mid-run.` +
-            (result.alts.length > 0
-              ? ` Found **${result.alts.length}** match${result.alts.length === 1 ? '' : 'es'} before stopping (not appended).`
-              : ' No matches recorded before stop.'),
+          description: 'Scan was cancelled before any matches were recorded.',
           fields: [
-            { name: 'Scanned', value: `${result.scannedCandidates} / ${result.candidateLimit}`, inline: true },
+            { name: 'Scanned', value: `${result.scannedCandidates} / ${result.totalCandidates ?? result.scannedCandidates}`, inline: true },
             { name: 'Failed', value: `${result.failedCandidates}`, inline: true },
           ],
           footer: 'Re-run /la-list enrich to start a fresh scan when bible is calmer.',
         })],
         components: [],
       });
+      notifyCompletion({ outcome: 'stopped-no-alts', scanResult: result, altsForDm: [] });
       return;
     }
 
@@ -313,6 +337,7 @@ export function createEnrichHandlers({ client, services }) {
         })],
         components: [],
       });
+      notifyCompletion({ outcome: 'no-alts', scanResult: result || {}, altsForDm: [] });
       return;
     }
 
@@ -340,6 +365,11 @@ export function createEnrichHandlers({ client, services }) {
             `All **${result.alts.length}** discovered alts are already on the ${ctx.label} entry. Nothing new to append.`,
         })],
         components: [],
+      });
+      notifyCompletion({
+        outcome: wasCancelled ? 'stopped-with-alts' : 'completed',
+        scanResult: result,
+        altsForDm: result.alts,
       });
       return;
     }
@@ -369,7 +399,13 @@ export function createEnrichHandlers({ client, services }) {
       newAlts,
       result,
       sessionId: session.sessionId,
+      stoppedEarly: wasCancelled,
     }));
+    notifyCompletion({
+      outcome: wasCancelled ? 'stopped-with-alts' : 'completed',
+      scanResult: result,
+      altsForDm: newAlts,
+    });
   }
 
   async function handleListEnrichCommand(interaction) {

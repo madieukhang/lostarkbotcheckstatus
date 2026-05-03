@@ -193,6 +193,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
     },
     alts,
     totalMembers: members.length,
+    totalCandidates: limitedCandidates.length,
     scannedCandidates,
     skippedCandidates,
     failedCandidates,

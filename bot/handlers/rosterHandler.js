@@ -39,6 +39,7 @@ import {
   registerScan,
   unregisterScan,
 } from '../utils/scanSession.js';
+import { sendScanCompletionDm, buildResultMessageUrl } from '../utils/scanCompletionDm.js';
 
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
 // ~40-60 progress updates over a typical 10-15 minute gentle-mode
@@ -232,12 +233,18 @@ export async function handleRosterCommand(interaction) {
         );
 
         if (alts.length > 0) {
+          const cancelledTag = altResult?.cancelled ? ' · partial (stopped early)' : '';
           descriptionParts.push(
             '',
-            `**Same-account alts (${alts.length}):**`,
+            `**Same-account alts (${alts.length})${cancelledTag}:**`,
             ...alts.map(
               (a, i) => `${i + 1}. [${a.name}](https://lostark.bible/character/NA/${encodeURIComponent(a.name)}/roster) · ${a.className || '?'} · \`${a.itemLevel}\``
             ),
+          );
+        } else if (deep && altResult?.cancelled) {
+          descriptionParts.push(
+            '',
+            '🛑 Scan was stopped before any matches were recorded.',
           );
         } else if (!deep) {
           descriptionParts.push(
@@ -279,7 +286,28 @@ export async function handleRosterCommand(interaction) {
           .setFooter({ text: `${deep ? `${alts.length} alt(s) · ` : ''}${guildMembers.length} guild members${deepStats ? ` · ${deepStats}` : ''} · lostark.bible` })
           .setTimestamp();
 
-        await interaction.editReply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed], components: [] });
+        // DM the caller when deep scan was run (long-running). Skip
+        // for plain /la-roster which finishes in seconds.
+        if (deep && altResult) {
+          const replyMsg = await interaction.fetchReply().catch(() => null);
+          let outcome;
+          if (altResult.cancelled) {
+            outcome = altResult.alts.length > 0 ? 'stopped-with-alts' : 'stopped-no-alts';
+          } else {
+            outcome = altResult.alts.length > 0 ? 'completed' : 'no-alts';
+          }
+          sendScanCompletionDm({
+            user: interaction.user,
+            commandLabel: '/la-roster deep',
+            scanTargetName: name,
+            guildName: meta?.guildName,
+            channelMention: interaction.channelId ? `<#${interaction.channelId}>` : undefined,
+            resultMessageUrl: buildResultMessageUrl(interaction, replyMsg),
+            outcome,
+            result: altResult,
+          }).catch(() => {});
+        }
         return;
       }
 
@@ -432,6 +460,11 @@ export async function handleRosterCommand(interaction) {
       }
     }
 
+    // Visible-roster deep scan: hoist these to the function scope so
+    // the post-editReply DM block at the bottom can reference them.
+    let visibleDeepResult = null;
+    let visibleDeepMeta = null;
+
     // Deep scan: Stronghold alt detection even when roster is visible
     if (deep) {
       try {
@@ -512,20 +545,28 @@ export async function handleRosterCommand(interaction) {
         } finally {
           if (sessionId) unregisterScan(sessionId);
         }
+        // Surface deep-scan result to the function scope for the
+        // post-reply DM. visMeta gives the DM access to guildName.
+        visibleDeepResult = altResult;
+        visibleDeepMeta = visMeta;
+
         const deepStats = formatDeepScanStats(altResult);
+        const stoppedNote = altResult?.cancelled
+          ? '\n*🛑 Scan stopped early · partial result.*'
+          : '';
         if (altResult && altResult.alts.length > 0) {
           const altLines = altResult.alts.map(
             (a, i) => `${i + 1}. [${a.name}](https://lostark.bible/character/NA/${encodeURIComponent(a.name)}/roster) · ${a.className || '?'} · \`${a.itemLevel}\``
           );
           embed.addFields({
-            name: `🔎 Deep Scan · Alts via Stronghold (${altResult.alts.length})`,
-            value: [...altLines, deepStats ? `\n${deepStats}` : null].filter(Boolean).join('\n').slice(0, 1024),
+            name: `🔎 Deep Scan · Alts via Stronghold (${altResult.alts.length})${altResult.cancelled ? ' · partial' : ''}`,
+            value: [...altLines, deepStats ? `\n${deepStats}` : null, stoppedNote || null].filter(Boolean).join('\n').slice(0, 1024),
             inline: false,
           });
         } else {
           embed.addFields({
             name: '🔎 Deep Scan',
-            value: `No additional alts found via Stronghold fingerprint.${deepStats ? `\n${deepStats}` : ''}`,
+            value: `${altResult?.cancelled ? 'Scan was stopped before any matches were recorded.' : 'No additional alts found via Stronghold fingerprint.'}${deepStats ? `\n${deepStats}` : ''}${stoppedNote}`,
             inline: false,
           });
         }
@@ -540,7 +581,30 @@ export async function handleRosterCommand(interaction) {
 
     const content = contentLines.length > 0 ? contentLines.join('\n') : undefined;
 
-    await interaction.editReply({ content, embeds });
+    await interaction.editReply({ content, embeds, components: [] });
+
+    // DM the caller when a deep scan was actually run (skip plain
+    // /la-roster which finishes in seconds and doesn't warrant a
+    // notification ping).
+    if (deep && visibleDeepResult) {
+      const replyMsg = await interaction.fetchReply().catch(() => null);
+      let outcome;
+      if (visibleDeepResult.cancelled) {
+        outcome = visibleDeepResult.alts.length > 0 ? 'stopped-with-alts' : 'stopped-no-alts';
+      } else {
+        outcome = visibleDeepResult.alts.length > 0 ? 'completed' : 'no-alts';
+      }
+      sendScanCompletionDm({
+        user: interaction.user,
+        commandLabel: '/la-roster deep',
+        scanTargetName: name,
+        guildName: visibleDeepMeta?.guildName,
+        channelMention: interaction.channelId ? `<#${interaction.channelId}>` : undefined,
+        resultMessageUrl: buildResultMessageUrl(interaction, replyMsg),
+        outcome,
+        result: visibleDeepResult,
+      }).catch(() => {});
+    }
   } catch (err) {
     await interaction.editReply({
       embeds: [buildAlertEmbed({

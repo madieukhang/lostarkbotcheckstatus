@@ -41,22 +41,35 @@ export function buildEnrichProgressEmbed({ entry, foundType, meta, progress }) {
   });
 }
 
-export function buildEnrichPreviewReply({ entry, foundType, meta, newAlts, result, sessionId }) {
+export function buildEnrichPreviewReply({ entry, foundType, meta, newAlts, result, sessionId, stoppedEarly = false }) {
   const ctx = LIST_LABELS[foundType];
   const altLines = newAlts
     .map((alt, index) => {
       const cls = getClassName(alt.classId) || alt.classId || 'Unknown';
       const ilvl = typeof alt.itemLevel === 'number' ? alt.itemLevel.toFixed(2) : alt.itemLevel;
-      return `**${index + 1}.** ${alt.name} · ${cls} · \`${ilvl}\``;
+      const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
+      return `**${index + 1}.** [${alt.name}](${link}) · ${cls} · \`${ilvl}\``;
     })
     .join('\n');
 
+  // Stopped-early prefix lets the officer see at a glance that this
+  // preview is a *partial* result of a cancelled scan. Confirming
+  // appends only what was matched before the Stop click; the rest of
+  // the candidate list was never scanned.
+  const stoppedPrefix = stoppedEarly
+    ? `🛑 **Scan stopped early at ${result.scannedCandidates}/${result.totalCandidates ?? result.scannedCandidates} candidates.** ` +
+      `These are the matches found before the Stop click; later candidates were never checked.\n\n`
+    : '';
+
   const embed = buildAlertEmbed({
-    severity: AlertSeverity.INFO,
-    titleIcon: ICONS.search,
+    severity: stoppedEarly ? AlertSeverity.WARNING : AlertSeverity.INFO,
+    titleIcon: stoppedEarly ? '🛑' : ICONS.search,
     color: ctx.color,
-    title: `Enrich preview · ${entry.name}`,
+    title: stoppedEarly
+      ? `Partial enrich preview · ${entry.name}`
+      : `Enrich preview · ${entry.name}`,
     description:
+      stoppedPrefix +
       `I scanned the stronghold in **${meta.guildName}** and matched ` +
       `${result.alts.length} alt(s). **${newAlts.length}** of them ` +
       `aren't on this ${ctx.label} entry yet:\n\n${altLines}\n\n` +
@@ -72,11 +85,11 @@ export function buildEnrichPreviewReply({ entry, foundType, meta, newAlts, resul
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`list-enrich:confirm:${sessionId}`)
-      .setLabel(`Confirm Add ${newAlts.length}`)
+      .setLabel(stoppedEarly ? `Save partial · ${newAlts.length}` : `Confirm Add ${newAlts.length}`)
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`list-enrich:cancel:${sessionId}`)
-      .setLabel('Cancel')
+      .setLabel(stoppedEarly ? 'Discard' : 'Cancel')
       .setStyle(ButtonStyle.Secondary)
   );
 
@@ -89,8 +102,12 @@ export function buildEnrichPreviewReply({ entry, foundType, meta, newAlts, resul
 
 export function buildEnrichSuccessEmbed(session, updateResult) {
   const ctx = LIST_LABELS[session.type];
-  const altNames = session.newAlts.map((alt) => alt.name);
-  const lines = altNames.map((name, index) => `${index + 1}. ${name}`).join('\n');
+  const lines = session.newAlts
+    .map((alt, index) => {
+      const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
+      return `${index + 1}. [${alt.name}](${link})`;
+    })
+    .join('\n');
 
   return buildAlertEmbed({
     severity: AlertSeverity.SUCCESS,
@@ -98,7 +115,7 @@ export function buildEnrichSuccessEmbed(session, updateResult) {
     color: ctx.color,
     title: `Enriched · ${session.entryName}`,
     description:
-      `Appended ${altNames.length} alt(s) to the ${ctx.label} entry's ` +
+      `Appended ${session.newAlts.length} alt(s) to the ${ctx.label} entry's ` +
       `\`allCharacters\`:\n\n${lines}`,
     footer: `matched=${updateResult.matchedCount} · modified=${updateResult.modifiedCount}`,
   });
