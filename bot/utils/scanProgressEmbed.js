@@ -39,7 +39,11 @@ import { ICONS, buildProgressBar, relativeTime } from './ui.js';
  * description stays well under Discord's 4096-char cap even when
  * combined with subtitle + progress bar + stats.
  *
- * Each line: `• <Name> · <Class> · \`<ilvl>\``
+ * Each line: `• [<Name>](<roster-link>) · <Class> · \`<ilvl>\``
+ *
+ * Names are linked to the lostark.bible roster page so an officer
+ * can click straight through to verify the match without copying
+ * the name into a separate /la-roster lookup.
  */
 function buildAltsBlock(alts) {
   if (!Array.isArray(alts) || alts.length === 0) return '';
@@ -49,7 +53,8 @@ function buildAltsBlock(alts) {
     const ilvl = typeof alt.itemLevel === 'number'
       ? alt.itemLevel.toFixed(2)
       : (alt.itemLevel || '?');
-    return `• **${alt.name}** · ${cls} · \`${ilvl}\``;
+    const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
+    return `• **[${alt.name}](${link})** · ${cls} · \`${ilvl}\``;
   });
   const extra = alts.length > visible.length
     ? `\n*... and ${alts.length - visible.length} more*`
