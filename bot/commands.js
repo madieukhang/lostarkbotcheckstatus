@@ -185,6 +185,12 @@ function listCommand(name) {
               { name: 'server', value: 'server' }
             )
         )
+        .addStringOption((opt) =>
+          opt
+            .setName('additional_names')
+            .setDescription('Comma-separated alts to append (officer/owner only, manual filler when stronghold scan cant)')
+            .setRequired(false)
+        )
     )
     .addSubcommand((sub) =>
       sub
