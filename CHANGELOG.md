@@ -4,6 +4,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.34] - 2026-05-03
+
+### Changed
+- `bot/handlers/list/services/addExecutor.js` migrated to the new alert pattern. The success "Entry Added" card no longer builds a raw `EmbedBuilder`; it uses `buildAlertEmbed` with `titleIcon`/`color` overrides so it carries the list-type icon (⛔/✅/⚠️) and matches the rest of the alert family's layout. Six guard returns (trusted-exact, no-roster + suggestions, no-roster bare, ilvl-too-low, trusted-alt, duplicate) now drop their cosmetic icon prefix from `content` because user-facing render suppresses content when an embed is present (see `add/command.js#L110`); the remaining `content` strings are short summaries for log-style consumers (`approvalButton.js` error fallback, `bulk.js` result reporting).
+
+### Notes
+- This is the first migration after the `ui.js` foundation. Pattern locked in: alert-shaped → `buildAlertEmbed` with severity; list-typed → add `titleIcon`/`color` overrides; success card with structured fields → SUCCESS severity + list-type override.
+- Commands and routes untouched; consumer contract preserved (`{ ok, content?, embeds, entry?, isDuplicate?, existingEntry? }`).
+
 ## [v0.5.33] - 2026-05-03
 
 ### Added

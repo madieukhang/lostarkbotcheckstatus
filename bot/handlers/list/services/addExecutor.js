@@ -1,5 +1,3 @@
-import { EmbedBuilder } from 'discord.js';
-
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import { getClassName } from '../../../models/Class.js';
@@ -22,13 +20,19 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     const name = normalizeCharacterName(payload.name);
 
     // Step 0: Trusted user guard (exact name check — fast, before roster fetch)
+    //
+    // Note on `content` strings in non-ok returns: the user-facing reply
+    // suppresses content when an embed is present (see add/command.js
+    // line ~110). The string is kept for log-style consumers — bulk
+    // results and approval-flow error fallbacks read result.content for
+    // a one-line description of why the executor refused.
     {
       const trustedExact = await TrustedUser.findOne({ name })
         .collation({ locale: 'en', strength: 2 }).lean();
       if (trustedExact) {
         return {
           ok: false,
-          content: `🛡️ **${name}** is a trusted user and cannot be added to any list.`,
+          content: `${name} is a trusted user and cannot be added to any list.`,
           embeds: [buildTrustedBlockEmbed(name, trustedExact.reason)],
         };
       }
@@ -51,7 +55,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
         return {
           ok: false,
-          content: `❌ No roster found for **${name}**. Use one of the suggested names.`,
+          content: `No roster found for ${name}; ${suggestions.length} similar name(s) suggested.`,
           embeds: [
             buildAlertEmbed({
               severity: AlertSeverity.ERROR,
@@ -68,7 +72,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
       return {
         ok: false,
-        content: `❌ No roster found for **${name}**. No similar names found.`,
+        content: `No roster found for ${name}, no similar names suggested.`,
         embeds: [
           buildAlertEmbed({
             severity: AlertSeverity.ERROR,
@@ -84,7 +88,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     if (targetItemLevel !== null && targetItemLevel < 1700) {
       return {
         ok: false,
-        content: `❌ **${name}** has item level \`${targetItemLevel.toFixed(2)}\` (below 1700). Cannot add to ${label}.`,
+        content: `${name} has item level ${targetItemLevel.toFixed(2)} (below 1700).`,
         embeds: [
           buildAlertEmbed({
             severity: AlertSeverity.ERROR,
@@ -109,7 +113,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       if (trustedAlt) {
         return {
           ok: false,
-          content: `🛡️ **${name}** shares a roster with trusted user **${trustedAlt.name}**.`,
+          content: `${name} shares a roster with trusted user ${trustedAlt.name}.`,
           embeds: [buildTrustedBlockEmbed(name, trustedAlt.reason, { via: trustedAlt.name })],
         };
       }
@@ -144,8 +148,6 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
     if (existed) {
       const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
-      const via = isRosterMatch ? ` (roster match: **${existed.name}** is already in ${label})` : '';
-      const scopeNote = existed.scope === 'server' ? ' [Server]' : '';
 
       // Build structured alert embed with all the duplicate's context
       const existedRosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(existed.name)}/roster`;
@@ -201,11 +203,15 @@ export function createListAddExecutor({ client, broadcastListChange }) {
         ? `**${name}** is already in ${label} via roster match with **${existed.name}**.`
         : `**${name}** is already in ${label}.`;
 
+      const dupContent = isRosterMatch
+        ? `${name} already exists in ${label} (roster match: ${existed.name}).`
+        : `${name} already exists in ${label}.`;
+
       return {
         ok: false,
         isDuplicate: true,
         existingEntry: existed,
-        content: `⚠️ **${name}** already exists in ${label}.${via}${scopeNote}`,
+        content: dupContent,
         embeds: [
           buildAlertEmbed({
             severity: AlertSeverity.WARNING,
@@ -243,7 +249,10 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
     const entry = await model.create(createData);
 
-    // Build result embed with character links
+    // Build success embed with character links + roster source.
+    // Uses buildAlertEmbed with titleIcon/color overrides so the card
+    // wears the list-type icon (⛔/✅/⚠️) and matches the rest of the
+    // alert family's layout (footer, timestamp, field rendering).
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
     const autoLogsLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/logs`;
 
@@ -256,18 +265,21 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
     const scopeTag = (payload.type === 'black' && entryScope === 'server') ? ' [Server]' : '';
     const rosterSource = rosterVisibility === 'hidden' ? 'Hidden roster fallback' : 'Visible roster';
-    const embed = new EmbedBuilder()
-      .setTitle(`${labelCap}${scopeTag} — Entry Added`)
-      .addFields(
+
+    const embed = buildAlertEmbed({
+      severity: AlertSeverity.SUCCESS,
+      titleIcon: icon,
+      color,
+      title: `${labelCap}${scopeTag} · Entry Added`,
+      fields: [
         { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
         { name: 'Reason', value: payload.reason || 'N/A', inline: true },
         { name: 'Raid', value: payload.raid || 'N/A', inline: true },
         { name: `All Characters (${allCharacters.length})`, value: allCharsDisplay, inline: false },
         { name: 'Roster source', value: rosterSource, inline: true },
-        { name: 'Links', value: linkParts.join(' · '), inline: false }
-      )
-      .setColor(color)
-      .setTimestamp(new Date());
+        { name: 'Links', value: linkParts.join(' · '), inline: false },
+      ],
+    });
 
     // Resolve the freshest possible image URL from the just-created entry.
     // payload.imageUrl is unsafe here because for approval-delayed adds the
@@ -296,7 +308,6 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     return {
       ok: true,
       entry, // Mongoose doc for callers that need to re-use the created entry (e.g. bulk broadcast)
-      content: `${icon} Added **${entry.name}** to ${label}.${scopeTag ? ' *(server only)*' : ''}`,
       embeds: [embed],
     };
   }
