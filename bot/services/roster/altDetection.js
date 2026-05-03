@@ -149,11 +149,17 @@ export async function detectAltsViaStronghold(name, options = {}) {
         || alts.length > 0 && scannedCandidates % 1 === 0
       ) {
         if (typeof options.onProgress === 'function') {
+          // Pass a snapshot of the alts array (shallow copy of the
+          // current matches) so the UI can render names live as the
+          // scan finds them. Truncate to top-N inside the UI if the
+          // embed gets too long; we don't truncate here so the caller
+          // has full freedom.
           Promise.resolve(options.onProgress({
             scannedCandidates,
             totalCandidates: limitedCandidates.length,
             failedCandidates,
             altsFound: alts.length,
+            alts: alts.slice(),
             currentBackoffMs: backoff.current,
           })).catch((err) => {
             console.warn('[alt-detect] onProgress callback threw:', err?.message || err);
