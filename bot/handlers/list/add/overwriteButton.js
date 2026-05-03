@@ -2,6 +2,7 @@ import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { buildRosterCharacters } from '../../../services/rosterService.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   getListContext,
   buildApprovalResultRow,
@@ -21,7 +22,11 @@ export function createListAddOverwriteButtonHandler({
 
     if (!payload) {
       await interaction.reply({
-        content: '⚠️ This request has already been processed or expired.',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Request Expired',
+          description: 'This approval request was already processed or has expired.',
+        })],
         ephemeral: true,
       });
       return;
@@ -77,8 +82,13 @@ export function createListAddOverwriteButtonHandler({
 
       if (!dupeEntry) {
         await interaction.editReply({
-          content: '⚠️ Original entry no longer exists — it may have been removed.',
-          embeds: [],
+          content: '',
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            title: 'Original Entry Missing',
+            description: 'The duplicate entry no longer exists - it may have been removed in a parallel session.',
+            footer: 'Re-run /la-list add to create a fresh entry.',
+          })],
           components: [buildApprovalResultRow('Failed')],
         });
         return;
@@ -149,8 +159,13 @@ export function createListAddOverwriteButtonHandler({
     } catch (err) {
       console.error('[list] Overwrite failed:', err.message);
       await interaction.editReply({
-        content: `⚠️ Overwrite failed: \`${err.message}\``,
-        embeds: [],
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Overwrite Failed',
+          description: 'Could not overwrite the existing entry.',
+          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        })],
         components: [buildApprovalResultRow('Failed')],
       });
     }

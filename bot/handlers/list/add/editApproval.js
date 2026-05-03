@@ -1,6 +1,7 @@
 import PendingApproval from '../../../models/PendingApproval.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -25,7 +26,12 @@ export async function handleApprovedEditRequest({
   if (!existingEntry) {
     await PendingApproval.deleteOne({ requestId });
     await interaction.editReply({
-      content: `⚠️ Original entry no longer exists — it may have been removed.`,
+      content: '',
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        title: 'Original Entry Missing',
+        description: 'The entry referenced by this approval request no longer exists - it may have been removed.',
+      })],
       components: [buildApprovalResultRow('Failed')],
     });
     return;
@@ -52,7 +58,13 @@ export async function handleApprovedEditRequest({
     if (targetDupe) {
       await PendingApproval.deleteOne({ requestId });
       await interaction.editReply({
-        content: `⚠️ **${existingEntry.name}** already exists in target list. Edit aborted.`,
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Move Blocked',
+          description: `**${existingEntry.name}** already exists in the target list. Edit aborted.`,
+          footer: 'Remove the conflicting target entry first, then resubmit.',
+        })],
         components: [buildApprovalResultRow('Failed')],
       });
       return;
@@ -66,7 +78,7 @@ export async function handleApprovedEditRequest({
       if (trustedNow) {
         await PendingApproval.deleteOne({ requestId });
         await interaction.editReply({
-          content: `🛡️ **${existingEntry.name}** is now a trusted user — cannot be added to any list.`,
+          content: '',
           embeds: [buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason)],
           components: [buildApprovalResultRow('Blocked')],
         });
@@ -138,7 +150,13 @@ export async function handleApprovedEditRequest({
         if (err.code === 11000 && updateFields.scope) {
           await PendingApproval.deleteOne({ requestId });
           await interaction.editReply({
-            content: `⚠️ Cannot apply scope change: another entry with this name already occupies the target scope. Approval aborted.`,
+            content: '',
+            embeds: [buildAlertEmbed({
+              severity: AlertSeverity.WARNING,
+              title: 'Scope Change Raced',
+              description: 'Another entry with this name claimed the target scope between approval and persist. Approval aborted.',
+              footer: 'Resubmit the edit, or remove the conflicting entry first.',
+            })],
             components: [buildApprovalResultRow('Failed')],
           });
           return;
