@@ -27,6 +27,10 @@ import { connectDB } from './bot/db.js';
 import Blacklist from './bot/models/Blacklist.js';
 import RosterCache from './bot/models/RosterCache.js';
 import { getClassAutocompleteChoices } from './bot/models/Class.js';
+import {
+  isLegacyCommandName,
+  getLegacyDeprecationBanner,
+} from './bot/utils/deprecation.js';
 
 const client = new Client({
   intents: [
@@ -237,6 +241,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // with Discord during the soft-deprecation window so existing user
   // habit (`/status`, `/la-list add`, `/lahelp`, etc.) keeps working
   // while the new names take over the autocomplete grouping under `/la`.
+  //
+  // Phase 4b: when the user invoked the legacy name we send a one-line
+  // ephemeral followUp pointing at the modern name + cutover date.
+  // The followUp fires after the handler responds (success or error)
+  // so it never races with the primary reply.
+  const usedLegacyName = isLegacyCommandName(commandName);
   try {
     if (commandName === 'status' || commandName === 'la-status') {
       await systemHandlers.handleStatusCommand(interaction);
@@ -645,6 +655,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.editReply(reply).catch(() => {});
     } else {
       await interaction.reply(reply).catch(() => {});
+    }
+  } finally {
+    // Phase 4b deprecation banner. Fired only when the user invoked a
+    // legacy name. We use followUp (not a content prefix) so handlers
+    // stay untouched and the banner shape is uniform across every
+    // command, regardless of whether the handler replied with content,
+    // embeds, files, or all three.
+    if (usedLegacyName) {
+      const banner = getLegacyDeprecationBanner(interaction);
+      if (banner && (interaction.replied || interaction.deferred)) {
+        await interaction
+          .followUp({ content: banner, ephemeral: true })
+          .catch((err) => {
+            console.warn(
+              `[bot] Failed to send deprecation banner for /${commandName}:`,
+              err.message
+            );
+          });
+      }
     }
   }
 });
