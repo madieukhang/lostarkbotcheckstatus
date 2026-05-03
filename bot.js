@@ -149,7 +149,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  // /list multiadd preview Confirm/Cancel buttons
+  // /la-list multiadd preview Confirm/Cancel buttons
   if (
     interaction.isButton() &&
     (interaction.customId.startsWith('multiadd_confirm:') || interaction.customId.startsWith('multiadd_cancel:'))
@@ -167,7 +167,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  // /list multiadd bulk approval buttons (DM to Senior)
+  // /la-list multiadd bulk approval buttons (DM to Senior)
   if (
     interaction.isButton() &&
     (interaction.customId.startsWith('multiaddapprove_approve:') ||
@@ -213,7 +213,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.isAutocomplete()) {
     try {
-      if (interaction.commandName === 'search') {
+      if (interaction.commandName === 'search' || interaction.commandName === 'la-search') {
         const focused = interaction.options.getFocused(true);
         if (focused?.name === 'class') {
           await interaction.respond(getClassAutocompleteChoices(focused.value));
@@ -232,16 +232,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   const { commandName } = interaction;
 
+  // Phase 4 alias map: each legacy slash-command name routes to the
+  // same handler as its `la-` prefixed twin. Both names are registered
+  // with Discord during the soft-deprecation window so existing user
+  // habit (`/status`, `/la-list add`, `/lahelp`, etc.) keeps working
+  // while the new names take over the autocomplete grouping under `/la`.
   try {
-    if (commandName === 'status') {
+    if (commandName === 'status' || commandName === 'la-status') {
       await systemHandlers.handleStatusCommand(interaction);
-    } else if (commandName === 'reset') {
+    } else if (commandName === 'reset' || commandName === 'la-reset') {
       await systemHandlers.handleResetCommand(interaction);
-    } else if (commandName === 'roster') {
+    } else if (commandName === 'roster' || commandName === 'la-roster') {
       await handleRosterCommand(interaction);
-    } else if (commandName === 'search') {
+    } else if (commandName === 'search' || commandName === 'la-search') {
       await handleSearchCommand(interaction);
-    } else if (commandName === 'list') {
+    } else if (commandName === 'list' || commandName === 'la-list') {
       const subcommand = interaction.options.getSubcommand();
       if (subcommand === 'add') {
         await listHandlers.handleListAddCommand(interaction);
@@ -258,65 +263,67 @@ client.on(Events.InteractionCreate, async (interaction) => {
       } else if (subcommand === 'enrich') {
         await listHandlers.handleListEnrichCommand(interaction);
       }
-    } else if (commandName === 'listcheck') {
+    } else if (commandName === 'listcheck' || commandName === 'la-check') {
       await listHandlers.handleListCheckCommand(interaction);
-    } else if (commandName === 'lastats') {
+    } else if (commandName === 'lastats' || commandName === 'la-stats') {
       await handleStatsCommand(interaction);
-    } else if (commandName === 'lasetup') {
+    } else if (commandName === 'lasetup' || commandName === 'la-setup') {
       await handleSetupCommand(interaction);
-    } else if (commandName === 'laremote') {
+    } else if (commandName === 'laremote' || commandName === 'la-remote') {
       await handleSetupRemoteCommand(interaction);
-    } else if (commandName === 'lahelp') {
+    } else if (commandName === 'lahelp' || commandName === 'la-help') {
       const lang = interaction.options.getString('lang') || 'en';
 
       const helpLines = lang === 'vn' ? [
         '**📋 Danh sách lệnh:**',
+        '*(Tên cũ `/status`, `/la-list add`, `/lahelp` ... vẫn dùng được trong giai đoạn chuyển tiếp 2 tuần. Dùng tên mới `/la-...` để Discord gom hết command bot vào nhóm `/la`.)*',
         '',
-        '`/status` — Xem trạng thái server Lost Ark',
-        '`/reset` — Reset trạng thái đã lưu',
+        '`/la-status` — Xem trạng thái server Lost Ark',
+        '`/la-reset` — Reset trạng thái đã lưu',
         '',
-        '`/roster tên [deep]` — Tra cứu roster + theo dõi ilvl. `deep:true` quét alt qua Stronghold',
-        '`/search tên [min_ilvl] [max_ilvl] [class]` — Tìm tên tương tự với bộ lọc',
+        '`/la-roster tên [deep]` — Tra cứu roster + theo dõi ilvl. `deep:true` quét alt qua Stronghold',
+        '`/la-search tên [min_ilvl] [max_ilvl] [class]` — Tìm tên tương tự với bộ lọc',
         '',
-        '`/list add type tên lý_do [raid] [logs] [image] [scope]` — Thêm vào blacklist/whitelist/watchlist. Scope: global/server (chỉ blacklist)',
-        '`/list edit tên [reason] [type] [raid] [logs] [image] [scope]` — Sửa entry đã có. Scope chỉ áp dụng cho blacklist (promote/demote local↔global)',
-        '`/list remove tên` — Xoá entry khỏi danh sách',
-        '`/list view type [scope]` — Xem danh sách (type: all/black/white/watch/trusted, scope: all/global/server)',
-        '`/list trust action tên [reason]` — Quản lý danh sách uy tín (add/remove, chỉ officer)',
-        '`/list enrich tên [deep_limit]` — 🔍 Stronghold deep-scan entry đã có và append alts khám phá được (officer only, ~5-7 phút)',
-        '`/list multiadd action [file]` — 📦 **Bulk add** qua Excel template (xem chi tiết ở dưới)',
+        '`/la-list add type tên lý_do [raid] [logs] [image] [scope]` — Thêm vào blacklist/whitelist/watchlist. Scope: global/server (chỉ blacklist)',
+        '`/la-list edit tên [reason] [type] [raid] [logs] [image] [scope]` — Sửa entry đã có. Scope chỉ áp dụng cho blacklist (promote/demote local↔global)',
+        '`/la-list remove tên` — Xoá entry khỏi danh sách',
+        '`/la-list view type [scope]` — Xem danh sách (type: all/black/white/watch/trusted, scope: all/global/server)',
+        '`/la-list trust action tên [reason]` — Quản lý danh sách uy tín (add/remove, chỉ officer)',
+        '`/la-list enrich tên [deep_limit]` — 🔍 Stronghold deep-scan entry đã có và append alts khám phá được (officer only, ~5-7 phút)',
+        '`/la-list multiadd action [file]` — 📦 **Bulk add** qua Excel template (xem chi tiết ở dưới)',
         '',
-        '`/listcheck image` — Trích tên từ ảnh chụp, kiểm tra với tất cả danh sách',
+        '`/la-check image` — Trích tên từ ảnh chụp, kiểm tra với tất cả danh sách',
         '',
-        '`/lasetup autochannel #channel` — Đặt kênh tự động kiểm tra ảnh',
-        '`/lasetup notifychannel #channel` — Đặt kênh nhận thông báo',
-        '`/lasetup view` — Xem cấu hình hiện tại',
-        '`/lasetup off` — Bật/tắt nhận thông báo từ server khác',
-        '`/lasetup defaultscope global/server` — Đặt scope mặc định cho blacklist',
+        '`/la-setup autochannel #channel` — Đặt kênh tự động kiểm tra ảnh',
+        '`/la-setup notifychannel #channel` — Đặt kênh nhận thông báo',
+        '`/la-setup view` — Xem cấu hình hiện tại',
+        '`/la-setup off` — Bật/tắt nhận thông báo từ server khác',
+        '`/la-setup defaultscope global/server` — Đặt scope mặc định cho blacklist',
       ] : [
         '**📋 Available Commands:**',
+        '*(Legacy names like `/status`, `/la-list add`, `/lahelp` still work during the 2-week transition window. Use the new `/la-...` names so Discord groups every bot command under `/la` autocomplete.)*',
         '',
-        '`/status` — Show live server status for all monitored servers',
-        '`/reset` — Reset the stored status state',
+        '`/la-status` — Show live server status for all monitored servers',
+        '`/la-reset` — Reset the stored status state',
         '',
-        '`/roster name [deep]` — Fetch roster + progression tracking + list check. `deep:true` for Stronghold alt scan',
-        '`/search name [min_ilvl] [max_ilvl] [class]` — Search similar names with filters',
+        '`/la-roster name [deep]` — Fetch roster + progression tracking + list check. `deep:true` for Stronghold alt scan',
+        '`/la-search name [min_ilvl] [max_ilvl] [class]` — Search similar names with filters',
         '',
-        '`/list add type name reason [raid] [logs] [image] [scope]` — Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only)',
-        '`/list edit name [reason] [type] [raid] [logs] [image] [scope]` — Edit an existing entry. Scope only applies to blacklist (promote/demote local↔global)',
-        '`/list remove name` — Remove an entry from a list',
-        '`/list view type [scope]` — View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
-        '`/list trust action name [reason]` — Manage trusted list (add/remove, officer only)',
-        '`/list enrich name [deep_limit]` — 🔍 Stronghold deep-scan an existing entry and append discovered alts (officer only, ~5-7 min)',
-        '`/list multiadd action [file]` — 📦 **Bulk add** via Excel template (see details below)',
+        '`/la-list add type name reason [raid] [logs] [image] [scope]` — Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only)',
+        '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope]` — Edit an existing entry. Scope only applies to blacklist (promote/demote local↔global)',
+        '`/la-list remove name` — Remove an entry from a list',
+        '`/la-list view type [scope]` — View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
+        '`/la-list trust action name [reason]` — Manage trusted list (add/remove, officer only)',
+        '`/la-list enrich name [deep_limit]` — 🔍 Stronghold deep-scan an existing entry and append discovered alts (officer only, ~5-7 min)',
+        '`/la-list multiadd action [file]` — 📦 **Bulk add** via Excel template (see details below)',
         '',
-        '`/listcheck image` — Check names from screenshot against all lists',
+        '`/la-check image` — Check names from screenshot against all lists',
         '',
-        '`/lasetup autochannel #channel` — Set auto-check channel for this server',
-        '`/lasetup notifychannel #channel` — Set notification channel for this server',
-        '`/lasetup view` — View current channel configuration',
-        '`/lasetup off` — Toggle global list notifications on/off',
-        '`/lasetup defaultscope global/server` — Set default blacklist scope for /list add',
+        '`/la-setup autochannel #channel` — Set auto-check channel for this server',
+        '`/la-setup notifychannel #channel` — Set notification channel for this server',
+        '`/la-setup view` — View current channel configuration',
+        '`/la-setup off` — Toggle global list notifications on/off',
+        '`/la-setup defaultscope global/server` — Set default blacklist scope for /la-list add',
       ];
 
       // Owner-only commands — only show in owner server
@@ -324,37 +331,37 @@ client.on(Events.InteractionCreate, async (interaction) => {
         helpLines.push(
           '',
           lang === 'vn' ? '**🛰️ Chỉ Owner Server:**' : '**🛰️ Owner Server Only:**',
-          '`/lastats` — ' + (lang === 'vn' ? 'Thống kê bot' : 'Show bot usage statistics'),
-          '`/laremote action [guild] [scope] [channel]` — ' + (lang === 'vn'
+          '`/la-stats` — ' + (lang === 'vn' ? 'Thống kê bot' : 'Show bot usage statistics'),
+          '`/la-remote action [guild] [scope] [channel]` — ' + (lang === 'vn'
             ? 'Senior: điều khiển config từ xa (view / off / defaultscope / evidencechannel / syncimages)'
             : 'Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)'),
-          '`/laremote action:evidencechannel channel:#...` — ' + (lang === 'vn'
+          '`/la-remote action:evidencechannel channel:#...` — ' + (lang === 'vn'
             ? 'Đặt kênh lưu ảnh evidence (bot rehost vào đây để tránh CDN expire ~24h)'
             : 'Set evidence storage channel (bot rehosts here to defeat CDN ~24h expiry)'),
-          '`/laremote action:syncimages` — ' + (lang === 'vn'
+          '`/la-remote action:syncimages` — ' + (lang === 'vn'
             ? 'Migrate ảnh legacy (pre-v0.5.2) sang rehost storage. Cần set `evidencechannel` trước. Idempotent. Xem chi tiết flow ở dưới'
             : 'Migrate legacy (pre-v0.5.2) images to rehost storage. Requires `evidencechannel` set first. Idempotent. See detailed flow below'),
         );
       }
 
-      // Detailed /list multiadd embed — separate from the main command list
+      // Detailed /la-list multiadd embed — separate from the main command list
       // because this feature has a multi-step flow that needs more explanation
       // than a one-liner. See CHANGELOG v0.5.1 for the feature spec.
       const multiaddEmbed = lang === 'vn'
         ? new EmbedBuilder()
-            .setTitle('📦 /list multiadd — Bulk Add qua Excel')
+            .setTitle('📦 /la-list multiadd — Bulk Add qua Excel')
             .setDescription(
               'Thêm **tối đa 30 entries** cùng lúc vào blacklist/whitelist/watchlist ' +
-                'bằng 1 file Excel, thay vì gõ `/list add` từng người một.'
+                'bằng 1 file Excel, thay vì gõ `/la-list add` từng người một.'
             )
             .setColor(0x5865f2)
             .addFields(
               {
                 name: '📥 Cách sử dụng (4 bước)',
                 value: [
-                  '**1.** `/list multiadd action:template` → Bot gửi file template trắng',
+                  '**1.** `/la-list multiadd action:template` → Bot gửi file template trắng',
                   '**2.** Mở file Excel, xoá dòng ví dụ màu vàng, điền data (tối đa 30 dòng)',
-                  '**3.** `/list multiadd action:file file:<file của bạn>` → Bot hiển thị preview',
+                  '**3.** `/la-list multiadd action:file file:<file của bạn>` → Bot hiển thị preview',
                   '**4.** Click **✅ Confirm** để add, hoặc **✖️ Cancel** để huỷ',
                 ].join('\n'),
                 inline: false,
@@ -387,7 +394,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                   '• Tối đa **30 rows** mỗi file',
                   '• File size ≤ **1 MB**, chỉ `.xlsx`',
                   '• Preview hết hạn sau **5 phút**',
-                  '• Tái sử dụng luật của `/list add`: ilvl ≥ 1700, trusted bị skip, duplicate check',
+                  '• Tái sử dụng luật của `/la-list add`: ilvl ≥ 1700, trusted bị skip, duplicate check',
                   '• Rows lỗi được liệt kê ở preview nhưng **không block** các row valid',
                   '• Duplicate trong cùng file (case-insensitive) sẽ bị reject',
                 ].join('\n'),
@@ -415,19 +422,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
             )
             .setFooter({ text: 'Phần chi tiết riêng — các lệnh khác ở trên' })
         : new EmbedBuilder()
-            .setTitle('📦 /list multiadd — Bulk Add via Excel')
+            .setTitle('📦 /la-list multiadd — Bulk Add via Excel')
             .setDescription(
               'Add **up to 30 entries** at once to blacklist/whitelist/watchlist ' +
-                'via a single Excel file, instead of running `/list add` one at a time.'
+                'via a single Excel file, instead of running `/la-list add` one at a time.'
             )
             .setColor(0x5865f2)
             .addFields(
               {
                 name: '📥 How to use (4 steps)',
                 value: [
-                  '**1.** `/list multiadd action:template` → Bot sends a blank template file',
+                  '**1.** `/la-list multiadd action:template` → Bot sends a blank template file',
                   '**2.** Open in Excel, delete the yellow example row, fill in up to 30 rows',
-                  '**3.** `/list multiadd action:file file:<your file>` → Bot shows a preview',
+                  '**3.** `/la-list multiadd action:file file:<your file>` → Bot shows a preview',
                   '**4.** Click **✅ Confirm** to proceed, or **✖️ Cancel** to abort',
                 ].join('\n'),
                 inline: false,
@@ -460,7 +467,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                   '• Max **30 rows** per file',
                   '• File size ≤ **1 MB**, `.xlsx` only',
                   '• Preview expires after **5 minutes**',
-                  '• Reuses `/list add` rules: ilvl ≥ 1700, trusted users skipped, duplicate check',
+                  '• Reuses `/la-list add` rules: ilvl ≥ 1700, trusted users skipped, duplicate check',
                   '• Failed rows listed in preview but **do not block** valid rows',
                   '• Duplicate names within the same file (case-insensitive) are rejected',
                 ].join('\n'),
@@ -488,7 +495,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             )
             .setFooter({ text: 'Detailed section — see the main command list above' });
 
-      // Detailed /laremote action:syncimages embed — only shown when the user
+      // Detailed /la-remote action:syncimages embed — only shown when the user
       // is in the owner guild (since the command is Senior-only). Mirrors the
       // multiaddEmbed pattern: dedicated explanation for a complex one-shot
       // operation that has prerequisites and side effects worth understanding
@@ -497,7 +504,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const syncImagesEmbed = isOwnerGuild
         ? (lang === 'vn'
             ? new EmbedBuilder()
-                .setTitle('🔄 /laremote action:syncimages — Migrate ảnh legacy')
+                .setTitle('🔄 /la-remote action:syncimages — Migrate ảnh legacy')
                 .setDescription(
                   'One-shot migration cho **entries cũ** có ảnh được lưu dạng URL trực tiếp ' +
                     '(trước v0.5.2 rehost). Bot tải lại ảnh và upload vào evidence channel ' +
@@ -508,9 +515,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
                   {
                     name: '✅ Prerequisites',
                     value: [
-                      '**1.** `/laremote action:evidencechannel channel:#...` đã được set',
+                      '**1.** `/la-remote action:evidencechannel channel:#...` đã được set',
                       '**2.** Bot có quyền `Send Messages` + `Attach Files` trong channel đó',
-                      '**3.** Senior account chạy lệnh (chỉ Senior mới có quyền `/laremote`)',
+                      '**3.** Senior account chạy lệnh (chỉ Senior mới có quyền `/la-remote`)',
                     ].join('\n'),
                     inline: false,
                   },
@@ -558,7 +565,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 )
                 .setFooter({ text: 'Owner-only · added v0.5.7, race-safe + external URL handling v0.5.8' })
             : new EmbedBuilder()
-                .setTitle('🔄 /laremote action:syncimages — Legacy Image Migration')
+                .setTitle('🔄 /la-remote action:syncimages — Legacy Image Migration')
                 .setDescription(
                   'One-shot migration for **legacy entries** whose evidence is stored as a ' +
                     'direct URL (created before v0.5.2 rehost). Bot re-downloads each image ' +
@@ -569,9 +576,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
                   {
                     name: '✅ Prerequisites',
                     value: [
-                      '**1.** `/laremote action:evidencechannel channel:#...` already set',
+                      '**1.** `/la-remote action:evidencechannel channel:#...` already set',
                       '**2.** Bot has `Send Messages` + `Attach Files` permission in that channel',
-                      '**3.** Run from a Senior account (only Senior has `/laremote` permission)',
+                      '**3.** Run from a Senior account (only Senior has `/la-remote` permission)',
                     ].join('\n'),
                     inline: false,
                   },

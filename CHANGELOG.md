@@ -4,6 +4,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.28] - 2026-05-03
+
+### Changed
+- Phase 4a (Direction D rollout): every slash command is now registered with both its legacy name and its `la-` prefixed twin. `/status` + `/la-status`, `/list` + `/la-list`, `/lahelp` + `/la-help`, etc. - both invocations route to the same handler in `bot.js`. Soft-deprecation window: 2 weeks before the legacy aliases come out (Phase 4c).
+- `bot/commands.js` refactored: each command is now a builder function that takes a name; `PUBLIC_COMMAND_DEFS` and `OWNER_COMMAND_DEFS` arrays drive the dual-registration loop. No behavior change in the handlers themselves.
+- `/lahelp` and `/la-help` text rewritten to surface the new names with a one-line transition notice. Legacy names still work; the help text shows the new names so users learn the new mental model first.
+- `.gitignore` adds `docs/` per Traine - design docs stay outside the Railway deploy artifact. The existing `phase4-command-surface-refactor.md` is untracked but kept locally.
+
 ## [v0.5.27] - 2026-05-03
 
 ### Docs
