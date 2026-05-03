@@ -3,7 +3,7 @@
  *
  * Generic in-progress embed for long-running stronghold deep scans.
  * Used by /la-list enrich and /la-roster deep:true so the officer can
- * watch the worker through a 5-7 minute candidate fan-out instead of
+ * watch the worker through a 10-15 minute candidate fan-out instead of
  * staring at a static "Running scan..." line.
  *
  * Caller is responsible for throttling editReply calls; Discord webhook

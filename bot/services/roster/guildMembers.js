@@ -46,8 +46,7 @@ async function fetchGuildMembersUncached(name, options = {}) {
   try {
     const jsonUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild/__data.json`;
     const htmlUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild`;
-    const fetchOptions = buildBibleFetchOptions(options);
-    const res = await fetchWithFallback(jsonUrl, fetchOptions);
+    const res = await fetchWithFallback(jsonUrl, buildBibleFetchOptions(options));
     if (res.ok) {
       try {
         const parsed = await res.json();
@@ -79,7 +78,7 @@ async function fetchGuildMembersUncached(name, options = {}) {
       }
     }
 
-    const htmlRes = await fetchWithFallback(htmlUrl, fetchOptions);
+    const htmlRes = await fetchWithFallback(htmlUrl, buildBibleFetchOptions(options));
     if (!htmlRes.ok) return [];
     const html = await htmlRes.text();
     return parseGuildMembersFromHtml(html);

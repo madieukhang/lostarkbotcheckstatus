@@ -8,8 +8,8 @@
  *
  * Why this is a separate command:
  *   - `/la-list add` is on the user-facing fast path and must reply within
- *     Discord's 3s defer budget. Stronghold deep scans take 5-7 minutes
- *     in production with the new cap (300) and concurrency (3).
+ *     Discord's 3s defer budget. Stronghold deep scans take ~10-15 minutes
+ *     in production with the gentle cap-300 scan profile.
  *   - Most adds do not need a deep scan: visible-roster characters
  *     return their full alt list directly via the roster scrape.
  *   - The blacklist edge case (target griefed under one alt, has more)
@@ -63,7 +63,7 @@ import {
 
 // Discord webhook edits are rate-limited (5 per 5s). Throttle progress
 // updates so the scan worker isn't bottlenecked on Discord; 30s gives
-// ~10-14 updates over a 5-7 minute scan, plenty for live signal.
+// ~10-30 updates over a 10-15 minute scan, plenty for live signal.
 const PROGRESS_EDIT_THROTTLE_MS = 30 * 1000;
 
 export function createEnrichHandlers({ client, services }) {

@@ -4,6 +4,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.45] - 2026-05-03
+
+### Changed
+- `/la-list view` paginated browse and `/la-list view type:trusted` redesigned for breathing room and visual hierarchy. Replaced the cramped one-line-per-entry description with a two-line layout:
+  - **Line 1**: position number, list-type icon, name (linked to lostark.bible roster), scope tag in code-style brackets.
+  - **Line 2** (`└ ` tree-prefixed): reason (truncated to 80 chars), raid in code-style backticks, relative-time, evidence link (when present).
+  - Empty line between entries so the page reads more like a card stack than a wall of text.
+  - Header line at top of description shows `Showing N of M entries · page X / Y` so users get context without hunting in the footer.
+- Pagination row now adds a non-clickable middle button showing the page indicator (`X / Y`) so it reads at a glance even when the embed has scrolled. Previous + Next buttons gain icon glyphs from `ICONS` instead of inline arrow chars.
+- Expired-session row reads `Session expired · re-run /la-list view` on the disabled middle button so the user knows what to do, instead of just two greyed-out arrows.
+- `buildEvidenceEmbed` adds the entry's roster URL as the embed URL (clickable title) and uses inline `Raid · List · Added` fields for a cleaner card.
+- All inline hex colors removed; uses `COLORS.trustedSoft` for the trusted list embed and `COLORS.info` for the all-lists view.
+
+### Notes
+- Description hard-cap at 4096 chars enforced via `.slice(0, 4096)`. With 10 entries × ~200 chars/entry the typical page is ~2000 chars, well clear.
+- 42/42 tests pass.
+
 ## [v0.5.44] - 2026-05-03
 
 ### Changed
