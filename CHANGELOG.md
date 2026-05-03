@@ -4,6 +4,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.25] - 2026-05-03
+
+### Added
+- `bot/utils/metaCache.js`: in-memory LRU+TTL cache for `fetchCharacterMeta` results. 30-min TTL, 5000-entry cap, LRU eviction on overflow. Successful meta is cached, transient failures (null) are not so a 429 outage cannot pin itself into the store. Tunable via `META_CACHE_TTL_MS` and `META_CACHE_MAX_SIZE`.
+- Adaptive backoff inside the alt-detect `scanWorker`. Shared per-scan delay starts at 300ms, grows by 500ms on every transient failure up to 3000ms, shrinks by 100ms on every success back to the floor. All workers see the same delay so bible heat slows them down together. Tunable via `SCAN_BACKOFF_MIN_MS` and `SCAN_BACKOFF_MAX_MS`.
+
+### Changed
+- `fetchCharacterMeta` now consults the meta cache before fetching and stores successful results back. Callers can opt out with `useCache: false` (e.g. force-refresh paths). Back-to-back `/roster deep` and the upcoming `/list enrich` will hit warm cache instead of refetching the same 300 candidates.
+- Deep-scan progress log now reports the current backoff value so operators can see bible heat in real time (`backoff 1800ms` next to the failed/alts counters).
+
 ## [v0.5.24] - 2026-05-03
 
 ### Changed

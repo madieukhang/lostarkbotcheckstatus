@@ -157,6 +157,29 @@ const config = {
   strongholdDeepCandidateLimit: parsePositiveIntEnv('STRONGHOLD_DEEP_CANDIDATE_LIMIT', 300),
   strongholdDeepConcurrency: parsePositiveIntEnv('STRONGHOLD_DEEP_CONCURRENCY', 3),
   strongholdDeepCandidateTimeoutMs: parsePositiveIntEnv('STRONGHOLD_DEEP_CANDIDATE_TIMEOUT_MS', 8000),
+
+  /**
+   * In-memory meta cache for fetchCharacterMeta results. Stronghold +
+   * rosterLevel are roster-account properties that drift on the order
+   * of days, so a 30-minute TTL is well below their natural change
+   * cadence while still letting back-to-back /roster deep + /list
+   * enrich invocations hit warm cache. Max-size cap is a memory guard;
+   * 5000 entries at ~200 bytes each is ~1 MB.
+   */
+  metaCacheTtlMs: parsePositiveIntEnv('META_CACHE_TTL_MS', 30 * 60 * 1000),
+  metaCacheMaxSize: parsePositiveIntEnv('META_CACHE_MAX_SIZE', 5000),
+
+  /**
+   * Adaptive backoff bounds for the deep-scan worker. The worker has
+   * no built-in throttle; it relied entirely on concurrency reduction
+   * to avoid bible 429s. Adaptive backoff adds a self-regulating per-
+   * worker pause: starts at 300ms, grows by 500ms on every null
+   * (transient failure) up to the max, shrinks by 100ms on every
+   * success back to the floor. Shared across the workers in one scan
+   * so all of them slow down together when bible heats up.
+   */
+  scanBackoffMinMs: parsePositiveIntEnv('SCAN_BACKOFF_MIN_MS', 300),
+  scanBackoffMaxMs: parsePositiveIntEnv('SCAN_BACKOFF_MAX_MS', 3000),
   strongholdDeepUseScraperApi: parseBooleanEnv('STRONGHOLD_DEEP_USE_SCRAPERAPI', false),
 
   /** Lost Ark server status page URL */
