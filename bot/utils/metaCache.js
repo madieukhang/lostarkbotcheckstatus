@@ -12,7 +12,7 @@
  *   change on the order of days, so a 30-minute TTL is well within
  *   their natural drift.
  *
- *   The /list enrich flow (Phase 3) will reuse the same cache so a
+ *   The /la-list enrich flow will reuse the same cache so a
  *   user who runs /la-list enrich right after /la-roster deep gets near-
  *   instant resolution instead of paying the per-candidate fetch
  *   tax twice in a row.

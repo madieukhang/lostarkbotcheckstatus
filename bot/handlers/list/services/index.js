@@ -1,7 +1,7 @@
 /**
  * services.js
  *
- * Shared closure services used by every /list * command handler. All
+ * Shared closure services used by every /la-list * command handler. All
  * functions close over the Discord `client`, so they live in a factory
  * that takes `{ client }` and returns the service object.
  *

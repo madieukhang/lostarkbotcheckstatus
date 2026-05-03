@@ -1,6 +1,6 @@
 /**
  * helpers.js
- * Pure helpers shared across the /list * command handlers. None of these
+ * Pure helpers shared across the /la-list * command handlers. None of these
  * functions close over the Discord client, so they live outside the
  * createListHandlers factory.
  */
