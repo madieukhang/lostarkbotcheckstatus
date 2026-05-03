@@ -3,6 +3,7 @@ import { EmbedBuilder } from 'discord.js';
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
+import { COLORS } from '../../../utils/ui.js';
 import {
   getSeniorApproverIds,
   isOfficerOrSenior,
@@ -194,7 +195,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
           `Your bulk add of **${pending.rows.length} rows** has been sent to Senior for approval.\n\n` +
             `You'll be notified in this channel when the decision is made.`
         )
-        .setColor(0xfee75c)
+        .setColor(COLORS.warning)
         .setFooter({ text: `Request ID: ${requestId.slice(0, 8)}` })
         .setTimestamp();
 

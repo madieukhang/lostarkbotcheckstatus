@@ -4,6 +4,7 @@ import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
+import { COLORS } from '../../utils/ui.js';
 import { handleSyncImagesAction } from './syncImages.js';
 /**
  * Handle /la-remote — Senior-only remote config management
@@ -36,7 +37,7 @@ export async function handleSetupRemoteCommand(interaction) {
 
     if (allGuilds.length === 0) {
       await interaction.editReply({ embeds: [
-        new EmbedBuilder().setTitle('🛰️ Remote Control — Dashboard').setDescription('*Bot is not in any server.*').setColor(0x95a5a6),
+        new EmbedBuilder().setTitle('🛰️ Remote Control — Dashboard').setDescription('*Bot is not in any server.*').setColor(COLORS.greyDark),
       ] });
       return;
     }
@@ -63,7 +64,7 @@ export async function handleSetupRemoteCommand(interaction) {
           { name: '🕐 Last Updated', value: updated, inline: true },
           { name: '👤 Updated By', value: gc?.updatedByTag || '—', inline: true },
         )
-        .setColor(isOwner ? 0xf1c40f : gc ? 0x5865f2 : 0x95a5a6);
+        .setColor(isOwner ? COLORS.gold : gc ? COLORS.info : COLORS.greyDark);
 
       // Bot-wide settings only shown on owner guild card
       if (isOwner) {
@@ -188,7 +189,7 @@ export async function handleSetupRemoteCommand(interaction) {
         { name: 'Channel ID', value: `\`${channelOpt.id}\``, inline: true },
         { name: 'Server', value: channelOpt.guild?.name || '*Unknown*', inline: true },
       )
-      .setColor(0x5865f2)
+      .setColor(COLORS.info)
       .setFooter({ text: `Set by ${interaction.user.tag} · bot-wide setting` })
       .setTimestamp();
 
@@ -214,7 +215,7 @@ export async function handleSetupRemoteCommand(interaction) {
         { name: 'Set evidence channel', value: '`/la-remote action:evidencechannel channel:#...`', inline: false },
         { name: 'Sync legacy images', value: '`/la-remote action:syncimages` (no guild ID needed)', inline: false },
       )
-      .setColor(0xed4245);
+      .setColor(COLORS.danger);
     await interaction.editReply({ embeds: [helpEmbed] });
     return;
   }
@@ -225,7 +226,7 @@ export async function handleSetupRemoteCommand(interaction) {
     const embed = new EmbedBuilder()
       .setTitle('❌ Guild Not Found')
       .setDescription(`Bot is not in a server with ID \`${targetGuildId}\`.\nUse \`action:view\` to see valid guild IDs.`)
-      .setColor(0xed4245);
+      .setColor(COLORS.danger);
     await interaction.editReply({ embeds: [embed] });
     return;
   }

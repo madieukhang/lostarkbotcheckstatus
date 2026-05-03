@@ -10,6 +10,7 @@ import {
   buildMultiaddTemplate,
   MULTIADD_MAX_ROWS,
 } from '../../../services/multiaddTemplateService.js';
+import { COLORS } from '../../../utils/ui.js';
 
 export async function buildTemplateReply() {
   const buffer = await buildMultiaddTemplate();
@@ -24,7 +25,7 @@ export async function buildTemplateReply() {
       `Fill in up to **${MULTIADD_MAX_ROWS} rows**, then upload via:\n` +
         '`/la-list multiadd action:file file:<your.xlsx>`'
     )
-    .setColor(0x5865f2)
+    .setColor(COLORS.info)
     .addFields(
       {
         name: '✅ Required Columns',
@@ -65,7 +66,7 @@ export function buildNoValidRowsEmbed(errors) {
         ? errors.slice(0, 15).join('\n').slice(0, 4000)
         : 'The file appears to be empty or has no data rows.'
     )
-    .setColor(0xed4245)
+    .setColor(COLORS.danger)
     .setFooter({ text: 'Fix the errors and re-upload.' });
 }
 
@@ -88,7 +89,7 @@ export function buildPreviewReply(parsed, requestId) {
   const previewEmbed = new EmbedBuilder()
     .setTitle(`📋 Bulk Add Preview — ${parsed.rows.length} valid row${parsed.rows.length === 1 ? '' : 's'}`)
     .setDescription(previewLines.join('\n').slice(0, 4000))
-    .setColor(0x5865f2)
+    .setColor(COLORS.info)
     .setFooter({
       text:
         parsed.errors.length > 0

@@ -1,6 +1,7 @@
 import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
 
 import config from '../../config.js';
+import { COLORS } from '../../utils/ui.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
@@ -127,7 +128,7 @@ async function sendProgress(interaction, current, total, stats) {
           { name: '🔀 Raced', value: String(stats.skippedRaced), inline: true },
           { name: '❌ Failed', value: String(stats.failed), inline: true },
         )
-        .setColor(0xfee75c)
+        .setColor(COLORS.warning)
         .setTimestamp(),
     ],
   }).catch(() => {});
@@ -136,8 +137,8 @@ async function sendProgress(interaction, current, total, stats) {
 function buildSummaryPayload(interaction, total, stats) {
   const summaryColor =
     stats.failed > 0 || stats.skippedDead > 0 || stats.skippedRaced > 0
-      ? 0xfee75c
-      : 0x2ecc71;
+      ? COLORS.warning
+      : COLORS.success;
 
   const summaryEmbed = new EmbedBuilder()
     .setTitle('✅ Sync Images — Complete')
@@ -233,7 +234,7 @@ export async function handleSyncImagesAction(interaction) {
           { name: 'Whitelist', value: String(whiteLegacy.length), inline: true },
           { name: 'Watchlist', value: String(watchLegacy.length), inline: true },
         )
-        .setColor(0xfee75c)
+        .setColor(COLORS.warning)
         .setFooter({ text: 'Each entry: refresh URL → download → rehost. ~1-2s per entry.' })
         .setTimestamp(),
     ],

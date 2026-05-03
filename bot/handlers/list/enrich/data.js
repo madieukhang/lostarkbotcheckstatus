@@ -1,13 +1,18 @@
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
+import { COLORS } from '../../../utils/ui.js';
 
 const COLLATION = { locale: 'en', strength: 2 };
 
+// Note: watchlist uses 👁️ (not the canonical ⚠️ from getListContext) on
+// purpose - the enrich UI emphasises the "under observation" aspect of
+// watch entries since enrich-discovered alts are often the reason an
+// entry gets watched in the first place.
 export const LIST_LABELS = {
-  black: { label: 'blacklist', icon: '⛔', color: 0xed4245 },
-  white: { label: 'whitelist', icon: '✅', color: 0x57f287 },
-  watch: { label: 'watchlist', icon: '👁️', color: 0xfee75c },
+  black: { label: 'blacklist', icon: '⛔', color: COLORS.danger  },
+  white: { label: 'whitelist', icon: '✅', color: COLORS.success },
+  watch: { label: 'watchlist', icon: '👁️', color: COLORS.warning },
 };
 
 export const MODELS_BY_TYPE = {

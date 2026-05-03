@@ -2,6 +2,7 @@ import { EmbedBuilder } from 'discord.js';
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import { COLORS } from '../../../utils/ui.js';
 
 export function createMultiaddApprovalButtonHandler(deps) {
   const {
@@ -52,7 +53,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
       const rejectEmbed = new EmbedBuilder()
         .setTitle('✖️ Bulk Add Rejected')
         .setDescription(`Rejected by <@${interaction.user.id}>`)
-        .setColor(0xed4245)
+        .setColor(COLORS.danger)
         .setTimestamp();
 
       await interaction.update({

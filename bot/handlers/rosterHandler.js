@@ -11,6 +11,7 @@ virtualConsole.on('jsdomError', (err) => {
 import { connectDB } from '../db.js';
 import config from '../config.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
+import { COLORS } from '../utils/ui.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import TrustedUser from '../models/TrustedUser.js';
@@ -169,7 +170,7 @@ export async function handleRosterCommand(interaction) {
         const description = descriptionParts.join('\n');
         const hasBlack = guildBlackHits.length > 0;
         const hasWhite = guildWhiteHits.length > 0;
-        const color = hasBlack ? 0xed4245 : hasWhite ? 0x57f287 : 0xfee75c;
+        const color = hasBlack ? COLORS.danger : hasWhite ? COLORS.success : COLORS.warning;
 
         const embed = new EmbedBuilder()
           .setTitle(`Hidden Roster – ${name}`)
@@ -189,7 +190,7 @@ export async function handleRosterCommand(interaction) {
       if (filtered.length > 0) {
         const embed = new EmbedBuilder()
           .setDescription(formatSuggestionLines(filtered))
-          .setColor(0xed4245)
+          .setColor(COLORS.danger)
           .setTimestamp();
         await interaction.editReply({
           content: `❌ No roster found for **${name}**. Rosters similar to **${name}**:`,
@@ -264,7 +265,7 @@ export async function handleRosterCommand(interaction) {
       TrustedUser.findOne({ name: { $in: charNames } }).collation({ locale: 'en', strength: 2 }).lean(),
     ]);
 
-    const embedColor = blacklistResult ? 0xed4245 : whitelistResult ? 0x57f287 : trustedResult ? 0x57d6a1 : 0x5865f2;
+    const embedColor = blacklistResult ? COLORS.danger : whitelistResult ? COLORS.success : trustedResult ? COLORS.trustedSoft : COLORS.info;
     const embed = new EmbedBuilder()
       .setTitle(`Roster – ${name}`)
       .setURL(targetUrl)
@@ -291,7 +292,7 @@ export async function handleRosterCommand(interaction) {
         const evidenceEmbed = new EmbedBuilder()
           .setTitle('Blacklist Evidence')
           .setImage(blackImageUrl)
-          .setColor(0xed4245);
+          .setColor(COLORS.danger);
         embeds.unshift(evidenceEmbed);
       }
     }
@@ -306,7 +307,7 @@ export async function handleRosterCommand(interaction) {
         const evidenceEmbed = new EmbedBuilder()
           .setTitle('Whitelist Evidence')
           .setImage(whiteImageUrl)
-          .setColor(0x57f287);
+          .setColor(COLORS.success);
         embeds.unshift(evidenceEmbed);
       }
     }

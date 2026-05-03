@@ -9,7 +9,6 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
 } from 'discord.js';
 
 import config from '../../config.js';
@@ -17,6 +16,7 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { COLORS, ICONS } from '../../utils/ui.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
@@ -24,12 +24,12 @@ const MEMBER_APPROVER_IDS = config.memberApproverIds;
 
 export function getListContext(type) {
   if (type === 'black') {
-    return { model: Blacklist, label: 'blacklist', color: 0xed4245, icon: '⛔' };
+    return { model: Blacklist, label: 'blacklist', color: COLORS.danger, icon: '⛔' };
   }
   if (type === 'watch') {
-    return { model: Watchlist, label: 'watchlist', color: 0xfee75c, icon: '⚠️' };
+    return { model: Watchlist, label: 'watchlist', color: COLORS.warning, icon: '⚠️' };
   }
-  return { model: Whitelist, label: 'whitelist', color: 0x57f287, icon: '✅' };
+  return { model: Whitelist, label: 'whitelist', color: COLORS.success, icon: '✅' };
 }
 
 /**
@@ -84,15 +84,15 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
     });
   }
 
-  const embed = new EmbedBuilder()
-    .setTitle(`✏️ ${icon} ${labelCap}${scopeTag} — ${titleAction}`)
-    .addFields(fields)
-    .setColor(color)
-    .setTimestamp(new Date());
+  const embed = buildAlertEmbed({
+    severity: AlertSeverity.SUCCESS,
+    titleIcon: `${ICONS.edit} ${icon}`,
+    color,
+    title: `${labelCap}${scopeTag} · ${titleAction}`,
+    fields,
+    footer: requesterDisplayName ? `Edited by ${requesterDisplayName}` : undefined,
+  });
 
-  if (requesterDisplayName) {
-    embed.setFooter({ text: `Edited by ${requesterDisplayName}` });
-  }
   if (freshDisplayUrl) {
     embed.setImage(freshDisplayUrl);
   }
@@ -119,14 +119,16 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     });
   }
 
-  const embed = new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(payload.action === 'edit'
+  const embed = buildAlertEmbed({
+    severity: AlertSeverity.INFO,
+    titleIcon: ICONS.shield,
+    color: payload.type === 'black' ? COLORS.danger : COLORS.success,
+    title,
+    description: payload.action === 'edit'
       ? `A list edit request was submitted in **${guild.name}**.`
-      : `A new list add request was submitted in **${guild.name}**.`)
-    .addFields(fields)
-    .setColor(payload.type === 'black' ? 0xed4245 : 0x57f287)
-    .setTimestamp(new Date());
+      : `A new list add request was submitted in **${guild.name}**.`,
+    fields,
+  });
 
   if (payload.imageUrl) {
     embed.setImage(payload.imageUrl);

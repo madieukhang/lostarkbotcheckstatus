@@ -18,12 +18,15 @@
  * is a distinct shade used for the trusted-user block card.
  */
 export const COLORS = Object.freeze({
-  success: 0x57f287,   // Discord green   - operation completed
-  warning: 0xfee75c,   // Discord yellow  - blocked but recoverable
-  info:    0x5865f2,   // Discord blurple - neutral info / picker UI
-  danger:  0xed4245,   // Discord red     - error / blacklist
-  muted:   0x99aab5,   // Discord grey    - expired / cancelled session
-  trusted: 0x3b82f6,   // Tailwind blue   - trusted-user block card
+  success:     0x57f287,   // Discord green     - operation completed
+  warning:     0xfee75c,   // Discord yellow    - blocked but recoverable
+  info:        0x5865f2,   // Discord blurple   - neutral info / picker UI
+  danger:      0xed4245,   // Discord red       - error / blacklist
+  muted:       0x99aab5,   // Discord grey      - expired / cancelled session
+  trusted:     0x3b82f6,   // Tailwind blue     - trusted-user block card
+  trustedSoft: 0x57d6a1,   // Soft teal-green   - trusted list view (informational, not alarming)
+  gold:        0xf1c40f,   // Owner-special     - /la-remote view header for owner guild
+  greyDark:    0x95a5a6,   // Inactive          - guilds with no config in /la-remote view
 });
 
 /**

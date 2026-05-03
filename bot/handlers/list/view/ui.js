@@ -9,6 +9,7 @@ import {
 import {
   refreshImageUrl,
 } from '../../../utils/imageRehost.js';
+import { COLORS } from '../../../utils/ui.js';
 
 export function buildTrustedListEmbed(entries) {
   const lines = entries.map((entry, index) => {
@@ -22,7 +23,7 @@ export function buildTrustedListEmbed(entries) {
   return new EmbedBuilder()
     .setTitle(`🛡️ Trusted Users (${entries.length})`)
     .setDescription(lines.join('\n'))
-    .setColor(0x57d6a1)
+    .setColor(COLORS.trustedSoft)
     .setTimestamp();
 }
 
@@ -78,7 +79,7 @@ export async function buildListPageEmbed(options) {
         : `${getListContext(currentType).icon} ${getListContext(currentType).label} (${allEntries.length})`
     )
     .setDescription(lines.join('\n'))
-    .setColor(currentType === 'all' ? 0x5865f2 : getListContext(currentType).color)
+    .setColor(currentType === 'all' ? COLORS.info : getListContext(currentType).color)
     .setFooter({ text: `Page ${page + 1}/${totalPages}` })
     .setTimestamp();
 }

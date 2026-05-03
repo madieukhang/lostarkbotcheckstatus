@@ -7,6 +7,7 @@ import {
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import { COLORS } from '../../../utils/ui.js';
 import {
   getListContext,
   buildApprovalResultRow,
@@ -131,7 +132,7 @@ export function createListAddApprovalButtonHandler({
             { name: `📌 Existing Entry${existingScopeTag}`, value: `**${existing.name}**\nReason: ${existing.reason || 'N/A'}\nRaid: ${existing.raid || 'N/A'}\nAdded: <t:${Math.floor(new Date(existing.addedAt || 0).getTime() / 1000)}:R>`, inline: true },
             { name: `🆕 New Request${requestScopeTag}`, value: `**${payload.name}**\nReason: ${payload.reason || 'N/A'}\nRaid: ${payload.raid || 'N/A'}\nBy: ${payload.requestedByDisplayName || 'Unknown'}`, inline: true },
           )
-          .setColor(0xfee75c);
+          .setColor(COLORS.warning);
 
         const overwriteRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
