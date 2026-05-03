@@ -6,6 +6,10 @@
  * replies, ad-hoc embeds, and handler-specific helpers — which made the UX
  * inconsistent and made color-coded severity impossible to read at a glance.
  *
+ * Tokens live in `bot/utils/ui.js`. This module is the thin builder that
+ * pairs a severity with the right color/icon and returns an EmbedBuilder
+ * that callers can still chain on.
+ *
  * Usage:
  *   import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
  *
@@ -20,11 +24,14 @@
  *     footer: 'Use /la-list view black to see the full entry',
  *   });
  *
- * Returns an EmbedBuilder so callers can still chain .setImage(), .setThumbnail(),
- * etc. when they need extra customization beyond the standard alert layout.
+ * For domain-specific embeds (list-type cards, preview dialogs) pass
+ * `titleIcon` and/or `color` to override the severity defaults while
+ * keeping the rest of the layout consistent.
  */
 
 import { EmbedBuilder } from 'discord.js';
+
+import { COLORS, ICONS } from './ui.js';
 
 /**
  * Severity levels for alert embeds. Each level maps to a specific color +
@@ -38,33 +45,13 @@ export const AlertSeverity = Object.freeze({
   TRUSTED: 'trusted',   // Navy   — special case for trusted user blocks
 });
 
-/**
- * Severity → visual config map. Colors match the existing bot palette
- * (same values used by getListContext for black/white/watch) so the alert
- * embeds feel visually integrated with the rest of the UI.
- */
-const SEVERITY_CONFIG = {
-  error: {
-    color: 0xed4245,   // Discord red — same as blacklist
-    icon: '❌',
-  },
-  warning: {
-    color: 0xfee75c,   // Discord yellow — same as watchlist
-    icon: '⚠️',
-  },
-  info: {
-    color: 0x5865f2,   // Discord Blurple
-    icon: '💡',
-  },
-  success: {
-    color: 0x57f287,   // Discord green — same as whitelist
-    icon: '✅',
-  },
-  trusted: {
-    color: 0x3b82f6,   // Tailwind blue-500 — distinct from Blurple
-    icon: '🛡️',
-  },
-};
+const SEVERITY_CONFIG = Object.freeze({
+  error:   { color: COLORS.danger,  icon: ICONS.error  },
+  warning: { color: COLORS.warning, icon: ICONS.warn   },
+  info:    { color: COLORS.info,    icon: ICONS.info   },
+  success: { color: COLORS.success, icon: ICONS.done   },
+  trusted: { color: COLORS.trusted, icon: ICONS.shield },
+});
 
 /**
  * Build a standardized alert embed.
@@ -76,6 +63,12 @@ const SEVERITY_CONFIG = {
  * @param {Array<{name: string, value: string, inline?: boolean}>} [options.fields] - Structured data fields
  * @param {string} [options.footer] - Footer hint (e.g. "Use /la-list view ...")
  * @param {boolean} [options.timestamp=true] - Include a timestamp (default true)
+ * @param {string} [options.titleIcon] - Override the severity icon prefix on the title.
+ *   Use when the embed has a stronger contextual icon (list-type icon,
+ *   action icon) than the severity glyph would carry.
+ * @param {number} [options.color] - Override the severity color.
+ *   Use when the embed sits inside a list-type context (blacklist/whitelist/
+ *   watchlist) and the entry color carries more meaning than severity.
  * @returns {EmbedBuilder}
  */
 export function buildAlertEmbed({
@@ -85,12 +78,16 @@ export function buildAlertEmbed({
   fields = [],
   footer,
   timestamp = true,
+  titleIcon,
+  color,
 }) {
   const config = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.info;
+  const finalIcon = titleIcon ?? config.icon;
+  const finalColor = color ?? config.color;
 
   const embed = new EmbedBuilder()
-    .setTitle(`${config.icon}  ${title}`)
-    .setColor(config.color);
+    .setTitle(finalIcon ? `${finalIcon}  ${title}` : title)
+    .setColor(finalColor);
 
   if (description) {
     embed.setDescription(description);

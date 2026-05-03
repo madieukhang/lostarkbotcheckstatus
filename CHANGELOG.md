@@ -4,6 +4,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.33] - 2026-05-03
+
+### Added
+- `bot/utils/ui.js`: cross-handler UI tokens. Exports `COLORS` (Discord-native palette + trusted-blue), `ICONS` (severity / status / action / persona buckets), and helpers `relativeTime`, `absoluteTime`, `buildSessionFooter`, `buildCooldownLines`. Ported from RaidManage's `src/raid/shared.js` so both bots read consistently.
+- `bot/utils/alertEmbed.js` now accepts `titleIcon` and `color` overrides so list-typed embeds (blacklist/whitelist/watchlist context) can carry their own icon and color while keeping the rest of the layout consistent.
+- `test/ui-tokens.test.js`: 9 tests covering color hex codes, icon presence, native timestamp format, session-footer string, cooldown-line stacking.
+
+### Changed
+- `bot/handlers/list/enrich/ui.js` migrated to the new pattern as the exemplar for the broader rework: pulls icons + session-footer helper from `bot/utils/ui.js`, delegates layout to `buildAlertEmbed` with list-type icon + color overrides, voice unchanged (English-first Artist Kitsune; warm first-person, no em-dash, no stage directions).
+- `alertEmbed.js` SEVERITY_CONFIG no longer inlines hex codes; it consumes `COLORS` and `ICONS` from `ui.js`. Behaviour identical for existing callers; severity icon prefix can now be suppressed by passing `titleIcon: ''` if a handler wants no icon at all.
+
+### Notes
+- Migration of remaining ~25 inline `new EmbedBuilder` callsites is staged for follow-up commits, one command at a time. Voice across LoaLogs stays English; sister bot RaidManage stays VN-first.
+- 41/41 tests pass.
+
 ## [v0.5.32] - 2026-05-03
 
 ### Added

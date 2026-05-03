@@ -1,12 +1,26 @@
+/**
+ * enrich/ui.js
+ *
+ * Embed + component builders for the /la-list enrich confirm dialog
+ * and the post-confirm success card. First migration target for the
+ * RaidManage-inspired UI rework: pulls icons/colors from `bot/utils/ui.js`,
+ * uses Discord native timestamps via the session-footer helper, and
+ * delegates layout to `buildAlertEmbed`. Voice is English-first Artist
+ * Kitsune (warm first-person, no em-dash, no stage directions).
+ */
+
 import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
 } from 'discord.js';
 
 import { getClassName } from '../../../models/Class.js';
 import { LIST_LABELS } from './data.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { ICONS, buildSessionFooter } from '../../../utils/ui.js';
+
+const ENRICH_SESSION_MINUTES = 5;
 
 export function buildEnrichPreviewReply({ entry, foundType, meta, newAlts, result, sessionId }) {
   const ctx = LIST_LABELS[foundType];
@@ -18,19 +32,23 @@ export function buildEnrichPreviewReply({ entry, foundType, meta, newAlts, resul
     })
     .join('\n');
 
-  const embed = new EmbedBuilder()
-    .setTitle(`${ctx.icon} Enrich preview — ${entry.name}`)
-    .setDescription(
-      `Stronghold scan in **${meta.guildName}** matched ${result.alts.length} alt(s). ` +
-      `${newAlts.length} are not yet in this ${ctx.label} entry.\n\n${altLines}\n\n` +
-      `Click **Confirm** to append all ${newAlts.length} to \`allCharacters\`, or **Cancel** to discard.`
-    )
-    .setColor(ctx.color)
-    .setFooter({
-      text:
-        `Scanned ${result.scannedCandidates} candidates, ` +
-        `${result.failedCandidates} failed · Session expires in 5 min`,
-    });
+  const embed = buildAlertEmbed({
+    severity: AlertSeverity.INFO,
+    titleIcon: ICONS.search,
+    color: ctx.color,
+    title: `Enrich preview · ${entry.name}`,
+    description:
+      `I scanned the stronghold in **${meta.guildName}** and matched ` +
+      `${result.alts.length} alt(s). **${newAlts.length}** of them ` +
+      `aren't on this ${ctx.label} entry yet:\n\n${altLines}\n\n` +
+      `Hit **Confirm** and I'll append all ${newAlts.length} to ` +
+      `\`allCharacters\`. **Cancel** drops them.`,
+    footer:
+      `Scanned ${result.scannedCandidates} candidates · ` +
+      `${result.failedCandidates} failed · ` +
+      buildSessionFooter(ENRICH_SESSION_MINUTES, 'only you can act'),
+    timestamp: false,
+  });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -53,15 +71,16 @@ export function buildEnrichPreviewReply({ entry, foundType, meta, newAlts, resul
 export function buildEnrichSuccessEmbed(session, updateResult) {
   const ctx = LIST_LABELS[session.type];
   const altNames = session.newAlts.map((alt) => alt.name);
-  return new EmbedBuilder()
-    .setTitle(`${ctx.icon} Enriched ${session.entryName}`)
-    .setDescription(
-      `Appended ${altNames.length} alt(s) to ${ctx.label} entry's \`allCharacters\`:\n\n` +
-      altNames.map((name, index) => `${index + 1}. ${name}`).join('\n')
-    )
-    .setColor(ctx.color)
-    .setFooter({
-      text: `matched=${updateResult.matchedCount} modified=${updateResult.modifiedCount}`,
-    })
-    .setTimestamp(new Date());
+  const lines = altNames.map((name, index) => `${index + 1}. ${name}`).join('\n');
+
+  return buildAlertEmbed({
+    severity: AlertSeverity.SUCCESS,
+    titleIcon: ctx.icon,
+    color: ctx.color,
+    title: `Enriched · ${session.entryName}`,
+    description:
+      `Appended ${altNames.length} alt(s) to the ${ctx.label} entry's ` +
+      `\`allCharacters\`:\n\n${lines}`,
+    footer: `matched=${updateResult.matchedCount} · modified=${updateResult.modifiedCount}`,
+  });
 }
