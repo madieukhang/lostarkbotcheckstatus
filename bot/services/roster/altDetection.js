@@ -109,6 +109,21 @@ export async function detectAltsViaStronghold(name, options = {}) {
           `[alt-detect] Progress ${scannedCandidates}/${limitedCandidates.length};` +
           ` failed ${failedCandidates}; alts ${alts.length}; backoff ${backoff.current}ms`
         );
+        // Surface progress to caller (e.g. Discord embed update). Fire-and-
+        // forget so a slow / rate-limited UI edit does not block the next
+        // candidate fetch. The caller is expected to throttle its own
+        // edits if it needs to respect external rate limits.
+        if (typeof options.onProgress === 'function') {
+          Promise.resolve(options.onProgress({
+            scannedCandidates,
+            totalCandidates: limitedCandidates.length,
+            failedCandidates,
+            altsFound: alts.length,
+            currentBackoffMs: backoff.current,
+          })).catch((err) => {
+            console.warn('[alt-detect] onProgress callback threw:', err?.message || err);
+          });
+        }
       }
 
       if (nextCandidateIndex < limitedCandidates.length) {
