@@ -1,6 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
 
 import { STATUS } from '../monitor/serverStatus.js';
+import { COLORS } from '../utils/ui.js';
 
 function formatStatus(status) {
   switch (status) {
@@ -29,7 +30,7 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
 
       const allOnline = [...statusMap.values()].every((s) => s === STATUS.ONLINE);
       const hasOffline = [...statusMap.values()].some((s) => s === STATUS.OFFLINE);
-      const color = hasOffline ? 0xed4245 : allOnline ? 0x57f287 : 0xfee75c;
+      const color = hasOffline ? COLORS.danger : allOnline ? COLORS.success : COLORS.warning;
 
       const embed = new EmbedBuilder()
         .setTitle('Server Status')

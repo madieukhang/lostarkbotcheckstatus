@@ -7,6 +7,7 @@ import {
 
 import { connectDB } from '../db.js';
 import { buildBlacklistQuery } from '../utils/scope.js';
+import { COLORS } from '../utils/ui.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import Watchlist from '../models/Watchlist.js';
@@ -132,7 +133,7 @@ export async function handleSearchCommand(interaction) {
     const hasBlack = results.some((r) => r.black);
     const hasWatch = results.some((r) => r.watch);
     const hasWhite = results.some((r) => r.white);
-    const color = hasBlack ? 0xed4245 : hasWatch ? 0xfee75c : hasWhite ? 0x57f287 : 0x5865f2;
+    const color = hasBlack ? COLORS.danger : hasWatch ? COLORS.warning : hasWhite ? COLORS.success : COLORS.info;
 
     const filterParts = [`ilvl ≥ ${minIlvl}`];
     if (maxIlvl !== null) filterParts.push(`ilvl ≤ ${maxIlvl}`);
@@ -210,7 +211,7 @@ export async function handleSearchCommand(interaction) {
       }
 
       const listLabel = r.black ? 'blacklist' : r.white ? 'whitelist' : 'watchlist';
-      const listColor = r.black ? 0xed4245 : r.white ? 0x57f287 : 0xfee75c;
+      const listColor = r.black ? COLORS.danger : r.white ? COLORS.success : COLORS.warning;
 
       const evidenceEmbed = new EmbedBuilder()
         .setTitle(`${r.black ? '⛔' : r.white ? '✅' : '⚠️'} ${r.name}`)

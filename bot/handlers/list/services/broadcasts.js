@@ -3,6 +3,7 @@ import { EmbedBuilder } from 'discord.js';
 import config from '../../../config.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { COLORS } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
 
 export function createBroadcastServices({ client }) {
@@ -127,7 +128,7 @@ export function createBroadcastServices({ client }) {
 
       const embed = new EmbedBuilder()
         .setTitle(`📢 Bulk Add${isLocal ? ' (Local)' : ''} — ${entries.length} entries`)
-        .setColor(0x5865f2)
+        .setColor(COLORS.info)
         .setTimestamp(new Date());
 
       const typeLabels = { black: 'Blacklist', white: 'Whitelist', watch: 'Watchlist' };

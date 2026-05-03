@@ -10,6 +10,7 @@ import {
   getApproverRecipientIds,
   getSeniorApproverIds,
 } from '../helpers.js';
+import { COLORS } from '../../../utils/ui.js';
 
 export function createApprovalServices({ client }) {
   async function sendListAddApprovalToApprovers(guild, payload, options = {}) {
@@ -104,7 +105,7 @@ export function createApprovalServices({ client }) {
     const embed = new EmbedBuilder()
       .setTitle(`📋 Bulk Add Approval — ${pending.rows.length} rows`)
       .setDescription(previewLines.join('\n').slice(0, 4000))
-      .setColor(0x5865f2)
+      .setColor(COLORS.info)
       .addFields(
         {
           name: 'Requested by',

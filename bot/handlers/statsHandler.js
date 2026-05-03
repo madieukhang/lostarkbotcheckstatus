@@ -5,6 +5,7 @@
 
 import { EmbedBuilder } from 'discord.js';
 import { connectDB } from '../db.js';
+import { COLORS } from '../utils/ui.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import Watchlist from '../models/Watchlist.js';
@@ -40,7 +41,7 @@ export async function handleStatsCommand(interaction) {
       { name: '💾 Cache', value: `Roster Cache: **${cacheCount}** entries\nGuild Configs: **${guildConfigCount}**`, inline: true },
       { name: '🤖 Bot', value: `Servers: **${guildCount}**\nUptime: **${hours}h ${minutes}m**`, inline: true },
     )
-    .setColor(0x5865f2)
+    .setColor(COLORS.info)
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });

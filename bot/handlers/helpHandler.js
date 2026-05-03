@@ -1,6 +1,7 @@
 ﻿import { EmbedBuilder } from 'discord.js';
 
 import config from '../config.js';
+import { COLORS } from '../utils/ui.js';
 
 export async function handleHelpCommand(interaction) {
   const lang = interaction.options.getString('lang') || 'en';
@@ -85,7 +86,7 @@ export async function handleHelpCommand(interaction) {
           'Thêm **tối đa 30 entries** cùng lúc vào blacklist/whitelist/watchlist ' +
             'bằng 1 file Excel, thay vì gõ `/la-list add` từng người một.'
         )
-        .setColor(0x5865f2)
+        .setColor(COLORS.info)
         .addFields(
           {
             name: '📥 Cách sử dụng (4 bước)',
@@ -158,7 +159,7 @@ export async function handleHelpCommand(interaction) {
           'Add **up to 30 entries** at once to blacklist/whitelist/watchlist ' +
             'via a single Excel file, instead of running `/la-list add` one at a time.'
         )
-        .setColor(0x5865f2)
+        .setColor(COLORS.info)
         .addFields(
           {
             name: '📥 How to use (4 steps)',
@@ -241,7 +242,7 @@ export async function handleHelpCommand(interaction) {
                 '(trước v0.5.2 rehost). Bot tải lại ảnh và upload vào evidence channel ' +
                 'để URL không bao giờ expire nữa.'
             )
-            .setColor(0x5865f2)
+            .setColor(COLORS.info)
             .addFields(
               {
                 name: '✅ Prerequisites',
@@ -302,7 +303,7 @@ export async function handleHelpCommand(interaction) {
                 'direct URL (created before v0.5.2 rehost). Bot re-downloads each image ' +
                 'and re-uploads it to the evidence channel so the URL never expires again.'
             )
-            .setColor(0x5865f2)
+            .setColor(COLORS.info)
             .addFields(
               {
                 name: '✅ Prerequisites',

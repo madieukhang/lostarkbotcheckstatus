@@ -4,6 +4,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.35] - 2026-05-03
+
+### Changed
+- Sweeping color-token migration: every embed-color call site that used a Discord-native palette hex (`0xed4245`, `0xfee75c`, `0x57f287`, `0x5865f2`, `0x99aab5`, `0x3b82f6`) or a known shade (`0x57d6a1` trustedSoft, `0xf1c40f` gold, `0x95a5a6` greyDark) now imports from `bot/utils/ui.js` `COLORS`. Touches 17 files across handlers/list/, handlers/setup/, and the top-level handlers (`rosterHandler`, `searchHandler`, `systemHandlers`, `statsHandler`, `helpHandler`, plus enrich/data and view/ui).
+- `bot/handlers/list/helpers.js`: `buildListEditSuccessEmbed` and `buildListAddApprovalEmbed` migrated to `buildAlertEmbed` with `titleIcon`/`color` overrides so the edit success card and the approval-request DM card carry the same alert family layout (severity-driven timestamp + footer rendering) while keeping their list-type icon and color identity. `getListContext` now reads colors from `COLORS` instead of inlining hex.
+- `bot/utils/ui.js` `COLORS` extended with `trustedSoft` (0x57d6a1, list-view trusted), `gold` (0xf1c40f, owner header in /la-remote), `greyDark` (0x95a5a6, inactive guild marker).
+
+### Notes
+- Admin-only divergent shades (0x2ecc71, 0xe74c3c, 0x9b59b6, 0x3498db) in `setup/remote.js` and `setup/syncImages.js` left inline. Intentional palette divergence for admin UX differentiation.
+- Plain-text alert replies (~101 across 25 files) are the next wave - to be migrated to `buildAlertEmbed` in follow-up commits.
+- 41/41 tests pass.
+
 ## [v0.5.34] - 2026-05-03
 
 ### Changed

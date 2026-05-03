@@ -4,6 +4,7 @@ import { EmbedBuilder } from 'discord.js';
 import { connectDB } from '../../../db.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
+import { COLORS } from '../../../utils/ui.js';
 
 export function createBulkServices({ client, executeListAddToDatabase }) {
   async function executeBulkMultiadd(rows, meta, onProgress = null) {
@@ -115,7 +116,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
   function buildBulkSummaryEmbed(results, meta) {
     const totalAttempted = results.added.length + results.skipped.length + results.failed.length;
     const hasFailures = results.failed.length > 0;
-    const color = hasFailures ? 0xfee75c : results.added.length > 0 ? 0x57f287 : 0xed4245;
+    const color = hasFailures ? COLORS.warning : results.added.length > 0 ? COLORS.success : COLORS.danger;
 
     const embed = new EmbedBuilder()
       .setTitle('📋 Bulk Add Complete')

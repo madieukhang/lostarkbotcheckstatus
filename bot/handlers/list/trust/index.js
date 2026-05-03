@@ -39,6 +39,7 @@ import {
 } from '../../../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { COLORS } from '../../../utils/ui.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import {
   buildMultiaddTemplate,
@@ -97,7 +98,7 @@ export function createTrustHandlers({ client }) {
           { name: 'Was trusted for', value: deleted.reason || 'N/A', inline: true },
           { name: 'Removed by', value: interaction.user.tag, inline: true },
         )
-        .setColor(0xed4245)
+        .setColor(COLORS.danger)
         .setFooter({ text: 'This character can now be blacklisted' })
         .setTimestamp(new Date());
 
@@ -144,7 +145,7 @@ export function createTrustHandlers({ client }) {
         { name: 'Reason', value: reason || 'N/A', inline: true },
         { name: 'Added by', value: interaction.user.tag, inline: true },
       )
-      .setColor(0x57d6a1)
+      .setColor(COLORS.trustedSoft)
       .setFooter({ text: 'This character (and its alts) cannot be added to any list' })
       .setTimestamp(new Date());
 

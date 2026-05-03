@@ -10,6 +10,7 @@ import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
+import { COLORS } from '../../utils/ui.js';
 
 /**
  * Check if the bot has required permissions in a channel.
@@ -269,7 +270,7 @@ async function handleSetupView(interaction) {
   const embed = new EmbedBuilder()
     .setTitle('⚙️ Bot Configuration')
     .setDescription(lines.join('\n'))
-    .setColor(0x5865f2)
+    .setColor(COLORS.info)
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });

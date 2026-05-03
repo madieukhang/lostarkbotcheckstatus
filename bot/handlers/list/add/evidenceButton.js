@@ -3,6 +3,7 @@ import { EmbedBuilder } from 'discord.js';
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { refreshImageUrl } from '../../../utils/imageRehost.js';
+import { COLORS } from '../../../utils/ui.js';
 
 export function createListAddViewEvidenceButtonHandler({ client }) {
   async function handleListAddViewEvidenceButton(interaction) {
@@ -56,7 +57,7 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
       .setTitle(`📎 Evidence — ${payload.name}`)
       .setDescription(payload.reason ? `*${payload.reason}*` : null)
       .setImage(freshUrl)
-      .setColor(payload.type === 'black' ? 0xed4245 : payload.type === 'white' ? 0x57f287 : 0xfee75c)
+      .setColor(payload.type === 'black' ? COLORS.danger : payload.type === 'white' ? COLORS.success : COLORS.warning)
       .setFooter({
         text: isLegacy
           ? 'Legacy image (may have expired) — submitted before evidence rehost'
