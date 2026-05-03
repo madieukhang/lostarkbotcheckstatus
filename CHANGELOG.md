@@ -7,7 +7,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## [v0.5.27] - 2026-05-03
 
 ### Docs
-- `docs/phase4-command-surface-refactor.md`: Phase 4 writing-plan covering current command surface audit (11 top-level commands, 7 `/list` subcommands), three refactor directions (verb-based / entity-based / mode-flag merge) with pros/cons, recommendation (entity-based), and a four-step migration strategy with a soft-deprecation window. Document is design-only - no code changes shipped here. Phase 4 code execution waits on Traine answering the six open questions in section 5 of the doc.
+- `docs/phase4-command-surface-refactor.md`: Phase 4 writing-plan covering the command surface audit and refactor directions. Direction B (entity-based split into `/la-blacklist` / `/la-whitelist` / `/la-watchlist`) was rejected by Traine because users are already used to the `/list ...` prefix. Direction D approved instead: keep the `/list` subcommand tree intact, rename top-level to `/la-list`, and add `la-` prefix to every other top-level command so Discord autocomplete groups all bot commands under `/la`. Five open questions remain (deprecation window length, multiadd-merge, /listcheck rename target, dashed-form for legacy `la*` commands, welcome embed flow). No code shipped here — design only.
 
 ## [v0.5.26] - 2026-05-03
 
