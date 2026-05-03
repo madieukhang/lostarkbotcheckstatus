@@ -63,6 +63,9 @@ export async function handleRosterCommand(interaction) {
   // to false and should stay false in production.
   const deepOptions = {
     ...(deepLimit !== null ? { candidateLimit: deepLimit } : {}),
+    useScraperApiForCandidates: false,
+    allowScraperApiForTarget: false,
+    allowScraperApiForGuild: false,
   };
   await interaction.deferReply();
 
@@ -77,12 +80,20 @@ export async function handleRosterCommand(interaction) {
 
     if (characters.length === 0) {
       // ── Hidden roster: try guild-based detection ──
-      const meta = await fetchCharacterMeta(name);
+      const meta = await fetchCharacterMeta(name, {
+        allowScraperApi: false,
+        fallbackOnRateLimit: false,
+        timeoutMs: config.strongholdDeepCandidateTimeoutMs,
+      });
       const hasGuild = meta && meta.guildName;
 
       if (hasGuild) {
         // Step 1: Get guild member list (fast, single request)
-        const guildMembers = await fetchGuildMembers(name);
+        const guildMembers = await fetchGuildMembers(name, {
+          allowScraperApi: false,
+          timeoutMs: config.strongholdDeepCandidateTimeoutMs,
+          cacheKey: meta.guildName,
+        });
         const memberNames = guildMembers.map((m) => m.name);
 
         // Step 2: Quick DB check — are any guild members already in the lists?

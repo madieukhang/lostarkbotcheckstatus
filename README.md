@@ -12,7 +12,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 - **Quick Add** — after auto-check, dropdown adds unflagged names straight to blacklist/watchlist via modal
 - **Approval flow** — members submit, officers instant-approve; senior approver always receives the DM
 - **Evidence rehosting** — images uploaded with an entry are rehosted into a pinned evidence channel so Discord's 24h CDN expiry doesn't rot the reference
-- **ScraperAPI fallback** — direct fetch to `lostark.bible` first, auto-fallback through up to 3 ScraperAPI keys on 403/503
+- **ScraperAPI fallback** — direct fetch to `lostark.bible` first, auto-fallback through up to 3 ScraperAPI keys on 403/503; high-fanout roster/list/OCR paths keep ScraperAPI off by default
 - **Guild-only commands** — `setDMPermission(false)` on every slash command; nothing runs in DMs
 
 ## Commands
@@ -254,6 +254,20 @@ Copy `.env.example` to `.env` and fill in values.
 | `GEMINI_MODELS` | `gemini-2.5-flash,...` | Comma-separated model priority list (failover) |
 | `LISTCHECK_ALT_ENRICHMENT` | `false` | Run background Stronghold alt scan after OCR hits; keep off to avoid request spikes |
 | `LISTCHECK_ALT_ENRICHMENT_LIMIT` | `1` | Max flagged OCR names to enrich per screenshot when enrichment is enabled |
+| `LISTCHECK_ALT_ENRICHMENT_CANDIDATE_LIMIT` | `80` | Max guild candidates checked per OCR background alt scan |
+| `LISTCHECK_MAX_NAMES` | `8` | Max OCR names checked from one image |
+| `LISTCHECK_ROSTER_LOOKUP_CONCURRENCY` | `3` | Parallel direct roster lookups during `/la-check` |
+| `LISTCHECK_ROSTER_LOOKUP_START_SPACING_MS` | `150` | Start spacing between `/la-check` roster lookups |
+| `LISTCHECK_ROSTER_LOOKUP_TIMEOUT_MS` | `6000` | Timeout for each direct `/la-check` roster/suggestion lookup |
+| `LISTCHECK_SIMILAR_LOOKUP_LIMIT` | `3` | Max no-roster names that trigger similar-name suggestions |
+| `OCR_CACHE_TTL_MS` | `300000` | Short-lived cache for repeated OCR of the same attachment URL |
+| `OCR_CACHE_MAX_SIZE` | `100` | Max cached OCR attachment results |
+| `GUILD_MEMBERS_CACHE_TTL_MS` | `900000` | Cache guild member lists for Stronghold deep/enrich scans |
+| `GUILD_MEMBERS_CACHE_MAX_SIZE` | `200` | Max cached guild member lists |
+| `STRONGHOLD_DEEP_CANDIDATE_LIMIT` | `300` | Max guild candidates checked by `/la-roster deep:true` |
+| `STRONGHOLD_DEEP_CONCURRENCY` | `3` | Parallel candidate profile fetches in Stronghold deep scans |
+| `STRONGHOLD_DEEP_CANDIDATE_TIMEOUT_MS` | `8000` | Timeout per Stronghold candidate lookup |
+| `STRONGHOLD_DEEP_USE_SCRAPERAPI` | `false` | Enable ScraperAPI for deep candidate fan-out only when explicitly needed |
 | `AUTO_CHECK_CHANNEL_IDS` | — | Global fallback for auto-check (prefer per-server `/la-setup`) |
 | `LIST_NOTIFY_CHANNEL_IDS` | — | Global fallback for list notifications |
 | `OFFICER_APPROVER_IDS` | — | Officer Discord user IDs (instant approval on `/la-list add`) |

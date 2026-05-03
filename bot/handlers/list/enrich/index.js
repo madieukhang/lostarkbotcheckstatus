@@ -47,6 +47,7 @@ import Watchlist from '../../../models/Watchlist.js';
 import { getClassName } from '../../../models/Class.js';
 import {
   fetchCharacterMeta,
+  fetchGuildMembers,
   detectAltsViaStronghold,
 } from '../../../services/rosterService.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
@@ -132,7 +133,11 @@ export function createEnrichHandlers({ client, services }) {
 
     // Up-front bible probe so we can fail fast on no-guild / no-stronghold
     // before paying the multi-minute candidate fan-out.
-    const meta = await fetchCharacterMeta(name);
+    const meta = await fetchCharacterMeta(name, {
+      allowScraperApi: false,
+      fallbackOnRateLimit: false,
+      timeoutMs: config.strongholdDeepCandidateTimeoutMs,
+    });
     if (!meta) {
       await interaction.editReply({
         content: `❌ Could not fetch character meta for **${name}** from lostark.bible. Profile may be hidden or the name may be misspelled.`,
@@ -150,16 +155,32 @@ export function createEnrichHandlers({ client, services }) {
     // command is alive during the long fetch fan-out. Single update,
     // no streaming — Discord webhook edits are cheap and Operations
     // already monitor server logs for the per-25 progress lines.
+    const guildMembers = await fetchGuildMembers(name, {
+      allowScraperApi: false,
+      timeoutMs: config.strongholdDeepCandidateTimeoutMs,
+      cacheKey: meta.guildName,
+    });
+    if (guildMembers.length === 0) {
+      await interaction.editReply({
+        content: `❌ Could not fetch guild member list for **${name}** without ScraperAPI. Try again later.`,
+      });
+      return;
+    }
+
     await interaction.editReply({
       content:
         `🔍 Running stronghold deep scan for **${name}** in guild **${meta.guildName}**` +
-        ` (cap ${cap}, concurrency ${config.strongholdDeepConcurrency}). ` +
+        ` (${guildMembers.length} guild members, cap ${cap}, concurrency ${config.strongholdDeepConcurrency}, ScraperAPI off). ` +
         `Expect roughly 5-7 minutes; do not click anything.`,
     });
 
     const result = await detectAltsViaStronghold(name, {
       targetMeta: meta,
+      guildMembers,
       candidateLimit: cap,
+      useScraperApiForCandidates: false,
+      allowScraperApiForTarget: false,
+      allowScraperApiForGuild: false,
     });
 
     if (!result || !Array.isArray(result.alts) || result.alts.length === 0) {

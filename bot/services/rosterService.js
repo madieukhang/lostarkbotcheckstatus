@@ -22,6 +22,8 @@ configureMetaCache({
 });
 
 const inFlightMetaFetches = new Map();
+const guildMembersCache = new Map();
+const inFlightGuildMemberFetches = new Map();
 
 function normalizeMetaFetchKey(name) {
   return String(name || '').trim().toLowerCase();
@@ -41,6 +43,54 @@ function buildMetaInflightKey(name, options = {}) {
 function cacheMetaResult(name, meta) {
   if (meta) setCachedMeta(name, meta);
   return meta;
+}
+
+function buildDirectBibleFetchOptions(options = {}) {
+  const fetchOptions = {
+    allowScraperApi: options.allowScraperApi !== false,
+    preferScraperApi: options.preferScraperApi === true,
+    fallbackOnRateLimit: options.fallbackOnRateLimit === true,
+  };
+  if (options.timeoutMs) {
+    fetchOptions.signal = AbortSignal.timeout(options.timeoutMs);
+  }
+  return fetchOptions;
+}
+
+function normalizeGuildMembersCacheKey(key) {
+  return String(key || '').trim().toLowerCase();
+}
+
+function getCachedGuildMembers(cacheKey) {
+  const key = normalizeGuildMembersCacheKey(cacheKey);
+  if (!key) return undefined;
+  const entry = guildMembersCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    guildMembersCache.delete(key);
+    return undefined;
+  }
+  guildMembersCache.delete(key);
+  guildMembersCache.set(key, entry);
+  return entry.members;
+}
+
+function setCachedGuildMembers(cacheKey, members) {
+  const key = normalizeGuildMembersCacheKey(cacheKey);
+  if (!key || !Array.isArray(members) || members.length === 0) return;
+  if (guildMembersCache.size >= config.guildMembersCacheMaxSize) {
+    const firstKey = guildMembersCache.keys().next().value;
+    guildMembersCache.delete(firstKey);
+  }
+  guildMembersCache.set(key, {
+    members,
+    expiresAt: Date.now() + config.guildMembersCacheTtlMs,
+  });
+}
+
+export function clearGuildMembersCache() {
+  guildMembersCache.clear();
+  inFlightGuildMemberFetches.clear();
 }
 
 const virtualConsole = new VirtualConsole();
@@ -197,11 +247,11 @@ export function extractRosterClassMapFromHtml(html) {
  * Search for similar character names via lostark.bible API.
  * @returns {Array|null} Array of suggestions, or null on API error (403/network)
  */
-export async function fetchNameSuggestions(name) {
+export async function fetchNameSuggestions(name, options = {}) {
   try {
     const payload = Buffer.from(JSON.stringify([{"name":1,"region":2}, name, 'NA'])).toString('base64');
     const targetUrl = `https://lostark.bible/_app/remote/ngsbie/search?payload=${encodeURIComponent(payload)}`;
-    const res = await fetchWithFallback(targetUrl);
+    const res = await fetchWithFallback(targetUrl, buildDirectBibleFetchOptions(options));
     if (!res.ok) {
       console.warn(`[search] lostark.bible search API returned HTTP ${res.status} for "${name}"`);
       return null; // API error — distinct from "no results"
@@ -257,8 +307,8 @@ export function extractCharacterItemLevelFromHtml(html) {
   return null;
 }
 
-async function inferHiddenRosterItemLevel(name) {
-  const suggestions = await fetchNameSuggestions(name);
+async function inferHiddenRosterItemLevel(name, options = {}) {
+  const suggestions = await fetchNameSuggestions(name, options);
   const exact = suggestions?.find((s) => s.name?.toLowerCase() === name.toLowerCase());
   return exact ? parseItemLevelValue(exact.itemLevel) : null;
 }
@@ -268,6 +318,7 @@ export async function buildRosterCharacters(name, options = {}) {
     hiddenRosterFallback = false,
     includeHiddenRosterAlts = false,
   } = options;
+  const fetchOptions = buildDirectBibleFetchOptions(options);
 
   let allCharacters = [name];
   let hasValidRoster = false;
@@ -277,7 +328,7 @@ export async function buildRosterCharacters(name, options = {}) {
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
-    const response = await fetchWithFallback(targetUrl);
+    const response = await fetchWithFallback(targetUrl, fetchOptions);
 
     if (!response.ok) {
       failReason = response.status === 429 ? 'Rate limited — try again later' : `HTTP ${response.status}`;
@@ -314,15 +365,20 @@ export async function buildRosterCharacters(name, options = {}) {
         rosterVisibility = 'visible';
         allCharacters = [...new Set(rosterChars)];
       } else if (hiddenRosterFallback) {
-        const meta = await fetchCharacterMeta(name);
+        const meta = await fetchCharacterMeta(name, options);
         if (meta) {
           hasValidRoster = true;
           rosterVisibility = 'hidden';
-          targetItemLevel = meta.itemLevel ?? await inferHiddenRosterItemLevel(name);
+          targetItemLevel = meta.itemLevel ?? await inferHiddenRosterItemLevel(name, options);
           allCharacters = [name];
 
           if (includeHiddenRosterAlts && meta.guildName) {
-            const altResult = await detectAltsViaStronghold(name, { targetMeta: meta, targetItemLevel });
+            const altResult = await detectAltsViaStronghold(name, {
+              targetMeta: meta,
+              targetItemLevel,
+              useScraperApiForCandidates: options.useScraperApiForCandidates,
+              allowScraperApiForGuild: options.allowScraperApi,
+            });
             const altNames = altResult?.alts?.map((alt) => alt.name).filter(Boolean) ?? [];
             allCharacters = [...new Set([name, ...altNames])];
           }
@@ -517,14 +573,7 @@ async function fetchCharacterMetaUncached(name, options = {}) {
   try {
     const jsonUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/__data.json`;
     const htmlUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}`;
-    const fetchOptions = {
-      allowScraperApi: options.allowScraperApi !== false,
-      preferScraperApi: options.preferScraperApi === true,
-      fallbackOnRateLimit: options.fallbackOnRateLimit === true,
-    };
-    if (options.timeoutMs) {
-      fetchOptions.signal = AbortSignal.timeout(options.timeoutMs);
-    }
+    const fetchOptions = buildDirectBibleFetchOptions(options);
     let res = await fetchWithFallback(jsonUrl, fetchOptions);
 
     // Handle rate limit: wait and retry once. Same policy as the
@@ -620,11 +669,12 @@ function parseGuildMembersFromHtml(html) {
  * @param {string} name - Character name (must be in a guild)
  * @returns {Promise<Array<{name, cls, ilvl, rank, combatPower}>>}
  */
-export async function fetchGuildMembers(name) {
+async function fetchGuildMembersUncached(name, options = {}) {
   try {
     const jsonUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild/__data.json`;
     const htmlUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild`;
-    const res = await fetchWithFallback(jsonUrl);
+    const fetchOptions = buildDirectBibleFetchOptions(options);
+    const res = await fetchWithFallback(jsonUrl, fetchOptions);
     if (res.ok) {
       try {
         const parsed = await res.json();
@@ -659,7 +709,7 @@ export async function fetchGuildMembers(name) {
     // HTML fallback path - same regex behavior as the pre-migration
     // implementation. Returns [] on any error so deep scan can short
     // circuit to "no candidates" rather than throwing.
-    const htmlRes = await fetchWithFallback(htmlUrl);
+    const htmlRes = await fetchWithFallback(htmlUrl, fetchOptions);
     if (!htmlRes.ok) return [];
     const html = await htmlRes.text();
     return parseGuildMembersFromHtml(html);
@@ -669,14 +719,47 @@ export async function fetchGuildMembers(name) {
   }
 }
 
+export async function fetchGuildMembers(name, options = {}) {
+  const cacheKey = options.cacheKey || options.guildName || name;
+  const useCache = options.useCache !== false;
+
+  if (useCache) {
+    const cached = getCachedGuildMembers(cacheKey);
+    if (cached !== undefined) return cached;
+
+    const normalizedKey = normalizeGuildMembersCacheKey(cacheKey);
+    const inFlight = inFlightGuildMemberFetches.get(normalizedKey);
+    if (inFlight) return inFlight;
+
+    const fetchPromise = fetchGuildMembersUncached(name, options)
+      .then((members) => {
+        setCachedGuildMembers(cacheKey, members);
+        return members;
+      })
+      .finally(() => {
+        inFlightGuildMemberFetches.delete(normalizedKey);
+      });
+    inFlightGuildMemberFetches.set(normalizedKey, fetchPromise);
+    return fetchPromise;
+  }
+
+  return fetchGuildMembersUncached(name, options);
+}
+
 export async function detectAltsViaStronghold(name, options = {}) {
   console.log(`[alt-detect] Starting alt detection for ${name}...`);
   const candidateLimit = options.candidateLimit ?? config.strongholdDeepCandidateLimit;
   const concurrency = Math.max(1, Math.min(options.concurrency ?? config.strongholdDeepConcurrency, 12));
   const candidateTimeoutMs = options.candidateTimeoutMs ?? config.strongholdDeepCandidateTimeoutMs;
   const useScraperApiForCandidates = options.useScraperApiForCandidates ?? config.strongholdDeepUseScraperApi;
+  const allowScraperApiForTarget = options.allowScraperApiForTarget !== false;
+  const allowScraperApiForGuild = options.allowScraperApiForGuild !== false;
 
-  const meta = options.targetMeta || await fetchCharacterMeta(name);
+  const meta = options.targetMeta || await fetchCharacterMeta(name, {
+    allowScraperApi: allowScraperApiForTarget,
+    timeoutMs: options.targetTimeoutMs ?? candidateTimeoutMs,
+    fallbackOnRateLimit: false,
+  });
   if (!meta) {
     console.log('[alt-detect] No character meta found.');
     return null;
@@ -696,7 +779,11 @@ export async function detectAltsViaStronghold(name, options = {}) {
 
   const members = Array.isArray(options.guildMembers)
     ? options.guildMembers
-    : await fetchGuildMembers(name);
+    : await fetchGuildMembers(name, {
+        allowScraperApi: allowScraperApiForGuild,
+        timeoutMs: options.guildTimeoutMs ?? candidateTimeoutMs,
+        cacheKey: options.guildMembersCacheKey || meta.guildName,
+      });
   if (members.length === 0) {
     console.log('[alt-detect] No guild members found.');
     return null;

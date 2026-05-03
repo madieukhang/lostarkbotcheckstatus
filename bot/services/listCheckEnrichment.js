@@ -52,7 +52,7 @@ export function selectFlaggedItemsForEnrichment(results, limit = Number.POSITIVE
   return selected;
 }
 
-export async function enrichFlaggedListEntries(flaggedItems, { logPrefix = 'listcheck' } = {}) {
+export async function enrichFlaggedListEntries(flaggedItems, { logPrefix = 'listcheck', settings = config } = {}) {
   const deps = await loadEnrichmentDeps();
 
   for (const item of flaggedItems) {
@@ -61,7 +61,12 @@ export async function enrichFlaggedListEntries(flaggedItems, { logPrefix = 'list
     if (!listEntry || !model) continue;
 
     try {
-      const altResult = await deps.detectAltsViaStronghold(item.name);
+      const altResult = await deps.detectAltsViaStronghold(item.name, {
+        candidateLimit: settings.listcheckAltEnrichmentCandidateLimit,
+        useScraperApiForCandidates: false,
+        allowScraperApiForTarget: false,
+        allowScraperApiForGuild: false,
+      });
       if (!altResult || altResult.alts.length === 0) continue;
 
       const newAltNames = altResult.alts.map((a) => a.name);
@@ -103,7 +108,7 @@ export function queueFlaggedListEntryEnrichment(
     return { queued: 0, skipped: allFlagged.length, reason: 'limit' };
   }
 
-  enrichFlaggedListEntries(flaggedItems, { logPrefix })
+  enrichFlaggedListEntries(flaggedItems, { logPrefix, settings })
     .catch((err) => console.error(`[${logPrefix}] Background enrichment error:`, err.message));
 
   return {

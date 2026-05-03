@@ -26,8 +26,10 @@ import {
 import { buildBlacklistQuery } from '../utils/scope.js';
 import { mapWithConcurrency, sleep } from '../utils/async.js';
 
-const ROSTER_LOOKUP_CONCURRENCY = 2;
-const ROSTER_LOOKUP_START_SPACING_MS = 250;
+const ROSTER_LOOKUP_CONCURRENCY = config.listcheckRosterLookupConcurrency;
+const ROSTER_LOOKUP_START_SPACING_MS = config.listcheckRosterLookupStartSpacingMs;
+const ROSTER_LOOKUP_TIMEOUT_MS = config.listcheckRosterLookupTimeoutMs;
+const SIMILAR_LOOKUP_LIMIT = config.listcheckSimilarLookupLimit;
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -38,6 +40,37 @@ const SERVER_NAMES = new Set([
   'brelshaza', 'kazeros', 'arcturus', 'enviska', 'valtan', 'mari',
   'akkan', 'vairgrys', 'bergstrom', 'danube', 'mokoko',
 ]);
+
+const ocrCache = new Map();
+
+function getCachedOcrNames(cacheKey) {
+  if (!cacheKey) return undefined;
+  const entry = ocrCache.get(cacheKey);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    ocrCache.delete(cacheKey);
+    return undefined;
+  }
+  ocrCache.delete(cacheKey);
+  ocrCache.set(cacheKey, entry);
+  return [...entry.names];
+}
+
+function setCachedOcrNames(cacheKey, names) {
+  if (!cacheKey || !Array.isArray(names)) return;
+  if (ocrCache.size >= config.ocrCacheMaxSize) {
+    const firstKey = ocrCache.keys().next().value;
+    ocrCache.delete(firstKey);
+  }
+  ocrCache.set(cacheKey, {
+    names: [...names],
+    expiresAt: Date.now() + config.ocrCacheTtlMs,
+  });
+}
+
+export function clearOcrCache() {
+  ocrCache.clear();
+}
 
 /** Gemini OCR prompt for Lost Ark waiting room screenshots */
 const GEMINI_PROMPT = [
@@ -99,6 +132,13 @@ export async function extractNamesFromImage(image) {
 
   if (image.contentType && !image.contentType.startsWith('image/')) {
     throw new Error('Attachment must be an image file.');
+  }
+
+  const cacheKey = image.url || '';
+  const cachedNames = getCachedOcrNames(cacheKey);
+  if (cachedNames !== undefined) {
+    console.log(`[listcheck] OCR cache hit for attachment ${image.id || cacheKey.slice(0, 32)}`);
+    return cachedNames;
   }
 
   const imageRes = await fetch(image.url, { signal: AbortSignal.timeout(15000) });
@@ -198,7 +238,9 @@ export async function extractNamesFromImage(image) {
     }
     if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
 
-    return filterAndDeduplicateNames(parsed);
+    const names = filterAndDeduplicateNames(parsed);
+    setCachedOcrNames(cacheKey, names);
+    return names;
   }
 
   throw new Error(`All Gemini models failed: ${failures.join(' | ')}`);
@@ -324,7 +366,11 @@ export async function checkNamesAgainstLists(names, options = {}) {
 
       if (!candidateNames) {
         await waitForRosterLookupSlot();
-        const suggestions = await fetchNameSuggestions(item.name) || [];
+        const suggestions = await fetchNameSuggestions(item.name, {
+          allowScraperApi: false,
+          fallbackOnRateLimit: false,
+          timeoutMs: ROSTER_LOOKUP_TIMEOUT_MS,
+        }) || [];
         const similarCandidates = suggestions
           .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== item.name.toLowerCase())
           .slice(0, 3);
@@ -359,6 +405,10 @@ export async function checkNamesAgainstLists(names, options = {}) {
       const rosterStartedAt = Date.now();
       const rosterResult = await buildRosterCharacters(item.name, {
         hiddenRosterFallback: true,
+        allowScraperApi: false,
+        fallbackOnRateLimit: false,
+        retryOnRateLimit: false,
+        timeoutMs: ROSTER_LOOKUP_TIMEOUT_MS,
       });
       item.hasRoster = rosterResult.hasValidRoster;
       item.failReason = rosterResult.failReason;
@@ -391,7 +441,8 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const noRosterItems = results.filter(
     (item) => !item.blackEntry && !item.whiteEntry && !item.watchEntry && !item.hasRoster
   );
-  await mapWithConcurrency(noRosterItems, ROSTER_LOOKUP_CONCURRENCY, attachSimilarNameCandidates);
+  const similarLookupItems = noRosterItems.slice(0, SIMILAR_LOOKUP_LIMIT);
+  await mapWithConcurrency(similarLookupItems, ROSTER_LOOKUP_CONCURRENCY, attachSimilarNameCandidates);
 
   const similarCandidateNames = [];
   const seenSimilarCandidateNames = new Set();

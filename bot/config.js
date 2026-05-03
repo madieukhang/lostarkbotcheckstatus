@@ -132,6 +132,18 @@ const config = {
    */
   listcheckAltEnrichmentEnabled: parseBooleanEnv('LISTCHECK_ALT_ENRICHMENT', false),
   listcheckAltEnrichmentLimit: parsePositiveIntEnv('LISTCHECK_ALT_ENRICHMENT_LIMIT', 1),
+  listcheckAltEnrichmentCandidateLimit: parsePositiveIntEnv('LISTCHECK_ALT_ENRICHMENT_CANDIDATE_LIMIT', 80),
+
+  /** OCR/list-check network bounds. These are direct-only by default; no ScraperAPI. */
+  listcheckMaxNames: parsePositiveIntEnv('LISTCHECK_MAX_NAMES', 8),
+  listcheckRosterLookupConcurrency: parsePositiveIntEnv('LISTCHECK_ROSTER_LOOKUP_CONCURRENCY', 3),
+  listcheckRosterLookupStartSpacingMs: parsePositiveIntEnv('LISTCHECK_ROSTER_LOOKUP_START_SPACING_MS', 150),
+  listcheckRosterLookupTimeoutMs: parsePositiveIntEnv('LISTCHECK_ROSTER_LOOKUP_TIMEOUT_MS', 6000),
+  listcheckSimilarLookupLimit: parsePositiveIntEnv('LISTCHECK_SIMILAR_LOOKUP_LIMIT', 3),
+
+  /** Short-lived Gemini OCR result cache for repeated checks of the same attachment URL. */
+  ocrCacheTtlMs: parsePositiveIntEnv('OCR_CACHE_TTL_MS', 5 * 60 * 1000),
+  ocrCacheMaxSize: parsePositiveIntEnv('OCR_CACHE_MAX_SIZE', 100),
 
   /**
    * Stronghold deep scans are intentionally bounded. Matching alts requires
@@ -168,6 +180,8 @@ const config = {
    */
   metaCacheTtlMs: parsePositiveIntEnv('META_CACHE_TTL_MS', 30 * 60 * 1000),
   metaCacheMaxSize: parsePositiveIntEnv('META_CACHE_MAX_SIZE', 5000),
+  guildMembersCacheTtlMs: parsePositiveIntEnv('GUILD_MEMBERS_CACHE_TTL_MS', 15 * 60 * 1000),
+  guildMembersCacheMaxSize: parsePositiveIntEnv('GUILD_MEMBERS_CACHE_MAX_SIZE', 200),
 
   /**
    * Adaptive backoff bounds for the deep-scan worker. The worker has

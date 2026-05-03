@@ -82,11 +82,12 @@ export function createCheckHandlers({ client }) {
       return;
     }
 
-    const limitedNames = names.slice(0, 8);
+    const maxNames = config.listcheckMaxNames;
+    const limitedNames = names.slice(0, maxNames);
     await interaction.editReply({
       content: [
         `🔍 Extracted **${limitedNames.length}** name(s) — checking lists & roster...`,
-        limitedNames.length < names.length ? `Ignored **${names.length - limitedNames.length}** extra name(s) (limit: 8).` : null,
+        limitedNames.length < names.length ? `Ignored **${names.length - limitedNames.length}** extra name(s) (limit: ${maxNames}).` : null,
       ].filter(Boolean).join('\n'),
     });
 
@@ -96,7 +97,7 @@ export function createCheckHandlers({ client }) {
 
       const sections = [
         `Checked: **${limitedNames.length}** name(s)`,
-        limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: 8)` : null,
+        limitedNames.length < names.length ? `Ignored: **${names.length - limitedNames.length}** extra name(s) (limit: ${maxNames})` : null,
         '',
         ...lines,
       ].filter((line) => line !== null);
