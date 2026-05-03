@@ -97,7 +97,7 @@ export function createEnrichHandlers({ client, services }) {
   async function handleListEnrichCommand(interaction) {
     if (!isOfficerOrSenior(interaction.user.id)) {
       await interaction.reply({
-        content: '⛔ Only officers/senior approvers can run `/list enrich`.',
+        content: '⛔ Only officers/senior approvers can run `/la-list enrich`.',
         ephemeral: true,
       });
       return;
@@ -282,7 +282,7 @@ export function createEnrichHandlers({ client, services }) {
     const session = sessions.get(sessionId);
     if (!session) {
       await interaction.reply({
-        content: '⚠️ This enrich session has expired. Re-run `/list enrich` to try again.',
+        content: '⚠️ This enrich session has expired. Re-run `/la-list enrich` to try again.',
         ephemeral: true,
       });
       return;

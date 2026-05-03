@@ -1,6 +1,6 @@
 /**
  * statsHandler.js
- * Handles /lastats command — shows bot usage statistics.
+ * Handles /la-stats command — shows bot usage statistics.
  */
 
 import { EmbedBuilder } from 'discord.js';
