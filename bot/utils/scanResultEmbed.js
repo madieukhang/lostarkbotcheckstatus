@@ -173,6 +173,9 @@ export function buildScanResultEmbed({
     `**Found** ${alts.length}`,
     `**Failed** ${result.failedCandidates ?? 0}`,
   ];
+  if ((result.rateLimitRetries ?? 0) > 0) {
+    statsParts.push(`**429 retries** ${result.rateLimitRetries}`);
+  }
   if (state.remaining > 0) {
     statsParts.push(`**Remaining** ${state.remaining}`);
   }

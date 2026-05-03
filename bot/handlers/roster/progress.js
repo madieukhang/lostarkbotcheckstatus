@@ -15,7 +15,7 @@ const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
  * tick because the post-scan branch overwrites the embed immediately
  * afterwards (would flicker for ms).
  */
-export function makeRosterScanProgressCallback({ interaction, name, meta, totalMembers, startedAtRef, lastEditRef, cancelFlag, sessionId }) {
+export function makeRosterScanProgressCallback({ interaction, replyEditor, name, meta, totalMembers, startedAtRef, lastEditRef, cancelFlag, sessionId }) {
   return (progress) => {
     const now = Date.now();
     const isFinal = progress.scannedCandidates >= progress.totalCandidates;
@@ -27,7 +27,10 @@ export function makeRosterScanProgressCallback({ interaction, name, meta, totalM
     const buttonRow = cancelFlag?.cancelled
       ? buildStopButtonRow(sessionId, { disabled: true, label: 'Stopping...' })
       : buildStopButtonRow(sessionId);
-    interaction.editReply({
+    const edit = replyEditor?.edit
+      ? replyEditor.edit.bind(replyEditor)
+      : interaction.editReply.bind(interaction);
+    edit({
       content: '',
       embeds: [buildScanProgressEmbed({
         title: `Stronghold scan in progress · ${name}`,

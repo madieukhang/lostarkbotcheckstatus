@@ -70,6 +70,7 @@ import {
   getScan,
 } from '../../../utils/scanSession.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../../utils/scanCompletionDm.js';
+import { createLongRunningReplyEditor } from '../../../utils/longRunningReply.js';
 
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
 // ~40-60 updates over a 10-15 minute gentle-mode scan; well under the
@@ -108,14 +109,15 @@ export function createEnrichHandlers({ client, services }) {
    *   resume: the session's scannedNames feed excludeNames so the next pass
    *   skips already-visited candidates, and the result is merged into
    *   session.allDiscoveredAlts rather than starting fresh.
-   */
+  */
   async function runEnrichFlow(interaction, { name, cap, existingSession = null }) {
     await connectDB();
     const resolvedCap = cap ?? config.strongholdDeepCandidateLimit;
+    const replyEditor = createLongRunningReplyEditor(interaction);
 
     const found = await findEntryByName(name);
     if (!found) {
-      await interaction.editReply({
+      await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: 'No List Entry',
@@ -139,7 +141,7 @@ export function createEnrichHandlers({ client, services }) {
     } else {
       const probe = await buildRosterCharacters(name, { hiddenRosterFallback: true });
       if (!probe.hasValidRoster) {
-        await interaction.editReply({
+        await replyEditor.edit({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.ERROR,
             title: 'Profile Not Found',
@@ -161,7 +163,7 @@ export function createEnrichHandlers({ client, services }) {
       timeoutMs: config.strongholdDeepCandidateTimeoutMs,
     });
     if (!meta) {
-      await interaction.editReply({
+      await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: 'Profile Not Found',
@@ -173,7 +175,7 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
     if (!meta.guildName) {
-      await interaction.editReply({
+      await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: 'No Guild on Bible',
@@ -193,7 +195,7 @@ export function createEnrichHandlers({ client, services }) {
       cacheKey: meta.guildName,
     });
     if (guildMembers.length === 0) {
-      await interaction.editReply({
+      await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: 'Guild Member List Unavailable',
@@ -235,7 +237,7 @@ export function createEnrichHandlers({ client, services }) {
       startedAt,
     };
     const stopRow = buildStopButtonRow(sessionId);
-    await interaction.editReply({
+    await replyEditor.edit({
       content: '',
       embeds: [buildEnrichProgressEmbed({
         entry: found.entry,
@@ -256,7 +258,7 @@ export function createEnrichHandlers({ client, services }) {
       const buttonRow = cancelFlag.cancelled
         ? buildStopButtonRow(sessionId, { disabled: true, label: 'Stopping...' })
         : stopRow;
-      interaction.editReply({
+      replyEditor.edit({
         content: '',
         embeds: [buildEnrichProgressEmbed({
           entry: found.entry,
@@ -290,7 +292,7 @@ export function createEnrichHandlers({ client, services }) {
     // we already validated meta + guild upstream so null is unexpected,
     // but render a clean error rather than crashing the editReply.
     if (!result) {
-      await interaction.editReply({
+      await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: `Scan failed · ${name}`,
@@ -314,6 +316,8 @@ export function createEnrichHandlers({ client, services }) {
     ];
     const cumulativeScanned = (existingSession?.scanStats?.scanned ?? 0) + (result.scannedCandidates || 0);
     const cumulativeFailed = (existingSession?.scanStats?.failed ?? 0) + (result.failedCandidates || 0);
+    const cumulativeRateLimitRetries =
+      (existingSession?.scanStats?.rateLimitRetries ?? 0) + (result.rateLimitRetries || 0);
 
     // Diff against entry.allCharacters to surface only NEW alts. Names
     // are stored case-sensitive in the DB so we lowercase both sides
@@ -337,6 +341,7 @@ export function createEnrichHandlers({ client, services }) {
         scanStats: {
           scanned: cumulativeScanned,
           failed: cumulativeFailed,
+          rateLimitRetries: cumulativeRateLimitRetries,
           totalAlts: cumulativeAlts.length,
           guildName: meta.guildName,
         },
@@ -361,6 +366,7 @@ export function createEnrichHandlers({ client, services }) {
         scanStats: {
           scanned: cumulativeScanned,
           failed: cumulativeFailed,
+          rateLimitRetries: cumulativeRateLimitRetries,
           totalAlts: cumulativeAlts.length,
           guildName: meta.guildName,
         },
@@ -375,6 +381,7 @@ export function createEnrichHandlers({ client, services }) {
       ...result,
       scannedCandidates: cumulativeScanned,
       failedCandidates: cumulativeFailed,
+      rateLimitRetries: cumulativeRateLimitRetries,
       alts: cumulativeAlts,
       scannedNames: cumulativeScannedNames,
     };
@@ -424,7 +431,7 @@ export function createEnrichHandlers({ client, services }) {
       newAltsCount: newAlts.length,
     });
 
-    await interaction.editReply({
+    await replyEditor.edit({
       content: '',
       embeds: [embed],
       components: buttonRow ? [buttonRow] : [],
@@ -438,7 +445,7 @@ export function createEnrichHandlers({ client, services }) {
     else if (cumulativeAlts.length === 0) outcome = 'no-alts';
     else outcome = 'completed';
     try {
-      const reply = await interaction.fetchReply().catch(() => null);
+      const reply = replyEditor.getMessage();
       sendScanCompletionDm({
         user: interaction.user,
         commandLabel: '/la-list enrich',

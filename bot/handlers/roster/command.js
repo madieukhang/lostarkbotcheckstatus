@@ -22,6 +22,7 @@ import {
 import { normalizeCharacterName } from '../../utils/names.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
+import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
 
@@ -40,6 +41,7 @@ export async function handleRosterCommand(interaction) {
     useScraperApiForCandidates: false,
   };
   await interaction.deferReply();
+  const replyEditor = createLongRunningReplyEditor(interaction);
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
@@ -51,7 +53,7 @@ export async function handleRosterCommand(interaction) {
     const characters = await parseRosterCharactersFromHtml(html, document);
 
     if (characters.length === 0) {
-      await handleHiddenRosterResult({ interaction, name, deep, deepOptions });
+      await handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions });
       return;
     }
 
@@ -179,19 +181,19 @@ export async function handleRosterCommand(interaction) {
     }
 
     const visibleDeep = deep
-      ? await runVisibleRosterDeepScan({ interaction, name, deepOptions, embed, contentLines })
+      ? await runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed, contentLines })
       : { resultEmbed: null, components: [], result: null, meta: null };
 
     const content = contentLines.length > 0 ? contentLines.join('\n') : undefined;
 
     if (visibleDeep.resultEmbed) embeds.push(visibleDeep.resultEmbed);
-    await interaction.editReply({ content, embeds, components: visibleDeep.components });
+    await replyEditor.edit({ content, embeds, components: visibleDeep.components });
 
     // DM the caller when a deep scan was actually run (skip plain
     // /la-roster which finishes in seconds and doesn't warrant a
     // notification ping).
     if (deep && visibleDeep.result) {
-      const replyMsg = await interaction.fetchReply().catch(() => null);
+      const replyMsg = replyEditor.getMessage();
       let outcome;
       if (visibleDeep.result.cancelled) {
         outcome = visibleDeep.result.alts.length > 0 ? 'stopped-with-alts' : 'stopped-no-alts';
@@ -210,7 +212,7 @@ export async function handleRosterCommand(interaction) {
       }).catch(() => {});
     }
   } catch (err) {
-    await interaction.editReply({
+    await replyEditor.edit({
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
         title: 'Roster Fetch Failed',

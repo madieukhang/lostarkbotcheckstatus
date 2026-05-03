@@ -83,9 +83,12 @@ async function fetchMetaResponse(url, name, phase, options = {}) {
       }
 
       const delayMs = parseRetryAfterMs(res, fallbackDelayMs);
-      console.warn(
-        `[alt-detect] HTTP ${res.status} on ${phase} meta for ${name}, waiting ${delayMs}ms to retry...`
-      );
+      options.onRetryableStatus?.({ status: res.status, phase, name, attempt, delayMs });
+      if (!options.suppressRetryWarnings) {
+        console.warn(
+          `[alt-detect] HTTP ${res.status} on ${phase} meta for ${name}, waiting ${delayMs}ms to retry...`
+        );
+      }
       await sleep(delayMs);
     } catch (err) {
       if (attempt === maxAttempts || options.retryOnRateLimit === false) {

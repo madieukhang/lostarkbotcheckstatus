@@ -80,6 +80,11 @@ export function buildScanProgressEmbed({
     ? `\n*Started ${relativeTime(progress.startedAt)}*`
     : '';
   const altsBlock = buildAltsBlock(progress.alts);
+  const footerParts = [`Backoff ${progress.currentBackoffMs}ms`];
+  if ((progress.rateLimitRetries ?? 0) > 0) {
+    footerParts.push(`429 retries ${progress.rateLimitRetries}`);
+  }
+  footerParts.push('15s update interval');
 
   return buildAlertEmbed({
     severity: AlertSeverity.INFO,
@@ -95,7 +100,7 @@ export function buildScanProgressEmbed({
       altsBlock +
       startedLine
     ).slice(0, 4096),
-    footer: `Backoff ${progress.currentBackoffMs}ms · 15s update interval`,
+    footer: footerParts.join(' · '),
     timestamp: false,
   });
 }

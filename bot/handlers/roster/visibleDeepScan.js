@@ -21,7 +21,7 @@ import {
 import { createRosterDeepSession } from '../../utils/rosterDeepSession.js';
 import { makeRosterScanProgressCallback } from './progress.js';
 
-export async function runVisibleRosterDeepScan({ interaction, name, deepOptions, embed, contentLines }) {
+export async function runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed, contentLines }) {
     // Visible-roster deep scan: hoist these to the function scope so
     // the post-editReply DM block at the bottom can reference them.
     let visibleDeepResult = null;
@@ -69,7 +69,7 @@ export async function runVisibleRosterDeepScan({ interaction, name, deepOptions,
             startedAt: startedAtRef.value,
             label: `${name} (roster deep · visible)`,
           });
-          await interaction.editReply({
+          await replyEditor.edit({
             content: '',
             embeds: [buildScanProgressEmbed({
               title: `Stronghold scan in progress · ${name}`,
@@ -99,6 +99,7 @@ export async function runVisibleRosterDeepScan({ interaction, name, deepOptions,
             onProgress: hasGuildContext
               ? makeRosterScanProgressCallback({
                   interaction,
+                  replyEditor,
                   name,
                   meta: visMeta,
                   totalMembers: visGuildMembers.length,
@@ -144,6 +145,7 @@ export async function runVisibleRosterDeepScan({ interaction, name, deepOptions,
               cap: deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit,
               scanStats: {
                 failed: altResult.failedCandidates || 0,
+                rateLimitRetries: altResult.rateLimitRetries || 0,
               },
               // primaryEmbedJSON captured AFTER editReply below; we
               // overwrite it here with the working embed snapshot so

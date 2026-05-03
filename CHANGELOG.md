@@ -4,6 +4,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.56] - 2026-05-03
+
+### Fixed
+- Long-running `/la-list enrich` and `/la-roster deep:true` scans no longer fail with `DiscordAPIError[50027]: Invalid Webhook Token` after Discord's ~15-minute interaction webhook window expires. After the first progress card is created, scan flows now keep the Discord `Message` object and update it with `message.edit()` via the bot token for progress/final cards.
+- Stronghold deep scans now react to lostark.bible `429` responses even when the retry eventually succeeds. Candidate pacing ramps up to an 8s gentle-mode ceiling after rate-limit retries, and per-candidate retry warnings are suppressed in gentle scans so logs no longer fill with red `HTTP 429 ... waiting ...` lines. Progress/result cards surface a compact `429 retries` count instead.
+
+### Notes
+- This specifically covers scan runs that exceed the original interaction token lifetime, such as large guild scans still in progress around 30+ minutes.
+
 ## [v0.5.55] - 2026-05-03
 
 ### Fixed
