@@ -4,6 +4,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.31] - 2026-05-03
+
+### Removed
+- Phase 4d cleanup: `bot/utils/deprecation.js` and `test/deprecation.test.js` deleted; the import + `usedLegacyName` finally block in `bot.js` are gone. The deprecation banner served its purpose during the (compressed) Phase 4b window; with the legacy aliases unregistered in Phase 4c, no slash invocation can reach a legacy name anymore so the helper has no callers.
+
+### Notes
+- Test count drops from 26 to 17 (9 deprecation tests removed alongside the helper).
+- Phase 4 is now complete. Final command surface: 8 public + 2 owner commands, all `/la-` prefixed.
+
 ## [v0.5.30] - 2026-05-03
 
 ### Removed (BREAKING)
