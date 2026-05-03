@@ -159,7 +159,12 @@ LostArk_LoaLogs/
 │   │   │   ├── trust/              # /la-list trust
 │   │   │   ├── quickadd/           # quick-add select + modal (used by /la-check)
 │   │   │   ├── enrich/             # /la-list enrich
-│   │   │   └── multiadd/           # /la-list multiadd + confirm/approval
+│   │   │   └── multiadd/           # /la-list multiadd command + scoped helpers
+│   │   │       ├── index.js        # command router + pending upload state
+│   │   │       ├── attachment.js   # file validation + CDN download
+│   │   │       ├── ui.js           # template/preview embeds + buttons
+│   │   │       ├── confirmButton.js # requester confirm/cancel execution flow
+│   │   │       └── approvalButton.js # Senior approve/reject flow
 │   │   ├── rosterHandler.js        # /la-roster + Stronghold alt detection + progression
 │   │   ├── searchHandler.js        # /la-search (similar-name scan)
 │   │   ├── setupHandler.js         # Thin exports for /la-setup + /la-remote
@@ -172,7 +177,11 @@ LostArk_LoaLogs/
 │   │   └── systemHandlers.js       # /la-status, /la-reset
 │   ├── services/
 │   │   ├── listCheckService.js          # Shared OCR + name matching + embed formatting
-│   │   ├── multiaddTemplateService.js   # Excel template generator + parser (zero-dep)
+│   │   ├── multiaddTemplateService.js   # Public facade for Excel template/parser
+│   │   ├── multiadd/                    # Excel multiadd internals
+│   │   │   ├── template.js              # Entries worksheet generator
+│   │   │   ├── instructionsSheet.js     # Instructions worksheet generator
+│   │   │   └── parser.js                # Uploaded .xlsx parser/validator
 │   │   ├── rosterService.js             # Public facade for roster modules
 │   │   └── roster/                      # lostark.bible fetch/search/parse/deep-scan internals
 │   │       ├── bibleFetch.js            # Direct fetch + ScraperAPI fallback
