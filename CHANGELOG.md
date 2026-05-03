@@ -4,6 +4,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.48] - 2026-05-03
+
+### Changed
+- `/la-status` server status card polished. Author header replaces bare title; new headline at the top of the description summarises overall health (`All monitored servers online` / `Some servers are offline` / `Maintenance window in progress`) so the embed reads at a glance without parsing per-server fields. Per-server status entries stay as inline fields with the same status glyphs (🟢/🔴/🟡). Footer cites the source page (`playlostark.com`) and tells the user how to refresh.
+- `STATUS_GLYPH` lookup table replaces the inline glyph switch so the same icons are reused in the description headline and the field values.
+
+### Notes
+- 42/42 tests pass.
+
 ## [v0.5.47] - 2026-05-03
 
 ### Changed
