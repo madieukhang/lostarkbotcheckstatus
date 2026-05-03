@@ -503,7 +503,7 @@ export const FETCH_HEADERS = {
 
 /**
  * Fetch a character's meta from lostark.bible (Stronghold, Roster Level, Guild).
- * Uses direct fetch (no ScraperAPI) since lostark.bible character pages are accessible.
+ * Callers can pass allowScraperApi:false for bounded direct-only paths.
  * @param {string} name
  * @returns {Promise<object|null>}
  */
