@@ -13,7 +13,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
   const allowScraperApiForGuild = options.allowScraperApiForGuild !== false;
 
   // Mode selection. The Phase 1 verification scan that found Ainslinn's
-  // 5 alts ran in 'gentle' mode (sequential, 1.5s throttle, retry-on-429).
+  // 5 alts ran in 'gentle' mode (sequential, 1.5s throttle, transient retry).
   // 'fast' mode (concurrency 3, no retry, 300ms backoff floor) was the
   // original production default; Bao's 2026-05-03 peak-hour run on
   // Ainslinn hit 100% failure with fast mode because bible was
@@ -74,7 +74,7 @@ export async function detectAltsViaStronghold(name, options = {}) {
   console.log(
     `[alt-detect] ${candidates.length} candidate(s) after filtering ilvl >= 1700; scanning ${limitedCandidates.length}`
     + (skippedCandidates > 0 ? `, skipping ${skippedCandidates} by limit` : '')
-    + `. Mode: ${mode}. Candidate ScraperAPI: ${useScraperApiForCandidates ? 'on' : 'off'}. Concurrency: ${concurrency}. Retry-on-429: ${retryOnRateLimit ? 'on' : 'off'}.`
+    + `. Mode: ${mode}. Candidate ScraperAPI: ${useScraperApiForCandidates ? 'on' : 'off'}. Concurrency: ${concurrency}. Transient retry: ${retryOnRateLimit ? 'on' : 'off'}.`
   );
 
   const alts = [];

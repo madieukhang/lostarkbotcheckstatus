@@ -142,6 +142,67 @@ test('fetchCharacterMeta caches successful profile meta by character name', asyn
   }
 });
 
+test('fetchCharacterMeta retries transient profile failures with fresh timeout signals', async () => {
+  clearMetaCache();
+  const originalFetch = globalThis.fetch;
+  const requestedUrls = [];
+  const signals = [];
+  let fetchCalls = 0;
+
+  globalThis.fetch = async (url, options = {}) => {
+    fetchCalls += 1;
+    requestedUrls.push(String(url));
+    signals.push(options.signal);
+
+    if (fetchCalls === 1) {
+      return new Response('busy', { status: 503 });
+    }
+
+    return Response.json({
+      nodes: [
+        {
+          data: [
+            { header: 1 },
+            { rosterLevel: 2, stronghold: 3, guild: 6, class: 9, ilvl: 10 },
+            300,
+            { level: 4, name: 5 },
+            70,
+            'RetryHome',
+            { name: 7, grade: 8 },
+            'RetryGuild',
+            'Member',
+            'bard',
+            1725.55,
+          ],
+        },
+      ],
+    });
+  };
+
+  try {
+    const result = await fetchCharacterMeta('RetryName', {
+      useCache: false,
+      allowScraperApi: false,
+      retryOnRateLimit: true,
+      timeoutMs: 8000,
+      rateLimitRetryDelayMs: 1,
+    });
+
+    assert.equal(fetchCalls, 2);
+    assert.deepEqual(requestedUrls, [
+      'https://lostark.bible/character/NA/RetryName/__data.json',
+      'https://lostark.bible/character/NA/RetryName/__data.json',
+    ]);
+    assert.ok(signals[0]);
+    assert.ok(signals[1]);
+    assert.notStrictEqual(signals[0], signals[1]);
+    assert.equal(result.strongholdName, 'RetryHome');
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearMetaCache();
+  }
+});
+
 test('detectAltsViaStronghold reuses provided meta and guild members without target lookups', async () => {
   clearMetaCache();
   const originalFetch = globalThis.fetch;
