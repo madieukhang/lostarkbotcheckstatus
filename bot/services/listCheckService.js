@@ -72,6 +72,10 @@ export function clearOcrCache() {
   ocrCache.clear();
 }
 
+export function shouldCacheRosterLookupResult(rosterResult) {
+  return rosterResult?.hasValidRoster === true;
+}
+
 /** Gemini OCR prompt for Lost Ark waiting room screenshots */
 const GEMINI_PROMPT = [
   'This is a screenshot of a Lost Ark raid waiting room (party finder lobby).',
@@ -417,22 +421,24 @@ export async function checkNamesAgainstLists(names, options = {}) {
         `[listcheck] Roster lookup: ${item.name} (hasRoster: ${item.hasRoster}) in ${Date.now() - rosterStartedAt}ms`
       );
 
-      try {
-        await RosterCache.findOneAndUpdate(
-          { name: item.name },
-          {
-            $set: {
-              name: item.name,
-              hasRoster: rosterResult.hasValidRoster,
-              allCharacters: rosterResult.allCharacters || [],
-              failReason: rosterResult.failReason || '',
-              cachedAt: new Date(),
+      if (shouldCacheRosterLookupResult(rosterResult)) {
+        try {
+          await RosterCache.findOneAndUpdate(
+            { name: item.name },
+            {
+              $set: {
+                name: item.name,
+                hasRoster: rosterResult.hasValidRoster,
+                allCharacters: rosterResult.allCharacters || [],
+                failReason: '',
+                cachedAt: new Date(),
+              },
             },
-          },
-          { upsert: true, returnDocument: 'after', collation }
-        );
-      } catch (err) {
-        console.warn(`[listcheck] Cache save failed for ${item.name}:`, err.message);
+            { upsert: true, returnDocument: 'after', collation }
+          );
+        } catch (err) {
+          console.warn(`[listcheck] Cache save failed for ${item.name}:`, err.message);
+        }
       }
 
     }
