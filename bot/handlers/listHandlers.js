@@ -1,34 +1,34 @@
 /**
  * listHandlers.js
  *
- * Thin orchestrator for the /list * command family. Each command family
- * lives in its own factory module under ./list/; this file only wires
+ * Thin orchestrator for the /la-list * command family. Each command family
+ * lives in its own factory folder under ./list/; this file only wires
  * shared services into each factory and exposes the unified handler
  * object that bot.js plugs into the interaction router.
  *
  * Module map:
  *   ./list/helpers.js     - pure module-level helpers (no closure on client)
- *   ./list/services.js    - shared closure services (broadcast, approval, persistence, bulk)
- *   ./list/add.js         - /list add + 3 button handlers (approval/viewevidence/overwrite)
- *   ./list/edit.js        - /list edit
- *   ./list/remove.js      - /list remove
- *   ./list/view.js        - /list view (paginated browse)
- *   ./list/check.js       - /listcheck (OCR screenshot)
- *   ./list/trust.js       - /list trust
- *   ./list/quickadd.js    - quick-add select + modal (used by /listcheck flow)
- *   ./list/multiadd.js    - /list multiadd + 2 button handlers (confirm/approval)
+ *   ./list/services/     - shared closure services (approval, persistence, broadcast, bulk)
+ *   ./list/add/          - /la-list add + 3 button handlers (approval/viewevidence/overwrite)
+ *   ./list/edit/         - /la-list edit
+ *   ./list/remove/       - /la-list remove
+ *   ./list/view/         - /la-list view (paginated browse)
+ *   ./list/check/        - /la-check (OCR screenshot)
+ *   ./list/trust/        - /la-list trust
+ *   ./list/quickadd/     - quick-add select + modal (used by /la-check flow)
+ *   ./list/multiadd/     - /la-list multiadd + 2 button handlers (confirm/approval)
  */
 
-import { createSharedServices } from './list/services.js';
-import { createAddHandlers } from './list/add.js';
-import { createCheckHandlers } from './list/check.js';
-import { createEditHandlers } from './list/edit.js';
-import { createEnrichHandlers } from './list/enrich.js';
-import { createMultiaddHandlers } from './list/multiadd.js';
-import { createQuickAddHandlers } from './list/quickadd.js';
-import { createRemoveHandlers } from './list/remove.js';
-import { createTrustHandlers } from './list/trust.js';
-import { createViewHandlers } from './list/view.js';
+import { createSharedServices } from './list/services/index.js';
+import { createAddHandlers } from './list/add/index.js';
+import { createCheckHandlers } from './list/check/index.js';
+import { createEditHandlers } from './list/edit/index.js';
+import { createEnrichHandlers } from './list/enrich/index.js';
+import { createMultiaddHandlers } from './list/multiadd/index.js';
+import { createQuickAddHandlers } from './list/quickadd/index.js';
+import { createRemoveHandlers } from './list/remove/index.js';
+import { createTrustHandlers } from './list/trust/index.js';
+import { createViewHandlers } from './list/view/index.js';
 
 export function createListHandlers({ client }) {
   const services = createSharedServices({ client });

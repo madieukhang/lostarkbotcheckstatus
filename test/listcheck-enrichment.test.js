@@ -22,6 +22,17 @@ test('selectFlaggedItemsForEnrichment returns only flagged list hits and respect
   );
 });
 
+test('selectFlaggedItemsForEnrichment deduplicates repeated hits for the same entry', () => {
+  const sharedEntry = { _id: 'same-entry', name: 'MainHit' };
+  const first = { name: 'AltOne', blackEntry: sharedEntry };
+  const second = { name: 'AltTwo', blackEntry: sharedEntry };
+
+  assert.deepEqual(
+    selectFlaggedItemsForEnrichment([first, second], 10),
+    [first]
+  );
+});
+
 test('queueFlaggedListEntryEnrichment skips Stronghold scan when disabled', () => {
   const result = queueFlaggedListEntryEnrichment(
     [{ name: 'BlackHit', blackEntry: { _id: 'b1', name: 'BlackHit' } }],

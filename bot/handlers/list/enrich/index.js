@@ -1,13 +1,13 @@
 /**
- * /list enrich <name>
+ * /la-list enrich <name>
  *
  * Run a stronghold deep scan against an existing list entry and append
  * the discovered alts to its `allCharacters` array. The entry must
- * already exist (created via `/list add` or `/list multiadd`); this
+ * already exist (created via `/la-list add` or `/la-list multiadd`); this
  * command does NOT create entries, only enriches them.
  *
  * Why this is a separate command:
- *   - `/list add` is on the user-facing fast path and must reply within
+ *   - `/la-list add` is on the user-facing fast path and must reply within
  *     Discord's 3s defer budget. Stronghold deep scans take 5-7 minutes
  *     in production with the new cap (300) and concurrency (3).
  *   - Most adds do not need a deep scan: visible-roster characters
@@ -39,18 +39,18 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 
-import { connectDB } from '../../db.js';
-import config from '../../config.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import Watchlist from '../../models/Watchlist.js';
-import { getClassName } from '../../models/Class.js';
+import { connectDB } from '../../../db.js';
+import config from '../../../config.js';
+import Blacklist from '../../../models/Blacklist.js';
+import Whitelist from '../../../models/Whitelist.js';
+import Watchlist from '../../../models/Watchlist.js';
+import { getClassName } from '../../../models/Class.js';
 import {
   fetchCharacterMeta,
   detectAltsViaStronghold,
-} from '../../services/rosterService.js';
-import { normalizeCharacterName } from '../../utils/names.js';
-import { isOfficerOrSenior } from './helpers.js';
+} from '../../../services/rosterService.js';
+import { normalizeCharacterName } from '../../../utils/names.js';
+import { isOfficerOrSenior } from '../helpers.js';
 
 const ENRICH_COOLDOWN_MS = 30 * 1000;
 const SESSION_TTL_MS = 5 * 60 * 1000;
@@ -125,7 +125,7 @@ export function createEnrichHandlers({ client, services }) {
     const found = await findEntryByName(name);
     if (!found) {
       await interaction.editReply({
-        content: `❌ No list entry found for **${name}**. Use \`/list add\` to create one first.`,
+        content: `❌ No list entry found for **${name}**. Use \`/la-list add\` to create one first.`,
       });
       return;
     }

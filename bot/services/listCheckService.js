@@ -1,7 +1,7 @@
 /**
  * listCheckService.js
  * Shared logic for checking character names against blacklist/whitelist/watchlist.
- * Used by both /listcheck command and auto-check channel handler.
+ * Used by both /la-check command and auto-check channel handler.
  */
 
 import { connectDB } from '../db.js';
@@ -23,7 +23,7 @@ import {
   normalizeCharacterName,
   getAddedByDisplay,
 } from '../utils/names.js';
-import { buildBlacklistQuery, isOwnerGuild as checkOwner } from '../utils/scope.js';
+import { buildBlacklistQuery } from '../utils/scope.js';
 import { mapWithConcurrency, sleep } from '../utils/async.js';
 
 const ROSTER_LOOKUP_CONCURRENCY = 2;
@@ -228,7 +228,6 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const collation = { locale: 'en', strength: 2 };
 
   // Blacklist: scope-aware query (owner sees all, others see global + own server)
-  const isOwnerGuild = checkOwner(guildId);
   const blackQuery = buildBlacklistQuery(nameQuery, guildId);
 
   const [allBlack, allWhite, allWatch, allTrusted] = await Promise.all([
@@ -317,7 +316,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     if (waitMs > 0) await sleep(waitMs);
   }
 
-  async function attachSimilarNames(item) {
+  async function attachSimilarNameCandidates(item) {
     try {
       let candidateNames = item._cachedSearchSuggestions?.length > 0
         ? item._cachedSearchSuggestions.map((s) => s.name)
@@ -346,29 +345,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
         }
       }
 
-      if (candidateNames.length > 0) {
-        const simQuery = { $or: [{ name: { $in: candidateNames } }, { allCharacters: { $in: candidateNames } }] };
-        const simBlackQuery = buildBlacklistQuery(simQuery, guildId);
-        const [simBlack, simWhite, simWatch] = await Promise.all([
-          Blacklist.find(simBlackQuery).collation(collation).lean(),
-          Whitelist.find(simQuery).collation(collation).lean(),
-          Watchlist.find(simQuery).collation(collation).lean(),
-        ]);
-
-        const simBlackMap = buildEntryMap(simBlack);
-        const simWhiteMap = buildEntryMap(simWhite);
-        const simWatchMap = buildEntryMap(simWatch);
-
-        item.similarNames = candidateNames.map((name) => {
-          const lower = name.toLowerCase();
-          let flag = '';
-          if (simBlackMap.has(lower)) flag += '⛔';
-          if (simWhiteMap.has(lower)) flag += '✅';
-          if (simWatchMap.has(lower)) flag += '⚠️';
-          if (!flag) flag = '❓';
-          return { name, flag };
-        });
-      }
+      item._similarCandidateNames = candidateNames;
     } catch (err) {
       console.warn(`[listcheck] Similar name search failed for ${item.name}:`, err.message);
     }
@@ -414,7 +391,62 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const noRosterItems = results.filter(
     (item) => !item.blackEntry && !item.whiteEntry && !item.watchEntry && !item.hasRoster
   );
-  await mapWithConcurrency(noRosterItems, ROSTER_LOOKUP_CONCURRENCY, attachSimilarNames);
+  await mapWithConcurrency(noRosterItems, ROSTER_LOOKUP_CONCURRENCY, attachSimilarNameCandidates);
+
+  const similarCandidateNames = [];
+  const seenSimilarCandidateNames = new Set();
+  for (const item of noRosterItems) {
+    for (const candidateName of item._similarCandidateNames || []) {
+      const normalizedCandidateName = typeof candidateName === 'string' ? candidateName.trim() : '';
+      if (!normalizedCandidateName) continue;
+
+      const key = normalizedCandidateName.toLowerCase();
+      if (seenSimilarCandidateNames.has(key)) continue;
+      seenSimilarCandidateNames.add(key);
+      similarCandidateNames.push(normalizedCandidateName);
+    }
+  }
+
+  if (similarCandidateNames.length > 0) {
+    try {
+      const simQuery = {
+        $or: [
+          { name: { $in: similarCandidateNames } },
+          { allCharacters: { $in: similarCandidateNames } },
+        ],
+      };
+      const simBlackQuery = buildBlacklistQuery(simQuery, guildId);
+      const [simBlack, simWhite, simWatch] = await Promise.all([
+        Blacklist.find(simBlackQuery).collation(collation).lean(),
+        Whitelist.find(simQuery).collation(collation).lean(),
+        Watchlist.find(simQuery).collation(collation).lean(),
+      ]);
+
+      const simBlackMap = buildEntryMap(simBlack);
+      const simWhiteMap = buildEntryMap(simWhite);
+      const simWatchMap = buildEntryMap(simWatch);
+
+      for (const item of noRosterItems) {
+        const candidateNames = item._similarCandidateNames || [];
+        if (candidateNames.length === 0) continue;
+
+        item.similarNames = candidateNames
+          .map((candidateName) => (typeof candidateName === 'string' ? candidateName.trim() : ''))
+          .filter(Boolean)
+          .map((candidateName) => {
+            const lower = candidateName.toLowerCase();
+            let flag = '';
+            if (simBlackMap.has(lower)) flag += '⛔';
+            if (simWhiteMap.has(lower)) flag += '✅';
+            if (simWatchMap.has(lower)) flag += '⚠️';
+            if (!flag) flag = '❓';
+            return { name: candidateName, flag };
+          });
+      }
+    } catch (err) {
+      console.warn('[listcheck] Similar name list cross-check failed:', err.message);
+    }
+  }
 
   // Phase 3: Resolve trusted status via allCharacters (alt detection)
   // Collect all roster names from list entries + roster results to check against TrustedUser

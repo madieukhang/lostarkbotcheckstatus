@@ -28,9 +28,28 @@ function getModelForItem(item, models) {
 }
 
 export function selectFlaggedItemsForEnrichment(results, limit = Number.POSITIVE_INFINITY) {
-  const flagged = (results || []).filter((item) => Boolean(getFlaggedEntry(item)));
-  const cap = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : flagged.length;
-  return flagged.slice(0, cap);
+  const cap = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : Number.POSITIVE_INFINITY;
+  if (cap <= 0) return [];
+
+  const selected = [];
+  const seenEntries = new Set();
+
+  for (const item of results || []) {
+    const entry = getFlaggedEntry(item);
+    if (!entry) continue;
+
+    const type = item?.blackEntry ? 'black' : item?.whiteEntry ? 'white' : 'watch';
+    const entryKey = entry._id
+      ? `${type}:${String(entry._id)}`
+      : `${type}:${String(entry.name || item.name || '').trim().toLowerCase()}`;
+    if (seenEntries.has(entryKey)) continue;
+
+    seenEntries.add(entryKey);
+    selected.push(item);
+    if (selected.length >= cap) break;
+  }
+
+  return selected;
 }
 
 export async function enrichFlaggedListEntries(flaggedItems, { logPrefix = 'listcheck' } = {}) {

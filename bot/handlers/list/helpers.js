@@ -55,7 +55,7 @@ export function buildTrustedBlockEmbed(name, reason, { via } = {}) {
 }
 
 /**
- * Build a rich success embed for /list edit (both auto-approve and approval
+ * Build a rich success embed for /la-list edit (both auto-approve and approval
  * paths). Replaces the old plain-text "✅ Name edited in blacklist" reply
  * with a color-coded, structured response showing the entry's current state,
  * the changes applied, and (when available) the fresh evidence image.
@@ -161,9 +161,9 @@ export function isRequesterAutoApprover(userId) {
 }
 
 /**
- * Stricter variant used by /list multiadd auto-approve check.
+ * Stricter variant used by /la-list multiadd auto-approve check.
  * Only senior + officer can bypass bulk approval; MEMBER_APPROVER_IDS
- * (which gives bypass rights on single /list add for legacy reasons)
+ * (which gives bypass rights on single /la-list add for legacy reasons)
  * does NOT confer bulk-add auto-approval. This matches the README claim
  * that only officers/seniors auto-approve multiadd batches.
  */
@@ -174,7 +174,7 @@ export function isOfficerOrSenior(userId) {
 }
 
 /**
- * Senior-only recipient list for /list multiadd bulk approval DMs.
+ * Senior-only recipient list for /la-list multiadd bulk approval DMs.
  * Unlike getApproverRecipientIds (which mixes in a random officer), this
  * returns exclusively SENIOR_APPROVER_IDS - bulk batches are a high-impact
  * operation that should always be reviewed by a Senior.

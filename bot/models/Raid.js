@@ -1,5 +1,5 @@
 /**
- * Allowed raid labels for /list add.
+ * Allowed raid labels for /la-list add.
  */
 export const RAIDS = [
   'Act4 Nor',

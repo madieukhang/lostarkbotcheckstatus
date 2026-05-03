@@ -2,10 +2,10 @@
  * In-memory LRU+TTL cache for `fetchCharacterMeta` results.
  *
  * Why this exists:
- *   /roster deep alt-detect fetches every guild candidate's meta one
+ *   /la-roster deep alt-detect fetches every guild candidate's meta one
  *   by one to compare stronghold + rosterLevel. On large guilds this
  *   is hundreds of bible round-trips per scan, and repeated scans
- *   (the same user re-running /roster, or two users asking about the
+ *   (the same user re-running /la-roster, or two users asking about the
  *   same guild) re-hit the same characters. A short-lived in-memory
  *   cache absorbs that repetition without changing data semantics:
  *   stronghold + rosterLevel are roster-account properties that
@@ -13,7 +13,7 @@
  *   their natural drift.
  *
  *   The /list enrich flow (Phase 3) will reuse the same cache so a
- *   user who runs /list enrich right after /roster deep gets near-
+ *   user who runs /la-list enrich right after /la-roster deep gets near-
  *   instant resolution instead of paying the per-candidate fetch
  *   tax twice in a row.
  *
@@ -30,7 +30,7 @@
  *     `get` checks the entry's `expiresAt` and removes if stale. Drop-
  *     simple and good enough for the observed scan cadence.
  *   - **In-memory only**: bot restart drops the cache, which is fine -
- *     the next /roster deep simply pays the cold-cache cost once and
+ *     the next /la-roster deep simply pays the cold-cache cost once and
  *     repopulates. Persisting to Mongo is a Phase 2.5+ concern that
  *     would need invalidation hooks; not justified by current load.
  */
