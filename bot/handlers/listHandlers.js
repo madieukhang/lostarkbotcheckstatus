@@ -59,6 +59,7 @@ export function createListHandlers({ client }) {
     handleListAddOverwriteButton: add.handleListAddOverwriteButton,
     handleListEnrichConfirmButton: enrich.handleListEnrichConfirmButton,
     handleListEnrichCancelButton: enrich.handleListEnrichCancelButton,
+    handleListAddEnrichHiddenButton: enrich.handleListAddEnrichHiddenButton,
     handleQuickAddSelect: quickadd.handleQuickAddSelect,
     handleQuickAddModal: quickadd.handleQuickAddModal,
   };

@@ -1,3 +1,9 @@
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} from 'discord.js';
+
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import { getClassName } from '../../../models/Class.js';
@@ -7,6 +13,7 @@ import {
 } from '../../../services/rosterService.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { ICONS } from '../../../utils/ui.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import {
   getListContext,
@@ -305,10 +312,37 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       );
     }
 
+    // Hidden roster: surface a one-click button so an officer can kick
+    // off /la-list enrich without re-typing the name. The button click
+    // re-validates officer permission + cooldown, so members who land
+    // on this card cannot bypass the gate. Button is omitted entirely
+    // when the roster was visible (allCharacters already populated).
+    const components = [];
+    if (rosterVisibility === 'hidden') {
+      embed.addFields({
+        name: `${ICONS.search} Hidden roster detected`,
+        value:
+          'Only the typed name is on the entry right now. Officers can hit ' +
+          '**Enrich now** below to scan the target\'s guild for same-stronghold alts ' +
+          '(5-7 minutes), then append discovered alts to `allCharacters`.',
+        inline: false,
+      });
+      components.push(
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`list-add:enrich-hidden:${encodeURIComponent(entry.name)}`)
+            .setLabel('Enrich now')
+            .setEmoji(ICONS.search)
+            .setStyle(ButtonStyle.Primary)
+        )
+      );
+    }
+
     return {
       ok: true,
       entry, // Mongoose doc for callers that need to re-use the created entry (e.g. bulk broadcast)
       embeds: [embed],
+      components,
     };
   }
 

@@ -149,6 +149,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  // "Enrich now" button posted on /la-list add success cards when the
+  // entry was created against a hidden roster. Lets an officer trigger
+  // /la-list enrich for the entry without re-typing the name.
+  if (
+    interaction.isButton() &&
+    interaction.customId.startsWith('list-add:enrich-hidden:')
+  ) {
+    try {
+      await listHandlers.handleListAddEnrichHiddenButton(interaction);
+    } catch (err) {
+      console.error('[list] add->enrich button error:', err);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '❌ Failed to start enrich scan.', ephemeral: true }).catch(() => {});
+      }
+    }
+    return;
+  }
+
   // /la-list multiadd preview Confirm/Cancel buttons
   if (
     interaction.isButton() &&

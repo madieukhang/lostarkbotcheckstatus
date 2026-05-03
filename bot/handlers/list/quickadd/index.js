@@ -157,6 +157,7 @@ export function createQuickAddHandlers({ client, services }) {
         await interaction.editReply({
           content: hasEmbed ? null : result.content,
           embeds: result.embeds ?? [],
+          components: result.components ?? [],
         });
         return;
       }
