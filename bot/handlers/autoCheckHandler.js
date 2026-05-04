@@ -16,9 +16,9 @@ import {
   formatCheckResults,
 } from '../services/listCheckService.js';
 import { queueFlaggedListEntryEnrichment } from '../services/listCheckEnrichment.js';
-import { truncateDiscordContent } from '../utils/discordText.js';
 import { getGuildConfig } from '../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
+import { buildListCheckEmbed } from '../utils/listCheckEmbed.js';
 
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);
@@ -98,23 +98,34 @@ export function setupAutoCheck(client) {
         return;
       }
 
-      const limitedNames = names.slice(0, 8);
+      const MAX_AUTO_NAMES = 8;
+      const limitedNames = names.slice(0, MAX_AUTO_NAMES);
 
-      // Send progress message immediately after OCR
+      // Send progress message immediately after OCR. Plain content here
+      // (not an embed) because this is a transient "working on it" line
+      // that gets edited into a full embed below within seconds.
       const progressMsg = await message.reply({
         content: `🔍 Extracted **${limitedNames.length}** name(s) · checking lists & roster...`,
       });
 
       const results = await checkNamesAgainstLists(limitedNames, { guildId: message.guild.id });
-      const lines = formatCheckResults(results);
+      const formattedLines = formatCheckResults(results);
 
-      const content = truncateDiscordContent([
-        `🔍 Auto-check: **${limitedNames.length}** name(s)`,
-        '',
-        ...lines,
-      ].join('\n'));
+      // Same embed builder as /la-list check; mode: 'auto' tweaks the
+      // title verb ("Auto-check" vs "List Check") and the footer copy
+      // (mentions the Quick-Add dropdown below).
+      const { embed } = buildListCheckEmbed({
+        results,
+        formattedLines,
+        limitedNamesCount: limitedNames.length,
+        ignoredCount: names.length - limitedNames.length,
+        maxNames: MAX_AUTO_NAMES,
+        mode: 'auto',
+      });
 
-      // Build quick-add select menu for unflagged names (❓ or ⚪)
+      // Quick-Add dropdown for unflagged names. Sits below the embed so
+      // an officer eyeballing the result can immediately blacklist a
+      // suspicious "no roster" hit without retyping the name.
       const unflaggedNames = results.filter(
         (r) => !r.blackEntry && !r.whiteEntry && !r.watchEntry
       );
@@ -137,8 +148,7 @@ export function setupAutoCheck(client) {
         components.push(selectRow);
       }
 
-      // Edit progress message with final results
-      await progressMsg.edit({ content, components });
+      await progressMsg.edit({ content: '', embeds: [embed], components });
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
       await message.react('✅').catch(() => {});
 
