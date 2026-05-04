@@ -35,6 +35,9 @@ const rosterCacheSchema = new mongoose.Schema({
   targetItemLevel: { type: Number, default: 0 },
   targetCombatScore: { type: String, default: '' },
 
+  /** Whether class data is expected on this cache row */
+  rosterVisibility: { type: String, enum: ['', 'visible', 'hidden'], default: '' },
+
   /** When this cache entry was created · TTL index expires after 24h */
   cachedAt: { type: Date, default: Date.now, expires: 86400 },
 });

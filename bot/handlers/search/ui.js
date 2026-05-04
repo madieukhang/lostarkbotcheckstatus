@@ -2,7 +2,7 @@ import { EmbedBuilder } from 'discord.js';
 
 import { getClassName, getClassEmoji } from '../../models/Class.js';
 import { COLORS } from '../../utils/ui.js';
-import { entryHasImage } from './evidence.js';
+import { pickEvidenceEntry } from './evidence.js';
 
 export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter }) {
   const lines = results.map((result, index) => {
@@ -14,8 +14,7 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
     // queried via /la-roster (graceful skip · the row still carries
     // class icon + ilvl).
     const cpSuffix = result.combatScore ? ` · CP ${result.combatScore}` : '';
-    const entry = result.black || result.white || result.watch;
-    const hasImage = entryHasImage(entry);
+    const hasImage = Boolean(pickEvidenceEntry(result));
 
     let icon = '';
     if (result.black) icon += '⛔';

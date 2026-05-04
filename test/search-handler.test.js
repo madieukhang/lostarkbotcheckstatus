@@ -50,3 +50,23 @@ test('search evidence picker skips earlier list entries without images', () => {
 
   assert.equal(pickEvidenceEntry(result), watchEntry);
 });
+
+test('search result row shows evidence marker when later flagged entry has image', () => {
+  const embed = buildSearchResultEmbed({
+    name: 'Ains',
+    minIlvl: 1700,
+    maxIlvl: null,
+    classFilter: null,
+    results: [{
+      name: 'Ainslinn',
+      cls: 'bard',
+      itemLevel: 1700,
+      black: { name: 'Ainslinn', reason: 'black-no-image' },
+      white: null,
+      watch: { name: 'Ainslinn', reason: 'watch', imageMessageId: '123' },
+      trusted: null,
+    }],
+  });
+
+  assert.match(embed.toJSON().description, /📎/u);
+});
