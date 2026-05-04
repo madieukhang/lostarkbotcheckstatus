@@ -4,6 +4,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.69] - 2026-05-04
+
+### Added
+- **`/la-search` results** carry class icon + CP per row. Old line `**1.** ⛔ [Name](link) · Bard · \`1740\`` becomes `**1.** ⛔ <:bard:id> [Name](link) · \`1740\` · CP 450,000`. CP sourced from `RosterSnapshot` join in the search handler; bible suggestions already carry the className (rendered via class icon).
+- **Cross-server broadcast** (`broadcastListChange` single + `broadcastBulkAdd` bulk) carry class icon prefix on the headline name + ilvl + CP fields when `RosterSnapshot` has data. Recipients in other servers no longer have to run `/la-roster` to see the character context.
+
+### Notes
+- 57/57 tests pass.
+- Single-broadcast adds two extra inline fields (📊 ilvl + ⚔️ CP) only when snapshot data exists; legacy entries without a prior `/la-roster` query still render the older minimal card.
+- Bulk-broadcast does one batched `RosterSnapshot.find({ name: $in })` per dispatch; falls back to plain rows when snapshot missing for that name.
+
 ## [v0.5.68] - 2026-05-04
 
 ### Added

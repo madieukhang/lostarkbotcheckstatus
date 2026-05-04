@@ -1,13 +1,19 @@
 import { EmbedBuilder } from 'discord.js';
 
-import { getClassName } from '../../models/Class.js';
+import { getClassName, getClassEmoji } from '../../models/Class.js';
 import { COLORS } from '../../utils/ui.js';
 import { entryHasImage } from './evidence.js';
 
 export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter }) {
   const lines = results.map((result, index) => {
     const cls = getClassName(result.cls);
+    const classPrefix = getClassEmoji(cls) || cls;
     const ilvl = Number(result.itemLevel || 0).toFixed(2);
+    // CP comes through from the snapshot enrichment that searchHandler
+    // attaches when available; falsy when the name has never been
+    // queried via /la-roster (graceful skip · the row still carries
+    // class icon + ilvl).
+    const cpSuffix = result.combatScore ? ` · CP ${result.combatScore}` : '';
     const entry = result.black || result.white || result.watch;
     const hasImage = entryHasImage(entry);
 
@@ -19,7 +25,9 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
     if (icon) icon += ' ';
 
     const link = `[${result.name}](https://lostark.bible/character/NA/${encodeURIComponent(result.name)}/roster)`;
-    let line = `**${index + 1}.** ${icon}${link} · ${cls || '?'} · \`${ilvl}\`${hasImage ? ' · 📎' : ''}`;
+    // Class icon (or text fallback) sits BEFORE the name, after the list-
+    // status icon. Pattern matches the rest of the v0.5.67 vocabulary.
+    let line = `**${index + 1}.** ${icon}${classPrefix} ${link} · \`${ilvl}\`${cpSuffix}${hasImage ? ' · 📎' : ''}`;
 
     for (const entry of [result.black, result.white, result.watch]) {
       if (!entry) continue;
