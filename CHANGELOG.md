@@ -4,6 +4,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.71] - 2026-05-04
+
+### Fixed
+- OCR check (`/la-list check` + auto-check) was still rendering plain `❓ Name` for names that v0.5.70 should have decorated. Root cause: the v0.5.70 fix only fired in the cache-miss branch of `checkNamesAgainstLists`. Names previously checked (in `RosterCache` from any pre-v0.5.71 deploy) hit the cache-hit branch which short-circuited the fresh scrape, so class/ilvl/CP were never extracted. Fix: `RosterCache` schema gained `targetClassName / targetItemLevel / targetCombatScore` fields. Fresh scrapes now populate them; cache hits surface them onto `item.snapClassName / snapItemLevel / snapCombatScore` so `formatResultLine` renders the rich row. Pre-v0.5.71 entries that satisfy `hasRoster` but lack class data are treated as cache miss for one request so the next scrape backfills both cache + snapshot in one pass.
+
+### Notes
+- 57/57 tests pass.
+- Snapshot data still wins over cache fields when both are present (snapshot is fresher because `/la-roster` writes it on every command, while cache TTL is 24h).
+- Pre-v0.5.71 cache entries TTL out within 24h regardless; the re-scrape backfill just speeds the transition for actively-checked names.
+
 ## [v0.5.70] - 2026-05-04
 
 ### Fixed

@@ -23,6 +23,18 @@ const rosterCacheSchema = new mongoose.Schema({
   /** Cached search suggestions for names without roster (diacritics correction) */
   searchSuggestions: { type: [{ name: String, flag: String }], default: [] },
 
+  /**
+   * Target character display tokens captured during the same roster
+   * scrape that populated `hasRoster` / `allCharacters`. Lets cache
+   * hits in `/la-list check` and auto-check render the class icon +
+   * ilvl + CP without falling back to RosterSnapshot or a fresh
+   * roster fetch · v0.5.71 fix for the "cache hit but no class data"
+   * bug observed when names had been checked before v0.5.70.
+   */
+  targetClassName: { type: String, default: '' },
+  targetItemLevel: { type: Number, default: 0 },
+  targetCombatScore: { type: String, default: '' },
+
   /** When this cache entry was created · TTL index expires after 24h */
   cachedAt: { type: Date, default: Date.now, expires: 86400 },
 });
