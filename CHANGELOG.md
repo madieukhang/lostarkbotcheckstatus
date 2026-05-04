@@ -59,6 +59,18 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ### Notes
 - This specifically covers scan runs that exceed the original interaction token lifetime, such as large guild scans still in progress around 30+ minutes.
 
+## [v0.5.58] - 2026-05-04
+
+### Changed
+- **`/la-status`** title moves from `setAuthor()` to `setTitle()` with a state-driven dot prefix (🟢/🟡/🔴/❓). Stats summary badge as inline fields (Online / Maintenance / Offline / Unknown) precedes the per-server grid; problem servers float to the top of the per-server grid via priority sort. Lets a Discord skim land on outage servers first.
+- **`/la-list trust add/remove`** success cards rewritten with a hero description line explaining the consequence ("From now on **<name>** and any character that resolves to the same roster cannot be added to..."), emoji-prefixed fields (🧬 Character · 📝 Reason · 👤 By · 🕐 Trusted since), and a next-step Tip footer. Remove uses `COLORS.muted` instead of `COLORS.danger` because it is a neutral state change, not a hostile one.
+- **`/la-list multiadd` approval DM** gains a per-type breakdown line (`⛔ N · ⚠️ N · ✅ N · 🏠 N local`), color tint that follows the dominant outcome (red for blacklist-heavy batches, yellow for watch-heavy, green for whitelist-heavy), per-row raid tag inline next to the name, and structured fields (Requested by · Server · Total · Request ID) with the same emoji vocabulary as the v0.5.57 single-add approval DM.
+
+### Notes
+- 57/57 tests pass.
+- Vocabulary unified across the full approval / detail / scan family: 📒 List, 🗡️ Raid, 🌐 Scope, 📝 Reason, 🧬 Tracked alts, 🔗 Logs, 👤 Added by, 🆔 Request ID.
+- This closes the v0.5.55 audit list: every user-facing surface flagged as plain-text or sparse is now structured.
+
 ## [v0.5.57] - 2026-05-04
 
 ### Changed

@@ -93,32 +93,73 @@ export function createApprovalServices({ client }) {
     );
 
     const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');
+
+    // Per-type breakdown gives the senior a quick "what am I about to
+    // approve?" read before they parse the line list. A bulk batch of
+    // 30 rows skewed heavily blacklist deserves visible warning vs an
+    // all-whitelist batch which is mostly mechanical.
+    const typeCounts = { black: 0, white: 0, watch: 0 };
+    let serverScopedCount = 0;
+    for (const r of pending.rows) {
+      if (typeCounts[r.type] !== undefined) typeCounts[r.type]++;
+      if (r.scope === 'server') serverScopedCount++;
+    }
+    const breakdownParts = [];
+    if (typeCounts.black) breakdownParts.push(`⛔ **${typeCounts.black}**`);
+    if (typeCounts.watch) breakdownParts.push(`⚠️ **${typeCounts.watch}**`);
+    if (typeCounts.white) breakdownParts.push(`✅ **${typeCounts.white}**`);
+    if (serverScopedCount > 0) breakdownParts.push(`🏠 **${serverScopedCount}** local`);
+
     const previewLines = pending.rows.slice(0, 20).map((r, i) => {
       const reasonShort = (r.reason || '').length > 40 ? (r.reason || '').slice(0, 37) + '...' : (r.reason || '');
-      const scopeTag = r.scope === 'server' ? ' `[S]`' : '';
-      return `\`${String(i + 1).padStart(2, ' ')}.\` ${typeIcon(r.type)} **${r.name}**${scopeTag} · ${reasonShort}`;
+      const scopeTag = r.scope === 'server' ? ' `[Local]`' : '';
+      const raidTag = r.raid ? ` \`${r.raid}\`` : '';
+      return `\`${String(i + 1).padStart(2, ' ')}.\` ${typeIcon(r.type)} **${r.name}**${scopeTag}${raidTag} · ${reasonShort}`;
     });
     if (pending.rows.length > 20) {
       previewLines.push(`*... and ${pending.rows.length - 20} more rows*`);
     }
 
+    // Color follows the dominant outcome: blacklist-heavy batches tint
+    // red, whitelist-heavy go green, watch-heavy yellow. Mixed batches
+    // fall back to blurple. Approvers reading a stack of DMs scan
+    // colors first.
+    let color;
+    if (typeCounts.black >= typeCounts.white && typeCounts.black >= typeCounts.watch) color = COLORS.danger;
+    else if (typeCounts.watch >= typeCounts.white) color = COLORS.warning;
+    else color = COLORS.success;
+
+    const headerLine = breakdownParts.length > 0
+      ? `**Outcome:** ${breakdownParts.join(' · ')}`
+      : `Reviewing **${pending.rows.length}** entries.`;
+
     const embed = new EmbedBuilder()
       .setTitle(`📋 Bulk Add Approval · ${pending.rows.length} rows`)
-      .setDescription(previewLines.join('\n').slice(0, 4000))
-      .setColor(COLORS.info)
+      .setDescription(`${headerLine}\n\n${previewLines.join('\n').slice(0, 3800)}`)
+      .setColor(color)
       .addFields(
         {
-          name: 'Requested by',
+          name: '👤 Requested by',
           value: `${pending.requesterDisplayName || pending.requesterTag || 'Unknown'} (<@${pending.requesterId}>)`,
           inline: false,
         },
         {
-          name: 'Server',
+          name: '🏠 Server',
           value: guild?.name || pending.guildId || 'Unknown',
           inline: true,
         },
+        {
+          name: '📊 Total',
+          value: String(pending.rows.length),
+          inline: true,
+        },
+        {
+          name: '🆔 Request ID',
+          value: `\`${pending.requestId.slice(0, 8)}\``,
+          inline: true,
+        },
       )
-      .setFooter({ text: `Request ID: ${pending.requestId.slice(0, 8)}` })
+      .setFooter({ text: '🛡️ Approve / Reject buttons below · Lost Ark Check approval flow' })
       .setTimestamp(new Date());
 
     const deliveredApproverIds = [];
