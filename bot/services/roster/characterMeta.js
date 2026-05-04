@@ -78,6 +78,13 @@ async function fetchMetaResponse(url, name, phase, options = {}) {
       // across a 5s retry sleep leaves the retry with a half-expired
       // signal, which turns recoverable bible 429/503s into false nulls.
       const res = await fetchWithFallback(url, buildBibleFetchOptions(options));
+      options.onMetaFetchResult?.({
+        name,
+        phase,
+        status: res.status,
+        ok: res.ok,
+        attempt,
+      });
       if (!shouldRetryMetaStatus(res.status, options) || attempt === maxAttempts) {
         return res;
       }
@@ -91,6 +98,12 @@ async function fetchMetaResponse(url, name, phase, options = {}) {
       }
       await sleep(delayMs);
     } catch (err) {
+      options.onMetaFetchResult?.({
+        name,
+        phase,
+        error: err,
+        attempt,
+      });
       if (attempt === maxAttempts || options.retryOnRateLimit === false) {
         throw err;
       }

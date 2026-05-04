@@ -25,6 +25,12 @@ function buildAltsBlock(alts) {
   return `\n\n**Matches so far (${alts.length}):**\n${lines.join('\n')}${extra}`;
 }
 
+function formatFailureReason(reason) {
+  const value = String(reason || '').trim();
+  if (!value) return '';
+  return value.length > 120 ? `${value.slice(0, 117)}...` : value;
+}
+
 export function buildScanProgressEmbed({
   title,
   subtitle,
@@ -41,6 +47,10 @@ export function buildScanProgressEmbed({
     ? `\n*Started ${relativeTime(progress.startedAt)}*`
     : '';
   const altsBlock = buildAltsBlock(progress.alts);
+  const failureReason = formatFailureReason(progress.lastFailureReason);
+  const failureLine = failureReason && (progress.failedCandidates ?? 0) > 0
+    ? `\nLast error: \`${failureReason}\``
+    : '';
   const footerParts = [`Backoff ${progress.currentBackoffMs}ms`];
   if ((progress.rateLimitRetries ?? 0) > 0) {
     footerParts.push(`429 retries ${progress.rateLimitRetries}`);
@@ -63,6 +73,7 @@ export function buildScanProgressEmbed({
       (subtitle ? `${subtitle}\n\n` : '') +
       `\`${bar}\` ${pct}%\n\n` +
       statsLine +
+      failureLine +
       altsBlock +
       startedLine
     ).slice(0, 4096),

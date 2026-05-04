@@ -108,6 +108,12 @@ function buildAltList(alts, { newAltsSet } = {}) {
   return lines.join('\n') + extra;
 }
 
+function formatFailureReason(reason) {
+  const value = String(reason || '').trim();
+  if (!value) return '';
+  return value.length > 140 ? `${value.slice(0, 137)}...` : value;
+}
+
 /**
  * Build the unified scan-result embed.
  *
@@ -189,7 +195,10 @@ export function buildScanResultEmbed({
     const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
     const failed = result.failedCandidates ?? 0;
     const rate = attempted > 0 ? Math.round((failed / attempted) * 100) : 0;
-    stopHint = `Bible rejected ${failed}/${attempted} profiles (${rate}%); I paused so we don't burn the rest. Failed candidates were not marked checked, so **Continue scan** will retry them.`;
+    const lastError = formatFailureReason(result.lastFailureReason);
+    stopHint = `Bible rejected ${failed}/${attempted} profiles (${rate}%); I paused so we don't burn the rest.` +
+      (lastError ? ` Last error: \`${lastError}\`.` : '') +
+      ` Failed candidates were not marked checked, so **Continue scan** will retry them.`;
   } else if (state.stopReason === 'cap-hit') {
     stopHint = `Hit the candidate cap (${result.candidateLimit ?? 'configured limit'}). **${state.remaining}** eligible candidate(s) above the cap unchecked · hit **Continue scan** to walk the rest.`;
   }

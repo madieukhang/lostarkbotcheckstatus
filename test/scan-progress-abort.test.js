@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { makeRosterScanProgressCallback } from '../bot/handlers/roster/progress.js';
+import { buildScanProgressEmbed } from '../bot/utils/scanProgressEmbed.js';
 
 test('roster progress callback aborts scan after repeated message edit failures', async () => {
   const cancelFlag = { cancelled: false };
@@ -44,4 +45,23 @@ test('roster progress callback aborts scan after repeated message edit failures'
   assert.equal(cancelFlag.cancelled, true);
   assert.equal(cancelFlag.reason, 'discord-progress-update-failed');
   assert.equal(cancelFlag.label, 'Discord update failed');
+});
+
+test('scan progress embed surfaces the latest bible failure reason', () => {
+  const embed = buildScanProgressEmbed({
+    title: 'Stronghold scan in progress - Ainslinn',
+    subtitle: 'Guild **Bullet Shell**',
+    progress: {
+      scannedCandidates: 20,
+      attemptedCandidates: 20,
+      checkedCandidates: 0,
+      totalCandidates: 437,
+      failedCandidates: 20,
+      altsFound: 0,
+      currentBackoffMs: 8000,
+      lastFailureReason: 'HTML HTTP 403',
+    },
+  });
+
+  assert.match(embed.toJSON().description, /Last error: `HTML HTTP 403`/);
 });
