@@ -1,9 +1,8 @@
 import config from '../../config.js';
 import { recordScraperApiRequest } from '../../utils/scraperApiUsage.js';
+import { FETCH_HEADERS } from './bibleHeaders.js';
 
-export const FETCH_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-};
+export { FETCH_HEADERS };
 
 /**
  * Smart fallback cache - remembers when direct fetch is blocked by Cloudflare.
@@ -24,6 +23,13 @@ export function buildBibleFetchOptions(options = {}) {
     allowScraperApi: options.allowScraperApi !== false,
     preferScraperApi: options.preferScraperApi === true,
     fallbackOnRateLimit: options.fallbackOnRateLimit === true,
+    // Forwarded to bibleClient so it can route this request through
+    // the residential-IP worker sidecar instead of direct fetch. Only
+    // honored when BIBLE_WORKER_ENABLED is on at the bot level. Heavy
+    // fan-out callers (enrich, deep, hidden roster) opt in; everything
+    // else leaves it falsy and stays on direct.
+    viaWorker: options.viaWorker === true,
+    timeoutMs: options.timeoutMs,
   };
   if (options.timeoutMs) {
     fetchOptions.signal = AbortSignal.timeout(options.timeoutMs);

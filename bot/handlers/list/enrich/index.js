@@ -184,6 +184,7 @@ export function createEnrichHandlers({ client, services }) {
     // 429/503 and a one-off fallback is cheap quota-wise.
     const meta = existingSession?.meta || await fetchCharacterMeta(name, {
       timeoutMs: config.strongholdDeepCandidateTimeoutMs,
+      viaWorker: true,
     });
     if (!meta) {
       await replyEditor.edit({
@@ -216,6 +217,7 @@ export function createEnrichHandlers({ client, services }) {
     const guildMembers = await fetchGuildMembers(name, {
       timeoutMs: config.strongholdDeepCandidateTimeoutMs,
       cacheKey: meta.guildName,
+      viaWorker: true,
     });
     if (guildMembers.length === 0) {
       await replyEditor.edit({
@@ -316,6 +318,7 @@ export function createEnrichHandlers({ client, services }) {
         onProgress,
         cancelFlag,
         excludeNames: existingSession?.scannedNames ?? [],
+        viaWorker: true,
       });
     } catch (err) {
       scanThrownError = err;

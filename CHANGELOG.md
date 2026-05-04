@@ -4,6 +4,27 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.77] - 2026-05-05
+
+### Changed
+- Phase 1 of local-worker migration. `bibleClient.fetch(url, options)` now routes based on two conditions: the bot-level kill switch `BIBLE_WORKER_ENABLED` (parsed as boolean, off by default), AND the per-call opt-in flag `options.viaWorker === true`. Both must be true to delegate to `workerBibleClient`; otherwise the call goes through `fetchWithFallback` as before. Production behavior is unchanged until both the env var is on and the call site explicitly opts in.
+- Worker scope is intentionally narrow: only the heavy fan-out commands `/la-list enrich`, `/la-roster deep` (visible), `/la-roster` hidden-roster fallback, the Continue-resume button, and the optional post-OCR auto-enrich pass `viaWorker: true`. Latency-sensitive callers (autocomplete search, `/la-list add` single fetch, top-level `/la-roster` page fetch) stay on direct fetch even when worker mode is enabled, so the bot's UX doesn't collapse from per-keystroke Mongo round-trips.
+- New `bot/models/ScrapeJob.js` schema with 1-hour TTL on `createdAt`. Stores `url`, `options.timeoutMs`, `status` (pending/in_progress/done/failed), `result.{status,headers,body}`, and `error`. Headers stored as `Map<String, String>`.
+- New `bot/services/roster/workerBibleClient.js` exposing `createWorkerBibleClient({ ScrapeJob, pollIntervalMs, defaultTimeoutMs, now })` for DI-friendly tests, plus a default singleton wired to the production model. Reconstructs a real `Response` object from the Mongo-stored body/status/headers so upstream callers (which all use `bibleClient.fetch(url)`) need no changes.
+- New `bot/services/scrapeWorker.js` exports `claimAndProcessOne()` and `claimNextJob()`. Pure functions, no top-level side effects. Tests can drive a single iteration without spawning a worker process; the standalone `loa-worker.js` calls `claimAndProcessOne` in its poll loop.
+- New `loa-worker.js` standalone at repo root. Connects to MongoDB via `process.env.MONGODB_URI`, runs the poll loop, sleeps 1s on idle. Uses `FETCH_HEADERS` from new `bot/services/roster/bibleHeaders.js` (config-free module so worker never drags in `bot/config.js` and its DISCORD_TOKEN/CHANNEL_ID validation). THIN headers verified 10/10 pass from residential IP on 2026-05-04.
+- `buildBibleFetchOptions` now forwards `viaWorker` and `timeoutMs` so the option propagates from upstream callers (enrich, deep, hidden roster, deepContinue, listCheckEnrichment) through the existing fetchCharacterMeta / fetchGuildMembers / detectAltsViaStronghold chain to bibleClient. The candidate-loop fan-out inside altDetection inherits `viaWorker` from the same options bag so all 437+ candidate fetches per scan ride the worker.
+
+### Tests
+- New `test/loa-worker.integration.test.js` uses `mongodb-memory-server` (devDependency) to spin up an in-memory MongoDB per test session. Verifies the full Mongoose round trip (insert -> claim -> fetch -> update -> read back) without ever touching production. fetch is stubbed; the goal is to verify worker mechanics + Mongoose Map<>Object header conversion + state transitions.
+- 5 integration cases: idle when no jobs, processes pending and writes done, marks failed when fetch throws, picks oldest pending first, ignores non-pending jobs.
+- 5 existing unit tests for `workerBibleClient` still cover the bot side (happy path, failed job, timeout, options sanitization, missing-job/TTL).
+
+### Notes
+- 74/74 tests pass (69 prior + 5 new integration). End-to-end smoke run against real bible from a residential IP on 2026-05-05: 662ms total round trip (queue 229ms + worker fetch 433ms), HTTP 200 returned, Mongoose Map header serialization round-trips cleanly.
+- `BIBLE_WORKER_ENABLED` is read at module load time; toggling requires a bot restart. Setting it to anything other than `1`/`true`/`yes`/`y`/`on` (case-insensitive) leaves worker mode off.
+- Phases 2-4 (hardening, prod cutover) intentionally not bundled with Phase 1. After deploy + a real `/la-list enrich` run with worker mode, the latency / success / queue depth observed in prod will inform Phase 2 design.
+
 ## [v0.5.76] - 2026-05-04
 
 ### Changed

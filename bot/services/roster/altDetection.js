@@ -19,6 +19,12 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   const useScraperApiForCandidates = options.useScraperApiForCandidates ?? config.strongholdDeepUseScraperApi;
   const allowScraperApiForTarget = options.allowScraperApiForTarget !== false;
   const allowScraperApiForGuild = options.allowScraperApiForGuild !== false;
+  // Heavy fan-out flow: every bible request inside this detector should
+  // go through the worker when the caller opted in (enrich / deep /
+  // hidden roster). Plain `useScraperApiForCandidates` only covers the
+  // candidate loop; viaWorker also covers the upstream meta + guild
+  // probes so the whole chain bypasses Railway's CF-blocked IP.
+  const viaWorker = options.viaWorker === true;
 
   // Mode selection. The Phase 1 verification scan that found Ainslinn's
   // 5 alts ran in 'gentle' mode (sequential, 1.5s throttle, transient retry).
@@ -47,6 +53,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     allowScraperApi: allowScraperApiForTarget,
     timeoutMs: options.targetTimeoutMs ?? candidateTimeoutMs,
     fallbackOnRateLimit: false,
+    viaWorker,
   });
   if (!meta) {
     console.log('[alt-detect] No character meta found.');
@@ -71,6 +78,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
         allowScraperApi: allowScraperApiForGuild,
         timeoutMs: options.guildTimeoutMs ?? candidateTimeoutMs,
         cacheKey: options.guildMembersCacheKey || meta.guildName,
+        viaWorker,
       });
   if (members.length === 0) {
     console.log('[alt-detect] No guild members found.');
@@ -175,6 +183,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
         retryOnRateLimit,
         rateLimitRetryDelayMs,
         suppressRetryWarnings: isGentle,
+        viaWorker,
         onMetaFetchResult: ({ phase, status, ok, error }) => {
           if (error) {
             candidateFailureReason = `${phase} ${error.message || 'fetch failed'}`;
