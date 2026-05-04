@@ -701,20 +701,18 @@ function formatResultLine(item) {
 
   // Branch builder for flag context. Each list (black, white, watch)
   // gets its own ↳ line when present so an officer scanning the card
-  // sees each origin separately.
+  // sees each origin separately. The list-status icon is dropped from
+  // the branch because the main row above already carries it · two
+  // copies in a row read cluttered (v0.5.73 cleanup).
   const branches = [];
-  for (const [entry, label] of [
-    [item.blackEntry, '⛔'],
-    [item.whiteEntry, '✅'],
-    [item.watchEntry, '⚠️'],
-  ]) {
+  for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
     if (!entry) continue;
     const isRosterMatch = entry.name.toLowerCase() !== item.name.toLowerCase();
     const parts = [];
     if (isRosterMatch) parts.push(`via **${entry.name}**`);
     if (entry.reason?.trim()) parts.push(`*${entry.reason.trim()}*`);
     if (entry.raid?.trim()) parts.push(`[${entry.raid.trim()}]`);
-    if (parts.length > 0) branches.push(`   ↳ ${label} ${parts.join(' · ')}`);
+    if (parts.length > 0) branches.push(`   ↳ ${parts.join(' · ')}`);
   }
 
   const branchBlock = branches.length > 0 ? `\n${branches.join('\n')}` : '';
@@ -792,24 +790,12 @@ export function formatCheckResults(results) {
     else counts.noRoster++;
   }
 
-  // Build summary
-  const summaryParts = [];
-  if (counts.black) summaryParts.push(`⛔ ${counts.black}`);
-  if (counts.watch) summaryParts.push(`⚠️ ${counts.watch}`);
-  if (counts.white) summaryParts.push(`✅ ${counts.white}`);
-  if (counts.trusted) summaryParts.push(`🛡️ ${counts.trusted}`);
-  if (counts.clean) summaryParts.push(`❓ ${counts.clean}`);
-  if (counts.noRoster) summaryParts.push(`⚪ ${counts.noRoster}`);
-
+  // No inline summary line · the embed builder (`buildListCheckEmbed`)
+  // already renders the same per-status breakdown at the top of the
+  // description. Pre-v0.5.73 we pushed it here too, which produced
+  // two copies of the same counts stacked above the per-name list.
+  // Just emit the lines.
   const lines = [];
-
-  // Only show summary when there are flagged entries · otherwise it's just noise
-  const hasFlagged = counts.black > 0 || counts.watch > 0;
-  if (hasFlagged) {
-    lines.push(summaryParts.join(' · '));
-    lines.push('');
-  }
-
   for (const f of formatted) {
     lines.push(f.line);
   }
