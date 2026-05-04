@@ -33,6 +33,31 @@ function buildEntryMetaLine({ entry, freshUrl }) {
   return parts.length > 0 ? `└ ${parts.join(' · ')}` : '';
 }
 
+/**
+ * Render the roster (allCharacters) line that sits below the meta
+ * line. Goal: tell the reader "who else is on this account" at a
+ * glance without blowing up the description budget. The entry's own
+ * name is always present in allCharacters and is filtered out (we
+ * already showed it on line 1). Capped at 3 visible alts with a
+ * `+N more` suffix; entries with no alts skip this line entirely.
+ *
+ * Why compact: /la-list view renders 10 entries per page and Discord's
+ * description hard cap is 4096 chars. Showing every alt inline would
+ * blow that budget on guilds with deep rosters; the detail view + DM
+ * surface the full list when an officer wants the whole picture.
+ */
+function buildEntryRosterLine(entry) {
+  const others = (entry.allCharacters || [])
+    .filter((n) => String(n).toLowerCase() !== String(entry.name).toLowerCase());
+  if (others.length === 0) return '';
+  const visible = others.slice(0, 3);
+  const linked = visible.map((n) => `[${n}](${rosterLink(n)})`);
+  const tail = others.length > visible.length
+    ? ` *+${others.length - visible.length} more*`
+    : '';
+  return `   ↳ alts: ${linked.join(', ')}${tail}`;
+}
+
 export function buildTrustedListEmbed(entries) {
   const lines = entries.flatMap((entry) => {
     const link = rosterLink(entry.name);
@@ -96,8 +121,10 @@ export async function buildListPageEmbed(options) {
     const link = rosterLink(entry.name);
     const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${entry._icon} **[${entry.name}](${link})**${scopeTag}`;
     const meta = buildEntryMetaLine({ entry, freshUrl: freshUrls[index] });
+    const rosterLine = buildEntryRosterLine(entry);
     lines.push(head);
     if (meta) lines.push(meta);
+    if (rosterLine) lines.push(rosterLine);
     lines.push('');
   });
   if (lines[lines.length - 1] === '') lines.pop();
@@ -173,18 +200,65 @@ export function buildListViewComponents({ allEntries, itemsPerPage, page, totalP
   return rows;
 }
 
+/**
+ * Detail view for a single list entry, used when an officer clicks
+ * the evidence dropdown in /la-list view (and now also as the shared
+ * renderer for /la-search evidence clicks). Layout has 3 visual blocks:
+ *
+ *   1. Title bar    - list-icon + entry name + bible-link via setURL
+ *   2. Reason field - full reason text (1024 char cap)
+ *   3. Inline meta  - Raid · List · Added (3-up grid)
+ *   4. Roster field - "Tracked alts" with linked names; falls back
+ *                     to "(only this character)" if allCharacters is
+ *                     just the entry name
+ *   5. Evidence     - image OR warning placeholder when expired
+ *   6. Logs / Added by (optional) - kept from prior version
+ *
+ * The Roster field is the headline change vs the older detail card:
+ * an officer auditing a blacklist hit can now see the full list of
+ * names that resolve to this entry without re-running /la-list view
+ * or hitting bible directly.
+ */
 export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false } = {}) {
   const link = rosterLink(entry.name);
   const fields = [
-    { name: 'Reason', value: entry.reason || 'N/A', inline: false },
+    { name: '📝 Reason', value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
   ];
+
   const inlineMeta = [];
-  if (entry.raid) inlineMeta.push({ name: 'Raid', value: `\`${entry.raid}\``, inline: true });
-  inlineMeta.push({ name: 'List', value: entry._label, inline: true });
+  if (entry.raid) inlineMeta.push({ name: '🗡️ Raid', value: `\`${entry.raid}\``, inline: true });
+  inlineMeta.push({ name: '📒 List', value: entry._label, inline: true });
   if (entry.addedAt) {
-    inlineMeta.push({ name: 'Added', value: relativeTime(entry.addedAt), inline: true });
+    inlineMeta.push({ name: '🕐 Added', value: relativeTime(entry.addedAt), inline: true });
   }
   fields.push(...inlineMeta);
+
+  // Roster (allCharacters) field. Counts alts excluding the entry's own
+  // name, then renders a numbered list with bible roster links so the
+  // officer can click straight through to verify any alt. Capped at 12
+  // visible names with `+N more` overflow line so the field stays
+  // under Discord's 1024-char field-value limit.
+  const allChars = Array.isArray(entry.allCharacters) ? entry.allCharacters : [];
+  const others = allChars.filter((n) => String(n).toLowerCase() !== String(entry.name).toLowerCase());
+  if (others.length > 0) {
+    const visible = others.slice(0, 12);
+    const lines = visible.map((n, i) => `${i + 1}. [${n}](${rosterLink(n)})`);
+    const extra = others.length > visible.length
+      ? `\n*... and ${others.length - visible.length} more*`
+      : '';
+    const value = (lines.join('\n') + extra).slice(0, 1024);
+    fields.push({
+      name: `🧬 Tracked alts (${others.length})`,
+      value,
+      inline: false,
+    });
+  } else {
+    fields.push({
+      name: '🧬 Tracked alts',
+      value: '_Only this character is tracked on this entry._',
+      inline: false,
+    });
+  }
 
   const embed = new EmbedBuilder()
     .setTitle(`${entry._icon} ${entry.name}`)
@@ -204,11 +278,11 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false }
   }
 
   if (entry.logsUrl) {
-    embed.addFields({ name: 'Logs', value: `[View Logs](${entry.logsUrl})`, inline: false });
+    embed.addFields({ name: '🔗 Logs', value: `[View Logs](${entry.logsUrl})`, inline: false });
   }
 
   if (includeAddedBy && entry.addedByDisplayName) {
-    embed.addFields({ name: 'Added by', value: entry.addedByDisplayName, inline: true });
+    embed.addFields({ name: '👤 Added by', value: entry.addedByDisplayName, inline: true });
   }
 
   return embed;

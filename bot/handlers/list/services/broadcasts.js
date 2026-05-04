@@ -27,11 +27,39 @@ export function createBroadcastServices({ client }) {
     const headline = `${icon} **[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}.`;
 
     const fields = [
-      { name: 'Reason', value: entry.reason || 'N/A', inline: false },
+      { name: '📝 Reason', value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
     ];
-    if (entry.raid) fields.push({ name: 'Raid', value: `\`${entry.raid}\``, inline: true });
+    if (entry.raid) fields.push({ name: '🗡️ Raid', value: `\`${entry.raid}\``, inline: true });
     if (entry.addedAt) {
-      fields.push({ name: action === 'added' ? 'Added' : 'Edited', value: relativeTime(entry.addedAt), inline: true });
+      fields.push({
+        name: action === 'added' ? '🕐 Added' : '🕐 Edited',
+        value: relativeTime(entry.addedAt),
+        inline: true,
+      });
+    }
+
+    // Roster (allCharacters) field. Cross-server recipients of this
+    // broadcast haven't run /la-list view themselves, so seeing the
+    // full alt list inline saves them a lookup when deciding whether
+    // someone in their guild is the same account. Capped at 12 visible
+    // names with a `+N more` overflow line so the field stays under
+    // Discord's 1024-char field-value limit.
+    const allChars = Array.isArray(entry.allCharacters) ? entry.allCharacters : [];
+    const others = allChars.filter((n) => String(n).toLowerCase() !== String(entry.name).toLowerCase());
+    if (others.length > 0) {
+      const visible = others.slice(0, 12);
+      const lines = visible.map((n, i) => {
+        const link = `https://lostark.bible/character/NA/${encodeURIComponent(n)}/roster`;
+        return `${i + 1}. [${n}](${link})`;
+      });
+      const extra = others.length > visible.length
+        ? `\n*... and ${others.length - visible.length} more*`
+        : '';
+      fields.push({
+        name: `🧬 Tracked alts (${others.length})`,
+        value: (lines.join('\n') + extra).slice(0, 1024),
+        inline: false,
+      });
     }
 
     const embed = new EmbedBuilder()

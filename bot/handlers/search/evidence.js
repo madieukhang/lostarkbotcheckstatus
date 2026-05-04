@@ -2,12 +2,12 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ComponentType,
-  EmbedBuilder,
 } from 'discord.js';
 
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
+import { buildEvidenceEmbed } from '../list/view/ui.js';
 
 /** Detect whether an entry has any image evidence (rehosted OR legacy). */
 export function entryHasImage(entry) {
@@ -112,22 +112,20 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
       return;
     }
 
+    // Decorate the entry with the visual tokens that buildEvidenceEmbed
+    // expects (it shares those tokens with /la-list view's renderer).
+    // The search-result envelope holds the raw Mongoose doc on `entry`,
+    // so the search-result name (which may match via roster, not entry
+    // name) is layered on top so the title reads as the searched name.
     const style = getEvidenceStyle(result, entry);
-    const evidenceEmbed = new EmbedBuilder()
-      .setTitle(`${style.emoji} ${result.name}`)
-      .addFields(
-        { name: 'Reason', value: entry.reason || 'N/A', inline: true },
-        { name: 'Raid', value: entry.raid || 'N/A', inline: true },
-        { name: 'List', value: style.label, inline: true },
-      )
-      .setImage(displayUrl)
-      .setColor(style.color)
-      .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : undefined);
-
-    if (entry.logsUrl) {
-      evidenceEmbed.addFields({ name: 'Logs', value: `[View Logs](${entry.logsUrl})`, inline: false });
-    }
-
+    const decoratedEntry = {
+      ...entry,
+      name: result.name,
+      _icon: style.emoji,
+      _label: style.label,
+      _color: style.color,
+    };
+    const evidenceEmbed = buildEvidenceEmbed(decoratedEntry, displayUrl);
     await sel.reply({ embeds: [evidenceEmbed], ephemeral: true });
   });
 
