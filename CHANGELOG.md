@@ -4,6 +4,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.72] - 2026-05-04
+
+### Fixed
+- Class extraction in `buildRosterCharacters` was silently failing for some names: ilvl + CP populated but `targetClassName` came back null. Root cause: a duplicate inline DOM-walk + rosterClassMap lookup that drifted from the canonical parser. Refactored to call `parseRosterCharactersFromHtml` directly (the same proven function `/la-roster` uses) and pull the queried character's record from its output. Now className extraction matches the rest of the codebase and the OCR check renders class icons consistently.
+
+### Changed
+- **OCR check result lines** restructured for richer per-character context. Old layout inlined flag info next to the name (`⛔ **Apakksoul** · via **Apakkbreak** · reason · [Act4 Nor]`); new layout shows full character identity on the main row (`⛔ <:reaper:id> **Apakksoul** · \`1730\` · CP 3500`) with a sub-line branch for flag context (`   ↳ ⛔ via **Apakkbreak** · *reason* · [Act4 Nor]`). Same convention `/la-search` already uses for multi-line result rows.
+- **Flagged entries** (blacklist / whitelist / watchlist) now go through Phase 2 roster lookup just like clean ones. Previously the lookup skipped them, leaving flagged rows without class / ilvl / CP. The data is the same backing the unflagged rows (`RosterSnapshot` snapshot + cache + fresh-scrape fallback).
+- **Support classes sorted last** within each priority bucket (Bard / Paladin / Artist / Valkyrie). DPS rows surface first so a raid leader scanning the card sees the DPS roster impact ahead of supports (which are easier to slot in at the same flag tier). Mirrors sister bot RaidManage's `SUPPORT_CLASS_NAMES` constant.
+
+### Notes
+- 57/57 tests pass.
+- Party grouping (Party 1 / Party 2 split when an OCR'd image has 2 raid groups) is a known follow-up: requires Gemini OCR to surface spatial info per name. Tracked for a separate commit.
+
 ## [v0.5.71] - 2026-05-04
 
 ### Fixed

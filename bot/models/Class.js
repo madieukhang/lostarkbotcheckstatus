@@ -82,6 +82,28 @@ export function resolveClassId(value) {
 }
 
 /**
+ * Hard-support classes in current Lost Ark meta. Everyone else is DPS.
+ * Stored as display names (not bible class IDs) because consuming code
+ * reads `className` which is already the resolved display form.
+ * Matches sister bot RaidManage's SUPPORT_CLASS_NAMES so the two bots
+ * agree on role classification.
+ */
+export const SUPPORT_CLASS_NAMES = new Set([
+  'Bard',
+  'Paladin',
+  'Artist',
+  'Valkyrie',
+]);
+
+/**
+ * @param {string} className - Display name (e.g., "Bard", "Berserker").
+ * @returns {boolean} True when the class is a hard-support.
+ */
+export function isSupportClass(className) {
+  return SUPPORT_CLASS_NAMES.has(String(className || '').trim());
+}
+
+/**
  * Map of class display name -> Discord application emoji string.
  *
  * Seeded empty here. The bot's startup bootstrap
