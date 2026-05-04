@@ -26,6 +26,42 @@ const envChannelSet = new Set(config.autoCheckChannelIds);
 /** Per-user cooldown to prevent spam (userId → timestamp) */
 const userCooldowns = new Map();
 const COOLDOWN_MS = 10_000; // 10 seconds between checks per user
+const processedMessages = new Map(); // messageId -> timestamp
+const inFlightMessages = new Set();
+const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
+
+function pruneProcessedMessages(now = Date.now()) {
+  for (const [messageId, ts] of processedMessages) {
+    if (now - ts > MESSAGE_DEDUPE_TTL_MS) {
+      processedMessages.delete(messageId);
+    }
+  }
+}
+
+export function claimAutoCheckMessage(messageId, now = Date.now()) {
+  if (!messageId) return true;
+  pruneProcessedMessages(now);
+  if (inFlightMessages.has(messageId) || processedMessages.has(messageId)) {
+    return false;
+  }
+  inFlightMessages.add(messageId);
+  return true;
+}
+
+export function completeAutoCheckMessage(messageId, options = {}) {
+  if (!messageId) return;
+  const { processed = true, now = Date.now() } = options;
+  inFlightMessages.delete(messageId);
+  if (processed) {
+    processedMessages.set(messageId, now);
+  }
+}
+
+export function resetAutoCheckDedupeForTest() {
+  processedMessages.clear();
+  inFlightMessages.clear();
+  userCooldowns.clear();
+}
 
 /**
  * Check if a channel is configured for auto-check
@@ -76,21 +112,27 @@ export function setupAutoCheck(client) {
 
     if (images.size === 0) return;
 
-    // Check if this channel is configured for auto-check
-    const isActive = await isAutoCheckChannel(message.channelId, message.guild.id);
-    if (!isActive) return;
-
-    // Per-user cooldown to prevent spam
-    const lastCheck = userCooldowns.get(message.author.id) || 0;
-    if (Date.now() - lastCheck < COOLDOWN_MS) return;
-    userCooldowns.set(message.author.id, Date.now());
-
-    const image = images.first();
-    console.log(`[auto-check] Image detected from ${message.author.tag} in #${message.channel.name}, processing...`);
-
-    await message.react('🔍').catch(() => {});
+    if (!claimAutoCheckMessage(message.id)) return;
+    let shouldRememberMessage = false;
 
     try {
+      // Check if this channel is configured for auto-check
+      const isActive = await isAutoCheckChannel(message.channelId, message.guild.id);
+      if (!isActive) return;
+      shouldRememberMessage = true;
+
+      // Per-user cooldown to prevent spam. The message claim above runs
+      // before this async channel lookup can race with duplicate
+      // MessageCreate deliveries or a duplicate listener in one process.
+      const lastCheck = userCooldowns.get(message.author.id) || 0;
+      if (Date.now() - lastCheck < COOLDOWN_MS) return;
+      userCooldowns.set(message.author.id, Date.now());
+
+      const image = images.first();
+      console.log(`[auto-check] Image detected from ${message.author.tag} in #${message.channel.name}, processing...`);
+
+      await message.react('🔍').catch(() => {});
+
       const names = await extractNamesFromImage(image);
 
       if (names.length === 0) {
@@ -165,6 +207,8 @@ export function setupAutoCheck(client) {
           fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
         })],
       }).catch(() => {});
+    } finally {
+      completeAutoCheckMessage(message.id, { processed: shouldRememberMessage });
     }
   });
 }
