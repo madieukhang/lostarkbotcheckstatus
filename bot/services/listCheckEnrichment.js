@@ -66,6 +66,7 @@ export async function enrichFlaggedListEntries(flaggedItems, { logPrefix = 'list
         useScraperApiForCandidates: false,
         allowScraperApiForTarget: false,
         allowScraperApiForGuild: false,
+        viaWorker: true,
       });
       if (!altResult || altResult.alts.length === 0) continue;
 

@@ -37,6 +37,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
       // ScraperAPI off via useScraperApiForCandidates.
       const meta = await fetchCharacterMeta(name, {
         timeoutMs: config.strongholdDeepCandidateTimeoutMs,
+        viaWorker: true,
       });
       const hasGuild = meta && meta.guildName;
 
@@ -45,6 +46,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         const guildMembers = await fetchGuildMembers(name, {
           timeoutMs: config.strongholdDeepCandidateTimeoutMs,
           cacheKey: meta.guildName,
+          viaWorker: true,
         });
         const memberNames = guildMembers.map((m) => m.name);
 
@@ -109,6 +111,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
           try {
             altResult = await detectAltsViaStronghold(name, {
               ...deepOptions,
+              viaWorker: true,
               targetMeta: meta,
               guildMembers,
               cancelFlag,

@@ -41,11 +41,13 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
         // internal target/guild fetches when both are pre-supplied.
         const visMeta = await fetchCharacterMeta(name, {
           timeoutMs: config.strongholdDeepCandidateTimeoutMs,
+          viaWorker: true,
         });
         const visGuildMembers = visMeta?.guildName
           ? await fetchGuildMembers(name, {
               timeoutMs: config.strongholdDeepCandidateTimeoutMs,
               cacheKey: visMeta.guildName,
+              viaWorker: true,
             })
           : [];
 
@@ -93,6 +95,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
         try {
           altResult = await detectAltsViaStronghold(name, {
             ...deepOptions,
+            viaWorker: true,
             ...(visMeta ? { targetMeta: visMeta } : {}),
             ...(visGuildMembers.length > 0 ? { guildMembers: visGuildMembers } : {}),
             ...(cancelFlag ? { cancelFlag } : {}),

@@ -159,6 +159,7 @@ export async function handleRosterDeepContinueButton(interaction) {
       useScraperApiForCandidates: false,
       excludeNames: session.scannedNames || [],
       cancelFlag,
+      viaWorker: true,
       onProgress: makeRosterScanProgressCallback({
         interaction,
         replyEditor,
