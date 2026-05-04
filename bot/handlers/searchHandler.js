@@ -5,6 +5,7 @@ import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import Watchlist from '../models/Watchlist.js';
 import TrustedUser from '../models/TrustedUser.js';
+import RosterSnapshot from '../models/RosterSnapshot.js';
 import { getClassName, resolveClassId } from '../models/Class.js';
 import { fetchNameSuggestions } from '../services/rosterService.js';
 import { normalizeCharacterName } from '../utils/names.js';
@@ -82,25 +83,35 @@ export async function handleSearchCommand(interaction) {
     const nameQuery = { $or: [{ name: { $in: allNames } }, { allCharacters: { $in: allNames } }] };
     const blackQuery = buildBlacklistQuery(nameQuery, searchGuildId);
 
-    const [allBlack, allWhite, allWatch, allTrusted] = await Promise.all([
+    const [allBlack, allWhite, allWatch, allTrusted, allSnapshots] = await Promise.all([
       Blacklist.find(blackQuery).collation(collation).lean(),
       Whitelist.find(nameQuery).collation(collation).lean(),
       Watchlist.find(nameQuery).collation(collation).lean(),
       TrustedUser.find({ name: { $in: allNames } }).collation(collation).lean(),
+      RosterSnapshot.find({ name: { $in: allNames } }).collation(collation).lean(),
     ]);
 
     const blackMap = buildEntryMap(sortBlacklistForScopePriority(allBlack));
     const whiteMap = buildEntryMap(allWhite);
     const watchMap = buildEntryMap(allWatch);
     const trustedMap = new Map(allTrusted.map((t) => [t.name.toLowerCase(), t]));
+    // Snapshot enrichment surfaces combatScore + a fresher itemLevel
+    // from the last /la-roster run on each name. Bible suggestions
+    // already carry name/cls/itemLevel but no CP, so the snapshot is
+    // strictly additive when present.
+    const snapshotMap = new Map(allSnapshots.map((s) => [s.name.toLowerCase(), s]));
 
-    const results = sliced.map((s) => ({
-      ...s,
-      black: blackMap.get(s.name.toLowerCase()) || null,
-      white: whiteMap.get(s.name.toLowerCase()) || null,
-      watch: watchMap.get(s.name.toLowerCase()) || null,
-      trusted: trustedMap.get(s.name.toLowerCase()) || null,
-    }));
+    const results = sliced.map((s) => {
+      const snap = snapshotMap.get(s.name.toLowerCase()) || null;
+      return {
+        ...s,
+        black: blackMap.get(s.name.toLowerCase()) || null,
+        white: whiteMap.get(s.name.toLowerCase()) || null,
+        watch: watchMap.get(s.name.toLowerCase()) || null,
+        trusted: trustedMap.get(s.name.toLowerCase()) || null,
+        combatScore: snap?.combatScore || '',
+      };
+    });
 
     const embed = buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter });
 

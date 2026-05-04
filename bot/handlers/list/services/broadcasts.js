@@ -2,6 +2,8 @@ import { EmbedBuilder } from 'discord.js';
 
 import config from '../../../config.js';
 import GuildConfig from '../../../models/GuildConfig.js';
+import RosterSnapshot from '../../../models/RosterSnapshot.js';
+import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
@@ -22,9 +24,26 @@ export function createBroadcastServices({ client }) {
     const verb = ACTION_VERB[action] || action;
     const scopeTag = entry.scope === 'server' ? ' `[Local]`' : '';
 
+    // RosterSnapshot enrichment for class icon + ilvl + CP. Best-effort:
+    // if /la-roster has queried this name before, the broadcast carries
+    // the same rich vocabulary as the v0.5.67 OCR check / scan cards.
+    // Otherwise fall back to the older name-only headline.
+    let snap = null;
+    try {
+      snap = await RosterSnapshot.findOne({ name: entry.name })
+        .collation({ locale: 'en', strength: 2 })
+        .lean();
+    } catch (err) {
+      console.warn('[list] Snapshot lookup for broadcast failed (non-fatal):', err.message);
+    }
+    const className = snap?.classId ? getClassName(snap.classId) : '';
+    const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
+
     // Description leads with a one-line headline so the recipient
     // sees "What changed in which list" without parsing the fields.
-    const headline = `${icon} **[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}.`;
+    // Class icon (when known) sits between the list-status icon and
+    // the linked name to match the rest of the v0.5.67 vocabulary.
+    const headline = `${icon} ${classPrefix}**[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}.`;
 
     const fields = [
       { name: '📝 Reason', value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
@@ -34,6 +53,24 @@ export function createBroadcastServices({ client }) {
       fields.push({
         name: action === 'added' ? '🕐 Added' : '🕐 Edited',
         value: relativeTime(entry.addedAt),
+        inline: true,
+      });
+    }
+    // Roster stats from the snapshot lookup above. Both fields share
+    // the same `if snap` gate because RosterSnapshot writes ilvl + CP
+    // together; one without the other is unexpected. Inline with the
+    // existing meta so the card stays compact.
+    if (snap?.itemLevel > 0) {
+      fields.push({
+        name: '📊 ilvl',
+        value: `\`${snap.itemLevel.toFixed(2)}\``,
+        inline: true,
+      });
+    }
+    if (snap?.combatScore) {
+      fields.push({
+        name: '⚔️ CP',
+        value: snap.combatScore,
         inline: true,
       });
     }
@@ -161,6 +198,34 @@ export function createBroadcastServices({ client }) {
 
     const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');
 
+    // Snapshot enrichment for the bulk preview line: one query for all
+    // names in the batch instead of N. When snapshot data is present,
+    // each row picks up a class-icon prefix (matches v0.5.67 vocab);
+    // names without a snapshot fall back to the bare name + reason.
+    const allBulkNames = addedResults.map((r) => r.entry?.name || r.name).filter(Boolean);
+    let snapshotMap = new Map();
+    if (allBulkNames.length > 0) {
+      try {
+        const snaps = await RosterSnapshot.find({ name: { $in: allBulkNames } })
+          .collation({ locale: 'en', strength: 2 })
+          .lean();
+        snapshotMap = new Map(snaps.map((s) => [s.name.toLowerCase(), s]));
+      } catch (err) {
+        console.warn('[list] Snapshot lookup for bulk broadcast failed (non-fatal):', err.message);
+      }
+    }
+
+    const renderBulkLine = (i, t, r) => {
+      const name = r.entry?.name || r.name;
+      const snap = snapshotMap.get(String(name).toLowerCase());
+      const cls = snap?.classId ? getClassName(snap.classId) : '';
+      const classPrefix = cls ? `${getClassEmoji(cls) || cls} ` : '';
+      const reasonShort = (r.entry?.reason || '').length > 60
+        ? (r.entry?.reason || '').slice(0, 57) + '...'
+        : (r.entry?.reason || '');
+      return `${i + 1}. ${typeIcon(t)} ${classPrefix}**${name}** · ${reasonShort}`;
+    };
+
     const buildBulkEmbed = (entries, isLocal) => {
       const grouped = { black: [], white: [], watch: [] };
       for (const r of entries) {
@@ -178,7 +243,7 @@ export function createBroadcastServices({ client }) {
         if (grouped[t].length === 0) continue;
         const lines = grouped[t]
           .slice(0, 15)
-          .map((r, i) => `${i + 1}. ${typeIcon(t)} **${r.name}** · ${(r.entry?.reason || '').slice(0, 80)}`)
+          .map((r, i) => renderBulkLine(i, t, r))
           .join('\n');
         const suffix = grouped[t].length > 15 ? `\n*... and ${grouped[t].length - 15} more*` : '';
         embed.addFields({
