@@ -104,17 +104,26 @@ export function createTrustHandlers({ client }) {
       }
 
       const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(deleted.name)}/roster`;
+      const trustedSince = deleted.createdAt
+        ? `<t:${Math.floor(new Date(deleted.createdAt).getTime() / 1000)}:R>`
+        : 'unknown';
+
       const embed = buildAlertEmbed({
-        severity: AlertSeverity.SUCCESS,
-        titleIcon: '🛡️',
-        color: COLORS.danger,
-        title: 'Trusted · Entry Removed',
+        severity: AlertSeverity.WARNING,
+        titleIcon: '',
+        color: COLORS.muted,
+        title: `🛡️ Trusted · Removed · ${deleted.name}`,
+        description:
+          `**${deleted.name}** is no longer on the trusted list. ` +
+          `This character (and any alts via roster match) can now be added to ` +
+          `the blacklist / watchlist again.`,
         fields: [
-          { name: 'Name', value: `[${deleted.name}](${rosterLink})`, inline: true },
-          { name: 'Was trusted for', value: deleted.reason || 'N/A', inline: true },
-          { name: 'Removed by', value: interaction.user.tag, inline: true },
+          { name: '🧬 Character', value: `[${deleted.name}](${rosterLink})`, inline: true },
+          { name: '📝 Was trusted for', value: (deleted.reason || 'N/A').slice(0, 1024), inline: true },
+          { name: '🕐 Trusted since', value: trustedSince, inline: true },
+          { name: '👤 Removed by', value: interaction.user.tag, inline: false },
         ],
-        footer: 'This character can now be blacklisted.',
+        footer: 'Tip: /la-list trust action:add to re-trust if this was a mistake.',
       });
 
       await interaction.editReply({ embeds: [embed] });
@@ -163,15 +172,19 @@ export function createTrustHandlers({ client }) {
     const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
     const embed = buildAlertEmbed({
       severity: AlertSeverity.SUCCESS,
-      titleIcon: '🛡️',
+      titleIcon: '',
       color: COLORS.trustedSoft,
-      title: 'Trusted · Entry Added',
+      title: `🛡️ Trusted · Added · ${name}`,
+      description:
+        `**${name}** is now on the trusted list. From this point on, ` +
+        `**${name}** and any character that resolves to the same roster ` +
+        `cannot be added to the blacklist, whitelist, or watchlist by anyone.`,
       fields: [
-        { name: 'Name', value: `[${name}](${rosterLink})`, inline: true },
-        { name: 'Reason', value: reason || 'N/A', inline: true },
-        { name: 'Added by', value: interaction.user.tag, inline: true },
+        { name: '🧬 Character', value: `[${name}](${rosterLink})`, inline: true },
+        { name: '📝 Reason', value: (reason || 'N/A').slice(0, 1024), inline: true },
+        { name: '👤 Added by', value: interaction.user.tag, inline: true },
       ],
-      footer: 'This character (and its alts) cannot be added to any list.',
+      footer: 'Tip: /la-list view trusted to browse the trusted roster.',
     });
 
     await interaction.editReply({ embeds: [embed] });
