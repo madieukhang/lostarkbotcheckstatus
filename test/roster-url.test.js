@@ -278,6 +278,8 @@ test('detectAltsViaStronghold pauses early on candidate failure storms and retri
     assert.equal(result.failedCandidates, 1);
     assert.deepEqual(result.scannedNames, []);
     assert.deepEqual(result.failedNames, ['Failone']);
+    assert.equal(result.lastFailureReason, 'HTML HTTP 429');
+    assert.deepEqual(result.failureReasons, { 'HTML HTTP 429': 1 });
     assert.equal(fetchCalls, 2);
   } finally {
     globalThis.fetch = originalFetch;

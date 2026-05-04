@@ -108,6 +108,8 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   const scannedNames = [];
   const attemptedNames = [];
   const failedNames = [];
+  const failureReasons = new Map();
+  let lastFailureReason = '';
   let failedCandidates = 0;
   let attemptedCandidates = 0;
   let checkedCandidates = 0;
@@ -144,6 +146,12 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     return failedCandidates / attemptedCandidates >= failureGuardFailedRate;
   }
 
+  function recordFailureReason(reason) {
+    const normalized = String(reason || 'profile meta unavailable').trim() || 'profile meta unavailable';
+    lastFailureReason = normalized;
+    failureReasons.set(normalized, (failureReasons.get(normalized) || 0) + 1);
+  }
+
   async function scanWorker() {
     while (nextCandidateIndex < limitedCandidates.length) {
       if (cancelFlag.cancelled) {
@@ -159,6 +167,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
       const cand = limitedCandidates[nextCandidateIndex++];
       attemptedNames.push(cand.name);
       let candidateRateLimitRetries = 0;
+      let candidateFailureReason = '';
       const candMeta = await fetchCharacterMeta(cand.name, {
         allowScraperApi: useScraperApiForCandidates,
         preferScraperApi: useScraperApiForCandidates,
@@ -166,6 +175,13 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
         retryOnRateLimit,
         rateLimitRetryDelayMs,
         suppressRetryWarnings: isGentle,
+        onMetaFetchResult: ({ phase, status, ok, error }) => {
+          if (error) {
+            candidateFailureReason = `${phase} ${error.message || 'fetch failed'}`;
+          } else if (!ok) {
+            candidateFailureReason = `${phase} HTTP ${status}`;
+          }
+        },
         onRetryableStatus: ({ status }) => {
           if (status === 429) {
             candidateRateLimitRetries++;
@@ -185,6 +201,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
       if (candMeta === null) {
         failedCandidates++;
         failedNames.push(cand.name);
+        recordFailureReason(candidateFailureReason);
         backoff.current = Math.min(backoff.current + backoff.step, backoff.max);
       } else {
         checkedCandidates++;
@@ -236,6 +253,8 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
             alts: alts.slice(),
             currentBackoffMs: backoff.current,
             rateLimitRetries,
+            lastFailureReason,
+            failureReasons: Object.fromEntries(failureReasons),
           })).catch((err) => {
             console.warn('[alt-detect] onProgress callback threw:', err?.message || err);
           });
@@ -246,7 +265,8 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
         pausedForFailureStorm = true;
         abortReason = 'bible-failure-storm';
         abortLabel = 'Bible rejected candidate profiles';
-        abortDetail = `${failedCandidates}/${attemptedCandidates} candidate attempts failed.`;
+        abortDetail = `${failedCandidates}/${attemptedCandidates} candidate attempts failed.` +
+          (lastFailureReason ? ` Last error: ${lastFailureReason}.` : '');
         console.warn(
           `[alt-detect] Pausing ${name}: high failure rate ` +
           `${failedCandidates}/${attemptedCandidates} (${Math.round((failedCandidates / attemptedCandidates) * 100)}%).`
@@ -298,6 +318,8 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     skippedCandidates,
     excludedCandidates,
     failedCandidates,
+    lastFailureReason,
+    failureReasons: Object.fromEntries(failureReasons),
     rateLimitRetries,
     candidateLimit,
     concurrency,

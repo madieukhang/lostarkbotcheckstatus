@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deriveScanState } from '../bot/utils/scanResultEmbed.js';
+import {
+  buildScanResultEmbed,
+  deriveScanState,
+} from '../bot/utils/scanResultEmbed.js';
 
 test('deriveScanState treats failure storm as paused and leaves failed attempts retryable', () => {
   const state = deriveScanState({
@@ -35,3 +38,25 @@ test('deriveScanState exposes system aborts distinctly from manual stops', () =>
   });
 });
 
+test('scan result embeds surface the latest bible failure reason', () => {
+  const { embed } = buildScanResultEmbed({
+    target: {
+      name: 'Ainslinn',
+      isHidden: true,
+      guildName: 'Bullet Shell',
+    },
+    result: {
+      totalEligibleInGuild: 437,
+      checkedCandidates: 0,
+      attemptedCandidates: 25,
+      failedCandidates: 25,
+      pausedForFailureStorm: true,
+      lastFailureReason: 'HTML HTTP 429',
+      alts: [],
+    },
+    kind: 'roster-hidden',
+    summaryLine: 'I scanned **Bullet Shell** for stronghold matches with **Ainslinn**.',
+  });
+
+  assert.match(embed.toJSON().description, /Last error: `HTML HTTP 429`/);
+});
