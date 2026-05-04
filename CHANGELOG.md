@@ -4,6 +4,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.75] - 2026-05-04
+
+### Fixed
+- Auto-check now deduplicates each Discord message before the async channel-config lookup. This prevents one uploaded screenshot from producing two result cards when Discord delivers duplicate `messageCreate` events or the listener is accidentally attached twice in one bot process.
+
 ## [v0.5.74] - 2026-05-04
 
 ### Fixed
