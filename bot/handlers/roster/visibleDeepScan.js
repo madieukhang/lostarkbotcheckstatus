@@ -144,6 +144,8 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
               allDiscoveredAlts: altResult.alts || [],
               cap: deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit,
               scanStats: {
+                scanned: altResult.scannedCandidates || 0,
+                attempted: altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0,
                 failed: altResult.failedCandidates || 0,
                 rateLimitRetries: altResult.rateLimitRetries || 0,
               },

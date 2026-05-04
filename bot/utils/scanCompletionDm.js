@@ -92,11 +92,20 @@ export async function sendScanCompletionDm(opts) {
     lines.push(`Guild: **${guildName}**`);
   }
 
+  const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
+  const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
   const statFields = [
-    { name: 'Scanned', value: String(result.scannedCandidates ?? 0), inline: true },
+    { name: 'Checked', value: String(checkedCandidates), inline: true },
     { name: 'Found', value: String(alts.length), inline: true },
     { name: 'Failed', value: String(result.failedCandidates ?? 0), inline: true },
   ];
+  if (attemptedCandidates > checkedCandidates) {
+    statFields.push({
+      name: 'Attempts',
+      value: String(attemptedCandidates),
+      inline: true,
+    });
+  }
   if ((result.scraperApiRequests ?? 0) > 0) {
     statFields.push({
       name: 'ScraperAPI',

@@ -315,6 +315,9 @@ export function createEnrichHandlers({ client, services }) {
       ...(result.scannedNames || []),
     ];
     const cumulativeScanned = (existingSession?.scanStats?.scanned ?? 0) + (result.scannedCandidates || 0);
+    const cumulativeAttempted =
+      (existingSession?.scanStats?.attempted ?? 0) +
+      (result.attemptedCandidates ?? result.scannedCandidates ?? 0);
     const cumulativeFailed = (existingSession?.scanStats?.failed ?? 0) + (result.failedCandidates || 0);
     const cumulativeRateLimitRetries =
       (existingSession?.scanStats?.rateLimitRetries ?? 0) + (result.rateLimitRetries || 0);
@@ -340,6 +343,7 @@ export function createEnrichHandlers({ client, services }) {
         scannedNames: cumulativeScannedNames,
         scanStats: {
           scanned: cumulativeScanned,
+          attempted: cumulativeAttempted,
           failed: cumulativeFailed,
           rateLimitRetries: cumulativeRateLimitRetries,
           totalAlts: cumulativeAlts.length,
@@ -365,6 +369,7 @@ export function createEnrichHandlers({ client, services }) {
         scannedNames: cumulativeScannedNames,
         scanStats: {
           scanned: cumulativeScanned,
+          attempted: cumulativeAttempted,
           failed: cumulativeFailed,
           rateLimitRetries: cumulativeRateLimitRetries,
           totalAlts: cumulativeAlts.length,
@@ -380,6 +385,8 @@ export function createEnrichHandlers({ client, services }) {
     const cumulativeResult = {
       ...result,
       scannedCandidates: cumulativeScanned,
+      checkedCandidates: cumulativeScanned,
+      attemptedCandidates: cumulativeAttempted,
       failedCandidates: cumulativeFailed,
       rateLimitRetries: cumulativeRateLimitRetries,
       alts: cumulativeAlts,
@@ -440,8 +447,8 @@ export function createEnrichHandlers({ client, services }) {
     // DM the caller so they don't have to keep the channel open during
     // a multi-minute scan. Outcome is derived from state + alt count.
     let outcome;
-    if (state.stopReason === 'stopped' && cumulativeAlts.length === 0) outcome = 'stopped-no-alts';
-    else if (state.stopReason === 'stopped') outcome = 'stopped-with-alts';
+    if ((state.stopReason === 'stopped' || state.stopReason === 'failure-storm') && cumulativeAlts.length === 0) outcome = 'stopped-no-alts';
+    else if (state.stopReason === 'stopped' || state.stopReason === 'failure-storm') outcome = 'stopped-with-alts';
     else if (cumulativeAlts.length === 0) outcome = 'no-alts';
     else outcome = 'completed';
     try {

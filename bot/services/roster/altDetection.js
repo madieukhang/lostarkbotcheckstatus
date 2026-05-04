@@ -38,6 +38,10 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   const retryOnRateLimit = options.retryOnRateLimit ?? isGentle;
   const backoffFloorMs = isGentle ? 1500 : config.scanBackoffMinMs;
   const rateLimitRetryDelayMs = options.rateLimitRetryDelayMs ?? (isGentle ? 8000 : undefined);
+  const failureGuardMinCandidates = options.failureGuardMinCandidates
+    ?? config.strongholdDeepFailureGuardMinCandidates;
+  const failureGuardFailedRate = options.failureGuardFailedRate
+    ?? config.strongholdDeepFailureGuardRate;
 
   const meta = options.targetMeta || await fetchCharacterMeta(name, {
     allowScraperApi: allowScraperApiForTarget,
@@ -98,15 +102,18 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   );
 
   const alts = [];
-  // scannedNames captures the bible-cased names of candidates the worker
-  // actually visited (regardless of match outcome). Continue-scan reads
-  // this back via the result envelope to seed excludeNames for the next
-  // pass, so a resume never re-fetches the same profile twice.
+  // scannedNames captures only candidates with successfully parsed meta.
+  // Failed attempts are deliberately excluded so Continue can retry them
+  // later instead of permanently skipping profiles that bible rejected.
   const scannedNames = [];
+  const attemptedNames = [];
+  const failedNames = [];
   let failedCandidates = 0;
-  let scannedCandidates = 0;
+  let attemptedCandidates = 0;
+  let checkedCandidates = 0;
   let nextCandidateIndex = 0;
   let rateLimitRetries = 0;
+  let pausedForFailureStorm = false;
 
   console.log(`[alt-detect] Scanning ${limitedCandidates.length} candidate(s)...`);
 
@@ -128,14 +135,20 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   const cancelFlag = options.cancelFlag || { cancelled: false };
   let cancelledByFlag = false;
 
+  function shouldPauseForFailureStorm() {
+    if (!failureGuardMinCandidates || !failureGuardFailedRate) return false;
+    if (attemptedCandidates < failureGuardMinCandidates) return false;
+    return failedCandidates / attemptedCandidates >= failureGuardFailedRate;
+  }
+
   async function scanWorker() {
     while (nextCandidateIndex < limitedCandidates.length) {
-      if (cancelFlag.cancelled) {
+      if (cancelFlag.cancelled || pausedForFailureStorm) {
         cancelledByFlag = true;
         break;
       }
       const cand = limitedCandidates[nextCandidateIndex++];
-      scannedNames.push(cand.name);
+      attemptedNames.push(cand.name);
       let candidateRateLimitRetries = 0;
       const candMeta = await fetchCharacterMeta(cand.name, {
         allowScraperApi: useScraperApiForCandidates,
@@ -153,7 +166,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
         timeoutMs: candidateTimeoutMs,
       });
 
-      scannedCandidates++;
+      attemptedCandidates++;
       if (candidateRateLimitRetries > 0) {
         backoff.current = Math.min(
           backoff.current + backoff.rateLimitStep * candidateRateLimitRetries,
@@ -162,8 +175,11 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
       }
       if (candMeta === null) {
         failedCandidates++;
+        failedNames.push(cand.name);
         backoff.current = Math.min(backoff.current + backoff.step, backoff.max);
       } else {
+        checkedCandidates++;
+        scannedNames.push(cand.name);
         if (candidateRateLimitRetries === 0) {
           backoff.current = Math.max(backoff.current - backoff.recover, backoff.min);
         }
@@ -182,17 +198,18 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
       // Console log stays per-25 (operator-facing). UI progress emits
       // per-5 so the embed can pulse faster between throttled edits;
       // the caller decides how often to actually push to Discord.
-      if (scannedCandidates % 25 === 0 || scannedCandidates === limitedCandidates.length) {
+      if (attemptedCandidates % 25 === 0 || attemptedCandidates === limitedCandidates.length) {
         console.log(
-          `[alt-detect] Progress ${scannedCandidates}/${limitedCandidates.length};` +
+          `[alt-detect] Progress ${attemptedCandidates}/${limitedCandidates.length};` +
+          ` checked ${checkedCandidates};` +
           ` failed ${failedCandidates}; alts ${alts.length};` +
           ` rate-limit retries ${rateLimitRetries}; backoff ${backoff.current}ms`
         );
       }
       if (
-        scannedCandidates % 5 === 0
-        || scannedCandidates === limitedCandidates.length
-        || alts.length > 0 && scannedCandidates % 1 === 0
+        attemptedCandidates % 5 === 0
+        || attemptedCandidates === limitedCandidates.length
+        || alts.length > 0 && attemptedCandidates % 1 === 0
       ) {
         if (typeof options.onProgress === 'function') {
           // Pass a snapshot of the alts array (shallow copy of the
@@ -201,7 +218,9 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
           // embed gets too long; we don't truncate here so the caller
           // has full freedom.
           Promise.resolve(options.onProgress({
-            scannedCandidates,
+            scannedCandidates: attemptedCandidates,
+            checkedCandidates,
+            attemptedCandidates,
             totalCandidates: limitedCandidates.length,
             failedCandidates,
             altsFound: alts.length,
@@ -212,6 +231,15 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
             console.warn('[alt-detect] onProgress callback threw:', err?.message || err);
           });
         }
+      }
+
+      if (shouldPauseForFailureStorm()) {
+        pausedForFailureStorm = true;
+        console.warn(
+          `[alt-detect] Pausing ${name}: high failure rate ` +
+          `${failedCandidates}/${attemptedCandidates} (${Math.round((failedCandidates / attemptedCandidates) * 100)}%).`
+        );
+        break;
       }
 
       if (nextCandidateIndex < limitedCandidates.length) {
@@ -241,6 +269,8 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     },
     alts,
     scannedNames,
+    attemptedNames,
+    failedNames,
     totalMembers: members.length,
     // totalEligibleInGuild is invariant across multiple Continue passes
     // (it counts every guild member ilvl >= 1700 minus the target) so
@@ -250,7 +280,9 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     totalEligibleInGuild: baseCandidates.length,
     eligibleCandidates: candidates.length,
     totalCandidates: limitedCandidates.length,
-    scannedCandidates,
+    scannedCandidates: checkedCandidates,
+    checkedCandidates,
+    attemptedCandidates,
     skippedCandidates,
     excludedCandidates,
     failedCandidates,
@@ -262,6 +294,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     scraperApiRequests: scraperApiUsage.totalRequests,
     mode,
     retryOnRateLimit,
+    pausedForFailureStorm,
     cancelled: cancelledByFlag,
   };
 }

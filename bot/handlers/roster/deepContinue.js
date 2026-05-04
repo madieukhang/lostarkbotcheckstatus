@@ -163,6 +163,10 @@ export async function handleRosterDeepContinueButton(interaction) {
   session.scannedNames = mergedScannedNames;
   session.scanStats = {
     ...(session.scanStats || {}),
+    scanned: (session.scanStats?.scanned ?? 0) + (altResult.scannedCandidates || 0),
+    attempted:
+      (session.scanStats?.attempted ?? 0) +
+      (altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0),
     failed: (session.scanStats?.failed ?? 0) + (altResult.failedCandidates || 0),
     rateLimitRetries: (session.scanStats?.rateLimitRetries ?? 0) + (altResult.rateLimitRetries || 0),
   };
@@ -171,7 +175,9 @@ export async function handleRosterDeepContinueButton(interaction) {
   // counts grown across passes.
   const cumulativeResult = {
     ...altResult,
-    scannedCandidates: mergedScannedNames.length,
+    scannedCandidates: session.scanStats.scanned ?? mergedScannedNames.length,
+    checkedCandidates: session.scanStats.scanned ?? mergedScannedNames.length,
+    attemptedCandidates: session.scanStats.attempted ?? mergedScannedNames.length,
     failedCandidates: session.scanStats.failed,
     rateLimitRetries: session.scanStats.rateLimitRetries,
     alts: mergedAlts,
@@ -210,7 +216,7 @@ export async function handleRosterDeepContinueButton(interaction) {
   // DM only on terminal states (fully scanned or cancelled). Mid-scan
   // continues do not warrant a fresh DM ping.
   let outcome = null;
-  if (altResult.cancelled) {
+  if (altResult.cancelled || altResult.pausedForFailureStorm) {
     outcome = mergedAlts.length > 0 ? 'stopped-with-alts' : 'stopped-no-alts';
   } else if (!state.hasRemaining) {
     outcome = mergedAlts.length > 0 ? 'completed' : 'no-alts';

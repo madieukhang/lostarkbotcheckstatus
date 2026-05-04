@@ -4,6 +4,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.60] - 2026-05-04
+
+### Fixed
+- Stronghold deep scans now auto-pause when lostark.bible starts rejecting nearly every candidate profile. Instead of spending 30+ minutes producing `Failed 200+ / Found 0`, the detector stops after a high-failure sample and leaves failed candidates retryable for a later Continue pass.
+- Continue-scan state now distinguishes successfully checked names from failed attempts. A failed candidate is no longer written into `scannedNames`, so retrying later does not skip profiles that were never actually parsed.
+
 ## [v0.5.59] - 2026-05-04
 
 ### Fixed
