@@ -49,7 +49,12 @@ export function makeRosterScanProgressCallback({ interaction, replyEditor, name,
 export function formatDeepScanStats(altResult) {
   if (!altResult) return '';
 
-  const parts = [`scanned ${altResult.scannedCandidates ?? 0}`];
+  const checked = altResult.checkedCandidates ?? altResult.scannedCandidates ?? 0;
+  const attempted = altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0;
+  const parts = [`checked ${checked}`];
+  if (attempted > checked) {
+    parts.push(`attempted ${attempted}`);
+  }
   if ((altResult.skippedCandidates ?? 0) > 0) {
     parts.push(`skipped ${altResult.skippedCandidates} by limit`);
   }

@@ -207,6 +207,8 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
               allDiscoveredAlts: altResult.alts || [],
               cap: deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit,
               scanStats: {
+                scanned: altResult.scannedCandidates || 0,
+                attempted: altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0,
                 failed: altResult.failedCandidates || 0,
                 rateLimitRetries: altResult.rateLimitRetries || 0,
               },
@@ -230,7 +232,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         if (deep && altResult) {
           const replyMsg = replyEditor.getMessage();
           let outcome;
-          if (altResult.cancelled) {
+          if (altResult.cancelled || altResult.pausedForFailureStorm) {
             outcome = altResult.alts.length > 0 ? 'stopped-with-alts' : 'stopped-no-alts';
           } else {
             outcome = altResult.alts.length > 0 ? 'completed' : 'no-alts';

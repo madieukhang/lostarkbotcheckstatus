@@ -235,6 +235,54 @@ test('detectAltsViaStronghold reuses provided meta and guild members without tar
   }
 });
 
+test('detectAltsViaStronghold pauses early on candidate failure storms and retries failed names later', async () => {
+  clearMetaCache();
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return new Response('rate limited', { status: 429 });
+  };
+
+  try {
+    const result = await detectAltsViaStronghold('Ainslinn', {
+      targetMeta: {
+        rosterLevel: 300,
+        strongholdLevel: 70,
+        strongholdName: 'AinsHome',
+        guildName: 'AinsGuild',
+        guildGrade: 'Member',
+        classId: 'bard',
+        itemLevel: 1723.33,
+      },
+      guildMembers: [
+        { name: 'Failone', cls: 'bard', ilvl: 1800, rank: 'Member' },
+        { name: 'Failtwo', cls: 'bard', ilvl: 1790, rank: 'Member' },
+      ],
+      candidateLimit: 2,
+      mode: 'fast',
+      concurrency: 1,
+      retryOnRateLimit: false,
+      failureGuardMinCandidates: 1,
+      failureGuardFailedRate: 1,
+      useScraperApiForCandidates: false,
+    });
+
+    assert.equal(result.pausedForFailureStorm, true);
+    assert.equal(result.attemptedCandidates, 1);
+    assert.equal(result.checkedCandidates, 0);
+    assert.equal(result.scannedCandidates, 0);
+    assert.equal(result.failedCandidates, 1);
+    assert.deepEqual(result.scannedNames, []);
+    assert.deepEqual(result.failedNames, ['Failone']);
+    assert.equal(fetchCalls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearMetaCache();
+  }
+});
+
 test('extractCharacterItemLevelFromHtml supports common SSR item level shapes', () => {
   assert.equal(extractCharacterItemLevelFromHtml('itemLevel:1723.33'), 1723.33);
   assert.equal(extractCharacterItemLevelFromHtml('"itemLevel":"1,723.33"'), 1723.33);

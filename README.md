@@ -314,6 +314,8 @@ Copy `.env.example` to `.env` and fill in values.
 | `STRONGHOLD_DEEP_CONCURRENCY` | `3` | Parallel candidate profile fetches in Stronghold deep scans |
 | `STRONGHOLD_DEEP_CANDIDATE_TIMEOUT_MS` | `8000` | Timeout per Stronghold candidate lookup |
 | `STRONGHOLD_DEEP_USE_SCRAPERAPI` | `false` | Low-level default for detector callers that do not override it; command handlers keep high-fanout scans off |
+| `STRONGHOLD_DEEP_FAILURE_GUARD_MIN_CANDIDATES` | `25` | Candidate-attempt sample before auto-pausing a scan with extreme fetch failures |
+| `STRONGHOLD_DEEP_FAILURE_GUARD_RATE` | `0.85` | Failed-attempt ratio that triggers the auto-pause guard (`0.85` = 85%) |
 | `AUTO_CHECK_CHANNEL_IDS` | — | Global fallback for auto-check (prefer per-server `/la-setup`) |
 | `LIST_NOTIFY_CHANNEL_IDS` | — | Global fallback for list notifications |
 | `OFFICER_APPROVER_IDS` | — | Officer Discord user IDs (instant approval on `/la-list add`) |

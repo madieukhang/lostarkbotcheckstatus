@@ -65,6 +65,13 @@ function parsePositiveIntEnv(key, defaultValue) {
   return Number.isFinite(raw) && raw > 0 ? raw : defaultValue;
 }
 
+function parseRatioEnv(key, defaultValue) {
+  const raw = Number(process.env[key]);
+  if (!Number.isFinite(raw) || raw <= 0) return defaultValue;
+  if (raw > 1 && raw <= 100) return raw / 100;
+  return raw <= 1 ? raw : defaultValue;
+}
+
 const config = {
   /** Discord bot token */
   token: requireEnv('DISCORD_TOKEN'),
@@ -195,6 +202,8 @@ const config = {
   scanBackoffMinMs: parsePositiveIntEnv('SCAN_BACKOFF_MIN_MS', 300),
   scanBackoffMaxMs: parsePositiveIntEnv('SCAN_BACKOFF_MAX_MS', 3000),
   strongholdDeepUseScraperApi: parseBooleanEnv('STRONGHOLD_DEEP_USE_SCRAPERAPI', false),
+  strongholdDeepFailureGuardMinCandidates: parsePositiveIntEnv('STRONGHOLD_DEEP_FAILURE_GUARD_MIN_CANDIDATES', 25),
+  strongholdDeepFailureGuardRate: parseRatioEnv('STRONGHOLD_DEEP_FAILURE_GUARD_RATE', 0.85),
 
   /** Lost Ark server status page URL */
   statusUrl: 'https://www.playlostark.com/en-gb/support/server-status',

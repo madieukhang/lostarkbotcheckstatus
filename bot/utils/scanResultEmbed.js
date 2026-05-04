@@ -38,7 +38,7 @@ import { COLORS, ICONS } from './ui.js';
  * embed copy and button selection.
  *
  * @param {object} result - Result envelope from detectAltsViaStronghold.
- * @returns {{stopReason: 'completed'|'stopped'|'cap-hit', hasRemaining: boolean, remaining: number}}
+ * @returns {{stopReason: 'completed'|'stopped'|'failure-storm'|'cap-hit', hasRemaining: boolean, remaining: number}}
  */
 export function deriveScanState(result) {
   // Prefer totalEligibleInGuild for the remaining-count math because it is
@@ -51,14 +51,16 @@ export function deriveScanState(result) {
     : (Number.isFinite(result?.eligibleCandidates)
       ? result.eligibleCandidates
       : (result?.totalCandidates ?? 0));
-  const scanned = result?.scannedCandidates ?? 0;
+  const scanned = result?.checkedCandidates ?? result?.scannedCandidates ?? 0;
   const cancelled = result?.cancelled === true;
+  const pausedForFailureStorm = result?.pausedForFailureStorm === true;
 
   const remaining = Math.max(0, totalEligible - scanned);
   const hasRemaining = remaining > 0;
 
   let stopReason;
-  if (cancelled) stopReason = 'stopped';
+  if (pausedForFailureStorm) stopReason = 'failure-storm';
+  else if (cancelled) stopReason = 'stopped';
   else if (hasRemaining) stopReason = 'cap-hit';
   else stopReason = 'completed';
 
@@ -68,6 +70,7 @@ export function deriveScanState(result) {
 const STATE_STYLE = {
   completed: { icon: ICONS.done,    color: COLORS.success, label: 'Scan complete' },
   'cap-hit': { icon: ICONS.search,  color: COLORS.warning, label: 'Scan paused at candidate limit' },
+  'failure-storm': { icon: ICONS.warn, color: COLORS.warning, label: 'Scan paused: bible is rejecting profiles' },
   stopped:   { icon: '🛑',          color: COLORS.warning, label: 'Scan stopped early' },
 };
 
@@ -168,11 +171,16 @@ export function buildScanResultEmbed({
 
   // 3. Stats grid as a compact prose line. Discord's inline fields would
   // wrap unpredictably for 4-5 short numbers; a single line reads better.
+  const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
+  const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
   const statsParts = [
-    `**Scanned** ${result.scannedCandidates ?? 0}`,
+    `**Checked** ${checkedCandidates}`,
     `**Found** ${alts.length}`,
     `**Failed** ${result.failedCandidates ?? 0}`,
   ];
+  if (attemptedCandidates > checkedCandidates) {
+    statsParts.push(`**Attempts** ${attemptedCandidates}`);
+  }
   if ((result.rateLimitRetries ?? 0) > 0) {
     statsParts.push(`**429 retries** ${result.rateLimitRetries}`);
   }
@@ -193,6 +201,15 @@ export function buildScanResultEmbed({
     sections.push(
       `Scan was stopped before reaching the end. ${state.remaining} eligible candidate(s) ` +
       `were not checked. Hit **Continue scan** to pick up where this run left off.`
+    );
+  } else if (state.stopReason === 'failure-storm') {
+    const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
+    const failed = result.failedCandidates ?? 0;
+    const rate = attempted > 0 ? Math.round((failed / attempted) * 100) : 0;
+    sections.push(
+      `Bible rejected too many candidate profiles (${failed}/${attempted}, ${rate}% failed), ` +
+      `so I paused instead of burning the rest of the guild scan. ` +
+      `Failed candidates were **not** marked checked; hit **Continue scan** later to retry them.`
     );
   } else if (state.stopReason === 'cap-hit') {
     sections.push(

@@ -195,7 +195,7 @@ export async function handleRosterCommand(interaction) {
     if (deep && visibleDeep.result) {
       const replyMsg = replyEditor.getMessage();
       let outcome;
-      if (visibleDeep.result.cancelled) {
+      if (visibleDeep.result.cancelled || visibleDeep.result.pausedForFailureStorm) {
         outcome = visibleDeep.result.alts.length > 0 ? 'stopped-with-alts' : 'stopped-no-alts';
       } else {
         outcome = visibleDeep.result.alts.length > 0 ? 'completed' : 'no-alts';
