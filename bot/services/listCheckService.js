@@ -360,9 +360,33 @@ export async function checkNamesAgainstLists(names, options = {}) {
       item.hasRoster = cached.hasRoster;
       item.failReason = cached.failReason || null;
       item._allCharacters = cached.allCharacters || [];
+      // Surface cached class/ilvl/CP only when the snapshot Phase 1
+      // didn't already populate them (snap data takes priority because
+      // /la-roster writes more aggressive data than the OCR check).
+      // Empty cached fields fall through to the existing snap values.
+      if (cached.targetClassName && !item.snapClassName) {
+        item.snapClassName = cached.targetClassName;
+      }
+      if (cached.targetItemLevel > 0 && !(item.snapItemLevel > 0)) {
+        item.snapItemLevel = cached.targetItemLevel;
+      }
+      if (cached.targetCombatScore && !item.snapCombatScore) {
+        item.snapCombatScore = cached.targetCombatScore;
+      }
       if (cached.searchSuggestions?.length > 0) {
         item.similarNames = cached.searchSuggestions;
         item._cachedSearchSuggestions = cached.searchSuggestions;
+      }
+      // Force re-scrape when the cached row was written by an older
+      // bot version that did not store class/CP. Pre-v0.5.71 entries
+      // satisfy hasRoster but carry empty target* fields; treating
+      // them as cache miss lets the next request backfill the cache
+      // + snapshot in one pass.
+      const cachedHasClassData = Boolean(cached.targetClassName) || cached.targetItemLevel > 0;
+      if (cached.hasRoster && !cachedHasClassData) {
+        cacheMissItems.push(item);
+        console.log(`[listcheck] Cache hit (missing class data, re-scraping): ${item.name}`);
+        continue;
       }
       console.log(`[listcheck] Cache hit: ${item.name} (hasRoster: ${cached.hasRoster})`);
     } else {
@@ -464,6 +488,14 @@ export async function checkNamesAgainstLists(names, options = {}) {
                 hasRoster: rosterResult.hasValidRoster,
                 allCharacters: rosterResult.allCharacters || [],
                 failReason: '',
+                // Stash the per-target render tokens so the next
+                // cache hit can render class icon + CP without a
+                // fresh scrape or a snapshot lookup.
+                targetClassName: rosterResult.targetClassName || '',
+                targetItemLevel: typeof rosterResult.targetItemLevel === 'number'
+                  ? rosterResult.targetItemLevel
+                  : 0,
+                targetCombatScore: rosterResult.targetCombatScore || '',
                 cachedAt: new Date(),
               },
             },
