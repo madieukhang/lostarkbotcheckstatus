@@ -4,6 +4,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.62] - 2026-05-04
+
+### Fixed
+- `/la-list add` hidden-roster success cards now check whether lostark.bible exposes a guild before offering enrich. If a guild is present, the card names `/la-list enrich name:<character>` and keeps the **Enrich now** button. If no guild is visible, the button is omitted and the card points officers to `/la-list edit ... additional_names` instead.
+
 ## [v0.5.61] - 2026-05-04
 
 ### Fixed
