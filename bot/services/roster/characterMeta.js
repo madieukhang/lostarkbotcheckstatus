@@ -5,7 +5,8 @@ import {
   getCachedMeta,
   setCachedMeta,
 } from '../../utils/metaCache.js';
-import { buildBibleFetchOptions, fetchWithFallback } from './bibleFetch.js';
+import { buildBibleFetchOptions } from './bibleFetch.js';
+import { bibleClient } from './bibleClient.js';
 import {
   parseCharacterMetaFromHtml,
   shapeCharacterMetaFromHeader,
@@ -77,7 +78,7 @@ async function fetchMetaResponse(url, name, phase, options = {}) {
       // Build fetch options per attempt. Reusing AbortSignal.timeout()
       // across a 5s retry sleep leaves the retry with a half-expired
       // signal, which turns recoverable bible 429/503s into false nulls.
-      const res = await fetchWithFallback(url, buildBibleFetchOptions(options));
+      const res = await bibleClient.fetch(url, buildBibleFetchOptions(options));
       options.onMetaFetchResult?.({
         name,
         phase,

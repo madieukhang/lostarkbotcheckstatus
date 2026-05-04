@@ -1,6 +1,7 @@
 import config from '../../config.js';
 import { findBibleNode } from '../../utils/bibleData.js';
-import { buildBibleFetchOptions, fetchWithFallback } from './bibleFetch.js';
+import { buildBibleFetchOptions } from './bibleFetch.js';
+import { bibleClient } from './bibleClient.js';
 import { parseGuildMembersFromHtml } from './parsers.js';
 
 const guildMembersCache = new Map();
@@ -46,7 +47,7 @@ async function fetchGuildMembersUncached(name, options = {}) {
   try {
     const jsonUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild/__data.json`;
     const htmlUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/guild`;
-    const res = await fetchWithFallback(jsonUrl, buildBibleFetchOptions(options));
+    const res = await bibleClient.fetch(jsonUrl, buildBibleFetchOptions(options));
     if (res.ok) {
       try {
         const parsed = await res.json();
@@ -78,7 +79,7 @@ async function fetchGuildMembersUncached(name, options = {}) {
       }
     }
 
-    const htmlRes = await fetchWithFallback(htmlUrl, buildBibleFetchOptions(options));
+    const htmlRes = await bibleClient.fetch(htmlUrl, buildBibleFetchOptions(options));
     if (!htmlRes.ok) return [];
     const html = await htmlRes.text();
     return parseGuildMembersFromHtml(html);

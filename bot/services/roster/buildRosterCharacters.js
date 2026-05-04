@@ -1,6 +1,7 @@
 import { JSDOM, VirtualConsole } from 'jsdom';
 
-import { buildBibleFetchOptions, fetchWithFallback } from './bibleFetch.js';
+import { buildBibleFetchOptions } from './bibleFetch.js';
+import { bibleClient } from './bibleClient.js';
 import { fetchCharacterMeta } from './characterMeta.js';
 import { inferHiddenRosterItemLevel } from './search.js';
 import { detectAltsViaStronghold } from './altDetection.js';
@@ -30,7 +31,7 @@ export async function buildRosterCharacters(name, options = {}) {
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
-    const response = await fetchWithFallback(targetUrl, fetchOptions);
+    const response = await bibleClient.fetch(targetUrl, fetchOptions);
 
     if (!response.ok) {
       failReason = response.status === 429 ? 'Rate limited - try again later' : `HTTP ${response.status}`;
