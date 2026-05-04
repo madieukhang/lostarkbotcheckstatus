@@ -82,6 +82,7 @@ export async function buildRosterCharacters(name, options = {}) {
               targetItemLevel,
               useScraperApiForCandidates: options.useScraperApiForCandidates,
               allowScraperApiForGuild: options.allowScraperApi,
+              viaWorker: options.viaWorker === true,
             });
             const altNames = altResult?.alts?.map((alt) => alt.name).filter(Boolean) ?? [];
             allCharacters = [...new Set([name, ...altNames])];

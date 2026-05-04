@@ -162,7 +162,7 @@ export function createEnrichHandlers({ client, services }) {
     if (existingSession?.targetIsHidden !== undefined) {
       targetIsHidden = existingSession.targetIsHidden;
     } else {
-      const probe = await buildRosterCharacters(name, { hiddenRosterFallback: true });
+      const probe = await buildRosterCharacters(name, { hiddenRosterFallback: true, viaWorker: true });
       if (!probe.hasValidRoster) {
         await replyEditor.edit({
           embeds: [buildAlertEmbed({

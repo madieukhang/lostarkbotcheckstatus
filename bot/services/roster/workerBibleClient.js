@@ -1,4 +1,5 @@
 import ScrapeJobDefault from '../../models/ScrapeJob.js';
+import { getWorkerHealth as getDefaultWorkerHealth } from '../worker/heartbeat.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 500;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -38,6 +39,7 @@ function sanitizeOptions(options = {}) {
 // uses the real Mongoose model and live polling cadence.
 export function createWorkerBibleClient({
   ScrapeJob = ScrapeJobDefault,
+  getWorkerHealth = null,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
   defaultTimeoutMs = DEFAULT_TIMEOUT_MS,
   backpressureThreshold = DEFAULT_BACKPRESSURE_THRESHOLD,
@@ -46,6 +48,19 @@ export function createWorkerBibleClient({
   return {
     async fetch(url, options = {}) {
       const sanitized = sanitizeOptions(options);
+
+      if (getWorkerHealth) {
+        const health = await getWorkerHealth();
+        if (!health.online) {
+          const age = Number.isFinite(health.ageMs)
+            ? `; last heartbeat ${Math.round(health.ageMs / 1000)}s ago`
+            : '';
+          throw new Error(
+            `Scraping worker offline (${health.reason || 'unknown'}${age}). ` +
+            'Start loa-worker.js and try again.'
+          );
+        }
+      }
 
       // Backpressure: count pending jobs before insert. If the worker
       // is offline / overwhelmed and the queue grows past threshold,
@@ -105,4 +120,6 @@ export function createWorkerBibleClient({
   };
 }
 
-export const workerBibleClient = createWorkerBibleClient();
+export const workerBibleClient = createWorkerBibleClient({
+  getWorkerHealth: getDefaultWorkerHealth,
+});
