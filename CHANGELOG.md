@@ -59,6 +59,18 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ### Notes
 - This specifically covers scan runs that exceed the original interaction token lifetime, such as large guild scans still in progress around 30+ minutes.
 
+## [v0.5.57] - 2026-05-04
+
+### Changed
+- **`/la-list check` result** moved from plain text content to a structured embed. Old layout used `truncateDiscordContent(...)` against the 2000-char message-content cap and produced a flat `Checked: N name(s)` header followed by an unstyled list. New embed shows: state-driven title icon (⛔ if any blacklist hit, ⚠️ for watch, ✅ for clean) + breakdown line (`⛔ 3 · ⚠️ 1 · ❓ 5 clean`) + 3-up inline stats panel (Checked / Flagged / Cleared) + per-name list in description + actionable footer hint.
+- **`/la-list remove`** confirm + success messages converted from plain content lines to embeds. Single removal renders a result card with list icon, scope tag, and a tracked-alts preview (up to 6 names) so the user can verify they targeted the right account. Multi-list picker (when name appears in 2+ lists) gains an embed listing each list option with reason snippet, replacing the old `🔎 Found Y in blacklist and watchlist.\nChoose a removal option:` plain text. Failure paths (legacy entry, not-owner) get distinct copy in the same card.
+- **`/la-list add` approval DM** redesigned for senior triage. Title now leads with the list icon (⛔/✅/⚠️) instead of the generic shield so approvers can scan red vs green DMs at a glance. Layout: hero line ("An officer in **<guild>** wants to **add** **<name>** to the blacklist `[Global]`"), 3-up inline meta (List · Raid · Scope), full Reason field, **Tracked alts** field with linked roster names (matches the `/la-list view` evidence detail), Requested-by mention, Request ID at the bottom for audit. Shield emoji preserved in the footer line for visual identity.
+
+### Notes
+- 57/57 tests pass.
+- `removeOne` in `/la-list remove` now returns a structured outcome envelope (`{ ok, reason?, entry, type, label, icon }`) instead of a pre-formatted string. Lets the result-card builder distinguish success / legacy / not-owner cases for color + copy.
+- Approval DM Tracked alts field is rendered only when `payload.allCharacters` carries entries beyond the entry name itself; falls back gracefully on legacy approval payloads that don't include it.
+
 ## [v0.5.56] - 2026-05-04
 
 ### Changed

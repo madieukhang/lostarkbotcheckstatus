@@ -109,20 +109,26 @@ export function createRemoveHandlers({ client, services }) {
         return;
       }
 
+      // removeOne returns a structured outcome envelope so the caller
+      // can render it as an embed. The previous string-based return
+      // produced plain content lines which lacked visual hierarchy
+      // (no color, no inline scope tag, no allCharacters reference).
+      //
+      // Outcome shapes:
+      //   { ok: false, reason: 'legacy' | 'not-owner', entry, type }
+      //   { ok: true, entry, type }
       const removeOne = async (entry, type) => {
         const { model, label, icon } = getListContext(type);
 
         if (!entry.addedByUserId) {
-          return `⚠️ **${entry.name}** in ${label} is a legacy entry without owner metadata, so it cannot be removed with this command.`;
+          return { ok: false, reason: 'legacy', entry, type, label, icon };
         }
-
         if (entry.addedByUserId !== interaction.user.id) {
-          return `⛔ You cannot remove **${entry.name}** from ${label}. Only **${entry.addedByTag || entry.addedByUserId}** (who added it) can remove it.`;
+          return { ok: false, reason: 'not-owner', entry, type, label, icon };
         }
 
         await model.deleteOne({ _id: entry._id });
 
-        // Global: broadcast to all. Server-scoped: broadcast to owner only
         broadcastListChange('removed', entry, {
           type,
           guildId: interaction.guild?.id || '',
@@ -130,18 +136,96 @@ export function createRemoveHandlers({ client, services }) {
           requestedByTag: interaction.user.tag,
         }, { onlyOwner: entry.scope === 'server' }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 
-        const scopeNote = entry.scope === 'server' ? ' *(server only)*' : '';
-        return `${icon} Removed **${entry.name}** from ${label}.${scopeNote}`;
+        return { ok: true, entry, type, label, icon };
       };
 
-      // Single entry · remove directly
+      // Render N outcome envelopes as a single result embed. Color and
+      // title icon follow the strongest outcome present (any failure
+      // tints warning; otherwise the success-list-icon if just one
+      // type, else generic success).
+      const buildRemoveResultEmbed = (outcomes) => {
+        const oks = outcomes.filter((o) => o.ok);
+        const fails = outcomes.filter((o) => !o.ok);
+
+        let color;
+        let titleIcon;
+        let title;
+        if (fails.length > 0 && oks.length === 0) {
+          color = 0xfee75c;
+          titleIcon = '⚠️';
+          title = `Removal blocked · ${name}`;
+        } else if (oks.length === 1 && fails.length === 0) {
+          color = oks[0].type === 'black' ? 0xed4245 : oks[0].type === 'white' ? 0x57f287 : 0xfee75c;
+          titleIcon = oks[0].icon;
+          title = `Removed from ${oks[0].label} · ${name}`;
+        } else if (oks.length > 1) {
+          color = 0x57f287;
+          titleIcon = '🗑️';
+          title = `Removed from ${oks.length} list(s) · ${name}`;
+        } else {
+          color = 0xfee75c;
+          titleIcon = '⚠️';
+          title = `Mixed result · ${name}`;
+        }
+
+        const sections = [];
+        if (oks.length > 0) {
+          const removedLines = oks.map((o) => {
+            const scopeTag = o.entry.scope === 'server' ? ' `[Local]`' : '';
+            const reason = o.entry.reason ? ` *${(o.entry.reason || '').slice(0, 80)}${o.entry.reason.length > 80 ? '...' : ''}*` : '';
+            return `${o.icon} **${o.label}**${scopeTag}${reason}`;
+          });
+          sections.push(`✅ **Successfully removed:**\n${removedLines.join('\n')}`);
+        }
+        if (fails.length > 0) {
+          const failLines = fails.map((o) => {
+            if (o.reason === 'legacy') {
+              return `⚠️ **${o.label}**: Legacy entry (no owner metadata). Use /la-list edit to remove.`;
+            }
+            const owner = o.entry.addedByTag || o.entry.addedByUserId;
+            return `⛔ **${o.label}**: Only **${owner}** (who added it) can remove this entry.`;
+          });
+          sections.push(`🚫 **Could not remove:**\n${failLines.join('\n')}`);
+        }
+
+        // Roster preview helps verify "did I remove the right entry?"
+        // Scan all entries (oks + fails) for allCharacters; first one
+        // with > 1 char wins (entries usually share the same roster).
+        const sourceEntry = (outcomes.find((o) => Array.isArray(o.entry.allCharacters) && o.entry.allCharacters.length > 1))?.entry;
+        if (sourceEntry) {
+          const others = (sourceEntry.allCharacters || []).filter(
+            (n) => String(n).toLowerCase() !== String(sourceEntry.name).toLowerCase()
+          );
+          if (others.length > 0) {
+            const visible = others.slice(0, 6);
+            const linked = visible.map((n) => `[${n}](https://lostark.bible/character/NA/${encodeURIComponent(n)}/roster)`);
+            const tail = others.length > visible.length ? ` *+${others.length - visible.length} more*` : '';
+            sections.push(`🧬 **Tracked alts on this entry (${others.length}):**\n${linked.join(', ')}${tail}`);
+          }
+        }
+
+        return new EmbedBuilder()
+          .setTitle(`${titleIcon} ${title}`)
+          .setDescription(sections.join('\n\n').slice(0, 4096))
+          .setColor(color)
+          .setFooter({
+            text: oks.length > 0
+              ? 'Use /la-list view to confirm the removal landed.'
+              : 'Use /la-list view to inspect the entry; /la-list edit to modify legacy entries.',
+          })
+          .setTimestamp();
+      };
+
+      // Single entry · remove directly, render as embed.
       if (found.length === 1) {
-        const message = await removeOne(found[0].entry, found[0].type);
-        await interaction.editReply({ content: message });
+        const outcome = await removeOne(found[0].entry, found[0].type);
+        await interaction.editReply({ content: '', embeds: [buildRemoveResultEmbed([outcome])] });
         return;
       }
 
-      // Multiple entries · show selection buttons
+      // Multiple entries · show selection buttons. Promote the prior
+      // plain-text "Found X in Y" line into an embed so the picker
+      // dialog matches the post-confirm result card visually.
       const buttonStyles = { black: ButtonStyle.Danger, white: ButtonStyle.Success, watch: ButtonStyle.Secondary };
       const row = new ActionRowBuilder().addComponents(
         ...found.map((f, i) => {
@@ -157,11 +241,23 @@ export function createRemoveHandlers({ client, services }) {
           .setStyle(ButtonStyle.Secondary)
       );
 
-      const listNames = found.map((f) => getListContext(f.type).label).join(' and ');
-      await interaction.editReply({
-        content: `🔎 Found **${name}** in ${listNames}.\nChoose a removal option:`,
-        components: [row],
+      const listLines = found.map((f, i) => {
+        const ctx = getListContext(f.type);
+        const scopeTag = f.entry.scope === 'server' ? ' `[Local]`' : '';
+        const reason = f.entry.reason ? ` *${(f.entry.reason || '').slice(0, 80)}${f.entry.reason.length > 80 ? '...' : ''}*` : '';
+        return `${i + 1}. ${ctx.icon} **${ctx.label}**${scopeTag}${reason}`;
       });
+      const pickerEmbed = new EmbedBuilder()
+        .setTitle(`🔎 Found · ${name}`)
+        .setDescription(
+          `**${name}** is in ${found.length} list(s). Pick which to remove:\n\n` +
+          listLines.join('\n')
+        )
+        .setColor(0x5865f2)
+        .setFooter({ text: '30s timeout · only you can act on this picker.' })
+        .setTimestamp();
+
+      await interaction.editReply({ content: '', embeds: [pickerEmbed], components: [row] });
 
       const reply = await interaction.fetchReply();
       const button = await reply.awaitMessageComponent({
@@ -170,16 +266,19 @@ export function createRemoveHandlers({ client, services }) {
         time: 30000,
       });
 
-      let messages;
+      let outcomes;
       if (button.customId === 'remove_all') {
-        messages = await Promise.all(found.map((f) => removeOne(f.entry, f.type)));
+        outcomes = await Promise.all(found.map((f) => removeOne(f.entry, f.type)));
       } else {
         const target = found.find((f) => button.customId === `remove_${f.type}`);
-        messages = target ? [await removeOne(target.entry, target.type)] : ['⚠️ Unknown selection.'];
+        outcomes = target
+          ? [await removeOne(target.entry, target.type)]
+          : [{ ok: false, reason: 'unknown-selection', entry: { name }, type: 'black', label: 'unknown', icon: '⚠️' }];
       }
 
       await button.update({
-        content: messages.join('\n'),
+        content: '',
+        embeds: [buildRemoveResultEmbed(outcomes)],
         components: [],
       });
       return;
