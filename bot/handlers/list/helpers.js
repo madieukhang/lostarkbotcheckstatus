@@ -100,34 +100,103 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   return embed;
 }
 
+/**
+ * Approval-DM card sent to senior + officer approvers when a non-bypass
+ * member submits a /la-list add (or /la-list edit). Approvers review
+ * many of these per day; the layout is optimised for fast scan:
+ *
+ *   - Title bar: shield icon + action verb + entry name
+ *   - Hero line: who/where/which list + scope tag (`[Local]`/`[Global]`)
+ *   - Inline meta (3-up): Type · Raid · Scope
+ *   - Reason: full-width field, capped at 1024
+ *   - Tracked alts: linked roster names so the approver can verify
+ *     the request maps to the right account in one click
+ *   - Requested by: full-width with mention so approvers can ping back
+ *   - Request ID: full-width footer bar (also feeds the Approve button
+ *     dispatch path so it must remain in the embed for audit trail)
+ *
+ * The list-type icon (⛔/✅/⚠️) is preferred over the generic shield
+ * because approvers triage at a glance: a red ⛔ DM lands differently
+ * from a green ✅ one even before they read the title.
+ */
 export function buildListAddApprovalEmbed(guild, payload, options = {}) {
-  const title = options.title || 'List Add · Approval Required';
   const includeRequestedBy = options.includeRequestedBy ?? true;
+  const isEdit = payload.action === 'edit';
+
+  // List-type vocabulary derived locally so we don't import the full
+  // getListContext (which lives below this fn and would create a cycle).
+  let listIcon = '🛡️';
+  let listLabel = 'list';
+  let listColor = COLORS.info;
+  if (payload.type === 'black') { listIcon = '⛔'; listLabel = 'blacklist'; listColor = COLORS.danger; }
+  else if (payload.type === 'white') { listIcon = '✅'; listLabel = 'whitelist'; listColor = COLORS.success; }
+  else if (payload.type === 'watch') { listIcon = '⚠️'; listLabel = 'watchlist'; listColor = COLORS.warning; }
+
+  const titleVerb = isEdit ? 'Edit' : 'Add';
+  const title = options.title || `${listIcon} ${titleVerb} approval · ${payload.name}`;
+  const scopeTag = payload.scope === 'server' ? ' `[Local]`' : payload.scope === 'global' ? ' `[Global]`' : '';
+
+  const heroLine = isEdit
+    ? `An officer in **${guild.name}** wants to **edit** **${payload.name}** on the ${listLabel}${scopeTag}.`
+    : `An officer in **${guild.name}** wants to **add** **${payload.name}** to the ${listLabel}${scopeTag}.`;
+
   const fields = [
-    { name: 'Request ID', value: payload.requestId, inline: false },
-    { name: 'Type', value: payload.type, inline: true },
-    { name: 'Name', value: payload.name, inline: true },
-    { name: 'Raid', value: payload.raid || 'N/A', inline: true },
-    { name: 'Reason', value: payload.reason, inline: false },
+    { name: '📒 List', value: `${listIcon} ${listLabel}`, inline: true },
+    { name: '🗡️ Raid', value: payload.raid ? `\`${payload.raid}\`` : 'N/A', inline: true },
+    { name: '🌐 Scope', value: payload.scope || 'global', inline: true },
+    { name: '📝 Reason', value: (payload.reason || 'N/A').slice(0, 1024), inline: false },
   ];
+
+  // Tracked alts give the approver "is this the right person?" context
+  // without forcing them to run /la-roster manually. Capped at 12
+  // visible names; cross-checks with allCharacters from the bible
+  // probe that ran at submission time.
+  const allChars = Array.isArray(payload.allCharacters) ? payload.allCharacters : [];
+  const others = allChars.filter((n) => String(n).toLowerCase() !== String(payload.name).toLowerCase());
+  if (others.length > 0) {
+    const visible = others.slice(0, 12);
+    const lines = visible.map((n, i) => {
+      const link = `https://lostark.bible/character/NA/${encodeURIComponent(n)}/roster`;
+      return `${i + 1}. [${n}](${link})`;
+    });
+    const extra = others.length > visible.length ? `\n*... and ${others.length - visible.length} more*` : '';
+    fields.push({
+      name: `🧬 Tracked alts (${others.length})`,
+      value: (lines.join('\n') + extra).slice(0, 1024),
+      inline: false,
+    });
+  }
 
   if (includeRequestedBy) {
     fields.push({
-      name: 'Requested by',
+      name: '👤 Requested by',
       value: `${payload.requestedByDisplayName} (<@${payload.requestedByUserId}>)`,
       inline: false,
     });
   }
 
+  // Request ID stays at the bottom · approvers shouldn't scan past it
+  // to read business context. Code-formatted so it's visually distinct
+  // and copy-paste-friendly when an approver wants to look the row
+  // up server-side.
+  fields.push({
+    name: '🆔 Request ID',
+    value: `\`${payload.requestId}\``,
+    inline: false,
+  });
+
+  // No titleIcon override · the title already leads with the list icon
+  // (⛔/✅/⚠️). Stacking the shield prefix on top reads cluttered ("🛡️ ⛔
+  // Add approval"). The shield emoji is reintroduced subtly via the
+  // approver-flow footer instead.
   const embed = buildAlertEmbed({
     severity: AlertSeverity.INFO,
-    titleIcon: ICONS.shield,
-    color: payload.type === 'black' ? COLORS.danger : COLORS.success,
+    titleIcon: '',
+    color: listColor,
     title,
-    description: payload.action === 'edit'
-      ? `A list edit request was submitted in **${guild.name}**.`
-      : `A new list add request was submitted in **${guild.name}**.`,
+    description: heroLine,
     fields,
+    footer: `${ICONS.shield} Approve / Reject buttons below · Lost Ark Check approval flow`,
   });
 
   if (payload.imageUrl) {
