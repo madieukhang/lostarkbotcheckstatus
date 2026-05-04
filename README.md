@@ -22,14 +22,14 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 |---|---|
 | `/la-status` | Live server status |
 | `/la-reset` | Reset the stored server status state |
-| `/la-roster name [deep] [deep_limit]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan |
+| `/la-roster name [deep] [deep_limit]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan. Regular users can keep one scan active at a time |
 | `/la-search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists |
 | `/la-list add type name reason [raid] [logs] [image] [scope]` | Add to blacklist/whitelist/watchlist. `scope`: `global` / `server` (blacklist only) |
 | `/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` | Edit existing entry (owner/officer instant, members via approval). `additional_names` appends alts manually for hidden-roster + no-guild edge case |
 | `/la-list remove name` | Remove an entry (ownership check) |
 | `/la-list view type [scope]` | View entries. `scope`: `all` / `global` / `server` |
 | `/la-list trust action name [reason]` | Manage trusted list — `add` / `remove` (officer/senior only) |
-| `/la-list enrich name [deep_limit]` | Stronghold deep-scan an existing entry and append discovered alts |
+| `/la-list enrich name [deep_limit]` | Stronghold deep-scan an existing entry and append discovered alts. Regular users can keep one scan active at a time |
 | `/la-list multiadd action [file]` | Bulk add via Excel template (≤ 30 rows). `action:template` downloads, `action:file` uploads |
 | `/la-check image` | OCR a screenshot → cross-check names against all lists |
 | `/la-help` | Show all commands |

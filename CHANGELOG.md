@@ -4,6 +4,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.64] - 2026-05-04
+
+### Changed
+- `/la-roster deep:true` and `/la-list enrich` are now available to regular users. To avoid request storms, regular users can keep only one Stronghold scan active at a time across both commands.
+- Officers and seniors are treated as privileged operators and can still run parallel Stronghold scans when needed.
+
 ## [v0.5.63] - 2026-05-04
 
 ### Changed

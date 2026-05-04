@@ -262,7 +262,7 @@ function listCommand(name) {
     .addSubcommand((sub) =>
       sub
         .setName('enrich')
-        .setDescription('Stronghold deep-scan an existing list entry and append discovered alts (officer only)')
+        .setDescription('Stronghold deep-scan an existing list entry and append discovered alts')
         .addStringOption((opt) =>
           opt
             .setName('name')

@@ -3,6 +3,7 @@ import { EmbedBuilder } from 'discord.js';
 import config from '../../config.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import { detectAltsViaStronghold } from '../../services/rosterService.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import {
@@ -13,6 +14,7 @@ import {
   buildStopButtonRow,
   newScanSessionId,
   registerScan,
+  reserveUserScan,
   unregisterScan,
 } from '../../utils/scanSession.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
@@ -23,6 +25,24 @@ import {
   clearRosterDeepSession,
 } from '../../utils/rosterDeepSession.js';
 import { makeRosterScanProgressCallback } from './progress.js';
+
+function reserveCallerScan(interaction, label) {
+  return reserveUserScan(interaction.user.id, {
+    label,
+    startedAt: Date.now(),
+  }, {
+    allowMultiple: isPrivilegedStrongholdScanUser(interaction.user.id),
+  });
+}
+
+function buildScanLimitEmbed(active) {
+  return buildAlertEmbed({
+    severity: AlertSeverity.WARNING,
+    title: 'Scan Already Running',
+    description: 'You already have a Stronghold scan running. Wait for it to finish or press **Stop scan** on the active card before starting another.',
+    footer: active?.label ? `Active: ${active.label}` : undefined,
+  });
+}
 
 /**
  * Continue button for /la-roster deep:true. Resumes the prior scan with
@@ -52,7 +72,7 @@ export async function handleRosterDeepContinueButton(interaction) {
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.ERROR,
         title: 'Not Your Session',
-        description: 'Only the officer who started this scan can continue it.',
+        description: 'Only the user who started this scan can continue it.',
       })],
       ephemeral: true,
     });
@@ -70,7 +90,19 @@ export async function handleRosterDeepContinueButton(interaction) {
     return;
   }
 
-  await interaction.deferUpdate();
+  const scanReservation = reserveCallerScan(interaction, `/la-roster deep continue ${session.targetName}`);
+  if (!scanReservation.ok) {
+    await interaction.reply({
+      embeds: [buildScanLimitEmbed(scanReservation.active)],
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.deferUpdate().catch((err) => {
+    scanReservation.release();
+    throw err;
+  });
   const replyEditor = createLongRunningReplyEditor(interaction);
   session.inProgress = true;
   refreshRosterDeepSession(session);
@@ -145,6 +177,7 @@ export async function handleRosterDeepContinueButton(interaction) {
     session.inProgress = false;
     refreshRosterDeepSession(session);
     unregisterScan(scanSessionId);
+    scanReservation.release();
   }
 
   if (scanThrownError) {
