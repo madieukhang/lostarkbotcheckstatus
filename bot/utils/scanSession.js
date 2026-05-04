@@ -24,6 +24,7 @@ import {
 } from 'discord.js';
 
 const activeScans = new Map(); // sessionId -> { cancelFlag, callerId, startedAt, label }
+const userScanReservations = new Map(); // userId -> { userId, startedAt, label }
 
 export function registerScan(sessionId, info) {
   activeScans.set(sessionId, info);
@@ -40,6 +41,34 @@ export function unregisterScan(sessionId) {
 
 export function newScanSessionId() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+export function reserveUserScan(userId, info = {}, options = {}) {
+  if (!userId || options.allowMultiple) {
+    return { ok: true, active: null, release() {} };
+  }
+
+  const active = userScanReservations.get(userId);
+  if (active) {
+    return { ok: false, active, release() {} };
+  }
+
+  const reservation = {
+    userId,
+    startedAt: Date.now(),
+    ...info,
+  };
+  userScanReservations.set(userId, reservation);
+
+  return {
+    ok: true,
+    active: reservation,
+    release() {
+      if (userScanReservations.get(userId) === reservation) {
+        userScanReservations.delete(userId);
+      }
+    },
+  };
 }
 
 /**

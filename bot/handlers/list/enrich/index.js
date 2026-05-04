@@ -16,10 +16,9 @@
  *     is exactly when an officer wants the option to opt in to a
  *     thorough discovery on demand.
  *
- * Permission gate: officer/senior approvers only. The original entry
- * already passed approval; enrichment just appends mechanically-
- * matched alts (same stronghold name + roster level on bible) to that
- * entry. There is no subjective decision here, so no approval flow.
+ * Access: everyone can run this, but regular users are limited to one
+ * active Stronghold scan at a time. Officers/seniors can run parallel
+ * operational scans when needed.
  *
  * Cooldown: 30 seconds per entry (in-memory). Deep scans burn bible
  * quota; the cooldown prevents an accidental double-click from
@@ -41,6 +40,7 @@ import {
   buildRosterCharacters,
 } from '../../../services/rosterService.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
+import { isPrivilegedStrongholdScanUser } from '../../../utils/scanPermissions.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   buildScanResultEmbed,
@@ -66,6 +66,7 @@ import {
   buildStopButtonRow,
   newScanSessionId,
   registerScan,
+  reserveUserScan,
   unregisterScan,
   getScan,
 } from '../../../utils/scanSession.js';
@@ -96,9 +97,30 @@ export function createEnrichHandlers({ client, services }) {
   // eslint-disable-next-line no-unused-vars
   const _services = services;
 
+  function reserveCallerScan(interaction, label) {
+    return reserveUserScan(interaction.user.id, {
+      label,
+      startedAt: Date.now(),
+    }, {
+      allowMultiple: isPrivilegedStrongholdScanUser(interaction.user.id),
+    });
+  }
+
+  async function replyScanLimit(interaction, active) {
+    await interaction.reply({
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        title: 'Scan Already Running',
+        description: 'You already have a Stronghold scan running. Wait for it to finish or press **Stop scan** on the active card before starting another.',
+        footer: active?.label ? `Active: ${active.label}` : undefined,
+      })],
+      ephemeral: true,
+    });
+  }
+
   /**
    * Runs the enrich pipeline post-validation. Caller is responsible for:
-   *   - permission gate (officer/senior)
+   *   - regular-user one-active-scan gate
    *   - cooldown gate + markCooldown
    *   - deferReply / deferUpdate (this function only does editReply)
    *
@@ -498,18 +520,6 @@ export function createEnrichHandlers({ client, services }) {
   }
 
   async function handleListEnrichCommand(interaction) {
-    if (!isOfficerOrSenior(interaction.user.id)) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Officer-Only Command',
-          description: 'Only officers and senior approvers can run `/la-list enrich`.',
-        })],
-        ephemeral: true,
-      });
-      return;
-    }
-
     const rawName = interaction.options.getString('name', true).trim();
     const name = normalizeCharacterName(rawName);
     const cap = interaction.options.getInteger('deep_limit') ?? config.strongholdDeepCandidateLimit;
@@ -522,10 +532,21 @@ export function createEnrichHandlers({ client, services }) {
       });
       return;
     }
+
+    const scanReservation = reserveCallerScan(interaction, `/la-list enrich ${name}`);
+    if (!scanReservation.ok) {
+      await replyScanLimit(interaction, scanReservation.active);
+      return;
+    }
+
     markCooldown(name);
 
-    await interaction.deferReply();
-    await runEnrichFlow(interaction, { name, cap });
+    try {
+      await interaction.deferReply();
+      await runEnrichFlow(interaction, { name, cap });
+    } finally {
+      scanReservation.release();
+    }
   }
 
   /**
@@ -534,18 +555,6 @@ export function createEnrichHandlers({ client, services }) {
    * customId shape: `list-add:enrich-hidden:<encodedName>`
    */
   async function handleListAddEnrichHiddenButton(interaction) {
-    if (!isOfficerOrSenior(interaction.user.id)) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Officer-Only Action',
-          description: 'Only officers and senior approvers can trigger an enrich scan.',
-        })],
-        ephemeral: true,
-      });
-      return;
-    }
-
     const parts = interaction.customId.split(':');
     const encoded = parts.slice(2).join(':');
     const rawName = decodeURIComponent(encoded || '').trim();
@@ -572,17 +581,28 @@ export function createEnrichHandlers({ client, services }) {
       });
       return;
     }
+
+    const scanReservation = reserveCallerScan(interaction, `/la-list enrich ${name}`);
+    if (!scanReservation.ok) {
+      await replyScanLimit(interaction, scanReservation.active);
+      return;
+    }
+
     markCooldown(name);
 
-    await interaction.deferReply();
-    await runEnrichFlow(interaction, { name, cap });
+    try {
+      await interaction.deferReply();
+      await runEnrichFlow(interaction, { name, cap });
+    } finally {
+      scanReservation.release();
+    }
   }
 
   /**
    * Continue-scan button: resume the same enrich session with the prior
    * pass's scanned-names fed back as excludeNames so the next pass walks
-   * only fresh candidates. Re-uses officer + cooldown gates and refreshes
-   * the session TTL.
+   * only fresh candidates. Re-uses the regular-user one-active-scan
+   * gate + cooldown and refreshes the session TTL.
    */
   async function handleListEnrichContinueButton(interaction) {
     const sessionId = interaction.customId.split(':')[2];
@@ -604,18 +624,7 @@ export function createEnrichHandlers({ client, services }) {
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: 'Not Your Session',
-          description: 'Only the officer who started this enrich session can continue it.',
-        })],
-        ephemeral: true,
-      });
-      return;
-    }
-    if (!isOfficerOrSenior(interaction.user.id)) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Officer-Only Action',
-          description: 'Only officers and senior approvers can continue an enrich scan.',
+          description: 'Only the user who started this enrich session can continue it.',
         })],
         ephemeral: true,
       });
@@ -631,14 +640,25 @@ export function createEnrichHandlers({ client, services }) {
       });
       return;
     }
+
+    const scanReservation = reserveCallerScan(interaction, `/la-list enrich continue ${session.entryName}`);
+    if (!scanReservation.ok) {
+      await replyScanLimit(interaction, scanReservation.active);
+      return;
+    }
+
     markCooldown(session.entryName);
 
-    await interaction.deferUpdate();
-    await runEnrichFlow(interaction, {
-      name: session.entryName,
-      cap: session.cap,
-      existingSession: session,
-    });
+    try {
+      await interaction.deferUpdate();
+      await runEnrichFlow(interaction, {
+        name: session.entryName,
+        cap: session.cap,
+        existingSession: session,
+      });
+    } finally {
+      scanReservation.release();
+    }
   }
 
   async function handleListEnrichConfirmButton(interaction) {
@@ -661,7 +681,7 @@ export function createEnrichHandlers({ client, services }) {
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: 'Not Your Session',
-          description: 'Only the officer who started this enrich session can confirm it.',
+          description: 'Only the user who started this enrich session can confirm it.',
         })],
         ephemeral: true,
       });
@@ -734,7 +754,7 @@ export function createEnrichHandlers({ client, services }) {
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: 'Not Your Session',
-          description: 'Only the officer who started this enrich session can cancel it.',
+          description: 'Only the user who started this enrich session can cancel it.',
         })],
         ephemeral: true,
       });
@@ -752,7 +772,7 @@ export function createEnrichHandlers({ client, services }) {
 
   /**
    * Stop button handler. Posted on long-running scan progress embeds
-   * (enrich + roster deep:true) so the officer can interrupt a stuck
+   * (enrich + roster deep:true) so the caller can interrupt a stuck
    * scan without waiting for the 15-min Discord webhook timeout.
    */
   async function handleScanCancelButton(interaction) {
@@ -774,7 +794,7 @@ export function createEnrichHandlers({ client, services }) {
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           title: 'Not Authorised',
-          description: 'Only the officer who started this scan (or any senior) can stop it.',
+          description: 'Only the user who started this scan (or an officer/senior) can stop it.',
         })],
         ephemeral: true,
       });

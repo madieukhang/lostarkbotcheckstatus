@@ -28,7 +28,7 @@ export function buildHiddenRosterGuidance(entryName, guildName) {
     value: hasGuild
       ? (
           'Only the typed name is on the entry right now. ' +
-          `Bible shows guild **${guildName}**, so officers can run ` +
+          `Bible shows guild **${guildName}**, so you can run ` +
           `\`/la-list enrich name:${entryName}\` or press **Enrich now** below ` +
           'to scan guildmates for same-stronghold alts and append matches to `allCharacters`.'
         )

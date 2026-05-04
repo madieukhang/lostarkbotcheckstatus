@@ -20,17 +20,38 @@ import {
   handleRosterWhiteListCheck,
 } from '../../services/rosterService.js';
 import { normalizeCharacterName } from '../../utils/names.js';
+import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
+import { reserveUserScan } from '../../utils/scanSession.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
+
+function reserveCallerScan(interaction, label) {
+  return reserveUserScan(interaction.user.id, {
+    label,
+    startedAt: Date.now(),
+  }, {
+    allowMultiple: isPrivilegedStrongholdScanUser(interaction.user.id),
+  });
+}
+
+function buildScanLimitEmbed(active) {
+  return buildAlertEmbed({
+    severity: AlertSeverity.WARNING,
+    title: 'Scan Already Running',
+    description: 'You already have a Stronghold scan running. Wait for it to finish or press **Stop scan** on the active card before starting another.',
+    footer: active?.label ? `Active: ${active.label}` : undefined,
+  });
+}
 
 export async function handleRosterCommand(interaction) {
   const raw = interaction.options.getString('name');
   const name = normalizeCharacterName(raw);
   const deep = interaction.options.getBoolean('deep') ?? false;
   const deepLimit = interaction.options.getInteger('deep_limit');
+
   // ScraperAPI is intentionally locked off for the per-candidate scan
   // because that is the high-fanout (300+ requests) path that would burn
   // quota fast. Single-request meta + guild fetches inside the detector
@@ -40,7 +61,20 @@ export async function handleRosterCommand(interaction) {
     ...(deepLimit !== null ? { candidateLimit: deepLimit } : {}),
     useScraperApiForCandidates: false,
   };
-  await interaction.deferReply();
+
+  const scanReservation = deep ? reserveCallerScan(interaction, `/la-roster deep ${name}`) : null;
+  if (scanReservation && !scanReservation.ok) {
+    await interaction.reply({
+      embeds: [buildScanLimitEmbed(scanReservation.active)],
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.deferReply().catch((err) => {
+    scanReservation?.release();
+    throw err;
+  });
   const replyEditor = createLongRunningReplyEditor(interaction);
 
   try {
@@ -220,5 +254,7 @@ export async function handleRosterCommand(interaction) {
         fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
       })],
     });
+  } finally {
+    scanReservation?.release();
   }
 }
