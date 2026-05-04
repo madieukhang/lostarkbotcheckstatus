@@ -118,6 +118,7 @@ export async function handleRosterDeepContinueButton(interaction) {
   }).catch(() => {});
 
   let altResult;
+  let scanThrownError = null;
   try {
     altResult = await detectAltsViaStronghold(session.targetName, {
       targetMeta: session.meta,
@@ -138,10 +139,29 @@ export async function handleRosterDeepContinueButton(interaction) {
         sessionId: scanSessionId,
       }),
     });
+  } catch (err) {
+    scanThrownError = err;
   } finally {
     session.inProgress = false;
     refreshRosterDeepSession(session);
     unregisterScan(scanSessionId);
+  }
+
+  if (scanThrownError) {
+    await replyEditor.edit({
+      content: session.contentText || '',
+      embeds: [
+        primaryEmbed,
+        buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: `Deep scan stopped · ${session.targetName}`,
+          description: `Reason: **${scanThrownError.message || 'unexpected detector error'}**`,
+          footer: 'Continue can be retried after the issue clears.',
+        }),
+      ],
+      components: [],
+    }).catch(() => {});
+    return;
   }
 
   if (!altResult) {

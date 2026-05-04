@@ -4,6 +4,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.61] - 2026-05-04
+
+### Fixed
+- Long-running stronghold scans now carry a concise abort reason into the final result card/DM. System stops such as repeated Discord progress-card update failures render as `Scan stopped: issue detected` with a short reason instead of only logging server-side.
+- Progress cards now distinguish `Checked` from `Attempts`, so users can tell whether candidates were actually parsed or merely tried and failed.
+
 ## [v0.5.60] - 2026-05-04
 
 ### Fixed

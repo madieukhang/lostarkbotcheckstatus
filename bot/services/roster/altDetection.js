@@ -114,6 +114,9 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   let nextCandidateIndex = 0;
   let rateLimitRetries = 0;
   let pausedForFailureStorm = false;
+  let abortReason = '';
+  let abortLabel = '';
+  let abortDetail = '';
 
   console.log(`[alt-detect] Scanning ${limitedCandidates.length} candidate(s)...`);
 
@@ -143,8 +146,14 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
 
   async function scanWorker() {
     while (nextCandidateIndex < limitedCandidates.length) {
-      if (cancelFlag.cancelled || pausedForFailureStorm) {
+      if (cancelFlag.cancelled) {
         cancelledByFlag = true;
+        abortReason = cancelFlag.reason || 'user-stopped';
+        abortLabel = cancelFlag.label || 'Stopped by user';
+        abortDetail = cancelFlag.detail || 'Stop button clicked.';
+        break;
+      }
+      if (pausedForFailureStorm) {
         break;
       }
       const cand = limitedCandidates[nextCandidateIndex++];
@@ -235,6 +244,9 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
 
       if (shouldPauseForFailureStorm()) {
         pausedForFailureStorm = true;
+        abortReason = 'bible-failure-storm';
+        abortLabel = 'Bible rejected candidate profiles';
+        abortDetail = `${failedCandidates}/${attemptedCandidates} candidate attempts failed.`;
         console.warn(
           `[alt-detect] Pausing ${name}: high failure rate ` +
           `${failedCandidates}/${attemptedCandidates} (${Math.round((failedCandidates / attemptedCandidates) * 100)}%).`
@@ -295,6 +307,9 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     mode,
     retryOnRateLimit,
     pausedForFailureStorm,
+    abortReason,
+    abortLabel,
+    abortDetail,
     cancelled: cancelledByFlag,
   };
 }
