@@ -20,6 +20,7 @@ import {
 } from 'discord.js';
 
 import { COLORS, ICONS } from './ui.js';
+import { getClassEmoji } from '../models/Class.js';
 
 /**
  * @typedef ScanDmOptions
@@ -59,10 +60,11 @@ function buildAltLines(alts = []) {
   const lines = visible.map((alt, i) => {
     const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
     const cls = alt.className || alt.classId || '?';
+    const classPrefix = getClassEmoji(cls) || cls;
     const ilvl = typeof alt.itemLevel === 'number'
       ? alt.itemLevel.toFixed(2)
       : (alt.itemLevel || '?');
-    return `**${i + 1}.** [${alt.name}](${link}) · ${cls} · \`${ilvl}\``;
+    return `**${i + 1}.** ${classPrefix} [${alt.name}](${link}) · \`${ilvl}\``;
   });
   const extra = alts.length > visible.length
     ? `\n*... and ${alts.length - visible.length} more*`

@@ -30,6 +30,7 @@ import {
 } from 'discord.js';
 
 import { COLORS, ICONS } from './ui.js';
+import { getClassEmoji } from '../models/Class.js';
 
 /**
  * Compute the post-scan state from the result envelope. Stop reasons are
@@ -90,11 +91,16 @@ function buildAltList(alts, { newAltsSet } = {}) {
   const lines = visible.map((alt, i) => {
     const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
     const cls = alt.className || alt.classId || '?';
+    // Class icon replaces the className text and sits BEFORE the
+    // character name (per project styling decision). Falls back to
+    // the className text when the bootstrap hasn't mapped this class
+    // yet so the row still carries the class info.
+    const classPrefix = getClassEmoji(cls) || cls;
     const ilvl = typeof alt.itemLevel === 'number'
       ? alt.itemLevel.toFixed(2)
       : (alt.itemLevel || '?');
     const isNewMark = newAltsSet?.has(String(alt.name).toLowerCase()) ? ' `new`' : '';
-    return `${i + 1}. **[${alt.name}](${link})** · ${cls} · \`${ilvl}\`${isNewMark}`;
+    return `${i + 1}. ${classPrefix} **[${alt.name}](${link})** · \`${ilvl}\`${isNewMark}`;
   });
   const extra = alts.length > visible.length
     ? `\n*... and ${alts.length - visible.length} more*`
