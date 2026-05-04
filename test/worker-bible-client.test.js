@@ -6,7 +6,7 @@ import { createWorkerBibleClient } from '../bot/services/roster/workerBibleClien
 // Minimal in-memory stand-in for the Mongoose ScrapeJob model. Captures
 // the inserted job, exposes a helper to advance its status the way a
 // real worker process would, and supports findById().lean().
-function buildFakeScrapeJob() {
+function buildFakeScrapeJob({ pendingCount = 0 } = {}) {
   let stored = null;
   let initialInsert = null;
   let nextId = 1;
@@ -19,6 +19,9 @@ function buildFakeScrapeJob() {
     flipTo(state) {
       if (!stored) throw new Error('No job to flip');
       Object.assign(stored, state);
+    },
+    async countDocuments() {
+      return pendingCount;
     },
     async create(payload) {
       stored = {
@@ -139,6 +142,7 @@ test('workerBibleClient strips non-serializable options before insert', async ()
 
 test('workerBibleClient surfaces missing job (TTL expired or deleted)', async () => {
   const ScrapeJob = {
+    async countDocuments() { return 0; },
     async create(payload) { return { _id: 'ghost-1', ...payload }; },
     findById() { return { async lean() { return null; } }; },
   };
@@ -153,4 +157,46 @@ test('workerBibleClient surfaces missing job (TTL expired or deleted)', async ()
     () => client.fetch('https://lostark.bible/character/NA/Ghost/__data.json'),
     /Worker job ghost-1 disappeared/,
   );
+});
+
+test('workerBibleClient rejects insert when pending queue is over backpressure threshold', async () => {
+  // 5 pending jobs already in the queue, threshold set to 5 -> reject
+  // immediately rather than wait for the worker to drain.
+  const ScrapeJob = buildFakeScrapeJob({ pendingCount: 5 });
+  const client = createWorkerBibleClient({
+    ScrapeJob,
+    pollIntervalMs: 1,
+    defaultTimeoutMs: 5_000,
+    backpressureThreshold: 5,
+  });
+
+  await assert.rejects(
+    () => client.fetch('https://lostark.bible/character/NA/Overload/__data.json'),
+    /Scraping service overloaded: 5 pending jobs \(>= 5 threshold\)/,
+  );
+
+  // No job should have been inserted because the count check ran first.
+  assert.equal(ScrapeJob.inserted(), null);
+});
+
+test('workerBibleClient still inserts when pending queue is below backpressure threshold', async () => {
+  // 2 pending jobs, threshold 100 (default) -> proceed normally.
+  const ScrapeJob = buildFakeScrapeJob({ pendingCount: 2 });
+  const client = createWorkerBibleClient({
+    ScrapeJob,
+    pollIntervalMs: 1,
+    defaultTimeoutMs: 5_000,
+    backpressureThreshold: 100,
+  });
+
+  setTimeout(() => {
+    ScrapeJob.flipTo({
+      status: 'done',
+      result: { status: 200, headers: {}, body: 'ok' },
+    });
+  }, 2);
+
+  const res = await client.fetch('https://lostark.bible/character/NA/Fine/__data.json');
+  assert.equal(res.status, 200);
+  assert.ok(ScrapeJob.inserted());
 });

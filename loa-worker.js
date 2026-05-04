@@ -23,10 +23,12 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 
 import { claimAndProcessOne } from './bot/services/scrapeWorker.js';
+import { startHeartbeat, stopHeartbeat } from './bot/services/worker/heartbeat.js';
 
 const POLL_IDLE_MS = 1000;
 
 let stopping = false;
+let heartbeatHandle = null;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -61,10 +63,14 @@ async function main() {
   console.log(`[worker] connected to MongoDB host=${host} db=${name}`);
   console.log('[worker] polling scrape_jobs every', POLL_IDLE_MS, 'ms');
 
+  heartbeatHandle = startHeartbeat();
+  console.log('[worker] heartbeat started');
+
   process.on('SIGINT', async () => {
     if (stopping) return;
     stopping = true;
     console.log('\n[worker] SIGINT received, shutting down...');
+    stopHeartbeat(heartbeatHandle);
     await mongoose.disconnect();
     process.exit(0);
   });
