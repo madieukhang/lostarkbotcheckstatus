@@ -4,6 +4,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.63] - 2026-05-04
+
+### Changed
+- Cross-server list broadcast cards no longer include the `/la-setup off to mute cross-server list broadcasts` footer hint.
+
 ## [v0.5.62] - 2026-05-04
 
 ### Fixed

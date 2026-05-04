@@ -39,7 +39,6 @@ export function createBroadcastServices({ client }) {
       .setDescription(headline)
       .addFields(fields)
       .setColor(color)
-      .setFooter({ text: '/la-setup off to mute cross-server list broadcasts' })
       .setTimestamp(new Date());
 
     const displayUrl = preResolvedUrl !== undefined
