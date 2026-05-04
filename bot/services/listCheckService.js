@@ -78,6 +78,12 @@ export function shouldCacheRosterLookupResult(rosterResult) {
   return rosterResult?.hasValidRoster === true;
 }
 
+export function shouldRescrapeCachedRoster(cached) {
+  if (!cached?.hasRoster) return false;
+  if (cached.rosterVisibility === 'hidden') return false;
+  return !cached.targetClassName;
+}
+
 /** Gemini OCR prompt for Lost Ark waiting room screenshots */
 const GEMINI_PROMPT = [
   'This is a screenshot of a Lost Ark raid waiting room (party finder lobby).',
@@ -378,13 +384,11 @@ export async function checkNamesAgainstLists(names, options = {}) {
         item.similarNames = cached.searchSuggestions;
         item._cachedSearchSuggestions = cached.searchSuggestions;
       }
-      // Force re-scrape when the cached row was written by an older
-      // bot version that did not store class/CP. Pre-v0.5.71 entries
-      // satisfy hasRoster but carry empty target* fields; treating
-      // them as cache miss lets the next request backfill the cache
-      // + snapshot in one pass.
-      const cachedHasClassData = Boolean(cached.targetClassName) || cached.targetItemLevel > 0;
-      if (cached.hasRoster && !cachedHasClassData) {
+      // Force re-scrape when a visible-roster cache row was written by
+      // an older bot version that did not store class data. Hidden
+      // rosters legitimately lack class data, so their refreshed cache
+      // rows opt out via rosterVisibility.
+      if (shouldRescrapeCachedRoster(cached)) {
         cacheMissItems.push(item);
         console.log(`[listcheck] Cache hit (missing class data, re-scraping): ${item.name}`);
         continue;
@@ -497,6 +501,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
                   ? rosterResult.targetItemLevel
                   : 0,
                 targetCombatScore: rosterResult.targetCombatScore || '',
+                rosterVisibility: rosterResult.rosterVisibility || '',
                 cachedAt: new Date(),
               },
             },
@@ -569,15 +574,17 @@ export async function checkNamesAgainstLists(names, options = {}) {
         ],
       };
       const simBlackQuery = buildBlacklistQuery(simQuery, guildId);
-      const [simBlack, simWhite, simWatch] = await Promise.all([
+      const [simBlack, simWhite, simWatch, simTrusted] = await Promise.all([
         Blacklist.find(simBlackQuery).collation(collation).lean(),
         Whitelist.find(simQuery).collation(collation).lean(),
         Watchlist.find(simQuery).collation(collation).lean(),
+        TrustedUser.find({ name: { $in: similarCandidateNames } }).collation(collation).lean(),
       ]);
 
       const simBlackMap = buildEntryMap(simBlack);
       const simWhiteMap = buildEntryMap(simWhite);
       const simWatchMap = buildEntryMap(simWatch);
+      const simTrustedMap = new Map(simTrusted.map((t) => [t.name.toLowerCase(), t]));
 
       for (const item of noRosterItems) {
         const candidateNames = item._similarCandidateNames || [];
@@ -592,6 +599,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
             if (simBlackMap.has(lower)) flag += '⛔';
             if (simWhiteMap.has(lower)) flag += '✅';
             if (simWatchMap.has(lower)) flag += '⚠️';
+            if (simTrustedMap.has(lower)) flag += '💚';
             if (!flag) flag = '❓';
             return { name: candidateName, flag };
           });

@@ -103,8 +103,10 @@ export async function handleSearchCommand(interaction) {
 
     const results = sliced.map((s) => {
       const snap = snapshotMap.get(s.name.toLowerCase()) || null;
+      const snapItemLevel = Number(snap?.itemLevel || 0);
       return {
         ...s,
+        itemLevel: snapItemLevel > 0 ? snapItemLevel : s.itemLevel,
         black: blackMap.get(s.name.toLowerCase()) || null,
         white: whiteMap.get(s.name.toLowerCase()) || null,
         watch: watchMap.get(s.name.toLowerCase()) || null,
