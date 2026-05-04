@@ -4,6 +4,31 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.65] - 2026-05-04
+
+### Fixed
+- Slash-command dispatcher now silences Discord transient interaction errors (`10062 Unknown interaction` and `40060 Interaction already acknowledged`) instead of dumping full stacks. Both happen when the 3-second initial-response window expires before deferReply lands (Railway redeploy with an in-flight slash command, websocket reconnect mid-handler, cold-start event-loop stall) or two paths race to ack the same interaction. The bot stays online and the user can retry; old behavior dumped the full stack at console.error level which buried genuine bugs in the deploy log. New behavior logs a one-line warning (`[bot] Transient on /la-list: Unknown interaction (3s window expired) (10062)`).
+
+### Changed
+- **UI vocabulary pass across 9 surfaces.** Plain-text and sparse cards rebuilt with structured embed layouts and a unified emoji vocabulary (📒 List · 🗡️ Raid · 🌐 Scope · 📝 Reason · 🧬 Tracked alts · 🔗 Logs · 👤 Added by · 🆔 Request ID · 🔍 Checked · 🎯 Found · ⚠️ Failed · 🔁 Attempts · 🌐 ScraperAPI):
+  - **`/la-list enrich` Confirm success card** carries class + ilvl per alt, scan source (guild + hidden-roster indicator), and a Tip footer pointing at `/la-list view`. Mongoose `matched/modified` counts moved to a server-side debug log.
+  - **Scan result embed** (enrich + roster deep) splits stats into 3-up inline fields (Checked / Found / Failed plus optional Remaining / Attempts / 429 retries / ScraperAPI) so the description carries narrative only.
+  - **Scan completion DM** aligned with the result card: same emoji vocab, same hero line opening with command + channel mention.
+  - **`/la-list view` page** adds a third line per entry showing the first three tracked alts and a `+N more` suffix.
+  - **Detail evidence embed** (`/la-list view` and `/la-search` evidence dropdowns share `buildEvidenceEmbed`) gains a `🧬 Tracked alts` field with up to 12 numbered linked names.
+  - **Cross-server broadcast** gains the same `🧬 Tracked alts` field so recipients in other servers have alt context inline.
+  - **`/la-list check`** moves from message content (2000-char cap) to a structured embed with state-driven icon, breakdown line, 3-up stats panel, and actionable footer.
+  - **`/la-list remove`** confirm + success render as embeds with list icon, scope tag, and a tracked-alts preview. Failure paths (legacy entry, not-owner) get distinct copy in the same card.
+  - **`/la-list add` approval DM** leads with the list icon (⛔/✅/⚠️) instead of the generic shield so approvers triage at a glance. Adds Tracked alts field, scope chip, and matches the v0.5.65 detail/broadcast vocab.
+  - **`/la-status`** moves title to `setTitle` with a state dot prefix; adds stats badge fields and priority-sorted per-server grid so outages float to the top.
+  - **`/la-list trust add/remove`** gains a hero description, emoji-prefixed fields, next-step Tip footer. Remove uses `COLORS.muted` instead of `COLORS.danger` because it's a neutral state change.
+  - **`/la-list multiadd` approval DM** gets a per-type breakdown line, outcome-driven color tint, per-row raid tag, and structured fields matching the single-add approval DM.
+
+### Notes
+- 57/57 tests pass.
+- Tier-2 audit list (multiadd preview, status, trust) closed; every user-facing surface flagged as plain-text or sparse is now structured.
+- Helpers `isTransientInteractionError` + `logTransientInteraction` exposed for the button/select dispatcher catches if we see similar transient noise on those code paths.
+
 ## [v0.5.64] - 2026-05-04
 
 ### Changed
@@ -58,45 +83,6 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ### Notes
 - This specifically covers scan runs that exceed the original interaction token lifetime, such as large guild scans still in progress around 30+ minutes.
-
-## [v0.5.58] - 2026-05-04
-
-### Changed
-- **`/la-status`** title moves from `setAuthor()` to `setTitle()` with a state-driven dot prefix (🟢/🟡/🔴/❓). Stats summary badge as inline fields (Online / Maintenance / Offline / Unknown) precedes the per-server grid; problem servers float to the top of the per-server grid via priority sort. Lets a Discord skim land on outage servers first.
-- **`/la-list trust add/remove`** success cards rewritten with a hero description line explaining the consequence ("From now on **<name>** and any character that resolves to the same roster cannot be added to..."), emoji-prefixed fields (🧬 Character · 📝 Reason · 👤 By · 🕐 Trusted since), and a next-step Tip footer. Remove uses `COLORS.muted` instead of `COLORS.danger` because it is a neutral state change, not a hostile one.
-- **`/la-list multiadd` approval DM** gains a per-type breakdown line (`⛔ N · ⚠️ N · ✅ N · 🏠 N local`), color tint that follows the dominant outcome (red for blacklist-heavy batches, yellow for watch-heavy, green for whitelist-heavy), per-row raid tag inline next to the name, and structured fields (Requested by · Server · Total · Request ID) with the same emoji vocabulary as the v0.5.57 single-add approval DM.
-
-### Notes
-- 57/57 tests pass.
-- Vocabulary unified across the full approval / detail / scan family: 📒 List, 🗡️ Raid, 🌐 Scope, 📝 Reason, 🧬 Tracked alts, 🔗 Logs, 👤 Added by, 🆔 Request ID.
-- This closes the v0.5.55 audit list: every user-facing surface flagged as plain-text or sparse is now structured.
-
-## [v0.5.57] - 2026-05-04
-
-### Changed
-- **`/la-list check` result** moved from plain text content to a structured embed. Old layout used `truncateDiscordContent(...)` against the 2000-char message-content cap and produced a flat `Checked: N name(s)` header followed by an unstyled list. New embed shows: state-driven title icon (⛔ if any blacklist hit, ⚠️ for watch, ✅ for clean) + breakdown line (`⛔ 3 · ⚠️ 1 · ❓ 5 clean`) + 3-up inline stats panel (Checked / Flagged / Cleared) + per-name list in description + actionable footer hint.
-- **`/la-list remove`** confirm + success messages converted from plain content lines to embeds. Single removal renders a result card with list icon, scope tag, and a tracked-alts preview (up to 6 names) so the user can verify they targeted the right account. Multi-list picker (when name appears in 2+ lists) gains an embed listing each list option with reason snippet, replacing the old `🔎 Found Y in blacklist and watchlist.\nChoose a removal option:` plain text. Failure paths (legacy entry, not-owner) get distinct copy in the same card.
-- **`/la-list add` approval DM** redesigned for senior triage. Title now leads with the list icon (⛔/✅/⚠️) instead of the generic shield so approvers can scan red vs green DMs at a glance. Layout: hero line ("An officer in **<guild>** wants to **add** **<name>** to the blacklist `[Global]`"), 3-up inline meta (List · Raid · Scope), full Reason field, **Tracked alts** field with linked roster names (matches the `/la-list view` evidence detail), Requested-by mention, Request ID at the bottom for audit. Shield emoji preserved in the footer line for visual identity.
-
-### Notes
-- 57/57 tests pass.
-- `removeOne` in `/la-list remove` now returns a structured outcome envelope (`{ ok, reason?, entry, type, label, icon }`) instead of a pre-formatted string. Lets the result-card builder distinguish success / legacy / not-owner cases for color + copy.
-- Approval DM Tracked alts field is rendered only when `payload.allCharacters` carries entries beyond the entry name itself; falls back gracefully on legacy approval payloads that don't include it.
-
-## [v0.5.56] - 2026-05-04
-
-### Changed
-- **Enrich success card** redesigned. The post-Confirm card was a one-line "Appended N alt(s) to entry's allCharacters" plus a list of bare names; it dropped the class + ilvl data the session already had and exposed Mongoose-ese (`matched=1 · modified=1`) in the footer. New layout: hero line ("I appended **N new alt(s)** to the **<list>** entry"), source block (guild name + hidden-roster indicator when applicable), numbered alts with class + ilvl, and a closing Tip line pointing at `/la-list view`. Mongoose write counts moved to a server-side debug log.
-- **Scan result embed** (post-scan card for `/la-list enrich` and `/la-roster deep:true`) split out stats into Discord inline fields. Old layout pushed all metrics into a `·`-joined prose line in the description which read cluttered when 5-6 metrics were active. New layout: narrative description (state, hidden notice, stop reason, alt list, action hint) on top; 3-up inline stats panel (Checked / Found / Failed plus optional Remaining / Attempts / 429 retries / ScraperAPI) below.
-- **Scan completion DM** styling aligned with the new result card. Title format changed to `${state-icon}  ${headline} · ${target}`, fields use the same emoji vocabulary (🔍 Checked, 🎯 Found, ⚠️ Failed, 🔁 Attempts, 🌐 ScraperAPI, 🛑 Stop reason). Description block opens with `Your /la-list enrich scan in <#channel> just finished.` for instant context.
-- **`/la-list view` page** now shows a third line per entry listing tracked alts (compact, capped at 3 visible names with `+N more` suffix). Entries with no alts skip the line. Lets an officer skim the roster without opening the detail view.
-- **Detail evidence embed** (clicked from `/la-list view` evidence dropdown OR `/la-search` evidence dropdown) gains a `🧬 Tracked alts` field with up to 12 numbered linked names. Both surfaces now route through `buildEvidenceEmbed` so the layout stays in sync; the search-side inline embed builder is removed.
-- **Broadcast notification** (cross-server list-change ping) gains the same `🧬 Tracked alts` field. Recipients in other servers get the full alt list inline so they don't have to lookup whether one of their members is the same account.
-
-### Notes
-- 57/57 tests pass.
-- Field emoji vocabulary unified across enrich + roster + DM + detail + broadcast: 📝 Reason, 🗡️ Raid, 📒 List, 🕐 Added, 🧬 Tracked alts, 🔗 Logs, 👤 Added by.
-- Voice unchanged (English-first per `feedback_loalogs_voice`).
 
 ## [v0.5.55] - 2026-05-03
 
