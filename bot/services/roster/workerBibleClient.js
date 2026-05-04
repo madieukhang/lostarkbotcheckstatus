@@ -2,6 +2,14 @@ import ScrapeJobDefault from '../../models/ScrapeJob.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 500;
 const DEFAULT_TIMEOUT_MS = 30_000;
+// Backpressure threshold: if pending queue grows beyond this, reject
+// new inserts with an explicit overload error. Tunable via env so prod
+// can raise/lower without redeploy. 100 is a guess; revisit after real
+// /la-list enrich runs surface actual queue depth distributions.
+const DEFAULT_BACKPRESSURE_THRESHOLD = (() => {
+  const raw = parseInt(process.env.WORKER_QUEUE_BACKPRESSURE_THRESHOLD, 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 100;
+})();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,11 +40,26 @@ export function createWorkerBibleClient({
   ScrapeJob = ScrapeJobDefault,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
   defaultTimeoutMs = DEFAULT_TIMEOUT_MS,
+  backpressureThreshold = DEFAULT_BACKPRESSURE_THRESHOLD,
   now = () => Date.now(),
 } = {}) {
   return {
     async fetch(url, options = {}) {
       const sanitized = sanitizeOptions(options);
+
+      // Backpressure: count pending jobs before insert. If the worker
+      // is offline / overwhelmed and the queue grows past threshold,
+      // reject immediately so the bot surfaces overload to users
+      // rather than every caller eating a 30s timeout.
+      const pendingCount = await ScrapeJob.countDocuments({ status: 'pending' });
+      if (pendingCount >= backpressureThreshold) {
+        throw new Error(
+          `Scraping service overloaded: ${pendingCount} pending jobs ` +
+          `(>= ${backpressureThreshold} threshold). Worker may be offline ` +
+          `or behind. Try again in a minute.`
+        );
+      }
+
       const job = await ScrapeJob.create({
         url,
         options: sanitized,

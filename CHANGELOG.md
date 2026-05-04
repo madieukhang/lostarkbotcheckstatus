@@ -4,6 +4,25 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.78] - 2026-05-05
+
+### Changed
+- Phase 2 of local-worker migration. Adds dark-by-default hardening primitives that activate alongside Phase 1's worker mode. Thresholds shipped with best-guess defaults; needs adjustment after first real `/la-list enrich` run surfaces production numbers.
+- New `bot/models/WorkerHeartbeat.js` schema (`worker_heartbeats` collection, single doc per `workerId`). Worker upserts `lastSeenAt: now()` every 15s; bot reads via `getWorkerHealth()`.
+- New `bot/services/worker/heartbeat.js` exposes `startHeartbeat({ intervalMs })` and `stopHeartbeat(handle)` for the worker process, plus `getWorkerHealth({ maxStaleMs })` for the bot. Default stale threshold 30s = 2x the heartbeat interval, so a single missed tick is OK and two consecutive misses flip the state to offline. `getWorkerHealth` is DI-friendly (accepts `WorkerHeartbeat` model + `now` fn) so tests don't need a real Mongo.
+- `loa-worker.js` calls `startHeartbeat()` after Mongo connect and `stopHeartbeat(handle)` on SIGINT, alongside the existing poll loop.
+- `workerBibleClient.fetch` now runs a `countDocuments({ status: 'pending' })` check before insert. If pending count is at or above `WORKER_QUEUE_BACKPRESSURE_THRESHOLD` (default 100, env-tunable), the call throws "Scraping service overloaded" immediately rather than letting every caller eat the 30s timeout. Threshold is read at module load time; toggling requires a bot restart. Factory function accepts `backpressureThreshold` for test injection.
+
+### Tests
+- 7 new tests, 81/81 total pass.
+- 5 new in `test/worker-heartbeat.test.js`: no-record offline, fresh heartbeat online, stale heartbeat offline, custom workerId isolation, exact-boundary inclusive.
+- 2 new in `test/worker-bible-client.test.js`: backpressure rejects when queue at threshold, still inserts when below.
+
+### Notes
+- Surface UI (`/la-status` command, DM alerts) deliberately not wired in this commit. Once the first real `/la-list enrich` run produces queue depth + heartbeat latency data, those thresholds (DM-after-N-minutes, `/la-status` warning bands) can be tuned with grounding instead of guessing at 1 AM.
+- Heartbeat doc has no TTL on purpose: a stale doc IS the diagnostic signal "worker offline since X". Manual cleanup not required; next worker start UPSERTs.
+- Phase 3 cutover (set `BIBLE_WORKER_ENABLED=true` on Railway, start `loa-worker.js` on Traine's PC) is intentionally NOT in this commit. Manual production change, gated on awake/rested operator.
+
 ## [v0.5.77] - 2026-05-05
 
 ### Changed
