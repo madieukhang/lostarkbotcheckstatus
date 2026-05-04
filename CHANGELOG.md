@@ -4,6 +4,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.74] - 2026-05-04
+
+### Fixed
+- Trusted-status indicator changed from 🛡️ to 💚 in OCR check rendering. The shield emoji collided visually with the Paladin / Valkyrie class icons (whose PNG art is a literal shield), producing a "two shields stacked" look on those classes' rows. The new green-heart icon is semantically equivalent (approved / loved) and visually distinct from every class icon.
+
+### Changed
+- Direct-match trusted rows (name equals the trusted entry name) now surface `· trusted` as an inline suffix on the main row instead of an empty branch. Via-match trusted rows keep the existing branch line (`   ↳ via Other · trusted`) for context.
+
+### Notes
+- 57/57 tests pass.
+- Outcome breakdown line + `formatResultLine` both updated; the change is consistent across the embed header and the per-name list.
+- Other surfaces still use 🛡️ shield as the trusted icon (it remains unambiguous when not stacked next to class art).
+
 ## [v0.5.73] - 2026-05-04
 
 ### Changed

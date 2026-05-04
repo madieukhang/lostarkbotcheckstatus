@@ -694,10 +694,13 @@ function formatResultLine(item) {
     ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP ${item.snapCombatScore}` : ''}`
     : '';
 
-  // Trusted shield rendered alongside the status icon when the
+  // Trusted indicator rendered alongside the status icon when the
   // character is on the trusted list AND another flag (e.g. previously
-  // blacklisted then re-trusted).
-  const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 🛡️' : '';
+  // blacklisted then re-trusted). Uses 💚 (green heart) instead of
+  // 🛡️ to avoid visual collision with the Paladin/Valkyrie class
+  // icons whose PNG art is a literal shield · v0.5.74 fix for the
+  // "two shields stacked" case Bao reported.
+  const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 💚' : '';
 
   // Branch builder for flag context. Each list (black, white, watch)
   // gets its own ↳ line when present so an officer scanning the card
@@ -738,9 +741,13 @@ function formatResultLine(item) {
   }
   if (item.trustedEntry) {
     const isVia = item.trustedEntry.name.toLowerCase() !== item.name.toLowerCase();
-    const viaBranch = isVia ? `\n   ↳ 🛡️ via **${item.trustedEntry.name}** · trusted` : '';
+    const viaBranch = isVia ? `\n   ↳ via **${item.trustedEntry.name}** · trusted` : '';
+    // Direct trusted match (name == trusted entry name) has no via
+    // branch, so we surface "· trusted" inline on the main row to
+    // distinguish from clean ❓ which has the same shape otherwise.
+    const directTag = isVia ? '' : ' · trusted';
     return {
-      line: `🛡️ ${classPrefix}**${item.name}**${statSuffix}${viaBranch}`,
+      line: `💚 ${classPrefix}**${item.name}**${statSuffix}${directTag}${viaBranch}`,
       priority: 2,
     };
   }
