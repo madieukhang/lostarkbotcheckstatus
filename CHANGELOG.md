@@ -4,6 +4,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.59] - 2026-05-04
+
+### Fixed
+- Long-running scan reply edits now resolve the real Discord message after the first webhook edit and use `Message.edit()` for later progress/final updates. This covers `/la-list enrich` runs where `interaction.editReply()` returned a non-editable API message shape, causing the final result edit to still hit the expired interaction webhook after 15+ minutes.
+
 ## [v0.5.58] - 2026-05-04
 
 ### Added
