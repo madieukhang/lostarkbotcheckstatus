@@ -4,6 +4,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.68] - 2026-05-04
+
+### Added
+- OCR check results (`/la-list check` slash + auto-check passive) now show class icon + ilvl + CP per name when available. Pattern shifted from `❓ Anhsairoi` to `❓ <:bard:id> Anhsairoi · \`1740.83\` · CP 450,000`. Data sourced from `RosterSnapshot` (populated by prior `/la-roster` runs); names that have never been queried fall back to the previous unadorned line so brand-new screenshots still render.
+- `RosterSnapshot` join added to `checkNamesAgainstLists` (one extra `find({ name: $in })` per request, batched). Each result item carries `snapClassName / snapItemLevel / snapCombatScore`; render sites read these via the new `formatResultLine` enrichment branch.
+
+### Notes
+- 57/57 tests pass.
+- Class icon depends on the v0.5.67 emoji bootstrap; pre-bootstrap or an unmapped class falls back to the className text so the row still carries class info.
+- Auto-check inherits the change automatically because it shares `formatCheckResults` + `buildListCheckEmbed` with the slash command.
+
 ## [v0.5.67] - 2026-05-04
 
 ### Added
