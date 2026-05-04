@@ -140,101 +140,62 @@ export function buildScanResultEmbed({
   const finalColor = contextStyle?.color ?? style.color;
   const finalIcon = contextStyle?.icon ?? style.icon;
 
-  const titleParts = [];
-  if (kind === 'enrich') {
-    titleParts.push('Enrich result');
-  } else if (kind === 'roster-hidden') {
-    titleParts.push('Hidden roster scan');
-  } else {
-    titleParts.push('Deep scan result');
-  }
-  titleParts.push('·');
-  titleParts.push(target.name);
+  // Title carries kind + state in a single line. The state icon prefix
+  // is enough state signal that we no longer need a separate bolded
+  // banner line in the description — saves one paragraph break.
+  let kindLabel;
+  if (kind === 'enrich') kindLabel = 'Enrich result';
+  else if (kind === 'roster-hidden') kindLabel = 'Hidden roster scan';
+  else kindLabel = 'Deep scan result';
 
   const sections = [];
 
-  // 1. State banner. Plain bolded line; the title icon already carries
-  // most of the state signal so this is a one-line confirmation.
-  sections.push(`**${style.label}**`);
-
+  // 1. Summary lead. Combines summaryLine (caller-supplied "I scanned X
+  // for Y") with state label so the reader knows in one paragraph what
+  // happened and how it ended.
   if (summaryLine) {
-    sections.push(summaryLine);
+    sections.push(`${summaryLine}\n*${style.label}.*`);
+  } else {
+    sections.push(`*${style.label}.*`);
   }
 
-  // 2. Hidden roster notice. Only fires when the target's roster is
-  // private, since stronghold detection has stronger limitations there
-  // (no direct alt list to cross-check against).
+  // 2. Hidden roster notice. Single-line italic, less verbose than the
+  // prior 2-line blockquote. The "explains how stronghold fingerprint
+  // works" copy still appears once in the help docs and in DM, so
+  // this card doesn't need to repeat the whole spiel.
   if (target.isHidden) {
     sections.push(
-      `> ${ICONS.locked} Roster of **${target.name}** is hidden on bible.\n` +
-      `> Alts below were matched by stronghold fingerprint (same SH name + roster level), ` +
-      `not a direct roster scan. Mechanically reliable but only sees alts in the same guild.`
+      `${ICONS.locked} *Target's roster is hidden; alts below come from stronghold fingerprint match (same SH + RL).*`
     );
   }
 
-  // 3. Stats grid as a compact prose line. Discord's inline fields would
-  // wrap unpredictably for 4-5 short numbers; a single line reads better.
-  const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
-  const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
-  const statsParts = [
-    `**Checked** ${checkedCandidates}`,
-    `**Found** ${alts.length}`,
-    `**Failed** ${result.failedCandidates ?? 0}`,
-  ];
-  if (attemptedCandidates > checkedCandidates) {
-    statsParts.push(`**Attempts** ${attemptedCandidates}`);
-  }
-  if ((result.rateLimitRetries ?? 0) > 0) {
-    statsParts.push(`**429 retries** ${result.rateLimitRetries}`);
-  }
-  if ((result.scraperApiRequests ?? 0) > 0) {
-    statsParts.push(`**ScraperAPI** ${result.scraperApiRequests}`);
-  }
-  if (state.remaining > 0) {
-    statsParts.push(`**Remaining** ${state.remaining}`);
-  }
-  if (Number.isFinite(result.totalMembers)) {
-    statsParts.push(`Guild ${result.totalMembers}`);
-  }
-  sections.push(statsParts.join(' · '));
-
-  // 4. Stop-reason hint. The banner + stats already say "stopped X/Y";
-  // this line tells the officer WHY and what they can do.
+  // 3. Stop-reason hint. The state's title icon already says WHAT
+  // happened; this paragraph explains WHY and what to do next. We
+  // tighten the copy here vs the older multi-sentence version.
+  let stopHint = '';
   if (state.stopReason === 'stopped') {
-    sections.push(
-      `Scan was stopped before reaching the end. ${state.remaining} eligible candidate(s) ` +
-      `were not checked. Hit **Continue scan** to pick up where this run left off.`
-    );
+    stopHint = `Stopped before the end. **${state.remaining}** eligible candidate(s) unchecked · hit **Continue scan** to resume.`;
   } else if (state.stopReason === 'scan-aborted') {
-    sections.push(
-      `Stopped: **${result.abortLabel || 'Issue detected'}**.` +
+    stopHint = `Stopped: **${result.abortLabel || 'Issue detected'}**.` +
       (result.abortDetail ? ` ${result.abortDetail}` : '') +
-      ` Hit **Continue scan** later if the issue has cleared.`
-    );
+      ` Hit **Continue scan** later if the issue clears.`;
   } else if (state.stopReason === 'failure-storm') {
     const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
     const failed = result.failedCandidates ?? 0;
     const rate = attempted > 0 ? Math.round((failed / attempted) * 100) : 0;
-    sections.push(
-      `Bible rejected too many candidate profiles (${failed}/${attempted}, ${rate}% failed), ` +
-      `so I paused instead of burning the rest of the guild scan. ` +
-      `Failed candidates were **not** marked checked; hit **Continue scan** later to retry them.`
-    );
+    stopHint = `Bible rejected ${failed}/${attempted} profiles (${rate}%); I paused so we don't burn the rest. Failed candidates were not marked checked, so **Continue scan** will retry them.`;
   } else if (state.stopReason === 'cap-hit') {
-    sections.push(
-      `Scan reached the candidate cap (${result.candidateLimit ?? 'configured limit'}). ` +
-      `${state.remaining} eligible candidate(s) above that cap were not checked. ` +
-      `Hit **Continue scan** to walk the rest with the same gentle throttle.`
-    );
+    stopHint = `Hit the candidate cap (${result.candidateLimit ?? 'configured limit'}). **${state.remaining}** eligible candidate(s) above the cap unchecked · hit **Continue scan** to walk the rest.`;
   }
+  if (stopHint) sections.push(stopHint);
 
-  // 5. Alt list block. Header doubles as a count so a reader scrolling
+  // 4. Alt list block. Header doubles as a count so a reader scrolling
   // through history can see at a glance how many came back.
   if (altList) {
-    sections.push(`**Alts found (${alts.length}):**\n${altList}`);
+    sections.push(`**🎯 Alts found (${alts.length}):**\n${altList}`);
   }
 
-  // 6. Action hint. Reserved for caller-specific next-step copy
+  // 5. Action hint. Reserved for caller-specific next-step copy
   // (e.g. enrich: "Confirm to append all N to allCharacters").
   if (actionHint) {
     sections.push(actionHint);
@@ -247,7 +208,7 @@ export function buildScanResultEmbed({
   const description = sections.join('\n\n').slice(0, 4096);
 
   const embed = new EmbedBuilder()
-    .setTitle(`${finalIcon}  ${titleParts.join(' ')}`)
+    .setTitle(`${finalIcon}  ${kindLabel} · ${target.name}`)
     .setDescription(description)
     .setColor(finalColor)
     .setTimestamp();
@@ -256,8 +217,35 @@ export function buildScanResultEmbed({
     embed.setURL(target.profileUrl);
   }
 
+  // Stats grid as inline fields. Discord renders 3 inline fields side-
+  // by-side which gives the card a clear "stats panel" affordance,
+  // visually separated from the narrative description above. Older
+  // version inlined these as a `·`-joined prose line which read
+  // cluttered when 5-6 metrics were active simultaneously.
+  const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
+  const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
+  const fields = [
+    { name: '🔍 Checked', value: String(checkedCandidates), inline: true },
+    { name: '🎯 Found', value: String(alts.length), inline: true },
+    { name: '⚠️ Failed', value: String(result.failedCandidates ?? 0), inline: true },
+  ];
+  if (state.remaining > 0) {
+    fields.push({ name: '📋 Remaining', value: String(state.remaining), inline: true });
+  }
+  if (attemptedCandidates > checkedCandidates) {
+    fields.push({ name: '🔁 Attempts', value: String(attemptedCandidates), inline: true });
+  }
+  if ((result.rateLimitRetries ?? 0) > 0) {
+    fields.push({ name: '⏱️ 429 retries', value: String(result.rateLimitRetries), inline: true });
+  }
+  if ((result.scraperApiRequests ?? 0) > 0) {
+    fields.push({ name: '🌐 ScraperAPI', value: String(result.scraperApiRequests), inline: true });
+  }
+  embed.addFields(...fields);
+
   const footerParts = [];
   if (target.guildName) footerParts.push(`Guild ${target.guildName}`);
+  if (Number.isFinite(result.totalMembers)) footerParts.push(`${result.totalMembers} members`);
   if (result.candidateLimit) footerParts.push(`Cap ${result.candidateLimit}`);
   if (Number.isFinite(result.excludedCandidates) && result.excludedCandidates > 0) {
     footerParts.push(`Excluded ${result.excludedCandidates} from prior pass`);

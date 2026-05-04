@@ -18,6 +18,7 @@ import { LIST_LABELS } from './data.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { ICONS } from '../../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../../utils/scanProgressEmbed.js';
+import { getClassName } from '../../../models/Class.js';
 
 /**
  * Enrich-flavoured wrapper around `buildScanProgressEmbed`. Carries the
@@ -37,23 +38,92 @@ export function buildEnrichProgressEmbed({ entry, foundType, meta, progress }) {
   });
 }
 
+/**
+ * Post-confirm success card. Replaces the older one-line "Appended N
+ * alt(s) to the entry's `allCharacters`" with a richer layout that
+ * surfaces the per-alt class + ilvl (data we already had on the
+ * session but threw away), the scan source (guild + hidden-roster
+ * indicator), and a next-step hint pointing at /la-list view. The
+ * Mongoose-ese footer (`matched=1 · modified=1`) is replaced with a
+ * user-friendly footer; the technical numbers go into a debug log
+ * server-side instead of polluting the end-user view.
+ *
+ * Layout:
+ *   ${list-icon} Saved · ${entry.name}        (color: list-type tint)
+ *
+ *   ✨ I appended **5 new alt(s)** to the blacklist entry.
+ *   📍 Source: Stronghold scan in **<guild>**
+ *   🔒 Roster was hidden, matched via stronghold fingerprint  [optional]
+ *
+ *   **🆕 Newly tracked characters:**
+ *   1. [Name](link) · Class · `1750.83`
+ *   2. [Name](link) · Class · `1740.00`
+ *   ...
+ *
+ *   💡 Tip: /la-list view <type> to browse the full list.
+ */
 export function buildEnrichSuccessEmbed(session, updateResult) {
   const ctx = LIST_LABELS[session.type];
-  const lines = session.newAlts
+
+  // Per-alt rendering: bring back class + ilvl that the success card
+  // dropped before. Names link out to bible roster page so an officer
+  // skimming the card can audit a specific match in one click.
+  const altLines = session.newAlts
     .map((alt, index) => {
+      // alt.classId may already be a resolved className (e.g. from
+      // older alt records) or a raw bible-side id ("deathblade",
+      // "warlord"). Try the known-id lookup first; fall back to
+      // string-stringify so non-string ids don't crash getClassName.
+      const idStr = alt.classId == null ? '' : String(alt.classId);
+      const cls = alt.className || getClassName(idStr) || idStr || 'Unknown';
+      const ilvl = typeof alt.itemLevel === 'number'
+        ? alt.itemLevel.toFixed(2)
+        : (alt.itemLevel || '?');
       const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
-      return `${index + 1}. [${alt.name}](${link})`;
+      return `**${index + 1}.** [${alt.name}](${link}) · ${cls} · \`${ilvl}\``;
     })
     .join('\n');
+
+  // Sections joined by blank lines. Each section is one visual block;
+  // the blank line between them gives Discord enough breathing room
+  // to render distinct units instead of a wall of text.
+  const sections = [];
+
+  sections.push(
+    `${ICONS.fox || '✨'} I appended **${session.newAlts.length} new alt(s)** to the **${ctx.label}** entry.`
+  );
+
+  const contextLines = [];
+  if (session.scanStats?.guildName) {
+    contextLines.push(`📍 Source: Stronghold scan in **${session.scanStats.guildName}**`);
+  }
+  if (session.targetIsHidden) {
+    contextLines.push(`${ICONS.locked} Roster was hidden, matched via stronghold fingerprint.`);
+  }
+  if (contextLines.length > 0) sections.push(contextLines.join('\n'));
+
+  if (altLines) {
+    sections.push(`**🆕 Newly tracked characters:**\n${altLines}`);
+  }
+
+  sections.push(`💡 Tip: \`/la-list view ${session.type}\` to browse the full list.`);
+
+  // Server-side trace for the Mongoose write outcome. Useful when
+  // diagnosing "I clicked Confirm but nothing seemed to save"; surfacing
+  // matched/modified to end users was confusing more than informative.
+  if (updateResult && (updateResult.matchedCount === 0 || updateResult.modifiedCount === 0)) {
+    console.warn(
+      `[enrich] Confirm wrote unexpectedly empty result for ${session.entryName}: ` +
+      `matched=${updateResult.matchedCount}, modified=${updateResult.modifiedCount}`
+    );
+  }
 
   return buildAlertEmbed({
     severity: AlertSeverity.SUCCESS,
     titleIcon: ctx.icon,
     color: ctx.color,
-    title: `Enriched · ${session.entryName}`,
-    description:
-      `Appended ${session.newAlts.length} alt(s) to the ${ctx.label} entry's ` +
-      `\`allCharacters\`:\n\n${lines}`,
-    footer: `matched=${updateResult.matchedCount} · modified=${updateResult.modifiedCount}`,
+    title: `Saved · ${session.entryName}`,
+    description: sections.join('\n\n'),
+    footer: `Lost Ark Check · enrich complete`,
   });
 }

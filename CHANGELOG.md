@@ -59,6 +59,21 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ### Notes
 - This specifically covers scan runs that exceed the original interaction token lifetime, such as large guild scans still in progress around 30+ minutes.
 
+## [v0.5.56] - 2026-05-04
+
+### Changed
+- **Enrich success card** redesigned. The post-Confirm card was a one-line "Appended N alt(s) to entry's allCharacters" plus a list of bare names; it dropped the class + ilvl data the session already had and exposed Mongoose-ese (`matched=1 · modified=1`) in the footer. New layout: hero line ("I appended **N new alt(s)** to the **<list>** entry"), source block (guild name + hidden-roster indicator when applicable), numbered alts with class + ilvl, and a closing Tip line pointing at `/la-list view`. Mongoose write counts moved to a server-side debug log.
+- **Scan result embed** (post-scan card for `/la-list enrich` and `/la-roster deep:true`) split out stats into Discord inline fields. Old layout pushed all metrics into a `·`-joined prose line in the description which read cluttered when 5-6 metrics were active. New layout: narrative description (state, hidden notice, stop reason, alt list, action hint) on top; 3-up inline stats panel (Checked / Found / Failed plus optional Remaining / Attempts / 429 retries / ScraperAPI) below.
+- **Scan completion DM** styling aligned with the new result card. Title format changed to `${state-icon}  ${headline} · ${target}`, fields use the same emoji vocabulary (🔍 Checked, 🎯 Found, ⚠️ Failed, 🔁 Attempts, 🌐 ScraperAPI, 🛑 Stop reason). Description block opens with `Your /la-list enrich scan in <#channel> just finished.` for instant context.
+- **`/la-list view` page** now shows a third line per entry listing tracked alts (compact, capped at 3 visible names with `+N more` suffix). Entries with no alts skip the line. Lets an officer skim the roster without opening the detail view.
+- **Detail evidence embed** (clicked from `/la-list view` evidence dropdown OR `/la-search` evidence dropdown) gains a `🧬 Tracked alts` field with up to 12 numbered linked names. Both surfaces now route through `buildEvidenceEmbed` so the layout stays in sync; the search-side inline embed builder is removed.
+- **Broadcast notification** (cross-server list-change ping) gains the same `🧬 Tracked alts` field. Recipients in other servers get the full alt list inline so they don't have to lookup whether one of their members is the same account.
+
+### Notes
+- 57/57 tests pass.
+- Field emoji vocabulary unified across enrich + roster + DM + detail + broadcast: 📝 Reason, 🗡️ Raid, 📒 List, 🕐 Added, 🧬 Tracked alts, 🔗 Logs, 👤 Added by.
+- Voice unchanged (English-first per `feedback_loalogs_voice`).
+
 ## [v0.5.55] - 2026-05-03
 
 ### Fixed
