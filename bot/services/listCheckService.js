@@ -12,7 +12,7 @@ import Watchlist from '../models/Watchlist.js';
 import RosterCache from '../models/RosterCache.js';
 import RosterSnapshot from '../models/RosterSnapshot.js';
 import TrustedUser from '../models/TrustedUser.js';
-import { getClassEmoji, getClassName, resolveClassId } from '../models/Class.js';
+import { getClassEmoji, getClassName, isSupportClass, resolveClassId } from '../models/Class.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
@@ -333,18 +333,20 @@ export async function checkNamesAgainstLists(names, options = {}) {
     };
   });
 
-  // Phase 2: roster check for unflagged names. Batch-read cache first, then
-  // resolve misses with bounded concurrency so screenshots with many clean
-  // names do not wait on 8 fully sequential lostark.bible round-trips.
-  const unflaggedNames = results
-    .filter((r) => !r.blackEntry && !r.whiteEntry && !r.watchEntry)
-    .map((r) => r.name);
+  // Phase 2: roster check for ALL names regardless of flag status.
+  // Pre-v0.5.72 this branch skipped flagged entries, so blacklisted
+  // characters never picked up class/ilvl/CP and rendered as a bare
+  // headline. Rendering full character context on flagged rows lets
+  // an officer see at a glance whether an OCR'd "RipDead" is the
+  // ilvl-1740 main grief or just a same-name cleric · same data
+  // backing the unflagged rows already.
+  const allCheckedNames = results.map((r) => r.name);
 
-  const cachedEntries = unflaggedNames.length > 0
+  const cachedEntries = allCheckedNames.length > 0
     ? await RosterCache.find({
         $or: [
-          { name: { $in: unflaggedNames } },
-          { allCharacters: { $in: unflaggedNames } },
+          { name: { $in: allCheckedNames } },
+          { allCharacters: { $in: allCheckedNames } },
         ],
       }).collation(collation).lean()
     : [];
@@ -352,7 +354,6 @@ export async function checkNamesAgainstLists(names, options = {}) {
 
   const cacheMissItems = [];
   for (const item of results) {
-    if (item.blackEntry || item.whiteEntry || item.watchEntry) continue;
 
     const cached = getRosterCacheMatch(cacheMap, item.name);
 
@@ -659,55 +660,91 @@ export async function checkNamesAgainstLists(names, options = {}) {
  * @param {object} item
  * @returns {{ line: string, priority: number }}
  */
+/**
+ * Build the per-character line for an OCR check result.
+ *
+ * Layout:
+ *   [status-icon] [class-icon] **Name** · `ilvl` · CP nnn
+ *      ↳ via Other · reason · [raid]            (only when flagged)
+ *      ↳ via Other · trusted                    (only when trusted via roster)
+ *
+ * The branch sub-line lets a reader see the character's full identity
+ * (class + ilvl + CP) on the main row and the flag context on a
+ * subordinate line · same convention `/la-search` uses for its
+ * multi-line result rows. Pre-v0.5.72 the flag info was inlined onto
+ * the main row which crowded the line and pushed class / ilvl / CP
+ * out of sight when the reason was long.
+ *
+ * @returns {{ line: string, priority: number }}
+ */
 function formatResultLine(item) {
   const isBlack = Boolean(item.blackEntry);
   const isWhite = Boolean(item.whiteEntry);
   const isWatch = Boolean(item.watchEntry);
 
-  // Class icon prefix (or className text fallback when icon not mapped).
-  // Only renders when snapshot enrichment found this name; brand-new
-  // names render without a class prefix · graceful fallback.
+  // Class icon (or className text fallback when the bootstrap hasn't
+  // mapped this class yet). Empty string when no snapshot data.
   const classPrefix = item.snapClassName
     ? (getClassEmoji(item.snapClassName) || item.snapClassName) + ' '
     : '';
 
-  // ilvl + CP suffix appended after the name when snapshot has them.
-  // Both behind the same `if snapItemLevel > 0` gate because snapshot
-  // either has both or neither (the writer always sets both fields).
+  // ilvl + CP suffix on the main row. Both behind the same gate
+  // because the snapshot writer always sets ilvl+CP together.
   const statSuffix = item.snapItemLevel > 0
     ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP ${item.snapCombatScore}` : ''}`
     : '';
 
-  const reasonParts = [];
-  for (const [entry] of [[item.blackEntry], [item.whiteEntry], [item.watchEntry]]) {
+  // Trusted shield rendered alongside the status icon when the
+  // character is on the trusted list AND another flag (e.g. previously
+  // blacklisted then re-trusted).
+  const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 🛡️' : '';
+
+  // Branch builder for flag context. Each list (black, white, watch)
+  // gets its own ↳ line when present so an officer scanning the card
+  // sees each origin separately.
+  const branches = [];
+  for (const [entry, label] of [
+    [item.blackEntry, '⛔'],
+    [item.whiteEntry, '✅'],
+    [item.watchEntry, '⚠️'],
+  ]) {
     if (!entry) continue;
     const isRosterMatch = entry.name.toLowerCase() !== item.name.toLowerCase();
-    const details = [];
-    if (isRosterMatch) details.push(`via **${entry.name}**`);
-    if (entry.reason?.trim()) details.push(entry.reason.trim());
-    if (entry.raid?.trim()) details.push(`[${entry.raid.trim()}]`);
-    if (details.length > 0) reasonParts.push(details.join(' · '));
+    const parts = [];
+    if (isRosterMatch) parts.push(`via **${entry.name}**`);
+    if (entry.reason?.trim()) parts.push(`*${entry.reason.trim()}*`);
+    if (entry.raid?.trim()) parts.push(`[${entry.raid.trim()}]`);
+    if (parts.length > 0) branches.push(`   ↳ ${label} ${parts.join(' · ')}`);
   }
 
-  const reasonSuffix = reasonParts.length > 0 ? ` · ${reasonParts.join(' | ')}` : '';
-
-  // Trusted indicator (shown alongside other flags)
-  const trustedTag = item.trustedEntry ? ' 🛡️' : '';
+  const branchBlock = branches.length > 0 ? `\n${branches.join('\n')}` : '';
 
   if (isBlack) {
     const scopeTag = item.blackEntry?.scope === 'server' ? ' (Local)' : '';
-    return { line: `⛔ ${classPrefix}**${item.name}**${scopeTag}${trustedTag}${statSuffix}${reasonSuffix}`, priority: 0 };
+    return {
+      line: `⛔ ${classPrefix}**${item.name}**${scopeTag}${trustedTag}${statSuffix}${branchBlock}`,
+      priority: 0,
+    };
   }
   if (isWatch) {
-    return { line: `⚠️ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${reasonSuffix}`, priority: 1 };
+    return {
+      line: `⚠️ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${branchBlock}`,
+      priority: 1,
+    };
   }
   if (isWhite) {
-    return { line: `✅ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${reasonSuffix}`, priority: 2 };
+    return {
+      line: `✅ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${branchBlock}`,
+      priority: 2,
+    };
   }
   if (item.trustedEntry) {
     const isVia = item.trustedEntry.name.toLowerCase() !== item.name.toLowerCase();
-    const via = isVia ? ` · via **${item.trustedEntry.name}**` : '';
-    return { line: `🛡️ ${classPrefix}**${item.name}**${via}${statSuffix} · trusted`, priority: 2 };
+    const viaBranch = isVia ? `\n   ↳ 🛡️ via **${item.trustedEntry.name}** · trusted` : '';
+    return {
+      line: `🛡️ ${classPrefix}**${item.name}**${statSuffix}${viaBranch}`,
+      priority: 2,
+    };
   }
   if (item.hasRoster) {
     return { line: `❓ ${classPrefix}${item.name}${statSuffix}`, priority: 3 };
@@ -731,8 +768,19 @@ function formatResultLine(item) {
 export function formatCheckResults(results) {
   const formatted = results.map((item) => ({ ...formatResultLine(item), item }));
 
-  // Sort by priority: flagged first
-  formatted.sort((a, b) => a.priority - b.priority);
+  // Sort: flag priority first (blacklist → watch → white/trusted →
+  // clean → no-roster), then within the same priority bucket DPS
+  // before supports. Supports-last lets a raid leader scanning the
+  // card see the DPS roster impact first; supports are typically the
+  // group-blocking concern but at the same priority they're "easier
+  // to slot in" so they live at the bottom of each tier.
+  formatted.sort((a, b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    const aSupport = isSupportClass(a.item.snapClassName) ? 1 : 0;
+    const bSupport = isSupportClass(b.item.snapClassName) ? 1 : 0;
+    if (aSupport !== bSupport) return aSupport - bSupport;
+    return 0;
+  });
 
   // Count by category
   const counts = { black: 0, watch: 0, white: 0, trusted: 0, clean: 0, noRoster: 0 };

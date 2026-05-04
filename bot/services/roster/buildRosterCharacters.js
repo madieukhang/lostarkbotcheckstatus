@@ -4,8 +4,7 @@ import { buildBibleFetchOptions, fetchWithFallback } from './bibleFetch.js';
 import { fetchCharacterMeta } from './characterMeta.js';
 import { inferHiddenRosterItemLevel } from './search.js';
 import { detectAltsViaStronghold } from './altDetection.js';
-import { extractRosterClassMapFromHtml } from './parsers.js';
-import { getClassName } from '../../models/Class.js';
+import { parseRosterCharactersFromHtml } from './parsers.js';
 
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('error', () => {});
@@ -38,48 +37,36 @@ export async function buildRosterCharacters(name, options = {}) {
     } else {
       const html = await response.text();
       const { document } = new JSDOM(html, { virtualConsole }).window;
-      const links = document.querySelectorAll('a[href^="/character/NA/"]');
-      const rosterChars = [];
-      // Class map lookup (name -> classId) parsed from the same html
-      // block parsers.js#parseRosterCharactersFromHtml uses. Lets us
-      // resolve the queried character's class without a second roster
-      // page fetch · `name` matches case-sensitively against bible
-      // capitalisation, so we lookup with the bible-cased charName
-      // discovered in the loop below.
-      const rosterClassMap = extractRosterClassMapFromHtml(html);
 
-      for (const link of links) {
-        const headerDiv = link.querySelector('.text-lg.font-semibold');
-        if (!headerDiv) continue;
+      // Use the canonical parser that /la-roster also uses. It returns
+      // per-character records with name + itemLevel + combatScore +
+      // classId + className already resolved. The previous inline
+      // duplicate did its own DOM walk and a separate rosterClassMap
+      // lookup that could silently fail for some names · routing
+      // through the proven function eliminates that drift.
+      const rosterChars = await parseRosterCharactersFromHtml(html, document);
 
-        const charName = [...headerDiv.childNodes]
-          .filter((n) => n.nodeType === 3)
-          .map((n) => n.textContent.trim())
-          .find((t) => t.length > 0);
-
-        if (!charName) continue;
-
-        rosterChars.push(charName);
-
-        if (charName.toLowerCase() === name.toLowerCase()) {
-          const spans = headerDiv.querySelectorAll('span');
-          const ilvlText = spans[0]?.textContent.trim() ?? '';
-          const parsed = parseFloat(ilvlText.replace(/,/g, ''));
-          if (!isNaN(parsed)) targetItemLevel = parsed;
-          // Combat score is the second span on the header div. Class
-          // id is from the JS-side rosterClassMap. Both are best-effort
-          // (null when missing) so callers can render gracefully.
-          const cpText = spans[1]?.textContent.trim() ?? '';
-          if (cpText) targetCombatScore = cpText;
-          const classId = rosterClassMap.get(charName);
-          if (classId) targetClassName = getClassName(classId);
+      // Find the queried character's record in the parsed list. Match
+      // is case-insensitive because OCR'd / user-typed names may not
+      // match bible's capitalisation exactly.
+      const targetRecord = rosterChars.find(
+        (c) => String(c.name).toLowerCase() === String(name).toLowerCase()
+      );
+      if (targetRecord) {
+        const parsedIlvl = parseFloat(String(targetRecord.itemLevel ?? '0').replace(/,/g, ''));
+        if (!isNaN(parsedIlvl) && parsedIlvl > 0) targetItemLevel = parsedIlvl;
+        if (targetRecord.combatScore && targetRecord.combatScore !== '?') {
+          targetCombatScore = targetRecord.combatScore;
         }
+        if (targetRecord.className) targetClassName = targetRecord.className;
       }
 
       if (rosterChars.length > 0) {
         hasValidRoster = true;
         rosterVisibility = 'visible';
-        allCharacters = [...new Set(rosterChars)];
+        // Dedup by name string so two same-named entries (rare on
+        // bible) collapse to one. Same shape as the old behaviour.
+        allCharacters = [...new Set(rosterChars.map((c) => c.name))];
       } else if (hiddenRosterFallback) {
         const meta = await fetchCharacterMeta(name, options);
         if (meta) {
