@@ -10,7 +10,9 @@ import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import Watchlist from '../models/Watchlist.js';
 import RosterCache from '../models/RosterCache.js';
+import RosterSnapshot from '../models/RosterSnapshot.js';
 import TrustedUser from '../models/TrustedUser.js';
+import { getClassEmoji, getClassName } from '../models/Class.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
@@ -276,12 +278,18 @@ export async function checkNamesAgainstLists(names, options = {}) {
   // Blacklist: scope-aware query (owner sees all, others see global + own server)
   const blackQuery = buildBlacklistQuery(nameQuery, guildId);
 
-  const [allBlack, allWhite, allWatch, allTrusted] = await Promise.all([
+  // RosterSnapshot has class/ilvl/CP populated by /la-roster runs.
+  // Best-effort enrichment: names previously queried have rich data
+  // surfaced inline; brand-new names render without (graceful fallback).
+  // One query for all input names, joined into the results below.
+  const [allBlack, allWhite, allWatch, allTrusted, allSnapshots] = await Promise.all([
     Blacklist.find(blackQuery).collation(collation).lean(),
     Whitelist.find(nameQuery).collation(collation).lean(),
     Watchlist.find(nameQuery).collation(collation).lean(),
     TrustedUser.find({ name: { $in: names } }).collation(collation).lean(),
+    RosterSnapshot.find({ name: { $in: names } }).collation(collation).lean(),
   ]);
+  const snapshotMap = new Map(allSnapshots.map((s) => [s.name.toLowerCase(), s]));
 
   // Build O(1) lookup maps from list entries (once per list, not per name)
   function buildEntryMap(entries) {
@@ -304,16 +312,26 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const watchMap = buildEntryMap(allWatch);
   const trustedMap = new Map(allTrusted.map((t) => [t.name.toLowerCase(), t]));
 
-  const results = names.map((name) => ({
-    name,
-    blackEntry: blackMap.get(name.toLowerCase()) || null,
-    whiteEntry: whiteMap.get(name.toLowerCase()) || null,
-    watchEntry: watchMap.get(name.toLowerCase()) || null,
-    trustedEntry: trustedMap.get(name.toLowerCase()) || null,
-    hasRoster: false,
-    failReason: null,
-    similarNames: null,
-  }));
+  const results = names.map((name) => {
+    const snap = snapshotMap.get(name.toLowerCase()) || null;
+    return {
+      name,
+      blackEntry: blackMap.get(name.toLowerCase()) || null,
+      whiteEntry: whiteMap.get(name.toLowerCase()) || null,
+      watchEntry: watchMap.get(name.toLowerCase()) || null,
+      trustedEntry: trustedMap.get(name.toLowerCase()) || null,
+      hasRoster: false,
+      failReason: null,
+      similarNames: null,
+      // Snapshot enrichment: present when /la-roster has previously
+      // queried this name. Empty/null when never seen before; render
+      // sites fall back gracefully.
+      snapClassId: snap?.classId || '',
+      snapClassName: snap?.classId ? getClassName(snap.classId) : '',
+      snapItemLevel: snap?.itemLevel || 0,
+      snapCombatScore: snap?.combatScore || '',
+    };
+  });
 
   // Phase 2: roster check for unflagged names. Batch-read cache first, then
   // resolve misses with bounded concurrency so screenshots with many clean
@@ -569,6 +587,20 @@ function formatResultLine(item) {
   const isWhite = Boolean(item.whiteEntry);
   const isWatch = Boolean(item.watchEntry);
 
+  // Class icon prefix (or className text fallback when icon not mapped).
+  // Only renders when snapshot enrichment found this name; brand-new
+  // names render without a class prefix · graceful fallback.
+  const classPrefix = item.snapClassName
+    ? (getClassEmoji(item.snapClassName) || item.snapClassName) + ' '
+    : '';
+
+  // ilvl + CP suffix appended after the name when snapshot has them.
+  // Both behind the same `if snapItemLevel > 0` gate because snapshot
+  // either has both or neither (the writer always sets both fields).
+  const statSuffix = item.snapItemLevel > 0
+    ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP ${item.snapCombatScore}` : ''}`
+    : '';
+
   const reasonParts = [];
   for (const [entry] of [[item.blackEntry], [item.whiteEntry], [item.watchEntry]]) {
     if (!entry) continue;
@@ -587,21 +619,21 @@ function formatResultLine(item) {
 
   if (isBlack) {
     const scopeTag = item.blackEntry?.scope === 'server' ? ' (Local)' : '';
-    return { line: `⛔ **${item.name}**${scopeTag}${trustedTag}${reasonSuffix}`, priority: 0 };
+    return { line: `⛔ ${classPrefix}**${item.name}**${scopeTag}${trustedTag}${statSuffix}${reasonSuffix}`, priority: 0 };
   }
   if (isWatch) {
-    return { line: `⚠️ **${item.name}**${trustedTag}${reasonSuffix}`, priority: 1 };
+    return { line: `⚠️ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${reasonSuffix}`, priority: 1 };
   }
   if (isWhite) {
-    return { line: `✅ **${item.name}**${trustedTag}${reasonSuffix}`, priority: 2 };
+    return { line: `✅ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${reasonSuffix}`, priority: 2 };
   }
   if (item.trustedEntry) {
     const isVia = item.trustedEntry.name.toLowerCase() !== item.name.toLowerCase();
     const via = isVia ? ` · via **${item.trustedEntry.name}**` : '';
-    return { line: `🛡️ **${item.name}**${via} · trusted`, priority: 2 };
+    return { line: `🛡️ ${classPrefix}**${item.name}**${via}${statSuffix} · trusted`, priority: 2 };
   }
   if (item.hasRoster) {
-    return { line: `❓ ${item.name}`, priority: 3 };
+    return { line: `❓ ${classPrefix}${item.name}${statSuffix}`, priority: 3 };
   }
 
   const reason = item.failReason ? ` *(${item.failReason})*` : '';
