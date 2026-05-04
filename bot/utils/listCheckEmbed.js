@@ -101,11 +101,15 @@ export function buildListCheckEmbed({
   // a safety net for long reasons or many similar-name suggestions.
   const description = (`${headerLine}${ignoreNote}\n\n${formattedLines.join('\n')}`).slice(0, 4096);
 
-  const fields = [
-    { name: '🔍 Checked', value: String(limitedNamesCount), inline: true },
-    { name: '🚨 Flagged', value: String(flaggedCount), inline: true },
-    { name: '✅ Cleared', value: String(clearedCount), inline: true },
-  ];
+  // Stats grid (Checked / Flagged / Cleared) was a 3-up inline field
+  // panel pre-v0.5.73. The Outcome breakdown line at the top of the
+  // description carries the same per-status info (with finer
+  // granularity), so the panel was strictly redundant and made the
+  // card feel busy. Dropped intentionally; reintroduce only if
+  // someone needs the aggregate counts in a separate visual block.
+  // (clearedCount kept above as a value reference for future copy
+  // tweaks but not surfaced in fields.)
+  void clearedCount;
 
   // Footer hint differs between modes:
   //   slash:  Tip toward /la-roster on a flagged hit OR retry hint when clean.
@@ -133,7 +137,6 @@ export function buildListCheckEmbed({
     .setTitle(title)
     .setDescription(description)
     .setColor(color)
-    .addFields(fields)
     .setFooter({ text: footerParts.join(' · ') })
     .setTimestamp();
 

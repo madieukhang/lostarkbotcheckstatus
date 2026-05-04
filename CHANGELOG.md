@@ -4,6 +4,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.73] - 2026-05-04
+
+### Changed
+- **OCR check card decluttered.** Three layers of redundancy collapsed:
+  - The per-status breakdown line (`⚠️ 1 · ✅ 1 · 🛡️ 2 · ❓ 4`) was being emitted twice: once as the `Outcome:` header by `buildListCheckEmbed`, and once again by `formatCheckResults` as a stand-alone summary above the per-name list. Removed the second copy; only the bolded `Outcome:` header survives.
+  - The 3-up stats panel (Checked / Flagged / Cleared) below the description carried the same aggregate counts in a different shape. Dropped from the embed; the `Outcome:` header already conveys all the numbers an officer needs at a glance.
+  - Branch sub-lines (`   ↳ ⛔ via Apakkbreak · ...`) repeated the list-status icon already shown on the main row above. Branch now reads `   ↳ via Apakkbreak · *reason* · [raid]` without the redundant glyph.
+
+### Notes
+- 57/57 tests pass.
+- Net effect: typical 8-name auto-check card is now ~30% shorter vertically with no information loss · the description carries Outcome breakdown + per-name lines + branch context, the footer carries the call-to-action and source citation.
+
 ## [v0.5.72] - 2026-05-04
 
 ### Fixed
