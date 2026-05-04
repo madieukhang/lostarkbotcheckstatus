@@ -70,6 +70,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         // This is intentionally gated behind deep:true because it can fan out
         // into hundreds of lostark.bible profile requests on large guilds.
         let altResult = null;
+        let scanErrorEmbed = null;
         if (deep) {
           // Send a 0% progress embed + Stop button immediately so the
           // officer knows the scan started and has a way out if bible
@@ -122,6 +123,13 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
                 cancelFlag,
                 sessionId,
               }),
+            });
+          } catch (err) {
+            scanErrorEmbed = buildAlertEmbed({
+              severity: AlertSeverity.ERROR,
+              title: `Deep scan stopped · ${name}`,
+              description: `Reason: **${err.message || 'unexpected detector error'}**`,
+              footer: 'The roster card is still shown; deep scan was not completed.',
             });
           } finally {
             unregisterScan(sessionId);
@@ -185,7 +193,9 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         const replyComponents = [];
         let scanState = null;
 
-        if (deep && altResult) {
+        if (scanErrorEmbed) {
+          replyEmbeds.push(scanErrorEmbed);
+        } else if (deep && altResult) {
           const profileUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
           const { embed: scanEmbed, state } = buildScanResultEmbed({
             target: { name, isHidden: true, guildName: meta.guildName, profileUrl },

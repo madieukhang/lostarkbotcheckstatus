@@ -7,6 +7,15 @@ import { buildStopButtonRow } from '../../utils/scanSession.js';
 // scan; well under the rate-limit ceiling. Tightened from 30s after
 // users reported the embed felt frozen between ticks.
 const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
+const PROGRESS_EDIT_FAILURE_LIMIT = 3;
+
+function abortForProgressEditFailures(cancelFlag) {
+  if (!cancelFlag || cancelFlag.cancelled) return;
+  cancelFlag.cancelled = true;
+  cancelFlag.reason = 'discord-progress-update-failed';
+  cancelFlag.label = 'Discord update failed';
+  cancelFlag.detail = 'Could not update the scan card repeatedly.';
+}
 
 /**
  * Build the onProgress callback used by both the hidden-roster and the
@@ -16,6 +25,8 @@ const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
  * afterwards (would flicker for ms).
  */
 export function makeRosterScanProgressCallback({ interaction, replyEditor, name, meta, totalMembers, startedAtRef, lastEditRef, cancelFlag, sessionId }) {
+  let progressEditFailures = 0;
+
   return (progress) => {
     const now = Date.now();
     const isFinal = progress.scannedCandidates >= progress.totalCandidates;
@@ -40,8 +51,14 @@ export function makeRosterScanProgressCallback({ interaction, replyEditor, name,
         progress: { ...progress, totalMembers, startedAt: startedAtRef.value },
       })],
       components: [buttonRow],
+    }).then(() => {
+      progressEditFailures = 0;
     }).catch((err) => {
+      progressEditFailures += 1;
       console.warn('[roster] Progress edit failed:', err?.message || err);
+      if (progressEditFailures >= PROGRESS_EDIT_FAILURE_LIMIT) {
+        abortForProgressEditFailures(cancelFlag);
+      }
     });
   };
 }

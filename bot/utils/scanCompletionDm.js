@@ -106,6 +106,13 @@ export async function sendScanCompletionDm(opts) {
       inline: true,
     });
   }
+  if (result.abortLabel) {
+    statFields.push({
+      name: 'Stopped reason',
+      value: String(result.abortLabel).slice(0, 1024),
+      inline: false,
+    });
+  }
   if ((result.scraperApiRequests ?? 0) > 0) {
     statFields.push({
       name: 'ScraperAPI',

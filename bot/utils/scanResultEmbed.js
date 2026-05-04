@@ -38,7 +38,7 @@ import { COLORS, ICONS } from './ui.js';
  * embed copy and button selection.
  *
  * @param {object} result - Result envelope from detectAltsViaStronghold.
- * @returns {{stopReason: 'completed'|'stopped'|'failure-storm'|'cap-hit', hasRemaining: boolean, remaining: number}}
+ * @returns {{stopReason: 'completed'|'stopped'|'scan-aborted'|'failure-storm'|'cap-hit', hasRemaining: boolean, remaining: number}}
  */
 export function deriveScanState(result) {
   // Prefer totalEligibleInGuild for the remaining-count math because it is
@@ -54,12 +54,14 @@ export function deriveScanState(result) {
   const scanned = result?.checkedCandidates ?? result?.scannedCandidates ?? 0;
   const cancelled = result?.cancelled === true;
   const pausedForFailureStorm = result?.pausedForFailureStorm === true;
+  const abortedBySystem = Boolean(result?.abortReason && result.abortReason !== 'user-stopped');
 
   const remaining = Math.max(0, totalEligible - scanned);
   const hasRemaining = remaining > 0;
 
   let stopReason;
   if (pausedForFailureStorm) stopReason = 'failure-storm';
+  else if (abortedBySystem) stopReason = 'scan-aborted';
   else if (cancelled) stopReason = 'stopped';
   else if (hasRemaining) stopReason = 'cap-hit';
   else stopReason = 'completed';
@@ -71,6 +73,7 @@ const STATE_STYLE = {
   completed: { icon: ICONS.done,    color: COLORS.success, label: 'Scan complete' },
   'cap-hit': { icon: ICONS.search,  color: COLORS.warning, label: 'Scan paused at candidate limit' },
   'failure-storm': { icon: ICONS.warn, color: COLORS.warning, label: 'Scan paused: bible is rejecting profiles' },
+  'scan-aborted': { icon: ICONS.warn, color: COLORS.warning, label: 'Scan stopped: issue detected' },
   stopped:   { icon: '🛑',          color: COLORS.warning, label: 'Scan stopped early' },
 };
 
@@ -201,6 +204,12 @@ export function buildScanResultEmbed({
     sections.push(
       `Scan was stopped before reaching the end. ${state.remaining} eligible candidate(s) ` +
       `were not checked. Hit **Continue scan** to pick up where this run left off.`
+    );
+  } else if (state.stopReason === 'scan-aborted') {
+    sections.push(
+      `Stopped: **${result.abortLabel || 'Issue detected'}**.` +
+      (result.abortDetail ? ` ${result.abortDetail}` : '') +
+      ` Hit **Continue scan** later if the issue has cleared.`
     );
   } else if (state.stopReason === 'failure-storm') {
     const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;

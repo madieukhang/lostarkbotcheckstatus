@@ -77,6 +77,7 @@ import { createLongRunningReplyEditor } from '../../../utils/longRunningReply.js
 // rate-limit ceiling and tight enough that progress feels live rather
 // than batched.
 const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
+const PROGRESS_EDIT_FAILURE_LIMIT = 3;
 
 /**
  * Merge two alt arrays case-insensitively by name. Later entries win
@@ -249,6 +250,7 @@ export function createEnrichHandlers({ client, services }) {
     });
 
     let lastProgressEdit = startedAt;
+    let progressEditFailures = 0;
     const onProgress = (progress) => {
       const now = Date.now();
       const isFinal = progress.scannedCandidates >= progress.totalCandidates;
@@ -267,12 +269,22 @@ export function createEnrichHandlers({ client, services }) {
           progress: { ...progress, totalMembers: guildMembers.length, startedAt },
         })],
         components: [buttonRow],
+      }).then(() => {
+        progressEditFailures = 0;
       }).catch((err) => {
+        progressEditFailures += 1;
         console.warn('[enrich] Progress edit failed:', err?.message || err);
+        if (progressEditFailures >= PROGRESS_EDIT_FAILURE_LIMIT && !cancelFlag.cancelled) {
+          cancelFlag.cancelled = true;
+          cancelFlag.reason = 'discord-progress-update-failed';
+          cancelFlag.label = 'Discord update failed';
+          cancelFlag.detail = 'Could not update the scan card repeatedly.';
+        }
       });
     };
 
     let result;
+    let scanThrownError = null;
     try {
       result = await detectAltsViaStronghold(name, {
         targetMeta: meta,
@@ -283,8 +295,24 @@ export function createEnrichHandlers({ client, services }) {
         cancelFlag,
         excludeNames: existingSession?.scannedNames ?? [],
       });
+    } catch (err) {
+      scanThrownError = err;
     } finally {
       unregisterScan(sessionId);
+    }
+
+    if (scanThrownError) {
+      await replyEditor.edit({
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.ERROR,
+          title: `Scan stopped · ${name}`,
+          description: `Reason: **${scanThrownError.message || 'unexpected detector error'}**`,
+          footer: 'No list changes were made. Try again after bible cools down.',
+        })],
+        components: [],
+      });
+      return;
     }
 
     // Defensive: detectAltsViaStronghold can return null on early-exit
@@ -762,6 +790,9 @@ export function createEnrichHandlers({ client, services }) {
     }
 
     scan.cancelFlag.cancelled = true;
+    scan.cancelFlag.reason = 'user-stopped';
+    scan.cancelFlag.label = 'Stopped by user';
+    scan.cancelFlag.detail = 'Stop button clicked.';
 
     await interaction.reply({
       embeds: [buildAlertEmbed({
