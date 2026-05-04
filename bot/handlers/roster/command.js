@@ -80,7 +80,7 @@ export async function handleRosterCommand(interaction) {
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
-    const response = await bibleClient.fetch(targetUrl);
+    const response = await bibleClient.fetch(targetUrl, deep ? { viaWorker: true } : {});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const html = await response.text();

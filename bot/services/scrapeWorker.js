@@ -2,6 +2,10 @@ import ScrapeJob from '../models/ScrapeJob.js';
 import { FETCH_HEADERS } from './roster/bibleHeaders.js';
 
 const FETCH_DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_JOB_LEASE_MS = (() => {
+  const raw = parseInt(process.env.WORKER_JOB_LEASE_MS, 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 2 * 60 * 1000;
+})();
 
 function abbreviateUrl(url) {
   if (typeof url !== 'string') return '';
@@ -9,14 +13,30 @@ function abbreviateUrl(url) {
   return `${url.slice(0, 80)}...${url.slice(-15)}`;
 }
 
+export function buildClaimNextJobFilter({
+  now = Date.now,
+  staleAfterMs = DEFAULT_JOB_LEASE_MS,
+} = {}) {
+  const staleStartedBefore = new Date(now() - staleAfterMs);
+  return {
+    $or: [
+      { status: 'pending' },
+      { status: 'in_progress', startedAt: { $lt: staleStartedBefore } },
+    ],
+  };
+}
+
 // Atomically grab the oldest pending job and flip it to in_progress.
 // Returns the job document (with the updated state) or null when no
 // pending work is available. Exposed for tests so they can drive a
 // single iteration without spawning a worker process.
-export async function claimNextJob() {
+export async function claimNextJob(options = {}) {
   return ScrapeJob.findOneAndUpdate(
-    { status: 'pending' },
-    { $set: { status: 'in_progress', startedAt: new Date() } },
+    buildClaimNextJobFilter(options),
+    {
+      $set: { status: 'in_progress', startedAt: new Date(options.now?.() ?? Date.now()) },
+      $unset: { completedAt: '', error: '', result: '' },
+    },
     { sort: { createdAt: 1 }, returnDocument: 'after' },
   );
 }

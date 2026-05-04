@@ -159,6 +159,27 @@ test('workerBibleClient surfaces missing job (TTL expired or deleted)', async ()
   );
 });
 
+test('workerBibleClient fails fast when heartbeat says worker is offline', async () => {
+  const ScrapeJob = buildFakeScrapeJob();
+  const client = createWorkerBibleClient({
+    ScrapeJob,
+    pollIntervalMs: 1,
+    defaultTimeoutMs: 5_000,
+    getWorkerHealth: async () => ({
+      online: false,
+      reason: 'stale-heartbeat',
+      ageMs: 45_000,
+    }),
+  });
+
+  await assert.rejects(
+    () => client.fetch('https://lostark.bible/character/NA/Offline/__data.json'),
+    /Scraping worker offline \(stale-heartbeat; last heartbeat 45s ago\)/,
+  );
+
+  assert.equal(ScrapeJob.inserted(), null);
+});
+
 test('workerBibleClient rejects insert when pending queue is over backpressure threshold', async () => {
   // 5 pending jobs already in the queue, threshold set to 5 -> reject
   // immediately rather than wait for the worker to drain.
