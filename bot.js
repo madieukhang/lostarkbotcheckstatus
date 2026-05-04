@@ -44,6 +44,37 @@ const systemHandlers = createSystemHandlers({
 
 const listHandlers = createListHandlers({ client });
 
+/**
+ * Detect Discord interaction errors that are transient client-side
+ * conditions, not bugs in our handlers.
+ *
+ *   10062 Unknown interaction       3-second initial-response window
+ *                                   expired before deferReply landed
+ *                                   (Railway redeploy with in-flight
+ *                                   slash command, cold-start stall,
+ *                                   websocket reconnect mid-handler).
+ *   40060 Interaction already acked Two code paths raced to ack the
+ *                                   same interaction (e.g. user
+ *                                   double-clicked a button while
+ *                                   the first click was still flushing
+ *                                   its deferUpdate).
+ *
+ * Both are recoverable from Discord's perspective: the interaction
+ * token is dead, but the bot stays online and the user can retry.
+ * We log them as warnings so they don't drown out genuine bugs in
+ * the deploy log.
+ */
+function isTransientInteractionError(err) {
+  return err?.code === 10062 || err?.code === 40060;
+}
+
+function logTransientInteraction(scope, err) {
+  const label = err.code === 10062
+    ? 'Unknown interaction (3s window expired)'
+    : 'Interaction already acknowledged';
+  console.warn(`[bot] Transient on ${scope}: ${label} (${err.code})`);
+}
+
 async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(config.token);
   try {
@@ -334,13 +365,27 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await handleHelpCommand(interaction);
     }
   } catch (err) {
+    if (isTransientInteractionError(err)) {
+      logTransientInteraction(`/${commandName}`, err);
+      return;
+    }
+
     console.error(`[bot] Unhandled error in /${commandName}:`, err);
 
     const reply = { content: '❌ An unexpected error occurred.', ephemeral: true };
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply(reply).catch(() => {});
-    } else {
-      await interaction.reply(reply).catch(() => {});
+    try {
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply(reply);
+      } else {
+        await interaction.reply(reply);
+      }
+    } catch (replyErr) {
+      // Reply itself can fail with a transient error (interaction died
+      // between our handler throw and our recovery attempt). Swallow
+      // these too to avoid double-logging.
+      if (replyErr?.code !== 10062 && replyErr?.code !== 40060) {
+        console.warn(`[bot] Failed to send error reply on /${commandName}:`, replyErr.message);
+      }
     }
   }
 });
