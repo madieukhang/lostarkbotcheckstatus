@@ -1,12 +1,13 @@
 import { getClassName } from '../../models/Class.js';
-import { buildBibleFetchOptions, fetchWithFallback } from './bibleFetch.js';
+import { buildBibleFetchOptions } from './bibleFetch.js';
+import { bibleClient } from './bibleClient.js';
 import { parseItemLevelValue } from './parsers.js';
 
 export async function fetchNameSuggestions(name, options = {}) {
   try {
     const payload = Buffer.from(JSON.stringify([{ name: 1, region: 2 }, name, 'NA'])).toString('base64');
     const targetUrl = `https://lostark.bible/_app/remote/ngsbie/search?payload=${encodeURIComponent(payload)}`;
-    const res = await fetchWithFallback(targetUrl, buildBibleFetchOptions(options));
+    const res = await bibleClient.fetch(targetUrl, buildBibleFetchOptions(options));
     if (!res.ok) {
       console.warn(`[search] lostark.bible search API returned HTTP ${res.status} for "${name}"`);
       return null;

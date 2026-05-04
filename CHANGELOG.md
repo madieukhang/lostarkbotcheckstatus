@@ -4,6 +4,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.76] - 2026-05-04
+
+### Changed
+- Introduced `bot/services/roster/bibleClient.js` as the single chokepoint for outbound bible requests. Phase 0 of the local-worker migration: behavior is unchanged (pass-through to `fetchWithFallback`), but all upstream callers now go through one indirection so Phase 1 can plug in a worker-queue transport without touching handler/service code.
+- Migrated 6 call sites from `fetchWithFallback()` to `bibleClient.fetch()`: `characterMeta.js`, `guildMembers.js` (×2), `search.js`, `buildRosterCharacters.js`, and `handlers/roster/command.js`. `rosterService.js` re-exports `bibleClient` alongside the existing `fetchWithFallback` export.
+
+### Notes
+- 64/64 tests pass. Test suite still imports `fetchWithFallback` directly to exercise the implementation - kept exported.
+- Direct fetch from Railway is currently 100% rejected by Cloudflare on the bible domain (datacenter IP scoring); local residential IP passes 10/10. Phase 1 will route bible traffic through a residential-IP sidecar via MongoDB job queue so the bot never hits CF directly.
+
 ## [v0.5.75] - 2026-05-04
 
 ### Fixed

@@ -14,7 +14,7 @@ import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import TrustedUser from '../../models/TrustedUser.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import {
-  fetchWithFallback,
+  bibleClient,
   parseRosterCharactersFromHtml,
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
@@ -80,7 +80,7 @@ export async function handleRosterCommand(interaction) {
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
-    const response = await fetchWithFallback(targetUrl);
+    const response = await bibleClient.fetch(targetUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const html = await response.text();

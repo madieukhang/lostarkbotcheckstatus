@@ -3,6 +3,8 @@ export {
   fetchWithFallback,
 } from './roster/bibleFetch.js';
 
+export { bibleClient } from './roster/bibleClient.js';
+
 export {
   extractCharacterItemLevelFromHtml,
   extractRosterClassMapFromHtml,
