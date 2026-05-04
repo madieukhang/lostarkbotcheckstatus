@@ -37,6 +37,7 @@ import {
 import { truncateDiscordContent } from '../../../utils/discordText.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import {
   buildMultiaddTemplate,
@@ -104,74 +105,16 @@ export function createCheckHandlers({ client }) {
 
     try {
       const results = await checkNamesAgainstLists(limitedNames, { guildId: interaction.guild?.id });
-      const lines = formatCheckResults(results);
+      const formattedLines = formatCheckResults(results);
 
-      // Per-category counts drive the title color, the inline stat fields,
-      // and the breakdown line at the top of the description. Computed
-      // once here so all three readers share the same source of truth.
-      const counts = { black: 0, watch: 0, white: 0, trusted: 0, clean: 0, noRoster: 0 };
-      for (const r of results) {
-        if (r.blackEntry) counts.black++;
-        else if (r.watchEntry) counts.watch++;
-        else if (r.whiteEntry) counts.white++;
-        else if (r.trustedEntry) counts.trusted++;
-        else if (r.hasRoster) counts.clean++;
-        else counts.noRoster++;
-      }
-
-      const flaggedCount = counts.black + counts.watch;
-      let color;
-      let titleIcon;
-      if (counts.black > 0) { color = 0xed4245; titleIcon = '⛔'; }
-      else if (counts.watch > 0) { color = 0xfee75c; titleIcon = '⚠️'; }
-      else if (counts.white > 0 || counts.trusted > 0) { color = 0x57f287; titleIcon = '✅'; }
-      else { color = 0x5865f2; titleIcon = '🔍'; }
-
-      // Top-of-description summary breakdown line. Bolded to anchor the
-      // reader's eye before they scan the per-name list below. Skipped
-      // entirely when no flags or successes exist (just clean+noRoster).
-      const summaryParts = [];
-      if (counts.black) summaryParts.push(`⛔ **${counts.black}**`);
-      if (counts.watch) summaryParts.push(`⚠️ **${counts.watch}**`);
-      if (counts.white) summaryParts.push(`✅ **${counts.white}**`);
-      if (counts.trusted) summaryParts.push(`🛡️ **${counts.trusted}**`);
-      if (counts.clean) summaryParts.push(`❓ **${counts.clean}** clean`);
-      if (counts.noRoster) summaryParts.push(`⚪ **${counts.noRoster}** no roster`);
-
-      const headerLine = summaryParts.length > 0
-        ? `**Outcome:** ${summaryParts.join(' · ')}`
-        : `Scanned **${limitedNames.length}** name(s) against the lists.`;
-
-      const ignoreNote = limitedNames.length < names.length
-        ? `\n*Ignored ${names.length - limitedNames.length} extra name(s) (cap: ${maxNames}).*`
-        : '';
-
-      // Discord description ceiling is 4096; for typical OCR runs (10-30
-      // names) the joined lines come in well under that. The slice is a
-      // safety net for unusually long reasons or many similar-name hits.
-      const description = (`${headerLine}${ignoreNote}\n\n${lines.join('\n')}`).slice(0, 4096);
-
-      const fields = [
-        { name: '🔍 Checked', value: String(limitedNames.length), inline: true },
-        { name: '🚨 Flagged', value: String(flaggedCount), inline: true },
-        { name: '✅ Cleared', value: String(counts.white + counts.trusted + counts.clean), inline: true },
-      ];
-
-      const footerParts = [];
-      if (flaggedCount > 0) {
-        footerParts.push('Tip: /la-roster <name> for the full roster of any flagged hit.');
-      } else {
-        footerParts.push('No flags. Re-run with a fresh image to re-check.');
-      }
-      footerParts.push('Source: blacklist + whitelist + watchlist + trusted');
-
-      const embed = new EmbedBuilder()
-        .setTitle(`${titleIcon} List Check · ${limitedNames.length} name(s)`)
-        .setDescription(description)
-        .setColor(color)
-        .addFields(fields)
-        .setFooter({ text: footerParts.join(' · ') })
-        .setTimestamp();
+      const { embed } = buildListCheckEmbed({
+        results,
+        formattedLines,
+        limitedNamesCount: limitedNames.length,
+        ignoredCount: names.length - limitedNames.length,
+        maxNames,
+        mode: 'slash',
+      });
 
       await interaction.editReply({ content: '', embeds: [embed] });
 

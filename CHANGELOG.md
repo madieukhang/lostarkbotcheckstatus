@@ -4,6 +4,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.66] - 2026-05-04
+
+### Changed
+- **Auto-check OCR result** (passive list check fired on image post in a configured channel) now renders as a structured embed instead of plain message content. Old layout was a flat `🔍 Auto-check: 2 name(s)\n\n❓ Anhsairoi\n❓ Ysylle` text block; new card has the same state-driven title icon, breakdown line, 3-up stats panel (Checked / Flagged / Cleared), and footer hint as `/la-list check`. The Quick-Add dropdown still ships below for unflagged names.
+- Auto-check + slash check now share `buildListCheckEmbed` (`bot/utils/listCheckEmbed.js`) so the two surfaces stay in visual sync forever. `mode: 'auto'` vs `mode: 'slash'` only tweaks the title verb ("Auto-check" vs "List Check") and the footer copy (auto mentions the Quick-Add dropdown below the embed).
+
+### Notes
+- 57/57 tests pass.
+- Closes the OCR family: every OCR-driven path (slash + passive auto-check) now follows the v0.5.65 vocabulary.
+
 ## [v0.5.65] - 2026-05-04
 
 ### Fixed
