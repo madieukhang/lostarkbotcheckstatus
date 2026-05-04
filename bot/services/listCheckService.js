@@ -12,7 +12,7 @@ import Watchlist from '../models/Watchlist.js';
 import RosterCache from '../models/RosterCache.js';
 import RosterSnapshot from '../models/RosterSnapshot.js';
 import TrustedUser from '../models/TrustedUser.js';
-import { getClassEmoji, getClassName } from '../models/Class.js';
+import { getClassEmoji, getClassName, resolveClassId } from '../models/Class.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
@@ -435,6 +435,21 @@ export async function checkNamesAgainstLists(names, options = {}) {
       item.hasRoster = rosterResult.hasValidRoster;
       item.failReason = rosterResult.failReason;
       item._allCharacters = rosterResult.allCharacters || [];
+      // Fresh roster scrape carries the queried character's class +
+      // combat score. Surface these so formatResultLine renders the
+      // class icon + CP even on the very first /la-list check run for
+      // a name (the v0.5.68 RosterSnapshot lookup only had data for
+      // names previously queried via /la-roster). Fresh values win
+      // over the prior snapshot data set in Phase 1.
+      if (rosterResult.targetClassName) {
+        item.snapClassName = rosterResult.targetClassName;
+      }
+      if (typeof rosterResult.targetItemLevel === 'number' && rosterResult.targetItemLevel > 0) {
+        item.snapItemLevel = rosterResult.targetItemLevel;
+      }
+      if (rosterResult.targetCombatScore) {
+        item.snapCombatScore = rosterResult.targetCombatScore;
+      }
       console.log(
         `[listcheck] Roster lookup: ${item.name} (hasRoster: ${item.hasRoster}) in ${Date.now() - rosterStartedAt}ms`
       );
@@ -459,6 +474,36 @@ export async function checkNamesAgainstLists(names, options = {}) {
         }
       }
 
+      // Auto-snapshot: when fresh roster data is in hand, write it to
+      // RosterSnapshot so the next /la-list check / /la-search hit
+      // for this name has the data inline without re-scraping. Same
+      // shape as /la-roster's existing snapshot upsert. Best-effort:
+      // failures are logged and swallowed so OCR check stays fast.
+      // resolveClassId reverse-maps display name -> bible classId (the
+      // form RosterSnapshot stores). Falls back to '' when the name
+      // isn't in the canonical map (e.g. brand new class Smilegate
+      // released and we haven't updated CLASS_NAMES yet).
+      const classIdForSnap = rosterResult.targetClassName
+        ? (resolveClassId(rosterResult.targetClassName) || '')
+        : '';
+      if (typeof rosterResult.targetItemLevel === 'number' && rosterResult.targetItemLevel > 0) {
+        try {
+          await RosterSnapshot.updateOne(
+            { name: item.name },
+            {
+              $set: {
+                itemLevel: rosterResult.targetItemLevel,
+                classId: classIdForSnap || '',
+                combatScore: rosterResult.targetCombatScore || '',
+                updatedAt: new Date(),
+              },
+            },
+            { upsert: true, collation }
+          );
+        } catch (err) {
+          console.warn(`[listcheck] Snapshot upsert failed for ${item.name}:`, err.message);
+        }
+      }
     }
   );
 

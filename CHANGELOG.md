@@ -4,6 +4,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.70] - 2026-05-04
+
+### Fixed
+- OCR check (auto-check + `/la-list check`) now shows class icon + ilvl + CP for **first-time names** too. v0.5.68 introduced the snapshot-based enrichment but only names previously queried via `/la-roster` had data; brand-new screenshots still rendered `❓ Anhsairoi` plain. Fix: `buildRosterCharacters` now exposes `targetClassName` + `targetCombatScore` extracted from the same roster page scrape that already runs during the OCR check (no extra fetch). The check service surfaces these onto the result item, overriding the snapshot lookup when the fresh scrape has data.
+- Auto-snapshot: when fresh roster data is in hand, OCR check upserts `RosterSnapshot` with the same shape `/la-roster` writes. Subsequent OCR checks / search / broadcast lookups for the same name now hit the snapshot cache and render the class icon + CP without re-scraping.
+
+### Notes
+- 57/57 tests pass.
+- Reverse-resolution display-name → bible classId via existing `resolveClassId`. Falls back to '' when a class isn't in the canonical `CLASS_NAMES` map (e.g. a new Smilegate release we haven't bumped yet); snapshot still gets ilvl + CP, just without classId.
+
 ## [v0.5.69] - 2026-05-04
 
 ### Added
