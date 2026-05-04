@@ -23,6 +23,7 @@ import { normalizeCharacterName } from '../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
+import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
 import { reserveUserScan } from '../../utils/scanSession.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
@@ -114,7 +115,9 @@ export async function handleRosterCommand(interaction) {
         else if (diff < 0) delta = ` *(${diff.toFixed(2)})*`;
       }
 
-      return `**${i + 1}.** ${c.name} · ${c.className || 'Unknown'} · \`${c.itemLevel}\`${delta} · ${c.combatScore}`;
+      const cls = c.className || 'Unknown';
+      const classPrefix = getClassEmoji(cls) || cls;
+      return `**${i + 1}.** ${classPrefix} ${c.name} · \`${c.itemLevel}\`${delta} · ${c.combatScore}`;
     });
 
     let description = lines.join('\n');
@@ -160,8 +163,9 @@ export async function handleRosterCommand(interaction) {
     const topChar = characters[0];
     const topIlvl = topChar?.itemLevel || '?';
     const topClass = topChar?.className || topChar?.classId || '?';
+    const topClassPrefix = getClassEmoji(topClass) || topClass;
     const summaryLine = topChar
-      ? `Top character: **${topChar.name}** · ${topClass} · \`${topIlvl}\``
+      ? `Top character: ${topClassPrefix} **${topChar.name}** · \`${topIlvl}\``
       : '';
 
     const fullDescription = summaryLine

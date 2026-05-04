@@ -18,7 +18,7 @@ import { LIST_LABELS } from './data.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { ICONS } from '../../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../../utils/scanProgressEmbed.js';
-import { getClassName } from '../../../models/Class.js';
+import { getClassName, getClassEmoji } from '../../../models/Class.js';
 
 /**
  * Enrich-flavoured wrapper around `buildScanProgressEmbed`. Carries the
@@ -76,11 +76,12 @@ export function buildEnrichSuccessEmbed(session, updateResult) {
       // string-stringify so non-string ids don't crash getClassName.
       const idStr = alt.classId == null ? '' : String(alt.classId);
       const cls = alt.className || getClassName(idStr) || idStr || 'Unknown';
+      const classPrefix = getClassEmoji(cls) || cls;
       const ilvl = typeof alt.itemLevel === 'number'
         ? alt.itemLevel.toFixed(2)
         : (alt.itemLevel || '?');
       const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
-      return `**${index + 1}.** [${alt.name}](${link}) · ${cls} · \`${ilvl}\``;
+      return `**${index + 1}.** ${classPrefix} [${alt.name}](${link}) · \`${ilvl}\``;
     })
     .join('\n');
 

@@ -82,6 +82,71 @@ export function resolveClassId(value) {
 }
 
 /**
+ * Map of class display name -> Discord application emoji string.
+ *
+ * Seeded empty here. The bot's startup bootstrap
+ * (`bot/services/emojiBootstrap.js`) populates entries at runtime by
+ * uploading PNGs from `assets/class-icons/` as application emoji
+ * (content-addressed naming: `{bibleId}_{md5short}`) and mutating
+ * this map with the resulting `<:name:id>` strings keyed by display
+ * name. Bootstrap is ported from sister bot RaidManage to keep the
+ * two visually consistent when raid + list cards reference classes.
+ *
+ * Any class missing from the map (bootstrap hasn't run yet, or upload
+ * failed) renders without an icon prefix · safe no-op fallback so the
+ * bot keeps working with degraded UX rather than crashing.
+ *
+ * Format: `<:emoji_name:emoji_id>` (no spaces, no leading backslash).
+ */
+export const CLASS_EMOJI_MAP = {
+  // Warriors
+  Berserker: '',
+  Slayer: '',
+  Gunlancer: '',
+  Paladin: '',
+  Valkyrie: '',
+  Destroyer: '',
+  'Guardian Knight': '',
+  // Martial Artists
+  Wardancer: '',
+  Scrapper: '',
+  Soulfist: '',
+  Glaivier: '',
+  Striker: '',
+  Breaker: '',
+  // Gunners
+  Deadeye: '',
+  Gunslinger: '',
+  Artillerist: '',
+  Sharpshooter: '',
+  Machinist: '',
+  // Mages
+  Bard: '',
+  Arcanist: '',
+  Summoner: '',
+  Sorceress: '',
+  // Assassins
+  Deathblade: '',
+  'Shadow Hunter': '',
+  Reaper: '',
+  Souleater: '',
+  // Specialists
+  Artist: '',
+  Aeromancer: '',
+  Wildsoul: '',
+};
+
+/**
+ * @param {string} className - Display name (e.g., "Bard", "Berserker").
+ * @returns {string} Discord custom emoji string `<:name:id>` for the class,
+ *   or empty string when the class isn't mapped (yet) · empty string is
+ *   a safe no-op when prepended to a char name template literal.
+ */
+export function getClassEmoji(className) {
+  return CLASS_EMOJI_MAP[String(className || '').trim()] || '';
+}
+
+/**
  * Build autocomplete choices for Discord's 25-result cap without losing
  * classes beyond the first 25 static choices.
  * @param {string} focusedValue

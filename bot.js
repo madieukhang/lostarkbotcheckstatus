@@ -23,6 +23,7 @@ import { setupAutoCheck } from './bot/handlers/autoCheckHandler.js';
 import { handleSetupCommand, handleSetupRemoteCommand } from './bot/handlers/setupHandler.js';
 import { handleStatsCommand } from './bot/handlers/statsHandler.js';
 import { handleHelpCommand } from './bot/handlers/helpHandler.js';
+import { bootstrapClassEmoji } from './bot/services/emojiBootstrap.js';
 import { connectDB } from './bot/db.js';
 import Blacklist from './bot/models/Blacklist.js';
 import RosterCache from './bot/models/RosterCache.js';
@@ -110,6 +111,17 @@ client.once(Events.ClientReady, async () => {
   await registerCommands();
   startMonitor(client);
   setupAutoCheck(client);
+
+  // Class-icon emoji bootstrap. Idempotent: lists existing application
+  // emoji, uploads only PNGs that aren't already there. After the first
+  // deploy uploads the full set, subsequent restarts are one GET + skip
+  // (~500ms). Failure is logged + swallowed so the bot keeps running
+  // with whatever subset of CLASS_EMOJI_MAP got populated; render paths
+  // (scan card alt list, enrich success, completion DM, roster card)
+  // fall back to plain text when an entry is empty.
+  bootstrapClassEmoji(client).catch((err) =>
+    console.warn('[bot] class-emoji bootstrap rejected (non-fatal):', err?.message || err)
+  );
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

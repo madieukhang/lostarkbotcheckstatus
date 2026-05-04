@@ -5,17 +5,19 @@
 
 import { buildAlertEmbed, AlertSeverity } from './alertEmbed.js';
 import { ICONS, buildProgressBar, relativeTime } from './ui.js';
+import { getClassEmoji } from '../models/Class.js';
 
 function buildAltsBlock(alts) {
   if (!Array.isArray(alts) || alts.length === 0) return '';
   const visible = alts.slice(0, 12);
   const lines = visible.map((alt) => {
     const cls = alt.className || alt.classId || 'Unknown';
+    const classPrefix = getClassEmoji(cls) || cls;
     const ilvl = typeof alt.itemLevel === 'number'
       ? alt.itemLevel.toFixed(2)
       : (alt.itemLevel || '?');
     const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
-    return `- **[${alt.name}](${link})** - ${cls} - \`${ilvl}\``;
+    return `- ${classPrefix} **[${alt.name}](${link})** - \`${ilvl}\``;
   });
   const extra = alts.length > visible.length
     ? `\n*... and ${alts.length - visible.length} more*`

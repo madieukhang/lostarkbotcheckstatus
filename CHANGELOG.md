@@ -4,6 +4,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.67] - 2026-05-04
+
+### Added
+- **Class icons** in scan / enrich / roster cards. Each character row now leads with a Discord application emoji of the class instead of the class name in text. Pattern shifted from `1. **Name** · Reaper · \`1750\`` to `1. <:reaper:id> **Name** · \`1750\``. Surfaces touched: scan progress card live alts, scan result card alt list, enrich Confirm success card, scan completion DM, `/la-roster` visible roster + top-char summary line.
+- `bot/services/emojiBootstrap.js` (ESM port of RaidManage's class-emoji bootstrap). On bot Ready event the bootstrap mirrors PNGs in `assets/class-icons/` to Discord application emoji slots (content-addressed naming `{bibleId}_{md5short}` so a PNG content change auto-refreshes on next deploy), then populates `CLASS_EMOJI_MAP` (`bot/models/Class.js`) with the resulting `<:name:id>` strings keyed by display name. Idempotent: ~10s on first deploy, ~500ms on subsequent restarts (one GET + skip).
+- 32 PNGs copied from `LostArk_RaidManage/assets/class-icons/`. 3 alias pairs (soulmaster/force_master, hawkeye/hawk_eye, plus the male/female form pairs Discord can't represent twice in one slot) collapse to a single emoji upload + shared ID via `CLASS_ALIAS_GROUPS`.
+
+### Notes
+- 57/57 tests pass.
+- Failure mode: emoji bootstrap is non-fatal. If Discord blocks the upload (slot exhausted, REST hiccup), the bot keeps running; `getClassEmoji()` returns empty string for unmapped entries and the renderer falls back to the className text so the row still carries class info.
+- Vocabulary parity with RaidManage: same `CLASS_NAMES` map, same alias groups, same content-hash naming so re-using emoji across bots is straightforward if we ever consolidate.
+
 ## [v0.5.66] - 2026-05-04
 
 ### Changed
