@@ -9,6 +9,7 @@ import TrustedUser from '../../../models/TrustedUser.js';
 import { getClassName } from '../../../models/Class.js';
 import {
   buildRosterCharacters,
+  fetchCharacterMeta,
   fetchNameSuggestions,
 } from '../../../services/rosterService.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
@@ -19,6 +20,41 @@ import {
   getListContext,
   buildTrustedBlockEmbed,
 } from '../helpers.js';
+
+export function buildHiddenRosterGuidance(entryName, guildName) {
+  const hasGuild = Boolean(String(guildName || '').trim());
+  const fields = [{
+    name: `${ICONS.search} Hidden roster detected`,
+    value: hasGuild
+      ? (
+          'Only the typed name is on the entry right now. ' +
+          `Bible shows guild **${guildName}**, so officers can run ` +
+          `\`/la-list enrich name:${entryName}\` or press **Enrich now** below ` +
+          'to scan guildmates for same-stronghold alts and append matches to `allCharacters`.'
+        )
+      : (
+          'Only the typed name is on the entry right now. ' +
+          '`/la-list enrich` needs a visible guild member list, but bible does not show a guild for this character. ' +
+          `Use \`/la-list edit name:${entryName} additional_names:Alt1, Alt2\` to append known alts manually.`
+        ),
+    inline: false,
+  }];
+
+  const components = [];
+  if (hasGuild) {
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`list-add:enrich-hidden:${encodeURIComponent(entryName)}`)
+          .setLabel('Enrich now')
+          .setEmoji(ICONS.search)
+          .setStyle(ButtonStyle.Primary)
+      )
+    );
+  }
+
+  return { fields, components };
+}
 
 export function createListAddExecutor({ client, broadcastListChange }) {
   async function executeListAddToDatabase(payload) {
@@ -49,6 +85,9 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     const { hasValidRoster, allCharacters, targetItemLevel, rosterVisibility } = await buildRosterCharacters(name, {
       hiddenRosterFallback: true,
     });
+    const hiddenRosterMeta = rosterVisibility === 'hidden'
+      ? await fetchCharacterMeta(name)
+      : null;
     if (!hasValidRoster) {
       const suggestions = await fetchNameSuggestions(name) || [];
       if (suggestions.length > 0) {
@@ -312,30 +351,14 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       );
     }
 
-    // Hidden roster: surface a one-click button so an officer can kick
-    // off /la-list enrich without re-typing the name. The button click
-    // re-validates officer permission + cooldown, so members who land
-    // on this card cannot bypass the gate. Button is omitted entirely
-    // when the roster was visible (allCharacters already populated).
+    // Hidden roster: surface next-step guidance. Enrich requires a guild
+    // member list, so only render the button when bible exposes guildName;
+    // otherwise direct officers to manual additional_names.
     const components = [];
     if (rosterVisibility === 'hidden') {
-      embed.addFields({
-        name: `${ICONS.search} Hidden roster detected`,
-        value:
-          'Only the typed name is on the entry right now. Officers can hit ' +
-          '**Enrich now** below to scan the target\'s guild for same-stronghold alts ' +
-          '(5-7 minutes), then append discovered alts to `allCharacters`.',
-        inline: false,
-      });
-      components.push(
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`list-add:enrich-hidden:${encodeURIComponent(entry.name)}`)
-            .setLabel('Enrich now')
-            .setEmoji(ICONS.search)
-            .setStyle(ButtonStyle.Primary)
-        )
-      );
+      const guidance = buildHiddenRosterGuidance(entry.name, hiddenRosterMeta?.guildName);
+      embed.addFields(...guidance.fields);
+      components.push(...guidance.components);
     }
 
     return {
