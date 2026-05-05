@@ -58,7 +58,16 @@ async function main() {
     process.exit(1);
   }
 
-  await mongoose.connect(uri);
+  // Explicitly join the bot's database. The bot on Railway connects to
+  // `la_blacklist` (visible in Railway deploy logs); Atlas connection
+  // strings copied without an explicit `/<dbName>` segment default to
+  // `test`, which left the worker writing heartbeats into a different
+  // database than the bot was reading from. dbName option here wins
+  // over whatever the URI carries, so a local .env without the db
+  // segment still routes to the right place. Override via env if the
+  // bot's database name ever changes.
+  const dbName = process.env.MONGODB_DB_NAME || 'la_blacklist';
+  await mongoose.connect(uri, { dbName });
   const { host, name } = mongoose.connection;
   console.log(`[worker] connected to MongoDB host=${host} db=${name}`);
   console.log('[worker] polling scrape_jobs every', POLL_IDLE_MS, 'ms');
