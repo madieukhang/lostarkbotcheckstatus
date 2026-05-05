@@ -202,8 +202,13 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
 
       attemptedCandidates++;
       if (candidateRateLimitRetries > 0) {
+        // Multiplicative backoff on 429 (rather than linear +1500ms per
+        // retry). 1.6x grows fast enough that two consecutive rate-limits
+        // double the gap, which matches the pace bible's app-level
+        // limiter expects when it fires. Linear addition was slow to
+        // recover and predictable - bot-detection signal in disguise.
         backoff.current = Math.min(
-          backoff.current + backoff.rateLimitStep * candidateRateLimitRetries,
+          Math.round(backoff.current * Math.pow(1.6, candidateRateLimitRetries)),
           backoff.max
         );
       }
@@ -284,7 +289,12 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
       }
 
       if (nextCandidateIndex < limitedCandidates.length) {
-        await new Promise((r) => setTimeout(r, backoff.current));
+        // Jitter the inter-candidate sleep by +/- 15% so the cadence
+        // is not a perfectly periodic signal CF / bible's anti-bot
+        // heuristics can clock. 0.85x .. 1.15x of backoff.current.
+        const jitterFactor = 0.85 + Math.random() * 0.3;
+        const sleepMs = Math.round(backoff.current * jitterFactor);
+        await new Promise((r) => setTimeout(r, sleepMs));
       }
     }
   }
