@@ -47,11 +47,10 @@ export async function handleStatsCommand(interaction) {
   const startedAt = uptimeMs > 0 ? Date.now() - uptimeMs : null;
   const guildCount = interaction.client.guilds.cache.size;
   const scraperApiUsage = getScraperApiUsageSnapshot();
-  const scraperKeyLines = scraperApiUsage.keyCounts.length > 0
-    ? scraperApiUsage.keyCounts
-        .map((key) => `Key #${key.keyNumber}: **${key.totalRequests}** (${key.successResponses} ok / ${key.failedResponses} fail)`)
-        .join('\n')
-    : 'No ScraperAPI requests this process.';
+  const scraperApiHasActivity = scraperApiUsage.totalRequests > 0;
+  const scraperKeyLines = scraperApiUsage.keyCounts
+    .map((key) => `Key #${key.keyNumber}: **${key.totalRequests}** (${key.successResponses} ok / ${key.failedResponses} fail)`)
+    .join('\n');
 
   const embed = new EmbedBuilder()
     .setAuthor({ name: 'Lost Ark Check · Bot Statistics' })
@@ -88,27 +87,21 @@ export async function handleStatsCommand(interaction) {
         inline: true,
       },
       {
-        name: '​',
-        value: '​',
-        inline: false,
-      },
-      {
         name: `${ICONS.search} Activity (last 7 days)`,
         value: `**${recentBlackCount}** new blacklist entr${recentBlackCount === 1 ? 'y' : 'ies'}`,
-        inline: false,
+        inline: true,
       },
       {
-        name: `${ICONS.refresh} ScraperAPI Usage (process)`,
-        value: [
-          `Requests: **${scraperApiUsage.totalRequests}**`,
-          `Success: **${scraperApiUsage.successResponses}**`,
-          `Failed: **${scraperApiUsage.failedResponses}**`,
-          scraperApiUsage.networkErrors > 0 ? `Network errors: **${scraperApiUsage.networkErrors}**` : null,
-          scraperApiUsage.lastRequestAt ? `Last used ${relativeTime(scraperApiUsage.lastRequestAt)}` : null,
-          '',
-          scraperKeyLines,
-        ].filter((line) => line !== null).join('\n').slice(0, 1024),
-        inline: false,
+        name: `${ICONS.refresh} ScraperAPI`,
+        value: scraperApiHasActivity
+          ? [
+              `**${scraperApiUsage.totalRequests}** req · ${scraperApiUsage.successResponses} ok / ${scraperApiUsage.failedResponses} fail` +
+                (scraperApiUsage.networkErrors > 0 ? ` / ${scraperApiUsage.networkErrors} net err` : ''),
+              scraperApiUsage.lastRequestAt ? `Last used ${relativeTime(scraperApiUsage.lastRequestAt)}` : null,
+              scraperKeyLines || null,
+            ].filter(Boolean).join('\n').slice(0, 1024)
+          : 'Idle this process.',
+        inline: true,
       },
     )
     .setColor(COLORS.info)
