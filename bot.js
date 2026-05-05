@@ -22,7 +22,7 @@ import { handleSearchCommand } from './bot/handlers/searchHandler.js';
 import { setupAutoCheck } from './bot/handlers/autoCheckHandler.js';
 import { handleSetupCommand, handleSetupRemoteCommand } from './bot/handlers/setupHandler.js';
 import { handleStatsCommand } from './bot/handlers/statsHandler.js';
-import { handleHelpCommand } from './bot/handlers/helpHandler.js';
+import { handleHelpCommand, handleHelpSelect } from './bot/handlers/helpHandler.js';
 import { bootstrapClassEmoji } from './bot/services/emojiBootstrap.js';
 import { connectDB } from './bot/db.js';
 import Blacklist from './bot/models/Blacklist.js';
@@ -295,6 +295,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await listHandlers.handleQuickAddSelect(interaction);
     } catch (err) {
       console.error('[quickadd] Select error:', err.message);
+    }
+    return;
+  }
+
+  // /la-help: section dropdown → swap detail embed in place
+  if (interaction.isStringSelectMenu() && interaction.customId.startsWith('la-help:select:')) {
+    try {
+      await handleHelpSelect(interaction);
+    } catch (err) {
+      console.error('[la-help] Select error:', err.message);
     }
     return;
   }
