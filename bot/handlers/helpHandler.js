@@ -378,15 +378,24 @@ export async function handleHelpCommand(interaction) {
     .setColor(COLORS.info)
     .setFooter({ text: overviewFooter });
 
-  // Assemble embeds list: overview first, multiaddEmbed always,
-  // syncImagesEmbed only for owner guild. Discord allows up to 10
-  // embeds per reply so 2 (or 3 in owner guild) is well under.
-  const helpEmbeds = [overviewEmbed, multiaddEmbed];
-  if (syncImagesEmbed) helpEmbeds.push(syncImagesEmbed);
-
+  // Send overview + multiadd in the initial reply; if the caller is
+  // in the owner guild, push syncImagesEmbed as a follow-up message.
+  // Discord caps the total text across all embeds in a single message
+  // at ~6000 chars (sum of title + description + field + footer). The
+  // 3-embed owner path measured ~6152 VN / ~6433 EN, which trips the
+  // MAX_EMBED_SIZE_EXCEEDED error from Discord. Splitting across two
+  // ephemeral messages keeps each one well under the cap without
+  // truncating any actual help content.
   await interaction.reply({
-    embeds: helpEmbeds,
+    embeds: [overviewEmbed, multiaddEmbed],
     ephemeral: true,
   });
+
+  if (syncImagesEmbed) {
+    await interaction.followUp({
+      embeds: [syncImagesEmbed],
+      ephemeral: true,
+    });
+  }
 }
 
