@@ -4,6 +4,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.79] - 2026-05-05
+
+### Changed
+- Hard gate: `/la-list enrich` and `/la-roster deep:true` are now restricted to officers/seniors. Non-privileged users see an ephemeral "Officers / Seniors only" embed explaining that the command depends on the bot owner's residential-IP worker. Plain `/la-roster name` (without the deep flag) stays open to everyone.
+- Same gate applies to the "Enrich now" button posted on `/la-list add` success cards for hidden-roster entries: the button is visible to anyone but pressing it as a non-privileged user gets the same denial embed (the worker-mode dependency is identical to the slash command).
+- Worker-offline error message reworded from `Scraping worker offline (...). Start loa-worker.js and try again.` to `Stronghold lookup service is offline (...). The bot owner's residential-IP worker is not running. Try again in a few minutes or ping the bot owner to start their local worker.` Reads better when the error surfaces in a Discord embed for an officer who is not the operator.
+- Help embed (`/la-help`) and `README.md` command tables now flag enrich + roster deep as officers/seniors only.
+
+### Notes
+- 83/83 tests pass. One worker-bible-client assertion updated to match the new offline message string.
+- Behavior change rationale: with worker mode pending Phase 3 cutover, the heavy commands have a hard dependency on a single residential-IP host. Restricting them to officers/seniors prevents regular users from running into a confusing "service offline" error every time the operator's PC is off, while keeping the commands accessible to the people who can coordinate with the operator.
+- Continue / Confirm / Discard buttons on enrich and deep-scan result cards inherit the gate via session-ownership checks (only the original officer who started the scan can press them).
+
 ## [v0.5.78] - 2026-05-05
 
 ### Changed

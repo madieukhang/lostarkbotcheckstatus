@@ -174,7 +174,7 @@ test('workerBibleClient fails fast when heartbeat says worker is offline', async
 
   await assert.rejects(
     () => client.fetch('https://lostark.bible/character/NA/Offline/__data.json'),
-    /Scraping worker offline \(stale-heartbeat; last heartbeat 45s ago\)/,
+    /Stronghold lookup service is offline \(stale-heartbeat; last heartbeat 45s ago\)/,
   );
 
   assert.equal(ScrapeJob.inserted(), null);
