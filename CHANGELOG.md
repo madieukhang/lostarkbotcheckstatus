@@ -4,6 +4,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.81] - 2026-05-05
+
+### Changed
+- `/la-help` rebuilt around the same drill-down pattern RaidManage's `/raid-help` uses: initial reply renders **one** overview embed plus a section dropdown; selecting an option swaps the embed in place via `interaction.update`. Replaces the previous "dump 2-3 embeds at once" reply that intermittently hit Discord's ~6000-char cross-embed text cap on the owner-guild path (`embeds[MAX_EMBED_SIZE_EXCEEDED]`).
+- Sections offered by the dropdown: Command list (default / overview), `/la-list multiadd` detail, and `/la-remote syncimages` detail (owner guild only). Picking any option re-renders the same ephemeral message; the dropdown sticks around so users can hop between sections without re-running `/la-help`.
+- Language is baked into the dropdown's `customId` (`la-help:select:<lang>`) so a user who picked `lang:vn` gets VN-language details on every dropdown selection, even if a separate command run elsewhere chose `lang:en`. Mirrors RaidManage's pattern.
+- Discard the prior reply + followUp split (`v0.5.80` patch). The drill-down approach keeps each rendered message strictly one embed, well under the 6000-char ceiling regardless of guild scope.
+- Minor `bot.js` wire-up: added `interaction.isStringSelectMenu() && customId.startsWith('la-help:select:')` dispatch to `handleHelpSelect`.
+
+### Notes
+- 83/83 tests pass. No new help-specific tests; existing test suite covers the broader command surface and the new code paths are pure render functions plus a thin Discord interaction wrapper.
+- Help content unchanged: same overview command list, same multiadd guide, same syncimages guide. Only the **delivery shape** differs (drill-down dropdown instead of stacked embeds).
+
 ## [v0.5.80] - 2026-05-05
 
 ### Changed

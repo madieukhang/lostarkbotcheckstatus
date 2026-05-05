@@ -1,12 +1,26 @@
-﻿import { EmbedBuilder } from 'discord.js';
+import {
+  EmbedBuilder,
+  StringSelectMenuBuilder,
+  ActionRowBuilder,
+} from 'discord.js';
 
 import config from '../config.js';
 import { COLORS } from '../utils/ui.js';
 
-export async function handleHelpCommand(interaction) {
-  const lang = interaction.options.getString('lang') || 'en';
+// ── helpers ────────────────────────────────────────────────────────────
 
-  const helpLines = lang === 'vn' ? [
+function pickLang(value) {
+  return value === 'en' ? 'en' : 'vn';
+}
+
+function isOwnerGuildInteraction(interaction) {
+  return interaction.guild?.id === config.ownerGuildId;
+}
+
+// ── overview (the command list) ────────────────────────────────────────
+
+function buildOverviewLines(lang, isOwnerGuild) {
+  const lines = lang === 'vn' ? [
     '**📋 Danh sách lệnh:**',
     '*(Tất cả lệnh bot dùng prefix `/la-` để Discord gom vào nhóm `/la` autocomplete.)*',
     '',
@@ -22,7 +36,7 @@ export async function handleHelpCommand(interaction) {
     '`/la-list view type [scope]` · Xem danh sách (type: all/black/white/watch/trusted, scope: all/global/server)',
     '`/la-list trust action tên [reason]` · Quản lý danh sách uy tín (add/remove, chỉ officer)',
     '`/la-list enrich tên [deep_limit]` · 🔍 Stronghold deep-scan entry đã có và append alts khám phá được (**chỉ officer/senior**, ~10-15 phút)',
-    '`/la-list multiadd action [file]` · 📦 **Bulk add** qua Excel template (xem chi tiết ở dưới)',
+    '`/la-list multiadd action [file]` · 📦 **Bulk add** qua Excel template (xem chi tiết ở dropdown)',
     '',
     '`/la-check image` · Trích tên từ ảnh chụp, kiểm tra với tất cả danh sách',
     '',
@@ -47,7 +61,7 @@ export async function handleHelpCommand(interaction) {
     '`/la-list view type [scope]` · View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
     '`/la-list trust action name [reason]` · Manage trusted list (add/remove, officer only)',
     '`/la-list enrich name [deep_limit]` · 🔍 Stronghold deep-scan an existing entry and append discovered alts (**officers/seniors only**, ~10-15 min)',
-    '`/la-list multiadd action [file]` · 📦 **Bulk add** via Excel template (see details below)',
+    '`/la-list multiadd action [file]` · 📦 **Bulk add** via Excel template (see dropdown for details)',
     '',
     '`/la-check image` · Check names from screenshot against all lists',
     '',
@@ -58,9 +72,9 @@ export async function handleHelpCommand(interaction) {
     '`/la-setup defaultscope global/server` · Set default blacklist scope for /la-list add',
   ];
 
-  // Owner-only commands · only show in owner server
-  if (interaction.guild?.id === config.ownerGuildId) {
-    helpLines.push(
+  // Owner-only commands · only show in owner server.
+  if (isOwnerGuild) {
+    lines.push(
       '',
       lang === 'vn' ? '**🛰️ Chỉ Owner Server:**' : '**🛰️ Owner Server Only:**',
       '`/la-stats` · ' + (lang === 'vn' ? 'Thống kê bot' : 'Show bot usage statistics'),
@@ -71,331 +85,389 @@ export async function handleHelpCommand(interaction) {
         ? 'Đặt kênh lưu ảnh evidence (bot rehost vào đây để tránh CDN expire ~24h)'
         : 'Set evidence storage channel (bot rehosts here to defeat CDN ~24h expiry)'),
       '`/la-remote action:syncimages` · ' + (lang === 'vn'
-        ? 'Migrate ảnh legacy (pre-v0.5.2) sang rehost storage. Cần set `evidencechannel` trước. Idempotent. Xem chi tiết flow ở dưới'
-        : 'Migrate legacy (pre-v0.5.2) images to rehost storage. Requires `evidencechannel` set first. Idempotent. See detailed flow below'),
+        ? 'Migrate ảnh legacy sang rehost storage. Xem chi tiết flow ở dropdown'
+        : 'Migrate legacy images to rehost storage. See dropdown for the detailed flow'),
     );
   }
 
-  // Detailed /la-list multiadd embed · separate from the main command list
-  // because this feature has a multi-step flow that needs more explanation
-  // than a one-liner. See CHANGELOG v0.5.1 for the feature spec.
-  const multiaddEmbed = lang === 'vn'
-    ? new EmbedBuilder()
-        .setTitle('📦 /la-list multiadd · Bulk Add qua Excel')
-        .setDescription(
-          'Thêm **tối đa 30 entries** cùng lúc vào blacklist/whitelist/watchlist ' +
-            'bằng 1 file Excel, thay vì gõ `/la-list add` từng người một.'
-        )
-        .setColor(COLORS.info)
-        .addFields(
-          {
-            name: '📥 Cách sử dụng (4 bước)',
-            value: [
-              '**1.** `/la-list multiadd action:template` → Bot gửi file template trắng',
-              '**2.** Mở file Excel, xoá dòng ví dụ màu vàng, điền data (tối đa 30 dòng)',
-              '**3.** `/la-list multiadd action:file file:<file của bạn>` → Bot hiển thị preview',
-              '**4.** Click **✅ Confirm** để add, hoặc **✖️ Cancel** để huỷ',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '📋 Các cột của template',
-            value: [
-              '**Bắt buộc:** `name`, `type`, `reason`',
-              '**Tuỳ chọn:** `raid`, `logs`, `image`, `scope`',
-              '• `type` (dropdown): `black` / `white` / `watch`',
-              '• `scope` (dropdown): `global` / `server` · chỉ cho blacklist',
-              '• `logs` và `image` phải là URL (`https://...`)',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '🔐 Quyền & Flow duyệt',
-            value: [
-              '**Officer / Senior** → Confirm xong là batch chạy ngay, có progress bar',
-              '**Member thường** → batch gửi lên **Senior qua 1 DM duy nhất** (không spam mỗi row 1 DM)',
-              'Senior click Approve → batch chạy + notify requester trong channel gốc',
-              'Senior click Reject → requester được báo bị reject',
-              'Chỉ người upload mới click được Confirm/Cancel',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '📏 Giới hạn & Quy tắc',
-            value: [
-              '• Tối đa **30 rows** mỗi file',
-              '• File size ≤ **1 MB**, chỉ `.xlsx`',
-              '• Preview hết hạn sau **5 phút**',
-              '• Tái sử dụng luật của `/la-list add`: ilvl ≥ 1700, trusted bị skip, duplicate check',
-              '• Rows lỗi được liệt kê ở preview nhưng **không block** các row valid',
-              '• Duplicate trong cùng file (case-insensitive) sẽ bị reject',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '🤔 Các trường hợp đặc biệt',
-            value: [
-              '• **Tên đã có trong list** → `⚠️ Skipped` với reason `"duplicate (already in list)"`',
-              '• **Tên không tồn tại** (no roster) → `⚠️ Skipped` với reason `"No roster found for..."`',
-              '• **Trusted user** → `⚠️ Skipped` tự động (exact match hoặc alt qua roster)',
-              '• **ilvl < 1700** → `⚠️ Skipped` với reason `"has item level X (below 1700)"`',
-              '• **Lỗi runtime** (network/DB) → `❌ Failed` với error message',
-              '• **Quan trọng:** lỗi 1 row **KHÔNG block** các row khác · batch chạy đến hết',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '🖼️ Ảnh evidence',
-            value:
-              'Excel **không hỗ trợ** embedded image. Upload screenshot lên Discord trước, ' +
-              'right-click → Copy Link, rồi paste URL vào cột `image`.',
-            inline: false,
-          }
-        )
-        .setFooter({ text: 'Phần chi tiết riêng · các lệnh khác ở trên' })
-    : new EmbedBuilder()
-        .setTitle('📦 /la-list multiadd · Bulk Add via Excel')
-        .setDescription(
-          'Add **up to 30 entries** at once to blacklist/whitelist/watchlist ' +
-            'via a single Excel file, instead of running `/la-list add` one at a time.'
-        )
-        .setColor(COLORS.info)
-        .addFields(
-          {
-            name: '📥 How to use (4 steps)',
-            value: [
-              '**1.** `/la-list multiadd action:template` → Bot sends a blank template file',
-              '**2.** Open in Excel, delete the yellow example row, fill in up to 30 rows',
-              '**3.** `/la-list multiadd action:file file:<your file>` → Bot shows a preview',
-              '**4.** Click **✅ Confirm** to proceed, or **✖️ Cancel** to abort',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '📋 Template columns',
-            value: [
-              '**Required:** `name`, `type`, `reason`',
-              '**Optional:** `raid`, `logs`, `image`, `scope`',
-              '• `type` (dropdown): `black` / `white` / `watch`',
-              '• `scope` (dropdown): `global` / `server` · blacklist only',
-              '• `logs` and `image` must be URLs (`https://...`)',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '🔐 Permission & Approval Flow',
-            value: [
-              '**Officer / Senior** → batch runs immediately after Confirm, with progress updates',
-              '**Regular member** → batch sent to **Senior as ONE DM** (no spam per row)',
-              'Senior clicks Approve → batch runs + requester notified in origin channel',
-              'Senior clicks Reject → requester notified of rejection',
-              'Only the original uploader can click Confirm/Cancel',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '📏 Limits & Rules',
-            value: [
-              '• Max **30 rows** per file',
-              '• File size ≤ **1 MB**, `.xlsx` only',
-              '• Preview expires after **5 minutes**',
-              '• Reuses `/la-list add` rules: ilvl ≥ 1700, trusted users skipped, duplicate check',
-              '• Failed rows listed in preview but **do not block** valid rows',
-              '• Duplicate names within the same file (case-insensitive) are rejected',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '🤔 Edge Cases',
-            value: [
-              '• **Name already in list** → `⚠️ Skipped` with reason `"duplicate (already in list)"`',
-              '• **Name doesn\'t exist** (no roster) → `⚠️ Skipped` with reason `"No roster found for..."`',
-              '• **Trusted user** → auto-`⚠️ Skipped` (exact match or alt via roster)',
-              '• **ilvl < 1700** → `⚠️ Skipped` with reason `"has item level X (below 1700)"`',
-              '• **Runtime error** (network/DB) → `❌ Failed` with error message',
-              '• **Important:** one row failing does **NOT block** other rows · batch runs to completion',
-            ].join('\n'),
-            inline: false,
-          },
-          {
-            name: '🖼️ Evidence images',
-            value:
-              "Excel doesn't support embedded images. Upload the screenshot to Discord first, " +
-              'right-click → Copy Link, then paste the URL into the `image` column.',
-            inline: false,
-          }
-        )
-        .setFooter({ text: 'Detailed section · see the main command list above' });
-
-  // Detailed /la-remote action:syncimages embed · only shown when the user
-  // is in the owner guild (since the command is Senior-only). Mirrors the
-  // multiaddEmbed pattern: dedicated explanation for a complex one-shot
-  // operation that has prerequisites and side effects worth understanding
-  // BEFORE the senior runs it.
-  const isOwnerGuild = interaction.guild?.id === config.ownerGuildId;
-  const syncImagesEmbed = isOwnerGuild
-    ? (lang === 'vn'
-        ? new EmbedBuilder()
-            .setTitle('🔄 /la-remote action:syncimages · Migrate ảnh legacy')
-            .setDescription(
-              'One-shot migration cho **entries cũ** có ảnh được lưu dạng URL trực tiếp ' +
-                '(trước v0.5.2 rehost). Bot tải lại ảnh và upload vào evidence channel ' +
-                'để URL không bao giờ expire nữa.'
-            )
-            .setColor(COLORS.info)
-            .addFields(
-              {
-                name: '✅ Prerequisites',
-                value: [
-                  '**1.** `/la-remote action:evidencechannel channel:#...` đã được set',
-                  '**2.** Bot có quyền `Send Messages` + `Attach Files` trong channel đó',
-                  '**3.** Senior account chạy lệnh (chỉ Senior mới có quyền `/la-remote`)',
-                ].join('\n'),
-                inline: false,
-              },
-              {
-                name: '🔄 Flow per entry (~1.2-1.5s mỗi cái)',
-                value: [
-                  '**1.** Detect URL host: Discord CDN hay external (Imgur, etc.)',
-                  '**2.** Discord URL → gọi `attachments/refresh-urls` lấy chữ ký mới',
-                  '       External URL → dùng trực tiếp, không cần refresh',
-                  '**3.** Download file → upload vào evidence channel với audit metadata',
-                  '**4.** Compare-and-swap update DB: clear `imageUrl`, set `imageMessageId/imageChannelId`',
-                ].join('\n'),
-                inline: false,
-              },
-              {
-                name: '⚠️ Side effects (đọc trước khi chạy!)',
-                value: [
-                  '• Evidence channel sẽ nhận **1 message mới mỗi entry** trong vòng vài phút',
-                  '• Với 100 entries → ~2-3 phút runtime + 100 messages spam channel',
-                  '• Khuyến nghị: **mute channel** trước, chạy off-hours nếu nhiều entries',
-                  '• Idempotent: chạy lại an toàn, entries đã migrate sẽ skip tự động',
-                ].join('\n'),
-                inline: false,
-              },
-              {
-                name: '📊 Result counters',
-                value: [
-                  '**✅ Synced** · entry migrate thành công, có rehost refs mới',
-                  '**⚠️ Skipped (dead URLs)** · file gốc đã bị xóa, không recover được',
-                  '**🔀 Skipped (raced)** · entry vừa bị edit/migrate bởi nguồn khác',
-                  '**❌ Failed** · lỗi infra (channel down, rate limit, etc.) · retry được',
-                ].join('\n'),
-                inline: false,
-              },
-              {
-                name: '🛟 Khi gặp vấn đề',
-                value: [
-                  '• `Failed > 0` → check log Railway, có thể retry sau',
-                  '• `Skipped (dead)` → entries không recover được, cân nhắc remove + add lại',
-                  '• `Skipped (raced)` → có orphan upload trong channel, log warn cho biết location',
-                  '• Mọi case đều **không mất data** · entries skipped không bị touch',
-                ].join('\n'),
-                inline: false,
-              }
-            )
-            .setFooter({ text: 'Owner-only · added v0.5.7, race-safe + external URL handling v0.5.8' })
-        : new EmbedBuilder()
-            .setTitle('🔄 /la-remote action:syncimages · Legacy Image Migration')
-            .setDescription(
-              'One-shot migration for **legacy entries** whose evidence is stored as a ' +
-                'direct URL (created before v0.5.2 rehost). Bot re-downloads each image ' +
-                'and re-uploads it to the evidence channel so the URL never expires again.'
-            )
-            .setColor(COLORS.info)
-            .addFields(
-              {
-                name: '✅ Prerequisites',
-                value: [
-                  '**1.** `/la-remote action:evidencechannel channel:#...` already set',
-                  '**2.** Bot has `Send Messages` + `Attach Files` permission in that channel',
-                  '**3.** Run from a Senior account (only Senior has `/la-remote` permission)',
-                ].join('\n'),
-                inline: false,
-              },
-              {
-                name: '🔄 Flow per entry (~1.2-1.5s each)',
-                value: [
-                  '**1.** Detect URL host: Discord CDN vs external (Imgur, etc.)',
-                  '**2.** Discord URL → call `attachments/refresh-urls` for fresh signature',
-                  '       External URL → use as-is, no refresh needed',
-                  '**3.** Download file → upload to evidence channel with audit metadata',
-                  '**4.** Compare-and-swap DB update: clear `imageUrl`, set `imageMessageId/imageChannelId`',
-                ].join('\n'),
-                inline: false,
-              },
-              {
-                name: '⚠️ Side effects (read before running!)',
-                value: [
-                  '• Evidence channel will receive **1 new message per entry** within minutes',
-                  '• 100 entries → ~2-3 min runtime + 100 messages flooding the channel',
-                  '• Recommended: **mute channel** first, run off-hours for large batches',
-                  '• Idempotent: safe to re-run, already-migrated entries are auto-skipped',
-                ].join('\n'),
-                inline: false,
-              },
-              {
-                name: '📊 Result counters',
-                value: [
-                  '**✅ Synced** · entry migrated successfully, has new rehost refs',
-                  '**⚠️ Skipped (dead URLs)** · original file deleted, cannot recover',
-                  '**🔀 Skipped (raced)** · entry was edited/migrated by another source',
-                  '**❌ Failed** · infra error (channel down, rate limit, etc.) · retryable',
-                ].join('\n'),
-                inline: false,
-              },
-              {
-                name: '🛟 Troubleshooting',
-                value: [
-                  '• `Failed > 0` → check Railway logs, can retry later',
-                  '• `Skipped (dead)` → entries unrecoverable, consider remove + re-add',
-                  '• `Skipped (raced)` → orphan upload in channel, warn log shows location',
-                  '• In all cases: **no data loss** · skipped entries are untouched',
-                ].join('\n'),
-                inline: false,
-              }
-            )
-            .setFooter({ text: 'Owner-only · added v0.5.7, race-safe + external URL handling v0.5.8' }))
-    : null;
-
-  // Wrap the command list in an embed so we don't run into Discord's
-  // 2000-char message-content cap. Owner-server EN had already crept
-  // past the limit (~2106 chars) and Discord rejected the reply; the
-  // VN owner copy was at 1964, two added options away from the same
-  // failure. Embed description ceiling is 4096, plenty of headroom for
-  // future commands. Title carries the language tag so users see at a
-  // glance which copy they got.
-  const overviewTitle = lang === 'vn'
-    ? '📋 Lost Ark Check · Help (VN)'
-    : '📋 Lost Ark Check · Help (EN)';
-  const overviewFooter = lang === 'vn'
-    ? 'Đổi ngôn ngữ: /la-help lang:en · Phần chi tiết multiadd / syncimages ở các embed dưới'
-    : 'Switch language: /la-help lang:vn · Detailed multiadd / syncimages sections in the embeds below';
-  const overviewEmbed = new EmbedBuilder()
-    .setTitle(overviewTitle)
-    .setDescription(helpLines.join('\n').slice(0, 4096))
-    .setColor(COLORS.info)
-    .setFooter({ text: overviewFooter });
-
-  // Send overview + multiadd in the initial reply; if the caller is
-  // in the owner guild, push syncImagesEmbed as a follow-up message.
-  // Discord caps the total text across all embeds in a single message
-  // at ~6000 chars (sum of title + description + field + footer). The
-  // 3-embed owner path measured ~6152 VN / ~6433 EN, which trips the
-  // MAX_EMBED_SIZE_EXCEEDED error from Discord. Splitting across two
-  // ephemeral messages keeps each one well under the cap without
-  // truncating any actual help content.
-  await interaction.reply({
-    embeds: [overviewEmbed, multiaddEmbed],
-    ephemeral: true,
-  });
-
-  if (syncImagesEmbed) {
-    await interaction.followUp({
-      embeds: [syncImagesEmbed],
-      ephemeral: true,
-    });
-  }
+  return lines;
 }
 
+function buildOverviewEmbed(lang, isOwnerGuild) {
+  const lines = buildOverviewLines(lang, isOwnerGuild);
+  const title = lang === 'vn'
+    ? '📋 Lost Ark Check · Help (VN)'
+    : '📋 Lost Ark Check · Help (EN)';
+  const footer = lang === 'vn'
+    ? 'Đổi ngôn ngữ: /la-help lang:en · Chọn dropdown để xem chi tiết'
+    : 'Switch language: /la-help lang:vn · Pick a dropdown option for details';
+  return new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(lines.join('\n').slice(0, 4096))
+    .setColor(COLORS.info)
+    .setFooter({ text: footer });
+}
+
+// ── /la-list multiadd detail ───────────────────────────────────────────
+
+function buildMultiaddEmbed(lang) {
+  if (lang === 'vn') {
+    return new EmbedBuilder()
+      .setTitle('📦 /la-list multiadd · Bulk Add qua Excel')
+      .setDescription(
+        'Thêm **tối đa 30 entries** cùng lúc vào blacklist/whitelist/watchlist ' +
+          'bằng 1 file Excel, thay vì gõ `/la-list add` từng người một.'
+      )
+      .setColor(COLORS.info)
+      .addFields(
+        {
+          name: '📥 Cách sử dụng (4 bước)',
+          value: [
+            '**1.** `/la-list multiadd action:template` → Bot gửi file template trắng',
+            '**2.** Mở file Excel, xoá dòng ví dụ màu vàng, điền data (tối đa 30 dòng)',
+            '**3.** `/la-list multiadd action:file file:<file của bạn>` → Bot hiển thị preview',
+            '**4.** Click **✅ Confirm** để add, hoặc **✖️ Cancel** để huỷ',
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '📋 Các cột của template',
+          value: [
+            '**Bắt buộc:** `name`, `type`, `reason`',
+            '**Tuỳ chọn:** `raid`, `logs`, `image`, `scope`',
+            '• `type` (dropdown): `black` / `white` / `watch`',
+            '• `scope` (dropdown): `global` / `server` · chỉ cho blacklist',
+            '• `logs` và `image` phải là URL (`https://...`)',
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '🔐 Quyền & Flow duyệt',
+          value: [
+            '**Officer / Senior** → Confirm xong là batch chạy ngay, có progress bar',
+            '**Member thường** → batch gửi lên **Senior qua 1 DM duy nhất** (không spam mỗi row 1 DM)',
+            'Senior click Approve → batch chạy + notify requester trong channel gốc',
+            'Senior click Reject → requester được báo bị reject',
+            'Chỉ người upload mới click được Confirm/Cancel',
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '📏 Giới hạn & Quy tắc',
+          value: [
+            '• Tối đa **30 rows** mỗi file',
+            '• File size ≤ **1 MB**, chỉ `.xlsx`',
+            '• Preview hết hạn sau **5 phút**',
+            '• Tái sử dụng luật của `/la-list add`: ilvl ≥ 1700, trusted bị skip, duplicate check',
+            '• Rows lỗi được liệt kê ở preview nhưng **không block** các row valid',
+            '• Duplicate trong cùng file (case-insensitive) sẽ bị reject',
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '🤔 Các trường hợp đặc biệt',
+          value: [
+            '• **Tên đã có trong list** → `⚠️ Skipped` với reason `"duplicate (already in list)"`',
+            '• **Tên không tồn tại** (no roster) → `⚠️ Skipped` với reason `"No roster found for..."`',
+            '• **Trusted user** → `⚠️ Skipped` tự động (exact match hoặc alt qua roster)',
+            '• **ilvl < 1700** → `⚠️ Skipped` với reason `"has item level X (below 1700)"`',
+            '• **Lỗi runtime** (network/DB) → `❌ Failed` với error message',
+            '• **Quan trọng:** lỗi 1 row **KHÔNG block** các row khác · batch chạy đến hết',
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '🖼️ Ảnh evidence',
+          value:
+            'Excel **không hỗ trợ** embedded image. Upload screenshot lên Discord trước, ' +
+            'right-click → Copy Link, rồi paste URL vào cột `image`.',
+          inline: false,
+        }
+      )
+      .setFooter({ text: 'Phần chi tiết multiadd · chọn dropdown để chuyển section' });
+  }
+
+  return new EmbedBuilder()
+    .setTitle('📦 /la-list multiadd · Bulk Add via Excel')
+    .setDescription(
+      'Add **up to 30 entries** at once to blacklist/whitelist/watchlist ' +
+        'via a single Excel file, instead of running `/la-list add` one at a time.'
+    )
+    .setColor(COLORS.info)
+    .addFields(
+      {
+        name: '📥 How to use (4 steps)',
+        value: [
+          '**1.** `/la-list multiadd action:template` → Bot sends a blank template file',
+          '**2.** Open in Excel, delete the yellow example row, fill in up to 30 rows',
+          '**3.** `/la-list multiadd action:file file:<your file>` → Bot shows a preview',
+          '**4.** Click **✅ Confirm** to proceed, or **✖️ Cancel** to abort',
+        ].join('\n'),
+        inline: false,
+      },
+      {
+        name: '📋 Template columns',
+        value: [
+          '**Required:** `name`, `type`, `reason`',
+          '**Optional:** `raid`, `logs`, `image`, `scope`',
+          '• `type` (dropdown): `black` / `white` / `watch`',
+          '• `scope` (dropdown): `global` / `server` · blacklist only',
+          '• `logs` and `image` must be URLs (`https://...`)',
+        ].join('\n'),
+        inline: false,
+      },
+      {
+        name: '🔐 Permission & Approval Flow',
+        value: [
+          '**Officer / Senior** → batch runs immediately after Confirm, with progress updates',
+          '**Regular member** → batch sent to **Senior as ONE DM** (no spam per row)',
+          'Senior clicks Approve → batch runs + requester notified in origin channel',
+          'Senior clicks Reject → requester notified of rejection',
+          'Only the original uploader can click Confirm/Cancel',
+        ].join('\n'),
+        inline: false,
+      },
+      {
+        name: '📏 Limits & Rules',
+        value: [
+          '• Max **30 rows** per file',
+          '• File size ≤ **1 MB**, `.xlsx` only',
+          '• Preview expires after **5 minutes**',
+          '• Reuses `/la-list add` rules: ilvl ≥ 1700, trusted users skipped, duplicate check',
+          '• Failed rows listed in preview but **do not block** valid rows',
+          '• Duplicate names within the same file (case-insensitive) are rejected',
+        ].join('\n'),
+        inline: false,
+      },
+      {
+        name: '🤔 Edge Cases',
+        value: [
+          '• **Name already in list** → `⚠️ Skipped` with reason `"duplicate (already in list)"`',
+          '• **Name doesn\'t exist** (no roster) → `⚠️ Skipped` with reason `"No roster found for..."`',
+          '• **Trusted user** → auto-`⚠️ Skipped` (exact match or alt via roster)',
+          '• **ilvl < 1700** → `⚠️ Skipped` with reason `"has item level X (below 1700)"`',
+          '• **Runtime error** (network/DB) → `❌ Failed` with error message',
+          '• **Important:** one row failing does **NOT block** other rows · batch runs to completion',
+        ].join('\n'),
+        inline: false,
+      },
+      {
+        name: '🖼️ Evidence images',
+        value:
+          "Excel doesn't support embedded images. Upload the screenshot to Discord first, " +
+          'right-click → Copy Link, then paste the URL into the `image` column.',
+        inline: false,
+      }
+    )
+    .setFooter({ text: 'Multiadd detail · pick the dropdown to switch sections' });
+}
+
+// ── /la-remote syncimages detail (owner-only) ──────────────────────────
+
+function buildSyncImagesEmbed(lang) {
+  if (lang === 'vn') {
+    return new EmbedBuilder()
+      .setTitle('🔄 /la-remote action:syncimages · Migrate ảnh legacy')
+      .setDescription(
+        'One-shot migration cho **entries cũ** có ảnh được lưu dạng URL trực tiếp ' +
+          '(trước v0.5.2 rehost). Bot tải lại ảnh và upload vào evidence channel ' +
+          'để URL không bao giờ expire nữa.'
+      )
+      .setColor(COLORS.info)
+      .addFields(
+        {
+          name: '✅ Prerequisites',
+          value: [
+            '**1.** `/la-remote action:evidencechannel channel:#...` đã được set',
+            '**2.** Bot có quyền `Send Messages` + `Attach Files` trong channel đó',
+            '**3.** Senior account chạy lệnh (chỉ Senior mới có quyền `/la-remote`)',
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '🔄 Flow per entry (~1.2-1.5s mỗi cái)',
+          value: [
+            '**1.** Detect URL host: Discord CDN hay external (Imgur, etc.)',
+            '**2.** Discord URL → gọi `attachments/refresh-urls` lấy chữ ký mới',
+            '       External URL → dùng trực tiếp, không cần refresh',
+            '**3.** Download file → upload vào evidence channel với audit metadata',
+            '**4.** Compare-and-swap update DB: clear `imageUrl`, set `imageMessageId/imageChannelId`',
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '⚠️ Side effects (đọc trước khi chạy!)',
+          value: [
+            '• Evidence channel sẽ nhận **1 message mới mỗi entry** trong vòng vài phút',
+            '• Với 100 entries → ~2-3 phút runtime + 100 messages spam channel',
+            '• Khuyến nghị: **mute channel** trước, chạy off-hours nếu nhiều entries',
+            '• Idempotent: chạy lại an toàn, entries đã migrate sẽ skip tự động',
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '📊 Result counters',
+          value: [
+            '**✅ Synced** · entry migrate thành công, có rehost refs mới',
+            '**⚠️ Skipped (dead URLs)** · file gốc đã bị xóa, không recover được',
+            '**🔀 Skipped (raced)** · entry vừa bị edit/migrate bởi nguồn khác',
+            '**❌ Failed** · lỗi infra (channel down, rate limit, etc.) · retry được',
+          ].join('\n'),
+          inline: false,
+        },
+        {
+          name: '🛟 Khi gặp vấn đề',
+          value: [
+            '• `Failed > 0` → check log Railway, có thể retry sau',
+            '• `Skipped (dead)` → entries không recover được, cân nhắc remove + add lại',
+            '• `Skipped (raced)` → có orphan upload trong channel, log warn cho biết location',
+            '• Mọi case đều **không mất data** · entries skipped không bị touch',
+          ].join('\n'),
+          inline: false,
+        }
+      )
+      .setFooter({ text: 'Owner-only · added v0.5.7, race-safe + external URL handling v0.5.8' });
+  }
+
+  return new EmbedBuilder()
+    .setTitle('🔄 /la-remote action:syncimages · Legacy Image Migration')
+    .setDescription(
+      'One-shot migration for **legacy entries** whose evidence is stored as a ' +
+        'direct URL (created before v0.5.2 rehost). Bot re-downloads each image ' +
+        'and re-uploads it to the evidence channel so the URL never expires again.'
+    )
+    .setColor(COLORS.info)
+    .addFields(
+      {
+        name: '✅ Prerequisites',
+        value: [
+          '**1.** `/la-remote action:evidencechannel channel:#...` already set',
+          '**2.** Bot has `Send Messages` + `Attach Files` permission in that channel',
+          '**3.** Run from a Senior account (only Senior has `/la-remote` permission)',
+        ].join('\n'),
+        inline: false,
+      },
+      {
+        name: '🔄 Flow per entry (~1.2-1.5s each)',
+        value: [
+          '**1.** Detect URL host: Discord CDN vs external (Imgur, etc.)',
+          '**2.** Discord URL → call `attachments/refresh-urls` for fresh signature',
+          '       External URL → use as-is, no refresh needed',
+          '**3.** Download file → upload to evidence channel with audit metadata',
+          '**4.** Compare-and-swap DB update: clear `imageUrl`, set `imageMessageId/imageChannelId`',
+        ].join('\n'),
+        inline: false,
+      },
+      {
+        name: '⚠️ Side effects (read before running!)',
+        value: [
+          '• Evidence channel will receive **1 new message per entry** within minutes',
+          '• 100 entries → ~2-3 min runtime + 100 messages flooding the channel',
+          '• Recommended: **mute channel** first, run off-hours for large batches',
+          '• Idempotent: safe to re-run, already-migrated entries are auto-skipped',
+        ].join('\n'),
+        inline: false,
+      },
+      {
+        name: '📊 Result counters',
+        value: [
+          '**✅ Synced** · entry migrated successfully, has new rehost refs',
+          '**⚠️ Skipped (dead URLs)** · original file deleted, cannot recover',
+          '**🔀 Skipped (raced)** · entry was edited/migrated by another source',
+          '**❌ Failed** · infra error (channel down, rate limit, etc.) · retryable',
+        ].join('\n'),
+        inline: false,
+      },
+      {
+        name: '🛟 Troubleshooting',
+        value: [
+          '• `Failed > 0` → check Railway logs, can retry later',
+          '• `Skipped (dead)` → entries unrecoverable, consider remove + re-add',
+          '• `Skipped (raced)` → orphan upload in channel, warn log shows location',
+          '• In all cases: **no data loss** · skipped entries are untouched',
+        ].join('\n'),
+        inline: false,
+      }
+    )
+    .setFooter({ text: 'Owner-only · added v0.5.7, race-safe + external URL handling v0.5.8' });
+}
+
+// ── dropdown ───────────────────────────────────────────────────────────
+
+function buildHelpDropdown(lang, isOwnerGuild) {
+  const options = [
+    {
+      label: lang === 'vn' ? '📋 Tổng quan lệnh' : '📋 Command list',
+      value: 'overview',
+      description: lang === 'vn' ? 'Quay lại danh sách lệnh' : 'Return to the command list',
+      emoji: '📋',
+    },
+    {
+      label: lang === 'vn' ? '📦 /la-list multiadd' : '📦 /la-list multiadd',
+      value: 'multiadd',
+      description: lang === 'vn'
+        ? 'Bulk add nhiều entry qua Excel template'
+        : 'Bulk add multiple entries via Excel template',
+      emoji: '📦',
+    },
+  ];
+  if (isOwnerGuild) {
+    options.push({
+      label: lang === 'vn'
+        ? '🔄 /la-remote syncimages'
+        : '🔄 /la-remote syncimages',
+      value: 'syncimages',
+      description: lang === 'vn'
+        ? 'Migrate ảnh legacy (owner-only)'
+        : 'Legacy image migration (owner-only)',
+      emoji: '🔄',
+    });
+  }
+
+  // Lang baked into customId so the dropdown selection after a language
+  // toggle (re-running /la-help with lang:en/vn) renders details in the
+  // user's chosen language without re-running the command. bot.js
+  // dispatches the `la-help:select:` prefix to handleHelpSelect.
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId(`la-help:select:${lang}`)
+    .setPlaceholder(lang === 'vn'
+      ? '📖 Chọn section để xem chi tiết...'
+      : '📖 Pick a section for details...')
+    .addOptions(options);
+  return new ActionRowBuilder().addComponents(menu);
+}
+
+// ── handlers ───────────────────────────────────────────────────────────
+
+function buildSectionEmbed(sectionKey, lang, isOwnerGuild) {
+  if (sectionKey === 'multiadd') return buildMultiaddEmbed(lang);
+  if (sectionKey === 'syncimages' && isOwnerGuild) return buildSyncImagesEmbed(lang);
+  return buildOverviewEmbed(lang, isOwnerGuild);
+}
+
+export async function handleHelpCommand(interaction) {
+  const lang = pickLang(interaction.options.getString('lang'));
+  const isOwnerGuild = isOwnerGuildInteraction(interaction);
+
+  await interaction.reply({
+    embeds: [buildOverviewEmbed(lang, isOwnerGuild)],
+    components: [buildHelpDropdown(lang, isOwnerGuild)],
+    ephemeral: true,
+  });
+}
+
+export async function handleHelpSelect(interaction) {
+  // CustomId shape: `la-help:select:<lang>`. Lang comes from the customId
+  // (baked at dropdown build time) so the section detail renders in the
+  // language the user originally requested, even if they later re-run
+  // /la-help with a different lang option in another message.
+  const lang = pickLang(interaction.customId.split(':')[2]);
+  const sectionKey = interaction.values?.[0];
+  const isOwnerGuild = isOwnerGuildInteraction(interaction);
+  const embed = buildSectionEmbed(sectionKey, lang, isOwnerGuild);
+
+  await interaction.update({
+    embeds: [embed],
+    components: [buildHelpDropdown(lang, isOwnerGuild)],
+  });
+}
