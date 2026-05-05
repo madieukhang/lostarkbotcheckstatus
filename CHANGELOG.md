@@ -4,6 +4,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## [v0.5.80] - 2026-05-05
+
+### Changed
+- Anti-detection tweaks for the Stronghold deep scan now that Phase 3 cutover is live and producing real bible traffic.
+- `FETCH_HEADERS` adds a `Referer: https://lostark.bible/` header. Real browser navigation always sets Referer; sending bible API requests with no Referer at all stands out from regular traffic. Homepage is a generic "just landed" approximation that does not require per-request bookkeeping.
+- `detectAltsViaStronghold` inter-candidate sleep is now jittered +/- 15% (0.85x to 1.15x of `backoff.current`). The previous fixed-pace cadence was a clock signal anti-bot heuristics can pattern-match; jitter breaks the periodicity without changing the average rate.
+- Backoff response on HTTP 429 changed from linear addition (`current + 1500 * retries`) to multiplicative growth (`current * 1.6^retries`). Production scan against Bullet Shell on 2026-05-05 (294 candidates, 10x 429) proved the linear ramp recovered too predictably. Multiplicative growth doubles the gap on consecutive rate-limits, matching the pace bible's app-level limiter expects when it fires.
+
+### Notes
+- 83/83 tests pass. No new tests for jitter directly (randomness is hard to assert); existing detector tests continue to verify backoff bounds and abort flows.
+- Compounding effect: next time the scan retries Bullet Shell, expect slightly fewer 429s in a long scan because the jittered cadence and stronger 429 backoff give bible's limiter more headroom. Latency per candidate may rise slightly during cool-off windows, but the trade is "fewer detection signals" for "marginally slower scan."
+- Phase 4 surface UI (`/la-status` worker heartbeat, DM alerts, PM2 / Windows scheduled task auto-restart) still pending. Anti-detection is the most urgent slice given user concern about long-term flagging.
+
 ## [v0.5.79] - 2026-05-05
 
 ### Changed
