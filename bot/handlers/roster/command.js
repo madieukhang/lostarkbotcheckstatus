@@ -53,6 +53,24 @@ export async function handleRosterCommand(interaction) {
   const deep = interaction.options.getBoolean('deep') ?? false;
   const deepLimit = interaction.options.getInteger('deep_limit');
 
+  // Hard gate: deep scans hit the bot owner's residential-IP worker.
+  // Plain /la-roster (no deep) stays open to everyone since it only
+  // does a single-page roster fetch with no fan-out.
+  if (deep && !isPrivilegedStrongholdScanUser(interaction.user.id)) {
+    await interaction.reply({
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        title: 'Officers / Seniors only',
+        description:
+          '`/la-roster deep:true` runs a long Stronghold scan that depends on the bot owner\'s ' +
+          'residential-IP worker. The deep flag is restricted to officers and seniors. ' +
+          'Re-run without `deep:true` for the basic roster view.',
+      })],
+      ephemeral: true,
+    });
+    return;
+  }
+
   // ScraperAPI is intentionally locked off for the per-candidate scan
   // because that is the high-fanout (300+ requests) path that would burn
   // quota fast. Single-request meta + guild fetches inside the detector

@@ -56,8 +56,9 @@ export function createWorkerBibleClient({
             ? `; last heartbeat ${Math.round(health.ageMs / 1000)}s ago`
             : '';
           throw new Error(
-            `Scraping worker offline (${health.reason || 'unknown'}${age}). ` +
-            'Start loa-worker.js and try again.'
+            `Stronghold lookup service is offline (${health.reason || 'unknown'}${age}). ` +
+            'The bot owner\'s residential-IP worker is not running. Try again in a few minutes ' +
+            'or ping the bot owner to start their local worker.'
           );
         }
       }

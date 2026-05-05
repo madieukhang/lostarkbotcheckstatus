@@ -522,7 +522,30 @@ export function createEnrichHandlers({ client, services }) {
     }
   }
 
+  // Hard gate: enrich runs a long Stronghold scan that needs the bot
+  // owner's residential-IP worker. Restricted to officers/seniors so a
+  // non-privileged user does not get a confusing "service offline"
+  // error when the worker is down. Must come before any deferReply so
+  // the ephemeral reply lands cleanly.
+  async function denyIfNotOfficer(interaction, commandLabel) {
+    if (isPrivilegedStrongholdScanUser(interaction.user.id)) return false;
+    await interaction.reply({
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        title: 'Officers / Seniors only',
+        description:
+          `\`${commandLabel}\` runs a long Stronghold scan that depends on the bot owner's ` +
+          `residential-IP worker. The command is restricted to officers and seniors so a regular ` +
+          `user does not see a confusing error when the worker is offline. Ask an officer to run it for you.`,
+      })],
+      ephemeral: true,
+    });
+    return true;
+  }
+
   async function handleListEnrichCommand(interaction) {
+    if (await denyIfNotOfficer(interaction, '/la-list enrich')) return;
+
     const rawName = interaction.options.getString('name', true).trim();
     const name = normalizeCharacterName(rawName);
     const cap = interaction.options.getInteger('deep_limit') ?? config.strongholdDeepCandidateLimit;
@@ -558,6 +581,8 @@ export function createEnrichHandlers({ client, services }) {
    * customId shape: `list-add:enrich-hidden:<encodedName>`
    */
   async function handleListAddEnrichHiddenButton(interaction) {
+    if (await denyIfNotOfficer(interaction, '/la-list enrich')) return;
+
     const parts = interaction.customId.split(':');
     const encoded = parts.slice(2).join(':');
     const rawName = decodeURIComponent(encoded || '').trim();
