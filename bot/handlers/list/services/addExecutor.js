@@ -82,7 +82,13 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     }
 
     // Step 1: Check if character exists
-    const { hasValidRoster, allCharacters, targetItemLevel, rosterVisibility } = await buildRosterCharacters(name, {
+    const {
+      hasValidRoster,
+      allCharacters,
+      targetItemLevel,
+      rosterVisibility,
+      rosterCharacters,
+    } = await buildRosterCharacters(name, {
       hiddenRosterFallback: true,
     });
     const hiddenRosterMeta = rosterVisibility === 'hidden'
@@ -346,6 +352,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       broadcastListChange('added', entry, payload, {
         onlyOwner: entryScope === 'server',
         displayUrl: freshDisplayUrl,
+        rosterCharacters,
       }).catch((err) =>
         console.warn('[list] Broadcast failed:', err.message)
       );

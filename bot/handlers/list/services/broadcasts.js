@@ -14,11 +14,102 @@ const ACTION_VERB = Object.freeze({
   edited:  'edited in',
 });
 
+const FIELD_VALUE_LIMIT = 1024;
+
+function normalizeNameKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function parseItemLevel(value) {
+  const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function normalizeCombatScore(value) {
+  const text = String(value || '').trim();
+  return text && text !== '?' ? text : '';
+}
+
+function normalizeRosterStatRecord(record) {
+  const name = String(record?.name || '').trim();
+  if (!name) return null;
+  return {
+    name,
+    classId: String(record?.classId || '').trim(),
+    className: String(record?.className || '').trim(),
+    itemLevel: parseItemLevel(record?.itemLevel),
+    combatScore: normalizeCombatScore(record?.combatScore),
+  };
+}
+
+export function mergeRosterStatRecords(records = [], baseMap = new Map()) {
+  for (const record of records || []) {
+    const normalized = normalizeRosterStatRecord(record);
+    if (!normalized) continue;
+    baseMap.set(normalizeNameKey(normalized.name), normalized);
+  }
+  return baseMap;
+}
+
+function getBroadcastClassName(record) {
+  if (!record) return '';
+  return record.className || (record.classId ? getClassName(record.classId) : '');
+}
+
+function getRosterLink(name) {
+  return `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+}
+
+export function formatBroadcastCharacterLine(name, index, statRecord) {
+  const className = getBroadcastClassName(statRecord);
+  const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
+  const statParts = [];
+  if (statRecord?.itemLevel > 0) statParts.push(`\`${statRecord.itemLevel.toFixed(2)}\``);
+  if (statRecord?.combatScore) statParts.push(`CP \`${statRecord.combatScore}\``);
+  const statSuffix = statParts.length > 0 ? ` · ${statParts.join(' · ')}` : '';
+  return `${index + 1}. ${classPrefix}[${name}](${getRosterLink(name)})${statSuffix}`;
+}
+
+export function buildTrackedAltsField(entry, statMap = new Map()) {
+  const allChars = Array.isArray(entry?.allCharacters) ? entry.allCharacters : [];
+  const entryKey = normalizeNameKey(entry?.name);
+  const others = allChars
+    .map((n) => String(n || '').trim())
+    .filter((n) => n && normalizeNameKey(n) !== entryKey);
+  if (others.length === 0) return null;
+
+  const lines = [];
+  for (const name of others) {
+    const line = formatBroadcastCharacterLine(
+      name,
+      lines.length,
+      statMap.get(normalizeNameKey(name))
+    );
+    const hiddenAfterThis = others.length - lines.length - 1;
+    const overflowLine = hiddenAfterThis > 0 ? `\n*... and ${hiddenAfterThis} more*` : '';
+    const candidate = [...lines, line].join('\n') + overflowLine;
+    if (candidate.length > FIELD_VALUE_LIMIT && lines.length > 0) break;
+    lines.push(line);
+  }
+
+  const hiddenCount = others.length - lines.length;
+  const extra = hiddenCount > 0 ? `\n*... and ${hiddenCount} more*` : '';
+  return {
+    name: `🧬 Tracked alts (${others.length})`,
+    value: (lines.join('\n') + extra).slice(0, FIELD_VALUE_LIMIT),
+    inline: false,
+  };
+}
+
 export function createBroadcastServices({ client }) {
   async function broadcastListChange(action, entry, payload, options = {}) {
-    const { onlyOwner = false, displayUrl: preResolvedUrl } = options;
+    const {
+      onlyOwner = false,
+      displayUrl: preResolvedUrl,
+      rosterCharacters = [],
+    } = options;
     const { label, color, icon } = getListContext(payload.type);
-    const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
+    const rosterLink = getRosterLink(entry.name);
 
     const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
     const verb = ACTION_VERB[action] || action;
@@ -28,15 +119,21 @@ export function createBroadcastServices({ client }) {
     // if /la-roster has queried this name before, the broadcast carries
     // the same rich vocabulary as the v0.5.67 OCR check / scan cards.
     // Otherwise fall back to the older name-only headline.
-    let snap = null;
+    const allChars = Array.isArray(entry.allCharacters) ? entry.allCharacters : [];
+    const lookupNames = [...new Set([entry.name, ...allChars].filter(Boolean))];
+    let statMap = new Map();
     try {
-      snap = await RosterSnapshot.findOne({ name: entry.name })
+      const snaps = await RosterSnapshot.find({ name: { $in: lookupNames } })
         .collation({ locale: 'en', strength: 2 })
         .lean();
+      statMap = mergeRosterStatRecords(snaps);
     } catch (err) {
       console.warn('[list] Snapshot lookup for broadcast failed (non-fatal):', err.message);
     }
-    const className = snap?.classId ? getClassName(snap.classId) : '';
+    mergeRosterStatRecords(rosterCharacters, statMap);
+
+    const snap = statMap.get(normalizeNameKey(entry.name)) || null;
+    const className = getBroadcastClassName(snap);
     const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
 
     // Description leads with a one-line headline so the recipient
@@ -79,25 +176,10 @@ export function createBroadcastServices({ client }) {
     // broadcast haven't run /la-list view themselves, so seeing the
     // full alt list inline saves them a lookup when deciding whether
     // someone in their guild is the same account. Capped at 12 visible
-    // names with a `+N more` overflow line so the field stays under
-    // Discord's 1024-char field-value limit.
-    const allChars = Array.isArray(entry.allCharacters) ? entry.allCharacters : [];
-    const others = allChars.filter((n) => String(n).toLowerCase() !== String(entry.name).toLowerCase());
-    if (others.length > 0) {
-      const visible = others.slice(0, 12);
-      const lines = visible.map((n, i) => {
-        const link = `https://lostark.bible/character/NA/${encodeURIComponent(n)}/roster`;
-        return `${i + 1}. [${n}](${link})`;
-      });
-      const extra = others.length > visible.length
-        ? `\n*... and ${others.length - visible.length} more*`
-        : '';
-      fields.push({
-        name: `🧬 Tracked alts (${others.length})`,
-        value: (lines.join('\n') + extra).slice(0, 1024),
-        inline: false,
-      });
-    }
+    // names with a `+N more` overflow line; rich rows are trimmed
+    // dynamically so the field stays under Discord's 1024-char limit.
+    const trackedAltsField = buildTrackedAltsField(entry, statMap);
+    if (trackedAltsField) fields.push(trackedAltsField);
 
     const embed = new EmbedBuilder()
       .setTitle(`${ICONS.dm} List ${verb.split(' ')[0]} broadcast`)

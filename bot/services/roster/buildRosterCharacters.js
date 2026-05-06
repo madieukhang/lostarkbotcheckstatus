@@ -28,6 +28,7 @@ export async function buildRosterCharacters(name, options = {}) {
   let targetClassName = null;
   let targetCombatScore = null;
   let rosterVisibility = 'missing';
+  let rosterCharacters = [];
 
   try {
     const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
@@ -46,6 +47,7 @@ export async function buildRosterCharacters(name, options = {}) {
       // lookup that could silently fail for some names · routing
       // through the proven function eliminates that drift.
       const rosterChars = await parseRosterCharactersFromHtml(html, document);
+      rosterCharacters = rosterChars;
 
       // Find the queried character's record in the parsed list. Match
       // is case-insensitive because OCR'd / user-typed names may not
@@ -75,6 +77,12 @@ export async function buildRosterCharacters(name, options = {}) {
           rosterVisibility = 'hidden';
           targetItemLevel = meta.itemLevel ?? await inferHiddenRosterItemLevel(name, options);
           allCharacters = [name];
+          rosterCharacters = [{
+            name,
+            classId: meta.classId || '',
+            itemLevel: targetItemLevel || 0,
+            combatScore: '',
+          }];
 
           if (includeHiddenRosterAlts && meta.guildName) {
             const altResult = await detectAltsViaStronghold(name, {
@@ -86,6 +94,10 @@ export async function buildRosterCharacters(name, options = {}) {
             });
             const altNames = altResult?.alts?.map((alt) => alt.name).filter(Boolean) ?? [];
             allCharacters = [...new Set([name, ...altNames])];
+            rosterCharacters = [
+              ...rosterCharacters,
+              ...(altResult?.alts || []).filter((alt) => alt?.name),
+            ];
           }
         }
       }
@@ -103,5 +115,6 @@ export async function buildRosterCharacters(name, options = {}) {
     targetClassName,
     targetCombatScore,
     rosterVisibility,
+    rosterCharacters,
   };
 }

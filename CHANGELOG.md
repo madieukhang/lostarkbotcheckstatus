@@ -4,6 +4,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates us
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
 
+## Unreleased
+
+### Changed
+- Cross-server list add/edit broadcasts now render tracked alts with class icon, item level, and CP when roster data is available. Rows still fall back to linked names when a snapshot is missing.
+
+### Tests
+- Added focused coverage for the richer tracked-alt broadcast formatter.
+
 ## [v0.5.81] - 2026-05-05
 
 ### Changed

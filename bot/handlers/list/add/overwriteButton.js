@@ -153,7 +153,10 @@ export function createListAddOverwriteButtonHandler({
         guildId: payload.guildId,
         requestedByDisplayName: payload.requestedByDisplayName,
         requestedByTag: payload.requestedByTag,
-      }, { onlyOwner: dupeEntry.scope === 'server' }).catch(() => {});
+      }, {
+        onlyOwner: dupeEntry.scope === 'server',
+        rosterCharacters: rosterResult?.rosterCharacters || [],
+      }).catch(() => {});
 
       await notifyRequesterAboutDecision(payload, { ok: true, content: resultMsg }, false);
     } catch (err) {
