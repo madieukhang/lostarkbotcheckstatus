@@ -47,7 +47,12 @@ import { CLASS_NAMES, CLASS_EMOJI_MAP } from '../../models/Class.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const CLASS_ICONS_DIR = path.resolve(__dirname, '..', '..', 'assets', 'class-icons');
+// 3 levels up from bot/services/discord/ → repo root, then assets/.
+// Pre-refactor file lived at bot/services/ so 2 levels was correct;
+// the cef2187 refactor pushed this file one level deeper without
+// updating the path, which silently broke icon discovery (file walk
+// returned empty → bootstrap reused stale Discord emoji slots only).
+const CLASS_ICONS_DIR = path.resolve(__dirname, '..', '..', '..', 'assets', 'class-icons');
 
 // Class IDs that share art with another class - upload ONE emoji and
 // point both display names at the same emoji ID. Saves application
