@@ -1,5 +1,5 @@
 /**
- * multiaddTemplateService.js
+ * services/multiadd/template.js
  *
  * Standalone .xlsx template generator + parser for /la-list multiadd.
  * Kept in its own module so it has zero dependencies on config/db/discord,

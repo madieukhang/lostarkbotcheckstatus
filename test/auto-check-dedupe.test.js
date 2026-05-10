@@ -9,7 +9,7 @@ const {
   claimAutoCheckMessage,
   completeAutoCheckMessage,
   resetAutoCheckDedupeForTest,
-} = await import('../bot/handlers/autoCheckHandler.js');
+} = await import('../bot/handlers/list/auto-check.js');
 
 test('auto-check rejects duplicate in-flight message events', () => {
   resetAutoCheckDedupeForTest();

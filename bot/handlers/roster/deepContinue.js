@@ -4,7 +4,7 @@ import config from '../../config.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
-import { detectAltsViaStronghold } from '../../services/rosterService.js';
+import { detectAltsViaStronghold } from '../../services/roster/index.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import {
   buildScanResultEmbed,

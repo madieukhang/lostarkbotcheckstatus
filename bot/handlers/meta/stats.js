@@ -1,17 +1,17 @@
 /**
- * statsHandler.js
+ * handlers/meta/stats.js
  * Handles /la-stats command · shows bot usage statistics.
  */
 
 import { EmbedBuilder } from 'discord.js';
-import { connectDB } from '../db.js';
-import { COLORS, ICONS, relativeTime } from '../utils/ui.js';
-import Blacklist from '../models/Blacklist.js';
-import Whitelist from '../models/Whitelist.js';
-import Watchlist from '../models/Watchlist.js';
-import RosterCache from '../models/RosterCache.js';
-import GuildConfig from '../models/GuildConfig.js';
-import { getScraperApiUsageSnapshot } from '../utils/scraperApiUsage.js';
+import { connectDB } from '../../db.js';
+import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
+import Blacklist from '../../models/Blacklist.js';
+import Whitelist from '../../models/Whitelist.js';
+import Watchlist from '../../models/Watchlist.js';
+import RosterCache from '../../models/RosterCache.js';
+import GuildConfig from '../../models/GuildConfig.js';
+import { getScraperApiUsageSnapshot } from '../../utils/scraperApiUsage.js';
 
 function formatUptime(ms) {
   if (!ms || ms < 0) return '0m';

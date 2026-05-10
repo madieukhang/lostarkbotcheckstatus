@@ -1,21 +1,21 @@
-import { connectDB } from '../db.js';
-import { buildBlacklistQuery } from '../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
-import Blacklist from '../models/Blacklist.js';
-import Whitelist from '../models/Whitelist.js';
-import Watchlist from '../models/Watchlist.js';
-import TrustedUser from '../models/TrustedUser.js';
-import RosterSnapshot from '../models/RosterSnapshot.js';
-import { getClassName, resolveClassId } from '../models/Class.js';
-import { fetchNameSuggestions } from '../services/rosterService.js';
-import { normalizeCharacterName } from '../utils/names.js';
+import { connectDB } from '../../db.js';
+import { buildBlacklistQuery } from '../../utils/scope.js';
+import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import Blacklist from '../../models/Blacklist.js';
+import Whitelist from '../../models/Whitelist.js';
+import Watchlist from '../../models/Watchlist.js';
+import TrustedUser from '../../models/TrustedUser.js';
+import RosterSnapshot from '../../models/RosterSnapshot.js';
+import { getClassName, resolveClassId } from '../../models/Class.js';
+import { fetchNameSuggestions } from '../../services/roster/index.js';
+import { normalizeCharacterName } from '../../utils/names.js';
 import {
   attachSearchEvidenceCollector,
   buildSearchEvidenceComponents,
   getFlaggedResultsWithImages,
-} from './search/evidence.js';
-import { buildEntryMap, sortBlacklistForScopePriority } from './search/matches.js';
-import { buildSearchResultEmbed } from './search/ui.js';
+} from './evidence.js';
+import { buildEntryMap, sortBlacklistForScopePriority } from './matches.js';
+import { buildSearchResultEmbed } from './ui.js';
 
 export async function handleSearchCommand(interaction) {
   const raw = interaction.options.getString('name', true);

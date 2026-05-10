@@ -5,7 +5,7 @@ import config from '../bot/config.js';
 import {
   clearOcrCache,
   extractNamesFromImage,
-} from '../bot/services/listCheckService.js';
+} from '../bot/services/list-check/service.js';
 
 test('extractNamesFromImage caches OCR results for repeated attachment URLs', async () => {
   clearOcrCache();

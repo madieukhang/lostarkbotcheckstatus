@@ -1,6 +1,6 @@
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
-import { buildRosterCharacters } from '../../../services/rosterService.js';
+import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {

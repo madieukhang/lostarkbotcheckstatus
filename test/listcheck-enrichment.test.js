@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   queueFlaggedListEntryEnrichment,
   selectFlaggedItemsForEnrichment,
-} from '../bot/services/listCheckEnrichment.js';
+} from '../bot/services/list-check/enrichment.js';
 
 test('selectFlaggedItemsForEnrichment returns only flagged list hits and respects limit', () => {
   const black = { name: 'BlackHit', blackEntry: { _id: 'b1', name: 'BlackHit' } };

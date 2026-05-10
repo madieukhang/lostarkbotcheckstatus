@@ -13,7 +13,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 import ScrapeJob from '../bot/models/ScrapeJob.js';
-import { claimAndProcessOne } from '../bot/services/scrapeWorker.js';
+import { claimAndProcessOne } from '../bot/services/worker/scrape-worker.js';
 
 let mongod;
 const silentLogger = { log: () => {}, warn: () => {} };

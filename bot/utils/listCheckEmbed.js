@@ -2,7 +2,7 @@
  * listCheckEmbed.js
  *
  * Shared embed + footer builder for OCR-driven list checks. Both
- * `/la-list check` (slash command) and `autoCheckHandler.js` (passive
+ * `/la-list check` (slash command) and `handlers/list/auto-check.js` (passive
  * auto-check on image post) call this so the two surfaces stay in
  * visual sync.
  *

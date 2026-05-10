@@ -132,139 +132,79 @@ Sample blacklist document:
 
 ```
 LostArk_LoaLogs/
-├── bot.js                          # Discord client, command routing, entry point (root because Dockerfile/Railway start with `node bot.js`)
-├── dusk-check.js                   # Diagnostic helper (local dev only, gitignored)
-│
-├── bot/
-│   ├── config.js                   # Env var loading + validation
-│   ├── db.js                       # Mongoose lazy singleton connect
-│   ├── commands.js                 # SlashCommandBuilder registry
-│   ├── monitor/
-│   │   ├── monitor.js              # Status polling loop + notification dispatch
-│   │   └── serverStatus.js         # Scrape playlostark.com for server state
-│   ├── handlers/                   # One file per command family
-│   │   ├── autoCheckHandler.js     # Auto-check channel listener (screenshot OCR)
-│   │   ├── listHandlers.js         # Thin orchestrator (~60 lines) wiring `list/` factories
-│   │   ├── list/                   # /la-list * + /la-check families
-│   │   │   ├── helpers.js          # Pure shared helpers
-│   │   │   ├── services/           # Shared closure services
-│   │   │   │   ├── index.js        # Service factory wiring
-│   │   │   │   ├── addExecutor.js  # /la-list add persistence + guards
-│   │   │   │   ├── approvals.js    # Approval DM dispatch + sync
-│   │   │   │   ├── broadcasts.js   # Broadcast channel routing
-│   │   │   │   └── bulk.js         # Bulk multiadd execution + summary
-│   │   │   ├── add/                # /la-list add + approval/view evidence/overwrite
-│   │   │   │   ├── index.js        # factory wiring
-│   │   │   │   ├── command.js      # slash command proposal flow
-│   │   │   │   ├── approvalButton.js # approver approve/reject router
-│   │   │   │   ├── editApproval.js # approved edit request executor
-│   │   │   │   ├── evidenceButton.js # ephemeral evidence viewer
-│   │   │   │   └── overwriteButton.js # duplicate overwrite/keep flow
-│   │   │   ├── edit/               # /la-list edit
-│   │   │   │   ├── index.js        # factory wiring
-│   │   │   │   ├── command.js      # validation + routing
-│   │   │   │   ├── applyNow.js     # owner/officer/local immediate edit
-│   │   │   │   └── approvalRequest.js # member edit approval proposal
-│   │   │   ├── remove/             # /la-list remove
-│   │   │   ├── view/               # /la-list view (paginated browse)
-│   │   │   │   ├── index.js        # query + interaction router
-│   │   │   │   └── ui.js           # page/evidence/trusted embeds
-│   │   │   ├── check/              # /la-check (OCR screenshot)
-│   │   │   ├── trust/              # /la-list trust
-│   │   │   ├── quickadd/           # quick-add select + modal (used by /la-check)
-│   │   │   ├── enrich/             # /la-list enrich
-│   │   │   │   ├── index.js        # command + confirm/cancel flow
-│   │   │   │   ├── data.js         # list lookup/model mapping
-│   │   │   │   ├── state.js        # cooldown + temporary sessions
-│   │   │   │   └── ui.js           # preview/success embeds
-│   │   │   └── multiadd/           # /la-list multiadd command + scoped helpers
-│   │   │       ├── index.js        # command router + pending upload state
-│   │   │       ├── attachment.js   # file validation + CDN download
-│   │   │       ├── ui.js           # template/preview embeds + buttons
-│   │   │       ├── confirmButton.js # requester confirm/cancel execution flow
-│   │   │       └── approvalButton.js # Senior approve/reject flow
-│   │   ├── rosterHandler.js        # Thin exports for /la-roster command + Continue button
-│   │   ├── roster/                 # /la-roster command internals
-│   │   │   ├── command.js           # roster lookup orchestration + visible roster card
-│   │   │   ├── hiddenRoster.js      # hidden-roster guild lookup + deep scan path
-│   │   │   ├── visibleDeepScan.js   # visible-roster deep scan path
-│   │   │   ├── deepContinue.js      # roster-deep Continue button resume flow
-│   │   │   └── progress.js          # shared scan progress/stat helpers
-│   │   ├── searchHandler.js        # Thin orchestration for /la-search
-│   │   ├── search/                 # /la-search UI + evidence helpers
-│   │   │   ├── evidence.js          # evidence dropdown + ephemeral evidence embeds
-│   │   │   ├── matches.js           # list-entry lookup maps
-│   │   │   └── ui.js                # search result embed rendering
-│   │   ├── setupHandler.js         # Thin exports for /la-setup + /la-remote
-│   │   ├── setup/                  # Setup command handlers split by workflow
-│   │   │   ├── guildSetup.js       # /la-setup per-guild config
-│   │   │   ├── remote.js           # /la-remote Senior router
-│   │   │   └── syncImages.js       # Legacy evidence image migration
-│   │   ├── helpHandler.js          # /la-help embed content
-│   │   ├── statsHandler.js         # Bot usage statistics
-│   │   └── systemHandlers.js       # /la-status, /la-reset
-│   ├── services/
-│   │   ├── listCheckService.js          # Shared OCR + name matching + embed formatting
-│   │   ├── multiaddTemplateService.js   # Public facade for Excel template/parser
-│   │   ├── multiadd/                    # Excel multiadd internals
-│   │   │   ├── template.js              # Entries worksheet generator
-│   │   │   ├── instructionsSheet.js     # Instructions worksheet generator
-│   │   │   └── parser.js                # Uploaded .xlsx parser/validator
-│   │   ├── rosterService.js             # Public facade for roster modules
-│   │   └── roster/                      # lostark.bible fetch/search/parse/deep-scan internals
-│   │       ├── bibleFetch.js            # Direct fetch + ScraperAPI fallback
-│   │       ├── search.js                # Similar-name search helpers
-│   │       ├── parsers.js               # Bible HTML/SvelteKit payload parsers
-│   │       ├── characterMeta.js         # Stronghold/roster-level meta cache
-│   │       ├── guildMembers.js          # Guild member fetch + cache
-│   │       ├── altDetection.js          # Stronghold fingerprint scan
-│   │       ├── buildRosterCharacters.js # Roster visibility + hidden fallback
-│   │       └── listChecks.js            # Roster blacklist/whitelist checks
-│   ├── utils/
-│   │   ├── alertEmbed.js           # Shared alert-embed builder
-│   │   ├── imageRehost.js          # Discord CDN image rehosting + URL refresh
-│   │   ├── names.js                # Case-insensitive normalization
-│   │   └── scope.js                # GuildConfig cache + scope helpers
-│   └── models/                     # Mongoose schemas + indexes
-│       ├── Blacklist.js            # scope: global / server, compound unique index
-│       ├── Whitelist.js
-│       ├── Watchlist.js
-│       ├── TrustedUser.js
-│       ├── PendingApproval.js      # 24h TTL
-│       ├── GuildConfig.js
-│       ├── RosterCache.js          # 24h TTL on check results
-│       ├── RosterSnapshot.js       # iLvl progression timeline
-│       ├── Class.js                # Bible class ID -> display name
-│       └── Raid.js                 # Raid tag choices for /la-list add
-│
-├── exports/                        # Historical CSV/XLSX drops (gitignored)
-├── data/
-│   └── status.json                 # Persisted server status state
-├── Dockerfile                      # node:20-slim, npm install --omit=dev
-├── railway.toml                    # Deploy policy
-├── .env.example
-└── package.json                    # ESM, Node ≥ 20, discord.js 14, mongoose 8
+|-- bot.js                         # Minimal Discord client entrypoint
+|-- loa-worker.js                  # Bible worker process entrypoint
+|-- dusk-check.js                  # Diagnostic helper (local dev only)
+|
+|-- bot/
+|   |-- app/                       # Startup, slash registration, interaction router
+|   |   |-- command-registration.js
+|   |   |-- interaction-router.js
+|   |   `-- lifecycle.js
+|   |-- commands/                  # SlashCommandBuilder registry
+|   |   `-- index.js
+|   |-- config.js                  # Env var loading + validation
+|   |-- db.js                      # Mongoose lazy singleton connect
+|   |-- monitor/                   # Server status polling
+|   |   |-- monitor.js
+|   |   `-- serverStatus.js
+|   |-- handlers/
+|   |   |-- system/                # /la-status, /la-reset
+|   |   |-- meta/                  # /la-help, /la-stats
+|   |   |-- setup/                 # /la-setup, /la-remote, image migration
+|   |   |-- search/                # /la-search command + evidence UI
+|   |   |-- roster/                # /la-roster visible/hidden/deep scan flows
+|   |   `-- list/                  # /la-list, /la-check, quick add, multiadd, enrich
+|   |       |-- index.js           # List command family factory wiring
+|   |       |-- auto-check.js      # Auto-check channel listener
+|   |       |-- helpers.js
+|   |       |-- services/          # List add/edit/broadcast/approval closures
+|   |       |-- add/
+|   |       |-- edit/
+|   |       |-- remove/
+|   |       |-- view/
+|   |       |-- check/
+|   |       |-- trust/
+|   |       |-- quickadd/
+|   |       |-- enrich/
+|   |       `-- multiadd/
+|   |-- services/
+|   |   |-- discord/              # Discord application emoji bootstrap
+|   |   |-- list-check/           # OCR, list matching, enrichment, roster cache lookup
+|   |   |-- multiadd/             # Excel template/parser facade + internals
+|   |   |-- roster/               # lostark.bible fetch/search/parse/deep-scan facade + internals
+|   |   `-- worker/               # Scrape worker + heartbeat
+|   |-- utils/                    # Shared embed, scan, text, scope, cache helpers
+|   `-- models/                   # Mongoose schemas + indexes
+|
+|-- assets/class-icons/            # Class icon PNGs for Discord application emoji
+|-- exports/                       # Historical CSV/XLSX drops (gitignored)
+|-- data/                          # Persisted runtime state
+|-- Dockerfile
+|-- railway.toml
+|-- .env.example
+`-- package.json
 ```
 
 Four compose principles:
 
-1. **Thin route facades for large command families.** Small families stay in one handler file, while large flows move internals into a subdirectory. `rosterHandler.js` now re-exports `handlers/roster/`, and `listHandlers.js` wires the split `/la-list *` modules.
-2. **Services wrap external I/O.** `services/rosterService.js` is the public roster facade; `services/roster/*` owns `lostark.bible` fetch/search/parse/deep-scan internals. `listCheckService.js` is the only file that calls Gemini. Tests and fallback paths still have one stable swap point.
-3. **Scope resolved once, cached.** `utils/scope.js` reads `GuildConfig` with a 60s in-memory cache; every command path goes through it instead of re-querying per invocation.
-4. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` (e.g. `list/services.js`, `list/add.js`) export a `create*({ client, ... })` factory rather than top-level functions. The orchestrator calls each factory once at startup and the returned closures are wired into the interaction router.
+1. **Entry point stays thin.** `bot.js` only creates the Discord client, wires lifecycle/router modules, and installs process-level crash logging.
+2. **Handlers follow feature folders.** Command families live under `handlers/<feature>/`; `handlers/list/index.js` is the list-family facade, while `handlers/list/auto-check.js` owns message-based screenshot checking.
+3. **Services wrap external I/O by domain.** `services/roster/index.js` is the public lostark.bible facade, `services/list-check/service.js` owns Gemini OCR/list matching, `services/multiadd/index.js` owns Excel import/export, and `services/worker/*` owns background scrape work.
+4. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` export `create*({ client, ... })` factories. `app/interaction-router.js` builds those closures once and routes slash commands, buttons, modals, selects, and autocomplete through them.
 
 Interaction flow:
 
 ```mermaid
 flowchart LR
-  U[Discord user] -->|slash / button / modal| B[bot.js router]
-  B --> H[bot/handlers/*]
+  U[Discord user] -->|slash / button / modal| R[app/interaction-router]
+  R --> H[bot/handlers/*]
   H --> S[bot/services/*]
   S -->|read / write| DB[(MongoDB)]
   S -->|HTTP| BIB[lostark.bible]
   S -->|HTTP| PROXY[ScraperAPI fallback]
   S -->|HTTP| GEM[Gemini OCR]
-  B -->|MessageCreate| AC[autoCheckHandler]
+  R -->|MessageCreate| AC[handlers/list/auto-check]
   AC --> S
 ```
 

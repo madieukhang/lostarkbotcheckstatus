@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildRosterCacheLookupMap,
   getRosterCacheMatch,
-} from '../bot/services/rosterCacheLookup.js';
+} from '../bot/services/list-check/roster-cache-lookup.js';
 import RosterCache from '../bot/models/RosterCache.js';
 
 test('buildRosterCacheLookupMap matches aliases from allCharacters', () => {

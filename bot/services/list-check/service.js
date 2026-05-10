@@ -1,32 +1,32 @@
 /**
- * listCheckService.js
+ * services/list-check/service.js
  * Shared logic for checking character names against blacklist/whitelist/watchlist.
  * Used by both /la-check command and auto-check channel handler.
  */
 
-import { connectDB } from '../db.js';
-import config from '../config.js';
-import Blacklist from '../models/Blacklist.js';
-import Whitelist from '../models/Whitelist.js';
-import Watchlist from '../models/Watchlist.js';
-import RosterCache from '../models/RosterCache.js';
-import RosterSnapshot from '../models/RosterSnapshot.js';
-import TrustedUser from '../models/TrustedUser.js';
-import { getClassEmoji, getClassName, isSupportClass, resolveClassId } from '../models/Class.js';
+import { connectDB } from '../../db.js';
+import config from '../../config.js';
+import Blacklist from '../../models/Blacklist.js';
+import Whitelist from '../../models/Whitelist.js';
+import Watchlist from '../../models/Watchlist.js';
+import RosterCache from '../../models/RosterCache.js';
+import RosterSnapshot from '../../models/RosterSnapshot.js';
+import TrustedUser from '../../models/TrustedUser.js';
+import { getClassEmoji, getClassName, isSupportClass, resolveClassId } from '../../models/Class.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
-} from './rosterService.js';
+} from '../roster/index.js';
 import {
   buildRosterCacheLookupMap,
   getRosterCacheMatch,
-} from './rosterCacheLookup.js';
+} from './roster-cache-lookup.js';
 import {
   normalizeCharacterName,
   getAddedByDisplay,
-} from '../utils/names.js';
-import { buildBlacklistQuery } from '../utils/scope.js';
-import { mapWithConcurrency, sleep } from '../utils/async.js';
+} from '../../utils/names.js';
+import { buildBlacklistQuery } from '../../utils/scope.js';
+import { mapWithConcurrency, sleep } from '../../utils/async.js';
 
 const ROSTER_LOOKUP_CONCURRENCY = config.listcheckRosterLookupConcurrency;
 const ROSTER_LOOKUP_START_SPACING_MS = config.listcheckRosterLookupStartSpacingMs;

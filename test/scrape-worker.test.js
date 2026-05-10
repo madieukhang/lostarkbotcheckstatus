@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildClaimNextJobFilter } from '../bot/services/scrapeWorker.js';
+import { buildClaimNextJobFilter } from '../bot/services/worker/scrape-worker.js';
 
 test('scrape worker claims pending jobs and stale in-progress jobs only', () => {
   const nowMs = Date.parse('2026-05-05T00:00:00Z');

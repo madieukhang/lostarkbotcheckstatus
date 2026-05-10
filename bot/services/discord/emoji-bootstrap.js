@@ -1,5 +1,5 @@
 /**
- * emojiBootstrap.js
+ * services/discord/emoji-bootstrap.js
  *
  * Bot-startup bootstrap that mirrors PNG files in `assets/class-icons/`
  * onto the bot's Discord application emoji slots and populates
@@ -42,7 +42,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-import { CLASS_NAMES, CLASS_EMOJI_MAP } from '../models/Class.js';
+import { CLASS_NAMES, CLASS_EMOJI_MAP } from '../../models/Class.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

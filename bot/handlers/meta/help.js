@@ -4,8 +4,8 @@ import {
   ActionRowBuilder,
 } from 'discord.js';
 
-import config from '../config.js';
-import { COLORS } from '../utils/ui.js';
+import config from '../../config.js';
+import { COLORS } from '../../utils/ui.js';
 
 // ── helpers ────────────────────────────────────────────────────────────
 

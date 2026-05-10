@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildCommands } from '../bot/commands.js';
+import { buildCommands } from '../bot/commands/index.js';
 import { getClassAutocompleteChoices, resolveClassId } from '../bot/models/Class.js';
 import RosterCache from '../bot/models/RosterCache.js';
 
