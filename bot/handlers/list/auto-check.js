@@ -1,5 +1,5 @@
 /**
- * autoCheckHandler.js
+ * handlers/list/auto-check.js
  * Listens for image attachments in designated channels and
  * automatically runs listcheck (Gemini OCR → blacklist/whitelist/watchlist check).
  *
@@ -9,16 +9,16 @@
  */
 
 import { ActionRowBuilder, Events, StringSelectMenuBuilder } from 'discord.js';
-import config from '../config.js';
+import config from '../../config.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
   formatCheckResults,
-} from '../services/listCheckService.js';
-import { queueFlaggedListEntryEnrichment } from '../services/listCheckEnrichment.js';
-import { getGuildConfig } from '../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
-import { buildListCheckEmbed } from '../utils/listCheckEmbed.js';
+} from '../../services/list-check/service.js';
+import { queueFlaggedListEntryEnrichment } from '../../services/list-check/enrichment.js';
+import { getGuildConfig } from '../../utils/scope.js';
+import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
 
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);

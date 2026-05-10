@@ -11,7 +11,7 @@ import {
   buildRosterCharacters,
   fetchCharacterMeta,
   fetchNameSuggestions,
-} from '../../../services/rosterService.js';
+} from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { ICONS } from '../../../utils/ui.js';

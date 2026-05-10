@@ -1,4 +1,4 @@
-import config from '../config.js';
+import config from '../../config.js';
 
 function getFlaggedEntry(item) {
   return item?.blackEntry || item?.whiteEntry || item?.watchEntry || null;
@@ -11,10 +11,10 @@ async function loadEnrichmentDeps() {
     { default: Watchlist },
     { detectAltsViaStronghold },
   ] = await Promise.all([
-    import('../models/Blacklist.js'),
-    import('../models/Whitelist.js'),
-    import('../models/Watchlist.js'),
-    import('./rosterService.js'),
+    import('../../models/Blacklist.js'),
+    import('../../models/Whitelist.js'),
+    import('../../models/Watchlist.js'),
+    import('../roster/index.js'),
   ]);
 
   return { Blacklist, Whitelist, Watchlist, detectAltsViaStronghold };

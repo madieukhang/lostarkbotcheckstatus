@@ -1,5 +1,5 @@
 ﻿/**
- * setupHandler.js
+ * handlers/setup/guildSetup.js
  * Handles /la-setup command for per-guild channel configuration.
  * Allows server admins to set auto-check and notification channels
  * without needing to modify environment variables.
@@ -378,5 +378,4 @@ async function handleSetupDefaultScope(interaction) {
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) defaultBlacklistScope → ${scope} by ${interaction.user.tag}`);
 }
-
 

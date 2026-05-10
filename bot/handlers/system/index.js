@@ -1,8 +1,8 @@
 import { EmbedBuilder } from 'discord.js';
 
-import { STATUS } from '../monitor/serverStatus.js';
-import { COLORS, ICONS, relativeTime } from '../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
+import { STATUS } from '../../monitor/serverStatus.js';
+import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
+import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 
 const STATUS_GLYPH = Object.freeze({
   [STATUS.ONLINE]:      '🟢',

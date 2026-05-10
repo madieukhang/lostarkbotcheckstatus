@@ -1,40 +1,40 @@
 export {
   FETCH_HEADERS,
   fetchWithFallback,
-} from './roster/bibleFetch.js';
+} from './bibleFetch.js';
 
-export { bibleClient } from './roster/bibleClient.js';
+export { bibleClient } from './bibleClient.js';
 
 export {
   extractCharacterItemLevelFromHtml,
   extractRosterClassMapFromHtml,
   parseRosterCharactersFromHtml,
-} from './roster/parsers.js';
+} from './parsers.js';
 
 export {
   fetchNameSuggestions,
   formatSuggestionLines,
-} from './roster/search.js';
+} from './search.js';
 
 export {
   buildRosterCharacters,
-} from './roster/buildRosterCharacters.js';
+} from './buildRosterCharacters.js';
 
 export {
   fetchCharacterMeta,
-} from './roster/characterMeta.js';
+} from './characterMeta.js';
 
 export {
   clearGuildMembersCache,
   fetchGuildMembers,
-} from './roster/guildMembers.js';
+} from './guildMembers.js';
 
 export {
   detectAltsViaStronghold,
-} from './roster/altDetection.js';
+} from './altDetection.js';
 
 export {
   buildRosterStatusContent,
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
-} from './roster/listChecks.js';
+} from './listChecks.js';

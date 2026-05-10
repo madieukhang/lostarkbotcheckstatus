@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { parseMultiaddFile } from '../../../services/multiaddTemplateService.js';
+import { parseMultiaddFile } from '../../../services/multiadd/index.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {

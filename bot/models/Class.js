@@ -107,7 +107,7 @@ export function isSupportClass(className) {
  * Map of class display name -> Discord application emoji string.
  *
  * Seeded empty here. The bot's startup bootstrap
- * (`bot/services/emojiBootstrap.js`) populates entries at runtime by
+ * (`bot/services/discord/emoji-bootstrap.js`) populates entries at runtime by
  * uploading PNGs from `assets/class-icons/` as application emoji
  * (content-addressed naming: `{bibleId}_{md5short}`) and mutating
  * this map with the resulting `<:name:id>` strings keyed by display

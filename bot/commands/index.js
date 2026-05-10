@@ -3,7 +3,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 
-import { getRaidChoices } from './models/Raid.js';
+import { getRaidChoices } from '../models/Raid.js';
 
 /**
  * Phase 4 (2026-05-03) put every bot command under the `la-` prefix so

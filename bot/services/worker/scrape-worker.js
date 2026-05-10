@@ -1,5 +1,5 @@
-import ScrapeJob from '../models/ScrapeJob.js';
-import { FETCH_HEADERS } from './roster/bibleHeaders.js';
+import ScrapeJob from '../../models/ScrapeJob.js';
+import { FETCH_HEADERS } from '../roster/bibleHeaders.js';
 
 const FETCH_DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_JOB_LEASE_MS = (() => {

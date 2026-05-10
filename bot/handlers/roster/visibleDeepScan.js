@@ -6,7 +6,7 @@ import {
   detectAltsViaStronghold,
   fetchCharacterMeta,
   fetchGuildMembers,
-} from '../../services/rosterService.js';
+} from '../../services/roster/index.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import {
   buildScanResultEmbed,

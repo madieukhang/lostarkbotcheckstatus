@@ -18,7 +18,7 @@ import {
   parseRosterCharactersFromHtml,
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
-} from '../../services/rosterService.js';
+} from '../../services/roster/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';

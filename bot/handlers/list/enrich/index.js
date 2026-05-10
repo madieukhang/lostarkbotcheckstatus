@@ -38,7 +38,7 @@ import {
   fetchGuildMembers,
   detectAltsViaStronghold,
   buildRosterCharacters,
-} from '../../../services/rosterService.js';
+} from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../../utils/scanPermissions.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';

@@ -9,7 +9,7 @@ import {
   fetchCharacterMeta,
   fetchGuildMembers,
   fetchWithFallback,
-} from '../bot/services/rosterService.js';
+} from '../bot/services/roster/index.js';
 import config from '../bot/config.js';
 import { clearMetaCache } from '../bot/utils/metaCache.js';
 

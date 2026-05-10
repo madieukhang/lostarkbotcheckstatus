@@ -9,7 +9,7 @@ import {
 import {
   buildMultiaddTemplate,
   MULTIADD_MAX_ROWS,
-} from '../../../services/multiaddTemplateService.js';
+} from '../../../services/multiadd/index.js';
 import { COLORS, ICONS, buildSessionFooter } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 

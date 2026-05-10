@@ -9,7 +9,7 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
     const cls = getClassName(result.cls);
     const classPrefix = getClassEmoji(cls) || cls;
     const ilvl = Number(result.itemLevel || 0).toFixed(2);
-    // CP comes through from the snapshot enrichment that searchHandler
+    // CP comes through from the snapshot enrichment that search/index
     // attaches when available; falsy when the name has never been
     // queried via /la-roster (graceful skip · the row still carries
     // class icon + ilvl).

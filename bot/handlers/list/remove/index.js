@@ -26,12 +26,12 @@ import {
   fetchNameSuggestions,
   fetchCharacterMeta,
   detectAltsViaStronghold,
-} from '../../../services/rosterService.js';
+} from '../../../services/roster/index.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
   formatCheckResults,
-} from '../../../services/listCheckService.js';
+} from '../../../services/list-check/service.js';
 import {
   normalizeCharacterName,
   getAddedByDisplay,
@@ -44,7 +44,7 @@ import {
   buildMultiaddTemplate,
   parseMultiaddFile,
   MULTIADD_MAX_ROWS,
-} from '../../../services/multiaddTemplateService.js';
+} from '../../../services/multiadd/index.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,

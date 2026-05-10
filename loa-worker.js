@@ -22,7 +22,7 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
 
-import { claimAndProcessOne } from './bot/services/scrapeWorker.js';
+import { claimAndProcessOne } from './bot/services/worker/scrape-worker.js';
 import { startHeartbeat, stopHeartbeat } from './bot/services/worker/heartbeat.js';
 
 const POLL_IDLE_MS = 1000;

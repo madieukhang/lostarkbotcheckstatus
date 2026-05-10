@@ -22,13 +22,13 @@ import {
   buildRosterCharacters,
   fetchNameSuggestions,
   fetchCharacterMeta,
-} from '../../../services/rosterService.js';
+} from '../../../services/roster/index.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
   formatCheckResults,
-} from '../../../services/listCheckService.js';
-import { queueFlaggedListEntryEnrichment } from '../../../services/listCheckEnrichment.js';
+} from '../../../services/list-check/service.js';
+import { queueFlaggedListEntryEnrichment } from '../../../services/list-check/enrichment.js';
 import {
   normalizeCharacterName,
   getAddedByDisplay,
@@ -43,7 +43,7 @@ import {
   buildMultiaddTemplate,
   parseMultiaddFile,
   MULTIADD_MAX_ROWS,
-} from '../../../services/multiaddTemplateService.js';
+} from '../../../services/multiadd/index.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
