@@ -72,6 +72,7 @@ import {
 } from '../../../utils/scanSession.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../../utils/scanCompletionDm.js';
 import { createLongRunningReplyEditor } from '../../../utils/longRunningReply.js';
+import { mergeAltsByName } from '../../../utils/alts.js';
 
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
 // ~40-60 updates over a 10-15 minute gentle-mode scan; well under the
@@ -79,18 +80,6 @@ import { createLongRunningReplyEditor } from '../../../utils/longRunningReply.js
 // than batched.
 const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
 const PROGRESS_EDIT_FAILURE_LIMIT = 3;
-
-/**
- * Merge two alt arrays case-insensitively by name. Later entries win
- * on tie (so a Continue-pass match with fresher class/ilvl data
- * overwrites the prior pass's record).
- */
-function mergeAltsByName(prior = [], next = []) {
-  const byName = new Map();
-  for (const alt of prior) byName.set(String(alt.name).toLowerCase(), alt);
-  for (const alt of next) byName.set(String(alt.name).toLowerCase(), alt);
-  return Array.from(byName.values());
-}
 
 export function createEnrichHandlers({ client, services }) {
   // services may grow Phase 3.5 broadcast support later; not used today.

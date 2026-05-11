@@ -12,7 +12,7 @@ import Watchlist from '../../models/Watchlist.js';
 import RosterCache from '../../models/RosterCache.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import TrustedUser from '../../models/TrustedUser.js';
-import { getClassEmoji, getClassName, isSupportClass, resolveClassId } from '../../models/Class.js';
+import { getClassName, resolveClassId } from '../../models/Class.js';
 import {
   buildRosterCharacters,
   fetchNameSuggestions,
@@ -22,9 +22,15 @@ import {
   getRosterCacheMatch,
 } from './roster-cache-lookup.js';
 import {
-  normalizeCharacterName,
-  getAddedByDisplay,
-} from '../../utils/names.js';
+  shouldCacheRosterLookupResult,
+  shouldRescrapeCachedRoster,
+} from './cache-policy.js';
+import { normalizeCharacterName } from '../../utils/names.js';
+export {
+  shouldCacheRosterLookupResult,
+  shouldRescrapeCachedRoster,
+} from './cache-policy.js';
+export { formatCheckResults } from './format.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 import { mapWithConcurrency, sleep } from '../../utils/async.js';
 
@@ -72,16 +78,6 @@ function setCachedOcrNames(cacheKey, names) {
 
 export function clearOcrCache() {
   ocrCache.clear();
-}
-
-export function shouldCacheRosterLookupResult(rosterResult) {
-  return rosterResult?.hasValidRoster === true;
-}
-
-export function shouldRescrapeCachedRoster(cached) {
-  if (!cached?.hasRoster) return false;
-  if (cached.rosterVisibility === 'hidden') return false;
-  return !cached.targetClassName;
 }
 
 /** Gemini OCR prompt for Lost Ark waiting room screenshots */
@@ -659,161 +655,4 @@ export async function checkNamesAgainstLists(names, options = {}) {
     `[listcheck] Checked ${names.length} name(s) in ${Date.now() - startedAt}ms (cacheMiss=${cacheMissItems.length})`
   );
   return results;
-}
-
-// ─── Formatting ─────────────────────────────────────────────────────────────
-
-/**
- * Format a single check result into a display line.
- * @param {object} item
- * @returns {{ line: string, priority: number }}
- */
-/**
- * Build the per-character line for an OCR check result.
- *
- * Layout:
- *   [status-icon] [class-icon] **Name** · `ilvl` · CP nnn
- *      ↳ via Other · reason · [raid]            (only when flagged)
- *      ↳ via Other · trusted                    (only when trusted via roster)
- *
- * The branch sub-line lets a reader see the character's full identity
- * (class + ilvl + CP) on the main row and the flag context on a
- * subordinate line · same convention `/la-search` uses for its
- * multi-line result rows. Pre-v0.5.72 the flag info was inlined onto
- * the main row which crowded the line and pushed class / ilvl / CP
- * out of sight when the reason was long.
- *
- * @returns {{ line: string, priority: number }}
- */
-function formatResultLine(item) {
-  const isBlack = Boolean(item.blackEntry);
-  const isWhite = Boolean(item.whiteEntry);
-  const isWatch = Boolean(item.watchEntry);
-
-  // Class icon (or className text fallback when the bootstrap hasn't
-  // mapped this class yet). Empty string when no snapshot data.
-  const classPrefix = item.snapClassName
-    ? (getClassEmoji(item.snapClassName) || item.snapClassName) + ' '
-    : '';
-
-  // ilvl + CP suffix on the main row. Both behind the same gate
-  // because the snapshot writer always sets ilvl+CP together.
-  const statSuffix = item.snapItemLevel > 0
-    ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP ${item.snapCombatScore}` : ''}`
-    : '';
-
-  // Trusted indicator rendered alongside the status icon when the
-  // character is on the trusted list AND another flag (e.g. previously
-  // blacklisted then re-trusted). Uses 💚 (green heart) instead of
-  // 🛡️ to avoid visual collision with the Paladin/Valkyrie class
-  // icons whose PNG art is a literal shield · v0.5.74 fix for the
-  // "two shields stacked" case Bao reported.
-  const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 💚' : '';
-
-  // Branch builder for flag context. Each list (black, white, watch)
-  // gets its own ↳ line when present so an officer scanning the card
-  // sees each origin separately. The list-status icon is dropped from
-  // the branch because the main row above already carries it · two
-  // copies in a row read cluttered (v0.5.73 cleanup).
-  const branches = [];
-  for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
-    if (!entry) continue;
-    const isRosterMatch = entry.name.toLowerCase() !== item.name.toLowerCase();
-    const parts = [];
-    if (isRosterMatch) parts.push(`via **${entry.name}**`);
-    if (entry.reason?.trim()) parts.push(`*${entry.reason.trim()}*`);
-    if (entry.raid?.trim()) parts.push(`[${entry.raid.trim()}]`);
-    if (parts.length > 0) branches.push(`   ↳ ${parts.join(' · ')}`);
-  }
-
-  const branchBlock = branches.length > 0 ? `\n${branches.join('\n')}` : '';
-
-  if (isBlack) {
-    const scopeTag = item.blackEntry?.scope === 'server' ? ' (Local)' : '';
-    return {
-      line: `⛔ ${classPrefix}**${item.name}**${scopeTag}${trustedTag}${statSuffix}${branchBlock}`,
-      priority: 0,
-    };
-  }
-  if (isWatch) {
-    return {
-      line: `⚠️ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${branchBlock}`,
-      priority: 1,
-    };
-  }
-  if (isWhite) {
-    return {
-      line: `✅ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${branchBlock}`,
-      priority: 2,
-    };
-  }
-  if (item.trustedEntry) {
-    const isVia = item.trustedEntry.name.toLowerCase() !== item.name.toLowerCase();
-    const viaBranch = isVia ? `\n   ↳ via **${item.trustedEntry.name}** · trusted` : '';
-    // Direct trusted match (name == trusted entry name) has no via
-    // branch, so we surface "· trusted" inline on the main row to
-    // distinguish from clean ❓ which has the same shape otherwise.
-    const directTag = isVia ? '' : ' · trusted';
-    return {
-      line: `💚 ${classPrefix}**${item.name}**${statSuffix}${directTag}${viaBranch}`,
-      priority: 2,
-    };
-  }
-  if (item.hasRoster) {
-    return { line: `❓ ${classPrefix}${item.name}${statSuffix}`, priority: 3 };
-  }
-
-  const reason = item.failReason ? ` *(${item.failReason})*` : '';
-  const similar = item.similarNames?.length > 0
-    ? ` · Similar: ${item.similarNames.map((s) => `${s.flag} ${s.name}`).join(', ')}`
-    : '';
-  return { line: `⚪ ${item.name}${reason}${similar}`, priority: 4 };
-}
-
-/**
- * Format check results into Discord-ready text lines.
- * Sorted by priority: ⛔ flagged first, then ⚠️ watch, ✅ white, ❓ clean, ⚪ no roster.
- * Includes a summary header line.
- *
- * @param {Array<object>} results - Output from checkNamesAgainstLists
- * @returns {string[]} Formatted lines including summary
- */
-export function formatCheckResults(results) {
-  const formatted = results.map((item) => ({ ...formatResultLine(item), item }));
-
-  // Sort: flag priority first (blacklist → watch → white/trusted →
-  // clean → no-roster), then within the same priority bucket DPS
-  // before supports. Supports-last lets a raid leader scanning the
-  // card see the DPS roster impact first; supports are typically the
-  // group-blocking concern but at the same priority they're "easier
-  // to slot in" so they live at the bottom of each tier.
-  formatted.sort((a, b) => {
-    if (a.priority !== b.priority) return a.priority - b.priority;
-    const aSupport = isSupportClass(a.item.snapClassName) ? 1 : 0;
-    const bSupport = isSupportClass(b.item.snapClassName) ? 1 : 0;
-    if (aSupport !== bSupport) return aSupport - bSupport;
-    return 0;
-  });
-
-  // Count by category
-  const counts = { black: 0, watch: 0, white: 0, trusted: 0, clean: 0, noRoster: 0 };
-  for (const f of formatted) {
-    if (f.priority === 0) counts.black++;
-    else if (f.priority === 1) counts.watch++;
-    else if (f.priority === 2) { if (f.item?.trustedEntry && !f.item?.whiteEntry) counts.trusted++; else counts.white++; }
-    else if (f.priority === 3) counts.clean++;
-    else counts.noRoster++;
-  }
-
-  // No inline summary line · the embed builder (`buildListCheckEmbed`)
-  // already renders the same per-status breakdown at the top of the
-  // description. Pre-v0.5.73 we pushed it here too, which produced
-  // two copies of the same counts stacked above the per-name list.
-  // Just emit the lines.
-  const lines = [];
-  for (const f of formatted) {
-    lines.push(f.line);
-  }
-
-  return lines;
 }

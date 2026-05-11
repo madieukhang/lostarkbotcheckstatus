@@ -19,6 +19,7 @@ import {
 } from '../../utils/scanSession.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
+import { mergeAltsByName } from '../../utils/alts.js';
 import {
   getRosterDeepSession,
   refreshRosterDeepSession,
@@ -208,7 +209,7 @@ export async function handleRosterDeepContinueButton(interaction) {
   }
 
   // Merge cumulative scan state into the session for the next Continue.
-  const mergedAlts = mergeRosterAlts(session.allDiscoveredAlts || [], altResult.alts || []);
+  const mergedAlts = mergeAltsByName(session.allDiscoveredAlts || [], altResult.alts || []);
   const mergedScannedNames = [
     ...(session.scannedNames || []),
     ...(altResult.scannedNames || []),
@@ -288,17 +289,4 @@ export async function handleRosterDeepContinueButton(interaction) {
       result: cumulativeResult,
     }).catch(() => {});
   }
-}
-
-/**
- * Local merge helper used by the roster-deep Continue resume. Same
- * shape as enrich/index.js#mergeAltsByName but kept private here to
- * avoid a circular import (enrich is the only other caller and lives
- * under handlers/list/).
- */
-function mergeRosterAlts(prior, next) {
-  const byName = new Map();
-  for (const alt of prior) byName.set(String(alt.name).toLowerCase(), alt);
-  for (const alt of next) byName.set(String(alt.name).toLowerCase(), alt);
-  return Array.from(byName.values());
 }

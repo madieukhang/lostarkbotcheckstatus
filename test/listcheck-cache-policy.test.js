@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   shouldCacheRosterLookupResult,
   shouldRescrapeCachedRoster,
-} from '../bot/services/list-check/service.js';
+} from '../bot/services/list-check/cache-policy.js';
 
 test('list check roster cache only stores confirmed roster hits', () => {
   assert.equal(shouldCacheRosterLookupResult({
