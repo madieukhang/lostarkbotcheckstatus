@@ -1,4 +1,8 @@
 import { getClassEmoji, isSupportClass } from '../../models/Class.js';
+import {
+  formatRosterFailureReason,
+  isRosterLookupUnavailable,
+} from './roster-status.js';
 
 /**
  * Build the per-character line for an OCR check result.
@@ -70,16 +74,21 @@ function formatResultLine(item) {
     return { line: `❓ ${classPrefix}${item.name}${statSuffix}`, priority: 3 };
   }
 
-  const reason = item.failReason ? ` *(${item.failReason})*` : '';
+  const displayReason = formatRosterFailureReason(item.failReason);
+  const reason = displayReason ? ` *(${displayReason})*` : '';
   const similar = item.similarNames?.length > 0
     ? ` · Similar: ${item.similarNames.map((s) => `${s.flag} ${s.name}`).join(', ')}`
     : '';
-  return { line: `⚪ ${item.name}${reason}${similar}`, priority: 4 };
+  if (isRosterLookupUnavailable(item)) {
+    return { line: `⚠️ ${item.name}${reason}`, priority: 4 };
+  }
+  return { line: `⚪ ${item.name}${reason}${similar}`, priority: 5 };
 }
 
 /**
  * Format check results into Discord-ready text lines.
- * Sorted by priority: blacklist, watchlist, whitelist/trusted, clean, no roster.
+ * Sorted by priority: blacklist, watchlist, whitelist/trusted, clean,
+ * lookup unavailable, no roster.
  *
  * @param {Array<object>} results - Output from checkNamesAgainstLists
  * @returns {string[]} Formatted lines sorted by display priority

@@ -6,11 +6,15 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Fixed
+- OCR list-check roster lookups now opt into the residential worker when worker mode is enabled. Temporary bible blocks such as `HTTP 403` render as `lookup issue` instead of `no roster`, so officers do not mistake a blocked lookup for a missing character.
+
 ### Changed
 - Cross-server list add/edit broadcasts now render tracked alts with class icon, item level, and CP when roster data is available. Rows still fall back to linked names when a snapshot is missing.
 
 ### Tests
 - Added focused coverage for the richer tracked-alt broadcast formatter.
+- Added coverage for blocked roster lookups in OCR check rendering.
 
 ## [v0.5.81] - 2026-05-05
 

@@ -16,6 +16,10 @@ import {
   formatCheckResults,
 } from '../../services/list-check/service.js';
 import { queueFlaggedListEntryEnrichment } from '../../services/list-check/enrichment.js';
+import {
+  getRosterLookupDescription,
+  getRosterLookupEmoji,
+} from '../../services/list-check/roster-status.js';
 import { getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
@@ -181,9 +185,9 @@ export function setupAutoCheck(client) {
             .addOptions(
               unflaggedNames.slice(0, 25).map((r) => ({
                 label: r.name,
-                description: r.hasRoster ? 'Has roster' : 'No roster found',
+                description: getRosterLookupDescription(r),
                 value: r.name,
-                emoji: r.hasRoster ? '❓' : '⚪',
+                emoji: getRosterLookupEmoji(r),
               }))
             )
         );

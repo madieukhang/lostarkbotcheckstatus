@@ -25,6 +25,7 @@ import {
   shouldCacheRosterLookupResult,
   shouldRescrapeCachedRoster,
 } from './cache-policy.js';
+import { isRosterLookupUnavailable } from './roster-status.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 export {
   shouldCacheRosterLookupResult,
@@ -422,6 +423,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
           allowScraperApi: false,
           fallbackOnRateLimit: false,
           timeoutMs: ROSTER_LOOKUP_TIMEOUT_MS,
+          viaWorker: true,
         }) || [];
         const similarCandidates = suggestions
           .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== item.name.toLowerCase())
@@ -461,6 +463,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
         fallbackOnRateLimit: false,
         retryOnRateLimit: false,
         timeoutMs: ROSTER_LOOKUP_TIMEOUT_MS,
+        viaWorker: true,
       });
       item.hasRoster = rosterResult.hasValidRoster;
       item.failReason = rosterResult.failReason;
@@ -547,7 +550,11 @@ export async function checkNamesAgainstLists(names, options = {}) {
   );
 
   const noRosterItems = results.filter(
-    (item) => !item.blackEntry && !item.whiteEntry && !item.watchEntry && !item.hasRoster
+    (item) => !item.blackEntry
+      && !item.whiteEntry
+      && !item.watchEntry
+      && !item.hasRoster
+      && !isRosterLookupUnavailable(item)
   );
   const similarLookupItems = noRosterItems.slice(0, SIMILAR_LOOKUP_LIMIT);
   await mapWithConcurrency(similarLookupItems, ROSTER_LOOKUP_CONCURRENCY, attachSimilarNameCandidates);

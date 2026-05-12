@@ -23,11 +23,12 @@
  */
 
 import { EmbedBuilder } from 'discord.js';
+import { isRosterLookupUnavailable } from '../services/list-check/roster-status.js';
 
 /**
  * @typedef ListCheckRender
  * @property {EmbedBuilder} embed
- * @property {{black:number, watch:number, white:number, trusted:number, clean:number, noRoster:number}} counts
+ * @property {{black:number, watch:number, white:number, trusted:number, clean:number, lookupIssue:number, noRoster:number}} counts
  */
 
 /**
@@ -50,13 +51,22 @@ export function buildListCheckEmbed({
 }) {
   // Per-category counts. Mirrors the priority logic in formatCheckResults
   // so the badge counts and the line-list categorisation never drift.
-  const counts = { black: 0, watch: 0, white: 0, trusted: 0, clean: 0, noRoster: 0 };
+  const counts = {
+    black: 0,
+    watch: 0,
+    white: 0,
+    trusted: 0,
+    clean: 0,
+    lookupIssue: 0,
+    noRoster: 0,
+  };
   for (const r of results) {
     if (r.blackEntry) counts.black++;
     else if (r.watchEntry) counts.watch++;
     else if (r.whiteEntry) counts.white++;
     else if (r.trustedEntry) counts.trusted++;
     else if (r.hasRoster) counts.clean++;
+    else if (isRosterLookupUnavailable(r)) counts.lookupIssue++;
     else counts.noRoster++;
   }
 
@@ -68,6 +78,7 @@ export function buildListCheckEmbed({
   if (counts.black > 0) { color = 0xed4245; titleIcon = '⛔'; }
   else if (counts.watch > 0) { color = 0xfee75c; titleIcon = '⚠️'; }
   else if (counts.white > 0 || counts.trusted > 0) { color = 0x57f287; titleIcon = '✅'; }
+  else if (counts.lookupIssue > 0) { color = 0xfee75c; titleIcon = '⚠️'; }
   else { color = 0x5865f2; titleIcon = '🔍'; }
 
   // Title verb differs between modes:
@@ -86,6 +97,7 @@ export function buildListCheckEmbed({
   if (counts.white) summaryParts.push(`✅ **${counts.white}**`);
   if (counts.trusted) summaryParts.push(`💚 **${counts.trusted}**`);
   if (counts.clean) summaryParts.push(`❓ **${counts.clean}** clean`);
+  if (counts.lookupIssue) summaryParts.push(`⚠️ **${counts.lookupIssue}** lookup issue`);
   if (counts.noRoster) summaryParts.push(`⚪ **${counts.noRoster}** no roster`);
 
   const headerLine = summaryParts.length > 0
@@ -119,7 +131,7 @@ export function buildListCheckEmbed({
   if (mode === 'auto') {
     if (flaggedCount > 0) {
       footerParts.push('Use the dropdown to Quick Add unflagged names · /la-roster <name> for full detail.');
-    } else if (counts.clean + counts.noRoster > 0) {
+    } else if (counts.clean + counts.lookupIssue + counts.noRoster > 0) {
       footerParts.push('Use the dropdown below to Quick Add unflagged names to a list.');
     } else {
       footerParts.push('No flags this image.');
