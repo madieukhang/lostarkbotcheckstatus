@@ -1,5 +1,15 @@
+function normalizeNameGlyphs(raw) {
+  return String(raw ?? '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/(\p{L})\s*\u00A8/gu, '$1\u0308')
+    .replace(/(\p{L})\s+([\u0300-\u036f])/gu, '$1$2')
+    .trim()
+    .normalize('NFC');
+}
+
 export function normalizeCharacterName(raw) {
-  const value = raw.trim();
+  const value = normalizeNameGlyphs(raw);
   if (!value) return '';
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }

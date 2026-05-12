@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseAdditionalNames } from '../bot/utils/names.js';
+import {
+  normalizeCharacterName,
+  parseAdditionalNames,
+} from '../bot/utils/names.js';
 
 test('parseAdditionalNames returns empty result for falsy input', () => {
   assert.deepEqual(parseAdditionalNames(''), { added: [], duplicates: [] });
@@ -65,4 +68,10 @@ test('parseAdditionalNames handles non-string input gracefully', () => {
   assert.deepEqual(parseAdditionalNames(123), { added: [], duplicates: [] });
   assert.deepEqual(parseAdditionalNames({}), { added: [], duplicates: [] });
   assert.deepEqual(parseAdditionalNames([]), { added: [], duplicates: [] });
+});
+
+test('normalizeCharacterName canonicalizes detached diaeresis marks from OCR', () => {
+  assert.equal(normalizeCharacterName('zoe\u0308'), 'Zoë');
+  assert.equal(normalizeCharacterName('zoe\u00A8'), 'Zoë');
+  assert.equal(normalizeCharacterName('zoe \u0308'), 'Zoë');
 });

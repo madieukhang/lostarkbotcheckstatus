@@ -60,3 +60,50 @@ test('extractNamesFromImage caches OCR results for repeated attachment URLs', as
     clearOcrCache();
   }
 });
+
+test('extractNamesFromImage dedupes canonical-equivalent diacritic spellings', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/diacritic-image.png') {
+      return new Response(new Uint8Array([4, 5, 6]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      return Response.json({
+        candidates: [
+          {
+            finishReason: 'STOP',
+            content: {
+              parts: [{ text: JSON.stringify(['zoë', 'zoe\u0308', 'zoe\u00A8']) }],
+            },
+          },
+        ],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'image-diacritic',
+      url: 'https://cdn.discordapp.com/diacritic-image.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(names, ['Zoë']);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
+});
