@@ -159,39 +159,41 @@ LostArk_LoaLogs/
 |   |       |-- auto-check.js      # Auto-check channel listener
 |   |       |-- helpers.js
 |   |       |-- services/          # List add/edit/broadcast/approval closures
-|   |       |-- add/
-|   |       |-- edit/
-|   |       |-- remove/
-|   |       |-- view/
-|   |       |-- check/
-|   |       |-- trust/
-|   |       |-- quickadd/
-|   |       |-- enrich/
-|   |       `-- multiadd/
+|   |       |-- add/               # Add command + approval/evidence buttons
+|   |       |-- edit/              # Edit command + approval/apply handlers
+|   |       |-- remove/            # Remove command
+|   |       |-- view/              # List view UI
+|   |       |-- check/             # Slash screenshot check
+|   |       |-- trust/             # Trusted list management
+|   |       |-- quickadd/          # Quick-add dropdown from OCR results
+|   |       |-- enrich/            # Stronghold alt enrichment flow
+|   |       `-- multiadd/          # Template upload + approval flow
 |   |-- services/
 |   |   |-- discord/              # Discord application emoji bootstrap
-|   |   |-- list-check/           # OCR, list matching, enrichment, roster cache lookup
+|   |   |-- list-check/           # Gemini OCR, OCR formatting, matching, cache policy, enrichment
 |   |   |-- multiadd/             # Excel template/parser facade + internals
-|   |   |-- roster/               # lostark.bible fetch/search/parse/deep-scan facade + internals
-|   |   `-- worker/               # Scrape worker + heartbeat
-|   |-- utils/                    # Shared embed, scan, text, scope, cache helpers
+|   |   |-- roster/               # lostark.bible client, parsers, search, roster/deep-scan helpers
+|   |   `-- worker/               # Scrape queue worker + heartbeat
+|   |-- utils/                    # Shared embeds, scan sessions, text/scope/cache/name helpers
 |   `-- models/                   # Mongoose schemas + indexes
 |
 |-- assets/class-icons/            # Class icon PNGs for Discord application emoji
 |-- exports/                       # Historical CSV/XLSX drops (gitignored)
 |-- data/                          # Persisted runtime state
+|-- test/                          # node --test coverage for handlers/services/utils
 |-- Dockerfile
 |-- railway.toml
 |-- .env.example
 `-- package.json
 ```
 
-Four compose principles:
+Five compose principles:
 
 1. **Entry point stays thin.** `bot.js` only creates the Discord client, wires lifecycle/router modules, and installs process-level crash logging.
 2. **Handlers follow feature folders.** Command families live under `handlers/<feature>/`; `handlers/list/index.js` is the list-family facade, while `handlers/list/auto-check.js` owns message-based screenshot checking.
 3. **Services wrap external I/O by domain.** `services/roster/index.js` is the public lostark.bible facade, `services/list-check/service.js` owns Gemini OCR/list matching, `services/multiadd/index.js` owns Excel import/export, and `services/worker/*` owns background scrape work.
-4. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` export `create*({ client, ... })` factories. `app/interaction-router.js` builds those closures once and routes slash commands, buttons, modals, selects, and autocomplete through them.
+4. **Utilities stay pure where possible.** Cross-feature formatting/session helpers live under `utils/`; OCR/name cleanup is centralized in `utils/names.js` so slash check, auto-check, and list edits normalize the same way.
+5. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` export `create*({ client, ... })` factories. `app/interaction-router.js` builds those closures once and routes slash commands, buttons, modals, selects, and autocomplete through them.
 
 Interaction flow:
 
