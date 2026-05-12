@@ -107,3 +107,45 @@ test('extractNamesFromImage dedupes canonical-equivalent diacritic spellings', a
     clearOcrCache();
   }
 });
+
+test('extractNamesFromImage rejects oversized downloads even when content-length is missing', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  const requestedUrls = [];
+
+  config.geminiApiKey = 'fake-gemini-key';
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    requestedUrls.push(requestedUrl);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/oversized-image.png') {
+      return new Response(new Uint8Array(20 * 1024 * 1024 + 1), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      throw new Error('Gemini should not be called for oversized images');
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    await assert.rejects(
+      () => extractNamesFromImage({
+        id: 'image-oversized',
+        url: 'https://cdn.discordapp.com/oversized-image.png',
+        contentType: 'image/png',
+      }),
+      /Image file too large/
+    );
+    assert.equal(requestedUrls.length, 1);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
+});

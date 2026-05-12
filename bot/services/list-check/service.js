@@ -38,6 +38,7 @@ const ROSTER_LOOKUP_CONCURRENCY = config.listcheckRosterLookupConcurrency;
 const ROSTER_LOOKUP_START_SPACING_MS = config.listcheckRosterLookupStartSpacingMs;
 const ROSTER_LOOKUP_TIMEOUT_MS = config.listcheckRosterLookupTimeoutMs;
 const SIMILAR_LOOKUP_LIMIT = config.listcheckSimilarLookupLimit;
+const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ const GEMINI_PROMPT = [
   'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
   'Keep umlaut letters exactly: ë, ö, ü.',
   'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
+  'If a mark looks like two horizontal dots above a letter, treat it as an umlaut on that letter, not as punctuation.',
   'Return JSON array only, no markdown, no explanation.',
   'Example output: ["name1","name2"].',
   'If no valid names are found, return [].',
@@ -155,12 +157,15 @@ export async function extractNamesFromImage(image) {
   }
 
   const contentLength = imageRes.headers.get('content-length');
-  if (contentLength && parseInt(contentLength) > 20 * 1024 * 1024) {
+  if (contentLength && parseInt(contentLength, 10) > MAX_OCR_IMAGE_BYTES) {
     throw new Error('Image file too large (max 20MB).');
   }
 
   const mimeType = image.contentType || imageRes.headers.get('content-type') || 'image/png';
   const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+  if (imageBuffer.byteLength > MAX_OCR_IMAGE_BYTES) {
+    throw new Error('Image file too large (max 20MB).');
+  }
   const imageBase64 = imageBuffer.toString('base64');
 
   const requestBody = {
