@@ -17,6 +17,8 @@ import {
   buildRosterCharacters,
   fetchNameSuggestions,
 } from '../roster/index.js';
+import { bibleClient } from '../roster/bibleClient.js';
+import { getWorkerHealth } from '../worker/heartbeat.js';
 import {
   buildRosterCacheLookupMap,
   getRosterCacheMatch,
@@ -40,6 +42,18 @@ const ROSTER_LOOKUP_START_SPACING_MS = config.listcheckRosterLookupStartSpacingM
 const ROSTER_LOOKUP_TIMEOUT_MS = config.listcheckRosterLookupTimeoutMs;
 const SIMILAR_LOOKUP_LIMIT = config.listcheckSimilarLookupLimit;
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
+
+async function shouldSkipWorkerRosterLookup() {
+  if (!bibleClient.workerEnabled) return false;
+
+  try {
+    const health = await getWorkerHealth();
+    return health?.online !== true;
+  } catch (err) {
+    console.warn('[listcheck] Worker health check failed:', err.message);
+    return false;
+  }
+}
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -402,6 +416,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     }
   }
 
+  const skipWorkerRosterLookup = await shouldSkipWorkerRosterLookup();
   let nextLookupStartAt = Date.now();
   async function waitForRosterLookupSlot() {
     const now = Date.now();
@@ -455,6 +470,11 @@ export async function checkNamesAgainstLists(names, options = {}) {
     cacheMissItems,
     ROSTER_LOOKUP_CONCURRENCY,
     async (item) => {
+      if (skipWorkerRosterLookup) {
+        item.rosterLookupSkipped = true;
+        return;
+      }
+
       await waitForRosterLookupSlot();
       const rosterStartedAt = Date.now();
       const rosterResult = await buildRosterCharacters(item.name, {
@@ -554,6 +574,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
       && !item.whiteEntry
       && !item.watchEntry
       && !item.hasRoster
+      && !item.rosterLookupSkipped
       && !isRosterLookupUnavailable(item)
   );
   const similarLookupItems = noRosterItems.slice(0, SIMILAR_LOOKUP_LIMIT);

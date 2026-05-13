@@ -49,6 +49,35 @@ test('list check renders HTTP 403 roster failures as lookup issues', () => {
   assert.doesNotMatch(rendered.description, /no roster/);
 });
 
+test('list check renders skipped worker roster lookups as unchecked', () => {
+  const results = [{
+    name: 'Workerdown',
+    hasRoster: false,
+    rosterLookupSkipped: true,
+  }];
+
+  const formattedLines = formatCheckResults(results);
+  assert.equal(formattedLines.length, 1);
+  assert.match(formattedLines[0], /Workerdown/);
+  assert.doesNotMatch(formattedLines[0], /worker offline|lookup issue/i);
+
+  const { counts, embed } = buildListCheckEmbed({
+    results,
+    formattedLines,
+    limitedNamesCount: 1,
+    mode: 'auto',
+  });
+
+  assert.equal(counts.lookupSkipped, 1);
+  assert.equal(counts.lookupIssue, 0);
+  assert.equal(counts.noRoster, 0);
+
+  const rendered = embed.toJSON();
+  assert.match(rendered.description, /unchecked/);
+  assert.doesNotMatch(rendered.description, /lookup issue|no roster/);
+  assert.equal(getRosterLookupDescription(results[0]), 'Roster lookup skipped');
+});
+
 test('roster status helpers keep true missing rosters separate from blocked lookups', () => {
   const blocked = { hasRoster: false, failReason: 'HTTP 403' };
   const missing = { hasRoster: false, failReason: 'HTTP 404' };

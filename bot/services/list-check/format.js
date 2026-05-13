@@ -73,6 +73,9 @@ function formatResultLine(item) {
   if (item.hasRoster) {
     return { line: `❓ ${classPrefix}${item.name}${statSuffix}`, priority: 3 };
   }
+  if (item.rosterLookupSkipped) {
+    return { line: `❓ ${classPrefix}${item.name}${statSuffix}`, priority: 3 };
+  }
 
   const displayReason = formatRosterFailureReason(item.failReason);
   const reason = displayReason ? ` *(${displayReason})*` : '';

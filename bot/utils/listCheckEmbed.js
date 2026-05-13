@@ -28,7 +28,7 @@ import { isRosterLookupUnavailable } from '../services/list-check/roster-status.
 /**
  * @typedef ListCheckRender
  * @property {EmbedBuilder} embed
- * @property {{black:number, watch:number, white:number, trusted:number, clean:number, lookupIssue:number, noRoster:number}} counts
+ * @property {{black:number, watch:number, white:number, trusted:number, clean:number, lookupSkipped:number, lookupIssue:number, noRoster:number}} counts
  */
 
 /**
@@ -57,6 +57,7 @@ export function buildListCheckEmbed({
     white: 0,
     trusted: 0,
     clean: 0,
+    lookupSkipped: 0,
     lookupIssue: 0,
     noRoster: 0,
   };
@@ -66,6 +67,7 @@ export function buildListCheckEmbed({
     else if (r.whiteEntry) counts.white++;
     else if (r.trustedEntry) counts.trusted++;
     else if (r.hasRoster) counts.clean++;
+    else if (r.rosterLookupSkipped) counts.lookupSkipped++;
     else if (isRosterLookupUnavailable(r)) counts.lookupIssue++;
     else counts.noRoster++;
   }
@@ -97,6 +99,7 @@ export function buildListCheckEmbed({
   if (counts.white) summaryParts.push(`✅ **${counts.white}**`);
   if (counts.trusted) summaryParts.push(`💚 **${counts.trusted}**`);
   if (counts.clean) summaryParts.push(`❓ **${counts.clean}** clean`);
+  if (counts.lookupSkipped) summaryParts.push(`❓ **${counts.lookupSkipped}** unchecked`);
   if (counts.lookupIssue) summaryParts.push(`⚠️ **${counts.lookupIssue}** lookup issue`);
   if (counts.noRoster) summaryParts.push(`⚪ **${counts.noRoster}** no roster`);
 
@@ -131,7 +134,7 @@ export function buildListCheckEmbed({
   if (mode === 'auto') {
     if (flaggedCount > 0) {
       footerParts.push('Use the dropdown to Quick Add unflagged names · /la-roster <name> for full detail.');
-    } else if (counts.clean + counts.lookupIssue + counts.noRoster > 0) {
+    } else if (counts.clean + counts.lookupSkipped + counts.lookupIssue + counts.noRoster > 0) {
       footerParts.push('Use the dropdown below to Quick Add unflagged names to a list.');
     } else {
       footerParts.push('No flags this image.');
