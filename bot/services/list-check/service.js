@@ -9,51 +9,14 @@ import config from '../../config.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
-import RosterCache from '../../models/RosterCache.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import TrustedUser from '../../models/TrustedUser.js';
-import { getClassName, resolveClassId } from '../../models/Class.js';
-import {
-  buildRosterCharacters,
-  fetchNameSuggestions,
-} from '../roster/index.js';
-import { bibleClient } from '../roster/bibleClient.js';
-import { getWorkerHealth } from '../worker/heartbeat.js';
-import {
-  buildRosterCacheLookupMap,
-  getRosterCacheMatch,
-} from './roster-cache-lookup.js';
-import {
-  shouldCacheRosterLookupResult,
-  shouldRescrapeCachedRoster,
-} from './cache-policy.js';
-import { isRosterLookupUnavailable } from './roster-status.js';
+import { getClassName } from '../../models/Class.js';
 import { normalizeCharacterName } from '../../utils/names.js';
-export {
-  shouldCacheRosterLookupResult,
-  shouldRescrapeCachedRoster,
-} from './cache-policy.js';
 export { formatCheckResults } from './format.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
-import { mapWithConcurrency, sleep } from '../../utils/async.js';
 
-const ROSTER_LOOKUP_CONCURRENCY = config.listcheckRosterLookupConcurrency;
-const ROSTER_LOOKUP_START_SPACING_MS = config.listcheckRosterLookupStartSpacingMs;
-const ROSTER_LOOKUP_TIMEOUT_MS = config.listcheckRosterLookupTimeoutMs;
-const SIMILAR_LOOKUP_LIMIT = config.listcheckSimilarLookupLimit;
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
-
-async function shouldSkipWorkerRosterLookup() {
-  if (!bibleClient.workerEnabled) return false;
-
-  try {
-    const health = await getWorkerHealth();
-    return health?.online !== true;
-  } catch (err) {
-    console.warn('[listcheck] Worker health check failed:', err.message);
-    return false;
-  }
-}
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -277,11 +240,12 @@ export async function extractNamesFromImage(image) {
 // ─── Name checking ──────────────────────────────────────────────────────────
 
 /**
- * Check an array of names against blacklist/whitelist/watchlist.
- * Includes roster check and similar name suggestions for unmatched names.
+ * Check an array of names against database-backed lists.
+ * OCR checks intentionally stay DB-only: no live bible/worker roster lookup,
+ * no hidden-roster fallback, no similar-name search.
  *
  * @param {string[]} names
- * @returns {Promise<Array<object>>} Results with list entries, roster status, similar names
+ * @returns {Promise<Array<object>>} Results with list entries and stored snapshot metadata
  */
 /**
  * @param {string[]} names
@@ -355,303 +319,15 @@ export async function checkNamesAgainstLists(names, options = {}) {
     };
   });
 
-  // Phase 2: roster check for ALL names regardless of flag status.
-  // Pre-v0.5.72 this branch skipped flagged entries, so blacklisted
-  // characters never picked up class/ilvl/CP and rendered as a bare
-  // headline. Rendering full character context on flagged rows lets
-  // an officer see at a glance whether an OCR'd "RipDead" is the
-  // ilvl-1740 main grief or just a same-name cleric · same data
-  // backing the unflagged rows already.
-  const allCheckedNames = results.map((r) => r.name);
-
-  const cachedEntries = allCheckedNames.length > 0
-    ? await RosterCache.find({
-        $or: [
-          { name: { $in: allCheckedNames } },
-          { allCharacters: { $in: allCheckedNames } },
-        ],
-      }).collation(collation).lean()
-    : [];
-  const cacheMap = buildRosterCacheLookupMap(cachedEntries);
-
-  const cacheMissItems = [];
-  for (const item of results) {
-
-    const cached = getRosterCacheMatch(cacheMap, item.name);
-
-    if (cached) {
-      item.hasRoster = cached.hasRoster;
-      item.failReason = cached.failReason || null;
-      item._allCharacters = cached.allCharacters || [];
-      // Surface cached class/ilvl/CP only when the snapshot Phase 1
-      // didn't already populate them (snap data takes priority because
-      // /la-roster writes more aggressive data than the OCR check).
-      // Empty cached fields fall through to the existing snap values.
-      if (cached.targetClassName && !item.snapClassName) {
-        item.snapClassName = cached.targetClassName;
-      }
-      if (cached.targetItemLevel > 0 && !(item.snapItemLevel > 0)) {
-        item.snapItemLevel = cached.targetItemLevel;
-      }
-      if (cached.targetCombatScore && !item.snapCombatScore) {
-        item.snapCombatScore = cached.targetCombatScore;
-      }
-      if (cached.searchSuggestions?.length > 0) {
-        item.similarNames = cached.searchSuggestions;
-        item._cachedSearchSuggestions = cached.searchSuggestions;
-      }
-      // Force re-scrape when a visible-roster cache row was written by
-      // an older bot version that did not store class data. Hidden
-      // rosters legitimately lack class data, so their refreshed cache
-      // rows opt out via rosterVisibility.
-      if (shouldRescrapeCachedRoster(cached)) {
-        cacheMissItems.push(item);
-        console.log(`[listcheck] Cache hit (missing class data, re-scraping): ${item.name}`);
-        continue;
-      }
-      console.log(`[listcheck] Cache hit: ${item.name} (hasRoster: ${cached.hasRoster})`);
-    } else {
-      cacheMissItems.push(item);
-      continue;
-    }
-  }
-
-  const skipWorkerRosterLookup = await shouldSkipWorkerRosterLookup();
-  let nextLookupStartAt = Date.now();
-  async function waitForRosterLookupSlot() {
-    const now = Date.now();
-    const startAt = Math.max(now, nextLookupStartAt);
-    nextLookupStartAt = startAt + ROSTER_LOOKUP_START_SPACING_MS;
-    const waitMs = startAt - now;
-    if (waitMs > 0) await sleep(waitMs);
-  }
-
-  async function attachSimilarNameCandidates(item) {
-    try {
-      let candidateNames = item._cachedSearchSuggestions?.length > 0
-        ? item._cachedSearchSuggestions.map((s) => s.name)
-        : null;
-
-      if (!candidateNames) {
-        await waitForRosterLookupSlot();
-        const suggestions = await fetchNameSuggestions(item.name, {
-          allowScraperApi: false,
-          fallbackOnRateLimit: false,
-          timeoutMs: ROSTER_LOOKUP_TIMEOUT_MS,
-          viaWorker: true,
-        }) || [];
-        const similarCandidates = suggestions
-          .filter((s) => Number(s.itemLevel || 0) >= 1700 && s.name.toLowerCase() !== item.name.toLowerCase())
-          .slice(0, 3);
-        candidateNames = similarCandidates.map((s) => s.name);
-
-        if (candidateNames.length > 0) {
-          RosterCache.findOneAndUpdate(
-            { name: item.name },
-            {
-              $set: {
-                name: item.name,
-                searchSuggestions: candidateNames.map((n) => ({ name: n, flag: '' })),
-                cachedAt: new Date(),
-              },
-            },
-            { upsert: true, collation }
-          ).catch(() => {});
-        }
-      }
-
-      item._similarCandidateNames = candidateNames;
-    } catch (err) {
-      console.warn(`[listcheck] Similar name search failed for ${item.name}:`, err.message);
-    }
-  }
-
-  await mapWithConcurrency(
-    cacheMissItems,
-    ROSTER_LOOKUP_CONCURRENCY,
-    async (item) => {
-      if (skipWorkerRosterLookup) {
-        item.rosterLookupSkipped = true;
-        return;
-      }
-
-      await waitForRosterLookupSlot();
-      const rosterStartedAt = Date.now();
-      const rosterResult = await buildRosterCharacters(item.name, {
-        hiddenRosterFallback: false,
-        allowScraperApi: false,
-        fallbackOnRateLimit: false,
-        retryOnRateLimit: false,
-        timeoutMs: ROSTER_LOOKUP_TIMEOUT_MS,
-        viaWorker: true,
-      });
-      item.hasRoster = rosterResult.hasValidRoster;
-      item.failReason = rosterResult.failReason;
-      item._allCharacters = rosterResult.allCharacters || [];
-      // Fresh roster scrape carries the queried character's class +
-      // combat score. Surface these so formatResultLine renders the
-      // class icon + CP even on the very first /la-list check run for
-      // a name (the v0.5.68 RosterSnapshot lookup only had data for
-      // names previously queried via /la-roster). Fresh values win
-      // over the prior snapshot data set in Phase 1.
-      if (rosterResult.targetClassName) {
-        item.snapClassName = rosterResult.targetClassName;
-      }
-      if (typeof rosterResult.targetItemLevel === 'number' && rosterResult.targetItemLevel > 0) {
-        item.snapItemLevel = rosterResult.targetItemLevel;
-      }
-      if (rosterResult.targetCombatScore) {
-        item.snapCombatScore = rosterResult.targetCombatScore;
-      }
-      console.log(
-        `[listcheck] Roster lookup: ${item.name} (hasRoster: ${item.hasRoster}) in ${Date.now() - rosterStartedAt}ms`
-      );
-
-      if (shouldCacheRosterLookupResult(rosterResult)) {
-        try {
-          await RosterCache.findOneAndUpdate(
-            { name: item.name },
-            {
-              $set: {
-                name: item.name,
-                hasRoster: rosterResult.hasValidRoster,
-                allCharacters: rosterResult.allCharacters || [],
-                failReason: '',
-                // Stash the per-target render tokens so the next
-                // cache hit can render class icon + CP without a
-                // fresh scrape or a snapshot lookup.
-                targetClassName: rosterResult.targetClassName || '',
-                targetItemLevel: typeof rosterResult.targetItemLevel === 'number'
-                  ? rosterResult.targetItemLevel
-                  : 0,
-                targetCombatScore: rosterResult.targetCombatScore || '',
-                rosterVisibility: rosterResult.rosterVisibility || '',
-                cachedAt: new Date(),
-              },
-            },
-            { upsert: true, returnDocument: 'after', collation }
-          );
-        } catch (err) {
-          console.warn(`[listcheck] Cache save failed for ${item.name}:`, err.message);
-        }
-      }
-
-      // Auto-snapshot: when fresh roster data is in hand, write it to
-      // RosterSnapshot so the next /la-list check / /la-search hit
-      // for this name has the data inline without re-scraping. Same
-      // shape as /la-roster's existing snapshot upsert. Best-effort:
-      // failures are logged and swallowed so OCR check stays fast.
-      // resolveClassId reverse-maps display name -> bible classId (the
-      // form RosterSnapshot stores). Falls back to '' when the name
-      // isn't in the canonical map (e.g. brand new class Smilegate
-      // released and we haven't updated CLASS_NAMES yet).
-      const classIdForSnap = rosterResult.targetClassName
-        ? (resolveClassId(rosterResult.targetClassName) || '')
-        : '';
-      if (typeof rosterResult.targetItemLevel === 'number' && rosterResult.targetItemLevel > 0) {
-        try {
-          await RosterSnapshot.updateOne(
-            { name: item.name },
-            {
-              $set: {
-                itemLevel: rosterResult.targetItemLevel,
-                classId: classIdForSnap || '',
-                combatScore: rosterResult.targetCombatScore || '',
-                updatedAt: new Date(),
-              },
-            },
-            { upsert: true, collation }
-          );
-        } catch (err) {
-          console.warn(`[listcheck] Snapshot upsert failed for ${item.name}:`, err.message);
-        }
-      }
-    }
-  );
-
-  const noRosterItems = results.filter(
-    (item) => !item.blackEntry
-      && !item.whiteEntry
-      && !item.watchEntry
-      && !item.hasRoster
-      && !item.rosterLookupSkipped
-      && !isRosterLookupUnavailable(item)
-  );
-  const similarLookupItems = noRosterItems.slice(0, SIMILAR_LOOKUP_LIMIT);
-  await mapWithConcurrency(similarLookupItems, ROSTER_LOOKUP_CONCURRENCY, attachSimilarNameCandidates);
-
-  const similarCandidateNames = [];
-  const seenSimilarCandidateNames = new Set();
-  for (const item of noRosterItems) {
-    for (const candidateName of item._similarCandidateNames || []) {
-      const normalizedCandidateName = typeof candidateName === 'string' ? candidateName.trim() : '';
-      if (!normalizedCandidateName) continue;
-
-      const key = normalizedCandidateName.toLowerCase();
-      if (seenSimilarCandidateNames.has(key)) continue;
-      seenSimilarCandidateNames.add(key);
-      similarCandidateNames.push(normalizedCandidateName);
-    }
-  }
-
-  if (similarCandidateNames.length > 0) {
-    try {
-      const simQuery = {
-        $or: [
-          { name: { $in: similarCandidateNames } },
-          { allCharacters: { $in: similarCandidateNames } },
-        ],
-      };
-      const simBlackQuery = buildBlacklistQuery(simQuery, guildId);
-      const [simBlack, simWhite, simWatch, simTrusted] = await Promise.all([
-        Blacklist.find(simBlackQuery).collation(collation).lean(),
-        Whitelist.find(simQuery).collation(collation).lean(),
-        Watchlist.find(simQuery).collation(collation).lean(),
-        TrustedUser.find({ name: { $in: similarCandidateNames } }).collation(collation).lean(),
-      ]);
-
-      const simBlackMap = buildEntryMap(simBlack);
-      const simWhiteMap = buildEntryMap(simWhite);
-      const simWatchMap = buildEntryMap(simWatch);
-      const simTrustedMap = new Map(simTrusted.map((t) => [t.name.toLowerCase(), t]));
-
-      for (const item of noRosterItems) {
-        const candidateNames = item._similarCandidateNames || [];
-        if (candidateNames.length === 0) continue;
-
-        item.similarNames = candidateNames
-          .map((candidateName) => (typeof candidateName === 'string' ? candidateName.trim() : ''))
-          .filter(Boolean)
-          .map((candidateName) => {
-            const lower = candidateName.toLowerCase();
-            let flag = '';
-            if (simBlackMap.has(lower)) flag += '⛔';
-            if (simWhiteMap.has(lower)) flag += '✅';
-            if (simWatchMap.has(lower)) flag += '⚠️';
-            if (simTrustedMap.has(lower)) flag += '💚';
-            if (!flag) flag = '❓';
-            return { name: candidateName, flag };
-          });
-      }
-    } catch (err) {
-      console.warn('[listcheck] Similar name list cross-check failed:', err.message);
-    }
-  }
-
-  // Phase 3: Resolve trusted status via allCharacters (alt detection)
-  // Collect all roster names from list entries + roster results to check against TrustedUser
+  // Phase 2: Resolve trusted status via allCharacters already stored
+  // on DB list entries. OCR checks deliberately stop here: no live
+  // roster lookup, no similar-name search, no worker dependency.
   const altNamesForTrustedCheck = new Set();
   for (const item of results) {
-    if (item.trustedEntry) continue; // already matched exact
-    // From list entries' allCharacters
+    if (item.trustedEntry) continue;
     for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
-      if (entry?.allCharacters) {
-        for (const c of entry.allCharacters) altNamesForTrustedCheck.add(c);
-      }
-    }
-    // From roster fetch/cache (stored on item during Phase 2)
-    if (item._allCharacters) {
-      for (const c of item._allCharacters) altNamesForTrustedCheck.add(c);
+      if (!entry?.allCharacters) continue;
+      for (const c of entry.allCharacters) altNamesForTrustedCheck.add(c);
     }
   }
 
@@ -664,7 +340,6 @@ export async function checkNamesAgainstLists(names, options = {}) {
 
       for (const item of results) {
         if (item.trustedEntry) continue;
-        // Check list entry allCharacters
         for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
           if (!entry?.allCharacters) continue;
           for (const c of entry.allCharacters) {
@@ -673,19 +348,12 @@ export async function checkNamesAgainstLists(names, options = {}) {
           }
           if (item.trustedEntry) break;
         }
-        // Check roster allCharacters (from Phase 2 fetch/cache)
-        if (!item.trustedEntry && item._allCharacters) {
-          for (const c of item._allCharacters) {
-            const match = altTrustedSet.get(c.toLowerCase());
-            if (match) { item.trustedEntry = match; break; }
-          }
-        }
       }
     }
   }
 
   console.log(
-    `[listcheck] Checked ${names.length} name(s) in ${Date.now() - startedAt}ms (cacheMiss=${cacheMissItems.length})`
+    `[listcheck] Checked ${names.length} name(s) in ${Date.now() - startedAt}ms (db-only)`
   );
   return results;
 }

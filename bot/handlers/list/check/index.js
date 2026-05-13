@@ -19,16 +19,10 @@ import PendingApproval from '../../../models/PendingApproval.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import { getClassName } from '../../../models/Class.js';
 import {
-  buildRosterCharacters,
-  fetchNameSuggestions,
-  fetchCharacterMeta,
-} from '../../../services/roster/index.js';
-import {
   extractNamesFromImage,
   checkNamesAgainstLists,
   formatCheckResults,
 } from '../../../services/list-check/service.js';
-import { queueFlaggedListEntryEnrichment } from '../../../services/list-check/enrichment.js';
 import {
   normalizeCharacterName,
   getAddedByDisplay,
@@ -98,7 +92,7 @@ export function createCheckHandlers({ client }) {
     const limitedNames = names.slice(0, maxNames);
     await interaction.editReply({
       content: [
-        `🔍 Extracted **${limitedNames.length}** name(s) · checking lists & roster...`,
+        `🔍 Extracted **${limitedNames.length}** name(s) · checking database lists...`,
         limitedNames.length < names.length ? `Ignored **${names.length - limitedNames.length}** extra name(s) (limit: ${maxNames}).` : null,
       ].filter(Boolean).join('\n'),
     });
@@ -117,8 +111,6 @@ export function createCheckHandlers({ client }) {
       });
 
       await interaction.editReply({ content: '', embeds: [embed] });
-
-      queueFlaggedListEntryEnrichment(results, { logPrefix: 'listcheck' });
     } catch (err) {
       console.error('[listcheck] ❌ Check failed:', err.message);
       await interaction.editReply({

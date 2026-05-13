@@ -8,27 +8,26 @@
  *
  * Layout:
  *   [state-driven title icon] List Check · N name(s)
- *   [breakdown line]   ⛔ 3 · ⚠️ 1 · ❓ 5 clean
+ *   [breakdown line]   ⛔ 3 · ⚠️ 1 · ❓ 5 not listed
  *   [per-name list]    ⛔ Name · reason · [raid]
  *                      ⚠️ Name · reason
  *                      ❓ Name
- *                      ⚪ Name *(no roster)*
+ *                      ❓ Name
  *   [stats fields]     🔍 Checked · 🚨 Flagged · ✅ Cleared (3-up inline)
  *   [footer]           Tip line + source citation
  *
  * Color follows the strongest outcome present:
  *   any blacklist hit → red,  any watch → yellow,
- *   else has white/trusted/clean → green,  else blurple (no flags but
+ *   else has white/trusted → green,  else blurple (no flags but
  *   nothing to celebrate).
  */
 
 import { EmbedBuilder } from 'discord.js';
-import { isRosterLookupUnavailable } from '../services/list-check/roster-status.js';
 
 /**
  * @typedef ListCheckRender
  * @property {EmbedBuilder} embed
- * @property {{black:number, watch:number, white:number, trusted:number, clean:number, lookupSkipped:number, lookupIssue:number, noRoster:number}} counts
+ * @property {{black:number, watch:number, white:number, trusted:number, notListed:number}} counts
  */
 
 /**
@@ -56,31 +55,24 @@ export function buildListCheckEmbed({
     watch: 0,
     white: 0,
     trusted: 0,
-    clean: 0,
-    lookupSkipped: 0,
-    lookupIssue: 0,
-    noRoster: 0,
+    notListed: 0,
   };
   for (const r of results) {
     if (r.blackEntry) counts.black++;
     else if (r.watchEntry) counts.watch++;
     else if (r.whiteEntry) counts.white++;
     else if (r.trustedEntry) counts.trusted++;
-    else if (r.hasRoster) counts.clean++;
-    else if (r.rosterLookupSkipped) counts.lookupSkipped++;
-    else if (isRosterLookupUnavailable(r)) counts.lookupIssue++;
-    else counts.noRoster++;
+    else counts.notListed++;
   }
 
   const flaggedCount = counts.black + counts.watch;
-  const clearedCount = counts.white + counts.trusted + counts.clean;
+  const clearedCount = counts.white + counts.trusted + counts.notListed;
 
   let color;
   let titleIcon;
   if (counts.black > 0) { color = 0xed4245; titleIcon = '⛔'; }
   else if (counts.watch > 0) { color = 0xfee75c; titleIcon = '⚠️'; }
   else if (counts.white > 0 || counts.trusted > 0) { color = 0x57f287; titleIcon = '✅'; }
-  else if (counts.lookupIssue > 0) { color = 0xfee75c; titleIcon = '⚠️'; }
   else { color = 0x5865f2; titleIcon = '🔍'; }
 
   // Title verb differs between modes:
@@ -91,17 +83,14 @@ export function buildListCheckEmbed({
 
   // Breakdown line at the top of the description gives the punchline
   // before the per-name list. Bolded counts anchor the eye when reading
-  // a long batch; falsy buckets are dropped silently so a clean run
+  // a long batch; falsy buckets are dropped silently so an unflagged run
   // doesn't show empty separators.
   const summaryParts = [];
   if (counts.black) summaryParts.push(`⛔ **${counts.black}**`);
   if (counts.watch) summaryParts.push(`⚠️ **${counts.watch}**`);
   if (counts.white) summaryParts.push(`✅ **${counts.white}**`);
   if (counts.trusted) summaryParts.push(`💚 **${counts.trusted}**`);
-  if (counts.clean) summaryParts.push(`❓ **${counts.clean}** clean`);
-  if (counts.lookupSkipped) summaryParts.push(`❓ **${counts.lookupSkipped}** unchecked`);
-  if (counts.lookupIssue) summaryParts.push(`⚠️ **${counts.lookupIssue}** lookup issue`);
-  if (counts.noRoster) summaryParts.push(`⚪ **${counts.noRoster}** no roster`);
+  if (counts.notListed) summaryParts.push(`❓ **${counts.notListed}** not listed`);
 
   const headerLine = summaryParts.length > 0
     ? `**Outcome:** ${summaryParts.join(' · ')}`
@@ -127,14 +116,14 @@ export function buildListCheckEmbed({
   void clearedCount;
 
   // Footer hint differs between modes:
-  //   slash:  Tip toward /la-roster on a flagged hit OR retry hint when clean.
+  //   slash:  Tip toward /la-roster on a flagged hit OR retry hint when unflagged.
   //   auto:   Note that the dropdown below lets you Quick Add unflagged
   //           names (the auto-check pipeline ships a select menu for that).
   const footerParts = [];
   if (mode === 'auto') {
     if (flaggedCount > 0) {
       footerParts.push('Use the dropdown to Quick Add unflagged names · /la-roster <name> for full detail.');
-    } else if (counts.clean + counts.lookupSkipped + counts.lookupIssue + counts.noRoster > 0) {
+    } else if (counts.notListed > 0) {
       footerParts.push('Use the dropdown below to Quick Add unflagged names to a list.');
     } else {
       footerParts.push('No flags this image.');
@@ -146,7 +135,7 @@ export function buildListCheckEmbed({
       footerParts.push('No flags. Re-run with a fresh image to re-check.');
     }
   }
-  footerParts.push('Source: blacklist + whitelist + watchlist + trusted');
+  footerParts.push('Source: database blacklist + whitelist + watchlist + trusted');
 
   const embed = new EmbedBuilder()
     .setTitle(title)
