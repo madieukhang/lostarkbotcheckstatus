@@ -43,12 +43,14 @@ export function formatRosterFailureReason(failReason) {
 
 export function getRosterLookupDescription(item) {
   if (item?.hasRoster) return 'Has roster';
+  if (item?.rosterLookupSkipped) return 'Roster lookup skipped';
   if (isRosterLookupUnavailable(item)) return 'Roster lookup unavailable';
   return 'No roster found';
 }
 
 export function getRosterLookupEmoji(item) {
   if (item?.hasRoster) return '❓';
+  if (item?.rosterLookupSkipped) return '❓';
   if (isRosterLookupUnavailable(item)) return '⚠️';
   return '⚪';
 }
