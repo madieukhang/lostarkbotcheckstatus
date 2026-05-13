@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -8,6 +9,18 @@ import {
   isRosterLookupUnavailable,
 } from '../bot/services/list-check/roster-status.js';
 import { buildListCheckEmbed } from '../bot/utils/listCheckEmbed.js';
+
+test('ocr list check does not use hidden-roster fallback', () => {
+  const serviceSource = readFileSync(
+    new URL('../bot/services/list-check/service.js', import.meta.url),
+    'utf8'
+  );
+
+  assert.match(
+    serviceSource,
+    /buildRosterCharacters\(item\.name,\s*\{\s*hiddenRosterFallback:\s*false,/s
+  );
+});
 
 test('list check renders HTTP 403 roster failures as lookup issues', () => {
   const results = [{
