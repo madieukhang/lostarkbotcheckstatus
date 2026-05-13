@@ -458,7 +458,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
       await waitForRosterLookupSlot();
       const rosterStartedAt = Date.now();
       const rosterResult = await buildRosterCharacters(item.name, {
-        hiddenRosterFallback: true,
+        hiddenRosterFallback: false,
         allowScraperApi: false,
         fallbackOnRateLimit: false,
         retryOnRateLimit: false,
