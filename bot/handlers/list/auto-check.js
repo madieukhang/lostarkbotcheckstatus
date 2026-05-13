@@ -15,11 +15,6 @@ import {
   checkNamesAgainstLists,
   formatCheckResults,
 } from '../../services/list-check/service.js';
-import { queueFlaggedListEntryEnrichment } from '../../services/list-check/enrichment.js';
-import {
-  getRosterLookupDescription,
-  getRosterLookupEmoji,
-} from '../../services/list-check/roster-status.js';
 import { getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
@@ -151,7 +146,7 @@ export function setupAutoCheck(client) {
       // (not an embed) because this is a transient "working on it" line
       // that gets edited into a full embed below within seconds.
       const progressMsg = await message.reply({
-        content: `🔍 Extracted **${limitedNames.length}** name(s) · checking lists & roster...`,
+        content: `🔍 Extracted **${limitedNames.length}** name(s) · checking database lists...`,
       });
 
       const results = await checkNamesAgainstLists(limitedNames, { guildId: message.guild.id });
@@ -169,9 +164,9 @@ export function setupAutoCheck(client) {
         mode: 'auto',
       });
 
-      // Quick-Add dropdown for unflagged names. Sits below the embed so
-      // an officer eyeballing the result can immediately blacklist a
-      // suspicious "no roster" hit without retyping the name.
+      // Quick-Add dropdown for names with no DB list hit. Sits below
+      // the embed so an officer can add a suspicious unlisted name
+      // without retyping it.
       const unflaggedNames = results.filter(
         (r) => !r.blackEntry && !r.whiteEntry && !r.watchEntry
       );
@@ -185,9 +180,9 @@ export function setupAutoCheck(client) {
             .addOptions(
               unflaggedNames.slice(0, 25).map((r) => ({
                 label: r.name,
-                description: getRosterLookupDescription(r),
+                description: 'No DB list hit',
                 value: r.name,
-                emoji: getRosterLookupEmoji(r),
+                emoji: '❓',
               }))
             )
         );
@@ -197,8 +192,6 @@ export function setupAutoCheck(client) {
       await progressMsg.edit({ content: '', embeds: [embed], components });
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
       await message.react('✅').catch(() => {});
-
-      queueFlaggedListEntryEnrichment(results, { logPrefix: 'auto-check' });
     } catch (err) {
       console.error('[auto-check] Error processing image:', err.message);
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
