@@ -15,8 +15,9 @@ import { getClassName } from '../../models/Class.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 export { formatCheckResults } from './format.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
-import { fetchCharacterMeta } from '../roster/characterMeta.js';
 import { fetchNameSuggestions } from '../roster/search.js';
+import { buildRosterCharacters } from '../roster/buildRosterCharacters.js';
+import { resolveClassId } from '../../models/Class.js';
 import { getWorkerHealth } from '../worker/heartbeat.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 
@@ -292,11 +293,16 @@ export async function extractNamesFromImage(image) {
  *
  * After DB cross-check, items missing class+ilvl snapshot data go
  * through a targeted enrichment phase that routes by worker health:
- *   - Worker online  → `fetchCharacterMeta` via worker (full meta).
+ *   - Worker online  → `buildRosterCharacters` via worker. Single
+ *     bible roster-page scrape returns class + ilvl + CP for the
+ *     target AND the full alt list. Result populates the snapshot
+ *     plus `item.discoveredAlts` so the formatter can render alts
+ *     for OCR'd names with no DB hit.
  *   - Worker offline → `fetchNameSuggestions` direct from Railway
  *     (lightweight search endpoint, less aggressive CF protection
- *     than the per-character page route).
- * Both paths persist the result to RosterSnapshot so subsequent
+ *     than the per-character page route). Class + ilvl only; alts
+ *     are not available in this mode.
+ * Both paths persist class + ilvl to RosterSnapshot so subsequent
  * checks on the same name hit the cache for free.
  *
  * @param {string[]} names
@@ -368,6 +374,13 @@ export async function checkNamesAgainstLists(names, options = {}) {
       snapClassName: snap?.classId ? getClassName(snap.classId) : '',
       snapItemLevel: snap?.itemLevel || 0,
       snapCombatScore: snap?.combatScore || '',
+      // Roster alts discovered during the online enrichment branch
+      // (worker-online + visible roster). DB list entries already carry
+      // their own allCharacters; this field surfaces alts for OCR'd
+      // names that have no DB hit yet, so format.js can render them
+      // inline. Empty when worker offline, hidden roster, or the name
+      // is not on bible.
+      discoveredAlts: [],
     };
   });
 
@@ -407,7 +420,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     const enrichStartedAt = Date.now();
     const mode = health.online ? 'worker-meta' : 'search-direct';
 
-    async function applyEnrichment(item, { classId, itemLevel }) {
+    async function applyEnrichment(item, { classId, itemLevel, combatScore }) {
       if (classId) {
         item.snapClassId = classId;
         item.snapClassName = getClassName(classId);
@@ -415,17 +428,22 @@ export async function checkNamesAgainstLists(names, options = {}) {
       if (typeof itemLevel === 'number' && itemLevel > 0) {
         item.snapItemLevel = itemLevel;
       }
+      if (combatScore && combatScore !== '?') {
+        item.snapCombatScore = String(combatScore);
+      }
       try {
+        const setOps = {
+          itemLevel: itemLevel || 0,
+          classId: classId || '',
+          rosterName: item.name,
+          updatedAt: new Date(),
+        };
+        if (combatScore && combatScore !== '?') {
+          setOps.combatScore = String(combatScore);
+        }
         await RosterSnapshot.updateOne(
           { name: item.name },
-          {
-            $set: {
-              itemLevel: itemLevel || 0,
-              classId: classId || '',
-              rosterName: item.name,
-              updatedAt: new Date(),
-            },
-          },
+          { $set: setOps },
           { upsert: true, collation: { locale: 'en', strength: 2 } }
         );
       } catch (saveErr) {
@@ -438,17 +456,40 @@ export async function checkNamesAgainstLists(names, options = {}) {
     await mapWithConcurrency(itemsNeedingEnrichment, concurrency, async (item) => {
       try {
         if (health.online) {
-          // Case 1 · worker online: fetch full character meta via worker.
-          const meta = await fetchCharacterMeta(item.name, {
+          // Case 1 · worker online: scrape the roster page via worker.
+          // Returns class + ilvl + CP for the target AND the full alt
+          // list (allCharacters) in a single fetch. The expensive
+          // hidden-roster + Stronghold-scan fallback inside the
+          // builder is left disabled (default off) to keep the
+          // list-check fast path bounded.
+          const roster = await buildRosterCharacters(item.name, {
             viaWorker: true,
             retryOnRateLimit: false,
             timeoutMs: lookupTimeoutMs,
           });
-          if (!meta) return;
+          if (!roster || !roster.hasValidRoster) return;
+          // Resolve classId from the per-character record (parser gives
+          // us classId directly), falling back to resolveClassId on the
+          // display name when the record didn't surface a bible id.
+          const targetRecord = (roster.rosterCharacters || []).find(
+            (c) => String(c.name).toLowerCase() === item.name.toLowerCase()
+          );
+          const classId = targetRecord?.classId
+            || (roster.targetClassName ? resolveClassId(roster.targetClassName) : '')
+            || '';
           await applyEnrichment(item, {
-            classId: meta.classId || '',
-            itemLevel: typeof meta.itemLevel === 'number' ? meta.itemLevel : 0,
+            classId,
+            itemLevel: typeof roster.targetItemLevel === 'number' ? roster.targetItemLevel : 0,
+            combatScore: roster.targetCombatScore || targetRecord?.combatScore || '',
           });
+          // Roster alts surface only when the roster is publicly visible.
+          // Hidden / missing rosters skip silently per the user-facing
+          // "if hidden, just don't count" contract.
+          if (roster.rosterVisibility === 'visible' && Array.isArray(roster.allCharacters)) {
+            item.discoveredAlts = roster.allCharacters.filter(
+              (n) => String(n).toLowerCase() !== item.name.toLowerCase()
+            );
+          }
         } else {
           // Case 2 · worker offline: hit bible's search endpoint directly.
           // No viaWorker (would just fail the same way it failed before).
