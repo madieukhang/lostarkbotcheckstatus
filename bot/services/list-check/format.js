@@ -15,8 +15,13 @@ function formatResultLine(item) {
   const isWhite = Boolean(item.whiteEntry);
   const isWatch = Boolean(item.watchEntry);
 
-  const classPrefix = item.snapClassName
-    ? (getClassEmoji(item.snapClassName) || item.snapClassName) + ' '
+  // Class icon priority: snapshot (most authoritative) > OCR (Gemini read
+  // the raid-lobby icon). Falling back to OCR keeps the icon visible
+  // when the snapshot is missing AND the worker-backed meta probe could
+  // not run (worker offline).
+  const classNameForRender = item.snapClassName || item.ocrClassName || '';
+  const classPrefix = classNameForRender
+    ? (getClassEmoji(classNameForRender) || classNameForRender) + ' '
     : '';
 
   const statSuffix = item.snapItemLevel > 0
@@ -81,8 +86,13 @@ export function formatCheckResults(results) {
 
   formatted.sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
-    const aSupport = isSupportClass(a.item.snapClassName) ? 1 : 0;
-    const bSupport = isSupportClass(b.item.snapClassName) ? 1 : 0;
+    // Support classification follows the same snapshot > OCR priority
+    // the render uses, so the sort stays stable across "snapshot fills
+    // class" vs "OCR fills class" cases.
+    const aClass = a.item.snapClassName || a.item.ocrClassName || '';
+    const bClass = b.item.snapClassName || b.item.ocrClassName || '';
+    const aSupport = isSupportClass(aClass) ? 1 : 0;
+    const bSupport = isSupportClass(bClass) ? 1 : 0;
     if (aSupport !== bSupport) return aSupport - bSupport;
     return 0;
   });

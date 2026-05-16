@@ -66,14 +66,18 @@ export function clearOcrCache() {
 const GEMINI_PROMPT = [
   'This is a screenshot of a Lost Ark raid waiting room (party finder lobby).',
   'Extract ALL player character names from the party member list, regardless of color.',
-  'Ignore all other text: raid names, class names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
-  'Preserve every character exactly as shown, including special letters and diacritics.',
+  'Ignore other text: raid names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
+  'For each character, identify the class from the small class icon shown to the left of the name. Use the official English class display name from Lost Ark: Berserker, Slayer, Gunlancer, Paladin, Valkyrie, Destroyer, Guardian Knight, Wardancer, Scrapper, Soulfist, Glaivier, Striker, Breaker, Deadeye, Gunslinger, Artillerist, Sharpshooter, Machinist, Bard, Arcanist, Summoner, Sorceress, Deathblade, Shadow Hunter, Reaper, Souleater, Artist, Aeromancer, Wildsoul.',
+  'If the class icon is unreadable or you cannot identify it confidently, use an empty string for class instead of guessing.',
+  'Preserve every character name exactly as shown, including special letters and diacritics.',
   'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
   'Keep umlaut letters exactly: ë, ö, ü.',
   'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
   'If a mark looks like two horizontal dots above a letter, treat it as an umlaut on that letter, not as punctuation.',
-  'Return JSON array only, no markdown, no explanation.',
-  'Example output: ["name1","name2"].',
+  'Return JSON array of objects only, no markdown, no explanation.',
+  'Each object has two keys: "name" (string) and "class" (string).',
+  'Example output: [{"name":"PlayerOne","class":"Bard"},{"name":"PlayerTwo","class":"Berserker"}].',
+  'If a class cannot be identified, return an empty string for that entry\'s class field, e.g. {"name":"PlayerThree","class":""}.',
   'If no valid names are found, return [].',
 ].join(' ');
 
@@ -92,29 +96,56 @@ function shouldFailoverGeminiModel(status, bodyText) {
   );
 }
 
-function filterAndDeduplicateNames(parsed) {
-  const names = parsed
-    .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
-    .filter((name) => name && !SERVER_NAMES.has(name.toLowerCase()));
+/**
+ * Normalize a single Gemini output item into `{ name, ocrClass }`. Accepts
+ * both shapes for forward/backward compatibility:
+ *   - Legacy: bare string `"PlayerOne"` → no class info.
+ *   - Current: object `{name, class}` → class carried through when present.
+ * Returns null when the input can't yield a usable name.
+ */
+function normalizeOcrEntry(item) {
+  if (typeof item === 'string') {
+    const name = normalizeCharacterName(item);
+    return name ? { name, ocrClass: '' } : null;
+  }
+  if (item && typeof item === 'object') {
+    const name = normalizeCharacterName(item.name || '');
+    if (!name) return null;
+    const ocrClass = typeof item.class === 'string' ? item.class.trim() : '';
+    return { name, ocrClass };
+  }
+  return null;
+}
+
+function filterAndDeduplicateEntries(parsed) {
+  const entries = parsed
+    .map(normalizeOcrEntry)
+    .filter((entry) => entry && !SERVER_NAMES.has(entry.name.toLowerCase()));
 
   const seen = new Set();
   const unique = [];
-  for (const name of names) {
-    const key = name.toLowerCase();
+  for (const entry of entries) {
+    const key = entry.name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    unique.push(name);
+    unique.push(entry);
   }
 
   return unique;
 }
 
 /**
- * Extract character names from an image using Gemini OCR.
+ * Extract character names + classes from an image using Gemini OCR.
  * Handles model failover on quota/rate limits and network errors.
  *
+ * Class info is best-effort: Gemini reads the small class icon next to
+ * each name in the raid lobby image. Used as a fallback when the bot
+ * has no RosterSnapshot and the worker-backed meta probe is offline, so
+ * class icons render even on a cold OCR check. Empty string when Gemini
+ * cannot identify the class confidently.
+ *
  * @param {object} image - Discord attachment or { url, contentType }
- * @returns {Promise<string[]>} Array of normalized character names
+ * @returns {Promise<Array<{name: string, ocrClass: string}>>} OCR entries
  */
 export async function extractNamesFromImage(image) {
   if (!config.geminiApiKey) {
@@ -126,10 +157,10 @@ export async function extractNamesFromImage(image) {
   }
 
   const cacheKey = image.url || '';
-  const cachedNames = getCachedOcrNames(cacheKey);
-  if (cachedNames !== undefined) {
+  const cachedEntries = getCachedOcrNames(cacheKey);
+  if (cachedEntries !== undefined) {
     console.log(`[listcheck] OCR cache hit for attachment ${image.id || cacheKey.slice(0, 32)}`);
-    return cachedNames;
+    return cachedEntries;
   }
 
   const imageRes = await fetch(image.url, { signal: AbortSignal.timeout(15000) });
@@ -232,9 +263,9 @@ export async function extractNamesFromImage(image) {
     }
     if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
 
-    const names = filterAndDeduplicateNames(parsed);
-    setCachedOcrNames(cacheKey, names);
-    return names;
+    const entries = filterAndDeduplicateEntries(parsed);
+    setCachedOcrNames(cacheKey, entries);
+    return entries;
   }
 
   throw new Error(`All Gemini models failed: ${failures.join(' | ')}`);
@@ -243,22 +274,44 @@ export async function extractNamesFromImage(image) {
 // ─── Name checking ──────────────────────────────────────────────────────────
 
 /**
- * Check an array of names against database-backed lists.
- * OCR checks intentionally stay DB-only: no live bible/worker roster lookup,
- * no hidden-roster fallback, no similar-name search.
+ * Check OCR entries against database-backed lists.
  *
- * @param {string[]} names
- * @returns {Promise<Array<object>>} Results with list entries and stored snapshot metadata
- */
-/**
- * @param {string[]} names
+ * Accepts either the legacy bare-name shape (`string[]`) or the new
+ * Gemini-extracted shape (`Array<{name, ocrClass}>`). Both flow through
+ * the same DB + targeted-enrichment pipeline; the `ocrClass` field, when
+ * present, is propagated into the result as a class-icon fallback when
+ * neither the snapshot nor the worker-backed meta probe provides class
+ * info (e.g. worker offline + never-queried name).
+ *
+ * @param {Array<string | {name: string, ocrClass?: string, class?: string}>} entries
  * @param {object} [options]
  * @param {string} [options.guildId] - Guild ID for including server-scoped blacklist entries
+ * @returns {Promise<Array<object>>} Results with list entries + snapshot + ocr metadata
  */
-export async function checkNamesAgainstLists(names, options = {}) {
+export async function checkNamesAgainstLists(entries, options = {}) {
   const startedAt = Date.now();
   await connectDB();
   const { guildId } = options;
+
+  // Normalize the caller's input into a uniform { name, ocrClass } shape.
+  // Legacy callers passing bare strings still work; new callers benefit
+  // from the carried ocrClass propagation.
+  const normalized = (entries || [])
+    .map((item) => {
+      if (typeof item === 'string') return { name: item, ocrClass: '' };
+      if (item && typeof item === 'object' && item.name) {
+        return { name: item.name, ocrClass: item.ocrClass || item.class || '' };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  const names = normalized.map((n) => n.name);
+  const ocrClassByName = new Map(
+    normalized
+      .filter((n) => n.ocrClass)
+      .map((n) => [n.name.toLowerCase(), n.ocrClass])
+  );
 
   // Phase 1: Batch list check · 3 queries for ALL names instead of 3 × N
   const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
@@ -319,6 +372,12 @@ export async function checkNamesAgainstLists(names, options = {}) {
       snapClassName: snap?.classId ? getClassName(snap.classId) : '',
       snapItemLevel: snap?.itemLevel || 0,
       snapCombatScore: snap?.combatScore || '',
+      // OCR-detected class (best-effort from Gemini reading the raid
+      // lobby icon). Used as a fallback by format.js when neither the
+      // snapshot nor the worker meta probe filled snapClassName.
+      // Empty string when Gemini wasn't confident or the input came
+      // through the legacy string[] entry shape.
+      ocrClassName: ocrClassByName.get(name.toLowerCase()) || '',
     };
   });
 
