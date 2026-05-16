@@ -1,4 +1,5 @@
 import { getClassName } from '../../models/Class.js';
+import { rosterUrl } from '../../utils/rosterLink.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
 import { parseItemLevelValue } from './parsers.js';
@@ -47,6 +48,6 @@ export async function inferHiddenRosterItemLevel(name, options = {}) {
 
 export function formatSuggestionLines(suggestions) {
   return suggestions
-    .map((s) => `[${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) · \`${Number(s.itemLevel).toFixed(2)}\` · ${getClassName(s.cls)}`)
+    .map((s) => `[${s.name}](${rosterUrl(s.name)}) · \`${Number(s.itemLevel).toFixed(2)}\` · ${getClassName(s.cls)}`)
     .join('\n');
 }

@@ -205,6 +205,22 @@ const config = {
   strongholdDeepFailureGuardMinCandidates: parsePositiveIntEnv('STRONGHOLD_DEEP_FAILURE_GUARD_MIN_CANDIDATES', 25),
   strongholdDeepFailureGuardRate: parseRatioEnv('STRONGHOLD_DEEP_FAILURE_GUARD_RATE', 0.85),
 
+  /**
+   * Base URL for character-page display links rendered in embeds (e.g.
+   * "Tracked alts" rows, evidence detail title, broadcast cards).
+   * The bot appends `<urlencoded-name>/roster` (or `/logs`, `/guild`)
+   * onto this base. Trailing slash is auto-trimmed at use time so both
+   * `https://lostark.bible/character/NA/` and `https://lostark.bible/character/NA`
+   * shapes are accepted. Default keeps current production behavior.
+   *
+   * Decoupling rationale: the moderation DB itself is self-sufficient,
+   * but historical embeds linked into bible for click-through verification.
+   * If/when bible is replaced (e.g. local-sync proxy, alternative roster
+   * site), set this env var to swap every display link in one place.
+   * Data-fetch URLs (e.g. `__data.json`) are NOT controlled by this base.
+   */
+  bibleBaseUrl: (process.env.BIBLE_BASE_URL || 'https://lostark.bible/character/NA/').trim().replace(/\/+$/, ''),
+
   /** Lost Ark server status page URL */
   statusUrl: 'https://www.playlostark.com/en-gb/support/server-status',
 

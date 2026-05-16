@@ -25,6 +25,7 @@ import {
   refreshRosterDeepSession,
   clearRosterDeepSession,
 } from '../../utils/rosterDeepSession.js';
+import { rosterUrl } from '../../utils/rosterLink.js';
 import { makeRosterScanProgressCallback } from './progress.js';
 
 function reserveCallerScan(interaction, label) {
@@ -239,7 +240,7 @@ export async function handleRosterDeepContinueButton(interaction) {
     scannedNames: mergedScannedNames,
   };
 
-  const profileUrl = `https://lostark.bible/character/NA/${encodeURIComponent(session.targetName)}/roster`;
+  const profileUrl = rosterUrl(session.targetName);
   const { embed: resultEmbed, state } = buildScanResultEmbed({
     target: { name: session.targetName, isHidden: session.isHidden, guildName: session.meta.guildName, profileUrl },
     result: cumulativeResult,

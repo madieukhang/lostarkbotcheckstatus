@@ -13,6 +13,7 @@ import {
 } from 'discord.js';
 
 import { connectDB } from '../../../db.js';
+import { rosterUrl } from '../../../utils/rosterLink.js';
 import config from '../../../config.js';
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
@@ -103,7 +104,7 @@ export function createTrustHandlers({ client }) {
         return;
       }
 
-      const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(deleted.name)}/roster`;
+      const rosterLink = rosterUrl(deleted.name);
       const trustedSince = deleted.createdAt
         ? `<t:${Math.floor(new Date(deleted.createdAt).getTime() / 1000)}:R>`
         : 'unknown';
@@ -169,7 +170,7 @@ export function createTrustHandlers({ client }) {
       addedByTag: interaction.user.tag,
     });
 
-    const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+    const rosterLink = rosterUrl(name);
     const embed = buildAlertEmbed({
       severity: AlertSeverity.SUCCESS,
       titleIcon: '',

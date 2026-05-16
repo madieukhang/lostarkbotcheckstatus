@@ -4,6 +4,7 @@
  */
 
 import { buildAlertEmbed, AlertSeverity } from './alertEmbed.js';
+import { rosterUrl } from './rosterLink.js';
 import { ICONS, buildProgressBar, relativeTime } from './ui.js';
 import { getClassEmoji } from '../models/Class.js';
 
@@ -16,7 +17,7 @@ function buildAltsBlock(alts) {
     const ilvl = typeof alt.itemLevel === 'number'
       ? alt.itemLevel.toFixed(2)
       : (alt.itemLevel || '?');
-    const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
+    const link = rosterUrl(alt.name);
     return `- ${classPrefix} **[${alt.name}](${link})** - \`${ilvl}\``;
   });
   const extra = alts.length > visible.length

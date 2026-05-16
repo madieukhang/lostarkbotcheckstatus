@@ -9,12 +9,14 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ### Added
 - `/la-evidence name [public]` direct-lookup command. Autocomplete unions Blacklist/Whitelist/Watchlist by name prefix (case-insensitive, latest-added first when input is empty) and returns up to 25 `<type>:<name>` value choices so the handler picks the right list even when the same name exists across types. Reuses `buildEvidenceEmbed` from `/la-list view` so the rendered card stays visually consistent.
 - Permission shape: ephemeral by default (member-visible); `public:true` is gated to officer/senior so only privileged users can broadcast evidence into the channel. Members who pass `public:true` get a soft "Public Mode Restricted" alert prepended to a still-ephemeral reply rather than a hard reject. Officer-only "Added by" footer matches the existing `/la-list view` evidence detail behavior.
+- `bot/utils/rosterLink.js` centralises the four character-page display URL shapes (`rosterUrl`, `logsUrl`, `profileUrl`, `guildPageUrl`). New `config.bibleBaseUrl` (env `BIBLE_BASE_URL`, default `https://lostark.bible/character/NA/`) drives all four. Swapping the upstream roster site no longer means grepping ~25 files. Data-fetch URLs (`__data.json`, `/guild/__data.json`) intentionally remain controlled by the scraper/worker layer since those are bible-as-data-source, decoupled separately by the local-sync project.
+
+### Changed
+- All in-embed character-page links (`/la-list view` Tracked alts, `/la-list view` evidence detail, `/la-search` result rows, `/la-list add` success card with Roster + Logs buttons, `/la-list remove` Tracked alts, `/la-list trust` Added/Removed cards, `/la-list enrich` Newly tracked block, `/la-roster deep` scan-result/progress/completion DM, hidden-roster embed title) now route through the `rosterLink.js` helpers. Default URL output is unchanged from prior production behavior. `bot/services/multiadd/template.js` keeps its hardcoded example URL on purpose to preserve the module's zero-deps property (per its docstring).
+- Cross-server list add/edit broadcasts now render tracked alts with class icon, item level, and CP when roster data is available. Rows still fall back to linked names when a snapshot is missing.
 
 ### Fixed
 - OCR list-check and auto-check are now DB-only after OCR: they compare extracted names against blacklist/whitelist/watchlist/trusted data and stored snapshots only. They no longer call bible, worker roster lookup, hidden-roster fallback, similar-name search, or post-check roster enrichment.
-
-### Changed
-- Cross-server list add/edit broadcasts now render tracked alts with class icon, item level, and CP when roster data is available. Rows still fall back to linked names when a snapshot is missing.
 
 ### Tests
 - Added focused coverage for the richer tracked-alt broadcast formatter.

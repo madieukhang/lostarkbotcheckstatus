@@ -16,6 +16,7 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { rosterUrl } from '../../utils/rosterLink.js';
 import { COLORS, ICONS } from '../../utils/ui.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
@@ -38,7 +39,7 @@ export function getListContext(type) {
  * blocks have consistent styling with the rest of the bot's alerts.
  */
 export function buildTrustedBlockEmbed(name, reason, { via } = {}) {
-  const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+  const rosterLink = rosterUrl(name);
   const description = via
     ? `**${name}** shares a roster with trusted user **${via}** and cannot be added to any list.`
     : `**${name}** is a trusted user and cannot be added to any list.`;
@@ -66,7 +67,7 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
   const scopeTag = entry.scope === 'server' ? ' (Local)' : '';
   const titleAction = isMove ? 'Edited & Moved' : 'Edited';
-  const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
+  const rosterLink = rosterUrl(entry.name);
 
   const fields = [
     { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
@@ -156,7 +157,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   if (others.length > 0) {
     const visible = others.slice(0, 12);
     const lines = visible.map((n, i) => {
-      const link = `https://lostark.bible/character/NA/${encodeURIComponent(n)}/roster`;
+      const link = rosterUrl(n);
       return `${i + 1}. [${n}](${link})`;
     });
     const extra = others.length > visible.length ? `\n*... and ${others.length - visible.length} more*` : '';

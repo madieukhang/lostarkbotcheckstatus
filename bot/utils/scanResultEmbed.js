@@ -30,6 +30,7 @@ import {
 } from 'discord.js';
 
 import { COLORS, ICONS } from './ui.js';
+import { rosterUrl } from './rosterLink.js';
 import { getClassEmoji } from '../models/Class.js';
 
 /**
@@ -89,7 +90,7 @@ function buildAltList(alts, { newAltsSet } = {}) {
   if (!Array.isArray(alts) || alts.length === 0) return '';
   const visible = alts.slice(0, 25);
   const lines = visible.map((alt, i) => {
-    const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
+    const link = rosterUrl(alt.name);
     const cls = alt.className || alt.classId || '?';
     // Class icon replaces the className text and sits BEFORE the
     // character name (per project styling decision). Falls back to

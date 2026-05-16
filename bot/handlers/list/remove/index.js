@@ -13,6 +13,7 @@ import {
 } from 'discord.js';
 
 import { connectDB } from '../../../db.js';
+import { rosterUrl } from '../../../utils/rosterLink.js';
 import config from '../../../config.js';
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
@@ -198,7 +199,7 @@ export function createRemoveHandlers({ client, services }) {
           );
           if (others.length > 0) {
             const visible = others.slice(0, 6);
-            const linked = visible.map((n) => `[${n}](https://lostark.bible/character/NA/${encodeURIComponent(n)}/roster)`);
+            const linked = visible.map((n) => `[${n}](${rosterUrl(n)})`);
             const tail = others.length > visible.length ? ` *+${others.length - visible.length} more*` : '';
             sections.push(`🧬 **Tracked alts on this entry (${others.length}):**\n${linked.join(', ')}${tail}`);
           }

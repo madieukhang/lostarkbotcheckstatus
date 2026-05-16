@@ -16,6 +16,7 @@
 
 import { LIST_LABELS } from './data.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { rosterUrl } from '../../../utils/rosterLink.js';
 import { ICONS } from '../../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../../utils/scanProgressEmbed.js';
 import { getClassName, getClassEmoji } from '../../../models/Class.js';
@@ -80,7 +81,7 @@ export function buildEnrichSuccessEmbed(session, updateResult) {
       const ilvl = typeof alt.itemLevel === 'number'
         ? alt.itemLevel.toFixed(2)
         : (alt.itemLevel || '?');
-      const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
+      const link = rosterUrl(alt.name);
       return `**${index + 1}.** ${classPrefix} [${alt.name}](${link}) · \`${ilvl}\``;
     })
     .join('\n');

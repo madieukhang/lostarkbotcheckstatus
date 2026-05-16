@@ -16,6 +16,7 @@ import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { ICONS } from '../../../utils/ui.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { rosterUrl, logsUrl } from '../../../utils/rosterLink.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -101,7 +102,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
           .slice(0, 10)
           .map(
             (s, idx) =>
-              `**${idx + 1}.** [${s.name}](https://lostark.bible/character/NA/${encodeURIComponent(s.name)}/roster) · \`${Number(s.itemLevel || 0).toFixed(2)}\` · ${getClassName(s.cls)}`
+              `**${idx + 1}.** [${s.name}](${rosterUrl(s.name)}) · \`${Number(s.itemLevel || 0).toFixed(2)}\` · ${getClassName(s.cls)}`
           )
           .join('\n');
 
@@ -147,7 +148,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
             title: 'Item Level Too Low',
             description: `**${name}** does not meet the minimum item level required to be added to any list.`,
             fields: [
-              { name: 'Character', value: `[${name}](https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster)`, inline: true },
+              { name: 'Character', value: `[${name}](${rosterUrl(name)})`, inline: true },
               { name: 'Item level', value: `\`${targetItemLevel.toFixed(2)}\``, inline: true },
               { name: 'Minimum required', value: '`1700.00`', inline: true },
               { name: 'Target list', value: labelCap, inline: true },
@@ -202,7 +203,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
 
       // Build structured alert embed with all the duplicate's context
-      const existedRosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(existed.name)}/roster`;
+      const existedRosterLink = rosterUrl(existed.name);
       const dupFields = [];
       if (isRosterMatch) {
         dupFields.push({
@@ -305,8 +306,8 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     // Uses buildAlertEmbed with titleIcon/color overrides so the card
     // wears the list-type icon (⛔/✅/⚠️) and matches the rest of the
     // alert family's layout (footer, timestamp, field rendering).
-    const rosterLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/roster`;
-    const autoLogsLink = `https://lostark.bible/character/NA/${encodeURIComponent(entry.name)}/logs`;
+    const rosterLink = rosterUrl(entry.name);
+    const autoLogsLink = logsUrl(entry.name);
 
     const linkParts = [`[Roster](${rosterLink})`, `[Logs](${autoLogsLink})`];
     if (payload.logsUrl) linkParts.push(`[Evidence Logs](${payload.logsUrl})`);

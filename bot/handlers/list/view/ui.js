@@ -9,14 +9,8 @@ import {
 import {
   refreshImageUrl,
 } from '../../../utils/imageRehost.js';
+import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
-
-/**
- * Build a single roster-link Markdown for an entry name.
- */
-function rosterLink(name) {
-  return `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
-}
 
 /**
  * Render the meta line that sits under each entry's name. Uses middot
@@ -51,7 +45,7 @@ function buildEntryRosterLine(entry) {
     .filter((n) => String(n).toLowerCase() !== String(entry.name).toLowerCase());
   if (others.length === 0) return '';
   const visible = others.slice(0, 3);
-  const linked = visible.map((n) => `[${n}](${rosterLink(n)})`);
+  const linked = visible.map((n) => `[${n}](${rosterUrl(n)})`);
   const tail = others.length > visible.length
     ? ` *+${others.length - visible.length} more*`
     : '';
@@ -60,7 +54,7 @@ function buildEntryRosterLine(entry) {
 
 export function buildTrustedListEmbed(entries) {
   const lines = entries.flatMap((entry) => {
-    const link = rosterLink(entry.name);
+    const link = rosterUrl(entry.name);
     const head = `${ICONS.shield} **[${entry.name}](${link})**`;
     const meta = buildEntryMetaLine({ entry, freshUrl: '' });
     return meta ? [head, meta, ''] : [head, ''];
@@ -118,7 +112,7 @@ export async function buildListPageEmbed(options) {
         scopeTag = ' `[Local]`';
       }
     }
-    const link = rosterLink(entry.name);
+    const link = rosterUrl(entry.name);
     const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${entry._icon} **[${entry.name}](${link})**${scopeTag}`;
     const meta = buildEntryMetaLine({ entry, freshUrl: freshUrls[index] });
     const rosterLine = buildEntryRosterLine(entry);
@@ -220,7 +214,7 @@ export function buildListViewComponents({ allEntries, itemsPerPage, page, totalP
  * or hitting bible directly.
  */
 export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false } = {}) {
-  const link = rosterLink(entry.name);
+  const link = rosterUrl(entry.name);
   const fields = [
     { name: '📝 Reason', value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
   ];
@@ -242,7 +236,7 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false }
   const others = allChars.filter((n) => String(n).toLowerCase() !== String(entry.name).toLowerCase());
   if (others.length > 0) {
     const visible = others.slice(0, 12);
-    const lines = visible.map((n, i) => `${i + 1}. [${n}](${rosterLink(n)})`);
+    const lines = visible.map((n, i) => `${i + 1}. [${n}](${rosterUrl(n)})`);
     const extra = others.length > visible.length
       ? `\n*... and ${others.length - visible.length} more*`
       : '';

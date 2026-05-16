@@ -73,6 +73,7 @@ import {
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../../utils/scanCompletionDm.js';
 import { createLongRunningReplyEditor } from '../../../utils/longRunningReply.js';
 import { mergeAltsByName } from '../../../utils/alts.js';
+import { rosterUrl } from '../../../utils/rosterLink.js';
 
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
 // ~40-60 updates over a 10-15 minute gentle-mode scan; well under the
@@ -440,7 +441,7 @@ export function createEnrichHandlers({ client, services }) {
 
     const ctx = LIST_LABELS[found.type];
     const newAltsSet = new Set(newAlts.map((a) => String(a.name).toLowerCase()));
-    const profileUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+    const profileUrl = rosterUrl(name);
 
     const summaryLine =
       `I scanned **${meta.guildName}** for stronghold matches with **${name}**` +
