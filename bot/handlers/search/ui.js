@@ -1,6 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
 
 import { getClassName, getClassEmoji } from '../../models/Class.js';
+import { rosterUrl } from '../../utils/rosterLink.js';
 import { COLORS } from '../../utils/ui.js';
 import { pickEvidenceEntry } from './evidence.js';
 
@@ -23,7 +24,7 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
     if (result.trusted) icon += '🛡️';
     if (icon) icon += ' ';
 
-    const link = `[${result.name}](https://lostark.bible/character/NA/${encodeURIComponent(result.name)}/roster)`;
+    const link = `[${result.name}](${rosterUrl(result.name)})`;
     // Class icon (or text fallback) sits BEFORE the name, after the list-
     // status icon. Pattern matches the rest of the v0.5.67 vocabulary.
     let line = `**${index + 1}.** ${icon}${classPrefix} ${link} · \`${ilvl}\`${cpSuffix}${hasImage ? ' · 📎' : ''}`;

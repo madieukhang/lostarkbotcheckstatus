@@ -5,6 +5,7 @@ import GuildConfig from '../../../models/GuildConfig.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
 
@@ -57,7 +58,7 @@ function getBroadcastClassName(record) {
 }
 
 function getRosterLink(name) {
-  return `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+  return rosterUrl(name);
 }
 
 export function formatBroadcastCharacterLine(name, index, statRecord) {

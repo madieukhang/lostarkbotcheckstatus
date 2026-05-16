@@ -182,7 +182,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
 
         const primaryEmbed = new EmbedBuilder()
           .setTitle(`Hidden Roster – ${name}`)
-          .setURL(`https://lostark.bible/character/NA/${encodeURIComponent(name)}`)
+          .setURL(bibleProfileUrl(name))
           .setDescription(description.length > 4000 ? description.slice(0, 4000) + '\n…' : description)
           .setColor(color)
           .setFooter({ text: `${guildMembers.length} guild members${deepStats ? ` · ${deepStats}` : ''} · lostark.bible` })
@@ -199,7 +199,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         if (scanErrorEmbed) {
           replyEmbeds.push(scanErrorEmbed);
         } else if (deep && altResult) {
-          const profileUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+          const profileUrl = rosterUrl(name);
           const { embed: scanEmbed, state } = buildScanResultEmbed({
             target: { name, isHidden: true, guildName: meta.guildName, profileUrl },
             result: altResult,

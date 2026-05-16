@@ -20,6 +20,7 @@ import {
 } from 'discord.js';
 
 import { COLORS, ICONS } from './ui.js';
+import { rosterUrl } from './rosterLink.js';
 import { getClassEmoji } from '../models/Class.js';
 
 /**
@@ -58,7 +59,7 @@ function buildAltLines(alts = []) {
   if (!alts.length) return '';
   const visible = alts.slice(0, 10);
   const lines = visible.map((alt, i) => {
-    const link = `https://lostark.bible/character/NA/${encodeURIComponent(alt.name)}/roster`;
+    const link = rosterUrl(alt.name);
     const cls = alt.className || alt.classId || '?';
     const classPrefix = getClassEmoji(cls) || cls;
     const ilvl = typeof alt.itemLevel === 'number'

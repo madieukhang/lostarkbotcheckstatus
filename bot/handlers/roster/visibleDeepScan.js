@@ -19,6 +19,7 @@ import {
   unregisterScan,
 } from '../../utils/scanSession.js';
 import { createRosterDeepSession } from '../../utils/rosterDeepSession.js';
+import { rosterUrl } from '../../utils/rosterLink.js';
 import { makeRosterScanProgressCallback } from './progress.js';
 
 export async function runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed, contentLines }) {
@@ -127,7 +128,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
         // card. The visible-roster deep path is opt-in (deep:true) so
         // we know the officer wants the alt list visible.
         if (altResult && visMeta?.guildName) {
-          const profileUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+          const profileUrl = rosterUrl(name);
           const { embed: scanEmbed, state } = buildScanResultEmbed({
             target: { name, isHidden: false, guildName: visMeta.guildName, profileUrl },
             result: altResult,
@@ -173,7 +174,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
           // sees outcome. No Continue button (nothing to resume against
           // without a guild member list).
           const { embed: scanEmbed } = buildScanResultEmbed({
-            target: { name, isHidden: false, guildName: visMeta?.guildName, profileUrl: `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster` },
+            target: { name, isHidden: false, guildName: visMeta?.guildName, profileUrl: rosterUrl(name) },
             result: altResult,
             kind: 'roster-visible',
             summaryLine: `Stronghold scan ran without a guild member list.`,
