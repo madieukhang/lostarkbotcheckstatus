@@ -24,11 +24,17 @@ import { createAddHandlers } from './add/index.js';
 import { createCheckHandlers } from './check/index.js';
 import { createEditHandlers } from './edit/index.js';
 import { createEnrichHandlers } from './enrich/index.js';
+import {
+  createEvidenceHandlers,
+  handleListEvidenceAutocomplete,
+} from './evidence/command.js';
 import { createMultiaddHandlers } from './multiadd/index.js';
 import { createQuickAddHandlers } from './quickadd/index.js';
 import { createRemoveHandlers } from './remove/index.js';
 import { createTrustHandlers } from './trust/index.js';
 import { createViewHandlers } from './view/index.js';
+
+export { handleListEvidenceAutocomplete };
 
 export function createListHandlers({ client }) {
   const services = createSharedServices({ client });
@@ -37,6 +43,7 @@ export function createListHandlers({ client }) {
   const check = createCheckHandlers({ client });
   const edit = createEditHandlers({ client, services });
   const enrich = createEnrichHandlers({ client, services });
+  const evidence = createEvidenceHandlers({ client });
   const multiadd = createMultiaddHandlers({ client, services });
   const quickadd = createQuickAddHandlers({ client, services });
   const remove = createRemoveHandlers({ client, services });
@@ -48,6 +55,7 @@ export function createListHandlers({ client }) {
     handleListAddCommand: add.handleListAddCommand,
     handleListEditCommand: edit.handleListEditCommand,
     handleListEnrichCommand: enrich.handleListEnrichCommand,
+    handleListEvidenceCommand: evidence.handleListEvidenceCommand,
     handleListRemoveCommand: remove.handleListRemoveCommand,
     handleListViewCommand: view.handleListViewCommand,
     handleListTrustCommand: trust.handleListTrustCommand,

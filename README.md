@@ -12,6 +12,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 - **Quick Add** — after auto-check, dropdown adds unflagged names straight to blacklist/watchlist via modal
 - **Approval flow** — members submit, officers instant-approve; senior approver always receives the DM
 - **Evidence rehosting** — images uploaded with an entry are rehosted into a pinned evidence channel so Discord's 24h CDN expiry doesn't rot the reference
+- **Direct evidence lookup** — `/la-evidence name` with autocomplete jumps straight to a single entry's evidence embed, no list-view paging needed; officers can broadcast publicly with `public:true`
 - **ScraperAPI fallback** — direct fetch to `lostark.bible` first, auto-fallback through up to 3 ScraperAPI keys on 403/503; high-fanout roster/list/OCR paths keep ScraperAPI off by default
 - **ScraperAPI usage visibility** — `/la-stats` shows process-lifetime ScraperAPI request totals, success/failure split, network errors, and per-key counts
 - **Guild-only commands** — `setDMPermission(false)` on every slash command; nothing runs in DMs
@@ -24,6 +25,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 | `/la-reset` | Reset the stored server status state |
 | `/la-roster name [deep] [deep_limit]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan and is **restricted to officers/seniors** (it depends on the bot owner's residential-IP worker). Plain `/la-roster name` without the deep flag is open to everyone |
 | `/la-search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists |
+| `/la-evidence name [public]` | Direct evidence lookup for a single listed name. Autocomplete unions blacklist/whitelist/watchlist; bypasses `/la-list view` paging. Ephemeral by default; `public:true` is officer/senior only |
 | `/la-list add type name reason [raid] [logs] [image] [scope]` | Add to blacklist/whitelist/watchlist. `scope`: `global` / `server` (blacklist only) |
 | `/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` | Edit existing entry (owner/officer instant, members via approval). `additional_names` appends alts manually for hidden-roster + no-guild edge case |
 | `/la-list remove name` | Remove an entry (ownership check) |
