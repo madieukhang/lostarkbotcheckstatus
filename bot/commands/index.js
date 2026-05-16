@@ -334,6 +334,26 @@ function searchCommand(name) {
     .setDMPermission(false);
 }
 
+function evidenceCommand(name) {
+  return new SlashCommandBuilder()
+    .setName(name)
+    .setDescription('Direct lookup: show evidence for a listed character (autocomplete-driven)')
+    .setDMPermission(false)
+    .addStringOption((opt) =>
+      opt
+        .setName('name')
+        .setDescription('Character name (autocomplete shows entries across all lists)')
+        .setRequired(true)
+        .setAutocomplete(true)
+    )
+    .addBooleanOption((opt) =>
+      opt
+        .setName('public')
+        .setDescription('Broadcast publicly in this channel (officer/senior only; defaults to private)')
+        .setRequired(false)
+    );
+}
+
 function listCheckCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
@@ -474,6 +494,7 @@ const PUBLIC_COMMAND_DEFS = [
   ['la-roster', rosterCommand],
   ['la-list', listCommand],
   ['la-search', searchCommand],
+  ['la-evidence', evidenceCommand],
   ['la-check', listCheckCommand],
   ['la-help', helpCommand],
   ['la-setup', setupCommand],

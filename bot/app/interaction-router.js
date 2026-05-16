@@ -3,7 +3,10 @@ import { InteractionType } from 'discord.js';
 import { checkStatus, resetState } from '../monitor/monitor.js';
 import { createSystemHandlers } from '../handlers/system/index.js';
 import { handleRosterCommand, handleRosterDeepContinueButton } from '../handlers/roster/index.js';
-import { createListHandlers } from '../handlers/list/index.js';
+import {
+  createListHandlers,
+  handleListEvidenceAutocomplete,
+} from '../handlers/list/index.js';
 import { handleSearchCommand } from '../handlers/search/index.js';
 import { handleSetupCommand, handleSetupRemoteCommand } from '../handlers/setup/index.js';
 import { handleStatsCommand } from '../handlers/meta/stats.js';
@@ -52,6 +55,10 @@ async function handleAutocomplete(interaction) {
         await interaction.respond(getClassAutocompleteChoices(focused.value));
         return;
       }
+    }
+    if (interaction.commandName === 'la-evidence') {
+      await handleListEvidenceAutocomplete(interaction);
+      return;
     }
     await interaction.respond([]);
   } catch (err) {
@@ -208,6 +215,8 @@ export function createInteractionRouter({ client }) {
         await handleRosterCommand(interaction);
       } else if (commandName === 'la-search') {
         await handleSearchCommand(interaction);
+      } else if (commandName === 'la-evidence') {
+        await listHandlers.handleListEvidenceCommand(interaction);
       } else if (commandName === 'la-list') {
         const subcommand = interaction.options.getSubcommand();
         if (subcommand === 'add') {
