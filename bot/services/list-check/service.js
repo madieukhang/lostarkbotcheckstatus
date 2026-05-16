@@ -22,6 +22,20 @@ import { mapWithConcurrency } from '../../utils/async.js';
 
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
 
+/**
+ * Canonicalise a name for diacritic-tolerant comparison. Strips
+ * combining marks (NFD decomposition + drop ̀-ͯ) and
+ * lowercases. Used in the worker-offline enrichment branch to
+ * recover names where Gemini OCR dropped a diacritic and bible's
+ * search returns the canonical (with-diacritic) variant.
+ */
+function stripDiacritics(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /** Known Lost Ark server/world names to filter from OCR results */
@@ -410,12 +424,35 @@ export async function checkNamesAgainstLists(names, options = {}) {
           // No viaWorker (would just fail the same way it failed before).
           const suggestions = await fetchNameSuggestions(item.name);
           if (!Array.isArray(suggestions) || suggestions.length === 0) return;
+
+          // First pass: case-insensitive exact match. Covers the happy
+          // path where Gemini preserved every character.
           const target = item.name.toLowerCase();
-          const exact = suggestions.find((s) => String(s.name).toLowerCase() === target);
-          if (!exact) return;
+          let chosen = suggestions.find((s) => String(s.name).toLowerCase() === target);
+
+          // Second pass: diacritic-tolerant match. Gemini sometimes drops
+          // marks on letters like ù / ä / ë; bible's search returns the
+          // canonical (with-diacritic) name as a candidate, so accept it
+          // when the bare-letter form matches. Update item.name to the
+          // canonical form so the embed renders the correct spelling and
+          // the snapshot is keyed by the real name.
+          if (!chosen) {
+            const targetCanonical = stripDiacritics(item.name);
+            chosen = suggestions.find(
+              (s) => stripDiacritics(String(s.name)) === targetCanonical
+            );
+            if (chosen) {
+              console.log(
+                `[listcheck] Diacritic-tolerant match: OCR'd "${item.name}" -> canonical "${chosen.name}"`
+              );
+              item.name = chosen.name;
+            }
+          }
+
+          if (!chosen) return;
           await applyEnrichment(item, {
-            classId: exact.cls || '',
-            itemLevel: Number(exact.itemLevel) || 0,
+            classId: chosen.cls || '',
+            itemLevel: Number(chosen.itemLevel) || 0,
           });
         }
       } catch (err) {
