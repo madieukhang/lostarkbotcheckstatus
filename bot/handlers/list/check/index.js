@@ -33,6 +33,8 @@ import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
+import { COLORS, ICONS } from '../../../utils/ui.js';
+import { buildEvidenceEmbed } from '../view/ui.js';
 import {
   buildMultiaddTemplate,
   parseMultiaddFile,
@@ -53,6 +55,138 @@ import {
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
+
+/**
+ * Per-list-type style metadata for the auto-check evidence dropdown.
+ * Mirrors the style helper used by /la-search and /la-list view so the
+ * three evidence surfaces render the same icon/color vocabulary.
+ */
+function evidenceStyleForListType(listType) {
+  if (listType === 'black') return { emoji: '⛔', label: 'blacklist', color: COLORS.danger };
+  if (listType === 'white') return { emoji: '✅', label: 'whitelist', color: COLORS.success };
+  return { emoji: '⚠️', label: 'watchlist', color: COLORS.warning };
+}
+
+function pickListEntryWithEvidence(result) {
+  for (const [listType, entry] of [
+    ['black', result.blackEntry],
+    ['white', result.whiteEntry],
+    ['watch', result.watchEntry],
+  ]) {
+    if (entry && (entry.imageMessageId || entry.imageUrl)) {
+      return { entry, listType };
+    }
+  }
+  return null;
+}
+
+/**
+ * Build the auto-check / /la-check evidence dropdown. Lists every result
+ * row whose flagged list entry carries an evidence image (rehosted or
+ * legacy URL). Each option's value encodes `<listType>:<_id>` so the
+ * select handler resolves unambiguously across types and scopes (mirrors
+ * /la-evidence's encoding).
+ */
+export function buildAutoCheckEvidenceRow(results) {
+  const candidates = [];
+  for (const result of results) {
+    const picked = pickListEntryWithEvidence(result);
+    if (!picked) continue;
+    candidates.push({
+      result,
+      entry: picked.entry,
+      listType: picked.listType,
+    });
+  }
+  if (candidates.length === 0) return null;
+
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('autocheck_evidence')
+      .setPlaceholder(`${ICONS.evidence} View evidence for...`)
+      .addOptions(
+        candidates.slice(0, 25).map(({ result, entry, listType }) => {
+          const style = evidenceStyleForListType(listType);
+          return {
+            label: result.name,
+            description: (entry.reason || 'No reason').slice(0, 100),
+            value: `${listType}:${entry._id}`.slice(0, 100),
+            emoji: style.emoji,
+          };
+        })
+      )
+  );
+}
+
+const KNOWN_EVIDENCE_TYPES = ['black', 'white', 'watch'];
+const EVIDENCE_OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
+
+function parseEvidenceValue(raw) {
+  if (!raw) return null;
+  const idx = raw.indexOf(':');
+  if (idx <= 0 || idx >= raw.length - 1) return null;
+  const listType = raw.slice(0, idx);
+  const id = raw.slice(idx + 1).trim();
+  if (!KNOWN_EVIDENCE_TYPES.includes(listType)) return null;
+  if (!EVIDENCE_OBJECT_ID_RE.test(id)) return null;
+  return { listType, id };
+}
+
+export function createAutoCheckEvidenceHandler({ client }) {
+  return async function handleAutoCheckEvidenceSelect(interaction) {
+    const raw = interaction.values?.[0] || '';
+    const parsed = parseEvidenceValue(raw);
+
+    if (!parsed) {
+      await interaction.reply({
+        content: 'Evidence selection malformed (please re-run the check).',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await connectDB();
+    const ctx = getListContext(parsed.listType);
+    const entry = await ctx.model.findOne({ _id: parsed.id }).lean();
+
+    if (!entry) {
+      await interaction.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          title: 'Entry Removed',
+          description: 'The list entry behind this evidence row no longer exists.',
+        })],
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (!entry.imageMessageId && !entry.imageUrl) {
+      await interaction.reply({
+        content: 'No evidence image for this entry.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const style = evidenceStyleForListType(parsed.listType);
+    const decorated = {
+      ...entry,
+      _icon: style.emoji,
+      _label: style.label,
+      _color: style.color,
+    };
+    const displayUrl = await resolveDisplayImageUrl(entry, client);
+    const isOfficer =
+      config.officerApproverIds.includes(interaction.user.id)
+      || config.seniorApproverIds.includes(interaction.user.id);
+
+    await interaction.reply({
+      embeds: [buildEvidenceEmbed(decorated, displayUrl, { includeAddedBy: isOfficer })],
+      ephemeral: true,
+    });
+  };
+}
 
 export function createCheckHandlers({ client }) {
   async function handleListCheckCommand(interaction) {
@@ -110,7 +244,14 @@ export function createCheckHandlers({ client }) {
         mode: 'slash',
       });
 
-      await interaction.editReply({ content: '', embeds: [embed] });
+      // Evidence dropdown · mirror of /la-list view's evidence row.
+      // Surfaces every flagged row whose list entry has an evidence
+      // image so officers can audit without re-running /la-list view.
+      const components = [];
+      const evidenceRow = buildAutoCheckEvidenceRow(results);
+      if (evidenceRow) components.push(evidenceRow);
+
+      await interaction.editReply({ content: '', embeds: [embed], components });
     } catch (err) {
       console.error('[listcheck] ❌ Check failed:', err.message);
       await interaction.editReply({
@@ -124,5 +265,8 @@ export function createCheckHandlers({ client }) {
     }
   }
 
-  return { handleListCheckCommand };
+  return {
+    handleListCheckCommand,
+    handleAutoCheckEvidenceSelect: createAutoCheckEvidenceHandler({ client }),
+  };
 }

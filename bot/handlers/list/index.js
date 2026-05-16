@@ -52,6 +52,7 @@ export function createListHandlers({ client }) {
 
   return {
     handleListCheckCommand: check.handleListCheckCommand,
+    handleAutoCheckEvidenceSelect: check.handleAutoCheckEvidenceSelect,
     handleListAddCommand: add.handleListAddCommand,
     handleListEditCommand: edit.handleListEditCommand,
     handleListEnrichCommand: enrich.handleListEnrichCommand,
