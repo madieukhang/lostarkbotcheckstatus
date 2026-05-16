@@ -76,6 +76,30 @@ const blacklistSchema = new mongoose.Schema({
     default: [],
   },
 
+  /**
+   * Where `allCharacters` was last touched from. Tags the enrichment as
+   * 'bible' (roster/Stronghold scrape), 'manual' (additional_names append
+   * or other officer-driven write), 'local-sync' (future: browser companion),
+   * or null for legacy entries created before this field existed. Lets the
+   * bot reason about staleness/source without coupling renderers to a
+   * specific upstream.
+   */
+  enrichmentSource: {
+    type: String,
+    enum: ['bible', 'manual', 'local-sync', null],
+    default: null,
+  },
+
+  /**
+   * Timestamp of the most recent `allCharacters` write. Null for legacy
+   * entries; new writes always stamp this. Used together with
+   * `enrichmentSource` to drive a future re-enrich-when-stale loop.
+   */
+  enrichedAt: {
+    type: Date,
+    default: null,
+  },
+
   /** Discord user id that created this entry */
   addedByUserId: {
     type: String,

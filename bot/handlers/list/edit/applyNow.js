@@ -75,6 +75,17 @@ export async function applyListEditNow({
             : { imageUrl: newImageUrl, imageMessageId: '', imageChannelId: '' })
         : { imageUrl: existing.imageUrl || '', imageMessageId: existing.imageMessageId || '', imageChannelId: existing.imageChannelId || '' };
 
+      // Enrichment metadata carry-over rule: if this move appended any
+      // manual additional_names, the merged allCharacters is no longer
+      // a pure bible snapshot, so tag the resulting doc as 'manual' and
+      // stamp now(). Otherwise preserve the source/timestamp from the
+      // pre-move entry (null for legacy docs without metadata).
+      const moveEnrichmentSource = additionalNamesParsed.added.length > 0
+        ? 'manual'
+        : (existing.enrichmentSource ?? null);
+      const moveEnrichedAt = additionalNamesParsed.added.length > 0
+        ? new Date()
+        : (existing.enrichedAt ?? null);
       const movedEntry = await newModel.create({
         name: existing.name,
         reason: newReason || existing.reason,
@@ -85,6 +96,8 @@ export async function applyListEditNow({
           ...(existing.allCharacters || []),
           ...additionalNamesParsed.added,
         ],
+        enrichmentSource: moveEnrichmentSource,
+        enrichedAt: moveEnrichedAt,
         addedByUserId: existing.addedByUserId,
         addedByTag: existing.addedByTag,
         addedByDisplayName: existing.addedByDisplayName,
@@ -147,6 +160,10 @@ export async function applyListEditNow({
         updateOps.$addToSet = {
           allCharacters: { $each: additionalNamesParsed.added },
         };
+        // Manual append downgrades enrichmentSource to 'manual' and refreshes
+        // the timestamp; the alt list is no longer a pure bible snapshot.
+        updateOps.$set.enrichmentSource = 'manual';
+        updateOps.$set.enrichedAt = new Date();
       }
       try {
         await model.updateOne({ _id: existing._id }, updateOps);

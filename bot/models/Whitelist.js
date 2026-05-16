@@ -65,6 +65,23 @@ const whitelistSchema = new mongoose.Schema({
     default: [],
   },
 
+  /**
+   * Where `allCharacters` was last touched from. See Blacklist.js for the
+   * full semantics; mirrored here so all three list schemas keep the same
+   * shape and `getListContext(type).model` queries stay uniform.
+   */
+  enrichmentSource: {
+    type: String,
+    enum: ['bible', 'manual', 'local-sync', null],
+    default: null,
+  },
+
+  /** Timestamp of the most recent `allCharacters` write; null for legacy entries. */
+  enrichedAt: {
+    type: Date,
+    default: null,
+  },
+
   /** Discord user id that created this entry */
   addedByUserId: {
     type: String,
