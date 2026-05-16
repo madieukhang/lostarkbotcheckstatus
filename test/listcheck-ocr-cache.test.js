@@ -51,17 +51,8 @@ test('extractNamesFromImage caches OCR results for repeated attachment URLs', as
     const first = await extractNamesFromImage(image);
     const second = await extractNamesFromImage(image);
 
-    // Post-class-OCR shape: each entry is { name, ocrClass }. Legacy
-    // string-only Gemini output (this test's mock) normalizes to empty
-    // ocrClass, so the OCR-class fallback path is exercised too.
-    assert.deepEqual(first, [
-      { name: 'Alice', ocrClass: '' },
-      { name: 'Bob', ocrClass: '' },
-    ]);
-    assert.deepEqual(second, [
-      { name: 'Alice', ocrClass: '' },
-      { name: 'Bob', ocrClass: '' },
-    ]);
+    assert.deepEqual(first, ['Alice', 'Bob']);
+    assert.deepEqual(second, ['Alice', 'Bob']);
     assert.equal(requestedUrls.length, 2);
   } finally {
     config.geminiApiKey = originalKey;
@@ -103,13 +94,13 @@ test('extractNamesFromImage dedupes canonical-equivalent diacritic spellings', a
   };
 
   try {
-    const entries = await extractNamesFromImage({
+    const names = await extractNamesFromImage({
       id: 'image-diacritic',
       url: 'https://cdn.discordapp.com/diacritic-image.png',
       contentType: 'image/png',
     });
 
-    assert.deepEqual(entries, [{ name: 'Zoë', ocrClass: '' }]);
+    assert.deepEqual(names, ['Zoë']);
   } finally {
     config.geminiApiKey = originalKey;
     globalThis.fetch = originalFetch;

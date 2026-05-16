@@ -13,14 +13,13 @@ test('ocr list check service avoids the heavy roster ops', () => {
   const serviceSource = readRepoFile('../bot/services/list-check/service.js');
 
   // Forbidden = the expensive bible patterns the prior refactor removed:
-  // full roster fetch, similar-name search, hidden-roster fallback, and
-  // the legacy roster-cache layer. Targeted single-character meta
-  // enrichment (fetchCharacterMeta) is intentionally ALLOWED, and the
-  // worker-health gate (getWorkerHealth) is ALLOWED because it short-
-  // circuits the enrichment when the residential-IP worker is offline.
+  // full roster-page scrape, hidden-roster fallback, the legacy
+  // roster-cache layer, and the post-check enrichment queue. The
+  // targeted enrichment phase legitimately uses fetchCharacterMeta
+  // (worker online) or fetchNameSuggestions (worker offline) plus
+  // getWorkerHealth for routing, so those names are ALLOWED.
   for (const forbidden of [
     'buildRosterCharacters',
-    'fetchNameSuggestions',
     'RosterCache',
     'buildRosterCacheLookupMap',
     'getRosterCacheMatch',
