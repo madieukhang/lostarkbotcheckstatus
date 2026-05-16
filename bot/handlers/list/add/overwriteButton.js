@@ -104,6 +104,11 @@ export function createListAddOverwriteButtonHandler({
       // Only update roster if fetch succeeded · preserve old snapshot on failure
       if (rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0) {
         dupeEntry.allCharacters = rosterResult.allCharacters;
+        // Refresh stamped the alt list from a bible scrape just now, so
+        // record source + timestamp. Without this the stale-loop would
+        // misread the entry as legacy/null even though it was just refreshed.
+        dupeEntry.enrichmentSource = 'bible';
+        dupeEntry.enrichedAt = new Date();
       }
       dupeEntry.reason = payload.reason || dupeEntry.reason;
       dupeEntry.raid = payload.raid || dupeEntry.raid;

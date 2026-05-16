@@ -22,6 +22,7 @@ import {
 import { normalizeCharacterName } from '../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
+import { rosterUrl } from '../../utils/rosterLink.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
@@ -192,7 +193,10 @@ export async function handleRosterCommand(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle(`🛡️ ${name}'s Roster · ${characters.length} character${characters.length === 1 ? '' : 's'}`)
-      .setURL(targetUrl)
+      // Display URL goes through the helper so BIBLE_BASE_URL swaps cascade
+      // here too. targetUrl above is intentionally still hardcoded · it's
+      // the actual fetch endpoint, controlled by the scraper/worker layer.
+      .setURL(rosterUrl(name))
       .setDescription(fullDescription)
       .setColor(embedColor)
       .setFooter({ text: 'Source: lostark.bible · re-run /la-roster to refresh' })

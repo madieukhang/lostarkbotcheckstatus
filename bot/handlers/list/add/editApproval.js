@@ -106,6 +106,12 @@ export async function handleApprovedEditRequest({
       imageMessageId: moveImageMessageId,
       imageChannelId: moveImageChannelId,
       allCharacters: existingEntry.allCharacters || [],
+      // Cross-list move via approval just copies the alt list verbatim, so
+      // preserve the source/timestamp from the pre-move entry. Stale-loop
+      // logic would otherwise see this freshly-created doc as legacy null
+      // even though the alts haven't changed.
+      enrichmentSource: existingEntry.enrichmentSource ?? null,
+      enrichedAt: existingEntry.enrichedAt ?? null,
       addedByUserId: existingEntry.addedByUserId,
       addedByTag: existingEntry.addedByTag,
       addedByDisplayName: existingEntry.addedByDisplayName,
