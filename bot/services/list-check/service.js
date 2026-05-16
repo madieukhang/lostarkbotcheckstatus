@@ -16,6 +16,7 @@ import { normalizeCharacterName } from '../../utils/names.js';
 export { formatCheckResults } from './format.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 import { fetchCharacterMeta } from '../roster/characterMeta.js';
+import { getWorkerHealth } from '../worker/heartbeat.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -339,6 +340,22 @@ export async function checkNamesAgainstLists(names, options = {}) {
   );
 
   if (itemsNeedingEnrichment.length > 0) {
+    // Worker-health gate: when the residential-IP worker is offline, every
+    // per-name probe would fail at the worker layer ("Stronghold lookup
+    // service is offline (stale-heartbeat)") and spam logs while adding
+    // 400-600ms of wasted latency. Skip the whole enrichment phase up
+    // front instead, log once, and fall back to the bare render that the
+    // prior DB-only refactor already supports gracefully. Feature
+    // self-reactivates the next time a check runs after the worker is
+    // started.
+    const health = await getWorkerHealth().catch(() => ({ online: false, reason: 'health-check-threw' }));
+
+    if (!health.online) {
+      console.log(
+        `[listcheck] Skipping meta enrichment for ${itemsNeedingEnrichment.length} name(s) ` +
+        `(worker offline: ${health.reason || 'unknown'}). Names render without class/ilvl.`
+      );
+    } else {
     const concurrency = config.listcheckRosterLookupConcurrency || 3;
     const lookupTimeoutMs = config.listcheckRosterLookupTimeoutMs || 6000;
     const enrichStartedAt = Date.now();
@@ -388,6 +405,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     console.log(
       `[listcheck] Meta-enriched ${itemsNeedingEnrichment.length} name(s) in ${Date.now() - enrichStartedAt}ms (cost: API per missing-snapshot name)`
     );
+    }
   }
 
   // Phase 2: Resolve trusted status via allCharacters already stored
