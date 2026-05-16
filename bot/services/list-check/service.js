@@ -36,6 +36,34 @@ function stripDiacritics(value) {
     .toLowerCase();
 }
 
+/**
+ * Levenshtein edit distance · O(m·n) DP with rolling rows. Returns the
+ * minimum number of single-character insertions / deletions / swaps to
+ * turn `a` into `b`. Used to recover from Gemini OCR mistakes like
+ * doubled letters ("Trùmffighter" vs "Trùmfighter" → distance 1) when
+ * an exact / diacritic-tolerant match against bible's search results
+ * doesn't land.
+ */
+function levenshteinDistance(a, b) {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = new Array(n + 1);
+  for (let j = 0; j <= n; j += 1) prev[j] = j;
+  for (let i = 1; i <= m; i += 1) {
+    const curr = new Array(n + 1);
+    curr[0] = i;
+    for (let j = 1; j <= n; j += 1) {
+      curr[j] = a[i - 1] === b[j - 1]
+        ? prev[j - 1]
+        : 1 + Math.min(prev[j], curr[j - 1], prev[j - 1]);
+    }
+    prev = curr;
+  }
+  return prev[n];
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /** Known Lost Ark server/world names to filter from OCR results */
@@ -83,6 +111,8 @@ const GEMINI_PROMPT = [
   'Extract ALL player character names from the party member list, regardless of color.',
   'Ignore all other text: raid names, class names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
   'Preserve every character exactly as shown, including special letters and diacritics.',
+  'Letter count must match the image exactly. Do NOT double letters that appear once (e.g., a name shown as "Trumfighter" must not be returned as "Trumffighter"). Do NOT collapse repeated letters that appear twice.',
+  'Look-alike characters: distinguish lowercase L (l), uppercase i (I), and digit 1 (1) by context. Distinguish digit 0 (0) from uppercase O (O).',
   'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
   'Keep umlaut letters exactly: ë, ö, ü.',
   'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
@@ -436,14 +466,48 @@ export async function checkNamesAgainstLists(names, options = {}) {
           // when the bare-letter form matches. Update item.name to the
           // canonical form so the embed renders the correct spelling and
           // the snapshot is keyed by the real name.
+          const targetCanonical = stripDiacritics(item.name);
           if (!chosen) {
-            const targetCanonical = stripDiacritics(item.name);
             chosen = suggestions.find(
               (s) => stripDiacritics(String(s.name)) === targetCanonical
             );
             if (chosen) {
               console.log(
                 `[listcheck] Diacritic-tolerant match: OCR'd "${item.name}" -> canonical "${chosen.name}"`
+              );
+              item.name = chosen.name;
+            }
+          }
+
+          // Third pass: edit-distance fuzzy match. Recovers from Gemini
+          // OCR errors beyond diacritic loss · doubled letters
+          // ("Trùmfighter" -> "Trùmffighter"), missed letters, swapped
+          // look-alikes (l vs I). Threshold scales with name length to
+          // avoid false positives on short names (where 1 edit can
+          // match a totally different player): <6 chars no fuzzy,
+          // 6-11 chars ≤1 edit, 12+ chars ≤2 edits. Bible has already
+          // narrowed to similar names via its search index so the
+          // closest candidate within the threshold is almost certainly
+          // the real character. Picks the smallest-distance suggestion;
+          // ties break on bible's relevance ordering (most-relevant first).
+          if (!chosen && targetCanonical.length >= 6) {
+            const maxDistance = Math.min(2, Math.floor(targetCanonical.length / 6));
+            let bestMatch = null;
+            let bestDistance = Infinity;
+            for (const s of suggestions) {
+              const dist = levenshteinDistance(
+                targetCanonical,
+                stripDiacritics(String(s.name))
+              );
+              if (dist < bestDistance) {
+                bestDistance = dist;
+                bestMatch = s;
+              }
+            }
+            if (bestMatch && bestDistance <= maxDistance) {
+              chosen = bestMatch;
+              console.log(
+                `[listcheck] Fuzzy match (edit dist ${bestDistance} <= ${maxDistance}): OCR'd "${item.name}" -> canonical "${chosen.name}"`
               );
               item.name = chosen.name;
             }
