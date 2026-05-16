@@ -182,6 +182,16 @@ export function createInteractionRouter({ client }) {
       return;
     }
 
+    if (interaction.isStringSelectMenu() && customId === 'autocheck_evidence') {
+      await handleButton(
+        interaction,
+        '[autocheck] Evidence select error:',
+        (i) => listHandlers.handleAutoCheckEvidenceSelect(i),
+        '❌ Failed to load evidence.',
+      );
+      return;
+    }
+
     if (interaction.isStringSelectMenu() && customId.startsWith('la-help:select:')) {
       await handleButton(interaction, '[la-help] Select error:', handleHelpSelect);
       return;

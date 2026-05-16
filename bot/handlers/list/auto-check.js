@@ -18,6 +18,7 @@ import {
 import { getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
+import { buildAutoCheckEvidenceRow } from './check/index.js';
 
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);
@@ -188,6 +189,13 @@ export function setupAutoCheck(client) {
         );
         components.push(selectRow);
       }
+
+      // Evidence dropdown · second row when any flagged result has an
+      // attached image. Mirrors /la-list view's design so officers can
+      // audit evidence right from the auto-check card instead of
+      // re-running /la-list view.
+      const evidenceRow = buildAutoCheckEvidenceRow(results);
+      if (evidenceRow) components.push(evidenceRow);
 
       await progressMsg.edit({ content: '', embeds: [embed], components });
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
