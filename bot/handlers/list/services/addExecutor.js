@@ -288,6 +288,12 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       imageMessageId: payload.imageMessageId || '',
       imageChannelId: payload.imageChannelId || '',
       allCharacters,
+      // allCharacters here always came through buildRosterCharacters
+      // (visible OR hidden-roster fallback both consult bible), so the
+      // enrichment is bible-sourced. enrichedAt stamps the create time
+      // so future re-enrich loops can spot stale entries.
+      enrichmentSource: 'bible',
+      enrichedAt: new Date(),
       addedByUserId: payload.requestedByUserId,
       addedByTag: payload.requestedByTag,
       addedByName: payload.requestedByName,

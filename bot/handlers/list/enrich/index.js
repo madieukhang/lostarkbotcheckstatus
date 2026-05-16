@@ -740,7 +740,13 @@ export function createEnrichHandlers({ client, services }) {
 
     const updateResult = await Model.updateOne(
       { _id: session.entryId },
-      { $addToSet: { allCharacters: { $each: altNames } } }
+      {
+        $addToSet: { allCharacters: { $each: altNames } },
+        // Stronghold scan is bible-sourced; refresh source + timestamp so
+        // a later re-enrich-when-stale loop can tell this entry was
+        // touched recently. Keeps semantics aligned with /la-list add.
+        $set: { enrichmentSource: 'bible', enrichedAt: new Date() },
+      }
     );
 
     clearEnrichSession(sessionId);

@@ -17,6 +17,9 @@ const watchlistSchema = new mongoose.Schema({
   imageMessageId: { type: String, default: '', trim: true },
   imageChannelId: { type: String, default: '', trim: true },
   allCharacters: { type: [String], default: [] },
+  // See Blacklist.js for enrichmentSource/enrichedAt semantics.
+  enrichmentSource: { type: String, enum: ['bible', 'manual', 'local-sync', null], default: null },
+  enrichedAt: { type: Date, default: null },
   addedByUserId: { type: String, default: '', trim: true },
   addedByTag: { type: String, default: '', trim: true },
   addedByName: { type: String, default: '', trim: true },
