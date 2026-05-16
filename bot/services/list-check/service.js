@@ -15,6 +15,8 @@ import { getClassName } from '../../models/Class.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 export { formatCheckResults } from './format.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
+import { fetchCharacterMeta } from '../roster/characterMeta.js';
+import { mapWithConcurrency } from '../../utils/async.js';
 
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
 
@@ -319,9 +321,78 @@ export async function checkNamesAgainstLists(names, options = {}) {
     };
   });
 
+  // Phase 1.5: Targeted meta enrichment for items missing class+ilvl data.
+  // Re-introduces a SINGLE-character bible meta lookup (per name) for
+  // entries whose stored snapshot is missing or incomplete. Items that
+  // already have usable class+ilvl skip the lookup entirely, so the
+  // cost is "1 API call per previously-unseen name" rather than "1 per
+  // name". Persists the result back to RosterSnapshot so the next OCR
+  // run for the same name is free.
+  //
+  // Boundary with the prior DB-only refactor: still avoid the heavy
+  // roster-page scrape, similar-name search, hidden-roster fallback,
+  // and Stronghold alt scan. Only the single-name meta probe is
+  // restored, and only when there is a real UX gap (no snapshot data).
+  // Routed via worker by default to stay off Railway's CF-blocked path.
+  const itemsNeedingEnrichment = results.filter(
+    (item) => !item.snapClassId || !item.snapItemLevel
+  );
+
+  if (itemsNeedingEnrichment.length > 0) {
+    const concurrency = config.listcheckRosterLookupConcurrency || 3;
+    const lookupTimeoutMs = config.listcheckRosterLookupTimeoutMs || 6000;
+    const enrichStartedAt = Date.now();
+
+    await mapWithConcurrency(itemsNeedingEnrichment, concurrency, async (item) => {
+      try {
+        const meta = await fetchCharacterMeta(item.name, {
+          viaWorker: true,
+          retryOnRateLimit: false,
+          timeoutMs: lookupTimeoutMs,
+        });
+        if (!meta) return;
+        if (meta.classId) {
+          item.snapClassId = meta.classId;
+          item.snapClassName = getClassName(meta.classId);
+        }
+        if (typeof meta.itemLevel === 'number' && meta.itemLevel > 0) {
+          item.snapItemLevel = meta.itemLevel;
+        }
+        // Best-effort snapshot upsert so the next OCR run sees the data
+        // without re-calling bible. Failure is non-fatal · the in-memory
+        // enrichment still renders for THIS call.
+        try {
+          await RosterSnapshot.updateOne(
+            { name: item.name },
+            {
+              $set: {
+                itemLevel: meta.itemLevel || 0,
+                classId: meta.classId || '',
+                rosterName: item.name,
+                updatedAt: new Date(),
+              },
+            },
+            { upsert: true, collation: { locale: 'en', strength: 2 } }
+          );
+        } catch (saveErr) {
+          console.warn(`[listcheck] Snapshot upsert failed for ${item.name}: ${saveErr.message}`);
+        }
+      } catch (err) {
+        // Per-name failure is non-fatal: leave snap fields empty so the
+        // formatter renders the bare name. Worker-offline / 403 / rate
+        // limit / timeout all land here.
+        console.warn(`[listcheck] Meta enrichment skipped for ${item.name}: ${err.message}`);
+      }
+    });
+
+    console.log(
+      `[listcheck] Meta-enriched ${itemsNeedingEnrichment.length} name(s) in ${Date.now() - enrichStartedAt}ms (cost: API per missing-snapshot name)`
+    );
+  }
+
   // Phase 2: Resolve trusted status via allCharacters already stored
-  // on DB list entries. OCR checks deliberately stop here: no live
-  // roster lookup, no similar-name search, no worker dependency.
+  // on DB list entries. OCR checks still avoid roster fetch / similar-
+  // name search / hidden-roster fallback here.
   const altNamesForTrustedCheck = new Set();
   for (const item of results) {
     if (item.trustedEntry) continue;

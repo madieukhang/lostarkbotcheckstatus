@@ -9,9 +9,15 @@ function readRepoFile(path) {
   return readFileSync(new URL(path, import.meta.url), 'utf8');
 }
 
-test('ocr list check service stays database-only', () => {
+test('ocr list check service avoids the heavy roster ops', () => {
   const serviceSource = readRepoFile('../bot/services/list-check/service.js');
 
+  // Forbidden = the expensive bible patterns the prior refactor removed:
+  // full roster fetch, similar-name search, hidden-roster fallback, the
+  // legacy roster-cache layer, and any worker-readiness gating. Targeted
+  // single-character meta enrichment (fetchCharacterMeta) is intentionally
+  // ALLOWED: it adds one API call only for OCR'd names lacking class+ilvl
+  // snapshot data, and persists results so subsequent runs are free.
   for (const forbidden of [
     'buildRosterCharacters',
     'fetchNameSuggestions',
@@ -20,7 +26,6 @@ test('ocr list check service stays database-only', () => {
     'getRosterCacheMatch',
     'getWorkerHealth',
     'shouldSkipWorkerRosterLookup',
-    'viaWorker',
     'hiddenRosterFallback',
     'queueFlaggedListEntryEnrichment',
   ]) {
@@ -32,6 +37,10 @@ test('ocr list check handlers do not queue post-check roster enrichment', () => 
   const autoCheckSource = readRepoFile('../bot/handlers/list/auto-check.js');
   const slashCheckSource = readRepoFile('../bot/handlers/list/check/index.js');
 
+  // Handlers still must not invoke the heavy post-check pipelines. The
+  // single-name meta enrichment lives inside checkNamesAgainstLists (the
+  // service layer), not at handler level, so handlers should not need to
+  // reference viaWorker / hiddenRosterFallback / queueFlaggedListEntryEnrichment.
   assert.doesNotMatch(autoCheckSource, /queueFlaggedListEntryEnrichment/);
   assert.doesNotMatch(slashCheckSource, /queueFlaggedListEntryEnrichment/);
   assert.doesNotMatch(autoCheckSource, /viaWorker|hiddenRosterFallback/);
