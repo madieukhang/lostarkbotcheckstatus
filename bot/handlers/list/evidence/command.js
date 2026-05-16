@@ -9,16 +9,20 @@
  * shape stays consistent across the three evidence entry points
  * (list view dropdown, search dropdown, this command).
  *
- * Autocomplete unions Blacklist/Whitelist/Watchlist by name prefix and
- * returns one option per (name, listType) tuple. Value encoding is
- * `<type>:<name>` so the handler picks the right list even when the
- * same name exists across types (rare cross-list overlap is real).
+ * Autocomplete unions Blacklist/Whitelist/Watchlist by name prefix,
+ * scope-filtered for blacklist so a guild only sees its own server-scoped
+ * entries + global entries (owner guild sees everything · same model as
+ * /la-list view). Value encoding is `<type>:<_id>` (Mongo ObjectId,
+ * 24 hex chars, unambiguous across scope + cross-list overlap). Free-typed
+ * names fall back to a scope-aware lookup so unauthenticated input still
+ * respects the scope boundary.
  */
 
 import config from '../../../config.js';
 import { connectDB } from '../../../db.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildBlacklistScopeFilter } from '../../../utils/scope.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import { getListContext } from '../helpers.js';
 
@@ -26,6 +30,10 @@ const KNOWN_TYPES = ['black', 'white', 'watch'];
 const COLLATION = { locale: 'en', strength: 2 };
 const AUTOCOMPLETE_MAX = 25;
 const PER_LIST_FETCH_CAP = 25;
+// Mongo ObjectId is a 24-char lowercase hex string. Used to distinguish
+// autocomplete-picked values (which encode the entry's _id) from raw
+// user-typed names.
+const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
 
 function isOfficerOrSenior(userId) {
   if (!userId) return false;
@@ -44,37 +52,68 @@ function decorateEntry(entry, listType) {
 }
 
 /**
- * Parse the autocomplete-returned `name` value. Accepts either:
- *   - `<type>:<name>` shape (chosen via autocomplete)
- *   - `<name>` bare shape (user free-typed)
- * Returns { type, name } where type is null when the user free-typed.
+ * Apply the blacklist scope filter on top of a base name query. Whitelist
+ * and watchlist have no scope concept, so the base query passes through
+ * unchanged for those types. Blacklist owner guild sees everything; other
+ * guilds see global + own-server entries only.
  */
-function parseNameValue(raw) {
-  if (!raw) return { type: null, name: '' };
-  const idx = raw.indexOf(':');
-  if (idx > 0 && idx < raw.length - 1) {
-    const candidate = raw.slice(0, idx);
-    if (KNOWN_TYPES.includes(candidate)) {
-      return { type: candidate, name: raw.slice(idx + 1).trim() };
-    }
-  }
-  return { type: null, name: raw.trim() };
+function applyScopeForType(type, baseQuery, guildId) {
+  if (type !== 'black') return baseQuery;
+  const scopeFilter = buildBlacklistScopeFilter(guildId);
+  if (!scopeFilter) return baseQuery; // owner guild · no restriction
+  return { $and: [baseQuery, scopeFilter] };
 }
 
 /**
- * Look up an entry by name across all three lists. Honors an explicit
- * `preferredType` (from autocomplete) before falling back to priority
- * order black > white > watch (most-severe-first when an entry exists
- * in multiple lists, e.g. moved between lists without cleanup).
+ * Parse the autocomplete-returned `name` value. Two recognised shapes:
+ *   - `<type>:<24-hex-id>` chosen via autocomplete; lookup by _id.
+ *   - bare `<name>` free-typed; lookup by name with scope fallback.
+ * Returns { type, entryId, name } where entryId is set only for the
+ * autocomplete-picked shape.
  */
-async function findEntryByName({ name, preferredType }) {
+function parseNameValue(raw) {
+  if (!raw) return { type: null, entryId: null, name: '' };
+  const idx = raw.indexOf(':');
+  if (idx > 0 && idx < raw.length - 1) {
+    const candidate = raw.slice(0, idx);
+    const tail = raw.slice(idx + 1).trim();
+    if (KNOWN_TYPES.includes(candidate) && OBJECT_ID_RE.test(tail)) {
+      return { type: candidate, entryId: tail, name: '' };
+    }
+  }
+  return { type: null, entryId: null, name: raw.trim() };
+}
+
+/**
+ * Lookup an entry by Mongo _id (autocomplete path). Scope filter is still
+ * applied for blacklist so a leaked or copy-pasted _id from another guild
+ * cannot bypass the boundary. Returns null when the entry is not visible
+ * to this guild even if it exists in the DB.
+ */
+async function findEntryById({ entryId, type, guildId }) {
+  const { model } = getListContext(type);
+  const query = applyScopeForType(type, { _id: entryId }, guildId);
+  const entry = await model.findOne(query).collation(COLLATION).lean();
+  if (entry) return { entry, type };
+  return { entry: null, type: null };
+}
+
+/**
+ * Lookup an entry by free-typed name. Priority black > white > watch
+ * (most-severe-first) so an officer who types a name that exists in
+ * multiple lists lands on the actionable record. Scope filter applies
+ * to blacklist so guild-A users do not see guild-B's server-scoped
+ * entries even via direct name typing.
+ */
+async function findEntryByName({ name, preferredType, guildId }) {
   const types = preferredType
     ? [preferredType, ...KNOWN_TYPES.filter((t) => t !== preferredType)]
     : KNOWN_TYPES;
 
   for (const type of types) {
     const { model } = getListContext(type);
-    const entry = await model.findOne({ name }).collation(COLLATION).lean();
+    const query = applyScopeForType(type, { name }, guildId);
+    const entry = await model.findOne(query).collation(COLLATION).lean();
     if (entry) return { entry, type };
   }
   return { entry: null, type: null };
@@ -82,37 +121,28 @@ async function findEntryByName({ name, preferredType }) {
 
 /**
  * Lookup matching entries for autocomplete. Prefix-matches against each
- * list's `name` field via case-insensitive collation, dedupes by
- * (name, listType), and caps at 25 total options (Discord limit).
+ * list's `name` field via case-insensitive collation, scope-filters the
+ * blacklist results to the viewer's guild, dedupes by _id, caps at 25
+ * total options (Discord limit).
  */
-async function lookupAutocompleteCandidates(query) {
+async function lookupAutocompleteCandidates(query, guildId) {
   await connectDB();
   const trimmed = (query || '').trim();
-  if (!trimmed) {
-    // Empty input -> return latest-added entries across all three lists.
-    // Helps users browse without needing to remember a name prefix.
-    const results = await Promise.all(KNOWN_TYPES.map(async (type) => {
-      const { model } = getListContext(type);
-      const docs = await model
-        .find({})
-        .sort({ addedAt: -1 })
-        .limit(PER_LIST_FETCH_CAP)
-        .lean();
-      return docs.map((doc) => ({ doc, type }));
-    }));
-    return results.flat();
-  }
 
-  // Escape regex metacharacters and anchor to the start of the name field.
-  // We use the index-friendly $regex with `^` prefix so MongoDB can hit
-  // the compound index on (name, scope, guildId) for a range scan.
-  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const prefixPattern = new RegExp(`^${escaped}`, 'i');
+  const buildBaseQuery = (type) => {
+    if (!trimmed) return {};
+    // Escape regex metacharacters and anchor with `^` so MongoDB can hit
+    // the compound (name, scope, guildId) index for a prefix range scan.
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return { name: new RegExp(`^${escaped}`, 'i') };
+  };
 
   const results = await Promise.all(KNOWN_TYPES.map(async (type) => {
     const { model } = getListContext(type);
+    const baseQuery = buildBaseQuery(type);
+    const scoped = applyScopeForType(type, baseQuery, guildId);
     const docs = await model
-      .find({ name: prefixPattern })
+      .find(scoped)
       .collation(COLLATION)
       .sort({ addedAt: -1 })
       .limit(PER_LIST_FETCH_CAP)
@@ -123,16 +153,18 @@ async function lookupAutocompleteCandidates(query) {
 }
 
 /**
- * Build Discord autocomplete choices from raw lookup results. Dedupes
- * (name + type) combos to avoid showing the same row twice when the
- * same character was added under both global and a server scope.
+ * Build Discord autocomplete choices from raw lookup results. Dedupes by
+ * `_id` so an entry appearing twice in the union (shouldn't, but defense
+ * in depth) renders once. Value encodes the Mongo _id so the handler
+ * can fetch unambiguously even when the same name exists across types
+ * or scopes.
  */
 function buildAutocompleteChoices(rawResults) {
   const seen = new Set();
   const choices = [];
 
   for (const { doc, type } of rawResults) {
-    const key = `${type}:${doc.name.toLowerCase()}`;
+    const key = String(doc._id);
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -142,9 +174,12 @@ function buildAutocompleteChoices(rawResults) {
         ? doc.reason.slice(0, 47) + '...'
         : doc.reason
       : 'No reason';
-    // Discord caps name (label) at 100 chars and value at 100 chars.
-    const label = `${icon} ${doc.name} - ${reasonSnippet}`.slice(0, 100);
-    const value = `${type}:${doc.name}`.slice(0, 100);
+    // Local-scope tag helps an officer tell apart the same name appearing
+    // under global vs server scope (rare but possible for blacklist).
+    const scopeTag = type === 'black' && doc.scope === 'server' ? ' [S]' : '';
+    // Discord caps name (label) and value at 100 chars each.
+    const label = `${icon} ${doc.name}${scopeTag} - ${reasonSnippet}`.slice(0, 100);
+    const value = `${type}:${doc._id}`.slice(0, 100);
 
     choices.push({ name: label, value });
     if (choices.length >= AUTOCOMPLETE_MAX) break;
@@ -160,7 +195,7 @@ export async function handleListEvidenceAutocomplete(interaction) {
       await interaction.respond([]);
       return;
     }
-    const raw = await lookupAutocompleteCandidates(focused.value);
+    const raw = await lookupAutocompleteCandidates(focused.value, interaction.guild?.id);
     const choices = buildAutocompleteChoices(raw);
     await interaction.respond(choices);
   } catch (err) {
@@ -175,14 +210,33 @@ export function createEvidenceHandlers({ client }) {
     const requestedPublic = interaction.options.getBoolean('public') === true;
     const isPrivileged = isOfficerOrSenior(interaction.user.id);
     const usePublic = requestedPublic && isPrivileged;
+    const viewerGuildId = interaction.guild?.id || '';
 
     await interaction.deferReply({ ephemeral: !usePublic });
 
     try {
       await connectDB();
-      const { type: preferredType, name } = parseNameValue(rawNameOpt);
+      const { type: preferredType, entryId, name } = parseNameValue(rawNameOpt);
 
-      if (!name) {
+      // Autocomplete path: value carried an _id, look up unambiguously.
+      // Scope filter still applied so a leaked _id from another guild
+      // does not bypass the boundary.
+      let entry = null;
+      let type = null;
+      if (entryId && preferredType) {
+        ({ entry, type } = await findEntryById({
+          entryId,
+          type: preferredType,
+          guildId: viewerGuildId,
+        }));
+      } else if (name) {
+        // Free-typed path: priority lookup with scope filter for blacklist.
+        ({ entry, type } = await findEntryByName({
+          name,
+          preferredType,
+          guildId: viewerGuildId,
+        }));
+      } else {
         await interaction.editReply({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
@@ -193,14 +247,13 @@ export function createEvidenceHandlers({ client }) {
         return;
       }
 
-      const { entry, type } = await findEntryByName({ name, preferredType });
-
       if (!entry) {
+        const displayName = name || rawNameOpt;
         await interaction.editReply({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.INFO,
             title: 'Not Listed',
-            description: `**${name}** is not in any list (blacklist, whitelist, watchlist).`,
+            description: `**${displayName}** is not in any list visible to this server (blacklist / whitelist / watchlist).`,
             footer: 'Try /la-search for fuzzy-match across the bible name index.',
           })],
         });

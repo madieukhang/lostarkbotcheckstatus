@@ -27,6 +27,7 @@ import {
 } from '../../utils/scanSession.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { createRosterDeepSession } from '../../utils/rosterDeepSession.js';
+import { rosterUrl, profileUrl as bibleProfileUrl } from '../../utils/rosterLink.js';
 import { makeRosterScanProgressCallback, formatDeepScanStats } from './progress.js';
 
 export async function handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions }) {
