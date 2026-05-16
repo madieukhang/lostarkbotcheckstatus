@@ -16,6 +16,7 @@ import { normalizeCharacterName } from '../../utils/names.js';
 export { formatCheckResults } from './format.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 import { fetchCharacterMeta } from '../roster/characterMeta.js';
+import { fetchNameSuggestions } from '../roster/search.js';
 import { getWorkerHealth } from '../worker/heartbeat.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 
@@ -66,18 +67,14 @@ export function clearOcrCache() {
 const GEMINI_PROMPT = [
   'This is a screenshot of a Lost Ark raid waiting room (party finder lobby).',
   'Extract ALL player character names from the party member list, regardless of color.',
-  'Ignore other text: raid names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
-  'For each character, identify the class from the small class icon shown to the left of the name. Use the official English class display name from Lost Ark: Berserker, Slayer, Gunlancer, Paladin, Valkyrie, Destroyer, Guardian Knight, Wardancer, Scrapper, Soulfist, Glaivier, Striker, Breaker, Deadeye, Gunslinger, Artillerist, Sharpshooter, Machinist, Bard, Arcanist, Summoner, Sorceress, Deathblade, Shadow Hunter, Reaper, Souleater, Artist, Aeromancer, Wildsoul.',
-  'If the class icon is unreadable or you cannot identify it confidently, use an empty string for class instead of guessing.',
-  'Preserve every character name exactly as shown, including special letters and diacritics.',
+  'Ignore all other text: raid names, class names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
+  'Preserve every character exactly as shown, including special letters and diacritics.',
   'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
   'Keep umlaut letters exactly: ë, ö, ü.',
   'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
   'If a mark looks like two horizontal dots above a letter, treat it as an umlaut on that letter, not as punctuation.',
-  'Return JSON array of objects only, no markdown, no explanation.',
-  'Each object has two keys: "name" (string) and "class" (string).',
-  'Example output: [{"name":"PlayerOne","class":"Bard"},{"name":"PlayerTwo","class":"Berserker"}].',
-  'If a class cannot be identified, return an empty string for that entry\'s class field, e.g. {"name":"PlayerThree","class":""}.',
+  'Return JSON array only, no markdown, no explanation.',
+  'Example output: ["name1","name2"].',
   'If no valid names are found, return [].',
 ].join(' ');
 
@@ -96,56 +93,29 @@ function shouldFailoverGeminiModel(status, bodyText) {
   );
 }
 
-/**
- * Normalize a single Gemini output item into `{ name, ocrClass }`. Accepts
- * both shapes for forward/backward compatibility:
- *   - Legacy: bare string `"PlayerOne"` → no class info.
- *   - Current: object `{name, class}` → class carried through when present.
- * Returns null when the input can't yield a usable name.
- */
-function normalizeOcrEntry(item) {
-  if (typeof item === 'string') {
-    const name = normalizeCharacterName(item);
-    return name ? { name, ocrClass: '' } : null;
-  }
-  if (item && typeof item === 'object') {
-    const name = normalizeCharacterName(item.name || '');
-    if (!name) return null;
-    const ocrClass = typeof item.class === 'string' ? item.class.trim() : '';
-    return { name, ocrClass };
-  }
-  return null;
-}
-
-function filterAndDeduplicateEntries(parsed) {
-  const entries = parsed
-    .map(normalizeOcrEntry)
-    .filter((entry) => entry && !SERVER_NAMES.has(entry.name.toLowerCase()));
+function filterAndDeduplicateNames(parsed) {
+  const names = parsed
+    .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
+    .filter((name) => name && !SERVER_NAMES.has(name.toLowerCase()));
 
   const seen = new Set();
   const unique = [];
-  for (const entry of entries) {
-    const key = entry.name.toLowerCase();
+  for (const name of names) {
+    const key = name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    unique.push(entry);
+    unique.push(name);
   }
 
   return unique;
 }
 
 /**
- * Extract character names + classes from an image using Gemini OCR.
+ * Extract character names from an image using Gemini OCR.
  * Handles model failover on quota/rate limits and network errors.
  *
- * Class info is best-effort: Gemini reads the small class icon next to
- * each name in the raid lobby image. Used as a fallback when the bot
- * has no RosterSnapshot and the worker-backed meta probe is offline, so
- * class icons render even on a cold OCR check. Empty string when Gemini
- * cannot identify the class confidently.
- *
  * @param {object} image - Discord attachment or { url, contentType }
- * @returns {Promise<Array<{name: string, ocrClass: string}>>} OCR entries
+ * @returns {Promise<string[]>} Array of normalized character names
  */
 export async function extractNamesFromImage(image) {
   if (!config.geminiApiKey) {
@@ -157,10 +127,10 @@ export async function extractNamesFromImage(image) {
   }
 
   const cacheKey = image.url || '';
-  const cachedEntries = getCachedOcrNames(cacheKey);
-  if (cachedEntries !== undefined) {
+  const cachedNames = getCachedOcrNames(cacheKey);
+  if (cachedNames !== undefined) {
     console.log(`[listcheck] OCR cache hit for attachment ${image.id || cacheKey.slice(0, 32)}`);
-    return cachedEntries;
+    return cachedNames;
   }
 
   const imageRes = await fetch(image.url, { signal: AbortSignal.timeout(15000) });
@@ -263,9 +233,9 @@ export async function extractNamesFromImage(image) {
     }
     if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
 
-    const entries = filterAndDeduplicateEntries(parsed);
-    setCachedOcrNames(cacheKey, entries);
-    return entries;
+    const names = filterAndDeduplicateNames(parsed);
+    setCachedOcrNames(cacheKey, names);
+    return names;
   }
 
   throw new Error(`All Gemini models failed: ${failures.join(' | ')}`);
@@ -274,44 +244,26 @@ export async function extractNamesFromImage(image) {
 // ─── Name checking ──────────────────────────────────────────────────────────
 
 /**
- * Check OCR entries against database-backed lists.
+ * Check an array of names against database-backed lists.
  *
- * Accepts either the legacy bare-name shape (`string[]`) or the new
- * Gemini-extracted shape (`Array<{name, ocrClass}>`). Both flow through
- * the same DB + targeted-enrichment pipeline; the `ocrClass` field, when
- * present, is propagated into the result as a class-icon fallback when
- * neither the snapshot nor the worker-backed meta probe provides class
- * info (e.g. worker offline + never-queried name).
+ * After DB cross-check, items missing class+ilvl snapshot data go
+ * through a targeted enrichment phase that routes by worker health:
+ *   - Worker online  → `fetchCharacterMeta` via worker (full meta).
+ *   - Worker offline → `fetchNameSuggestions` direct from Railway
+ *     (lightweight search endpoint, less aggressive CF protection
+ *     than the per-character page route).
+ * Both paths persist the result to RosterSnapshot so subsequent
+ * checks on the same name hit the cache for free.
  *
- * @param {Array<string | {name: string, ocrClass?: string, class?: string}>} entries
+ * @param {string[]} names
  * @param {object} [options]
  * @param {string} [options.guildId] - Guild ID for including server-scoped blacklist entries
- * @returns {Promise<Array<object>>} Results with list entries + snapshot + ocr metadata
+ * @returns {Promise<Array<object>>} Results with list entries and stored snapshot metadata
  */
-export async function checkNamesAgainstLists(entries, options = {}) {
+export async function checkNamesAgainstLists(names, options = {}) {
   const startedAt = Date.now();
   await connectDB();
   const { guildId } = options;
-
-  // Normalize the caller's input into a uniform { name, ocrClass } shape.
-  // Legacy callers passing bare strings still work; new callers benefit
-  // from the carried ocrClass propagation.
-  const normalized = (entries || [])
-    .map((item) => {
-      if (typeof item === 'string') return { name: item, ocrClass: '' };
-      if (item && typeof item === 'object' && item.name) {
-        return { name: item.name, ocrClass: item.ocrClass || item.class || '' };
-      }
-      return null;
-    })
-    .filter(Boolean);
-
-  const names = normalized.map((n) => n.name);
-  const ocrClassByName = new Map(
-    normalized
-      .filter((n) => n.ocrClass)
-      .map((n) => [n.name.toLowerCase(), n.ocrClass])
-  );
 
   // Phase 1: Batch list check · 3 queries for ALL names instead of 3 × N
   const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
@@ -372,12 +324,6 @@ export async function checkNamesAgainstLists(entries, options = {}) {
       snapClassName: snap?.classId ? getClassName(snap.classId) : '',
       snapItemLevel: snap?.itemLevel || 0,
       snapCombatScore: snap?.combatScore || '',
-      // OCR-detected class (best-effort from Gemini reading the raid
-      // lobby icon). Used as a fallback by format.js when neither the
-      // snapshot nor the worker meta probe filled snapClassName.
-      // Empty string when Gemini wasn't confident or the input came
-      // through the legacy string[] entry shape.
-      ocrClassName: ocrClassByName.get(name.toLowerCase()) || '',
     };
   });
 
@@ -399,72 +345,90 @@ export async function checkNamesAgainstLists(entries, options = {}) {
   );
 
   if (itemsNeedingEnrichment.length > 0) {
-    // Worker-health gate: when the residential-IP worker is offline, every
-    // per-name probe would fail at the worker layer ("Stronghold lookup
-    // service is offline (stale-heartbeat)") and spam logs while adding
-    // 400-600ms of wasted latency. Skip the whole enrichment phase up
-    // front instead, log once, and fall back to the bare render that the
-    // prior DB-only refactor already supports gracefully. Feature
-    // self-reactivates the next time a check runs after the worker is
-    // started.
+    // Worker-health gate selects the enrichment route, never silently
+    // skips. Two cases:
+    //   - Worker ONLINE  → fetchCharacterMeta via worker. Richest data
+    //     (class + ilvl + stronghold + guild) on a residential IP that
+    //     bible accepts. Result persisted to RosterSnapshot.
+    //   - Worker OFFLINE → fetchNameSuggestions direct from Railway.
+    //     bible's search endpoint is lighter and tends to slip past CF
+    //     where the per-character HTML page does not. Returns just
+    //     {name, cls, itemLevel} for matches; we pick the exact-name
+    //     row and persist class+ilvl.
+    // Both paths upsert the snapshot so the next OCR run hits cache.
     const health = await getWorkerHealth().catch(() => ({ online: false, reason: 'health-check-threw' }));
 
-    if (!health.online) {
-      console.log(
-        `[listcheck] Skipping meta enrichment for ${itemsNeedingEnrichment.length} name(s) ` +
-        `(worker offline: ${health.reason || 'unknown'}). Names render without class/ilvl.`
-      );
-    } else {
     const concurrency = config.listcheckRosterLookupConcurrency || 3;
     const lookupTimeoutMs = config.listcheckRosterLookupTimeoutMs || 6000;
     const enrichStartedAt = Date.now();
+    const mode = health.online ? 'worker-meta' : 'search-direct';
+
+    async function applyEnrichment(item, { classId, itemLevel }) {
+      if (classId) {
+        item.snapClassId = classId;
+        item.snapClassName = getClassName(classId);
+      }
+      if (typeof itemLevel === 'number' && itemLevel > 0) {
+        item.snapItemLevel = itemLevel;
+      }
+      try {
+        await RosterSnapshot.updateOne(
+          { name: item.name },
+          {
+            $set: {
+              itemLevel: itemLevel || 0,
+              classId: classId || '',
+              rosterName: item.name,
+              updatedAt: new Date(),
+            },
+          },
+          { upsert: true, collation: { locale: 'en', strength: 2 } }
+        );
+      } catch (saveErr) {
+        // Snapshot upsert failure is non-fatal · in-memory enrichment
+        // still renders for THIS call; next call just re-fetches.
+        console.warn(`[listcheck] Snapshot upsert failed for ${item.name}: ${saveErr.message}`);
+      }
+    }
 
     await mapWithConcurrency(itemsNeedingEnrichment, concurrency, async (item) => {
       try {
-        const meta = await fetchCharacterMeta(item.name, {
-          viaWorker: true,
-          retryOnRateLimit: false,
-          timeoutMs: lookupTimeoutMs,
-        });
-        if (!meta) return;
-        if (meta.classId) {
-          item.snapClassId = meta.classId;
-          item.snapClassName = getClassName(meta.classId);
-        }
-        if (typeof meta.itemLevel === 'number' && meta.itemLevel > 0) {
-          item.snapItemLevel = meta.itemLevel;
-        }
-        // Best-effort snapshot upsert so the next OCR run sees the data
-        // without re-calling bible. Failure is non-fatal · the in-memory
-        // enrichment still renders for THIS call.
-        try {
-          await RosterSnapshot.updateOne(
-            { name: item.name },
-            {
-              $set: {
-                itemLevel: meta.itemLevel || 0,
-                classId: meta.classId || '',
-                rosterName: item.name,
-                updatedAt: new Date(),
-              },
-            },
-            { upsert: true, collation: { locale: 'en', strength: 2 } }
-          );
-        } catch (saveErr) {
-          console.warn(`[listcheck] Snapshot upsert failed for ${item.name}: ${saveErr.message}`);
+        if (health.online) {
+          // Case 1 · worker online: fetch full character meta via worker.
+          const meta = await fetchCharacterMeta(item.name, {
+            viaWorker: true,
+            retryOnRateLimit: false,
+            timeoutMs: lookupTimeoutMs,
+          });
+          if (!meta) return;
+          await applyEnrichment(item, {
+            classId: meta.classId || '',
+            itemLevel: typeof meta.itemLevel === 'number' ? meta.itemLevel : 0,
+          });
+        } else {
+          // Case 2 · worker offline: hit bible's search endpoint directly.
+          // No viaWorker (would just fail the same way it failed before).
+          const suggestions = await fetchNameSuggestions(item.name);
+          if (!Array.isArray(suggestions) || suggestions.length === 0) return;
+          const target = item.name.toLowerCase();
+          const exact = suggestions.find((s) => String(s.name).toLowerCase() === target);
+          if (!exact) return;
+          await applyEnrichment(item, {
+            classId: exact.cls || '',
+            itemLevel: Number(exact.itemLevel) || 0,
+          });
         }
       } catch (err) {
         // Per-name failure is non-fatal: leave snap fields empty so the
-        // formatter renders the bare name. Worker-offline / 403 / rate
-        // limit / timeout all land here.
-        console.warn(`[listcheck] Meta enrichment skipped for ${item.name}: ${err.message}`);
+        // formatter renders the bare name. Network / rate-limit /
+        // timeout / search-API-blocked all land here.
+        console.warn(`[listcheck] Enrichment (${mode}) skipped for ${item.name}: ${err.message}`);
       }
     });
 
     console.log(
-      `[listcheck] Meta-enriched ${itemsNeedingEnrichment.length} name(s) in ${Date.now() - enrichStartedAt}ms (cost: API per missing-snapshot name)`
+      `[listcheck] Enriched ${itemsNeedingEnrichment.length} name(s) via ${mode} in ${Date.now() - enrichStartedAt}ms`
     );
-    }
   }
 
   // Phase 2: Resolve trusted status via allCharacters already stored
