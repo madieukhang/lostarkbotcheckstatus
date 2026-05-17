@@ -33,7 +33,7 @@ import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
-import { COLORS, ICONS } from '../../../utils/ui.js';
+import { ICONS } from '../../../utils/ui.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import {
   buildMultiaddTemplate,
@@ -42,6 +42,8 @@ import {
 } from '../../../services/multiadd/index.js';
 import {
   getListContext,
+  decorateListEntry,
+  parseListEntryRef,
   buildTrustedBlockEmbed,
   buildListEditSuccessEmbed,
   buildListAddApprovalEmbed,
@@ -55,17 +57,6 @@ import {
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
-
-/**
- * Per-list-type style metadata for the auto-check evidence dropdown.
- * Mirrors the style helper used by /la-search and /la-list view so the
- * three evidence surfaces render the same icon/color vocabulary.
- */
-function evidenceStyleForListType(listType) {
-  if (listType === 'black') return { emoji: '⛔', label: 'blacklist', color: COLORS.danger };
-  if (listType === 'white') return { emoji: '✅', label: 'whitelist', color: COLORS.success };
-  return { emoji: '⚠️', label: 'watchlist', color: COLORS.warning };
-}
 
 function pickListEntryWithEvidence(result) {
   for (const [listType, entry] of [
@@ -106,36 +97,22 @@ export function buildAutoCheckEvidenceRow(results) {
       .setPlaceholder(`${ICONS.evidence} View evidence for...`)
       .addOptions(
         candidates.slice(0, 25).map(({ result, entry, listType }) => {
-          const style = evidenceStyleForListType(listType);
+          const ctx = getListContext(listType);
           return {
             label: result.name,
             description: (entry.reason || 'No reason').slice(0, 100),
             value: `${listType}:${entry._id}`.slice(0, 100),
-            emoji: style.emoji,
+            emoji: ctx.icon,
           };
         })
       )
   );
 }
 
-const KNOWN_EVIDENCE_TYPES = ['black', 'white', 'watch'];
-const EVIDENCE_OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
-
-function parseEvidenceValue(raw) {
-  if (!raw) return null;
-  const idx = raw.indexOf(':');
-  if (idx <= 0 || idx >= raw.length - 1) return null;
-  const listType = raw.slice(0, idx);
-  const id = raw.slice(idx + 1).trim();
-  if (!KNOWN_EVIDENCE_TYPES.includes(listType)) return null;
-  if (!EVIDENCE_OBJECT_ID_RE.test(id)) return null;
-  return { listType, id };
-}
-
 export function createAutoCheckEvidenceHandler({ client }) {
   return async function handleAutoCheckEvidenceSelect(interaction) {
     const raw = interaction.values?.[0] || '';
-    const parsed = parseEvidenceValue(raw);
+    const parsed = parseListEntryRef(raw);
 
     if (!parsed) {
       await interaction.reply({
@@ -169,13 +146,7 @@ export function createAutoCheckEvidenceHandler({ client }) {
       return;
     }
 
-    const style = evidenceStyleForListType(parsed.listType);
-    const decorated = {
-      ...entry,
-      _icon: style.emoji,
-      _label: style.label,
-      _color: style.color,
-    };
+    const decorated = decorateListEntry(entry, parsed.listType);
     const displayUrl = await resolveDisplayImageUrl(entry, client);
     const isOfficer =
       config.officerApproverIds.includes(interaction.user.id)

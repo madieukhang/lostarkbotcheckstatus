@@ -34,6 +34,51 @@ export function getListContext(type) {
 }
 
 /**
+ * Tack the visual tokens onto a list-entry document so it can flow into
+ * `buildEvidenceEmbed` (and any other renderer that reads `_icon` /
+ * `_label` / `_color`). Replaces the `{ ...entry, _icon: ctx.icon, ...}`
+ * one-liner that was sprawled across /la-evidence, /la-search,
+ * /la-check, /la-roster, and the approval-flow evidence button. Returns
+ * a shallow clone so the caller's input doc isn't mutated.
+ */
+export function decorateListEntry(entry, listType) {
+  const ctx = getListContext(listType);
+  return {
+    ...entry,
+    _icon: ctx.icon,
+    _label: ctx.label,
+    _color: ctx.color,
+  };
+}
+
+/**
+ * Mongo ObjectId regex · used by every `<type>:<_id>` autocomplete /
+ * select-menu value encoding the bot ships (/la-evidence picker,
+ * /la-check evidence dropdown). Centralised so the shape can evolve
+ * (length tweak, separator change) in one place instead of three.
+ */
+export const LIST_ENTRY_ID_RE = /^[0-9a-fA-F]{24}$/;
+
+/**
+ * Parse the canonical `<listType>:<_id>` value encoding used by every
+ * dropdown / autocomplete the bot ships for list entries. Returns
+ * `{ listType, id }` on a valid match (listType in {black, white,
+ * watch} and id passes the Mongo ObjectId shape) or `null` otherwise.
+ * Callers that also accept free-typed names should fall through to
+ * a name-based lookup when this returns null.
+ */
+export function parseListEntryRef(raw) {
+  if (!raw) return null;
+  const idx = raw.indexOf(':');
+  if (idx <= 0 || idx >= raw.length - 1) return null;
+  const listType = raw.slice(0, idx);
+  if (listType !== 'black' && listType !== 'white' && listType !== 'watch') return null;
+  const id = raw.slice(idx + 1).trim();
+  if (!LIST_ENTRY_ID_RE.test(id)) return null;
+  return { listType, id };
+}
+
+/**
  * Build a standardized embed for trusted user block messages.
  * Wraps the shared buildAlertEmbed with severity:'trusted' so trusted
  * blocks have consistent styling with the rest of the bot's alerts.

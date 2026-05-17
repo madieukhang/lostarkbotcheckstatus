@@ -24,31 +24,21 @@ import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { buildBlacklistScopeFilter } from '../../../utils/scope.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
-import { getListContext } from '../helpers.js';
+import {
+  decorateListEntry,
+  getListContext,
+  parseListEntryRef,
+} from '../helpers.js';
 
 const KNOWN_TYPES = ['black', 'white', 'watch'];
 const COLLATION = { locale: 'en', strength: 2 };
 const AUTOCOMPLETE_MAX = 25;
 const PER_LIST_FETCH_CAP = 25;
-// Mongo ObjectId is a 24-char lowercase hex string. Used to distinguish
-// autocomplete-picked values (which encode the entry's _id) from raw
-// user-typed names.
-const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
 
 function isOfficerOrSenior(userId) {
   if (!userId) return false;
   if (config.seniorApproverIds.includes(userId)) return true;
   return config.officerApproverIds.includes(userId);
-}
-
-function decorateEntry(entry, listType) {
-  const ctx = getListContext(listType);
-  return {
-    ...entry,
-    _icon: ctx.icon,
-    _label: ctx.label,
-    _color: ctx.color,
-  };
 }
 
 /**
@@ -65,23 +55,17 @@ function applyScopeForType(type, baseQuery, guildId) {
 }
 
 /**
- * Parse the autocomplete-returned `name` value. Two recognised shapes:
- *   - `<type>:<24-hex-id>` chosen via autocomplete; lookup by _id.
- *   - bare `<name>` free-typed; lookup by name with scope fallback.
- * Returns { type, entryId, name } where entryId is set only for the
- * autocomplete-picked shape.
+ * Parse the `name` option value. Delegates to the shared
+ * `parseListEntryRef` for the `<type>:<_id>` autocomplete shape, then
+ * falls back to a bare-name read when the input was free-typed.
+ * Returns `{ type, entryId, name }` where entryId is set only when
+ * autocomplete supplied the canonical encoded value.
  */
 function parseNameValue(raw) {
   if (!raw) return { type: null, entryId: null, name: '' };
-  const idx = raw.indexOf(':');
-  if (idx > 0 && idx < raw.length - 1) {
-    const candidate = raw.slice(0, idx);
-    const tail = raw.slice(idx + 1).trim();
-    if (KNOWN_TYPES.includes(candidate) && OBJECT_ID_RE.test(tail)) {
-      return { type: candidate, entryId: tail, name: '' };
-    }
-  }
-  return { type: null, entryId: null, name: raw.trim() };
+  const ref = parseListEntryRef(raw);
+  if (ref) return { type: ref.listType, entryId: ref.id, name: '' };
+  return { type: null, entryId: null, name: String(raw).trim() };
 }
 
 /**
@@ -260,7 +244,7 @@ export function createEvidenceHandlers({ client }) {
         return;
       }
 
-      const decorated = decorateEntry(entry, type);
+      const decorated = decorateListEntry(entry, type);
       const displayUrl = await resolveDisplayImageUrl(entry, client);
 
       // Officer privilege also unlocks the "Added by" field on the
