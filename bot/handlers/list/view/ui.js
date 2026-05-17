@@ -11,6 +11,7 @@ import {
 } from '../../../utils/imageRehost.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
+import { renderTrackedAltsField } from '../trackedAltsRender.js';
 
 /**
  * Render the meta line that sits under each entry's name. Uses middot
@@ -232,27 +233,16 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false }
   // officer can click straight through to verify any alt. Capped at 12
   // visible names with `+N more` overflow line so the field stays
   // under Discord's 1024-char field-value limit.
-  const allChars = Array.isArray(entry.allCharacters) ? entry.allCharacters : [];
-  const others = allChars.filter((n) => String(n).toLowerCase() !== String(entry.name).toLowerCase());
-  if (others.length > 0) {
-    const visible = others.slice(0, 12);
-    const lines = visible.map((n, i) => `${i + 1}. [${n}](${rosterUrl(n)})`);
-    const extra = others.length > visible.length
-      ? `\n*... and ${others.length - visible.length} more*`
-      : '';
-    const value = (lines.join('\n') + extra).slice(0, 1024);
-    fields.push({
-      name: `🧬 Tracked alts (${others.length})`,
-      value,
-      inline: false,
-    });
-  } else {
-    fields.push({
-      name: '🧬 Tracked alts',
-      value: '_Only this character is tracked on this entry._',
-      inline: false,
-    });
-  }
+  // Tracked alts via the shared renderer. View detail always shows the
+  // field (sentinel when empty) because it's part of the layout grammar
+  // the officer expects · the field is removed only when there is no
+  // entry at all, not when an entry happens to have no alts.
+  const altsField = renderTrackedAltsField({
+    names: entry.allCharacters,
+    primaryName: entry.name,
+    emptySentinel: '_Only this character is tracked on this entry._',
+  });
+  if (altsField) fields.push(altsField);
 
   const embed = new EmbedBuilder()
     .setTitle(`${entry._icon} ${entry.name}`)

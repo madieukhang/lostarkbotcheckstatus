@@ -6,7 +6,7 @@ import {
 
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
-import { getClassName, getClassEmoji } from '../../../models/Class.js';
+import { getClassName } from '../../../models/Class.js';
 import {
   buildRosterCharacters,
   fetchCharacterMeta,
@@ -17,6 +17,10 @@ import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { ICONS } from '../../../utils/ui.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl, logsUrl } from '../../../utils/rosterLink.js';
+import {
+  renderTrackedAltsField,
+  statMapFromRosterCharacters,
+} from '../trackedAltsRender.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -328,36 +332,16 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       ? 'hidden roster fallback'
       : 'visible roster';
 
-    // Tracked alts: filter out the primary name, render numbered list
-    // with class icon + ilvl from rosterCharacters when available, link
-    // each to its bible roster page. Caps visible rows at 12 so the
-    // 1024-char field-value budget stays in bounds even with deep
-    // rosters; overflow tail surfaces remaining count.
-    const otherChars = allCharacters.filter(
-      (n) => String(n).toLowerCase() !== entry.name.toLowerCase()
-    );
-    let trackedAltsValue;
-    if (otherChars.length === 0) {
-      trackedAltsValue = '_Only this character is tracked on this entry._';
-    } else {
-      const visible = otherChars.slice(0, 12);
-      const lines = visible.map((altName, idx) => {
-        const record = (rosterCharacters || []).find(
-          (c) => String(c.name).toLowerCase() === altName.toLowerCase()
-        );
-        const className = record?.className
-          || (record?.classId ? getClassName(record.classId) : '');
-        const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
-        const ilvl = record?.itemLevel && Number(record.itemLevel) > 0
-          ? ` · \`${Number(record.itemLevel).toFixed(2)}\``
-          : '';
-        return `**${idx + 1}.** ${classPrefix}[${altName}](${rosterUrl(altName)})${ilvl}`;
-      });
-      const extra = otherChars.length > visible.length
-        ? `\n*... and ${otherChars.length - visible.length} more*`
-        : '';
-      trackedAltsValue = (lines.join('\n') + extra).slice(0, 1024);
-    }
+    // Tracked alts via shared renderer · class icon + ilvl come from the
+    // rosterCharacters parse buildRosterCharacters returned for this name.
+    // Visible-roster path supplies the statMap; hidden-roster path (which
+    // returns just [name]) naturally falls through to the empty sentinel.
+    const altsField = renderTrackedAltsField({
+      names: allCharacters,
+      primaryName: entry.name,
+      statMap: statMapFromRosterCharacters(rosterCharacters),
+      emptySentinel: '_Only this character is tracked on this entry._',
+    });
 
     const requesterName = payload.requestedByDisplayName || payload.requestedByName || 'an officer';
     const heroLine = `**${requesterName}** added **${entry.name}** to the **${label}**${scopeTag}.`;
@@ -369,11 +353,9 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     if (payload.type === 'black') {
       fields.push({ name: '🌐 Scope', value: entryScope, inline: true });
     }
-    fields.push(
-      { name: '📝 Reason', value: (payload.reason || 'N/A').slice(0, 1024), inline: false },
-      { name: `🧬 Tracked alts (${otherChars.length})`, value: trackedAltsValue, inline: false },
-      { name: '🔗 Links', value: linkParts.join(' · '), inline: false },
-    );
+    fields.push({ name: '📝 Reason', value: (payload.reason || 'N/A').slice(0, 1024), inline: false });
+    if (altsField) fields.push(altsField);
+    fields.push({ name: '🔗 Links', value: linkParts.join(' · '), inline: false });
 
     // titleIcon prefixes done + list-type. For whitelist (✅) we drop
     // the done prefix to avoid a doubled tick (✅ ✅) and let the list

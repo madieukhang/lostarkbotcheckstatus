@@ -27,13 +27,16 @@ test('list broadcast tracked alts include class icon, item level, and CP when kn
     }, statMap);
 
     assert.equal(field.name, '🧬 Tracked alts (2)');
+    // Numbering is now bold-prefixed (`**N.**`) since the broadcast
+    // helper delegates to the shared trackedAltsRender · cross-surface
+    // consistency with /la-list view evidence detail.
     assert.match(
       field.value,
-      /1\. <:bard:1> \[Elynnä\]\(https:\/\/lostark\.bible\/character\/NA\/Elynn%C3%A4\/roster\) · `1745\.00` · CP `4501\.38`/
+      /\*\*1\.\*\* <:bard:1> \[Elynnä\]\(https:\/\/lostark\.bible\/character\/NA\/Elynn%C3%A4\/roster\) · `1745\.00` · CP `4501\.38`/
     );
     assert.match(
       field.value,
-      /2\. \[NoSnap\]\(https:\/\/lostark\.bible\/character\/NA\/NoSnap\/roster\)/
+      /\*\*2\.\*\* \[NoSnap\]\(https:\/\/lostark\.bible\/character\/NA\/NoSnap\/roster\)/
     );
   } finally {
     CLASS_EMOJI_MAP.Bard = oldBardEmoji;
@@ -50,6 +53,6 @@ test('list broadcast character lines fall back to class text when emoji is unava
 
   assert.equal(
     line,
-    '1. Breaker [AltName](https://lostark.bible/character/NA/AltName/roster) · `1710.50` · CP `3920`'
+    '**1.** Breaker [AltName](https://lostark.bible/character/NA/AltName/roster) · `1710.50` · CP `3920`'
   );
 });
