@@ -1,10 +1,9 @@
-import { EmbedBuilder } from 'discord.js';
-
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { refreshImageUrl } from '../../../utils/imageRehost.js';
-import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildEvidenceEmbed } from '../view/ui.js';
+import { getListContext } from '../helpers.js';
 
 export function createListAddViewEvidenceButtonHandler({ client }) {
   async function handleListAddViewEvidenceButton(interaction) {
@@ -66,17 +65,27 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
       return;
     }
 
-    const evidenceEmbed = new EmbedBuilder()
-      .setTitle(`📎 Evidence · ${payload.name}`)
-      .setDescription(payload.reason ? `*${payload.reason}*` : null)
-      .setImage(freshUrl)
-      .setColor(payload.type === 'black' ? COLORS.danger : payload.type === 'white' ? COLORS.success : COLORS.warning)
-      .setFooter({
-        text: isLegacy
-          ? 'Legacy image (may have expired) · submitted before evidence rehost'
-          : 'Fresh URL just resolved from evidence channel',
-      })
-      .setTimestamp(payload.createdAt ? new Date(payload.createdAt) : new Date());
+    // Route through the shared buildEvidenceEmbed so the approval-flow
+    // evidence card carries the same tokens (Reason field, list icon,
+    // inline meta, Tracked alts) that /la-evidence, /la-search,
+    // /la-list view, and /la-check already render. Approvers reviewing
+    // evidence used to see a thinner card here than they would later
+    // in /la-list view; this closes that gap.
+    const ctx = getListContext(payload.type);
+    const decorated = {
+      ...payload,
+      _icon: ctx.icon,
+      _label: ctx.label,
+      _color: ctx.color,
+      addedAt: payload.createdAt || payload.addedAt,
+      addedByDisplayName: payload.requestedByDisplayName || payload.addedByDisplayName || '',
+    };
+    const evidenceEmbed = buildEvidenceEmbed(decorated, freshUrl, { includeAddedBy: true });
+    evidenceEmbed.setFooter({
+      text: isLegacy
+        ? 'Legacy image (may have expired) · submitted before evidence rehost'
+        : 'Fresh URL just resolved from evidence channel',
+    });
 
     await interaction.reply({
       embeds: [evidenceEmbed],

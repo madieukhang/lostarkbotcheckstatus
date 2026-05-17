@@ -223,7 +223,8 @@ export async function handleSyncImagesAction(interaction) {
         new EmbedBuilder()
           .setTitle('✅ Sync Images · Nothing to do')
           .setDescription('All entries with images already have rehost refs. Nothing to migrate.')
-          .setColor(0x2ecc71)
+          .setColor(COLORS.success)
+          .setFooter({ text: 'Idempotent · re-runs are safe.' })
           .setTimestamp(),
       ],
     });
