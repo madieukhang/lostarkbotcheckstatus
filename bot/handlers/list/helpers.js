@@ -18,6 +18,7 @@ import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { COLORS, ICONS } from '../../utils/ui.js';
+import { renderTrackedAltsField } from './trackedAltsRender.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
@@ -194,24 +195,16 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   ];
 
   // Tracked alts give the approver "is this the right person?" context
-  // without forcing them to run /la-roster manually. Capped at 12
-  // visible names; cross-checks with allCharacters from the bible
-  // probe that ran at submission time.
-  const allChars = Array.isArray(payload.allCharacters) ? payload.allCharacters : [];
-  const others = allChars.filter((n) => String(n).toLowerCase() !== String(payload.name).toLowerCase());
-  if (others.length > 0) {
-    const visible = others.slice(0, 12);
-    const lines = visible.map((n, i) => {
-      const link = rosterUrl(n);
-      return `${i + 1}. [${n}](${link})`;
-    });
-    const extra = others.length > visible.length ? `\n*... and ${others.length - visible.length} more*` : '';
-    fields.push({
-      name: `🧬 Tracked alts (${others.length})`,
-      value: (lines.join('\n') + extra).slice(0, 1024),
-      inline: false,
-    });
-  }
+  // without forcing them to run /la-roster manually. Routed through the
+  // shared renderer so this card stays visually identical to the broadcast
+  // / la-list view evidence detail (numbering, link, overflow tail).
+  // No statMap supplied · the approval-DM doesn't run a snapshot lookup,
+  // so rows degrade to plain `[name](link)` rather than class+ilvl+CP.
+  const altsField = renderTrackedAltsField({
+    names: payload.allCharacters,
+    primaryName: payload.name,
+  });
+  if (altsField) fields.push(altsField);
 
   if (includeRequestedBy) {
     fields.push({

@@ -8,14 +8,16 @@ import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
+import {
+  formatAltLine,
+  renderTrackedAltsField,
+} from '../trackedAltsRender.js';
 
 const ACTION_VERB = Object.freeze({
   added:   'added to',
   removed: 'removed from',
   edited:  'edited in',
 });
-
-const FIELD_VALUE_LIMIT = 1024;
 
 function normalizeNameKey(value) {
   return String(value || '').trim().toLowerCase();
@@ -57,49 +59,22 @@ function getBroadcastClassName(record) {
   return record.className || (record.classId ? getClassName(record.classId) : '');
 }
 
-function getRosterLink(name) {
-  return rosterUrl(name);
-}
+// formatBroadcastCharacterLine + buildTrackedAltsField are kept as thin
+// wrappers around the shared renderer in handlers/list/trackedAltsRender.js
+// so the broadcast-specific public API (which tests import) stays stable
+// while the actual rendering logic lives in one place. Numbering changed
+// from "1." plain to "**1.**" bold to match the shared renderer's
+// formatting · cross-server broadcasts now read identically to the
+// /la-list view evidence detail card.
 
-export function formatBroadcastCharacterLine(name, index, statRecord) {
-  const className = getBroadcastClassName(statRecord);
-  const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
-  const statParts = [];
-  if (statRecord?.itemLevel > 0) statParts.push(`\`${statRecord.itemLevel.toFixed(2)}\``);
-  if (statRecord?.combatScore) statParts.push(`CP \`${statRecord.combatScore}\``);
-  const statSuffix = statParts.length > 0 ? ` · ${statParts.join(' · ')}` : '';
-  return `${index + 1}. ${classPrefix}[${name}](${getRosterLink(name)})${statSuffix}`;
-}
+export const formatBroadcastCharacterLine = formatAltLine;
 
 export function buildTrackedAltsField(entry, statMap = new Map()) {
-  const allChars = Array.isArray(entry?.allCharacters) ? entry.allCharacters : [];
-  const entryKey = normalizeNameKey(entry?.name);
-  const others = allChars
-    .map((n) => String(n || '').trim())
-    .filter((n) => n && normalizeNameKey(n) !== entryKey);
-  if (others.length === 0) return null;
-
-  const lines = [];
-  for (const name of others) {
-    const line = formatBroadcastCharacterLine(
-      name,
-      lines.length,
-      statMap.get(normalizeNameKey(name))
-    );
-    const hiddenAfterThis = others.length - lines.length - 1;
-    const overflowLine = hiddenAfterThis > 0 ? `\n*... and ${hiddenAfterThis} more*` : '';
-    const candidate = [...lines, line].join('\n') + overflowLine;
-    if (candidate.length > FIELD_VALUE_LIMIT && lines.length > 0) break;
-    lines.push(line);
-  }
-
-  const hiddenCount = others.length - lines.length;
-  const extra = hiddenCount > 0 ? `\n*... and ${hiddenCount} more*` : '';
-  return {
-    name: `🧬 Tracked alts (${others.length})`,
-    value: (lines.join('\n') + extra).slice(0, FIELD_VALUE_LIMIT),
-    inline: false,
-  };
+  return renderTrackedAltsField({
+    names: entry?.allCharacters,
+    primaryName: entry?.name,
+    statMap,
+  });
 }
 
 export function createBroadcastServices({ client }) {
@@ -110,7 +85,7 @@ export function createBroadcastServices({ client }) {
       rosterCharacters = [],
     } = options;
     const { label, color, icon } = getListContext(payload.type);
-    const rosterLink = getRosterLink(entry.name);
+    const rosterLink = rosterUrl(entry.name);
 
     const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
     const verb = ACTION_VERB[action] || action;
