@@ -3,6 +3,26 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 
+export function shapeRosterListHit(entry) {
+  return {
+    name: entry.name,
+    reason: entry.reason ?? '',
+    raid: entry.raid ?? '',
+    logsUrl: entry.logsUrl ?? '',
+    imageUrl: entry.imageUrl ?? '',
+    imageMessageId: entry.imageMessageId ?? '',
+    imageChannelId: entry.imageChannelId ?? '',
+    allCharacters: entry.allCharacters ?? [],
+    addedAt: entry.addedAt ?? null,
+    addedByDisplayName: entry.addedByDisplayName ?? '',
+    addedByName: entry.addedByName ?? '',
+    addedByTag: entry.addedByTag ?? '',
+    addedByUserId: entry.addedByUserId ?? '',
+    scope: entry.scope ?? '',
+    guildId: entry.guildId ?? '',
+  };
+}
+
 export async function handleRosterBlackListCheck(names, options = {}) {
   try {
     await connectDB();
@@ -17,18 +37,7 @@ export async function handleRosterBlackListCheck(names, options = {}) {
 
     if (entry) {
       console.log(`[blacklist] "${entry.name}" is BLACKLISTED - reason: ${entry.reason || '(none)'}`);
-      return {
-        name: entry.name,
-        reason: entry.reason ?? '',
-        raid: entry.raid ?? '',
-        imageUrl: entry.imageUrl ?? '',
-        imageMessageId: entry.imageMessageId ?? '',
-        imageChannelId: entry.imageChannelId ?? '',
-        addedByDisplayName: entry.addedByDisplayName ?? '',
-        addedByName: entry.addedByName ?? '',
-        addedByTag: entry.addedByTag ?? '',
-        addedByUserId: entry.addedByUserId ?? '',
-      };
+      return shapeRosterListHit(entry);
     }
 
     console.log('[blacklist] No blacklisted characters found in roster');
@@ -55,18 +64,7 @@ export async function handleRosterWhiteListCheck(names) {
 
     if (entry) {
       console.log(`[whitelist] "${entry.name}" is WHITELISTED - reason: ${entry.reason || '(none)'}`);
-      return {
-        name: entry.name,
-        reason: entry.reason ?? '',
-        raid: entry.raid ?? '',
-        imageUrl: entry.imageUrl ?? '',
-        imageMessageId: entry.imageMessageId ?? '',
-        imageChannelId: entry.imageChannelId ?? '',
-        addedByDisplayName: entry.addedByDisplayName ?? '',
-        addedByName: entry.addedByName ?? '',
-        addedByTag: entry.addedByTag ?? '',
-        addedByUserId: entry.addedByUserId ?? '',
-      };
+      return shapeRosterListHit(entry);
     }
 
     console.log('[whitelist] No whitelisted characters found in roster');
