@@ -23,6 +23,8 @@ import { normalizeCharacterName } from '../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
+import { buildEvidenceEmbed } from '../list/view/ui.js';
+import { getListContext } from '../list/helpers.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
@@ -214,14 +216,15 @@ export async function handleRosterCommand(interaction) {
       const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
       contentLines.push(`⛔ **${name}** is on the blacklist.${raid}${reason}`);
 
-      // Resolve fresh URL for rehosted entries; legacy entries use stored URL.
+      // Use the shared buildEvidenceEmbed so the inline evidence card
+      // matches /la-evidence, /la-search, /la-list view, /la-check.
+      // Was a title+image-only embed before · officer reviewing a
+      // /la-roster hit would see less context than they would elsewhere.
       const blackImageUrl = await resolveDisplayImageUrl(blacklistResult, interaction.client);
       if (blackImageUrl) {
-        const evidenceEmbed = new EmbedBuilder()
-          .setTitle('Blacklist Evidence')
-          .setImage(blackImageUrl)
-          .setColor(COLORS.danger);
-        embeds.unshift(evidenceEmbed);
+        const ctx = getListContext('black');
+        const decorated = { ...blacklistResult, _icon: ctx.icon, _label: ctx.label, _color: ctx.color };
+        embeds.unshift(buildEvidenceEmbed(decorated, blackImageUrl));
       }
     }
 
@@ -232,11 +235,9 @@ export async function handleRosterCommand(interaction) {
 
       const whiteImageUrl = await resolveDisplayImageUrl(whitelistResult, interaction.client);
       if (whiteImageUrl) {
-        const evidenceEmbed = new EmbedBuilder()
-          .setTitle('Whitelist Evidence')
-          .setImage(whiteImageUrl)
-          .setColor(COLORS.success);
-        embeds.unshift(evidenceEmbed);
+        const ctx = getListContext('white');
+        const decorated = { ...whitelistResult, _icon: ctx.icon, _label: ctx.label, _color: ctx.color };
+        embeds.unshift(buildEvidenceEmbed(decorated, whiteImageUrl));
       }
     }
 
