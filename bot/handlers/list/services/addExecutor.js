@@ -6,7 +6,7 @@ import {
 
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
-import { getClassName } from '../../../models/Class.js';
+import { getClassName, getClassEmoji } from '../../../models/Class.js';
 import {
   buildRosterCharacters,
   fetchCharacterMeta,
@@ -308,36 +308,86 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
     const entry = await model.create(createData);
 
-    // Build success embed with character links + roster source.
-    // Uses buildAlertEmbed with titleIcon/color overrides so the card
-    // wears the list-type icon (⛔/✅/⚠️) and matches the rest of the
-    // alert family's layout (footer, timestamp, field rendering).
+    // Build success embed using the same vocabulary as the approval
+    // card (buildListAddApprovalEmbed) so an officer reviewing both
+    // sees a consistent layout: list-type icon in the title bar, hero
+    // line describing the action in plain English, icon-prefixed
+    // fields (📒/🗡️/🌐/📝/🧬/🔗), numbered tracked-alts with class
+    // icon + ilvl when the roster scrape surfaced them, and a footer
+    // crediting the requester + roster source.
     const rosterLink = rosterUrl(entry.name);
     const autoLogsLink = logsUrl(entry.name);
 
     const linkParts = [`[Roster](${rosterLink})`, `[Logs](${autoLogsLink})`];
     if (payload.logsUrl) linkParts.push(`[Evidence Logs](${payload.logsUrl})`);
 
-    const allCharsDisplay = allCharacters.length <= 6
-      ? allCharacters.join(', ')
-      : allCharacters.slice(0, 6).join(', ') + ` +${allCharacters.length - 6} more`;
+    const scopeTag = (payload.type === 'black' && entryScope === 'server')
+      ? ' `[Local]`'
+      : payload.type === 'black' ? ' `[Global]`' : '';
+    const rosterSourceLabel = rosterVisibility === 'hidden'
+      ? 'hidden roster fallback'
+      : 'visible roster';
 
-    const scopeTag = (payload.type === 'black' && entryScope === 'server') ? ' [Server]' : '';
-    const rosterSource = rosterVisibility === 'hidden' ? 'Hidden roster fallback' : 'Visible roster';
+    // Tracked alts: filter out the primary name, render numbered list
+    // with class icon + ilvl from rosterCharacters when available, link
+    // each to its bible roster page. Caps visible rows at 12 so the
+    // 1024-char field-value budget stays in bounds even with deep
+    // rosters; overflow tail surfaces remaining count.
+    const otherChars = allCharacters.filter(
+      (n) => String(n).toLowerCase() !== entry.name.toLowerCase()
+    );
+    let trackedAltsValue;
+    if (otherChars.length === 0) {
+      trackedAltsValue = '_Only this character is tracked on this entry._';
+    } else {
+      const visible = otherChars.slice(0, 12);
+      const lines = visible.map((altName, idx) => {
+        const record = (rosterCharacters || []).find(
+          (c) => String(c.name).toLowerCase() === altName.toLowerCase()
+        );
+        const className = record?.className
+          || (record?.classId ? getClassName(record.classId) : '');
+        const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
+        const ilvl = record?.itemLevel && Number(record.itemLevel) > 0
+          ? ` · \`${Number(record.itemLevel).toFixed(2)}\``
+          : '';
+        return `**${idx + 1}.** ${classPrefix}[${altName}](${rosterUrl(altName)})${ilvl}`;
+      });
+      const extra = otherChars.length > visible.length
+        ? `\n*... and ${otherChars.length - visible.length} more*`
+        : '';
+      trackedAltsValue = (lines.join('\n') + extra).slice(0, 1024);
+    }
+
+    const requesterName = payload.requestedByDisplayName || payload.requestedByName || 'an officer';
+    const heroLine = `**${requesterName}** added **${entry.name}** to the **${label}**${scopeTag}.`;
+
+    const fields = [
+      { name: '📒 List', value: `${icon} ${label}`, inline: true },
+      { name: '🗡️ Raid', value: payload.raid ? `\`${payload.raid}\`` : 'N/A', inline: true },
+    ];
+    if (payload.type === 'black') {
+      fields.push({ name: '🌐 Scope', value: entryScope, inline: true });
+    }
+    fields.push(
+      { name: '📝 Reason', value: (payload.reason || 'N/A').slice(0, 1024), inline: false },
+      { name: `🧬 Tracked alts (${otherChars.length})`, value: trackedAltsValue, inline: false },
+      { name: '🔗 Links', value: linkParts.join(' · '), inline: false },
+    );
+
+    // titleIcon prefixes done + list-type. For whitelist (✅) we drop
+    // the done prefix to avoid a doubled tick (✅ ✅) and let the list
+    // icon carry the success cue on its own.
+    const titleIcon = payload.type === 'white' ? icon : `${ICONS.done} ${icon}`;
 
     const embed = buildAlertEmbed({
       severity: AlertSeverity.SUCCESS,
-      titleIcon: icon,
+      titleIcon,
       color,
-      title: `${labelCap}${scopeTag} · Entry Added`,
-      fields: [
-        { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
-        { name: 'Reason', value: payload.reason || 'N/A', inline: true },
-        { name: 'Raid', value: payload.raid || 'N/A', inline: true },
-        { name: `All Characters (${allCharacters.length})`, value: allCharsDisplay, inline: false },
-        { name: 'Roster source', value: rosterSource, inline: true },
-        { name: 'Links', value: linkParts.join(' · '), inline: false },
-      ],
+      title: `${labelCap} · Added · ${entry.name}`,
+      description: heroLine,
+      fields,
+      footer: `${ICONS.shield} Added by ${requesterName} · ${rosterSourceLabel}`,
     });
 
     // Resolve the freshest possible image URL from the just-created entry.
