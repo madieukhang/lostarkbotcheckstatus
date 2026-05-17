@@ -290,7 +290,7 @@ export async function handleSetupRemoteCommand(interaction) {
         { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
         { name: 'Status', value: newState ? '🔔 Receiving broadcasts' : '🔕 Silent · no broadcasts', inline: true },
       )
-      .setColor(newState ? 0x2ecc71 : 0xe74c3c)
+      .setColor(newState ? COLORS.success : COLORS.danger)
       .setFooter({ text: `Changed by ${interaction.user.tag} · silent · server not notified` })
       .setTimestamp();
 
@@ -326,7 +326,7 @@ export async function handleSetupRemoteCommand(interaction) {
         { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
         { name: 'Default Scope', value: scopeDisplay, inline: true },
       )
-      .setColor(scopeValue === 'server' ? 0x9b59b6 : 0x3498db)
+      .setColor(scopeValue === 'server' ? COLORS.warning : COLORS.info)
       .setFooter({ text: `Changed by ${interaction.user.tag} · silent · server not notified` })
       .setTimestamp();
 

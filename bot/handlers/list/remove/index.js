@@ -14,6 +14,7 @@ import {
 
 import { connectDB } from '../../../db.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
+import { COLORS } from '../../../utils/ui.js';
 import config from '../../../config.js';
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
@@ -254,7 +255,7 @@ export function createRemoveHandlers({ client, services }) {
           `**${name}** is in ${found.length} list(s). Pick which to remove:\n\n` +
           listLines.join('\n')
         )
-        .setColor(0x5865f2)
+        .setColor(COLORS.info)
         .setFooter({ text: '30s timeout · only you can act on this picker.' })
         .setTimestamp();
 

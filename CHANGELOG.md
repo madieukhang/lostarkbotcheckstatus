@@ -20,6 +20,9 @@ UX rework pass:
 - Multiadd reject embed now carries the same shape as the approval DM: title `✖️ Bulk Add · Rejected · N rows`, per-list-type breakdown (`⛔ N · ⚠️ N · ✅ N`), requester credit, request ID, footer. Previously was a two-line "Rejected by @id" card with no context.
 - Hidden-roster embed (`/la-roster` fallback path) gains the `🔒` title-icon prefix, plural-correct guild-member count, and explicit "Source: lostark.bible" qualifier in the footer to match the rest of the family.
 - `/la-remote action:syncimages` "Nothing to do" card moves off the hardcoded `0x2ecc71` hex onto `COLORS.success` and gains a footer noting idempotent re-run behavior.
+- `/la-roster` inline evidence card (when a blacklist or whitelist hit is detected) now routes through the shared `buildEvidenceEmbed` so the rich Reason / inline meta / Tracked alts vocabulary is consistent with `/la-evidence`, `/la-search`, `/la-list view`, `/la-check`, and the approval-flow evidence button. Was a `setTitle('Blacklist Evidence').setImage(url).setColor(...)` thin card before.
+- `/la-list remove` multi-list picker card moves off the hardcoded blurple hex onto `COLORS.info`.
+- `/la-remote action:off` and `action:defaultscope` confirmation cards move off magic hex (`0x2ecc71` / `0xe74c3c` / `0x9b59b6` / `0x3498db`) onto named `COLORS.*` tokens for visual consistency with the rest of the bot's color palette.
 
 Earlier in cycle:
 - Reverted Gemini class extraction (the `{name, class}[]` OCR output shape) introduced earlier in this Unreleased cycle. Gemini's icon recognition was unreliable for some classes (3/8 missing in a real raid lobby test), so the cleaner approach is to rely on bible's deterministic data via the routing above. OCR prompt is back to name-only string output; `extractNamesFromImage` returns `string[]`; `checkNamesAgainstLists` takes `string[]` only.
