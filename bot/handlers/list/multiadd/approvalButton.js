@@ -59,10 +59,41 @@ export function createMultiaddApprovalButtonHandler(deps) {
     };
 
     if (prefix === 'multiaddapprove_reject') {
+      // Count per-list-type so the reject card carries the same
+      // breakdown shape the approval card does. Gives the requester
+      // (and any other approver scrolling DMs) one-glance context for
+      // what was thrown out.
+      const rejectCounts = { black: 0, white: 0, watch: 0 };
+      for (const row of payload.bulkRows || []) {
+        if (row.type && rejectCounts[row.type] !== undefined) rejectCounts[row.type] += 1;
+      }
+      const breakdown = [];
+      if (rejectCounts.black > 0) breakdown.push(`⛔ **${rejectCounts.black}**`);
+      if (rejectCounts.watch > 0) breakdown.push(`⚠️ **${rejectCounts.watch}**`);
+      if (rejectCounts.white > 0) breakdown.push(`✅ **${rejectCounts.white}**`);
+
       const rejectEmbed = new EmbedBuilder()
-        .setTitle('✖️ Bulk Add Rejected')
-        .setDescription(`Rejected by <@${interaction.user.id}>`)
+        .setTitle(`✖️ Bulk Add · Rejected · ${payload.bulkRows.length} rows`)
+        .setDescription(`<@${interaction.user.id}> rejected the bulk-add request.`)
         .setColor(COLORS.danger)
+        .addFields(
+          {
+            name: '👤 Requested by',
+            value: `${payload.requestedByDisplayName || payload.requestedByTag || 'Unknown'} (<@${payload.requestedByUserId}>)`,
+            inline: false,
+          },
+          {
+            name: '📊 Rows discarded',
+            value: breakdown.length > 0 ? breakdown.join(' · ') : `**${payload.bulkRows.length}** rows`,
+            inline: true,
+          },
+          {
+            name: '🆔 Request ID',
+            value: `\`${payload.requestId.slice(0, 8)}\``,
+            inline: true,
+          },
+        )
+        .setFooter({ text: '🛡️ Bulk-add approval flow · request consumed, nothing was written to the DB' })
         .setTimestamp();
 
       await interaction.update({

@@ -182,11 +182,13 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         const deepStats = formatDeepScanStats(altResult);
 
         const primaryEmbed = new EmbedBuilder()
-          .setTitle(`Hidden Roster – ${name}`)
+          .setTitle(`🔒 Hidden Roster · ${name}`)
           .setURL(bibleProfileUrl(name))
           .setDescription(description.length > 4000 ? description.slice(0, 4000) + '\n…' : description)
           .setColor(color)
-          .setFooter({ text: `${guildMembers.length} guild members${deepStats ? ` · ${deepStats}` : ''} · lostark.bible` })
+          .setFooter({
+            text: `${guildMembers.length} guild member${guildMembers.length === 1 ? '' : 's'}${deepStats ? ` · ${deepStats}` : ''} · Source: lostark.bible`,
+          })
           .setTimestamp();
 
         // Build the second embed (scan result) and the Continue button
