@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { EmbedBuilder } from 'discord.js';
 import config from '../config.js';
+import { COLORS } from '../utils/ui.js';
 import { getServerStatus, getMultiServerStatus, STATUS } from './serverStatus.js';
 
 // ─── State helpers ────────────────────────────────────────────────────────────
@@ -58,10 +59,40 @@ async function sendOnlineNotification(client, serverName) {
       return;
     }
 
+    // The other monitored servers, listed so the embed surfaces "is the
+    // rest of the cluster also up?" context without forcing the reader
+    // to run /la-status separately. Self-filter so the focal server
+    // isn't repeated in the secondary list.
+    const otherServers = (config.targetServers || [])
+      .filter((s) => s && s.toLowerCase() !== String(serverName).toLowerCase());
+
+    const fields = [
+      {
+        name: '🌐 Server',
+        value: `**${serverName}**`,
+        inline: true,
+      },
+      {
+        name: '🕐 Came online',
+        value: `<t:${Math.floor(Date.now() / 1000)}:R>`,
+        inline: true,
+      },
+    ];
+    if (otherServers.length > 0) {
+      fields.push({
+        name: '📡 Also monitored',
+        value: otherServers.map((s) => `\`${s}\``).join(' · '),
+        inline: false,
+      });
+    }
+
     const embed = new EmbedBuilder()
-      .setTitle('Thông báo')
-      .setDescription(`**${serverName}** is online 🎉`)
-      .setColor(15258703)
+      .setAuthor({ name: 'Lost Ark · Status Monitor' })
+      .setTitle(`🟢 ${serverName} is back online`)
+      .setDescription(`Logins are open on **${serverName}**. Time to raid!`)
+      .addFields(fields)
+      .setColor(COLORS.success)
+      .setFooter({ text: 'Source: playlostark.com · /la-status for live state' })
       .setTimestamp();
 
     await channel.send({ content: '@here', embeds: [embed] });
