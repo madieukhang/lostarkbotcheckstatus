@@ -247,59 +247,73 @@ async function handleSetupView(interaction) {
 
   const autoCheckDb = guildConfig?.autoCheckChannelId;
   const notifyDb = guildConfig?.listNotifyChannelId;
-
-  // Env var fallback info
   const autoCheckEnv = config.autoCheckChannelIds;
   const notifyEnv = config.listNotifyChannelIds;
-
-  const lines = [];
-
-  // Auto-check channel
-  lines.push('**📸 Auto-check channel:**');
-  if (autoCheckDb) {
-    lines.push(`  → <#${autoCheckDb}> *(set via /la-setup)*`);
-  } else if (autoCheckEnv.length > 0) {
-    lines.push(`  → ${autoCheckEnv.map((id) => `<#${id}>`).join(', ')} *(from env vars)*`);
-  } else {
-    lines.push('  → *Not configured*');
-  }
-
-  lines.push('');
-
-  // Notify channel
-  lines.push('**🔔 Notification channel:**');
-  if (notifyDb) {
-    lines.push(`  → <#${notifyDb}> *(set via /la-setup)*`);
-  } else if (notifyEnv.length > 0) {
-    lines.push(`  → ${notifyEnv.map((id) => `<#${id}>`).join(', ')} *(from env vars)*`);
-  } else {
-    lines.push('  → *Not configured*');
-  }
-
-  // Global notification status
   const notifyEnabled = guildConfig?.globalNotifyEnabled ?? true;
-  lines.push('');
-  lines.push(`**📡 Global notifications:** ${notifyEnabled ? '🔔 Enabled' : '🔕 Disabled'}`);
-  if (!notifyEnabled) {
-    lines.push('  → *This server will not receive broadcast notifications from other servers*');
-  }
-
-  // Default blacklist scope
   const defaultScope = guildConfig?.defaultBlacklistScope || 'global';
   const scopeEmoji = defaultScope === 'server' ? '🔒' : '🌐';
-  lines.push('');
-  lines.push(`**${scopeEmoji} Default blacklist scope:** ${defaultScope}`);
-  lines.push(`  → *\`/la-list add type:black\` without scope will default to ${defaultScope}*`);
 
+  // Each setting renders as its own field so the dashboard reads as a
+  // 2x2 grid of "what's configured here?" cards instead of a wall of
+  // bullet points. The source qualifier (set via /la-setup vs env var
+  // fallback vs not configured) goes on a second line in italics so
+  // an admin scanning the grid can tell at a glance how each value
+  // was provisioned.
+  function channelFieldValue(dbId, envIds) {
+    if (dbId) return `<#${dbId}>\n*set via /la-setup*`;
+    if (envIds.length > 0) return `${envIds.map((id) => `<#${id}>`).join(', ')}\n*from env var fallback*`;
+    return '*Not configured*';
+  }
+
+  const fields = [
+    {
+      name: '📸 Auto-check channel',
+      value: channelFieldValue(autoCheckDb, autoCheckEnv),
+      inline: true,
+    },
+    {
+      name: '🔔 Notification channel',
+      value: channelFieldValue(notifyDb, notifyEnv),
+      inline: true,
+    },
+    {
+      name: '​',
+      value: '​',
+      inline: true,
+    },
+    {
+      name: `${scopeEmoji} Default blacklist scope`,
+      value: `**${defaultScope}**\n*\`/la-list add type:black\` defaults to ${defaultScope} when scope is omitted*`,
+      inline: true,
+    },
+    {
+      name: '📡 Global notifications',
+      value: notifyEnabled
+        ? '**🔔 Enabled**\n*Receives broadcasts from other servers*'
+        : '**🔕 Disabled**\n*Does not receive broadcasts from other servers*',
+      inline: true,
+    },
+    {
+      name: '​',
+      value: '​',
+      inline: true,
+    },
+  ];
+
+  const footerParts = [];
   if (guildConfig?.updatedAt) {
-    lines.push('');
-    lines.push(`Last updated: <t:${Math.floor(new Date(guildConfig.updatedAt).getTime() / 1000)}:R> by ${guildConfig.updatedByTag || 'Unknown'}`);
+    const updatedAtUnix = Math.floor(new Date(guildConfig.updatedAt).getTime() / 1000);
+    footerParts.push(`Last updated by ${guildConfig.updatedByTag || 'Unknown'} · <t:${updatedAtUnix}:R>`);
+  } else {
+    footerParts.push('No persisted config yet · values shown are env / defaults');
   }
 
   const embed = new EmbedBuilder()
-    .setTitle('⚙️ Bot Configuration')
-    .setDescription(lines.join('\n'))
+    .setAuthor({ name: `${interaction.guild.name} · Bot Configuration` })
+    .setDescription('Per-server settings for the Lost Ark Check bot. Use the matching `/la-setup` subcommand to change any of these.')
+    .addFields(fields)
     .setColor(COLORS.info)
+    .setFooter({ text: footerParts.join(' · ') })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
