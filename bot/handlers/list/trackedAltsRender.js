@@ -36,6 +36,11 @@ function classNameFromRecord(record) {
   return '';
 }
 
+function parsePositiveNumber(value) {
+  const parsed = Number(String(value ?? '').replace(/,/g, ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 /**
  * Build a single numbered alt line. Class icon + ilvl + CP are
  * appended when a stat record is available; the bare `[name](link)`
@@ -46,7 +51,8 @@ export function formatAltLine(name, index, record) {
   const className = classNameFromRecord(record);
   const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
   const statParts = [];
-  if (record?.itemLevel > 0) statParts.push(`\`${Number(record.itemLevel).toFixed(2)}\``);
+  const itemLevel = parsePositiveNumber(record?.itemLevel);
+  if (itemLevel > 0) statParts.push(`\`${itemLevel.toFixed(2)}\``);
   if (record?.combatScore && record.combatScore !== '?') statParts.push(`CP \`${record.combatScore}\``);
   const statSuffix = statParts.length > 0 ? ` · ${statParts.join(' · ')}` : '';
   return `**${index + 1}.** ${classPrefix}[${name}](${rosterUrl(name)})${statSuffix}`;

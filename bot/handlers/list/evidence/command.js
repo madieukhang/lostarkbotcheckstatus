@@ -68,6 +68,10 @@ function parseNameValue(raw) {
   return { type: null, entryId: null, name: String(raw).trim() };
 }
 
+export function buildListEvidenceNameQuery(name) {
+  return { $or: [{ name }, { allCharacters: name }] };
+}
+
 /**
  * Lookup an entry by Mongo _id (autocomplete path). Scope filter is still
  * applied for blacklist so a leaked or copy-pasted _id from another guild
@@ -96,7 +100,7 @@ async function findEntryByName({ name, preferredType, guildId }) {
 
   for (const type of types) {
     const { model } = getListContext(type);
-    const query = applyScopeForType(type, { name }, guildId);
+    const query = applyScopeForType(type, buildListEvidenceNameQuery(name), guildId);
     const entry = await model.findOne(query).collation(COLLATION).lean();
     if (entry) return { entry, type };
   }
