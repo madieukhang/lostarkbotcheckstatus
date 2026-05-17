@@ -3,7 +3,7 @@ import PendingApproval from '../../../models/PendingApproval.js';
 import { refreshImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
-import { getListContext } from '../helpers.js';
+import { decorateListEntry } from '../helpers.js';
 
 export function createListAddViewEvidenceButtonHandler({ client }) {
   async function handleListAddViewEvidenceButton(interaction) {
@@ -71,12 +71,8 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     // /la-list view, and /la-check already render. Approvers reviewing
     // evidence used to see a thinner card here than they would later
     // in /la-list view; this closes that gap.
-    const ctx = getListContext(payload.type);
     const decorated = {
-      ...payload,
-      _icon: ctx.icon,
-      _label: ctx.label,
-      _color: ctx.color,
+      ...decorateListEntry(payload, payload.type),
       addedAt: payload.createdAt || payload.addedAt,
       addedByDisplayName: payload.requestedByDisplayName || payload.addedByDisplayName || '',
     };

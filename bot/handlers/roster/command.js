@@ -24,7 +24,7 @@ import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { buildEvidenceEmbed } from '../list/view/ui.js';
-import { getListContext } from '../list/helpers.js';
+import { decorateListEntry } from '../list/helpers.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
@@ -222,9 +222,7 @@ export async function handleRosterCommand(interaction) {
       // /la-roster hit would see less context than they would elsewhere.
       const blackImageUrl = await resolveDisplayImageUrl(blacklistResult, interaction.client);
       if (blackImageUrl) {
-        const ctx = getListContext('black');
-        const decorated = { ...blacklistResult, _icon: ctx.icon, _label: ctx.label, _color: ctx.color };
-        embeds.unshift(buildEvidenceEmbed(decorated, blackImageUrl));
+        embeds.unshift(buildEvidenceEmbed(decorateListEntry(blacklistResult, 'black'), blackImageUrl));
       }
     }
 
@@ -235,9 +233,7 @@ export async function handleRosterCommand(interaction) {
 
       const whiteImageUrl = await resolveDisplayImageUrl(whitelistResult, interaction.client);
       if (whiteImageUrl) {
-        const ctx = getListContext('white');
-        const decorated = { ...whitelistResult, _icon: ctx.icon, _label: ctx.label, _color: ctx.color };
-        embeds.unshift(buildEvidenceEmbed(decorated, whiteImageUrl));
+        embeds.unshift(buildEvidenceEmbed(decorateListEntry(whitelistResult, 'white'), whiteImageUrl));
       }
     }
 
