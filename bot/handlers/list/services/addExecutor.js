@@ -410,6 +410,10 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     return {
       ok: true,
       entry, // Mongoose doc for callers that need to re-use the created entry (e.g. bulk broadcast)
+      // content honors the executor contract documented above: every return
+      // path (ok or not) carries a one-line string so approval-flow notifiers
+      // can render `<@requester> ${content}` without a literal "undefined".
+      content: `✅ Add approved: **${entry.name}** added to ${label}.`,
       embeds: [embed],
       components,
     };

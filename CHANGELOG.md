@@ -48,6 +48,7 @@ Earlier in cycle:
 - Cross-server list add/edit broadcasts now render tracked alts with class icon, item level, and CP when roster data is available. Rows still fall back to linked names when a snapshot is missing.
 
 ### Fixed
+- Approval ping to requester no longer renders as `<@user> undefined` after an officer approves `/la-list add`. `executeListAddToDatabase` success return was missing the `content` field that every other return path (errors, duplicate, edit, overwrite) populates; `notifyRequesterAboutDecision` then interpolated undefined into the ping line as a literal string. Added `content: "✅ Add approved: <name> added to <label>."` to the success shape so the executor contract holds across all paths; bulk and self-consumer call sites read `result.content` defensively and are unchanged.
 - OCR list-check and auto-check are now DB-only after OCR: they compare extracted names against blacklist/whitelist/watchlist/trusted data and stored snapshots only. They no longer call bible, worker roster lookup, hidden-roster fallback, similar-name search, or post-check roster enrichment.
 
 ### Tests
