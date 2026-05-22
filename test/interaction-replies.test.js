@@ -5,6 +5,7 @@ import {
   deferEphemeralReply,
   deferReply,
   editAlert,
+  editComponents,
   editContent,
   editEmbed,
   replyAlert,
@@ -79,6 +80,16 @@ test('editContent preserves content-only edit payloads', async () => {
     content: 'Working...',
     components: [],
   });
+});
+
+test('editComponents preserves component-only edit payloads', async () => {
+  const calls = [];
+  const interaction = { editReply: async (payload) => calls.push(payload) };
+  const components = [{ row: true }];
+
+  await editComponents(interaction, components);
+
+  assert.deepEqual(calls[0], { components });
 });
 
 test('defer helpers centralize public and ephemeral defer payloads', async () => {

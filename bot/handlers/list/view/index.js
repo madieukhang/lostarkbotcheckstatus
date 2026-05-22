@@ -3,7 +3,16 @@ import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import {
+  deferReply,
+  editAlert,
+  editComponents,
+  editEmbed,
+  replyAlert,
+  replyContent,
+  replyEmbed,
+} from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getListContext } from '../helpers.js';
 import {
@@ -80,13 +89,10 @@ async function buildGuildNameCache({ allEntries, client, isOwnerGuild }) {
 export function createViewHandlers({ client }) {
   async function handleListViewCommand(interaction) {
     if (!interaction.guild) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Server-Only Command',
-          description: 'This command can only be used inside a Discord server, not in DMs.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Server-Only Command',
+        description: 'This command can only be used inside a Discord server, not in DMs.',
       });
       return;
     }
@@ -94,7 +100,7 @@ export function createViewHandlers({ client }) {
     const type = interaction.options.getString('type', true);
     const scopeFilter = interaction.options.getString('scope') || '';
 
-    await interaction.deferReply();
+    await deferReply(interaction);
 
     try {
       await connectDB();
@@ -103,18 +109,16 @@ export function createViewHandlers({ client }) {
       if (type === 'trusted') {
         const trustedEntries = await TrustedUser.find({}).sort({ addedAt: -1 }).lean();
         if (trustedEntries.length === 0) {
-          await interaction.editReply({
-            embeds: [buildAlertEmbed({
-              severity: AlertSeverity.INFO,
-              titleIcon: '🛡️',
-              title: t('listView.trusted.emptyTitle', lang),
-              description: t('listView.trusted.emptyDescription', lang),
-              footer: t('listView.trusted.emptyFooter', lang),
-            })],
+          await editAlert(interaction, {
+            severity: AlertSeverity.INFO,
+            titleIcon: '🛡️',
+            title: t('listView.trusted.emptyTitle', lang),
+            description: t('listView.trusted.emptyDescription', lang),
+            footer: t('listView.trusted.emptyFooter', lang),
           });
           return;
         }
-        await interaction.editReply({ embeds: [buildTrustedListEmbed(trustedEntries, lang)] });
+        await editEmbed(interaction, buildTrustedListEmbed(trustedEntries, lang));
         return;
       }
 
@@ -124,17 +128,15 @@ export function createViewHandlers({ client }) {
 
       if (allEntries.length === 0) {
         const ctx = type === 'all' ? null : getListContext(type);
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.INFO,
-            titleIcon: ctx?.icon,
-            title: type === 'all'
-              ? t('listView.empty.allTitle', lang)
-              : t('listView.empty.typedTitle', lang, { label: ctx.label }),
-            description: type === 'all'
-              ? t('listView.empty.allDescription', lang)
-              : t('listView.empty.typedDescription', lang, { label: ctx.label }),
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.INFO,
+          titleIcon: ctx?.icon,
+          title: type === 'all'
+            ? t('listView.empty.allTitle', lang)
+            : t('listView.empty.typedTitle', lang, { label: ctx.label }),
+          description: type === 'all'
+            ? t('listView.empty.allDescription', lang)
+            : t('listView.empty.typedDescription', lang, { label: ctx.label }),
         });
         return;
       }
@@ -165,8 +167,7 @@ export function createViewHandlers({ client }) {
         totalPages,
       });
 
-      await interaction.editReply({
-        embeds: [await buildListPageEmbed(pageOptions())],
+      await editEmbed(interaction, await buildListPageEmbed(pageOptions()), {
         components: buildListViewComponents(componentOptions()),
       });
 
@@ -175,13 +176,10 @@ export function createViewHandlers({ client }) {
 
       collector.on('collect', async (componentInteraction) => {
         if (componentInteraction.user.id !== interaction.user.id) {
-          await componentInteraction.reply({
-            embeds: [buildAlertEmbed({
-              severity: AlertSeverity.ERROR,
-              title: 'Not Your Session',
-              description: 'Only the command user can navigate this list view.',
-            })],
-            ephemeral: true,
+          await replyAlert(componentInteraction, {
+            severity: AlertSeverity.ERROR,
+            title: 'Not Your Session',
+            description: 'Only the command user can navigate this list view.',
           });
           return;
         }
@@ -191,8 +189,7 @@ export function createViewHandlers({ client }) {
             ? Math.max(0, currentPage - 1)
             : Math.min(totalPages - 1, currentPage + 1);
           await componentInteraction.deferUpdate();
-          await componentInteraction.editReply({
-            embeds: [await buildListPageEmbed(pageOptions())],
+          await editEmbed(componentInteraction, await buildListPageEmbed(pageOptions()), {
             components: buildListViewComponents(componentOptions()),
           });
           return;
@@ -202,37 +199,27 @@ export function createViewHandlers({ client }) {
           const index = parseInt(componentInteraction.values[0], 10);
           const entry = allEntries[index];
           if (!entry?.imageMessageId && !entry?.imageUrl) {
-            await componentInteraction.reply({
-              content: t('listView.evidence.noImage', lang),
-              ephemeral: true,
-            });
+            await replyContent(componentInteraction, t('listView.evidence.noImage', lang));
             return;
           }
 
           const displayUrl = await resolveDisplayImageUrl(entry, client);
           const isOfficer = config.officerApproverIds.includes(componentInteraction.user.id)
             || config.seniorApproverIds.includes(componentInteraction.user.id);
-          await componentInteraction.reply({
-            embeds: [buildEvidenceEmbed(entry, displayUrl, { includeAddedBy: isOfficer, lang })],
-            ephemeral: true,
-          });
+          await replyEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, { includeAddedBy: isOfficer, lang }));
         }
       });
 
       collector.on('end', async () => {
-        await interaction.editReply({
-          components: buildExpiredComponents(lang),
-        }).catch(() => {});
+        await editComponents(interaction, buildExpiredComponents(lang)).catch(() => {});
       });
     } catch (err) {
       console.error('[list] View failed:', err.message);
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'View Failed',
-          description: 'Could not load the list.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'View Failed',
+        description: 'Could not load the list.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
       });
     }
   }
