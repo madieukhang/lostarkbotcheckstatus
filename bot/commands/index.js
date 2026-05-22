@@ -4,6 +4,7 @@ import {
 } from 'discord.js';
 
 import { getRaidChoices } from '../models/Raid.js';
+import { getSupportedLanguages, t } from '../services/i18n/index.js';
 
 /**
  * Phase 4 (2026-05-03) put every bot command under the `la-` prefix so
@@ -16,41 +17,45 @@ import { getRaidChoices } from '../models/Raid.js';
  * banner had been live long enough.
  */
 
+function commandText(key) {
+  return t(`commands.${key}`);
+}
+
 function statusCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Show live server status')
+    .setDescription(commandText('status.description'))
     .setDMPermission(false);
 }
 
 function resetCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Reset the stored status state back to default')
+    .setDescription(commandText('reset.description'))
     .setDMPermission(false);
 }
 
 function rosterCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Fetch roster for a Lost Ark character with progression tracking')
+    .setDescription(commandText('roster.description'))
     .setDMPermission(false)
     .addStringOption((opt) =>
       opt
         .setName('name')
-        .setDescription('Character name to look up')
+        .setDescription(commandText('roster.options.name'))
         .setRequired(true)
     )
     .addBooleanOption((opt) =>
       opt
         .setName('deep')
-        .setDescription('Run Stronghold alt detection scan (slower, finds hidden alts)')
+        .setDescription(commandText('roster.options.deep'))
         .setRequired(false)
     )
     .addIntegerOption((opt) =>
       opt
         .setName('deep_limit')
-        .setDescription('Stronghold scan limit: default env limit, 0 = scan all candidates')
+        .setDescription(commandText('roster.options.deepLimit'))
         .setRequired(false)
         .setMinValue(0)
         .setMaxValue(500)
@@ -60,16 +65,16 @@ function rosterCommand(name) {
 function listCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Manage blacklist/whitelist/watchlist entries')
+    .setDescription(commandText('list.description'))
     .setDMPermission(false)
     .addSubcommand((sub) =>
       sub
         .setName('add')
-        .setDescription('Add a character to blacklist, whitelist, or watchlist')
+        .setDescription(commandText('list.subcommands.add.description'))
         .addStringOption((opt) =>
           opt
             .setName('type')
-            .setDescription('Which list to add to')
+            .setDescription(commandText('list.subcommands.add.options.type'))
             .setRequired(true)
             .addChoices(
               { name: 'black', value: 'black' },
@@ -80,19 +85,19 @@ function listCommand(name) {
         .addStringOption((opt) =>
           opt
             .setName('name')
-            .setDescription('Character name to add')
+            .setDescription(commandText('list.subcommands.add.options.name'))
             .setRequired(true)
         )
         .addStringOption((opt) =>
           opt
             .setName('reason')
-            .setDescription('Reason for this entry')
+            .setDescription(commandText('list.subcommands.add.options.reason'))
             .setRequired(true)
         )
         .addStringOption((opt) => {
           opt
             .setName('raid')
-            .setDescription('Optional raid tag')
+            .setDescription(commandText('list.subcommands.add.options.raid'))
             .setRequired(false);
 
           for (const choice of getRaidChoices()) {
@@ -104,19 +109,19 @@ function listCommand(name) {
         .addStringOption((opt) =>
           opt
             .setName('logs')
-            .setDescription('Optional lostark.bible logs URL')
+            .setDescription(commandText('list.subcommands.add.options.logs'))
             .setRequired(false)
         )
         .addAttachmentOption((opt) =>
           opt
             .setName('image')
-            .setDescription('Optional evidence screenshot')
+            .setDescription(commandText('list.subcommands.add.options.image'))
             .setRequired(false)
         )
         .addStringOption((opt) =>
           opt
             .setName('scope')
-            .setDescription('Global (all servers) or Server (this server only) - blacklist only')
+            .setDescription(commandText('list.subcommands.add.options.scope'))
             .setRequired(false)
             .addChoices(
               { name: 'global', value: 'global' },
@@ -127,23 +132,23 @@ function listCommand(name) {
     .addSubcommand((sub) =>
       sub
         .setName('edit')
-        .setDescription('Edit an existing list entry (reason, raid, type, scope)')
+        .setDescription(commandText('list.subcommands.edit.description'))
         .addStringOption((opt) =>
           opt
             .setName('name')
-            .setDescription('Character name to edit')
+            .setDescription(commandText('list.subcommands.edit.options.name'))
             .setRequired(true)
         )
         .addStringOption((opt) =>
           opt
             .setName('reason')
-            .setDescription('New reason (leave empty to keep current)')
+            .setDescription(commandText('list.subcommands.edit.options.reason'))
             .setRequired(false)
         )
         .addStringOption((opt) =>
           opt
             .setName('type')
-            .setDescription('Move to a different list')
+            .setDescription(commandText('list.subcommands.edit.options.type'))
             .setRequired(false)
             .addChoices(
               { name: 'black', value: 'black' },
@@ -154,7 +159,7 @@ function listCommand(name) {
         .addStringOption((opt) => {
           opt
             .setName('raid')
-            .setDescription('New raid tag')
+            .setDescription(commandText('list.subcommands.edit.options.raid'))
             .setRequired(false);
 
           for (const choice of getRaidChoices()) {
@@ -166,19 +171,19 @@ function listCommand(name) {
         .addStringOption((opt) =>
           opt
             .setName('logs')
-            .setDescription('New logs URL')
+            .setDescription(commandText('list.subcommands.edit.options.logs'))
             .setRequired(false)
         )
         .addAttachmentOption((opt) =>
           opt
             .setName('image')
-            .setDescription('New evidence screenshot')
+            .setDescription(commandText('list.subcommands.edit.options.image'))
             .setRequired(false)
         )
         .addStringOption((opt) =>
           opt
             .setName('scope')
-            .setDescription('Promote local->global or demote global->local - blacklist only')
+            .setDescription(commandText('list.subcommands.edit.options.scope'))
             .setRequired(false)
             .addChoices(
               { name: 'global', value: 'global' },
@@ -188,29 +193,29 @@ function listCommand(name) {
         .addStringOption((opt) =>
           opt
             .setName('additional_names')
-            .setDescription('Comma-separated alts to append (officer/owner only, manual filler when stronghold scan cant)')
+            .setDescription(commandText('list.subcommands.edit.options.additionalNames'))
             .setRequired(false)
         )
     )
     .addSubcommand((sub) =>
       sub
         .setName('remove')
-        .setDescription('Remove a character from blacklist/whitelist/watchlist')
+        .setDescription(commandText('list.subcommands.remove.description'))
         .addStringOption((opt) =>
           opt
             .setName('name')
-            .setDescription('Character name to remove')
+            .setDescription(commandText('list.subcommands.remove.options.name'))
             .setRequired(true)
         )
     )
     .addSubcommand((sub) =>
       sub
         .setName('view')
-        .setDescription('View all entries in a list')
+        .setDescription(commandText('list.subcommands.view.description'))
         .addStringOption((opt) =>
           opt
             .setName('type')
-            .setDescription('Which list to view')
+            .setDescription(commandText('list.subcommands.view.options.type'))
             .setRequired(true)
             .addChoices(
               { name: 'all', value: 'all' },
@@ -223,7 +228,7 @@ function listCommand(name) {
         .addStringOption((opt) =>
           opt
             .setName('scope')
-            .setDescription('Filter blacklist by scope (owner server only for "all servers")')
+            .setDescription(commandText('list.subcommands.view.options.scope'))
             .setRequired(false)
             .addChoices(
               { name: 'all', value: 'all' },
@@ -235,11 +240,11 @@ function listCommand(name) {
     .addSubcommand((sub) =>
       sub
         .setName('trust')
-        .setDescription('Manage trusted list - trusted characters cannot be added to any list')
+        .setDescription(commandText('list.subcommands.trust.description'))
         .addStringOption((opt) =>
           opt
             .setName('action')
-            .setDescription('Add or remove from trusted list')
+            .setDescription(commandText('list.subcommands.trust.options.action'))
             .setRequired(true)
             .addChoices(
               { name: 'add', value: 'add' },
@@ -249,30 +254,30 @@ function listCommand(name) {
         .addStringOption((opt) =>
           opt
             .setName('name')
-            .setDescription('Character name')
+            .setDescription(commandText('list.subcommands.trust.options.name'))
             .setRequired(true)
         )
         .addStringOption((opt) =>
           opt
             .setName('reason')
-            .setDescription('Reason for trust (only for add)')
+            .setDescription(commandText('list.subcommands.trust.options.reason'))
             .setRequired(false)
         )
     )
     .addSubcommand((sub) =>
       sub
         .setName('enrich')
-        .setDescription('Stronghold deep-scan an existing list entry and append discovered alts')
+        .setDescription(commandText('list.subcommands.enrich.description'))
         .addStringOption((opt) =>
           opt
             .setName('name')
-            .setDescription('Character name with an existing list entry')
+            .setDescription(commandText('list.subcommands.enrich.options.name'))
             .setRequired(true)
         )
         .addIntegerOption((opt) =>
           opt
             .setName('deep_limit')
-            .setDescription('Override candidate cap (default = STRONGHOLD_DEEP_CANDIDATE_LIMIT)')
+            .setDescription(commandText('list.subcommands.enrich.options.deepLimit'))
             .setRequired(false)
             .setMinValue(0)
             .setMaxValue(500)
@@ -281,11 +286,11 @@ function listCommand(name) {
     .addSubcommand((sub) =>
       sub
         .setName('multiadd')
-        .setDescription('Bulk add via Excel template - officers auto, members via Senior approval')
+        .setDescription(commandText('list.subcommands.multiadd.description'))
         .addStringOption((opt) =>
           opt
             .setName('action')
-            .setDescription('template = download blank template, file = upload filled template')
+            .setDescription(commandText('list.subcommands.multiadd.options.action'))
             .setRequired(true)
             .addChoices(
               { name: 'template - download blank template', value: 'template' },
@@ -295,7 +300,7 @@ function listCommand(name) {
         .addAttachmentOption((opt) =>
           opt
             .setName('file')
-            .setDescription('Filled .xlsx file (max 30 rows, required for action:file)')
+            .setDescription(commandText('list.subcommands.multiadd.options.file'))
             .setRequired(false)
         )
     );
@@ -304,30 +309,30 @@ function listCommand(name) {
 function searchCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Search for a character name with filters and cross-check lists')
+    .setDescription(commandText('search.description'))
     .addStringOption((opt) =>
       opt
         .setName('name')
-        .setDescription('Character name to search')
+        .setDescription(commandText('search.options.name'))
         .setRequired(true)
     )
     .addIntegerOption((opt) =>
       opt
         .setName('min_ilvl')
-        .setDescription('Minimum item level (default: 1700)')
+        .setDescription(commandText('search.options.minIlvl'))
         .setRequired(false)
         .setMinValue(0)
     )
     .addIntegerOption((opt) =>
       opt
         .setName('max_ilvl')
-        .setDescription('Maximum item level')
+        .setDescription(commandText('search.options.maxIlvl'))
         .setRequired(false)
     )
     .addStringOption((opt) => {
       return opt
         .setName('class')
-        .setDescription('Filter by class')
+        .setDescription(commandText('search.options.class'))
         .setRequired(false)
         .setAutocomplete(true);
     })
@@ -337,19 +342,19 @@ function searchCommand(name) {
 function evidenceCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Direct lookup: show evidence for a listed character (autocomplete-driven)')
+    .setDescription(commandText('evidence.description'))
     .setDMPermission(false)
     .addStringOption((opt) =>
       opt
         .setName('name')
-        .setDescription('Character name (autocomplete shows entries across all lists)')
+        .setDescription(commandText('evidence.options.name'))
         .setRequired(true)
         .setAutocomplete(true)
     )
     .addBooleanOption((opt) =>
       opt
         .setName('public')
-        .setDescription('Broadcast publicly in this channel (officer/senior only; defaults to private)')
+        .setDescription(commandText('evidence.options.public'))
         .setRequired(false)
     );
 }
@@ -357,12 +362,12 @@ function evidenceCommand(name) {
 function listCheckCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Check names from screenshot against all lists')
+    .setDescription(commandText('check.description'))
     .setDMPermission(false)
     .addAttachmentOption((opt) =>
       opt
         .setName('image')
-        .setDescription('Raid waiting room screenshot')
+        .setDescription(commandText('check.options.image'))
         .setRequired(true)
     );
 }
@@ -370,66 +375,66 @@ function listCheckCommand(name) {
 function helpCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Show all available Lost Ark bot commands')
+    .setDescription(commandText('help.description'))
     .setDMPermission(false)
     .addStringOption((opt) =>
       opt
         .setName('lang')
-        .setDescription('Language (default: en)')
+        .setDescription(commandText('help.options.lang'))
         .setRequired(false)
-        .addChoices(
-          { name: 'English', value: 'en' },
-          { name: 'Tiếng Việt', value: 'vn' }
-        )
+        .addChoices(...getSupportedLanguages().map((language) => ({
+          name: language.label,
+          value: language.code,
+        })))
     );
 }
 
 function setupCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Configure bot channels for this server')
+    .setDescription(commandText('setup.description'))
     .setDMPermission(false)
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((sub) =>
       sub
         .setName('autochannel')
-        .setDescription('Set the channel for auto-checking screenshots')
+        .setDescription(commandText('setup.subcommands.autochannel.description'))
         .addChannelOption((opt) =>
           opt
             .setName('channel')
-            .setDescription('Channel where screenshots will be auto-checked')
+            .setDescription(commandText('setup.subcommands.autochannel.options.channel'))
             .setRequired(true)
         )
     )
     .addSubcommand((sub) =>
       sub
         .setName('notifychannel')
-        .setDescription('Set the channel for list add/remove notifications')
+        .setDescription(commandText('setup.subcommands.notifychannel.description'))
         .addChannelOption((opt) =>
           opt
             .setName('channel')
-            .setDescription('Channel where list notifications will be sent')
+            .setDescription(commandText('setup.subcommands.notifychannel.options.channel'))
             .setRequired(true)
         )
     )
     .addSubcommand((sub) =>
       sub
         .setName('view')
-        .setDescription('View current bot channel configuration')
+        .setDescription(commandText('setup.subcommands.view.description'))
     )
     .addSubcommand((sub) =>
       sub
         .setName('off')
-        .setDescription('Toggle global list notifications on/off for this server')
+        .setDescription(commandText('setup.subcommands.off.description'))
     )
     .addSubcommand((sub) =>
       sub
         .setName('defaultscope')
-        .setDescription('Set default blacklist scope for /la-list add (global or server)')
+        .setDescription(commandText('setup.subcommands.defaultscope.description'))
         .addStringOption((opt) =>
           opt
             .setName('scope')
-            .setDescription('Default scope when /la-list add does not specify scope')
+            .setDescription(commandText('setup.subcommands.defaultscope.options.scope'))
             .setRequired(true)
             .addChoices(
               { name: 'global', value: 'global' },
@@ -442,19 +447,19 @@ function setupCommand(name) {
 function statsCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Show bot usage statistics')
+    .setDescription(commandText('stats.description'))
     .setDMPermission(false);
 }
 
 function remoteCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
-    .setDescription('Senior: view/control bot config for any server (silent)')
+    .setDescription(commandText('remote.description'))
     .setDMPermission(false)
     .addStringOption((opt) =>
       opt
         .setName('action')
-        .setDescription('What to do')
+        .setDescription(commandText('remote.options.action'))
         .setRequired(true)
         .addChoices(
           { name: 'view - show all servers + bot config', value: 'view' },
@@ -467,13 +472,13 @@ function remoteCommand(name) {
     .addStringOption((opt) =>
       opt
         .setName('guild')
-        .setDescription('Target server ID (required for off/defaultscope)')
+        .setDescription(commandText('remote.options.guild'))
         .setRequired(false)
     )
     .addStringOption((opt) =>
       opt
         .setName('scope')
-        .setDescription('Scope value (for defaultscope action only)')
+        .setDescription(commandText('remote.options.scope'))
         .setRequired(false)
         .addChoices(
           { name: 'global', value: 'global' },
@@ -483,7 +488,7 @@ function remoteCommand(name) {
     .addChannelOption((opt) =>
       opt
         .setName('channel')
-        .setDescription('Channel to use (required for evidencechannel action)')
+        .setDescription(commandText('remote.options.channel'))
         .setRequired(false)
     );
 }
