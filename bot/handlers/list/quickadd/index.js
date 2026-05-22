@@ -1,67 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import {
   ActionRowBuilder,
-  AttachmentBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType,
-  EmbedBuilder,
   ModalBuilder,
-  StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
 
 import { connectDB } from '../../../db.js';
-import config from '../../../config.js';
-import Blacklist from '../../../models/Blacklist.js';
-import Whitelist from '../../../models/Whitelist.js';
-import Watchlist from '../../../models/Watchlist.js';
-import GuildConfig from '../../../models/GuildConfig.js';
 import PendingApproval from '../../../models/PendingApproval.js';
-import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { getClassName } from '../../../models/Class.js';
+import { getGuildConfig } from '../../../utils/scope.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
-  buildRosterCharacters,
-  fetchNameSuggestions,
-  fetchCharacterMeta,
-  detectAltsViaStronghold,
-} from '../../../services/roster/index.js';
-import {
-  extractNamesFromImage,
-  checkNamesAgainstLists,
-  formatCheckResults,
-} from '../../../services/list-check/service.js';
-import {
-  normalizeCharacterName,
-  getAddedByDisplay,
-  getInteractionDisplayName,
-} from '../../../utils/names.js';
-import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+  deferEphemeralReply,
+  editAlert,
+  editContent,
+  editEmbed,
+} from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
-import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
-import {
-  buildMultiaddTemplate,
-  parseMultiaddFile,
-  MULTIADD_MAX_ROWS,
-} from '../../../services/multiadd/index.js';
-import {
-  getListContext,
-  buildTrustedBlockEmbed,
-  buildListEditSuccessEmbed,
-  buildListAddApprovalEmbed,
-  getApproverRecipientIds,
-  isRequesterAutoApprover,
-  isOfficerOrSenior,
-  getSeniorApproverIds,
-  buildApprovalResultRow,
-  buildApprovalProcessingRow,
-} from '../helpers.js';
-
-const OFFICER_APPROVER_IDS = config.officerApproverIds;
-const SENIOR_APPROVER_IDS = config.seniorApproverIds;
+import { isRequesterAutoApprover } from '../helpers.js';
 
 export function createQuickAddHandlers({ client, services }) {
   const { sendListAddApprovalToApprovers, executeListAddToDatabase } = services;
@@ -114,17 +71,15 @@ export function createQuickAddHandlers({ client, services }) {
     // Validate type
     if (!['black', 'white', 'watch'].includes(type)) type = 'black';
 
-    await interaction.deferReply({ ephemeral: true });
+    await deferEphemeralReply(interaction);
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     if (!reason) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Reason Required',
-          description: 'Every list entry needs a reason.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Reason Required',
+        description: 'Every list entry needs a reason.',
       });
       return;
     }
@@ -160,23 +115,27 @@ export function createQuickAddHandlers({ client, services }) {
       if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
         const result = await executeListAddToDatabase(payload);
         const hasEmbed = (result.embeds?.length ?? 0) > 0;
-        await interaction.editReply({
-          content: hasEmbed ? null : result.content,
-          embeds: result.embeds ?? [],
-          components: result.components ?? [],
-        });
+        if (hasEmbed) {
+          await editEmbed(interaction, result.embeds ?? [], {
+            content: null,
+            components: result.components ?? [],
+          });
+        } else {
+          await editContent(interaction, result.content, {
+            embeds: [],
+            components: result.components ?? [],
+          });
+        }
         return;
       }
 
       // Non-approver → send approval request
       const sent = await sendListAddApprovalToApprovers(interaction.guild, payload);
       if (!sent.success) {
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Approval Delivery Failed',
-            description: sent.reason || 'Could not deliver the approval request.',
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Approval Delivery Failed',
+          description: sent.reason || 'Could not deliver the approval request.',
         });
         return;
       }
@@ -188,23 +147,19 @@ export function createQuickAddHandlers({ client, services }) {
         approverDmMessages: sent.deliveredDmMessages,
       });
 
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.INFO,
-          titleIcon: '📨',
-          title: 'Approval Request Sent',
-          description: `Request to add **${name}** to **${type}list** is awaiting approval.`,
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.INFO,
+        titleIcon: '📨',
+        title: 'Approval Request Sent',
+        description: `Request to add **${name}** to **${type}list** is awaiting approval.`,
       });
     } catch (err) {
       console.error('[quickadd] Failed:', err.message);
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Quick Add Failed',
-          description: 'Could not process the quick-add request.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Quick Add Failed',
+        description: 'Could not process the quick-add request.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
       });
     }
   }
