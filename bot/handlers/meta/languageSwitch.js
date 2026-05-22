@@ -1,0 +1,99 @@
+import {
+  ActionRowBuilder,
+  EmbedBuilder,
+  StringSelectMenuBuilder,
+} from 'discord.js';
+
+import { connectDB } from '../../db.js';
+import UserPreference from '../../models/UserPreference.js';
+import {
+  getSupportedLanguages,
+  getUserLanguage,
+  setUserLanguage,
+  t,
+} from '../../services/i18n/index.js';
+import { COLORS } from '../../utils/ui.js';
+
+export const LANGUAGE_SWITCH_SELECT_CUSTOM_ID = 'la-language-switch:select';
+
+export function buildLanguageEmbed(lang) {
+  const supported = getSupportedLanguages();
+  const current = supported.find((entry) => entry.code === lang) || supported[0];
+
+  return new EmbedBuilder()
+    .setColor(COLORS.info)
+    .setTitle(t('languageSwitch.title', lang))
+    .setDescription(
+      `${t('languageSwitch.description', lang)}\n\n` +
+        t('languageSwitch.currentLine', lang, {
+          flag: current.flag,
+          label: current.label,
+        })
+    )
+    .setFooter({ text: t('languageSwitch.footer', lang) });
+}
+
+export function buildLanguageDropdown(lang) {
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId(LANGUAGE_SWITCH_SELECT_CUSTOM_ID)
+    .setPlaceholder(t('languageSwitch.placeholder', lang))
+    .addOptions(
+      getSupportedLanguages().map((entry) => ({
+        label: t(`languageSwitch.options.${entry.code}`, lang),
+        value: entry.code,
+        emoji: entry.flag,
+        default: entry.code === lang,
+      }))
+    );
+
+  return new ActionRowBuilder().addComponents(menu);
+}
+
+export async function handleLanguageSwitchCommand(interaction) {
+  await connectDB();
+  const lang = await getUserLanguage(interaction.user.id, {
+    UserPreferenceModel: UserPreference,
+  });
+
+  await interaction.reply({
+    embeds: [buildLanguageEmbed(lang)],
+    components: [buildLanguageDropdown(lang)],
+    ephemeral: true,
+  });
+}
+
+export async function handleLanguageSwitchSelect(interaction) {
+  await connectDB();
+  const requested = interaction.values?.[0];
+  const previous = await getUserLanguage(interaction.user.id, {
+    UserPreferenceModel: UserPreference,
+  });
+  const next = await setUserLanguage(interaction.user.id, requested, {
+    UserPreferenceModel: UserPreference,
+    user: interaction.user,
+  });
+
+  const supported = getSupportedLanguages();
+  const target = supported.find((entry) => entry.code === next) || supported[0];
+  const unchanged = next === previous;
+
+  const embed = new EmbedBuilder()
+    .setColor(unchanged ? COLORS.info : COLORS.success)
+    .setTitle(t(unchanged ? 'languageSwitch.unchangedTitle' : 'languageSwitch.successTitle', next))
+    .setDescription(
+      t(
+        unchanged ? 'languageSwitch.unchangedDescription' : 'languageSwitch.successDescription',
+        next,
+        {
+          flag: target.flag,
+          label: target.label,
+        }
+      )
+    )
+    .setFooter({ text: t('languageSwitch.footer', next) });
+
+  await interaction.update({
+    embeds: [embed],
+    components: [buildLanguageDropdown(next)],
+  });
+}

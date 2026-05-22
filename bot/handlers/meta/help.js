@@ -5,7 +5,9 @@ import {
 } from 'discord.js';
 
 import config from '../../config.js';
-import { t, resolveLocale } from '../../services/i18n/index.js';
+import { connectDB } from '../../db.js';
+import UserPreference from '../../models/UserPreference.js';
+import { getUserLanguage, t, resolveLocale } from '../../services/i18n/index.js';
 import { COLORS } from '../../utils/ui.js';
 
 function pickLang(value) {
@@ -91,8 +93,18 @@ function buildHelpDropdown(lang, isOwnerGuild) {
   return new ActionRowBuilder().addComponents(menu);
 }
 
+async function resolveHelpLanguage(interaction) {
+  const requested = interaction.options.getString('lang');
+  if (requested) return pickLang(requested);
+
+  await connectDB();
+  return getUserLanguage(interaction.user.id, {
+    UserPreferenceModel: UserPreference,
+  });
+}
+
 export async function handleHelpCommand(interaction) {
-  const lang = pickLang(interaction.options.getString('lang'));
+  const lang = await resolveHelpLanguage(interaction);
   const isOwnerGuild = isOwnerGuildInteraction(interaction);
 
   await interaction.reply({
