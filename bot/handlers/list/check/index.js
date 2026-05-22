@@ -31,7 +31,16 @@ import {
 } from '../../../utils/names.js';
 import { truncateDiscordContent } from '../../../utils/discordText.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import {
+  deferReply,
+  editAlert,
+  editContent,
+  editEmbed,
+  replyAlert,
+  replyContent,
+  replyEmbed,
+} from '../../../utils/interactionReplies.js';
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import { ICONS } from '../../../utils/ui.js';
@@ -117,10 +126,7 @@ export function createAutoCheckEvidenceHandler({ client }) {
     const parsed = parseListEntryRef(raw);
 
     if (!parsed) {
-      await interaction.reply({
-        content: 'Evidence selection malformed (please re-run the check).',
-        ephemeral: true,
-      });
+      await replyContent(interaction, 'Evidence selection malformed (please re-run the check).');
       return;
     }
 
@@ -130,22 +136,16 @@ export function createAutoCheckEvidenceHandler({ client }) {
     const entry = await ctx.model.findOne({ _id: parsed.id }).lean();
 
     if (!entry) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Entry Removed',
-          description: 'The list entry behind this evidence row no longer exists.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Entry Removed',
+        description: 'The list entry behind this evidence row no longer exists.',
       });
       return;
     }
 
     if (!entry.imageMessageId && !entry.imageUrl) {
-      await interaction.reply({
-        content: t('listView.evidence.noImage', lang),
-        ephemeral: true,
-      });
+      await replyContent(interaction, t('listView.evidence.noImage', lang));
       return;
     }
 
@@ -155,10 +155,7 @@ export function createAutoCheckEvidenceHandler({ client }) {
       config.officerApproverIds.includes(interaction.user.id)
       || config.seniorApproverIds.includes(interaction.user.id);
 
-    await interaction.reply({
-      embeds: [buildEvidenceEmbed(decorated, displayUrl, { includeAddedBy: isOfficer, lang })],
-      ephemeral: true,
-    });
+    await replyEmbed(interaction, buildEvidenceEmbed(decorated, displayUrl, { includeAddedBy: isOfficer, lang }));
   };
 }
 
@@ -167,43 +164,37 @@ export function createCheckHandlers({ client }) {
     const image = interaction.options.getAttachment('image', true);
     let names = [];
 
-    await interaction.deferReply();
+    await deferReply(interaction);
 
     try {
       names = await extractNamesFromImage(image);
     } catch (err) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'OCR Failed',
-          description: 'Could not extract names from the uploaded image.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-          footer: 'Try a clearer screenshot, or check that the image is the raid waiting room.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'OCR Failed',
+        description: 'Could not extract names from the uploaded image.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        footer: 'Try a clearer screenshot, or check that the image is the raid waiting room.',
       });
       return;
     }
 
     if (names.length === 0) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'No Names Detected',
-          description: 'OCR ran but found no valid names in the image.',
-          footer: 'Try a clearer screenshot of the raid waiting room.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'No Names Detected',
+        description: 'OCR ran but found no valid names in the image.',
+        footer: 'Try a clearer screenshot of the raid waiting room.',
       });
       return;
     }
 
     const maxNames = config.listcheckMaxNames;
     const limitedNames = names.slice(0, maxNames);
-    await interaction.editReply({
-      content: [
-        `🔍 Extracted **${limitedNames.length}** name(s) · checking database lists...`,
-        limitedNames.length < names.length ? `Ignored **${names.length - limitedNames.length}** extra name(s) (limit: ${maxNames}).` : null,
-      ].filter(Boolean).join('\n'),
-    });
+    await editContent(interaction, [
+      `🔍 Extracted **${limitedNames.length}** name(s) · checking database lists...`,
+      limitedNames.length < names.length ? `Ignored **${names.length - limitedNames.length}** extra name(s) (limit: ${maxNames}).` : null,
+    ].filter(Boolean).join('\n'));
 
     try {
       const results = await checkNamesAgainstLists(limitedNames, { guildId: interaction.guild?.id });
@@ -226,16 +217,14 @@ export function createCheckHandlers({ client }) {
       const evidenceRow = buildAutoCheckEvidenceRow(results, lang);
       if (evidenceRow) components.push(evidenceRow);
 
-      await interaction.editReply({ content: '', embeds: [embed], components });
+      await editEmbed(interaction, embed, { content: '', components });
     } catch (err) {
       console.error('[listcheck] ❌ Check failed:', err.message);
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Check Failed',
-          description: 'Could not run the list check after OCR succeeded.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Check Failed',
+        description: 'Could not run the list check after OCR succeeded.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
       });
     }
   }

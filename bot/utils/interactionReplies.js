@@ -30,6 +30,13 @@ export function editEmbed(interaction, embedOrEmbeds, extras = {}) {
   });
 }
 
+export function editContent(interaction, content, extras = {}) {
+  return interaction.editReply({
+    content,
+    ...extras,
+  });
+}
+
 export function updateEmbed(interaction, embedOrEmbeds, extras = {}) {
   return interaction.update({
     ...extras,

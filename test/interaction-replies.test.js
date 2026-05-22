@@ -5,6 +5,7 @@ import {
   deferEphemeralReply,
   deferReply,
   editAlert,
+  editContent,
   editEmbed,
   replyAlert,
   replyContent,
@@ -66,6 +67,18 @@ test('editEmbed and updateEmbed preserve extra payload fields', async () => {
 
   assert.deepEqual(editCalls[0], { content: '', embeds: [embed] });
   assert.deepEqual(updateCalls[0], { components: [], embeds: [embed] });
+});
+
+test('editContent preserves content-only edit payloads', async () => {
+  const calls = [];
+  const interaction = { editReply: async (payload) => calls.push(payload) };
+
+  await editContent(interaction, 'Working...', { components: [] });
+
+  assert.deepEqual(calls[0], {
+    content: 'Working...',
+    components: [],
+  });
 });
 
 test('defer helpers centralize public and ephemeral defer payloads', async () => {
