@@ -10,7 +10,13 @@ import {
 } from '../../../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import {
+  deferReply,
+  editAlert,
+  editEmbed,
+  replyAlert,
+} from '../../../utils/interactionReplies.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -27,13 +33,10 @@ export function createListEditCommandHandler({
 }) {
   async function handleListEditCommand(interaction) {
     if (!interaction.guild) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Server-Only Command',
-          description: 'This command can only be used inside a Discord server, not in DMs.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Server-Only Command',
+        description: 'This command can only be used inside a Discord server, not in DMs.',
       });
       return;
     }
@@ -58,7 +61,7 @@ export function createListEditCommandHandler({
     // cross Discord's 3-second interaction ack window. Discord keeps the
     // attachment URL valid through the deferred state, so rehost can still
     // download it after the defer.
-    await interaction.deferReply();
+    await deferReply(interaction);
     await connectDB();
 
     // Rehost the new image NOW (while CDN URL is still valid). Result is used
@@ -88,13 +91,11 @@ export function createListEditCommandHandler({
 
     const existing = blackEntry || whiteEntry || watchEntry;
     if (!existing) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Entry Not Found',
-          description: `**${name}** is not in any list (blacklist, whitelist, or watchlist).`,
-          footer: 'Use /la-list view to browse existing entries.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Entry Not Found',
+        description: `**${name}** is not in any list (blacklist, whitelist, or watchlist).`,
+        footer: 'Use /la-list view to browse existing entries.',
       });
       return;
     }
@@ -110,13 +111,11 @@ export function createListEditCommandHandler({
       const isOwnerForAdd = existing.addedByUserId === interaction.user.id;
       const isApproverForAdd = isOfficerOrSenior(interaction.user.id);
       if (!isOwnerForAdd && !isApproverForAdd) {
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.TRUSTED,
-            title: 'Officer-Only Option',
-            description: 'The `additional_names` option is restricted to officers and the entry owner.',
-            footer: 'Ask an officer to append the alts for you.',
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.TRUSTED,
+          title: 'Officer-Only Option',
+          description: 'The `additional_names` option is restricted to officers and the entry owner.',
+          footer: 'Ask an officer to append the alts for you.',
         });
         return;
       }
@@ -130,13 +129,11 @@ export function createListEditCommandHandler({
 
     // Check if anything is actually changing
     if (!newReason && !newType && !newRaid && !newLogs && !newImageUrl && !newScope && !additionalNamesRaw) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'No Changes Provided',
-          description: 'You ran `/la-list edit` without setting any of the optional fields, so there is nothing to apply.',
-          footer: 'Set at least one of: reason / type / raid / logs / image / scope / additional_names.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'No Changes Provided',
+        description: 'You ran `/la-list edit` without setting any of the optional fields, so there is nothing to apply.',
+        footer: 'Set at least one of: reason / type / raid / logs / image / scope / additional_names.',
       });
       return;
     }
@@ -148,13 +145,11 @@ export function createListEditCommandHandler({
     // White/watch lists are always global by design · reject scope on non-blacklist
     // edits with a clear error rather than silently ignoring.
     if (newScope && targetType !== 'black') {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Scope Not Applicable',
-          description: `The \`scope\` option only applies to blacklist entries. ${targetType === 'white' ? 'Whitelist' : 'Watchlist'} entries are always global.`,
-          footer: 'Drop the scope option, or change type:black if you want a server-scoped entry.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Scope Not Applicable',
+        description: `The \`scope\` option only applies to blacklist entries. ${targetType === 'white' ? 'Whitelist' : 'Watchlist'} entries are always global.`,
+        footer: 'Drop the scope option, or change type:black if you want a server-scoped entry.',
       });
       return;
     }
@@ -192,13 +187,11 @@ export function createListEditCommandHandler({
         const conflictDesc = targetScope === 'global'
           ? 'A global blacklist entry with this name already exists.'
           : 'A server-scoped blacklist entry with this name already exists in this server.';
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Scope Change Blocked',
-            description: conflictDesc,
-            footer: 'Remove the conflicting entry first, or merge them manually.',
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Scope Change Blocked',
+          description: conflictDesc,
+          footer: 'Remove the conflicting entry first, or merge them manually.',
         });
         return;
       }
@@ -224,12 +217,10 @@ export function createListEditCommandHandler({
     // keeps the success message honest (otherwise it'd say "edited" with an
     // empty change list).
     if (changes.length === 0) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'No Effective Changes',
-          description: 'The values you provided already match the current entry.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'No Effective Changes',
+        description: 'The values you provided already match the current entry.',
       });
       return;
     }
@@ -244,9 +235,10 @@ export function createListEditCommandHandler({
       }).collation({ locale: 'en', strength: 2 }).lean();
       if (trustedCheck) {
         const isSelf = trustedCheck.name.toLowerCase() === existing.name.toLowerCase();
-        await interaction.editReply({
-          embeds: [buildTrustedBlockEmbed(existing.name, trustedCheck.reason, isSelf ? {} : { via: trustedCheck.name })],
-        });
+        await editEmbed(
+          interaction,
+          buildTrustedBlockEmbed(existing.name, trustedCheck.reason, isSelf ? {} : { via: trustedCheck.name })
+        );
         return;
       }
     }

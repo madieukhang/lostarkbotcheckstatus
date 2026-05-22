@@ -2,7 +2,8 @@ import {
   getInteractionDisplayName,
 } from '../../../utils/names.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import {
   getListContext,
   buildListEditSuccessEmbed,
@@ -53,13 +54,11 @@ export async function applyListEditNow({
       const targetDupe = await newModel.findOne(preflightQuery)
         .collation({ locale: 'en', strength: 2 }).lean();
       if (targetDupe) {
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Move Blocked',
-            description: `**${existing.name}** already exists in ${newLabel}.`,
-            footer: 'Remove the conflicting target entry first, then retry the move.',
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Move Blocked',
+          description: `**${existing.name}** already exists in ${newLabel}.`,
+          footer: 'Remove the conflicting target entry first, then retry the move.',
         });
         return;
       }
@@ -117,18 +116,17 @@ export async function applyListEditNow({
       // CDN snapshots, no extra round trip on re-render).
       const moveFreshUrl = await resolveDisplayImageUrl(movedEntry, client);
 
-      await interaction.editReply({
-        content: null,
-        embeds: [
-          buildListEditSuccessEmbed(movedEntry.toObject?.() || movedEntry, {
-            changes,
-            type: targetType,
-            freshDisplayUrl: moveFreshUrl,
-            requesterDisplayName: getInteractionDisplayName(interaction),
-            isMove: true,
-          }),
-        ],
-      });
+      await editEmbed(
+        interaction,
+        buildListEditSuccessEmbed(movedEntry.toObject?.() || movedEntry, {
+          changes,
+          type: targetType,
+          freshDisplayUrl: moveFreshUrl,
+          requesterDisplayName: getInteractionDisplayName(interaction),
+          isMove: true,
+        }),
+        { content: null }
+      );
     } else {
       // Update in place
       const updateFields = {};
@@ -172,13 +170,11 @@ export async function applyListEditNow({
         // index even though preflight should have caught it. Mongoose
         // wraps the duplicate-key error with code 11000.
         if (err.code === 11000 && isScopeChange) {
-          await interaction.editReply({
-            embeds: [buildAlertEmbed({
-              severity: AlertSeverity.WARNING,
-              title: 'Scope Change Raced',
-              description: 'Another entry with this name claimed the target scope between the preflight check and the persist step.',
-              footer: 'Retry the command, or remove the conflicting entry first.',
-            })],
+          await editAlert(interaction, {
+            severity: AlertSeverity.WARNING,
+            title: 'Scope Change Raced',
+            description: 'Another entry with this name claimed the target scope between the preflight check and the persist step.',
+            footer: 'Retry the command, or remove the conflicting entry first.',
           });
           return;
         }
@@ -198,18 +194,17 @@ export async function applyListEditNow({
       }
       const editFreshUrl = await resolveDisplayImageUrl(editedEntry, client);
 
-      await interaction.editReply({
-        content: null,
-        embeds: [
-          buildListEditSuccessEmbed(editedEntry, {
-            changes,
-            type: currentType,
-            freshDisplayUrl: editFreshUrl,
-            requesterDisplayName: getInteractionDisplayName(interaction),
-            isMove: false,
-          }),
-        ],
-      });
+      await editEmbed(
+        interaction,
+        buildListEditSuccessEmbed(editedEntry, {
+          changes,
+          type: currentType,
+          freshDisplayUrl: editFreshUrl,
+          requesterDisplayName: getInteractionDisplayName(interaction),
+          isMove: false,
+        }),
+        { content: null }
+      );
     }
 
     // Broadcast routing decided by the FINAL scope (after any scope change).
@@ -226,13 +221,11 @@ export async function applyListEditNow({
     }
 
   } catch (err) {
-    await interaction.editReply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        title: 'Edit Failed',
-        description: 'Could not apply the edit.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-      })],
+    await editAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      title: 'Edit Failed',
+      description: 'Could not apply the edit.',
+      fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
     });
   }
 }
