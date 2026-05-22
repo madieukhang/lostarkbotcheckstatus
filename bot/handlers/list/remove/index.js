@@ -1,69 +1,29 @@
-import { randomUUID } from 'node:crypto';
 import {
   ActionRowBuilder,
-  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
   EmbedBuilder,
-  ModalBuilder,
-  StringSelectMenuBuilder,
-  TextInputBuilder,
-  TextInputStyle,
 } from 'discord.js';
 
 import { connectDB } from '../../../db.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS } from '../../../utils/ui.js';
-import config from '../../../config.js';
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
-import GuildConfig from '../../../models/GuildConfig.js';
-import PendingApproval from '../../../models/PendingApproval.js';
-import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { getClassName } from '../../../models/Class.js';
+import { normalizeCharacterName } from '../../../utils/names.js';
+import { buildBlacklistQuery } from '../../../utils/scope.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
-  buildRosterCharacters,
-  fetchNameSuggestions,
-  fetchCharacterMeta,
-  detectAltsViaStronghold,
-} from '../../../services/roster/index.js';
-import {
-  extractNamesFromImage,
-  checkNamesAgainstLists,
-  formatCheckResults,
-} from '../../../services/list-check/service.js';
-import {
-  normalizeCharacterName,
-  getAddedByDisplay,
-  getInteractionDisplayName,
-} from '../../../utils/names.js';
-import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+  deferReply,
+  editAlert,
+  editEmbed,
+  updateEmbed,
+} from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
-import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
-import {
-  buildMultiaddTemplate,
-  parseMultiaddFile,
-  MULTIADD_MAX_ROWS,
-} from '../../../services/multiadd/index.js';
-import {
-  getListContext,
-  buildTrustedBlockEmbed,
-  buildListEditSuccessEmbed,
-  buildListAddApprovalEmbed,
-  getApproverRecipientIds,
-  isRequesterAutoApprover,
-  isOfficerOrSenior,
-  getSeniorApproverIds,
-  buildApprovalResultRow,
-  buildApprovalProcessingRow,
-} from '../helpers.js';
-
-const OFFICER_APPROVER_IDS = config.officerApproverIds;
-const SENIOR_APPROVER_IDS = config.seniorApproverIds;
+import { getListContext } from '../helpers.js';
 
 export function createRemoveHandlers({ client, services }) {
   const { broadcastListChange } = services;
@@ -72,7 +32,7 @@ export function createRemoveHandlers({ client, services }) {
     const rawName = interaction.options.getString('name', true).trim();
     const name = normalizeCharacterName(rawName);
 
-    await interaction.deferReply();
+    await deferReply(interaction);
 
     try {
       await connectDB();
@@ -103,13 +63,11 @@ export function createRemoveHandlers({ client, services }) {
       if (watchEntry) found.push({ entry: watchEntry, type: 'watch' });
 
       if (found.length === 0) {
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Not Found',
-            description: `**${name}** is not in any list, so there's nothing to remove.`,
-            footer: 'Use /la-list view to browse existing entries.',
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Not Found',
+          description: `**${name}** is not in any list, so there's nothing to remove.`,
+          footer: 'Use /la-list view to browse existing entries.',
         });
         return;
       }
@@ -224,7 +182,7 @@ export function createRemoveHandlers({ client, services }) {
       // Single entry · remove directly, render as embed.
       if (found.length === 1) {
         const outcome = await removeOne(found[0].entry, found[0].type);
-        await interaction.editReply({ content: '', embeds: [buildRemoveResultEmbed([outcome])] });
+        await editEmbed(interaction, buildRemoveResultEmbed([outcome]), { content: '' });
         return;
       }
 
@@ -262,7 +220,7 @@ export function createRemoveHandlers({ client, services }) {
         .setFooter({ text: '30s timeout · only you can act on this picker.' })
         .setTimestamp();
 
-      await interaction.editReply({ content: '', embeds: [pickerEmbed], components: [row] });
+      await editEmbed(interaction, pickerEmbed, { content: '', components: [row] });
 
       const reply = await interaction.fetchReply();
       const button = await reply.awaitMessageComponent({
@@ -281,21 +239,18 @@ export function createRemoveHandlers({ client, services }) {
           : [{ ok: false, reason: 'unknown-selection', entry: { name }, type: 'black', label: 'unknown', icon: '⚠️' }];
       }
 
-      await button.update({
+      await updateEmbed(button, buildRemoveResultEmbed(outcomes), {
         content: '',
-        embeds: [buildRemoveResultEmbed(outcomes)],
         components: [],
       });
       return;
     } catch (err) {
       console.error('[list] ❌ Remove failed:', err.message);
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Remove Failed',
-          description: 'Could not remove the entry.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Remove Failed',
+        description: 'Could not remove the entry.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
       });
     }
   }
