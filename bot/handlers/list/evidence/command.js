@@ -22,6 +22,7 @@ import config from '../../../config.js';
 import { connectDB } from '../../../db.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { deferReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { buildBlacklistScopeFilter } from '../../../utils/scope.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import {
@@ -200,7 +201,7 @@ export function createEvidenceHandlers({ client }) {
     const usePublic = requestedPublic && isPrivileged;
     const viewerGuildId = interaction.guild?.id || '';
 
-    await interaction.deferReply({ ephemeral: !usePublic });
+    await deferReply(interaction, { ephemeral: !usePublic });
 
     try {
       await connectDB();
@@ -225,25 +226,21 @@ export function createEvidenceHandlers({ client }) {
           guildId: viewerGuildId,
         }));
       } else {
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Name Required',
-            description: 'Pass a character name. Use autocomplete to pick from existing list entries.',
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Name Required',
+          description: 'Pass a character name. Use autocomplete to pick from existing list entries.',
         });
         return;
       }
 
       if (!entry) {
         const displayName = name || rawNameOpt;
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.INFO,
-            title: 'Not Listed',
-            description: `**${displayName}** is not in any list visible to this server (blacklist / whitelist / watchlist).`,
-            footer: 'Try /la-search for fuzzy-match across the bible name index.',
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.INFO,
+          title: 'Not Listed',
+          description: `**${displayName}** is not in any list visible to this server (blacklist / whitelist / watchlist).`,
+          footer: 'Try /la-search for fuzzy-match across the bible name index.',
         });
         return;
       }
@@ -270,16 +267,14 @@ export function createEvidenceHandlers({ client }) {
         }));
       }
 
-      await interaction.editReply({ embeds });
+      await editEmbed(interaction, embeds);
     } catch (err) {
       console.error('[evidence] Lookup failed:', err.message);
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Lookup Failed',
-          description: 'Could not load the evidence record.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Lookup Failed',
+        description: 'Could not load the evidence record.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
       });
     }
   }
