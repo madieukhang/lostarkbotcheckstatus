@@ -32,6 +32,7 @@ import {
 import { COLORS, ICONS } from './ui.js';
 import { rosterUrl } from './rosterLink.js';
 import { getClassEmoji } from '../models/Class.js';
+import { t } from '../services/i18n/index.js';
 
 /**
  * Compute the post-scan state from the result envelope. Stop reasons are
@@ -298,6 +299,7 @@ export function buildScanResultButtons({
   hasAlts,
   hasRemaining,
   newAltsCount,
+  lang = 'en',
 }) {
   const row = new ActionRowBuilder();
 
@@ -308,7 +310,7 @@ export function buildScanResultButtons({
       row.addComponents(
         new ButtonBuilder()
           .setCustomId(`list-enrich:continue:${sessionId}`)
-          .setLabel(`Continue scan`)
+          .setLabel(t('common.actions.continueScan', lang))
           .setEmoji(ICONS.refresh)
           .setStyle(ButtonStyle.Primary)
       );
@@ -316,14 +318,14 @@ export function buildScanResultButtons({
         row.addComponents(
           new ButtonBuilder()
             .setCustomId(`list-enrich:confirm:${sessionId}`)
-            .setLabel(`Save partial · ${newAltsCount ?? 0}`)
+            .setLabel(t('common.actions.savePartial', lang, { count: newAltsCount ?? 0 }))
             .setStyle(ButtonStyle.Success)
         );
       }
       row.addComponents(
         new ButtonBuilder()
           .setCustomId(`list-enrich:cancel:${sessionId}`)
-          .setLabel('Discard')
+          .setLabel(t('common.actions.discard', lang))
           .setStyle(ButtonStyle.Secondary)
       );
       return row;
@@ -334,11 +336,11 @@ export function buildScanResultButtons({
       row.addComponents(
         new ButtonBuilder()
           .setCustomId(`list-enrich:confirm:${sessionId}`)
-          .setLabel(`Confirm Add ${newAltsCount ?? 0}`)
+          .setLabel(t('common.actions.confirmAdd', lang, { count: newAltsCount ?? 0 }))
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId(`list-enrich:cancel:${sessionId}`)
-          .setLabel('Cancel')
+          .setLabel(t('common.actions.cancel', lang))
           .setStyle(ButtonStyle.Secondary)
       );
       return row;
@@ -352,7 +354,7 @@ export function buildScanResultButtons({
       row.addComponents(
         new ButtonBuilder()
           .setCustomId(`roster-deep:continue:${sessionId}`)
-          .setLabel('Continue scan')
+          .setLabel(t('common.actions.continueScan', lang))
           .setEmoji(ICONS.refresh)
           .setStyle(ButtonStyle.Primary)
       );

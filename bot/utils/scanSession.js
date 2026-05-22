@@ -23,6 +23,8 @@ import {
   ButtonStyle,
 } from 'discord.js';
 
+import { t } from '../services/i18n/index.js';
+
 const activeScans = new Map(); // sessionId -> { cancelFlag, callerId, startedAt, label }
 const userScanReservations = new Map(); // userId -> { userId, startedAt, label }
 
@@ -82,10 +84,11 @@ export function reserveUserScan(userId, info = {}, options = {}) {
  *   out (e.g. after the user already clicked Stop, while waiting for
  *   the worker to drop out of its current candidate).
  * @param {string} [opts.label='Stop scan']
+ * @param {string} [opts.lang='en']
  * @returns {ActionRowBuilder}
  */
 export function buildStopButtonRow(sessionId, opts = {}) {
-  const { disabled = false, label = 'Stop scan' } = opts;
+  const { disabled = false, lang = 'en', label = t('common.actions.stopScan', lang) } = opts;
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`scan-cancel:${sessionId}`)

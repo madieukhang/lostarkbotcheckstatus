@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto';
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import UserPreference from '../../../models/UserPreference.js';
 import {
   normalizeCharacterName,
   getInteractionDisplayName,
 } from '../../../utils/names.js';
+import { getUserLanguage } from '../../../services/i18n/index.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
@@ -74,7 +76,9 @@ export function createListAddCommandHandler({
     }
 
     try {
+      await connectDB();
       const requestId = randomUUID();
+      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
       // Rehost the image NOW (while the Discord CDN URL is still valid).
       // If rehost fails or no evidence channel is configured, we fall back to
@@ -110,6 +114,7 @@ export function createListAddCommandHandler({
         requestedByTag: interaction.user.tag,
         requestedByName: interaction.user.username,
         requestedByDisplayName: getInteractionDisplayName(interaction),
+        lang,
         createdAt: Date.now(),
       };
 

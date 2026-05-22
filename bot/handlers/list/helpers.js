@@ -18,6 +18,7 @@ import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { COLORS, ICONS } from '../../utils/ui.js';
+import { t } from '../../services/i18n/index.js';
 import { renderTrackedAltsField } from './trackedAltsRender.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
@@ -302,28 +303,42 @@ export function getSeniorApproverIds() {
   return out;
 }
 
-export function buildApprovalResultRow(actionLabel) {
+function localizeApprovalResultLabel(actionLabel, lang) {
+  const keyByLabel = {
+    Approved: 'common.actions.approved',
+    Rejected: 'common.actions.rejected',
+    Processed: 'common.actions.processed',
+    Failed: 'common.actions.failed',
+    Blocked: 'common.actions.blocked',
+    'Kept Existing': 'common.actions.keptExisting',
+    Overwritten: 'common.actions.overwritten',
+  };
+  const key = keyByLabel[actionLabel];
+  return key ? t(key, lang) : actionLabel;
+}
+
+export function buildApprovalResultRow(actionLabel, lang = 'en') {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('listadd_approved_done')
-      .setLabel(actionLabel)
+      .setLabel(localizeApprovalResultLabel(actionLabel, lang))
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true)
   );
 }
 
-export function buildApprovalProcessingRow(action) {
+export function buildApprovalProcessingRow(action, lang = 'en') {
   const isApprove = action === 'listadd_approve';
 
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('listadd_processing_approve')
-      .setLabel(isApprove ? 'Approving...' : 'Approve')
+      .setLabel(t(isApprove ? 'common.actions.approving' : 'common.actions.approve', lang))
       .setStyle(ButtonStyle.Success)
       .setDisabled(true),
     new ButtonBuilder()
       .setCustomId('listadd_processing_reject')
-      .setLabel(!isApprove ? 'Rejecting...' : 'Reject')
+      .setLabel(t(!isApprove ? 'common.actions.rejecting' : 'common.actions.reject', lang))
       .setStyle(ButtonStyle.Danger)
       .setDisabled(true)
   );

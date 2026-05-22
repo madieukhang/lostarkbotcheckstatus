@@ -11,6 +11,8 @@ import {
   getSeniorApproverIds,
 } from '../helpers.js';
 import { COLORS } from '../../../utils/ui.js';
+import UserPreference from '../../../models/UserPreference.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 
 export function createApprovalServices({ client }) {
   async function sendListAddApprovalToApprovers(guild, payload, options = {}) {
@@ -19,26 +21,28 @@ export function createApprovalServices({ client }) {
       return { success: false, reason: 'No approver user IDs configured. Set SENIOR_APPROVER_IDS or OFFICER_APPROVER_IDS in env.' };
     }
 
-    // Buttons are persistent; the evidence button resolves a fresh URL on click.
-    const buttons = [
-      new ButtonBuilder()
-        .setCustomId(`listadd_approve:${payload.requestId}`)
-        .setLabel('Approve')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId(`listadd_reject:${payload.requestId}`)
-        .setLabel('Reject')
-        .setStyle(ButtonStyle.Danger),
-    ];
-    if (payload.imageMessageId || payload.imageUrl) {
-      buttons.push(
+    const buildRow = (lang) => {
+      // Buttons are persistent; the evidence button resolves a fresh URL on click.
+      const buttons = [
         new ButtonBuilder()
-          .setCustomId(`listadd_viewevidence:${payload.requestId}`)
-          .setLabel('📎 View Evidence (Fresh)')
-          .setStyle(ButtonStyle.Secondary)
-      );
-    }
-    const row = new ActionRowBuilder().addComponents(buttons);
+          .setCustomId(`listadd_approve:${payload.requestId}`)
+          .setLabel(t('common.actions.approve', lang))
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`listadd_reject:${payload.requestId}`)
+          .setLabel(t('common.actions.reject', lang))
+          .setStyle(ButtonStyle.Danger),
+      ];
+      if (payload.imageMessageId || payload.imageUrl) {
+        buttons.push(
+          new ButtonBuilder()
+            .setCustomId(`listadd_viewevidence:${payload.requestId}`)
+            .setLabel(t('common.actions.viewEvidenceFresh', lang))
+            .setStyle(ButtonStyle.Secondary)
+        );
+      }
+      return new ActionRowBuilder().addComponents(buttons);
+    };
 
     const embed = buildListAddApprovalEmbed(guild, payload, options);
     const deliveredApproverIds = [];
@@ -49,8 +53,9 @@ export function createApprovalServices({ client }) {
         try {
           const user = await client.users.fetch(approverId);
           if (!user || user.bot) return;
+          const lang = await getUserLanguage(user.id, { UserPreferenceModel: UserPreference });
 
-          const sentMessage = await user.send({ embeds: [embed], components: [row] });
+          const sentMessage = await user.send({ embeds: [embed], components: [buildRow(lang)] });
           deliveredApproverIds.push(user.id);
           deliveredDmMessages.push({
             approverId: user.id,
@@ -79,20 +84,20 @@ export function createApprovalServices({ client }) {
       };
     }
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`multiaddapprove_approve:${pending.requestId}`)
-        .setLabel(`Approve · Add ${pending.rows.length}`)
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('✅'),
-      new ButtonBuilder()
-        .setCustomId(`multiaddapprove_reject:${pending.requestId}`)
-        .setLabel('Reject')
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('✖️')
-    );
+    const buildRow = (lang) => new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`multiaddapprove_approve:${pending.requestId}`)
+          .setLabel(t('common.actions.approveAdd', lang, { count: pending.rows.length }))
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('✅'),
+        new ButtonBuilder()
+          .setCustomId(`multiaddapprove_reject:${pending.requestId}`)
+          .setLabel(t('common.actions.reject', lang))
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('✖️')
+      );
 
-    const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');
+    const typeIcon = (type) => (type === 'black' ? '⛔' : type === 'white' ? '✅' : '⚠️');
 
     // Per-type breakdown gives the senior a quick "what am I about to
     // approve?" read before they parse the line list. A bulk batch of
@@ -170,8 +175,9 @@ export function createApprovalServices({ client }) {
         try {
           const user = await client.users.fetch(approverId);
           if (!user || user.bot) return;
+          const lang = await getUserLanguage(user.id, { UserPreferenceModel: UserPreference });
 
-          const sentMessage = await user.send({ embeds: [embed], components: [row] });
+          const sentMessage = await user.send({ embeds: [embed], components: [buildRow(lang)] });
           deliveredApproverIds.push(user.id);
           deliveredDmMessages.push({
             approverId: user.id,

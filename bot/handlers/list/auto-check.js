@@ -10,6 +10,7 @@
 
 import { ActionRowBuilder, Events, StringSelectMenuBuilder } from 'discord.js';
 import config from '../../config.js';
+import GuildConfig from '../../models/GuildConfig.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
@@ -18,6 +19,7 @@ import {
 import { getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
+import { getGuildLanguage, t } from '../../services/i18n/index.js';
 import { buildAutoCheckEvidenceRow } from './check/index.js';
 
 /** Env-based channel set (global fallback) */
@@ -151,6 +153,7 @@ export function setupAutoCheck(client) {
       });
 
       const results = await checkNamesAgainstLists(limitedNames, { guildId: message.guild.id });
+      const lang = await getGuildLanguage(message.guild.id, { GuildConfigModel: GuildConfig });
       const formattedLines = formatCheckResults(results);
 
       // Same embed builder as /la-list check; mode: 'auto' tweaks the
@@ -177,11 +180,11 @@ export function setupAutoCheck(client) {
         const selectRow = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId('quickadd_select')
-            .setPlaceholder('⚡ Quick Add to List · select a name')
+            .setPlaceholder(t('quickAdd.selectPlaceholder', lang))
             .addOptions(
               unflaggedNames.slice(0, 25).map((r) => ({
                 label: r.name,
-                description: 'No DB list hit',
+                description: t('quickAdd.noListHit', lang),
                 value: r.name,
                 emoji: '❓',
               }))
@@ -194,7 +197,7 @@ export function setupAutoCheck(client) {
       // attached image. Mirrors /la-list view's design so officers can
       // audit evidence right from the auto-check card instead of
       // re-running /la-list view.
-      const evidenceRow = buildAutoCheckEvidenceRow(results);
+      const evidenceRow = buildAutoCheckEvidenceRow(results, lang);
       if (evidenceRow) components.push(evidenceRow);
 
       await progressMsg.edit({ content: '', embeds: [embed], components });

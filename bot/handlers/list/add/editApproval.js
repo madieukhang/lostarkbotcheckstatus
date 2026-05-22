@@ -17,6 +17,7 @@ export async function handleApprovedEditRequest({
   syncApproverDmMessages,
   broadcastListChange,
   notifyRequesterAboutDecision,
+  lang = 'en',
 }) {
   const { model: oldModel } = getListContext(payload.currentType || payload.type);
   const { model: newModel, label: newLabel } = getListContext(payload.type);
@@ -32,7 +33,7 @@ export async function handleApprovedEditRequest({
         title: 'Original Entry Missing',
         description: 'The entry referenced by this approval request no longer exists - it may have been removed.',
       })],
-      components: [buildApprovalResultRow('Failed')],
+      components: [buildApprovalResultRow('Failed', lang)],
     });
     return;
   }
@@ -65,7 +66,7 @@ export async function handleApprovedEditRequest({
           description: `**${existingEntry.name}** already exists in the target list. Edit aborted.`,
           footer: 'Remove the conflicting target entry first, then resubmit.',
         })],
-        components: [buildApprovalResultRow('Failed')],
+        components: [buildApprovalResultRow('Failed', lang)],
       });
       return;
     }
@@ -80,7 +81,7 @@ export async function handleApprovedEditRequest({
         await interaction.editReply({
           content: '',
           embeds: [buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason)],
-          components: [buildApprovalResultRow('Blocked')],
+          components: [buildApprovalResultRow('Blocked', lang)],
         });
         return;
       }
@@ -163,7 +164,7 @@ export async function handleApprovedEditRequest({
               description: 'Another entry with this name claimed the target scope between approval and persist. Approval aborted.',
               footer: 'Resubmit the edit, or remove the conflicting entry first.',
             })],
-            components: [buildApprovalResultRow('Failed')],
+            components: [buildApprovalResultRow('Failed', lang)],
           });
           return;
         }
@@ -245,11 +246,11 @@ export async function handleApprovedEditRequest({
 
   await interaction.editReply({
     content: `✅ Edit approved by **${interaction.user.tag}**.`,
-    components: [buildApprovalResultRow('Approved')],
+    components: [buildApprovalResultRow('Approved', lang)],
   });
   await syncApproverDmMessages(payload, {
     content: `✅ Edit approved by **${interaction.user.tag}**.`,
-    components: [buildApprovalResultRow('Approved')],
+    components: [buildApprovalResultRow('Approved', lang)],
   }, { excludeMessageId: interaction.message.id });
   await notifyRequesterAboutDecision(payload, editResult, false);
   return;

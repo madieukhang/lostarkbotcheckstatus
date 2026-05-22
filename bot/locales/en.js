@@ -11,6 +11,33 @@ const en = {
       previous: 'Previous',
       next: 'Next',
     },
+    actions: {
+      approve: 'Approve',
+      reject: 'Reject',
+      approving: 'Approving...',
+      rejecting: 'Rejecting...',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      processed: 'Processed',
+      failed: 'Failed',
+      blocked: 'Blocked',
+      cancel: 'Cancel',
+      discard: 'Discard',
+      overwrite: 'Overwrite',
+      keepExisting: 'Keep Existing',
+      keptExisting: 'Kept Existing',
+      overwritten: 'Overwritten',
+      viewEvidenceFresh: '📎 View Evidence (Fresh)',
+      approveAdd: 'Approve · Add {count}',
+      confirmAdd: 'Confirm Add {count}',
+      confirmAddCompact: 'Confirm · Add {count}',
+      savePartial: 'Save partial · {count}',
+      continueScan: 'Continue scan',
+      stopScan: 'Stop scan',
+      stopping: 'Stopping...',
+      jumpToResult: 'Jump to result',
+      enrichNow: 'Enrich now',
+    },
   },
 
   commands: {
@@ -426,6 +453,23 @@ const en = {
       onlyThisCharacter: '_Only this character is tracked on this entry._',
       noImage: 'No evidence image for this entry.',
     },
+  },
+
+  quickAdd: {
+    selectPlaceholder: '⚡ Quick Add to List · select a name',
+    noListHit: 'No DB list hit',
+    modalTitle: 'Quick Add · {name}',
+    typeLabel: 'Type (black / watch)',
+    typePlaceholder: 'black',
+    reasonLabel: 'Reason',
+    reasonPlaceholder: 'Why add this player?',
+    raidLabel: 'Raid (optional)',
+    raidPlaceholder: 'e.g. Kazeros Hard',
+  },
+
+  remove: {
+    removeFrom: '{index}. Remove from {label}',
+    removeAll: '{index}. Remove all',
   },
 
   languageSwitch: {

@@ -7,6 +7,8 @@ import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
+import UserPreference from '../../models/UserPreference.js';
+import { getUserLanguage } from '../../services/i18n/index.js';
 import {
   detectAltsViaStronghold,
   fetchCharacterMeta,
@@ -31,6 +33,8 @@ import { rosterUrl, profileUrl as bibleProfileUrl } from '../../utils/rosterLink
 import { makeRosterScanProgressCallback, formatDeepScanStats } from './progress.js';
 
 export async function handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions }) {
+      await connectDB();
+      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       // ── Hidden roster: try guild-based detection ──
       // Single-request probes (meta + guild list) allow ScraperAPI
       // fallback because they are 1 request each and bible direct can
@@ -106,7 +110,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
                 startedAt: startedAtRef.value,
               },
             })],
-            components: [buildStopButtonRow(sessionId)],
+            components: [buildStopButtonRow(sessionId, { lang })],
           }).catch(() => {});
 
           try {
@@ -126,6 +130,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
                 lastEditRef,
                 cancelFlag,
                 sessionId,
+                lang,
               }),
             });
           } catch (err) {
@@ -236,6 +241,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
               sessionId: session.sessionId,
               hasAlts: (altResult.alts || []).length > 0,
               hasRemaining: true,
+              lang,
             });
             if (buttonRow) replyComponents.push(buttonRow);
           }
@@ -262,6 +268,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
             resultMessageUrl: buildResultMessageUrl(interaction, replyMsg),
             outcome,
             result: altResult,
+            lang,
           }).catch(() => {});
         }
         return;

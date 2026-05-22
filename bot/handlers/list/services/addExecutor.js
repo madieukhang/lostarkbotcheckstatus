@@ -15,6 +15,7 @@ import {
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { ICONS } from '../../../utils/ui.js';
+import { t } from '../../../services/i18n/index.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl, logsUrl } from '../../../utils/rosterLink.js';
 import {
@@ -26,7 +27,7 @@ import {
   buildTrustedBlockEmbed,
 } from '../helpers.js';
 
-export function buildHiddenRosterGuidance(entryName, guildName) {
+export function buildHiddenRosterGuidance(entryName, guildName, lang = 'en') {
   const hasGuild = Boolean(String(guildName || '').trim());
   const fields = [{
     name: `${ICONS.search} Hidden roster detected`,
@@ -51,7 +52,7 @@ export function buildHiddenRosterGuidance(entryName, guildName) {
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`list-add:enrich-hidden:${encodeURIComponent(entryName)}`)
-          .setLabel('Enrich now')
+          .setLabel(t('common.actions.enrichNow', lang))
           .setEmoji(ICONS.search)
           .setStyle(ButtonStyle.Primary)
       )
@@ -402,7 +403,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     // otherwise direct officers to manual additional_names.
     const components = [];
     if (rosterVisibility === 'hidden') {
-      const guidance = buildHiddenRosterGuidance(entry.name, hiddenRosterMeta?.guildName);
+      const guidance = buildHiddenRosterGuidance(entry.name, hiddenRosterMeta?.guildName, payload.lang);
       embed.addFields(...guidance.fields);
       components.push(...guidance.components);
     }

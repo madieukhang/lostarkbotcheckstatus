@@ -1,7 +1,10 @@
 import { EmbedBuilder } from 'discord.js';
 
+import { connectDB } from '../../db.js';
 import config from '../../config.js';
+import UserPreference from '../../models/UserPreference.js';
 import { COLORS } from '../../utils/ui.js';
+import { getUserLanguage } from '../../services/i18n/index.js';
 import {
   detectAltsViaStronghold,
   fetchCharacterMeta,
@@ -23,6 +26,8 @@ import { rosterUrl } from '../../utils/rosterLink.js';
 import { makeRosterScanProgressCallback } from './progress.js';
 
 export async function runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed, contentLines }) {
+    await connectDB();
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     // Visible-roster deep scan: hoist these to the function scope so
     // the post-editReply DM block at the bottom can reference them.
     let visibleDeepResult = null;
@@ -88,7 +93,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
                 startedAt: startedAtRef.value,
               },
             })],
-            components: [buildStopButtonRow(sessionId)],
+            components: [buildStopButtonRow(sessionId, { lang })],
           }).catch(() => {});
         }
 
@@ -111,6 +116,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
                   lastEditRef,
                   cancelFlag,
                   sessionId,
+                  lang,
                 })
               : undefined,
           });
@@ -165,6 +171,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
               sessionId: session.sessionId,
               hasAlts: (altResult.alts || []).length > 0,
               hasRemaining: true,
+              lang,
             });
             if (buttonRow) deepScanComponents.push(buttonRow);
           }

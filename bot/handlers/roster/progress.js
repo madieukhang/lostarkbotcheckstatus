@@ -1,6 +1,7 @@
 import { COLORS } from '../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import { buildStopButtonRow } from '../../utils/scanSession.js';
+import { t } from '../../services/i18n/index.js';
 
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
 // ~40-60 progress updates over a typical 10-15 minute gentle-mode
@@ -24,7 +25,7 @@ function abortForProgressEditFailures(cancelFlag) {
  * tick because the post-scan branch overwrites the embed immediately
  * afterwards (would flicker for ms).
  */
-export function makeRosterScanProgressCallback({ interaction, replyEditor, name, meta, totalMembers, startedAtRef, lastEditRef, cancelFlag, sessionId }) {
+export function makeRosterScanProgressCallback({ interaction, replyEditor, name, meta, totalMembers, startedAtRef, lastEditRef, cancelFlag, sessionId, lang = 'en' }) {
   let progressEditFailures = 0;
 
   return (progress) => {
@@ -36,8 +37,8 @@ export function makeRosterScanProgressCallback({ interaction, replyEditor, name,
     lastEditRef.value = now;
     if (isFinal) return;
     const buttonRow = cancelFlag?.cancelled
-      ? buildStopButtonRow(sessionId, { disabled: true, label: 'Stopping...' })
-      : buildStopButtonRow(sessionId);
+      ? buildStopButtonRow(sessionId, { disabled: true, label: t('common.actions.stopping', lang), lang })
+      : buildStopButtonRow(sessionId, { lang });
     const edit = replyEditor?.edit
       ? replyEditor.edit.bind(replyEditor)
       : interaction.editReply.bind(interaction);

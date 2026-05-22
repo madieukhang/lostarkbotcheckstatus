@@ -12,6 +12,7 @@ import {
 } from '../../../services/multiadd/index.js';
 import { COLORS, ICONS, buildSessionFooter } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { t } from '../../../services/i18n/index.js';
 
 export async function buildTemplateReply() {
   const buffer = await buildMultiaddTemplate();
@@ -76,7 +77,7 @@ function typeIcon(type) {
   return '⚠️';
 }
 
-export function buildPreviewReply(parsed, requestId) {
+export function buildPreviewReply(parsed, requestId, lang = 'en') {
   const previewLines = parsed.rows.slice(0, 20).map((row, index) => {
     const reasonShort = row.reason.length > 50 ? `${row.reason.slice(0, 47)}...` : row.reason;
     const scopeTag = row.scope === 'server' ? ' `[S]`' : '';
@@ -109,12 +110,12 @@ export function buildPreviewReply(parsed, requestId) {
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`multiadd_confirm:${requestId}`)
-      .setLabel(`Confirm · Add ${parsed.rows.length}`)
+      .setLabel(t('common.actions.confirmAddCompact', lang, { count: parsed.rows.length }))
       .setStyle(ButtonStyle.Success)
       .setEmoji('✅'),
     new ButtonBuilder()
       .setCustomId(`multiadd_cancel:${requestId}`)
-      .setLabel('Cancel')
+      .setLabel(t('common.actions.cancel', lang))
       .setStyle(ButtonStyle.Secondary)
       .setEmoji('✖️')
   );

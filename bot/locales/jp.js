@@ -11,6 +11,33 @@ const jp = {
       previous: '前へ',
       next: '次へ',
     },
+    actions: {
+      approve: '承認',
+      reject: '却下',
+      approving: '承認中...',
+      rejecting: '却下中...',
+      approved: '承認済み',
+      rejected: '却下済み',
+      processed: '処理済み',
+      failed: '失敗',
+      blocked: 'ブロック',
+      cancel: 'キャンセル',
+      discard: '破棄',
+      overwrite: '上書き',
+      keepExisting: '既存を維持',
+      keptExisting: '既存を維持済み',
+      overwritten: '上書き済み',
+      viewEvidenceFresh: '📎 evidence を見る (fresh)',
+      approveAdd: '承認 · {count} 件追加',
+      confirmAdd: '{count} 件追加を確定',
+      confirmAddCompact: '確定 · {count} 件追加',
+      savePartial: '途中保存 · {count}',
+      continueScan: 'scan 続行',
+      stopScan: 'scan 停止',
+      stopping: '停止中...',
+      jumpToResult: '結果へ移動',
+      enrichNow: '今すぐ enrich',
+    },
   },
 
   commands: {
@@ -249,6 +276,23 @@ const jp = {
       onlyThisCharacter: '_この entry ではこの character だけが track されています._',
       noImage: 'この entry には evidence 画像がありません。',
     },
+  },
+
+  quickAdd: {
+    selectPlaceholder: '⚡ Quick Add to List · 名前を選択',
+    noListHit: 'DB list hit なし',
+    modalTitle: 'Quick Add · {name}',
+    typeLabel: 'Type (black / watch)',
+    typePlaceholder: 'black',
+    reasonLabel: 'Reason',
+    reasonPlaceholder: 'この player を追加する理由',
+    raidLabel: 'Raid (任意)',
+    raidPlaceholder: '例: Kazeros Hard',
+  },
+
+  remove: {
+    removeFrom: '{index}. {label} から削除',
+    removeAll: '{index}. すべて削除',
   },
 
   languageSwitch: {

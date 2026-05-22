@@ -1,8 +1,11 @@
 import { EmbedBuilder } from 'discord.js';
 
+import { connectDB } from '../../db.js';
 import config from '../../config.js';
+import UserPreference from '../../models/UserPreference.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { getUserLanguage } from '../../services/i18n/index.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import { detectAltsViaStronghold } from '../../services/roster/index.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
@@ -55,6 +58,8 @@ function buildScanLimitEmbed(active) {
  * customId shape: `roster-deep:continue:<sessionId>`
  */
 export async function handleRosterDeepContinueButton(interaction) {
+  await connectDB();
+  const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
   const sessionId = interaction.customId.split(':')[2];
   const session = getRosterDeepSession(sessionId);
   if (!session) {
@@ -148,7 +153,7 @@ export async function handleRosterDeepContinueButton(interaction) {
   await replyEditor.edit({
     content: session.contentText || '',
     embeds: [primaryEmbed, progressEmbed],
-    components: [buildStopButtonRow(scanSessionId)],
+    components: [buildStopButtonRow(scanSessionId, { lang })],
   }).catch(() => {});
 
   let altResult;
@@ -172,6 +177,7 @@ export async function handleRosterDeepContinueButton(interaction) {
         lastEditRef,
         cancelFlag,
         sessionId: scanSessionId,
+        lang,
       }),
     });
   } catch (err) {
@@ -255,6 +261,7 @@ export async function handleRosterDeepContinueButton(interaction) {
       sessionId: session.sessionId,
       hasAlts: mergedAlts.length > 0,
       hasRemaining: true,
+      lang,
     });
     if (buttonRow) components.push(buttonRow);
   } else {
@@ -288,6 +295,7 @@ export async function handleRosterDeepContinueButton(interaction) {
       resultMessageUrl: buildResultMessageUrl(interaction, replyMsg),
       outcome,
       result: cumulativeResult,
+      lang,
     }).catch(() => {});
   }
 }
