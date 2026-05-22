@@ -3,7 +3,14 @@ import { EmbedBuilder } from 'discord.js';
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { COLORS } from '../../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import {
+  editPayload,
+  replyAlert,
+  updateAlert,
+  updateEmbed,
+  updatePayload,
+} from '../../../utils/interactionReplies.js';
 
 export function createMultiaddApprovalButtonHandler(deps) {
   const {
@@ -27,22 +34,18 @@ export function createMultiaddApprovalButtonHandler(deps) {
     if (!payload) {
       const stillExists = await PendingApproval.exists({ requestId, action: 'bulk' });
       if (stillExists) {
-        await interaction.reply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.ERROR,
-            title: 'Not Authorised',
-            description: 'You are not on the approver list for this request.',
-          })],
-          ephemeral: true,
+        await replyAlert(interaction, {
+          severity: AlertSeverity.ERROR,
+          title: 'Not Authorised',
+          description: 'You are not on the approver list for this request.',
         });
       } else {
-        await interaction.update({
+        await updateAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Request Expired',
+          description: 'This bulk-approval request has already been processed or expired.',
+        }, {
           content: '',
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Request Expired',
-            description: 'This bulk-approval request has already been processed or expired.',
-          })],
           components: [],
         }).catch(() => {});
       }
@@ -96,8 +99,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
         .setFooter({ text: '🛡️ Bulk-add approval flow · request consumed, nothing was written to the DB' })
         .setTimestamp();
 
-      await interaction.update({
-        embeds: [rejectEmbed],
+      await updateEmbed(interaction, rejectEmbed, {
         components: [],
       }).catch(() => {});
 
@@ -123,7 +125,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
 
     if (prefix !== 'multiaddapprove_approve') return;
 
-    await interaction.update({
+    await updatePayload(interaction, {
       content: `⏳ Approved. Processing ${payload.bulkRows.length} rows...`,
       embeds: [],
       components: [],
@@ -156,7 +158,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
       inline: false,
     });
 
-    await interaction.editReply({
+    await editPayload(interaction, {
       content: null,
       embeds: [summaryEmbed],
       components: [],

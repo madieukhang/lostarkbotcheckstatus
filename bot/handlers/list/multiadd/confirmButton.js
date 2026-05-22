@@ -6,6 +6,12 @@ import { rehostImage } from '../../../utils/imageRehost.js';
 import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
+  editPayload,
+  replyAlert,
+  updateAlert,
+  updatePayload,
+} from '../../../utils/interactionReplies.js';
+import {
   getSeniorApproverIds,
   isOfficerOrSenior,
 } from '../helpers.js';
@@ -26,34 +32,30 @@ export function createMultiaddConfirmButtonHandler(deps) {
     const pending = multiaddPending.get(requestId);
 
     if (!pending) {
-      await interaction.update({
+      await updateAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Request Expired',
+        description: 'This bulk-add preview has expired or was already processed.',
+        footer: 'Re-upload the file with /la-list multiadd action:file to start over.',
+      }, {
         content: '',
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Request Expired',
-          description: 'This bulk-add preview has expired or was already processed.',
-          footer: 'Re-upload the file with /la-list multiadd action:file to start over.',
-        })],
         components: [],
       });
       return;
     }
 
     if (interaction.user.id !== pending.requesterId) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Not Your Request',
-          description: 'Only the original uploader can use these buttons.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Not Your Request',
+        description: 'Only the original uploader can use these buttons.',
       });
       return;
     }
 
     if (prefix === 'multiadd_cancel') {
       clearMultiaddPending(requestId);
-      await interaction.update({
+      await updatePayload(interaction, {
         content: '',
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.INFO,
@@ -71,7 +73,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
     clearMultiaddPending(requestId);
 
     if (isOfficerOrSenior(pending.requesterId)) {
-      await interaction.update({
+      await updatePayload(interaction, {
         content: `⏳ Processing ${pending.rows.length} rows... (this may take up to ${Math.ceil(pending.rows.length * 0.7)}s)`,
         embeds: [],
         components: [],
@@ -80,7 +82,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
       const onProgress = async (current, total) => {
         if (current % 5 !== 0 && current !== total) return;
         try {
-          await interaction.editReply({
+          await editPayload(interaction, {
             content: `⏳ Processing... ${current}/${total} rows done`,
           });
         } catch { /* ignore progress errors */ }
@@ -103,7 +105,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
       }).catch((err) => console.warn('[multiadd] Bulk broadcast failed:', err.message));
 
       const summaryEmbed = buildBulkSummaryEmbed(results, pending);
-      await interaction.editReply({
+      await editPayload(interaction, {
         content: null,
         embeds: [summaryEmbed],
         components: [],
@@ -116,14 +118,13 @@ export function createMultiaddConfirmButtonHandler(deps) {
 
       const targetApproverIds = getSeniorApproverIds();
       if (targetApproverIds.length === 0) {
-        await interaction.update({
+        await updatePayload(interaction, {
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
             title: 'Approval Routing Misconfigured',
             description: 'No Senior approver user IDs are configured.',
             footer: 'Set SENIOR_APPROVER_IDS in the bot env, then retry the upload.',
           })],
-          embeds: [],
           components: [],
         });
         return;
@@ -191,7 +192,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
         await PendingApproval.deleteOne({ requestId }).catch((err) =>
           console.warn('[multiadd] Failed to clean up placeholder approval:', err.message)
         );
-        await interaction.update({
+        await updatePayload(interaction, {
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
             title: 'Approval Delivery Failed',
@@ -199,7 +200,6 @@ export function createMultiaddConfirmButtonHandler(deps) {
             fields: [{ name: 'Reason', value: sent.reason || 'unknown', inline: false }],
             footer: 'No entries were added. Try again or contact a senior directly.',
           })],
-          embeds: [],
           components: [],
         });
         return;
@@ -225,7 +225,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
         .setFooter({ text: `Request ID: ${requestId.slice(0, 8)}` })
         .setTimestamp();
 
-      await interaction.update({
+      await updatePayload(interaction, {
         content: null,
         embeds: [waitEmbed],
         components: [],
@@ -233,7 +233,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
     } catch (err) {
       console.error('[multiadd] Approval request create failed:', err);
       await PendingApproval.deleteOne({ requestId }).catch(() => {});
-      await interaction.update({
+      await updatePayload(interaction, {
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.WARNING,
           title: 'Approval Request Failed',
@@ -241,7 +241,6 @@ export function createMultiaddConfirmButtonHandler(deps) {
           fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
           footer: 'No entries were added. Retry the upload; if it persists, contact a senior.',
         })],
-        embeds: [],
         components: [],
       }).catch(() => {});
     }

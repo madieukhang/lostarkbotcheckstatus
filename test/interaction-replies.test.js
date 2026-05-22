@@ -13,6 +13,7 @@ import {
   replyContent,
   replyEmbed,
   updateEmbed,
+  updatePayload,
 } from '../bot/utils/interactionReplies.js';
 import { AlertSeverity } from '../bot/utils/alertEmbed.js';
 
@@ -99,6 +100,16 @@ test('editPayload passes through full edit payloads unchanged', async () => {
   const payload = { content: 'done', embeds: [], components: [{ row: true }] };
 
   await editPayload(interaction, payload);
+
+  assert.deepEqual(calls[0], payload);
+});
+
+test('updatePayload passes through full update payloads unchanged', async () => {
+  const calls = [];
+  const interaction = { update: async (payload) => calls.push(payload) };
+  const payload = { content: 'working', embeds: [], components: [] };
+
+  await updatePayload(interaction, payload);
 
   assert.deepEqual(calls[0], payload);
 });
