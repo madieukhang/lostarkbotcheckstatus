@@ -2,7 +2,8 @@ import { EmbedBuilder } from 'discord.js';
 
 import { STATUS } from '../../monitor/serverStatus.js';
 import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../utils/alertEmbed.js';
+import { deferReply, editAlert, editEmbed } from '../../utils/interactionReplies.js';
 
 const STATUS_GLYPH = Object.freeze({
   [STATUS.ONLINE]:      '🟢',
@@ -21,7 +22,7 @@ function formatStatus(status) {
 
 export function createSystemHandlers({ checkStatus, resetState, client }) {
   async function handleStatusCommand(interaction) {
-    await interaction.deferReply();
+    await deferReply(interaction);
 
     try {
       const statusMap = await checkStatus(client);
@@ -89,28 +90,24 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
         .setFooter({ text: `Source: playlostark.com · ${ICONS.refresh} re-run /la-status to refresh` })
         .setTimestamp();
 
-      await interaction.editReply({ embeds: [embed] });
+      await editEmbed(interaction, embed);
     } catch (err) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Status Fetch Failed',
-          description: 'Could not fetch server status.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Status Fetch Failed',
+        description: 'Could not fetch server status.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
       });
     }
   }
 
   async function handleResetCommand(interaction) {
-    await interaction.deferReply();
+    await deferReply(interaction);
     await resetState();
-    await interaction.editReply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.SUCCESS,
-        title: 'State Reset',
-        description: 'The stored server status was cleared. The bot will start tracking from the next monitor cycle.',
-      })],
+    await editAlert(interaction, {
+      severity: AlertSeverity.SUCCESS,
+      title: 'State Reset',
+      description: 'The stored server status was cleared. The bot will start tracking from the next monitor cycle.',
     });
   }
 

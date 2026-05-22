@@ -1,6 +1,7 @@
 import { connectDB } from '../../db.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../utils/alertEmbed.js';
+import { deferReply, editAlert, editEmbed } from '../../utils/interactionReplies.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
@@ -26,29 +27,25 @@ export async function handleSearchCommand(interaction) {
   const maxIlvl = interaction.options.getInteger('max_ilvl') ?? null;
   const classFilter = resolveClassId(interaction.options.getString('class'));
 
-  await interaction.deferReply();
+  await deferReply(interaction);
 
   try {
     let suggestions = await fetchNameSuggestions(name);
 
     if (suggestions === null) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Bible Unavailable',
-          description: 'lostark.bible is currently unavailable. Please try again later.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Bible Unavailable',
+        description: 'lostark.bible is currently unavailable. Please try again later.',
       });
       return;
     }
 
     if (suggestions.length === 0) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'No Results',
-          description: `No characters matching **${name}** were found.`,
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'No Results',
+        description: `No characters matching **${name}** were found.`,
       });
       return;
     }
@@ -65,13 +62,11 @@ export async function handleSearchCommand(interaction) {
       const filterDesc = [`ilvl ≥ ${minIlvl}`];
       if (maxIlvl !== null) filterDesc.push(`ilvl ≤ ${maxIlvl}`);
       if (classFilter) filterDesc.push(`class: ${getClassName(classFilter)}`);
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'No Results With Filters',
-          description: `No characters matching **${name}** with the applied filters.`,
-          fields: [{ name: 'Filters', value: filterDesc.join(', '), inline: false }],
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'No Results With Filters',
+        description: `No characters matching **${name}** with the applied filters.`,
+        fields: [{ name: 'Filters', value: filterDesc.join(', '), inline: false }],
       });
       return;
     }
@@ -124,17 +119,15 @@ export async function handleSearchCommand(interaction) {
     const flaggedWithImages = getFlaggedResultsWithImages(results);
     const components = buildSearchEvidenceComponents(flaggedWithImages, lang);
 
-    await interaction.editReply({ embeds: [embed], components });
+    await editEmbed(interaction, embed, { components });
     await attachSearchEvidenceCollector({ interaction, results, flaggedWithImages, lang });
   } catch (err) {
     console.error('[search] ❌ Search failed:', err.message);
-    await interaction.editReply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        title: 'Search Failed',
-        description: 'Could not run the name search.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-      })],
+    await editAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      title: 'Search Failed',
+      description: 'Could not run the name search.',
+      fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
     });
   }
 }

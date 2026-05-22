@@ -12,6 +12,7 @@ import {
   setUserLanguage,
   t,
 } from '../../services/i18n/index.js';
+import { replyEmbed, updateEmbed } from '../../utils/interactionReplies.js';
 import { COLORS } from '../../utils/ui.js';
 
 export const LANGUAGE_SWITCH_SELECT_CUSTOM_ID = 'la-language-switch:select';
@@ -55,10 +56,8 @@ export async function handleLanguageSwitchCommand(interaction) {
     UserPreferenceModel: UserPreference,
   });
 
-  await interaction.reply({
-    embeds: [buildLanguageEmbed(lang)],
+  await replyEmbed(interaction, buildLanguageEmbed(lang), {
     components: [buildLanguageDropdown(lang)],
-    ephemeral: true,
   });
 }
 
@@ -92,8 +91,7 @@ export async function handleLanguageSwitchSelect(interaction) {
     )
     .setFooter({ text: t('languageSwitch.footer', next) });
 
-  await interaction.update({
-    embeds: [embed],
+  await updateEmbed(interaction, embed, {
     components: [buildLanguageDropdown(next)],
   });
 }

@@ -8,6 +8,7 @@ import config from '../../config.js';
 import { connectDB } from '../../db.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t, resolveLocale } from '../../services/i18n/index.js';
+import { replyEmbed, updateEmbed } from '../../utils/interactionReplies.js';
 import { COLORS } from '../../utils/ui.js';
 
 function pickLang(value) {
@@ -107,10 +108,8 @@ export async function handleHelpCommand(interaction) {
   const lang = await resolveHelpLanguage(interaction);
   const isOwnerGuild = isOwnerGuildInteraction(interaction);
 
-  await interaction.reply({
-    embeds: [buildOverviewEmbed(lang, isOwnerGuild)],
+  await replyEmbed(interaction, buildOverviewEmbed(lang, isOwnerGuild), {
     components: [buildHelpDropdown(lang, isOwnerGuild)],
-    ephemeral: true,
   });
 }
 
@@ -119,8 +118,7 @@ export async function handleHelpSelect(interaction) {
   const sectionKey = interaction.values?.[0];
   const isOwnerGuild = isOwnerGuildInteraction(interaction);
 
-  await interaction.update({
-    embeds: [buildSectionEmbed(sectionKey, lang, isOwnerGuild)],
+  await updateEmbed(interaction, buildSectionEmbed(sectionKey, lang, isOwnerGuild), {
     components: [buildHelpDropdown(lang, isOwnerGuild)],
   });
 }
