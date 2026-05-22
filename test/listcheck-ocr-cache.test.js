@@ -108,6 +108,58 @@ test('extractNamesFromImage dedupes canonical-equivalent diacritic spellings', a
   }
 });
 
+test('extractNamesFromImage canonicalizes umlaut OCR split artifacts', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/umlaut-split-image.png') {
+      return new Response(new Uint8Array([7, 8, 9]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      return Response.json({
+        candidates: [
+          {
+            finishReason: 'STOP',
+            content: {
+              parts: [{
+                text: JSON.stringify([
+                  'b\u00E1nhcanhci\u00F9a',
+                  'b\u00E1nhcanhc\u00FCa',
+                ]),
+              }],
+            },
+          },
+        ],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'image-umlaut-split',
+      url: 'https://cdn.discordapp.com/umlaut-split-image.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(names, ['B\u00E1nhcanhc\u00FCa']);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
+});
+
 test('extractNamesFromImage rejects oversized downloads even when content-length is missing', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;

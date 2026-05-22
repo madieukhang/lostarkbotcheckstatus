@@ -3,6 +3,9 @@ function normalizeNameGlyphs(raw) {
     .normalize('NFKC')
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .replace(/(\p{L})\s*\u00A8/gu, '$1\u0308')
+    // Lost Ark lobby font can make Gemini split "ü" into "iù".
+    .replace(/i(?:\u00F9|u\u0300)/g, '\u00FC')
+    .replace(/I(?:\u00D9|U\u0300)/g, '\u00DC')
     .replace(/(\p{L})\s+([\u0300-\u036f])/gu, '$1$2')
     .trim()
     .normalize('NFC');
