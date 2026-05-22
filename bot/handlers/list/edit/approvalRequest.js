@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import PendingApproval from '../../../models/PendingApproval.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { editAlert } from '../../../utils/interactionReplies.js';
 
 export async function sendListEditApprovalRequest({
   interaction,
@@ -59,13 +60,11 @@ export async function sendListEditApprovalRequest({
   });
 
   if (!sent.success) {
-    await interaction.editReply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        title: 'Approval Delivery Failed',
-        description: sent.reason || 'Could not deliver the approval request.',
-        footer: 'No edit was applied. Try again or contact an officer directly.',
-      })],
+    await editAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      title: 'Approval Delivery Failed',
+      description: sent.reason || 'Could not deliver the approval request.',
+      footer: 'No edit was applied. Try again or contact an officer directly.',
     });
     return;
   }
@@ -76,17 +75,15 @@ export async function sendListEditApprovalRequest({
     approverDmMessages: sent.deliveredDmMessages,
   });
 
-  await interaction.editReply({
-    embeds: [buildAlertEmbed({
-      severity: AlertSeverity.INFO,
-      titleIcon: '📨',
-      title: 'Edit Request Sent',
-      description: 'An approver has been notified. The edit will apply once approved.',
-      fields: [{
-        name: `Pending changes (${changes.length})`,
-        value: changes.map((c) => `• ${c}`).join('\n').slice(0, 1024),
-        inline: false,
-      }],
-    })],
+  await editAlert(interaction, {
+    severity: AlertSeverity.INFO,
+    titleIcon: '📨',
+    title: 'Edit Request Sent',
+    description: 'An approver has been notified. The edit will apply once approved.',
+    fields: [{
+      name: `Pending changes (${changes.length})`,
+      value: changes.map((c) => `• ${c}`).join('\n').slice(0, 1024),
+      inline: false,
+    }],
   });
 }
