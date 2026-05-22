@@ -10,7 +10,13 @@ import {
 import { getUserLanguage } from '../../../services/i18n/index.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import {
+  deferReply,
+  editAlert,
+  editContent,
+  editEmbed,
+} from '../../../utils/interactionReplies.js';
 import {
   buildListAddApprovalEmbed,
   isRequesterAutoApprover,
@@ -31,15 +37,13 @@ export function createListAddCommandHandler({
     const inputScope = interaction.options.getString('scope') || '';
     const name = normalizeCharacterName(rawName);
 
-    await interaction.deferReply();
+    await deferReply(interaction);
 
     if (!interaction.guild) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Server-Only Command',
-          description: 'This command can only be used inside a Discord server, not in DMs.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Server-Only Command',
+        description: 'This command can only be used inside a Discord server, not in DMs.',
       });
       return;
     }
@@ -54,23 +58,19 @@ export function createListAddCommandHandler({
     if (!scope) scope = 'global'; // non-blacklist types always global
 
     if (!reason) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Reason Required',
-          description: 'Every list entry needs a reason. Re-run the command and fill the `reason` option.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Reason Required',
+        description: 'Every list entry needs a reason. Re-run the command and fill the `reason` option.',
       });
       return;
     }
 
     if (image?.contentType && !image.contentType.startsWith('image/')) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Invalid Attachment',
-          description: `The \`image\` option only accepts image files. Detected content type: \`${image.contentType}\`.`,
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Invalid Attachment',
+        description: `The \`image\` option only accepts image files. Detected content type: \`${image.contentType}\`.`,
       });
       return;
     }
@@ -126,24 +126,28 @@ export function createListAddCommandHandler({
         // Components carry the optional "Enrich now" button on hidden-
         // roster success cards (see addExecutor.js).
         const hasEmbed = (result.embeds?.length ?? 0) > 0;
-        await interaction.editReply({
-          content: hasEmbed ? null : result.content,
-          embeds: result.embeds ?? [],
-          components: result.components ?? [],
-        });
+        if (hasEmbed) {
+          await editEmbed(interaction, result.embeds ?? [], {
+            content: null,
+            components: result.components ?? [],
+          });
+        } else {
+          await editContent(interaction, result.content, {
+            embeds: [],
+            components: result.components ?? [],
+          });
+        }
         return;
       }
 
       const sent = await sendListAddApprovalToApprovers(interaction.guild, payload);
       if (!sent.success) {
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Approval Request Failed',
-            description: `Could not deliver the approval request to approvers.`,
-            fields: [{ name: 'Reason', value: sent.reason || 'unknown', inline: false }],
-            footer: 'No entry was created. Try again or contact an officer directly.',
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Approval Request Failed',
+          description: `Could not deliver the approval request to approvers.`,
+          fields: [{ name: 'Reason', value: sent.reason || 'unknown', inline: false }],
+          footer: 'No entry was created. Try again or contact an officer directly.',
         });
         return;
       }
@@ -155,14 +159,13 @@ export function createListAddCommandHandler({
         approverDmMessages: sent.deliveredDmMessages,
       });
 
-      await interaction.editReply({
-        embeds: [
-          buildListAddApprovalEmbed(interaction.guild, payload, {
-            title: 'List Add · Proposal Submitted',
-            includeRequestedBy: false,
-          }),
-        ],
-      });
+      await editEmbed(
+        interaction,
+        buildListAddApprovalEmbed(interaction.guild, payload, {
+          title: 'List Add · Proposal Submitted',
+          includeRequestedBy: false,
+        })
+      );
 
       try {
         const requestReply = await interaction.fetchReply();
@@ -175,14 +178,12 @@ export function createListAddCommandHandler({
       }
     } catch (err) {
       console.error('[list] ❌ Proposal create/send failed:', err.message);
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Proposal Failed',
-          description: 'Could not create the approval request.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-          footer: 'No entry was created. Retry the command; if the error persists, contact an officer.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Proposal Failed',
+        description: 'Could not create the approval request.',
+        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        footer: 'No entry was created. Retry the command; if the error persists, contact an officer.',
       });
     }
   }

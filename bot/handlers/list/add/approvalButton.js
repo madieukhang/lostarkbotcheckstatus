@@ -10,6 +10,7 @@ import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   getListContext,
@@ -42,24 +43,18 @@ export function createListAddApprovalButtonHandler({
       const stillExists = await PendingApproval.exists({ requestId });
 
       if (stillExists) {
-        await interaction.reply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.ERROR,
-            title: 'Not Authorised',
-            description: 'You are not on the approver list for this request.',
-          })],
-          ephemeral: true,
+        await replyAlert(interaction, {
+          severity: AlertSeverity.ERROR,
+          title: 'Not Authorised',
+          description: 'You are not on the approver list for this request.',
         });
         return;
       }
 
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Request Expired',
-          description: 'This approval request was already processed or has expired.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Request Expired',
+        description: 'This approval request was already processed or has expired.',
       });
       return;
     }
@@ -69,7 +64,7 @@ export function createListAddApprovalButtonHandler({
     // Acknowledge immediately, then show processing state to avoid 3s timeout issues.
     await interaction.deferUpdate();
 
-    await interaction.editReply({
+    await editPayload(interaction, {
       content: isApproveAction
         ? `⏳ Processing approval by **${interaction.user.tag}**...`
         : `⏳ Processing rejection by **${interaction.user.tag}**...`,
@@ -90,7 +85,7 @@ export function createListAddApprovalButtonHandler({
     if (!isApproveAction) {
       await PendingApproval.deleteOne({ requestId });
 
-      await interaction.editReply({
+      await editPayload(interaction, {
         content: `❌ Rejected by **${interaction.user.tag}**`,
         components: [buildApprovalResultRow('Rejected', lang)],
       });
@@ -158,7 +153,7 @@ export function createListAddApprovalButtonHandler({
             .setStyle(ButtonStyle.Secondary),
         );
 
-        await interaction.editReply({
+        await editPayload(interaction, {
           content: `⚠️ **${payload.name}** already in ${label}. Overwrite or keep?`,
           embeds: [compareEmbed],
           components: [overwriteRow],
@@ -180,7 +175,7 @@ export function createListAddApprovalButtonHandler({
       // Success or non-duplicate error · clean up
       await PendingApproval.deleteOne({ requestId });
 
-      await interaction.editReply({
+      await editPayload(interaction, {
         content: result.ok
           ? `✅ Approved by **${interaction.user.tag}** and executed successfully.`
           : `⚠️ Approved by **${interaction.user.tag}** but execution returned: ${result.content}`,
@@ -209,7 +204,7 @@ export function createListAddApprovalButtonHandler({
         fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
       });
 
-      await interaction.editReply({
+      await editPayload(interaction, {
         content: '',
         embeds: [failureEmbed],
         components: [buildApprovalResultRow('Failed', lang)],

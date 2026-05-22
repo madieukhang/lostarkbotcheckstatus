@@ -1,7 +1,8 @@
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { refreshImageUrl } from '../../../utils/imageRehost.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { replyAlert, replyEmbed } from '../../../utils/interactionReplies.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import { decorateListEntry } from '../helpers.js';
 
@@ -21,22 +22,16 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     if (!payload) {
       const stillExists = await PendingApproval.exists({ requestId });
       if (stillExists) {
-        await interaction.reply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.ERROR,
-            title: 'Not Authorised',
-            description: 'You are not on the approver list for this request, so you cannot view its evidence.',
-          })],
-          ephemeral: true,
+        await replyAlert(interaction, {
+          severity: AlertSeverity.ERROR,
+          title: 'Not Authorised',
+          description: 'You are not on the approver list for this request, so you cannot view its evidence.',
         });
       } else {
-        await interaction.reply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Request Expired',
-            description: 'This approval request was already processed or has expired.',
-          })],
-          ephemeral: true,
+        await replyAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Request Expired',
+          description: 'This approval request was already processed or has expired.',
         });
       }
       return;
@@ -54,13 +49,10 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     }
 
     if (!freshUrl) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'No Evidence Available',
-          description: 'No evidence image attached to this request, or the rehosted message was removed.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'No Evidence Available',
+        description: 'No evidence image attached to this request, or the rehosted message was removed.',
       });
       return;
     }
@@ -83,10 +75,7 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
         : 'Fresh URL just resolved from evidence channel',
     });
 
-    await interaction.reply({
-      embeds: [evidenceEmbed],
-      ephemeral: true,
-    });
+    await replyEmbed(interaction, evidenceEmbed);
   }
 
   return handleListAddViewEvidenceButton;

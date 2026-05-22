@@ -2,6 +2,7 @@ import PendingApproval from '../../../models/PendingApproval.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { editPayload } from '../../../utils/interactionReplies.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -26,7 +27,7 @@ export async function handleApprovedEditRequest({
   const existingEntry = await oldModel.findById(payload.existingEntryId);
   if (!existingEntry) {
     await PendingApproval.deleteOne({ requestId });
-    await interaction.editReply({
+    await editPayload(interaction, {
       content: '',
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
@@ -58,7 +59,7 @@ export async function handleApprovedEditRequest({
       .collation({ locale: 'en', strength: 2 }).lean();
     if (targetDupe) {
       await PendingApproval.deleteOne({ requestId });
-      await interaction.editReply({
+      await editPayload(interaction, {
         content: '',
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.WARNING,
@@ -78,7 +79,7 @@ export async function handleApprovedEditRequest({
       }).collation({ locale: 'en', strength: 2 }).lean();
       if (trustedNow) {
         await PendingApproval.deleteOne({ requestId });
-        await interaction.editReply({
+        await editPayload(interaction, {
           content: '',
           embeds: [buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason)],
           components: [buildApprovalResultRow('Blocked', lang)],
@@ -156,7 +157,7 @@ export async function handleApprovedEditRequest({
         // Defense in depth for the unique index race on scope change
         if (err.code === 11000 && updateFields.scope) {
           await PendingApproval.deleteOne({ requestId });
-          await interaction.editReply({
+          await editPayload(interaction, {
             content: '',
             embeds: [buildAlertEmbed({
               severity: AlertSeverity.WARNING,
@@ -244,7 +245,7 @@ export async function handleApprovedEditRequest({
     embeds: approvalSuccessEmbed ? [approvalSuccessEmbed] : [],
   };
 
-  await interaction.editReply({
+  await editPayload(interaction, {
     content: `✅ Edit approved by **${interaction.user.tag}**.`,
     components: [buildApprovalResultRow('Approved', lang)],
   });

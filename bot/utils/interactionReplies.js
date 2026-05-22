@@ -44,6 +44,10 @@ export function editComponents(interaction, components, extras = {}) {
   });
 }
 
+export function editPayload(interaction, payload) {
+  return interaction.editReply(payload);
+}
+
 export function updateEmbed(interaction, embedOrEmbeds, extras = {}) {
   return interaction.update({
     ...extras,
