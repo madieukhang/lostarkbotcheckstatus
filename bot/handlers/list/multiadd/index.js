@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
+import { connectDB } from '../../../db.js';
 import { parseMultiaddFile } from '../../../services/multiadd/index.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import UserPreference from '../../../models/UserPreference.js';
+import { getUserLanguage } from '../../../services/i18n/index.js';
 import {
   downloadMultiaddAttachment,
   validateMultiaddAttachment,
@@ -116,6 +119,8 @@ export function createMultiaddHandlers({ client, services }) {
       }
 
       const requestId = randomUUID();
+      await connectDB();
+      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       const expiryTimer = setTimeout(() => {
         multiaddPending.delete(requestId);
       }, MULTIADD_PENDING_TTL_MS);
@@ -133,7 +138,7 @@ export function createMultiaddHandlers({ client, services }) {
         expiryTimer,
       });
 
-      await interaction.editReply(buildPreviewReply(parsed, requestId));
+      await interaction.editReply(buildPreviewReply(parsed, requestId, lang));
       return;
     }
 

@@ -33,6 +33,7 @@
 
 import { connectDB } from '../../../db.js';
 import config from '../../../config.js';
+import UserPreference from '../../../models/UserPreference.js';
 import {
   fetchCharacterMeta,
   fetchGuildMembers,
@@ -42,6 +43,7 @@ import {
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../../utils/scanPermissions.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   buildScanResultEmbed,
   buildScanResultButtons,
@@ -125,6 +127,7 @@ export function createEnrichHandlers({ client, services }) {
   */
   async function runEnrichFlow(interaction, { name, cap, existingSession = null }) {
     await connectDB();
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     const resolvedCap = cap ?? config.strongholdDeepCandidateLimit;
     const replyEditor = createLongRunningReplyEditor(interaction);
 
@@ -251,7 +254,7 @@ export function createEnrichHandlers({ client, services }) {
       totalMembers: guildMembers.length,
       startedAt,
     };
-    const stopRow = buildStopButtonRow(sessionId);
+    const stopRow = buildStopButtonRow(sessionId, { lang });
     await replyEditor.edit({
       content: '',
       embeds: [buildEnrichProgressEmbed({
@@ -272,7 +275,7 @@ export function createEnrichHandlers({ client, services }) {
       lastProgressEdit = now;
       if (isFinal) return;
       const buttonRow = cancelFlag.cancelled
-        ? buildStopButtonRow(sessionId, { disabled: true, label: 'Stopping...' })
+        ? buildStopButtonRow(sessionId, { disabled: true, label: t('common.actions.stopping', lang), lang })
         : stopRow;
       replyEditor.edit({
         content: '',
@@ -479,6 +482,7 @@ export function createEnrichHandlers({ client, services }) {
       hasAlts: newAlts.length > 0,
       hasRemaining: state.hasRemaining,
       newAltsCount: newAlts.length,
+      lang,
     });
 
     await replyEditor.edit({
@@ -506,6 +510,7 @@ export function createEnrichHandlers({ client, services }) {
         outcome,
         result: cumulativeResult,
         alts: newAlts,
+        lang,
       }).catch(() => {});
     } catch (err) {
       console.warn('[enrich] DM dispatch failed:', err?.message || err);

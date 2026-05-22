@@ -22,6 +22,7 @@ import Watchlist from '../../../models/Watchlist.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import TrustedUser from '../../../models/TrustedUser.js';
+import UserPreference from '../../../models/UserPreference.js';
 import { getClassName } from '../../../models/Class.js';
 import {
   buildRosterCharacters,
@@ -41,6 +42,7 @@ import {
 } from '../../../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import {
   buildMultiaddTemplate,
@@ -74,6 +76,7 @@ export function createRemoveHandlers({ client, services }) {
 
     try {
       await connectDB();
+      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
       const removeGuildId = interaction.guild?.id || '';
       const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
@@ -234,12 +237,12 @@ export function createRemoveHandlers({ client, services }) {
           const { label } = getListContext(f.type);
           return new ButtonBuilder()
             .setCustomId(`remove_${f.type}`)
-            .setLabel(`${i + 1}. Remove from ${label}`)
+            .setLabel(t('remove.removeFrom', lang, { index: i + 1, label }))
             .setStyle(buttonStyles[f.type] || ButtonStyle.Secondary);
         }),
         new ButtonBuilder()
           .setCustomId('remove_all')
-          .setLabel(`${found.length + 1}. Remove all`)
+          .setLabel(t('remove.removeAll', lang, { index: found.length + 1 }))
           .setStyle(ButtonStyle.Secondary)
       );
 

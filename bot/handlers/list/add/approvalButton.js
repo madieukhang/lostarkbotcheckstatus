@@ -7,8 +7,10 @@ import {
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import UserPreference from '../../../models/UserPreference.js';
 import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   getListContext,
   buildApprovalResultRow,
@@ -28,6 +30,7 @@ export function createListAddApprovalButtonHandler({
     const action = customParts[0];
     const requestId = customParts[1];
     await connectDB();
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     // Find but don't delete yet · need to keep for duplicate overwrite flow
     const payload = await PendingApproval.findOne({
@@ -70,7 +73,7 @@ export function createListAddApprovalButtonHandler({
       content: isApproveAction
         ? `⏳ Processing approval by **${interaction.user.tag}**...`
         : `⏳ Processing rejection by **${interaction.user.tag}**...`,
-      components: [buildApprovalProcessingRow(action)],
+      components: [buildApprovalProcessingRow(action, lang)],
     });
 
     await syncApproverDmMessages(
@@ -79,7 +82,7 @@ export function createListAddApprovalButtonHandler({
         content: isApproveAction
           ? `⏳ Processing approval by **${interaction.user.tag}**...`
           : `⏳ Processing rejection by **${interaction.user.tag}**...`,
-        components: [buildApprovalProcessingRow(action)],
+        components: [buildApprovalProcessingRow(action, lang)],
       },
       { excludeMessageId: interaction.message.id }
     );
@@ -89,14 +92,14 @@ export function createListAddApprovalButtonHandler({
 
       await interaction.editReply({
         content: `❌ Rejected by **${interaction.user.tag}**`,
-        components: [buildApprovalResultRow('Rejected')],
+        components: [buildApprovalResultRow('Rejected', lang)],
       });
 
       await syncApproverDmMessages(
         payload,
         {
           content: `❌ Rejected by **${interaction.user.tag}**`,
-          components: [buildApprovalResultRow('Rejected')],
+          components: [buildApprovalResultRow('Rejected', lang)],
         },
         { excludeMessageId: interaction.message.id }
       );
@@ -116,6 +119,7 @@ export function createListAddApprovalButtonHandler({
           syncApproverDmMessages,
           broadcastListChange,
           notifyRequesterAboutDecision,
+          lang,
         });
         return;
       }
@@ -146,11 +150,11 @@ export function createListAddApprovalButtonHandler({
         const overwriteRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId(`listadd_overwrite:${requestId}`)
-            .setLabel('Overwrite')
+            .setLabel(t('common.actions.overwrite', lang))
             .setStyle(ButtonStyle.Danger),
           new ButtonBuilder()
             .setCustomId(`listadd_keep:${requestId}`)
-            .setLabel('Keep Existing')
+            .setLabel(t('common.actions.keepExisting', lang))
             .setStyle(ButtonStyle.Secondary),
         );
 
@@ -180,7 +184,7 @@ export function createListAddApprovalButtonHandler({
         content: result.ok
           ? `✅ Approved by **${interaction.user.tag}** and executed successfully.`
           : `⚠️ Approved by **${interaction.user.tag}** but execution returned: ${result.content}`,
-        components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed')],
+        components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', lang)],
       });
 
       await syncApproverDmMessages(
@@ -189,7 +193,7 @@ export function createListAddApprovalButtonHandler({
           content: result.ok
             ? `✅ Approved by **${interaction.user.tag}** and executed successfully.`
             : `⚠️ Approved by **${interaction.user.tag}** but execution returned: ${result.content}`,
-          components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed')],
+          components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', lang)],
         },
         { excludeMessageId: interaction.message.id }
       );
@@ -208,7 +212,7 @@ export function createListAddApprovalButtonHandler({
       await interaction.editReply({
         content: '',
         embeds: [failureEmbed],
-        components: [buildApprovalResultRow('Failed')],
+        components: [buildApprovalResultRow('Failed', lang)],
       });
 
       await syncApproverDmMessages(
@@ -216,7 +220,7 @@ export function createListAddApprovalButtonHandler({
         {
           content: '',
           embeds: [failureEmbed],
-          components: [buildApprovalResultRow('Failed')],
+          components: [buildApprovalResultRow('Failed', lang)],
         },
         { excludeMessageId: interaction.message.id }
       );

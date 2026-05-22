@@ -11,6 +11,33 @@ const vi = {
       previous: 'Trước',
       next: 'Tiếp',
     },
+    actions: {
+      approve: 'Duyệt',
+      reject: 'Từ chối',
+      approving: 'Đang duyệt...',
+      rejecting: 'Đang từ chối...',
+      approved: 'Đã duyệt',
+      rejected: 'Đã từ chối',
+      processed: 'Đã xử lý',
+      failed: 'Thất bại',
+      blocked: 'Bị chặn',
+      cancel: 'Huỷ',
+      discard: 'Bỏ qua',
+      overwrite: 'Ghi đè',
+      keepExisting: 'Giữ entry cũ',
+      keptExisting: 'Đã giữ entry cũ',
+      overwritten: 'Đã ghi đè',
+      viewEvidenceFresh: '📎 Xem evidence (fresh)',
+      approveAdd: 'Duyệt · thêm {count}',
+      confirmAdd: 'Xác nhận thêm {count}',
+      confirmAddCompact: 'Xác nhận · thêm {count}',
+      savePartial: 'Lưu tạm · {count}',
+      continueScan: 'Quét tiếp',
+      stopScan: 'Dừng quét',
+      stopping: 'Đang dừng...',
+      jumpToResult: 'Mở kết quả',
+      enrichNow: 'Enrich ngay',
+    },
   },
 
   commands: {
@@ -249,6 +276,23 @@ const vi = {
       onlyThisCharacter: '_Chỉ character này đang được track trong entry._',
       noImage: 'Entry này chưa có ảnh evidence.',
     },
+  },
+
+  quickAdd: {
+    selectPlaceholder: '⚡ Quick Add vào list · chọn tên',
+    noListHit: 'Chưa có hit trong DB',
+    modalTitle: 'Quick Add · {name}',
+    typeLabel: 'Loại (black / watch)',
+    typePlaceholder: 'black',
+    reasonLabel: 'Lý do',
+    reasonPlaceholder: 'Vì sao thêm player này?',
+    raidLabel: 'Raid (tuỳ chọn)',
+    raidPlaceholder: 'vd. Kazeros Hard',
+  },
+
+  remove: {
+    removeFrom: '{index}. Xoá khỏi {label}',
+    removeAll: '{index}. Xoá tất cả',
   },
 
   languageSwitch: {

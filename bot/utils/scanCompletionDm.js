@@ -22,6 +22,7 @@ import {
 import { COLORS, ICONS } from './ui.js';
 import { rosterUrl } from './rosterLink.js';
 import { getClassEmoji } from '../models/Class.js';
+import { t } from '../services/i18n/index.js';
 
 /**
  * @typedef ScanDmOptions
@@ -31,6 +32,7 @@ import { getClassEmoji } from '../models/Class.js';
  * @property {string} [guildName] - Bible-side guild name; rendered as context.
  * @property {string} [channelMention] - "<#channelId>" so the DM links the channel.
  * @property {string} [resultMessageUrl] - Discord message URL to attach as a Link button.
+ * @property {string} [lang='en'] - Display language for interactive controls.
  * @property {'completed'|'no-alts'|'stopped-with-alts'|'stopped-no-alts'|'enrich-saved'} outcome
  * @property {object} [result] - Scan result: { scannedCandidates, failedCandidates, alts? }
  * @property {Array} [alts] - Optional override for the alt list (use this when
@@ -85,6 +87,7 @@ export async function sendScanCompletionDm(opts) {
     guildName,
     channelMention,
     resultMessageUrl,
+    lang = 'en',
     outcome,
     result = {},
     alts: altsOverride,
@@ -154,7 +157,7 @@ export async function sendScanCompletionDm(opts) {
     components.push(
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setLabel('Jump to result')
+          .setLabel(t('common.actions.jumpToResult', lang))
           .setStyle(ButtonStyle.Link)
           .setURL(resultMessageUrl)
       )

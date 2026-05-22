@@ -13,6 +13,7 @@ import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import TrustedUser from '../../models/TrustedUser.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
+import UserPreference from '../../models/UserPreference.js';
 import {
   bibleClient,
   parseRosterCharactersFromHtml,
@@ -28,6 +29,7 @@ import { decorateListEntry } from '../list/helpers.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
+import { getUserLanguage } from '../../services/i18n/index.js';
 import { reserveUserScan } from '../../utils/scanSession.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
@@ -250,6 +252,7 @@ export async function handleRosterCommand(interaction) {
     // /la-roster which finishes in seconds and doesn't warrant a
     // notification ping).
     if (deep && visibleDeep.result) {
+      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       const replyMsg = replyEditor.getMessage();
       let outcome;
       if (visibleDeep.result.cancelled || visibleDeep.result.pausedForFailureStorm) {
@@ -266,6 +269,7 @@ export async function handleRosterCommand(interaction) {
         resultMessageUrl: buildResultMessageUrl(interaction, replyMsg),
         outcome,
         result: visibleDeep.result,
+        lang,
       }).catch(() => {});
     }
   } catch (err) {

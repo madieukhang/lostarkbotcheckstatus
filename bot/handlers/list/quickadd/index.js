@@ -20,6 +20,7 @@ import Watchlist from '../../../models/Watchlist.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import TrustedUser from '../../../models/TrustedUser.js';
+import UserPreference from '../../../models/UserPreference.js';
 import { getClassName } from '../../../models/Class.js';
 import {
   buildRosterCharacters,
@@ -39,6 +40,7 @@ import {
 } from '../../../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import {
   buildMultiaddTemplate,
@@ -66,34 +68,36 @@ export function createQuickAddHandlers({ client, services }) {
 
   async function handleQuickAddSelect(interaction) {
     const name = interaction.values[0];
+    await connectDB();
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     const modal = new ModalBuilder()
       .setCustomId(`quickadd_modal:${name}`)
-      .setTitle(`Quick Add · ${name}`)
+      .setTitle(t('quickAdd.modalTitle', lang, { name }).slice(0, 45))
       .addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId('quickadd_type')
-            .setLabel('Type (black / watch)')
+            .setLabel(t('quickAdd.typeLabel', lang))
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder('black')
+            .setPlaceholder(t('quickAdd.typePlaceholder', lang))
             .setValue('black')
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId('quickadd_reason')
-            .setLabel('Reason')
+            .setLabel(t('quickAdd.reasonLabel', lang))
             .setStyle(TextInputStyle.Paragraph)
-            .setPlaceholder('Why add this player?')
+            .setPlaceholder(t('quickAdd.reasonPlaceholder', lang))
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId('quickadd_raid')
-            .setLabel('Raid (optional)')
+            .setLabel(t('quickAdd.raidLabel', lang))
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder('e.g. Kazeros Hard')
+            .setPlaceholder(t('quickAdd.raidPlaceholder', lang))
             .setRequired(false)
         ),
       );
@@ -111,6 +115,8 @@ export function createQuickAddHandlers({ client, services }) {
     if (!['black', 'white', 'watch'].includes(type)) type = 'black';
 
     await interaction.deferReply({ ephemeral: true });
+    await connectDB();
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     if (!reason) {
       await interaction.editReply({
@@ -127,7 +133,6 @@ export function createQuickAddHandlers({ client, services }) {
       // Resolve scope from guild default setting
       let quickScope = 'global';
       if (type === 'black' && interaction.guild?.id) {
-        await connectDB();
         const gc = await getGuildConfig(interaction.guild.id);
         quickScope = gc?.defaultBlacklistScope || 'global';
       }
@@ -147,6 +152,7 @@ export function createQuickAddHandlers({ client, services }) {
         requestedByTag: interaction.user.tag,
         requestedByName: interaction.user.username,
         requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+        lang,
         createdAt: Date.now(),
       };
 

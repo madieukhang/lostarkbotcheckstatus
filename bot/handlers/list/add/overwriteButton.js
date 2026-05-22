@@ -1,8 +1,10 @@
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import UserPreference from '../../../models/UserPreference.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { getUserLanguage } from '../../../services/i18n/index.js';
 import {
   getListContext,
   buildApprovalResultRow,
@@ -18,6 +20,7 @@ export function createListAddOverwriteButtonHandler({
     const isOverwrite = interaction.customId.startsWith('listadd_overwrite:');
 
     await connectDB();
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     const payload = await PendingApproval.findOneAndDelete({ requestId }).lean();
 
     if (!payload) {
@@ -39,7 +42,7 @@ export function createListAddOverwriteButtonHandler({
       await interaction.editReply({
         content: `✅ Kept existing entry. New request for **${payload.name}** discarded.`,
         embeds: [],
-        components: [buildApprovalResultRow('Kept Existing')],
+        components: [buildApprovalResultRow('Kept Existing', lang)],
       });
 
       await syncApproverDmMessages(
@@ -47,7 +50,7 @@ export function createListAddOverwriteButtonHandler({
         {
           content: `✅ Kept existing entry. New request for **${payload.name}** discarded.`,
           embeds: [],
-          components: [buildApprovalResultRow('Kept Existing')],
+          components: [buildApprovalResultRow('Kept Existing', lang)],
         },
         { excludeMessageId: interaction.message.id }
       );
@@ -89,7 +92,7 @@ export function createListAddOverwriteButtonHandler({
             description: 'The duplicate entry no longer exists - it may have been removed in a parallel session.',
             footer: 'Re-run /la-list add to create a fresh entry.',
           })],
-          components: [buildApprovalResultRow('Failed')],
+          components: [buildApprovalResultRow('Failed', lang)],
         });
         return;
       }
@@ -139,7 +142,7 @@ export function createListAddOverwriteButtonHandler({
       await interaction.editReply({
         content: resultMsg,
         embeds: [],
-        components: [buildApprovalResultRow('Overwritten')],
+        components: [buildApprovalResultRow('Overwritten', lang)],
       });
 
       await syncApproverDmMessages(
@@ -147,7 +150,7 @@ export function createListAddOverwriteButtonHandler({
         {
           content: resultMsg,
           embeds: [],
-          components: [buildApprovalResultRow('Overwritten')],
+          components: [buildApprovalResultRow('Overwritten', lang)],
         },
         { excludeMessageId: interaction.message.id }
       );
@@ -174,7 +177,7 @@ export function createListAddOverwriteButtonHandler({
           description: 'Could not overwrite the existing entry.',
           fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
         })],
-        components: [buildApprovalResultRow('Failed')],
+        components: [buildApprovalResultRow('Failed', lang)],
       });
     }
   }
