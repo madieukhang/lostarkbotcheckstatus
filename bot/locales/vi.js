@@ -6,6 +6,13 @@ const vi = {
     flag: '🇻🇳',
   },
 
+  common: {
+    pagination: {
+      previous: 'Trước',
+      next: 'Tiếp',
+    },
+  },
+
   commands: {
     help: {
       options: {
@@ -185,6 +192,62 @@ const vi = {
           },
         ],
       },
+    },
+  },
+
+  listView: {
+    labels: {
+      allLists: 'Tất cả list',
+      black: 'Blacklist',
+      white: 'Whitelist',
+      watch: 'Watchlist',
+      trusted: 'Trusted users',
+    },
+    summary: {
+      header: 'Đang hiện **{shown}** / **{total}** {entryLabel} · trang **{page}** / {totalPages}',
+      entries: 'entry',
+      typedEntries: 'entry {label}',
+      footer: 'Refresh bằng /la-list view · dùng nút bên dưới để chuyển trang',
+    },
+    scope: {
+      local: 'Local',
+      localWithGuild: 'Local: {guildName}',
+    },
+    meta: {
+      evidence: 'evidence',
+      alts: 'alts',
+      more: '+{count} nữa',
+    },
+    navigation: {
+      evidencePlaceholder: 'Xem evidence của...',
+      expired: 'Hết hạn · chạy lại /la-list view',
+      noReason: 'Chưa có lý do',
+    },
+    empty: {
+      allTitle: 'Tất cả list đang trống',
+      allDescription: 'Chưa có entry nào trong các list.',
+      typedTitle: 'List {label} đang trống',
+      typedDescription: 'Chưa có entry nào trong {label}.',
+    },
+    trusted: {
+      title: 'Trusted users',
+      footer: '{count} trusted character · không thể thêm vào bất kỳ list nào',
+      emptyTitle: 'Trusted list đang trống',
+      emptyDescription: 'Chưa có trusted user nào.',
+      emptyFooter: 'Dùng /la-list trust action:add để đánh dấu character trusted (chỉ officer).',
+    },
+    evidence: {
+      reason: '📝 Lý do',
+      raid: '🗡️ Raid',
+      list: '📒 List',
+      added: '🕐 Đã thêm',
+      evidence: 'Evidence',
+      unavailable: 'Link ảnh đã hết hạn hoặc không khả dụng. Re-add evidence bằng `/la-list edit`.',
+      logs: '🔗 Logs',
+      viewLogs: 'Xem logs',
+      addedBy: '👤 Người thêm',
+      onlyThisCharacter: '_Chỉ character này đang được track trong entry._',
+      noImage: 'Entry này chưa có ảnh evidence.',
     },
   },
 

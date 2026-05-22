@@ -46,6 +46,7 @@ export function decorateListEntry(entry, listType) {
   const ctx = getListContext(listType);
   return {
     ...entry,
+    _listType: listType,
     _icon: ctx.icon,
     _label: ctx.label,
     _color: ctx.color,
