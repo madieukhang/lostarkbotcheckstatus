@@ -3,9 +3,11 @@
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
+import UserPreference from '../../models/UserPreference.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { handleSyncImagesAction } from './syncImages.js';
 /**
  * Handle /la-remote · Senior-only remote config management
@@ -31,6 +33,7 @@ export async function handleSetupRemoteCommand(interaction) {
 
   await interaction.deferReply({ ephemeral: true });
   await connectDB();
+  const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   // Helper: resolve guild name from ID
   async function resolveGuildName(gid) {
@@ -110,9 +113,9 @@ export async function handleSetupRemoteCommand(interaction) {
     function buildNav(page) {
       if (totalPages <= 1) return [];
       return [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('remote_prev').setLabel('◀ Previous').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+        new ButtonBuilder().setCustomId('remote_prev').setLabel(`◀ ${t('common.pagination.previous', lang)}`).setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
         new ButtonBuilder().setCustomId('remote_page').setLabel(`${page + 1} / ${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId('remote_next').setLabel('Next ▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1),
+        new ButtonBuilder().setCustomId('remote_next').setLabel(`${t('common.pagination.next', lang)} ▶`).setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1),
       )];
     }
 
@@ -334,4 +337,3 @@ export async function handleSetupRemoteCommand(interaction) {
     console.log(`[la-remote] ${targetGuildId} defaultBlacklistScope → ${scopeValue} by ${interaction.user.tag}`);
   }
 }
-
