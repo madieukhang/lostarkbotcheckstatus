@@ -55,6 +55,10 @@ export function updateEmbed(interaction, embedOrEmbeds, extras = {}) {
   });
 }
 
+export function updatePayload(interaction, payload) {
+  return interaction.update(payload);
+}
+
 export function deferReply(interaction, { ephemeral } = {}) {
   if (ephemeral === undefined) return interaction.deferReply();
   return interaction.deferReply({ ephemeral });
