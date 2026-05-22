@@ -137,11 +137,13 @@ export function createViewHandlers({ client }) {
       const guildNameCache = await buildGuildNameCache({ allEntries, client, isOwnerGuild });
       const totalPages = Math.ceil(allEntries.length / ITEMS_PER_PAGE);
       let currentPage = 0;
+      const evidenceUrlCache = new Map();
 
       const pageOptions = () => ({
         allEntries,
         client,
         currentType: type,
+        evidenceUrlCache,
         getListContext,
         guildNameCache,
         isOwnerGuild,

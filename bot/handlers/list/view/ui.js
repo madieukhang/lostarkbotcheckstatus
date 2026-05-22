@@ -53,6 +53,11 @@ function buildEntryRosterLine(entry) {
   return `   ↳ alts: ${linked.join(', ')}${tail}`;
 }
 
+function getEvidenceCacheKey(entry) {
+  if (!entry.imageMessageId || !entry.imageChannelId) return '';
+  return `${entry.imageChannelId}:${entry.imageMessageId}`;
+}
+
 export function buildTrustedListEmbed(entries) {
   const lines = entries.flatMap((entry) => {
     const link = rosterUrl(entry.name);
@@ -83,6 +88,8 @@ export async function buildListPageEmbed(options) {
     isOwnerGuild,
     itemsPerPage,
     page,
+    evidenceUrlCache,
+    refreshImageUrlFn = refreshImageUrl,
     totalPages,
   } = options;
   const start = page * itemsPerPage;
@@ -90,7 +97,12 @@ export async function buildListPageEmbed(options) {
   const freshUrls = await Promise.all(
     pageEntries.map(async (entry) => {
       if (entry.imageMessageId && entry.imageChannelId) {
-        const fresh = await refreshImageUrl(entry.imageMessageId, entry.imageChannelId, client);
+        const cacheKey = getEvidenceCacheKey(entry);
+        if (evidenceUrlCache?.has(cacheKey)) {
+          return evidenceUrlCache.get(cacheKey) || '';
+        }
+        const fresh = await refreshImageUrlFn(entry.imageMessageId, entry.imageChannelId, client);
+        if (fresh) evidenceUrlCache?.set(cacheKey, fresh);
         return fresh || '';
       }
       return entry.imageUrl || '';
