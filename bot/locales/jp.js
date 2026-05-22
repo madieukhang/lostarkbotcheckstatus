@@ -6,6 +6,13 @@ const jp = {
     flag: '🇯🇵',
   },
 
+  common: {
+    pagination: {
+      previous: '前へ',
+      next: '次へ',
+    },
+  },
+
   commands: {
     help: {
       options: {
@@ -185,6 +192,62 @@ const jp = {
           },
         ],
       },
+    },
+  },
+
+  listView: {
+    labels: {
+      allLists: 'すべての list',
+      black: 'Blacklist',
+      white: 'Whitelist',
+      watch: 'Watchlist',
+      trusted: 'Trusted users',
+    },
+    summary: {
+      header: '**{shown}** / **{total}** {entryLabel} を表示中 · page **{page}** / {totalPages}',
+      entries: 'entries',
+      typedEntries: '{label} entries',
+      footer: '/la-list view で更新 · 下のボタンで page 移動',
+    },
+    scope: {
+      local: 'Local',
+      localWithGuild: 'Local: {guildName}',
+    },
+    meta: {
+      evidence: 'evidence',
+      alts: 'alts',
+      more: '+{count} more',
+    },
+    navigation: {
+      evidencePlaceholder: 'evidence を見る...',
+      expired: '期限切れ · /la-list view を再実行',
+      noReason: 'No reason',
+    },
+    empty: {
+      allTitle: 'すべての list は空です',
+      allDescription: 'まだどの list にも entry がありません。',
+      typedTitle: '{label} は空です',
+      typedDescription: '{label} にはまだ entry がありません。',
+    },
+    trusted: {
+      title: 'Trusted users',
+      footer: '{count} trusted characters · どの list にも追加できません',
+      emptyTitle: 'Trusted list は空です',
+      emptyDescription: 'trusted user はまだいません。',
+      emptyFooter: '/la-list trust action:add で character を trusted にできます (officer only)。',
+    },
+    evidence: {
+      reason: '📝 Reason',
+      raid: '🗡️ Raid',
+      list: '📒 List',
+      added: '🕐 Added',
+      evidence: 'Evidence',
+      unavailable: '画像 link が期限切れ、または利用できません。`/la-list edit` で evidence を追加し直してください。',
+      logs: '🔗 Logs',
+      viewLogs: 'View Logs',
+      addedBy: '👤 Added by',
+      onlyThisCharacter: '_この entry ではこの character だけが track されています._',
+      noImage: 'この entry には evidence 画像がありません。',
     },
   },
 

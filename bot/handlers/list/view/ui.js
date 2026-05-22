@@ -11,6 +11,7 @@ import {
 } from '../../../utils/imageRehost.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
+import { t } from '../../../services/i18n/index.js';
 import { renderTrackedAltsField } from '../trackedAltsRender.js';
 
 /**
@@ -19,12 +20,29 @@ import { renderTrackedAltsField } from '../trackedAltsRender.js';
  * dropped silently so entries without a raid / image don't show empty
  * separators.
  */
-function buildEntryMetaLine({ entry, freshUrl }) {
+function capitalizeLabel(value) {
+  const text = String(value || '');
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+}
+
+function getListTypeLabel(type, fallback, lang) {
+  if (type === 'all') return t('listView.labels.allLists', lang);
+  if (!type) return capitalizeLabel(fallback);
+  const translated = t(`listView.labels.${type}`, lang);
+  return translated === `listView.labels.${type}` ? capitalizeLabel(fallback) : translated;
+}
+
+function getEntryLabel(type, fallback, lang) {
+  if (!type || type === 'all') return t('listView.summary.entries', lang);
+  return t('listView.summary.typedEntries', lang, { label: fallback || type });
+}
+
+function buildEntryMetaLine({ entry, freshUrl, lang = 'en' }) {
   const parts = [];
   if (entry.reason) parts.push(entry.reason.length > 80 ? entry.reason.slice(0, 77) + '...' : entry.reason);
   if (entry.raid) parts.push(`\`${entry.raid}\``);
   if (entry.addedAt) parts.push(relativeTime(entry.addedAt));
-  if (freshUrl) parts.push(`[${ICONS.evidence} evidence](${freshUrl})`);
+  if (freshUrl) parts.push(`[${ICONS.evidence} ${t('listView.meta.evidence', lang)}](${freshUrl})`);
   return parts.length > 0 ? `└ ${parts.join(' · ')}` : '';
 }
 
@@ -41,16 +59,16 @@ function buildEntryMetaLine({ entry, freshUrl }) {
  * blow that budget on guilds with deep rosters; the detail view + DM
  * surface the full list when an officer wants the whole picture.
  */
-function buildEntryRosterLine(entry) {
+function buildEntryRosterLine(entry, lang = 'en') {
   const others = (entry.allCharacters || [])
     .filter((n) => String(n).toLowerCase() !== String(entry.name).toLowerCase());
   if (others.length === 0) return '';
   const visible = others.slice(0, 3);
   const linked = visible.map((n) => `[${n}](${rosterUrl(n)})`);
   const tail = others.length > visible.length
-    ? ` *+${others.length - visible.length} more*`
+    ? ` *${t('listView.meta.more', lang, { count: others.length - visible.length })}*`
     : '';
-  return `   ↳ alts: ${linked.join(', ')}${tail}`;
+  return `   ↳ ${t('listView.meta.alts', lang)}: ${linked.join(', ')}${tail}`;
 }
 
 function getEvidenceCacheKey(entry) {
@@ -58,22 +76,22 @@ function getEvidenceCacheKey(entry) {
   return `${entry.imageChannelId}:${entry.imageMessageId}`;
 }
 
-export function buildTrustedListEmbed(entries) {
+export function buildTrustedListEmbed(entries, lang = 'en') {
   const lines = entries.flatMap((entry) => {
     const link = rosterUrl(entry.name);
     const head = `${ICONS.shield} **[${entry.name}](${link})**`;
-    const meta = buildEntryMetaLine({ entry, freshUrl: '' });
+    const meta = buildEntryMetaLine({ entry, freshUrl: '', lang });
     return meta ? [head, meta, ''] : [head, ''];
   });
   // Drop trailing blank line for cleaner footer-adjacent rendering.
   if (lines[lines.length - 1] === '') lines.pop();
 
   return new EmbedBuilder()
-    .setTitle(`${ICONS.shield} Trusted Users`)
+    .setTitle(`${ICONS.shield} ${t('listView.trusted.title', lang)}`)
     .setDescription(lines.join('\n').slice(0, 4096))
     .setColor(COLORS.trustedSoft)
     .setFooter({
-      text: `${entries.length} trusted character${entries.length === 1 ? '' : 's'} · cannot be added to any list`,
+      text: t('listView.trusted.footer', lang, { count: entries.length }),
     })
     .setTimestamp();
 }
@@ -87,6 +105,7 @@ export async function buildListPageEmbed(options) {
     guildNameCache,
     isOwnerGuild,
     itemsPerPage,
+    lang = 'en',
     page,
     evidenceUrlCache,
     refreshImageUrlFn = refreshImageUrl,
@@ -120,15 +139,15 @@ export async function buildListPageEmbed(options) {
     if (entry.scope === 'server') {
       if (isOwnerGuild && entry.guildId) {
         const guildName = guildNameCache.get(entry.guildId) || entry.guildId;
-        scopeTag = ` \`[Local: ${guildName}]\``;
+        scopeTag = ` \`[${t('listView.scope.localWithGuild', lang, { guildName })}]\``;
       } else {
-        scopeTag = ' `[Local]`';
+        scopeTag = ` \`[${t('listView.scope.local', lang)}]\``;
       }
     }
     const link = rosterUrl(entry.name);
     const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${entry._icon} **[${entry.name}](${link})**${scopeTag}`;
-    const meta = buildEntryMetaLine({ entry, freshUrl: freshUrls[index] });
-    const rosterLine = buildEntryRosterLine(entry);
+    const meta = buildEntryMetaLine({ entry, freshUrl: freshUrls[index], lang });
+    const rosterLine = buildEntryRosterLine(entry, lang);
     lines.push(head);
     if (meta) lines.push(meta);
     if (rosterLine) lines.push(rosterLine);
@@ -137,15 +156,19 @@ export async function buildListPageEmbed(options) {
   if (lines[lines.length - 1] === '') lines.pop();
 
   const ctx = currentType === 'all' ? null : getListContext(currentType);
-  const labelCap = ctx
-    ? ctx.label.charAt(0).toUpperCase() + ctx.label.slice(1)
-    : 'All Lists';
+  const labelCap = getListTypeLabel(currentType, ctx?.label, lang);
   const titleIcon = ctx?.icon || ICONS.search;
 
   // Showing-N-of-M header line at the top of the description gives
   // immediate context (filter scope, count, page) without having to
   // scan the footer. Empty line below to separate from the entry block.
-  const headerLine = `Showing **${pageEntries.length}** of **${allEntries.length}** ${ctx ? ctx.label + ' entries' : 'entries'} · page **${page + 1}** / ${totalPages}`;
+  const headerLine = t('listView.summary.header', lang, {
+    shown: pageEntries.length,
+    total: allEntries.length,
+    entryLabel: getEntryLabel(currentType, ctx?.label, lang),
+    page: page + 1,
+    totalPages,
+  });
   const description = [headerLine, '', ...lines].join('\n').slice(0, 4096);
 
   return new EmbedBuilder()
@@ -153,18 +176,18 @@ export async function buildListPageEmbed(options) {
     .setDescription(description)
     .setColor(currentType === 'all' ? COLORS.info : ctx.color)
     .setFooter({
-      text: `${ICONS.refresh} Refresh with /la-list view · navigate with the buttons below`,
+      text: `${ICONS.refresh} ${t('listView.summary.footer', lang)}`,
     })
     .setTimestamp();
 }
 
-export function buildListViewComponents({ allEntries, itemsPerPage, page, totalPages }) {
+export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en', page, totalPages }) {
   const rows = [];
   rows.push(
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('listview_prev')
-        .setLabel('Previous')
+        .setLabel(t('common.pagination.previous', lang))
         .setEmoji(ICONS.prev)
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page === 0),
@@ -175,7 +198,7 @@ export function buildListViewComponents({ allEntries, itemsPerPage, page, totalP
         .setDisabled(true),
       new ButtonBuilder()
         .setCustomId('listview_next')
-        .setLabel('Next')
+        .setLabel(t('common.pagination.next', lang))
         .setEmoji(ICONS.next)
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page >= totalPages - 1)
@@ -191,11 +214,11 @@ export function buildListViewComponents({ allEntries, itemsPerPage, page, totalP
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId('listview_evidence')
-          .setPlaceholder(`${ICONS.evidence} View evidence for...`)
+          .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.evidencePlaceholder', lang)}`)
           .addOptions(
             withImages.slice(0, 25).map((entry) => ({
               label: entry.name,
-              description: (entry.reason || 'No reason').slice(0, 100),
+              description: (entry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),
               value: String(start + pageEntries.indexOf(entry)),
               emoji: entry._icon,
             }))
@@ -226,17 +249,21 @@ export function buildListViewComponents({ allEntries, itemsPerPage, page, totalP
  * names that resolve to this entry without re-running /la-list view
  * or hitting bible directly.
  */
-export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false } = {}) {
+export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false, lang = 'en' } = {}) {
   const link = rosterUrl(entry.name);
   const fields = [
-    { name: '📝 Reason', value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
+    { name: t('listView.evidence.reason', lang), value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
   ];
 
   const inlineMeta = [];
-  if (entry.raid) inlineMeta.push({ name: '🗡️ Raid', value: `\`${entry.raid}\``, inline: true });
-  inlineMeta.push({ name: '📒 List', value: entry._label, inline: true });
+  if (entry.raid) inlineMeta.push({ name: t('listView.evidence.raid', lang), value: `\`${entry.raid}\``, inline: true });
+  inlineMeta.push({
+    name: t('listView.evidence.list', lang),
+    value: getListTypeLabel(entry._listType, entry._label, lang),
+    inline: true,
+  });
   if (entry.addedAt) {
-    inlineMeta.push({ name: '🕐 Added', value: relativeTime(entry.addedAt), inline: true });
+    inlineMeta.push({ name: t('listView.evidence.added', lang), value: relativeTime(entry.addedAt), inline: true });
   }
   fields.push(...inlineMeta);
 
@@ -252,7 +279,7 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false }
   const altsField = renderTrackedAltsField({
     names: entry.allCharacters,
     primaryName: entry.name,
-    emptySentinel: '_Only this character is tracked on this entry._',
+    emptySentinel: t('listView.evidence.onlyThisCharacter', lang),
   });
   if (altsField) fields.push(altsField);
 
@@ -267,40 +294,44 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false }
     embed.setImage(displayUrl);
   } else {
     embed.addFields({
-      name: `${ICONS.warn} Evidence`,
-      value: 'Image link expired or unavailable. Re-add evidence via `/la-list edit`.',
+      name: `${ICONS.warn} ${t('listView.evidence.evidence', lang)}`,
+      value: t('listView.evidence.unavailable', lang),
       inline: false,
     });
   }
 
   if (entry.logsUrl) {
-    embed.addFields({ name: '🔗 Logs', value: `[View Logs](${entry.logsUrl})`, inline: false });
+    embed.addFields({
+      name: t('listView.evidence.logs', lang),
+      value: `[${t('listView.evidence.viewLogs', lang)}](${entry.logsUrl})`,
+      inline: false,
+    });
   }
 
   if (includeAddedBy && entry.addedByDisplayName) {
-    embed.addFields({ name: '👤 Added by', value: entry.addedByDisplayName, inline: true });
+    embed.addFields({ name: t('listView.evidence.addedBy', lang), value: entry.addedByDisplayName, inline: true });
   }
 
   return embed;
 }
 
-export function buildExpiredComponents() {
+export function buildExpiredComponents(lang = 'en') {
   return [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('listview_prev_disabled')
-        .setLabel('Previous')
+        .setLabel(t('common.pagination.previous', lang))
         .setEmoji(ICONS.prev)
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(true),
       new ButtonBuilder()
         .setCustomId('listview_expired')
-        .setLabel('Session expired · re-run /la-list view')
+        .setLabel(t('listView.navigation.expired', lang))
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(true),
       new ButtonBuilder()
         .setCustomId('listview_next_disabled')
-        .setLabel('Next')
+        .setLabel(t('common.pagination.next', lang))
         .setEmoji(ICONS.next)
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(true)

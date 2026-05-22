@@ -5,9 +5,11 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import TrustedUser from '../../models/TrustedUser.js';
+import UserPreference from '../../models/UserPreference.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import { getClassName, resolveClassId } from '../../models/Class.js';
 import { fetchNameSuggestions } from '../../services/roster/index.js';
+import { getUserLanguage } from '../../services/i18n/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 import {
   attachSearchEvidenceCollector,
@@ -75,6 +77,7 @@ export async function handleSearchCommand(interaction) {
     }
 
     await connectDB();
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     const searchGuildId = interaction.guild?.id || '';
     const sliced = suggestions.slice(0, 15);
@@ -119,10 +122,10 @@ export async function handleSearchCommand(interaction) {
 
     // Build evidence dropdown for flagged entries with images (rehosted OR legacy)
     const flaggedWithImages = getFlaggedResultsWithImages(results);
-    const components = buildSearchEvidenceComponents(flaggedWithImages);
+    const components = buildSearchEvidenceComponents(flaggedWithImages, lang);
 
     await interaction.editReply({ embeds: [embed], components });
-    await attachSearchEvidenceCollector({ interaction, results, flaggedWithImages });
+    await attachSearchEvidenceCollector({ interaction, results, flaggedWithImages, lang });
   } catch (err) {
     console.error('[search] ❌ Search failed:', err.message);
     await interaction.editReply({

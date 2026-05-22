@@ -17,6 +17,7 @@ import config from '../../../config.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import TrustedUser from '../../../models/TrustedUser.js';
+import UserPreference from '../../../models/UserPreference.js';
 import { getClassName } from '../../../models/Class.js';
 import {
   extractNamesFromImage,
@@ -34,6 +35,7 @@ import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import { ICONS } from '../../../utils/ui.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import {
   buildMultiaddTemplate,
@@ -78,7 +80,7 @@ function pickListEntryWithEvidence(result) {
  * select handler resolves unambiguously across types and scopes (mirrors
  * /la-evidence's encoding).
  */
-export function buildAutoCheckEvidenceRow(results) {
+export function buildAutoCheckEvidenceRow(results, lang = 'en') {
   const candidates = [];
   for (const result of results) {
     const picked = pickListEntryWithEvidence(result);
@@ -94,13 +96,13 @@ export function buildAutoCheckEvidenceRow(results) {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('autocheck_evidence')
-      .setPlaceholder(`${ICONS.evidence} View evidence for...`)
+      .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.evidencePlaceholder', lang)}`)
       .addOptions(
         candidates.slice(0, 25).map(({ result, entry, listType }) => {
           const ctx = getListContext(listType);
           return {
             label: result.name,
-            description: (entry.reason || 'No reason').slice(0, 100),
+            description: (entry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),
             value: `${listType}:${entry._id}`.slice(0, 100),
             emoji: ctx.icon,
           };
@@ -123,6 +125,7 @@ export function createAutoCheckEvidenceHandler({ client }) {
     }
 
     await connectDB();
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     const ctx = getListContext(parsed.listType);
     const entry = await ctx.model.findOne({ _id: parsed.id }).lean();
 
@@ -140,7 +143,7 @@ export function createAutoCheckEvidenceHandler({ client }) {
 
     if (!entry.imageMessageId && !entry.imageUrl) {
       await interaction.reply({
-        content: 'No evidence image for this entry.',
+        content: t('listView.evidence.noImage', lang),
         ephemeral: true,
       });
       return;
@@ -153,7 +156,7 @@ export function createAutoCheckEvidenceHandler({ client }) {
       || config.seniorApproverIds.includes(interaction.user.id);
 
     await interaction.reply({
-      embeds: [buildEvidenceEmbed(decorated, displayUrl, { includeAddedBy: isOfficer })],
+      embeds: [buildEvidenceEmbed(decorated, displayUrl, { includeAddedBy: isOfficer, lang })],
       ephemeral: true,
     });
   };
@@ -204,6 +207,7 @@ export function createCheckHandlers({ client }) {
 
     try {
       const results = await checkNamesAgainstLists(limitedNames, { guildId: interaction.guild?.id });
+      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       const formattedLines = formatCheckResults(results);
 
       const { embed } = buildListCheckEmbed({
@@ -219,7 +223,7 @@ export function createCheckHandlers({ client }) {
       // Surfaces every flagged row whose list entry has an evidence
       // image so officers can audit without re-running /la-list view.
       const components = [];
-      const evidenceRow = buildAutoCheckEvidenceRow(results);
+      const evidenceRow = buildAutoCheckEvidenceRow(results, lang);
       if (evidenceRow) components.push(evidenceRow);
 
       await interaction.editReply({ content: '', embeds: [embed], components });

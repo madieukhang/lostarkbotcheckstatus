@@ -4,9 +4,10 @@ import {
   ComponentType,
 } from 'discord.js';
 
-import { COLORS } from '../../utils/ui.js';
+import { COLORS, ICONS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
+import { t } from '../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../list/view/ui.js';
 
 /** Detect whether an entry has any image evidence (rehosted OR legacy). */
@@ -26,12 +27,12 @@ function getEvidenceStyle(result, entry) {
   const isWhiteEvidence = entry === result?.white;
 
   if (isBlackEvidence) {
-    return { emoji: '⛔', label: 'blacklist', color: COLORS.danger };
+    return { emoji: '⛔', label: 'blacklist', color: COLORS.danger, type: 'black' };
   }
   if (isWhiteEvidence) {
-    return { emoji: '✅', label: 'whitelist', color: COLORS.success };
+    return { emoji: '✅', label: 'whitelist', color: COLORS.success, type: 'white' };
   }
-  return { emoji: '⚠️', label: 'watchlist', color: COLORS.warning };
+  return { emoji: '⚠️', label: 'watchlist', color: COLORS.warning, type: 'watch' };
 }
 
 export function getFlaggedResultsWithImages(results) {
@@ -40,21 +41,21 @@ export function getFlaggedResultsWithImages(results) {
     .filter(({ result }) => pickEvidenceEntry(result));
 }
 
-export function buildSearchEvidenceComponents(flaggedWithImages) {
+export function buildSearchEvidenceComponents(flaggedWithImages, lang = 'en') {
   if (flaggedWithImages.length === 0) return [];
 
   return [
     new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId('search_evidence')
-        .setPlaceholder('📎 View evidence for...')
+        .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.evidencePlaceholder', lang)}`)
         .addOptions(
           flaggedWithImages.slice(0, 25).map(({ result, index }) => {
             const evidenceEntry = pickEvidenceEntry(result);
             const style = getEvidenceStyle(result, evidenceEntry);
             return {
               label: result.name,
-              description: (evidenceEntry.reason || 'No reason').slice(0, 100),
+              description: (evidenceEntry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),
               value: String(index),
               emoji: style.emoji,
             };
@@ -64,7 +65,7 @@ export function buildSearchEvidenceComponents(flaggedWithImages) {
   ];
 }
 
-export async function attachSearchEvidenceCollector({ interaction, results, flaggedWithImages }) {
+export async function attachSearchEvidenceCollector({ interaction, results, flaggedWithImages, lang = 'en' }) {
   if (flaggedWithImages.length === 0) return;
 
   const reply = await interaction.fetchReply();
@@ -91,7 +92,7 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
     const entry = pickEvidenceEntry(result);
 
     if (!entryHasImage(entry)) {
-      await sel.reply({ content: 'No evidence image for this entry.', ephemeral: true });
+      await sel.reply({ content: t('listView.evidence.noImage', lang), ephemeral: true });
       return;
     }
 
@@ -121,11 +122,12 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
     const decoratedEntry = {
       ...entry,
       name: result.name,
+      _listType: style.type,
       _icon: style.emoji,
       _label: style.label,
       _color: style.color,
     };
-    const evidenceEmbed = buildEvidenceEmbed(decoratedEntry, displayUrl);
+    const evidenceEmbed = buildEvidenceEmbed(decoratedEntry, displayUrl, { lang });
     await sel.reply({ embeds: [evidenceEmbed], ephemeral: true });
   });
 

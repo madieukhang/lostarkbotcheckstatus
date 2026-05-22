@@ -1,8 +1,10 @@
 import config from '../../../config.js';
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
+import UserPreference from '../../../models/UserPreference.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getListContext } from '../helpers.js';
 import {
   buildEvidenceEmbed,
@@ -96,6 +98,7 @@ export function createViewHandlers({ client }) {
 
     try {
       await connectDB();
+      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
       if (type === 'trusted') {
         const trustedEntries = await TrustedUser.find({}).sort({ addedAt: -1 }).lean();
@@ -104,14 +107,14 @@ export function createViewHandlers({ client }) {
             embeds: [buildAlertEmbed({
               severity: AlertSeverity.INFO,
               titleIcon: '🛡️',
-              title: 'Trusted List Empty',
-              description: 'No trusted users yet.',
-              footer: 'Use /la-list trust action:add to mark a character trusted (officer-only).',
+              title: t('listView.trusted.emptyTitle', lang),
+              description: t('listView.trusted.emptyDescription', lang),
+              footer: t('listView.trusted.emptyFooter', lang),
             })],
           });
           return;
         }
-        await interaction.editReply({ embeds: [buildTrustedListEmbed(trustedEntries)] });
+        await interaction.editReply({ embeds: [buildTrustedListEmbed(trustedEntries, lang)] });
         return;
       }
 
@@ -125,10 +128,12 @@ export function createViewHandlers({ client }) {
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.INFO,
             titleIcon: ctx?.icon,
-            title: type === 'all' ? 'All Lists Empty' : `${ctx.label.charAt(0).toUpperCase() + ctx.label.slice(1)} Empty`,
+            title: type === 'all'
+              ? t('listView.empty.allTitle', lang)
+              : t('listView.empty.typedTitle', lang, { label: ctx.label }),
             description: type === 'all'
-              ? 'No entries in any list yet.'
-              : `No entries in the ${ctx.label} yet.`,
+              ? t('listView.empty.allDescription', lang)
+              : t('listView.empty.typedDescription', lang, { label: ctx.label }),
           })],
         });
         return;
@@ -148,12 +153,14 @@ export function createViewHandlers({ client }) {
         guildNameCache,
         isOwnerGuild,
         itemsPerPage: ITEMS_PER_PAGE,
+        lang,
         page: currentPage,
         totalPages,
       });
       const componentOptions = () => ({
         allEntries,
         itemsPerPage: ITEMS_PER_PAGE,
+        lang,
         page: currentPage,
         totalPages,
       });
@@ -195,7 +202,10 @@ export function createViewHandlers({ client }) {
           const index = parseInt(componentInteraction.values[0], 10);
           const entry = allEntries[index];
           if (!entry?.imageMessageId && !entry?.imageUrl) {
-            await componentInteraction.reply({ content: 'No evidence image for this entry.', ephemeral: true });
+            await componentInteraction.reply({
+              content: t('listView.evidence.noImage', lang),
+              ephemeral: true,
+            });
             return;
           }
 
@@ -203,7 +213,7 @@ export function createViewHandlers({ client }) {
           const isOfficer = config.officerApproverIds.includes(componentInteraction.user.id)
             || config.seniorApproverIds.includes(componentInteraction.user.id);
           await componentInteraction.reply({
-            embeds: [buildEvidenceEmbed(entry, displayUrl, { includeAddedBy: isOfficer })],
+            embeds: [buildEvidenceEmbed(entry, displayUrl, { includeAddedBy: isOfficer, lang })],
             ephemeral: true,
           });
         }
@@ -211,7 +221,7 @@ export function createViewHandlers({ client }) {
 
       collector.on('end', async () => {
         await interaction.editReply({
-          components: buildExpiredComponents(),
+          components: buildExpiredComponents(lang),
         }).catch(() => {});
       });
     } catch (err) {

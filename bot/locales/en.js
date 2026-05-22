@@ -6,6 +6,13 @@ const en = {
     flag: '🇬🇧',
   },
 
+  common: {
+    pagination: {
+      previous: 'Previous',
+      next: 'Next',
+    },
+  },
+
   commands: {
     status: {
       description: 'Show live server status',
@@ -362,6 +369,62 @@ const en = {
           },
         ],
       },
+    },
+  },
+
+  listView: {
+    labels: {
+      allLists: 'All Lists',
+      black: 'Blacklist',
+      white: 'Whitelist',
+      watch: 'Watchlist',
+      trusted: 'Trusted Users',
+    },
+    summary: {
+      header: 'Showing **{shown}** of **{total}** {entryLabel} · page **{page}** / {totalPages}',
+      entries: 'entries',
+      typedEntries: '{label} entries',
+      footer: 'Refresh with /la-list view · navigate with the buttons below',
+    },
+    scope: {
+      local: 'Local',
+      localWithGuild: 'Local: {guildName}',
+    },
+    meta: {
+      evidence: 'evidence',
+      alts: 'alts',
+      more: '+{count} more',
+    },
+    navigation: {
+      evidencePlaceholder: 'View evidence for...',
+      expired: 'Session expired · re-run /la-list view',
+      noReason: 'No reason',
+    },
+    empty: {
+      allTitle: 'All Lists Empty',
+      allDescription: 'No entries in any list yet.',
+      typedTitle: '{label} Empty',
+      typedDescription: 'No entries in the {label} yet.',
+    },
+    trusted: {
+      title: 'Trusted Users',
+      footer: '{count} trusted characters · cannot be added to any list',
+      emptyTitle: 'Trusted List Empty',
+      emptyDescription: 'No trusted users yet.',
+      emptyFooter: 'Use /la-list trust action:add to mark a character trusted (officer-only).',
+    },
+    evidence: {
+      reason: '📝 Reason',
+      raid: '🗡️ Raid',
+      list: '📒 List',
+      added: '🕐 Added',
+      evidence: 'Evidence',
+      unavailable: 'Image link expired or unavailable. Re-add evidence via `/la-list edit`.',
+      logs: '🔗 Logs',
+      viewLogs: 'View Logs',
+      addedBy: '👤 Added by',
+      onlyThisCharacter: '_Only this character is tracked on this entry._',
+      noImage: 'No evidence image for this entry.',
     },
   },
 
