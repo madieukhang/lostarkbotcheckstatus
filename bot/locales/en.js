@@ -3,7 +3,7 @@ const en = {
     code: 'en',
     label: 'English',
     nativeShort: 'English',
-    flag: 'GB',
+    flag: '🇬🇧',
   },
 
   commands: {
@@ -111,8 +111,11 @@ const en = {
     help: {
       description: 'Show all available Lost Ark bot commands',
       options: {
-        lang: 'Language (currently English only)',
+        lang: 'Language (default: your saved preference)',
       },
+    },
+    languageSwitch: {
+      description: 'Switch the language LoaLogs uses for your responses',
     },
     setup: {
       description: 'Configure bot channels for this server',
@@ -189,13 +192,14 @@ const en = {
   help: {
     overview: {
       title: 'Lost Ark Check - Help (EN)',
-      footer: 'Language support is English-only for now. Pick a dropdown option for details.',
+      footer: 'Switch language: /la-language-switch (persistent) - /la-help lang:vi (one-off)',
       lines: [
         '**Available Commands:**',
         'All bot commands use the `/la-` prefix so Discord groups them under `/la` autocomplete.',
         '',
         '`/la-status` - Show live server status for all monitored servers',
         '`/la-reset` - Reset the stored status state',
+        '`/la-language-switch` - Switch LoaLogs language for your account',
         '',
         '`/la-roster name [deep] [deep_limit]` - Fetch roster + progression tracking + list check. `deep:true` runs Stronghold alt scan (officers/seniors only).',
         '`/la-search name [min_ilvl] [max_ilvl] [class]` - Search similar names with filters',
@@ -359,6 +363,23 @@ const en = {
         ],
       },
     },
+  },
+
+  languageSwitch: {
+    title: '🌐 Switch LoaLogs language',
+    description: 'Pick the language you want LoaLogs to use. Supported responses will display in that language going forward.',
+    currentLine: 'Current: **{flag} {label}**',
+    placeholder: '🌐 Pick a language...',
+    options: {
+      en: 'English (default, cross-server)',
+      vi: 'Tiếng Việt (thân thiện hơn)',
+      jp: '日本語 (Senko-flavored)',
+    },
+    successTitle: '🌐 Language updated',
+    successDescription: 'LoaLogs will speak **{flag} {label}** with you from now on.',
+    unchangedTitle: '🌐 Language unchanged',
+    unchangedDescription: "You're already using **{flag} {label}**.",
+    footer: 'Run /la-language-switch any time to switch back',
   },
 };
 

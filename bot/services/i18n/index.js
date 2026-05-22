@@ -6,6 +6,7 @@ import {
 
 const SUPPORTED_CODES = new Set(SUPPORTED_LANGUAGES.map((entry) => entry.code));
 const KNOWN_LOCALE_CODES = new Set(Object.keys(TRANSLATIONS));
+const userLanguageCache = new Map();
 const guildLanguageCache = new Map();
 
 export function normalizeLanguage(value) {
@@ -57,6 +58,49 @@ export function t(key, lang = DEFAULT_LANGUAGE, vars = null) {
     if (fallback != null) return applyVars(fallback, vars);
   }
   return key;
+}
+
+function buildUserPreferenceSet(user, language) {
+  const $set = { language };
+  if (user?.username) $set.discordUsername = user.username;
+  if (user?.globalName) $set.discordGlobalName = user.globalName;
+  if (user?.displayName) $set.discordDisplayName = user.displayName;
+  return $set;
+}
+
+export async function getUserLanguage(discordId, { UserPreferenceModel } = {}) {
+  if (!discordId) return DEFAULT_LANGUAGE;
+  if (userLanguageCache.has(discordId)) return userLanguageCache.get(discordId);
+  if (!UserPreferenceModel) return DEFAULT_LANGUAGE;
+
+  try {
+    const doc = await UserPreferenceModel.findOne({ discordId }, { language: 1 }).lean();
+    const lang = normalizeLanguage(doc?.language);
+    userLanguageCache.set(discordId, lang);
+    return lang;
+  } catch {
+    return DEFAULT_LANGUAGE;
+  }
+}
+
+export async function setUserLanguage(discordId, lang, { UserPreferenceModel, user } = {}) {
+  const code = normalizeLanguage(lang);
+  if (!discordId) return code;
+
+  if (UserPreferenceModel) {
+    await UserPreferenceModel.updateOne(
+      { discordId },
+      { $set: buildUserPreferenceSet(user, code), $setOnInsert: { discordId } },
+      { upsert: true }
+    );
+  }
+
+  userLanguageCache.set(discordId, code);
+  return code;
+}
+
+export function clearUserLanguageCache() {
+  userLanguageCache.clear();
 }
 
 export async function getGuildLanguage(guildId, { GuildConfigModel } = {}) {

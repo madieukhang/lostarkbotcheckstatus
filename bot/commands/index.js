@@ -389,6 +389,13 @@ function helpCommand(name) {
     );
 }
 
+function languageSwitchCommand(name) {
+  return new SlashCommandBuilder()
+    .setName(name)
+    .setDescription(commandText('languageSwitch.description'))
+    .setDMPermission(false);
+}
+
 function setupCommand(name) {
   return new SlashCommandBuilder()
     .setName(name)
@@ -502,6 +509,7 @@ const PUBLIC_COMMAND_DEFS = [
   ['la-evidence', evidenceCommand],
   ['la-check', listCheckCommand],
   ['la-help', helpCommand],
+  ['la-language-switch', languageSwitchCommand],
   ['la-setup', setupCommand],
 ];
 

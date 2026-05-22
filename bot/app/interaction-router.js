@@ -11,6 +11,11 @@ import { handleSearchCommand } from '../handlers/search/index.js';
 import { handleSetupCommand, handleSetupRemoteCommand } from '../handlers/setup/index.js';
 import { handleStatsCommand } from '../handlers/meta/stats.js';
 import { handleHelpCommand, handleHelpSelect } from '../handlers/meta/help.js';
+import {
+  handleLanguageSwitchCommand,
+  handleLanguageSwitchSelect,
+  LANGUAGE_SWITCH_SELECT_CUSTOM_ID,
+} from '../handlers/meta/languageSwitch.js';
 import { getClassAutocompleteChoices } from '../models/Class.js';
 
 function hasPrefix(value, prefixes) {
@@ -197,6 +202,11 @@ export function createInteractionRouter({ client }) {
       return;
     }
 
+    if (interaction.isStringSelectMenu() && customId === LANGUAGE_SWITCH_SELECT_CUSTOM_ID) {
+      await handleButton(interaction, '[la-language-switch] Select error:', handleLanguageSwitchSelect);
+      return;
+    }
+
     if (interaction.isModalSubmit() && customId.startsWith('quickadd_modal:')) {
       try {
         await listHandlers.handleQuickAddModal(interaction);
@@ -254,6 +264,8 @@ export function createInteractionRouter({ client }) {
         await handleSetupRemoteCommand(interaction);
       } else if (commandName === 'la-help') {
         await handleHelpCommand(interaction);
+      } else if (commandName === 'la-language-switch') {
+        await handleLanguageSwitchCommand(interaction);
       }
     } catch (err) {
       if (isTransientInteractionError(err)) {
