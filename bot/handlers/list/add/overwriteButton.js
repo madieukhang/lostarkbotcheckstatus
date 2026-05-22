@@ -4,6 +4,7 @@ import UserPreference from '../../../models/UserPreference.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage } from '../../../services/i18n/index.js';
 import {
   getListContext,
@@ -24,13 +25,10 @@ export function createListAddOverwriteButtonHandler({
     const payload = await PendingApproval.findOneAndDelete({ requestId }).lean();
 
     if (!payload) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Request Expired',
-          description: 'This approval request was already processed or has expired.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Request Expired',
+        description: 'This approval request was already processed or has expired.',
       });
       return;
     }
@@ -39,7 +37,7 @@ export function createListAddOverwriteButtonHandler({
 
     if (!isOverwrite) {
       // Keep existing · just clean up
-      await interaction.editReply({
+      await editPayload(interaction, {
         content: `✅ Kept existing entry. New request for **${payload.name}** discarded.`,
         embeds: [],
         components: [buildApprovalResultRow('Kept Existing', lang)],
@@ -84,7 +82,7 @@ export function createListAddOverwriteButtonHandler({
       }
 
       if (!dupeEntry) {
-        await interaction.editReply({
+        await editPayload(interaction, {
           content: '',
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
@@ -139,7 +137,7 @@ export function createListAddOverwriteButtonHandler({
       console.log(`[list] Overwrite: updated ${payload.type} entry for ${dupeEntry.name} in-place`);
 
       const resultMsg = `✅ Overwritten by **${interaction.user.tag}**. Entry updated.`;
-      await interaction.editReply({
+      await editPayload(interaction, {
         content: resultMsg,
         embeds: [],
         components: [buildApprovalResultRow('Overwritten', lang)],
@@ -169,7 +167,7 @@ export function createListAddOverwriteButtonHandler({
       await notifyRequesterAboutDecision(payload, { ok: true, content: resultMsg }, false);
     } catch (err) {
       console.error('[list] Overwrite failed:', err.message);
-      await interaction.editReply({
+      await editPayload(interaction, {
         content: '',
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.WARNING,
