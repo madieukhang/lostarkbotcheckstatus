@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   deferEphemeralReply,
   deferReply,
+  deferUpdate,
   editAlert,
   editComponents,
   editContent,
@@ -122,6 +123,15 @@ test('defer helpers centralize public and ephemeral defer payloads', async () =>
   await deferEphemeralReply(interaction);
 
   assert.deepEqual(calls, [undefined, { ephemeral: true }]);
+});
+
+test('deferUpdate routes through the interaction update defer API', async () => {
+  const calls = [];
+  const interaction = { deferUpdate: async () => calls.push('deferUpdate') };
+
+  await deferUpdate(interaction);
+
+  assert.deepEqual(calls, ['deferUpdate']);
 });
 
 test('alert helpers route through the shared alert embed builder', async () => {

@@ -43,6 +43,16 @@ import {
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../../utils/scanPermissions.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import {
+  deferReply,
+  deferUpdate,
+  editAlert,
+  editEmbed,
+  replyAlert,
+  replyContent,
+  updateAlert,
+  updatePayload,
+} from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   buildScanResultEmbed,
@@ -99,14 +109,11 @@ export function createEnrichHandlers({ client, services }) {
   }
 
   async function replyScanLimit(interaction, active) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        title: 'Scan Already Running',
-        description: 'You already have a Stronghold scan running. Wait for it to finish or press **Stop scan** on the active card before starting another.',
-        footer: active?.label ? `Active: ${active.label}` : undefined,
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      title: 'Scan Already Running',
+      description: 'You already have a Stronghold scan running. Wait for it to finish or press **Stop scan** on the active card before starting another.',
+      footer: active?.label ? `Active: ${active.label}` : undefined,
     });
   }
 
@@ -524,16 +531,13 @@ export function createEnrichHandlers({ client, services }) {
   // the ephemeral reply lands cleanly.
   async function denyIfNotOfficer(interaction, commandLabel) {
     if (isPrivilegedStrongholdScanUser(interaction.user.id)) return false;
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        title: 'Officers / Seniors only',
-        description:
-          `\`${commandLabel}\` runs a long Stronghold scan that depends on the bot owner's ` +
-          `residential-IP worker. The command is restricted to officers and seniors so a regular ` +
-          `user does not see a confusing error when the worker is offline. Ask an officer to run it for you.`,
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      title: 'Officers / Seniors only',
+      description:
+        `\`${commandLabel}\` runs a long Stronghold scan that depends on the bot owner's ` +
+        `residential-IP worker. The command is restricted to officers and seniors so a regular ` +
+        `user does not see a confusing error when the worker is offline. Ask an officer to run it for you.`,
     });
     return true;
   }
@@ -547,10 +551,7 @@ export function createEnrichHandlers({ client, services }) {
 
     const cooldownWait = getCooldownWaitSeconds(name);
     if (cooldownWait > 0) {
-      await interaction.reply({
-        content: `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`,
-        ephemeral: true,
-      });
+      await replyContent(interaction, `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`);
       return;
     }
 
@@ -563,7 +564,7 @@ export function createEnrichHandlers({ client, services }) {
     markCooldown(name);
 
     try {
-      await interaction.deferReply();
+      await deferReply(interaction);
       await runEnrichFlow(interaction, { name, cap });
     } finally {
       scanReservation.release();
@@ -582,13 +583,10 @@ export function createEnrichHandlers({ client, services }) {
     const encoded = parts.slice(2).join(':');
     const rawName = decodeURIComponent(encoded || '').trim();
     if (!rawName) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Invalid Button',
-          description: 'Could not read the entry name from the button. Use `/la-list enrich` directly.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Invalid Button',
+        description: 'Could not read the entry name from the button. Use `/la-list enrich` directly.',
       });
       return;
     }
@@ -598,10 +596,7 @@ export function createEnrichHandlers({ client, services }) {
 
     const cooldownWait = getCooldownWaitSeconds(name);
     if (cooldownWait > 0) {
-      await interaction.reply({
-        content: `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`,
-        ephemeral: true,
-      });
+      await replyContent(interaction, `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`);
       return;
     }
 
@@ -614,7 +609,7 @@ export function createEnrichHandlers({ client, services }) {
     markCooldown(name);
 
     try {
-      await interaction.deferReply();
+      await deferReply(interaction);
       await runEnrichFlow(interaction, { name, cap });
     } finally {
       scanReservation.release();
@@ -631,25 +626,19 @@ export function createEnrichHandlers({ client, services }) {
     const sessionId = interaction.customId.split(':')[2];
     const session = getEnrichSession(sessionId);
     if (!session) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Session Expired',
-          description: 'This enrich preview is older than the 5-minute session window.',
-          footer: 'Re-run /la-list enrich to start a fresh scan.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Session Expired',
+        description: 'This enrich preview is older than the 5-minute session window.',
+        footer: 'Re-run /la-list enrich to start a fresh scan.',
       });
       return;
     }
     if (session.callerId !== interaction.user.id) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Not Your Session',
-          description: 'Only the user who started this enrich session can continue it.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Not Your Session',
+        description: 'Only the user who started this enrich session can continue it.',
       });
       return;
     }
@@ -657,10 +646,7 @@ export function createEnrichHandlers({ client, services }) {
 
     const cooldownWait = getCooldownWaitSeconds(session.entryName);
     if (cooldownWait > 0) {
-      await interaction.reply({
-        content: `⏳ Please wait ${cooldownWait}s before continuing the scan for **${session.entryName}**.`,
-        ephemeral: true,
-      });
+      await replyContent(interaction, `⏳ Please wait ${cooldownWait}s before continuing the scan for **${session.entryName}**.`);
       return;
     }
 
@@ -673,7 +659,7 @@ export function createEnrichHandlers({ client, services }) {
     markCooldown(session.entryName);
 
     try {
-      await interaction.deferUpdate();
+      await deferUpdate(interaction);
       await runEnrichFlow(interaction, {
         name: session.entryName,
         cap: session.cap,
@@ -688,57 +674,45 @@ export function createEnrichHandlers({ client, services }) {
     const sessionId = interaction.customId.split(':')[2];
     const session = getEnrichSession(sessionId);
     if (!session) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Session Expired',
-          description: 'This enrich preview is older than the 5-minute session window.',
-          footer: 'Re-run /la-list enrich to start a fresh scan.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Session Expired',
+        description: 'This enrich preview is older than the 5-minute session window.',
+        footer: 'Re-run /la-list enrich to start a fresh scan.',
       });
       return;
     }
     if (session.callerId !== interaction.user.id) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Not Your Session',
-          description: 'Only the user who started this enrich session can confirm it.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Not Your Session',
+        description: 'Only the user who started this enrich session can confirm it.',
       });
       return;
     }
 
-    await interaction.deferUpdate();
+    await deferUpdate(interaction);
 
     const Model = MODELS_BY_TYPE[session.type];
     if (!Model) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Internal Error',
-          description: `Unknown list type "${session.type}".`,
-          footer: 'Report this to an officer; the entry was not modified.',
-        })],
-        components: [],
-      });
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Internal Error',
+        description: `Unknown list type "${session.type}".`,
+        footer: 'Report this to an officer; the entry was not modified.',
+      }, { components: [] });
       return;
     }
 
     await connectDB();
     const altNames = (session.newAlts || []).map((a) => a.name);
     if (altNames.length === 0) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Nothing to Save',
-          description: 'No new alts were discovered, so the entry was not modified.',
-          footer: 'Re-run /la-list enrich if bible has cooled down and you want a fresh pass.',
-        })],
-        components: [],
-      });
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Nothing to Save',
+        description: 'No new alts were discovered, so the entry was not modified.',
+        footer: 'Re-run /la-list enrich if bible has cooled down and you want a fresh pass.',
+      }, { components: [] });
       clearEnrichSession(sessionId);
       return;
     }
@@ -756,9 +730,8 @@ export function createEnrichHandlers({ client, services }) {
 
     clearEnrichSession(sessionId);
 
-    await interaction.editReply({
+    await editEmbed(interaction, buildEnrichSuccessEmbed(session, updateResult), {
       content: '',
-      embeds: [buildEnrichSuccessEmbed(session, updateResult)],
       components: [],
     });
   }
@@ -767,32 +740,25 @@ export function createEnrichHandlers({ client, services }) {
     const sessionId = interaction.customId.split(':')[2];
     const session = getEnrichSession(sessionId);
     if (!session) {
-      await interaction.update({
-        content: '',
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Session Expired',
-          description: 'This enrich preview is older than the 5-minute session window.',
-        })],
-        components: [],
-      });
+      await updateAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Session Expired',
+        description: 'This enrich preview is older than the 5-minute session window.',
+      }, { content: '', components: [] });
       return;
     }
     if (session.callerId !== interaction.user.id) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Not Your Session',
-          description: 'Only the user who started this enrich session can cancel it.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Not Your Session',
+        description: 'Only the user who started this enrich session can cancel it.',
       });
       return;
     }
 
     clearEnrichSession(sessionId);
 
-    await interaction.update({
+    await updatePayload(interaction, {
       content: 'Cancelled · no changes made to the entry.',
       embeds: [],
       components: [],
@@ -808,33 +774,24 @@ export function createEnrichHandlers({ client, services }) {
     const sessionId = interaction.customId.split(':')[1];
     const scan = getScan(sessionId);
     if (!scan) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Scan Already Finished',
-          description: 'This scan has already completed or was cancelled. Re-run the command if you want a fresh scan.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Scan Already Finished',
+        description: 'This scan has already completed or was cancelled. Re-run the command if you want a fresh scan.',
       });
       return;
     }
     if (!isOfficerOrSenior(interaction.user.id) && scan.callerId !== interaction.user.id) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Not Authorised',
-          description: 'Only the user who started this scan (or an officer/senior) can stop it.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Not Authorised',
+        description: 'Only the user who started this scan (or an officer/senior) can stop it.',
       });
       return;
     }
 
     if (scan.cancelFlag.cancelled) {
-      await interaction.reply({
-        content: 'Already stopping...',
-        ephemeral: true,
-      });
+      await replyContent(interaction, 'Already stopping...');
       return;
     }
 
@@ -843,14 +800,11 @@ export function createEnrichHandlers({ client, services }) {
     scan.cancelFlag.label = 'Stopped by user';
     scan.cancelFlag.detail = 'Stop button clicked.';
 
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.INFO,
-        titleIcon: '🛑',
-        title: 'Stop signal sent',
-        description: 'The scan worker will exit at the end of its current candidate fetch (a few seconds at most).',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.INFO,
+      titleIcon: '🛑',
+      title: 'Stop signal sent',
+      description: 'The scan worker will exit at the end of its current candidate fetch (a few seconds at most).',
     });
   }
 

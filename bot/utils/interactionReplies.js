@@ -68,6 +68,10 @@ export function deferEphemeralReply(interaction) {
   return deferReply(interaction, { ephemeral: true });
 }
 
+export function deferUpdate(interaction) {
+  return interaction.deferUpdate();
+}
+
 export function replyAlert(interaction, alertOptions, extras = {}) {
   return replyEmbed(interaction, buildAlertEmbed(alertOptions), extras);
 }
