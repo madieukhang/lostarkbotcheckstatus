@@ -5,7 +5,8 @@ import {
 } from 'discord.js';
 
 import { COLORS, ICONS } from '../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../utils/alertEmbed.js';
+import { replyAlert, replyContent, replyEmbed } from '../../utils/interactionReplies.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { t } from '../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../list/view/ui.js';
@@ -76,13 +77,10 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
 
   collector.on('collect', async (sel) => {
     if (sel.user.id !== interaction.user.id) {
-      await sel.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Not Your Session',
-          description: 'Only the command user can view evidence on this search.',
-        })],
-        ephemeral: true,
+      await replyAlert(sel, {
+        severity: AlertSeverity.ERROR,
+        title: 'Not Your Session',
+        description: 'Only the command user can view evidence on this search.',
       });
       return;
     }
@@ -92,7 +90,7 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
     const entry = pickEvidenceEntry(result);
 
     if (!entryHasImage(entry)) {
-      await sel.reply({ content: t('listView.evidence.noImage', lang), ephemeral: true });
+      await replyContent(sel, t('listView.evidence.noImage', lang));
       return;
     }
 
@@ -101,14 +99,11 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
     // may already have expired).
     const displayUrl = await resolveDisplayImageUrl(entry, interaction.client);
     if (!displayUrl) {
-      await sel.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          title: 'Evidence Unavailable',
-          description: 'The evidence image link expired or the rehosted message was removed.',
-          footer: 'Re-upload via /la-list edit name:<entry> image:<file>.',
-        })],
-        ephemeral: true,
+      await replyAlert(sel, {
+        severity: AlertSeverity.WARNING,
+        title: 'Evidence Unavailable',
+        description: 'The evidence image link expired or the rehosted message was removed.',
+        footer: 'Re-upload via /la-list edit name:<entry> image:<file>.',
       });
       return;
     }
@@ -128,7 +123,7 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
       _color: style.color,
     };
     const evidenceEmbed = buildEvidenceEmbed(decoratedEntry, displayUrl, { lang });
-    await sel.reply({ embeds: [evidenceEmbed], ephemeral: true });
+    await replyEmbed(sel, evidenceEmbed);
   });
 
   collector.on('end', async () => {

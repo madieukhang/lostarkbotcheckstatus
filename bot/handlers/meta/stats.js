@@ -6,6 +6,7 @@
 import { EmbedBuilder } from 'discord.js';
 import { connectDB } from '../../db.js';
 import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
+import { deferEphemeralReply, editEmbed } from '../../utils/interactionReplies.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
@@ -26,7 +27,7 @@ function formatUptime(ms) {
 }
 
 export async function handleStatsCommand(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await deferEphemeralReply(interaction);
   await connectDB();
 
   const [blackCount, whiteCount, watchCount, cacheCount, guildConfigCount, recentBlackCount] = await Promise.all([
@@ -108,5 +109,5 @@ export async function handleStatsCommand(interaction) {
     .setFooter({ text: 'Officer-only command · ephemeral reply' })
     .setTimestamp();
 
-  await interaction.editReply({ embeds: [embed] });
+  await editEmbed(interaction, embed);
 }
