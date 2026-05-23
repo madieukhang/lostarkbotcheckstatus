@@ -80,3 +80,9 @@ test('normalizeCharacterName repairs Lost Ark umlaut OCR split artifacts', () =>
   assert.equal(normalizeCharacterName('b\u00E1nhcanhci\u00F9a'), 'B\u00E1nhcanhc\u00FCa');
   assert.equal(normalizeCharacterName('B\u00E1nhcanhci\u00F9a'), 'B\u00E1nhcanhc\u00FCa');
 });
+
+test('normalizeCharacterName removes OCR-inserted spaces inside character names', () => {
+  assert.equal(normalizeCharacterName('Gunlancer rrrrrrrr'), 'Gunlancerrrrrrrrr');
+  assert.equal(normalizeCharacterName('Qy oir'), 'Qyoir');
+  assert.equal(normalizeCharacterName('Qyo ir'), 'Qyoir');
+});
