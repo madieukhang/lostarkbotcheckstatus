@@ -136,6 +136,91 @@ test('search canonical names are normalized before rendering', async () => {
   }
 });
 
+test('worker-online enrichment falls back to search when the worker fetch errors out', async () => {
+  await markWorkerOnline();
+
+  const originalFetch = globalThis.fetch;
+  const counts = { rosterCalls: 0, searchCalls: 0 };
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/character/NA/')) {
+      counts.rosterCalls += 1;
+      throw new Error('simulated worker timeout');
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      counts.searchCalls += 1;
+      const data = [[1], [2, 3, 4], 'Bánhcanhcüa', 'lance_master', 1760];
+      return Response.json({ type: 'result', result: JSON.stringify(data) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Bánhcanhcüa'], { guildId: 'guild-1' });
+    const lines = formatCheckResults(results);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Bánhcanhcüa');
+    assert.equal(results[0].snapClassName, 'Glaivier');
+    assert.equal(results[0].snapItemLevel, 1760);
+    assert.match(lines[0], /1760/);
+    assert.equal(counts.rosterCalls, 1);
+    assert.equal(counts.searchCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('search retries with ASCII fold when the first query returns empty', async () => {
+  await markWorkerOnline();
+
+  const originalFetch = globalThis.fetch;
+  const counts = { rosterCalls: 0, searchCalls: 0, foldedHit: false };
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/character/NA/')) {
+      counts.rosterCalls += 1;
+      return new Response('<html><body>No roster here</body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      counts.searchCalls += 1;
+      const payloadMatch = requestedUrl.match(/payload=([^&]+)/);
+      const decoded = payloadMatch
+        ? Buffer.from(decodeURIComponent(payloadMatch[1]), 'base64').toString('utf8')
+        : '';
+      // First call carries the full-Unicode name and returns empty
+      // (simulating bible's NFD / Cyrillic-confusable miss). The retry
+      // carries the ASCII-folded "banhcanhcua" and returns the
+      // canonical row.
+      if (decoded.includes('banhcanhcua') && !decoded.includes('Bánhcanhcüa')) {
+        counts.foldedHit = true;
+        const data = [[1], [2, 3, 4], 'Bánhcanhcüa', 'lance_master', 1760];
+        return Response.json({ type: 'result', result: JSON.stringify(data) });
+      }
+      return Response.json({ type: 'result', result: JSON.stringify([[]]) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Bánhcanhcüa'], { guildId: 'guild-1' });
+    const lines = formatCheckResults(results);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Bánhcanhcüa');
+    assert.equal(results[0].snapClassName, 'Glaivier');
+    assert.equal(results[0].snapItemLevel, 1760);
+    assert.match(lines[0], /1760/);
+    assert.equal(counts.searchCalls, 2, 'expected first search + ASCII-fold retry');
+    assert.equal(counts.foldedHit, true, 'ASCII-fold retry should resolve the canonical row');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('worker-online canonicalization repairs short i/l look-alike names', async () => {
   await markWorkerOnline();
   const stub = installBibleSearchStub();
