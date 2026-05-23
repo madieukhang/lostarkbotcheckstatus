@@ -87,6 +87,64 @@ function installBibleSearchStub({
   };
 }
 
+test('worker-online enrichment marks chars as trusted via discoveredAlts when the roster main is trusted', async () => {
+  await markWorkerOnline();
+  const TrustedUser = (await import('../bot/models/TrustedUser.js')).default;
+  await TrustedUser.create({
+    name: 'Clauseduk',
+    reason: 'guild officer',
+    addedByUserId: 'tester',
+    addedByTag: 'tester#0001',
+  });
+
+  // Roster HTML: two-char roster (Morrahduk + Clauseduk) so the parser
+  // returns both names in `allCharacters`, which the service then mirrors
+  // into `item.discoveredAlts`. The trust resolver cross-references the
+  // alts against TrustedUser and snaps onto Clauseduk's record.
+  const rosterHtml = [
+    '<html><body>',
+    '<script>name:"Morrahduk",class:"berserker_male"</script>',
+    '<script>name:"Clauseduk",class:"lance_master"</script>',
+    '<a href="/character/NA/Morrahduk/roster">',
+    '  <div class="text-lg font-semibold">Morrahduk<span>1740.00</span><span>4095.16</span></div>',
+    '</a>',
+    '<a href="/character/NA/Clauseduk/roster">',
+    '  <div class="text-lg font-semibold">Clauseduk<span>1754.17</span><span>4632.64</span></div>',
+    '</a>',
+    '</body></html>',
+  ].join('\n');
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/character/NA/')) {
+      return new Response(rosterHtml, { status: 200, headers: { 'content-type': 'text/html' } });
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const data = [[1], [2, 3, 4], 'Morrahduk', 'berserker_male', 1740];
+      return Response.json({ type: 'result', result: JSON.stringify(data) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Morrahduk'], { guildId: 'guild-1' });
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Morrahduk');
+    assert.ok(
+      results[0].trustedEntry,
+      'expected Morrahduk to inherit trust via Clauseduk on the shared roster'
+    );
+    assert.equal(results[0].trustedEntry.name, 'Clauseduk');
+    const lines = formatCheckResults(results);
+    assert.match(lines[0], /🛡️/, 'rendered line should use the shield icon');
+    assert.doesNotMatch(lines[0], /💚/, 'heart icon should no longer render');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await TrustedUser.deleteMany({});
+  }
+});
+
 test('worker-online enrichment falls back to bible search canonical names', async () => {
   await markWorkerOnline();
   const stub = installBibleSearchStub();

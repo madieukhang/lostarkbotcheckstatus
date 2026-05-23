@@ -52,7 +52,7 @@ function formatResultLine(item) {
     ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP ${item.snapCombatScore}` : ''}`
     : '';
 
-  const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 💚' : '';
+  const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 🛡️' : '';
 
   const branches = [];
   for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
@@ -108,7 +108,7 @@ function formatResultLine(item) {
     for (const b of branches) trustedBranches.push(b);
     const trustedBlock = trustedBranches.length > 0 ? `\n${trustedBranches.join('\n')}` : '';
     return {
-      line: `💚 ${classPrefix}**${item.name}**${statSuffix}${directTag}${trustedBlock}`,
+      line: `🛡️ ${classPrefix}**${item.name}**${statSuffix}${directTag}${trustedBlock}`,
       priority: 2,
     };
   }

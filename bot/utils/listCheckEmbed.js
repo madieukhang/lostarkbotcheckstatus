@@ -89,7 +89,7 @@ export function buildListCheckEmbed({
   if (counts.black) summaryParts.push(`⛔ **${counts.black}**`);
   if (counts.watch) summaryParts.push(`⚠️ **${counts.watch}**`);
   if (counts.white) summaryParts.push(`✅ **${counts.white}**`);
-  if (counts.trusted) summaryParts.push(`💚 **${counts.trusted}**`);
+  if (counts.trusted) summaryParts.push(`🛡️ **${counts.trusted}**`);
   if (counts.notListed) summaryParts.push(`❓ **${counts.notListed}** not listed`);
 
   const headerLine = summaryParts.length > 0
