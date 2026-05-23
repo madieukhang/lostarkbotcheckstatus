@@ -160,6 +160,53 @@ test('extractNamesFromImage canonicalizes umlaut OCR split artifacts', async () 
   }
 });
 
+test('extractNamesFromImage removes OCR-inserted spaces inside names', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/spaced-name-image.png') {
+      return new Response(new Uint8Array([10, 11, 12]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      return Response.json({
+        candidates: [
+          {
+            finishReason: 'STOP',
+            content: {
+              parts: [{ text: JSON.stringify(['Gunlancer rrrrrrrr', 'Qy oir']) }],
+            },
+          },
+        ],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'image-spaced-name',
+      url: 'https://cdn.discordapp.com/spaced-name-image.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(names, ['Gunlancerrrrrrrrr', 'Qyoir']);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
+});
+
 test('extractNamesFromImage rejects oversized downloads even when content-length is missing', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;

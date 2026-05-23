@@ -26,15 +26,20 @@ const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
 /**
  * Canonicalise a name for diacritic-tolerant comparison. Strips
  * combining marks (NFD decomposition + drop ̀-ͯ) and
- * lowercases. Used in the worker-offline enrichment branch to
- * recover names where Gemini OCR dropped a diacritic and bible's
- * search returns the canonical (with-diacritic) variant.
+ * lowercases. Used when bible search returns a canonical candidate
+ * for a name where Gemini OCR added, dropped, or swapped a mark.
  */
 function stripDiacritics(value) {
   return String(value || '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+}
+
+function visualNameKey(value) {
+  return stripDiacritics(value)
+    .replace(/[l1]/g, 'i')
+    .replace(/0/g, 'o');
 }
 
 /**
@@ -113,6 +118,7 @@ const GEMINI_PROMPT = [
   'Ignore all other text: raid names, class names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
   'Preserve every character exactly as shown, including special letters and diacritics.',
   'Letter count must match the image exactly. Do NOT double letters that appear once (e.g., a name shown as "Trumfighter" must not be returned as "Trumffighter"). Do NOT collapse repeated letters that appear twice.',
+  'Lost Ark character names do not contain spaces; if letters appear as one character name, return them as one continuous string.',
   'Look-alike characters: distinguish lowercase L (l), uppercase i (I), and digit 1 (1) by context. Distinguish digit 0 (0) from uppercase O (O).',
   'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
   'Keep umlaut letters exactly: ë, ö, ü.',
@@ -153,6 +159,55 @@ function filterAndDeduplicateNames(parsed) {
   }
 
   return unique;
+}
+
+function chooseCanonicalSuggestion(name, suggestions) {
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
+
+  // First pass: case-insensitive exact match. Covers the happy path
+  // where Gemini preserved every character but casing drifted.
+  const target = String(name).toLowerCase();
+  let chosen = suggestions.find((s) => String(s.name).toLowerCase() === target);
+  if (chosen) return { chosen, reason: 'exact' };
+
+  // Second pass: diacritic-tolerant match. Gemini sometimes adds,
+  // drops, or swaps marks; bible's search can still return the real
+  // canonical name as a nearby candidate.
+  const targetCanonical = stripDiacritics(name);
+  chosen = suggestions.find(
+    (s) => stripDiacritics(String(s.name)) === targetCanonical
+  );
+  if (chosen) return { chosen, reason: 'diacritic' };
+
+  // Third pass: targeted visual look-alike match for short names where
+  // a full edit-distance pass would be too loose.
+  const targetVisual = visualNameKey(name);
+  if (targetVisual !== targetCanonical) {
+    chosen = suggestions.find((s) => visualNameKey(String(s.name)) === targetVisual);
+    if (chosen) return { chosen, reason: 'lookalike' };
+  }
+
+  // Fourth pass: edit-distance fuzzy match. Recovers small OCR errors
+  // beyond accents: doubled/missing letters and other substitutions.
+  if (targetCanonical.length < 6) return null;
+  const maxDistance = Math.min(2, Math.floor(targetCanonical.length / 6));
+  let bestMatch = null;
+  let bestDistance = Infinity;
+  for (const s of suggestions) {
+    const dist = levenshteinDistance(
+      targetCanonical,
+      stripDiacritics(String(s.name))
+    );
+    if (dist < bestDistance) {
+      bestDistance = dist;
+      bestMatch = s;
+    }
+  }
+
+  if (bestMatch && bestDistance <= maxDistance) {
+    return { chosen: bestMatch, reason: 'fuzzy', distance: bestDistance, maxDistance };
+  }
+  return null;
 }
 
 /**
@@ -453,6 +508,44 @@ export async function checkNamesAgainstLists(names, options = {}) {
       }
     }
 
+    async function applySearchSuggestionEnrichment(item) {
+      const originalName = item.name;
+      const suggestions = await fetchNameSuggestions(originalName);
+      const match = chooseCanonicalSuggestion(originalName, suggestions);
+      if (!match) return false;
+
+      const { chosen, reason, distance, maxDistance } = match;
+      const chosenName = String(chosen.name || '').trim();
+      if (!chosenName) return false;
+
+      if (chosenName !== originalName) {
+        if (reason === 'diacritic') {
+          console.log(
+            `[listcheck] Diacritic-tolerant match: OCR'd "${originalName}" -> canonical "${chosenName}"`
+          );
+        } else if (reason === 'fuzzy') {
+          console.log(
+            `[listcheck] Fuzzy match (edit dist ${distance} <= ${maxDistance}): OCR'd "${originalName}" -> canonical "${chosenName}"`
+          );
+        } else if (reason === 'lookalike') {
+          console.log(
+            `[listcheck] Look-alike match: OCR'd "${originalName}" -> canonical "${chosenName}"`
+          );
+        } else {
+          console.log(
+            `[listcheck] Search canonical match: OCR'd "${originalName}" -> canonical "${chosenName}"`
+          );
+        }
+        item.name = chosenName;
+      }
+
+      await applyEnrichment(item, {
+        classId: chosen.cls || '',
+        itemLevel: Number(chosen.itemLevel) || 0,
+      });
+      return true;
+    }
+
     await mapWithConcurrency(itemsNeedingEnrichment, concurrency, async (item) => {
       try {
         if (health.online) {
@@ -467,7 +560,10 @@ export async function checkNamesAgainstLists(names, options = {}) {
             retryOnRateLimit: false,
             timeoutMs: lookupTimeoutMs,
           });
-          if (!roster || !roster.hasValidRoster) return;
+          if (!roster || !roster.hasValidRoster) {
+            await applySearchSuggestionEnrichment(item);
+            return;
+          }
           // Resolve classId from the per-character record (parser gives
           // us classId directly), falling back to resolveClassId on the
           // display name when the record didn't surface a bible id.
@@ -477,9 +573,14 @@ export async function checkNamesAgainstLists(names, options = {}) {
           const classId = targetRecord?.classId
             || (roster.targetClassName ? resolveClassId(roster.targetClassName) : '')
             || '';
+          const rosterItemLevel = typeof roster.targetItemLevel === 'number' ? roster.targetItemLevel : 0;
+          if (!classId && !rosterItemLevel) {
+            await applySearchSuggestionEnrichment(item);
+            return;
+          }
           await applyEnrichment(item, {
             classId,
-            itemLevel: typeof roster.targetItemLevel === 'number' ? roster.targetItemLevel : 0,
+            itemLevel: rosterItemLevel,
             combatScore: roster.targetCombatScore || targetRecord?.combatScore || '',
           });
           // Roster alts surface only when the roster is publicly visible.
@@ -491,74 +592,8 @@ export async function checkNamesAgainstLists(names, options = {}) {
             );
           }
         } else {
-          // Case 2 · worker offline: hit bible's search endpoint directly.
-          // No viaWorker (would just fail the same way it failed before).
-          const suggestions = await fetchNameSuggestions(item.name);
-          if (!Array.isArray(suggestions) || suggestions.length === 0) return;
-
-          // First pass: case-insensitive exact match. Covers the happy
-          // path where Gemini preserved every character.
-          const target = item.name.toLowerCase();
-          let chosen = suggestions.find((s) => String(s.name).toLowerCase() === target);
-
-          // Second pass: diacritic-tolerant match. Gemini sometimes drops
-          // marks on letters like ù / ä / ë; bible's search returns the
-          // canonical (with-diacritic) name as a candidate, so accept it
-          // when the bare-letter form matches. Update item.name to the
-          // canonical form so the embed renders the correct spelling and
-          // the snapshot is keyed by the real name.
-          const targetCanonical = stripDiacritics(item.name);
-          if (!chosen) {
-            chosen = suggestions.find(
-              (s) => stripDiacritics(String(s.name)) === targetCanonical
-            );
-            if (chosen) {
-              console.log(
-                `[listcheck] Diacritic-tolerant match: OCR'd "${item.name}" -> canonical "${chosen.name}"`
-              );
-              item.name = chosen.name;
-            }
-          }
-
-          // Third pass: edit-distance fuzzy match. Recovers from Gemini
-          // OCR errors beyond diacritic loss · doubled letters
-          // ("Trùmfighter" -> "Trùmffighter"), missed letters, swapped
-          // look-alikes (l vs I). Threshold scales with name length to
-          // avoid false positives on short names (where 1 edit can
-          // match a totally different player): <6 chars no fuzzy,
-          // 6-11 chars ≤1 edit, 12+ chars ≤2 edits. Bible has already
-          // narrowed to similar names via its search index so the
-          // closest candidate within the threshold is almost certainly
-          // the real character. Picks the smallest-distance suggestion;
-          // ties break on bible's relevance ordering (most-relevant first).
-          if (!chosen && targetCanonical.length >= 6) {
-            const maxDistance = Math.min(2, Math.floor(targetCanonical.length / 6));
-            let bestMatch = null;
-            let bestDistance = Infinity;
-            for (const s of suggestions) {
-              const dist = levenshteinDistance(
-                targetCanonical,
-                stripDiacritics(String(s.name))
-              );
-              if (dist < bestDistance) {
-                bestDistance = dist;
-                bestMatch = s;
-              }
-            }
-            if (bestMatch && bestDistance <= maxDistance) {
-              chosen = bestMatch;
-              console.log(
-                `[listcheck] Fuzzy match (edit dist ${bestDistance} <= ${maxDistance}): OCR'd "${item.name}" -> canonical "${chosen.name}"`
-              );
-              item.name = chosen.name;
-            }
-          }
-
-          if (!chosen) return;
-          await applyEnrichment(item, {
-            classId: chosen.cls || '',
-            itemLevel: Number(chosen.itemLevel) || 0,
-          });
+          // Case 2: worker offline; use bible search directly.
+          await applySearchSuggestionEnrichment(item);
         }
       } catch (err) {
         // Per-name failure is non-fatal: leave snap fields empty so the

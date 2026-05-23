@@ -7,6 +7,9 @@ function normalizeNameGlyphs(raw) {
     .replace(/i(?:\u00F9|u\u0300)/g, '\u00FC')
     .replace(/I(?:\u00D9|U\u0300)/g, '\u00DC')
     .replace(/(\p{L})\s+([\u0300-\u036f])/gu, '$1$2')
+    // Lost Ark character names are single tokens. OCR sometimes inserts
+    // spaces before repeated tail letters, e.g. "Gunlancer rrrrr".
+    .replace(/\s+/g, '')
     .trim()
     .normalize('NFC');
 }
