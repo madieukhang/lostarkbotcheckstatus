@@ -12,6 +12,10 @@ function normalizeNameGlyphs(raw) {
     // Lost Ark character names are single tokens. OCR sometimes inserts
     // spaces before repeated tail letters, e.g. "Gunlancer rrrrr".
     .replace(/\s+/g, '')
+    // Keep this scoped to the observed full-name stem so legitimate
+    // Vietnamese grave-accent names keep their "ù".
+    .replace(/b\u00E1nhcanhc(?:\u00F9|u\u0300)a/giu, 'b\u00E1nhcanhc\u00FCa')
+    .replace(/b\u00E1nhcanh(?:\u00F9|u\u0300)a/giu, 'b\u00E1nhcanhc\u00FCa')
     .trim()
     .normalize('NFC');
 }

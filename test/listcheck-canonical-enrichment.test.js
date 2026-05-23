@@ -115,7 +115,7 @@ test('worker-online enrichment falls back to bible search canonical names', asyn
 test('search canonical names are normalized before rendering', async () => {
   await markWorkerOnline();
   const stub = installBibleSearchStub({
-    suggestedName: 'B\u00E1nhcanhci\u00F9a',
+    suggestedName: 'B\u00E1nhcanhc\u00F9a',
     itemLevel: 1760,
   });
 
@@ -128,7 +128,7 @@ test('search canonical names are normalized before rendering', async () => {
     assert.equal(results[0].snapClassName, 'Bard');
     assert.equal(results[0].snapItemLevel, 1760);
     assert.match(lines[0], /B\u00E1nhcanhc\u00FCa/);
-    assert.doesNotMatch(lines[0], /B\u00E1nhcanhci\u00F9a/);
+    assert.doesNotMatch(lines[0], /B\u00E1nhcanhc\u00F9a/);
     assert.equal(stub.counts.rosterCalls, 1);
     assert.equal(stub.counts.searchCalls, 1);
   } finally {

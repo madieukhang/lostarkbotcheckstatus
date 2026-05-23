@@ -207,6 +207,53 @@ test('extractNamesFromImage removes OCR-inserted spaces inside names', async () 
   }
 });
 
+test('extractNamesFromImage repairs observed Banhcanhcua umlaut collapses', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/banhcanh-image.png') {
+      return new Response(new Uint8Array([13, 14, 15]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      return Response.json({
+        candidates: [
+          {
+            finishReason: 'STOP',
+            content: {
+              parts: [{ text: JSON.stringify(['B\u00E1nhcanhc\u00F9a', 'B\u00E1nhcanh\u00F9a']) }],
+            },
+          },
+        ],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'image-banhcanh',
+      url: 'https://cdn.discordapp.com/banhcanh-image.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(names, ['B\u00E1nhcanhc\u00FCa']);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
+});
+
 test('extractNamesFromImage rejects oversized downloads even when content-length is missing', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;
