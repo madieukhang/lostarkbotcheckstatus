@@ -5,7 +5,9 @@ function normalizeNameGlyphs(raw) {
     .replace(/(\p{L})\s*\u00A8/gu, '$1\u0308')
     // Lost Ark lobby font can make Gemini split "ü" into "iù".
     .replace(/i(?:\u00F9|u\u0300)/g, '\u00FC')
+    .replace(/(?:\u00EC|i\u0300)u/g, '\u00FC')
     .replace(/I(?:\u00D9|U\u0300)/g, '\u00DC')
+    .replace(/(?:\u00CC|I\u0300)U/g, '\u00DC')
     .replace(/(\p{L})\s+([\u0300-\u036f])/gu, '$1$2')
     // Lost Ark character names are single tokens. OCR sometimes inserts
     // spaces before repeated tail letters, e.g. "Gunlancer rrrrr".

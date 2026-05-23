@@ -515,7 +515,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
       if (!match) return false;
 
       const { chosen, reason, distance, maxDistance } = match;
-      const chosenName = String(chosen.name || '').trim();
+      const chosenName = normalizeCharacterName(chosen.name);
       if (!chosenName) return false;
 
       if (chosenName !== originalName) {
