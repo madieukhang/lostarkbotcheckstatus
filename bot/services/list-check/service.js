@@ -656,15 +656,31 @@ export async function checkNamesAgainstLists(names, options = {}) {
     );
   }
 
-  // Phase 2: Resolve trusted status via allCharacters already stored
-  // on DB list entries. OCR checks still avoid roster fetch / similar-
-  // name search / hidden-roster fallback here.
+  // Phase 2: Resolve trusted status via roster relationships.
+  //
+  // Two alt sources cross-reference into TrustedUser here:
+  //   (a) `allCharacters` already stored on a blacklist / whitelist /
+  //       watchlist entry that the OCR'd name hit. These alts were
+  //       captured during the original /la-list add bible scrape.
+  //   (b) `item.discoveredAlts` populated by the worker-online
+  //       enrichment branch above (single roster-page scrape returns
+  //       the OCR'd name's full alt list). This covers the case where
+  //       a char has NO direct DB list hit but its bible roster shares
+  //       a main with a trusted entry · e.g. Morrahduk lives on
+  //       Clauseduk's roster and Clauseduk is trusted, so Morrahduk
+  //       inherits trust via the alts the roster scrape just returned.
+  //
+  // OCR checks still avoid an extra roster fetch here · we reuse the
+  // alts the gather phase already paid for.
   const altNamesForTrustedCheck = new Set();
   for (const item of results) {
     if (item.trustedEntry) continue;
     for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
       if (!entry?.allCharacters) continue;
       for (const c of entry.allCharacters) altNamesForTrustedCheck.add(c);
+    }
+    if (Array.isArray(item.discoveredAlts)) {
+      for (const c of item.discoveredAlts) altNamesForTrustedCheck.add(c);
     }
   }
 
@@ -684,6 +700,12 @@ export async function checkNamesAgainstLists(names, options = {}) {
             if (match) { item.trustedEntry = match; break; }
           }
           if (item.trustedEntry) break;
+        }
+        if (!item.trustedEntry && Array.isArray(item.discoveredAlts)) {
+          for (const c of item.discoveredAlts) {
+            const match = altTrustedSet.get(c.toLowerCase());
+            if (match) { item.trustedEntry = match; break; }
+          }
         }
       }
     }
