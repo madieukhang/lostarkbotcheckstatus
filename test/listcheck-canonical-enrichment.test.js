@@ -48,7 +48,11 @@ async function markWorkerOnline() {
   });
 }
 
-function installBibleSearchStub() {
+function installBibleSearchStub({
+  suggestedName = 'Qyoir',
+  classId = 'bard',
+  itemLevel = 1741.67,
+} = {}) {
   const originalFetch = globalThis.fetch;
   const counts = { rosterCalls: 0, searchCalls: 0 };
 
@@ -65,7 +69,7 @@ function installBibleSearchStub() {
 
     if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
       counts.searchCalls += 1;
-      const data = [[1], [2, 3, 4], 'Qyoir', 'bard', 1741.67];
+      const data = [[1], [2, 3, 4], suggestedName, classId, itemLevel];
       return Response.json({
         type: 'result',
         result: JSON.stringify(data),
@@ -103,6 +107,30 @@ test('worker-online enrichment falls back to bible search canonical names', asyn
     const snapshot = await RosterSnapshot.findOne({ name: 'Qyoir' }).lean();
     assert.equal(snapshot?.itemLevel, 1741.67);
     assert.equal(snapshot?.classId, 'bard');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search canonical names are normalized before rendering', async () => {
+  await markWorkerOnline();
+  const stub = installBibleSearchStub({
+    suggestedName: 'B\u00E1nhcanhci\u00F9a',
+    itemLevel: 1760,
+  });
+
+  try {
+    const results = await checkNamesAgainstLists(['B\u00E1nhcanhc\u00FCa'], { guildId: 'guild-1' });
+    const lines = formatCheckResults(results);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'B\u00E1nhcanhc\u00FCa');
+    assert.equal(results[0].snapClassName, 'Bard');
+    assert.equal(results[0].snapItemLevel, 1760);
+    assert.match(lines[0], /B\u00E1nhcanhc\u00FCa/);
+    assert.doesNotMatch(lines[0], /B\u00E1nhcanhci\u00F9a/);
+    assert.equal(stub.counts.rosterCalls, 1);
+    assert.equal(stub.counts.searchCalls, 1);
   } finally {
     stub.restore();
   }
