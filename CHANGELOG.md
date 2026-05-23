@@ -48,12 +48,15 @@ Earlier in cycle:
 - Cross-server list add/edit broadcasts now render tracked alts with class icon, item level, and CP when roster data is available. Rows still fall back to linked names when a snapshot is missing.
 
 ### Fixed
+- Auto-check + `/la-check` enrichment now recovers names where bible's search returns empty for the original query bytes. Observed for OCR output that survives `normalizeCharacterName` in NFD form (bible search returns `[[]]` for NFD bytes even though it accepts NFC, grave, acute, and bare-ASCII queries of the same name) and for visually-confusable Unicode (e.g. Cyrillic look-alikes). When the first search query returns empty, the bot retries once with an ASCII-folded fallback (`"banhcanhcua"` for `"Bánhcanhcüa"`); bible's search is diacritic-tolerant server-side, so the folded query returns the canonical row and the existing 4-pass canonical matcher snaps onto it. Previously these rows rendered bare (no class icon, no item level) because the worker route fell through to search and search itself ran dry. Logged as `[listcheck] Search empty for "X", retrying with ASCII fold "Y"` for forensics.
+- `checkNamesAgainstLists` worker branch now wraps `buildRosterCharacters` in an inner try/catch that falls through to search-direct when the worker call throws. Defensive today (the builder catches internally and returns `hasValidRoster: false` on error) but locks in the worker-error -> search-fallback contract so a future change to the builder's error handling cannot silently regress to bare-name rendering.
 - Approval ping to requester no longer renders as `<@user> undefined` after an officer approves `/la-list add`. `executeListAddToDatabase` success return was missing the `content` field that every other return path (errors, duplicate, edit, overwrite) populates; `notifyRequesterAboutDecision` then interpolated undefined into the ping line as a literal string. Added `content: "✅ Add approved: <name> added to <label>."` to the success shape so the executor contract holds across all paths; bulk and self-consumer call sites read `result.content` defensively and are unchanged.
 - OCR list-check and auto-check are now DB-only after OCR: they compare extracted names against blacklist/whitelist/watchlist/trusted data and stored snapshots only. They no longer call bible, worker roster lookup, hidden-roster fallback, similar-name search, or post-check roster enrichment.
 
 ### Tests
 - Added focused coverage for the richer tracked-alt broadcast formatter.
 - Added coverage that OCR list-check stays DB-only and renders unmatched names as `not listed`.
+- Added two coverage cases in `listcheck-canonical-enrichment.test.js`: (a) worker fetch errors out (stub throws on `/character/NA/`) and enrichment still resolves via the search-direct fallback; (b) bible search returns empty for the original query and the bot retries with an ASCII-folded query, picking up the canonical row on the retry.
 
 ## [v0.5.81] - 2026-05-05
 

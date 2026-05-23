@@ -36,6 +36,22 @@ function stripDiacritics(value) {
     .toLowerCase();
 }
 
+// Aggressive ASCII fallback for bible search retries. Strips combining
+// marks AND any remaining non-ASCII codepoint (catches Cyrillic
+// look-alikes and other Unicode confusables that survive Gemini's OCR
+// + normalizeCharacterName). Bible's search index is diacritic-
+// tolerant on the server side, so a pure-ASCII query like
+// "banhcanhcua" still returns the canonical "B\u00e1nhcanhc\u00fca". Empty
+// string is returned when nothing ASCII survives, in which case the
+// caller skips the retry.
+function asciiFoldName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x20-\x7e]/g, '')
+    .toLowerCase();
+}
+
 function visualNameKey(value) {
   return stripDiacritics(value)
     .replace(/[l1]/g, 'i')
@@ -510,7 +526,24 @@ export async function checkNamesAgainstLists(names, options = {}) {
 
     async function applySearchSuggestionEnrichment(item) {
       const originalName = item.name;
-      const suggestions = await fetchNameSuggestions(originalName);
+      let suggestions = await fetchNameSuggestions(originalName);
+      // Bible search returns empty `[[]]` when the query bytes do not
+      // match its index (observed for NFD-form input and visually-
+      // confusable Unicode like Cyrillic look-alikes that survive
+      // normalizeCharacterName + the OCR prompt's diacritic guard).
+      // Retry once with an ASCII-folded query. Bible's search is
+      // diacritic-tolerant server-side, so "banhcanhcua" still returns
+      // the canonical "Bánhcanhcüa" row that the 4-pass canonical
+      // matcher below can then snap onto.
+      if (!suggestions || suggestions.length === 0) {
+        const folded = asciiFoldName(originalName);
+        if (folded && folded !== originalName.toLowerCase()) {
+          console.log(
+            `[listcheck] Search empty for "${originalName}", retrying with ASCII fold "${folded}"`
+          );
+          suggestions = await fetchNameSuggestions(folded);
+        }
+      }
       const match = chooseCanonicalSuggestion(originalName, suggestions);
       if (!match) return false;
 
@@ -555,11 +588,26 @@ export async function checkNamesAgainstLists(names, options = {}) {
           // hidden-roster + Stronghold-scan fallback inside the
           // builder is left disabled (default off) to keep the
           // list-check fast path bounded.
-          const roster = await buildRosterCharacters(item.name, {
-            viaWorker: true,
-            retryOnRateLimit: false,
-            timeoutMs: lookupTimeoutMs,
-          });
+          //
+          // Worker errors fall through to search-direct rather than
+          // bare-render the row. Worker timeouts, parse failures, and
+          // transient CF blocks otherwise dead-end here even though
+          // bible's lightweight search endpoint can still answer the
+          // lookup. Observed for OCR'd names with umlaut characters
+          // (e.g. "Banhcanhcua") where the roster-page route is
+          // flakier than the search route.
+          let roster = null;
+          try {
+            roster = await buildRosterCharacters(item.name, {
+              viaWorker: true,
+              retryOnRateLimit: false,
+              timeoutMs: lookupTimeoutMs,
+            });
+          } catch (workerErr) {
+            console.warn(
+              `[listcheck] Worker enrichment threw for ${item.name}, falling back to search-direct: ${workerErr.message}`
+            );
+          }
           if (!roster || !roster.hasValidRoster) {
             await applySearchSuggestionEnrichment(item);
             return;
