@@ -136,6 +136,7 @@ const GEMINI_PROMPT = [
   'Letter count must match the image exactly. Do NOT double letters that appear once (e.g., a name shown as "Trumfighter" must not be returned as "Trumffighter"). Do NOT collapse repeated letters that appear twice.',
   'Lost Ark character names do not contain spaces; if letters appear as one character name, return them as one continuous string.',
   'Look-alike characters: distinguish lowercase L (l), uppercase i (I), and digit 1 (1) by context. Distinguish digit 0 (0) from uppercase O (O).',
+  'Lowercase letter pairs that lobby fonts can blur are NOT interchangeable: a vs e, a vs o, c vs e, u vs v, rn vs m. Pick the letter whose silhouette actually matches the pixel cluster · a has a closed bowl, e has a horizontal crossbar, o is fully round.',
   'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
   'Keep umlaut letters exactly: ë, ö, ü.',
   'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
