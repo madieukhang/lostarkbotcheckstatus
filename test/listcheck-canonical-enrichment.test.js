@@ -87,6 +87,46 @@ function installBibleSearchStub({
   };
 }
 
+test('worker-online enrichment canonicalizes the display name to bible spelling', async () => {
+  await markWorkerOnline();
+
+  // Roster HTML where bible's spelling is "Morrahduk" but the caller
+  // passes an all-caps OCR variant. The targetRecord match is case-
+  // insensitive, so it resolves, and the display name should snap to
+  // bible's canonical casing.
+  const rosterHtml = [
+    '<html><body>',
+    '<script>name:"Morrahduk",class:"berserker"</script>',
+    '<a href="/character/NA/Morrahduk/roster">',
+    '  <div class="text-lg font-semibold">Morrahduk<span>1740.00</span><span>4095.16</span></div>',
+    '</a>',
+    '</body></html>',
+  ].join('\n');
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/character/NA/')) {
+      return new Response(rosterHtml, { status: 200, headers: { 'content-type': 'text/html' } });
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const data = [[1], [2, 3, 4], 'Morrahduk', 'berserker', 1740];
+      return Response.json({ type: 'result', result: JSON.stringify(data) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['MORRAHDUK'], { guildId: 'guild-1' });
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Morrahduk', 'display name should match bible canonical casing');
+    assert.equal(results[0].snapClassName, 'Berserker');
+    assert.equal(results[0].snapItemLevel, 1740);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('worker-online enrichment marks chars as trusted via discoveredAlts when the roster main is trusted', async () => {
   await markWorkerOnline();
   const TrustedUser = (await import('../bot/models/TrustedUser.js')).default;

@@ -133,7 +133,7 @@ const GEMINI_PROMPT = [
   'Extract ALL player character names from the party member list, regardless of color.',
   'Ignore all other text: raid names, class names, item levels, buttons, chat messages, server/world names (e.g. Vairgrys, Brelshaza, Thaemine).',
   'Preserve every character exactly as shown, including special letters and diacritics.',
-  'Letter count must match the image exactly. Do NOT double letters that appear once (e.g., a name shown as "Trumfighter" must not be returned as "Trumffighter"). Do NOT collapse repeated letters that appear twice.',
+  'Letter count must match the image exactly. Do NOT double letters that appear once (e.g., a name shown as "Trumfighter" must not be returned as "Trumffighter"). Do NOT collapse a run of repeated letters: count each glyph in the run individually (e.g., a name with three i in a row like "Lpiiiv" must keep all three, not two; "Aaaron" keeps all three a).',
   'Lost Ark character names do not contain spaces; if letters appear as one character name, return them as one continuous string.',
   'Look-alike characters: distinguish lowercase L (l), uppercase i (I), and digit 1 (1) by context. Distinguish digit 0 (0) from uppercase O (O).',
   'Lowercase letter pairs that lobby fonts can blur are NOT interchangeable: a vs e, a vs o, c vs e, u vs v, rn vs m. Pick the letter whose silhouette actually matches the pixel cluster · a has a closed bowl, e has a horizontal crossbar, o is fully round.',
@@ -619,6 +619,17 @@ export async function checkNamesAgainstLists(names, options = {}) {
           const targetRecord = (roster.rosterCharacters || []).find(
             (c) => String(c.name).toLowerCase() === item.name.toLowerCase()
           );
+          // Canonicalize the display name to bible's exact spelling when
+          // the roster scrape resolved the target. Mirrors the search-
+          // direct branch so the embed shows bible's truth, not the OCR'd
+          // casing/diacritics, regardless of which route resolved the row.
+          // Done before the discoveredAlts filter + applyEnrichment below
+          // so the snapshot key and self-exclusion both use the canonical
+          // form.
+          if (targetRecord?.name) {
+            const canonical = normalizeCharacterName(targetRecord.name);
+            if (canonical && canonical !== item.name) item.name = canonical;
+          }
           const classId = targetRecord?.classId
             || (roster.targetClassName ? resolveClassId(roster.targetClassName) : '')
             || '';
