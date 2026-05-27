@@ -58,6 +58,18 @@ function visualNameKey(value) {
     .replace(/0/g, 'o');
 }
 
+// Is `a` a subsequence of `b`? (every char of a appears in b in order).
+// Used to distinguish a pure insertion/deletion (indel · subsequence
+// holds one way) from a same-length substitution (subsequence fails
+// both ways), so prefix-indel recovery only fires on the safe class.
+function isSubsequence(a, b) {
+  let i = 0;
+  for (let j = 0; j < b.length && i < a.length; j += 1) {
+    if (a[i] === b[j]) i += 1;
+  }
+  return i === a.length;
+}
+
 /**
  * Levenshtein edit distance · O(m·n) DP with rolling rows. Returns the
  * minimum number of single-character insertions / deletions / swaps to
@@ -225,6 +237,45 @@ function chooseCanonicalSuggestion(name, suggestions) {
     return { chosen: bestMatch, reason: 'fuzzy', distance: bestDistance, maxDistance };
   }
   return null;
+}
+
+/**
+ * Recover a single canonical row for an OCR'd name that bible's search
+ * can't match directly because exactly one letter was inserted or
+ * dropped · usually a miscounted repeated letter ("Qiyllyn" for
+ * "Qiylyn", "Lpiiv" for "Lpiiiv").
+ *
+ * bible search is prefix-based (a 4-char prefix returns up to ~10
+ * candidates; 2 chars returns nothing), so we re-query a 4-char prefix
+ * and keep only candidates that are exactly ONE indel away:
+ *   - length differs by exactly 1 (rules out same-length substitution),
+ *   - Levenshtein distance is exactly 1,
+ *   - and a subsequence relationship holds (the shorter is a
+ *     subsequence of the longer · confirms pure insertion/deletion,
+ *     NOT a swap like "Viatchu" -> "Viatchy" that would otherwise
+ *     mis-resolve to a different real player).
+ *
+ * Accept ONLY when exactly one candidate survives. Genuine ambiguity
+ * (e.g. both "Lpiiiv" and "Lpiiiiv" exist) returns null so the row
+ * renders bare instead of guessing the wrong character's class/ilvl.
+ *
+ * @returns {Promise<{name:string,cls:string,itemLevel:number}|null>}
+ */
+async function recoverViaPrefixIndel(name, options = {}) {
+  const folded = asciiFoldName(name);
+  // Need ≥5 chars so a 4-char prefix still leaves room for the indel
+  // and is specific enough that bible does not fan out to noise.
+  if (folded.length < 5) return null;
+  const prefix = folded.slice(0, 4);
+  const suggestions = await fetchNameSuggestions(prefix, options);
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
+  const matches = suggestions.filter((s) => {
+    const cand = asciiFoldName(String(s.name));
+    if (Math.abs(cand.length - folded.length) !== 1) return false;
+    if (levenshteinDistance(folded, cand) !== 1) return false;
+    return isSubsequence(folded, cand) || isSubsequence(cand, folded);
+  });
+  return matches.length === 1 ? matches[0] : null;
 }
 
 /**
@@ -546,7 +597,30 @@ export async function checkNamesAgainstLists(names, options = {}) {
         }
       }
       const match = chooseCanonicalSuggestion(originalName, suggestions);
-      if (!match) return false;
+      if (!match) {
+        // Last resort: prefix-indel recovery for a single inserted /
+        // dropped letter that bible's prefix-based search misses
+        // entirely (so there were no suggestions for the 4-pass matcher
+        // to work with). Already gated to exactly one distance-1 indel
+        // candidate, so accept it directly · the fuzzy pass in
+        // chooseCanonicalSuggestion bails under 6 chars and would reject
+        // short recoveries like "Lpiiv" -> "Lpiiiv".
+        const recovered = await recoverViaPrefixIndel(originalName);
+        if (recovered) {
+          const recoveredName = normalizeCharacterName(recovered.name);
+          if (!recoveredName) return false;
+          console.log(
+            `[listcheck] Prefix-indel recovery: OCR'd "${originalName}" -> canonical "${recoveredName}"`
+          );
+          if (recoveredName !== originalName) item.name = recoveredName;
+          await applyEnrichment(item, {
+            classId: recovered.cls || '',
+            itemLevel: Number(recovered.itemLevel) || 0,
+          });
+          return true;
+        }
+        return false;
+      }
 
       const { chosen, reason, distance, maxDistance } = match;
       const chosenName = normalizeCharacterName(chosen.name);

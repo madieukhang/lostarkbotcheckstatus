@@ -185,6 +185,88 @@ test('worker-online enrichment marks chars as trusted via discoveredAlts when th
   }
 });
 
+// Stub that resolves the empty roster page (forces search-direct), returns
+// empty for full-name search, and serves prefix-query candidates so the
+// prefix-indel recovery path can be exercised. `prefixResponses` maps a
+// lowercase query string to the bible result array.
+function installPrefixIndelStub(prefixResponses) {
+  const originalFetch = globalThis.fetch;
+  const counts = { searchCalls: 0 };
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/character/NA/')) {
+      return new Response('<html><body>No roster here</body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      counts.searchCalls += 1;
+      const m = requestedUrl.match(/payload=([^&]+)/);
+      const decoded = m ? Buffer.from(decodeURIComponent(m[1]), 'base64').toString('utf8') : '';
+      const q = ((decoded.match(/,"([^"]*)","NA"\]/) || [])[1] || '').toLowerCase();
+      const result = prefixResponses[q];
+      return Response.json({
+        type: 'result',
+        result: JSON.stringify(result || [[]]),
+      });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+  return { counts, restore() { globalThis.fetch = originalFetch; } };
+}
+
+test('prefix-indel recovery resolves a doubled letter (Qiyllyn -> Qiylyn)', async () => {
+  await markWorkerOnline();
+  const stub = installPrefixIndelStub({
+    qiyl: [[1], [2, 3, 4], 'Qiylyn', 'weather_artist', 1751.67],
+  });
+  try {
+    const results = await checkNamesAgainstLists(['Qiyllyn'], { guildId: 'guild-1' });
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Qiylyn', 'should recover canonical via prefix-indel');
+    assert.equal(results[0].snapItemLevel, 1751.67);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('prefix-indel recovery picks the unique distance-1 candidate (Lpiiv -> Lpiiiv, not Lpiiiiv)', async () => {
+  await markWorkerOnline();
+  // prefix "lpii" returns Lpiiiv (dist 1, recover) AND Lpiiiiv (dist 2,
+  // excluded by the strict indel gate · length differs by 2).
+  const stub = installPrefixIndelStub({
+    lpii: [[1, 5], [2, 3, 4], 'Lpiiiv', 'holyknight', 1730, [6, 7, 8], 'Lpiiiiv', 'berserker', 1660],
+  });
+  try {
+    const results = await checkNamesAgainstLists(['Lpiiv'], { guildId: 'guild-1' });
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Lpiiiv', 'should pick the single distance-1 indel candidate');
+    assert.equal(results[0].snapItemLevel, 1730);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('prefix-indel recovery rejects a same-length substitution (Viatchu stays bare, not Viatchy)', async () => {
+  await markWorkerOnline();
+  // prefix "viat" returns Viatchy · a real but DIFFERENT player one
+  // substitution away (u<->y). Same length, so the indel gate rejects it
+  // and the row renders bare rather than mis-resolving.
+  const stub = installPrefixIndelStub({
+    viat: [[1], [2, 3, 4], 'Viatchy', 'berserker_female', 1680],
+  });
+  try {
+    const results = await checkNamesAgainstLists(['Viatchu'], { guildId: 'guild-1' });
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Viatchu', 'OCR name unchanged · no unsafe substitution match');
+    assert.equal(results[0].snapItemLevel, 0, 'no item level · row stays bare');
+    assert.equal(results[0].snapClassName, '', 'no class · row stays bare');
+  } finally {
+    stub.restore();
+  }
+});
+
 test('worker-online enrichment falls back to bible search canonical names', async () => {
   await markWorkerOnline();
   const stub = installBibleSearchStub();
