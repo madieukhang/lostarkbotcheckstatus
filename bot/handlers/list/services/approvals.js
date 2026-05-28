@@ -1,3 +1,12 @@
+/**
+ * handlers/list/services/approvals.js
+ * Approval DM dispatch + sync helpers shared across /la-list add,
+ * edit, multiadd, and quickadd. Fans out the approval request to
+ * every assigned approver, tracks the message IDs so a decision in
+ * one DM mirrors to the others (syncApproverDmMessages), and posts
+ * the requester-DM with the final decision.
+ */
+
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -14,6 +23,18 @@ import { COLORS } from '../../../utils/ui.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 
+/**
+ * Build the approval DM service bag.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ *   for user DM fetching + message edits across the approver fan-out.
+ * @returns {{
+ *   sendListAddApprovalToApprovers: Function,
+ *   sendBulkApprovalToApprovers: Function,
+ *   syncApproverDmMessages: Function,
+ *   notifyRequesterAboutDecision: Function,
+ * }}
+ */
 export function createApprovalServices({ client }) {
   async function sendListAddApprovalToApprovers(guild, payload, options = {}) {
     const approverIds = getApproverRecipientIds();

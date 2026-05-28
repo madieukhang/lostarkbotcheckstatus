@@ -1,3 +1,12 @@
+/**
+ * handlers/list/services/broadcasts.js
+ * Cross-guild broadcast helpers · posts list-change notifications to
+ * the per-guild notify channel (configured via /la-setup notifychannel
+ * or LIST_NOTIFY_CHANNEL_IDS env fallback). Also exports the tracked-
+ * alts field builder and roster stat-record merge helpers reused by
+ * the multiadd reject/summary embeds.
+ */
+
 import { EmbedBuilder } from 'discord.js';
 
 import config from '../../../config.js';
@@ -77,6 +86,18 @@ export function buildTrackedAltsField(entry, statMap = new Map()) {
   });
 }
 
+/**
+ * Build the broadcast service bag.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ *   used to resolve the configured notify channels and post the
+ *   change embed.
+ * @returns {{
+ *   broadcastListChange: Function,
+ *   resolveBroadcastChannels: Function,
+ *   broadcastBulkAdd: Function,
+ * }}
+ */
 export function createBroadcastServices({ client }) {
   async function broadcastListChange(action, entry, payload, options = {}) {
     const {

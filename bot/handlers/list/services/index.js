@@ -21,6 +21,18 @@ import { createListAddExecutor } from './addExecutor.js';
 import { createBroadcastServices } from './broadcasts.js';
 import { createBulkServices } from './bulk.js';
 
+/**
+ * Compose the four shared service bags into one object every /la-list
+ * handler closes over.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ *   used by approvals (DM fan-out), broadcasts (cross-guild post),
+ *   and bulk (modal flows).
+ * @returns {object} the merged service surface · see this function's
+ *   return literal for the canonical key list (approval DM helpers,
+ *   add executor, broadcast helpers, bulk multiadd helpers, requester
+ *   notifier).
+ */
 export function createSharedServices({ client }) {
   const {
     sendListAddApprovalToApprovers,
