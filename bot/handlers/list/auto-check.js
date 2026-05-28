@@ -40,6 +40,17 @@ function pruneProcessedMessages(now = Date.now()) {
   }
 }
 
+/**
+ * Reserve a message for auto-check processing. Returns true when the
+ * caller has exclusive ownership and should proceed, false when the
+ * message is already in flight or has been processed within the TTL
+ * window. Discord can deliver MessageCreate twice (gateway retries +
+ * duplicate listeners in dev); this guard prevents double-OCR for the
+ * same attachment.
+ * @param {string} messageId - Discord message snowflake
+ * @param {number} [now=Date.now()] - timestamp override for tests
+ * @returns {boolean} true if claimed, false if already claimed/processed
+ */
 export function claimAutoCheckMessage(messageId, now = Date.now()) {
   if (!messageId) return true;
   pruneProcessedMessages(now);
@@ -50,6 +61,17 @@ export function claimAutoCheckMessage(messageId, now = Date.now()) {
   return true;
 }
 
+/**
+ * Release a previously claimed message. Pass `processed: false` for
+ * early-exit paths (image-less, off-channel, no OCR names) so the
+ * message can be re-claimed if it arrives again instead of being
+ * locked out for the dedupe TTL.
+ * @param {string} messageId - Discord message snowflake claimed earlier
+ * @param {object} [options]
+ * @param {boolean} [options.processed=true] - mark as processed (default true)
+ * @param {number} [options.now=Date.now()] - timestamp override for tests
+ * @returns {void}
+ */
 export function completeAutoCheckMessage(messageId, options = {}) {
   if (!messageId) return;
   const { processed = true, now = Date.now() } = options;
@@ -59,6 +81,11 @@ export function completeAutoCheckMessage(messageId, options = {}) {
   }
 }
 
+/**
+ * Wipe in-memory dedupe + cooldown state. Test seam only · lets each
+ * test run start from a clean slate without restarting the module.
+ * @returns {void}
+ */
 export function resetAutoCheckDedupeForTest() {
   processedMessages.clear();
   inFlightMessages.clear();
