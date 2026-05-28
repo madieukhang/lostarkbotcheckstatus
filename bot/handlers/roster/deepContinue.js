@@ -1,3 +1,11 @@
+/**
+ * handlers/roster/deepContinue.js
+ * "Continue scan" button on the /la-roster deep-scan progress card.
+ * Resumes the Stronghold alt-detection scan from where the previous
+ * run paused (a /la-roster deep:true run hands off via a button when
+ * the candidate window or time budget runs out).
+ */
+
 import { EmbedBuilder } from 'discord.js';
 
 import { connectDB } from '../../db.js';
@@ -56,6 +64,13 @@ function buildScanLimitEmbed(active) {
  * so we do not pay another roster-page fetch for the resume.
  *
  * customId shape: `roster-deep:continue:<sessionId>`
+ */
+/**
+ * Handle the "Continue scan" button on /la-roster deep-scan cards.
+ * Officer/senior-only · resumes detectAltsViaStronghold from the
+ * stored session cursor.
+ * @param {import('discord.js').Interaction} interaction
+ * @returns {Promise<void>}
  */
 export async function handleRosterDeepContinueButton(interaction) {
   await connectDB();

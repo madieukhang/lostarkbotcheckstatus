@@ -1,3 +1,11 @@
+/**
+ * handlers/roster/progress.js
+ * Shared progress-callback + stat formatter for /la-roster deep
+ * scans (visible + hidden + continue branches all use the same
+ * progress card). Throttles webhook edits to ~one per 15s so the
+ * deep scan stays well under Discord's 5-per-5s edit ceiling.
+ */
+
 import { COLORS } from '../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import { buildStopButtonRow } from '../../utils/scanSession.js';
@@ -24,6 +32,14 @@ function abortForProgressEditFailures(cancelFlag) {
  * throttle, preserves the Stop button row, and skips the final 100%
  * tick because the post-scan branch overwrites the embed immediately
  * afterwards (would flicker for ms).
+ */
+/**
+ * Build a throttled progress callback for a /la-roster deep scan.
+ * Returns a function the scan engine calls per candidate; this
+ * function rate-limits webhook edits to ~one per 15s and gracefully
+ * handles cancellation via cancelFlag.
+ * @param {object} args - the scan session context
+ * @returns {Function} progress callback(scanState)
  */
 export function makeRosterScanProgressCallback({ interaction, replyEditor, name, meta, totalMembers, startedAtRef, lastEditRef, cancelFlag, sessionId, lang = 'en' }) {
   let progressEditFailures = 0;
@@ -64,6 +80,13 @@ export function makeRosterScanProgressCallback({ interaction, replyEditor, name,
   };
 }
 
+/**
+ * Format the Stronghold deep-scan result into a short stats line
+ * (candidates scanned · alts found · failure rate). Used by both the
+ * visible + hidden deep-scan branches to print a consistent summary.
+ * @param {object} altResult - the detectAltsViaStronghold return
+ * @returns {string} the formatted stats line for the result embed
+ */
 export function formatDeepScanStats(altResult) {
   if (!altResult) return '';
 

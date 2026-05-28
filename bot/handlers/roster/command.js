@@ -1,3 +1,11 @@
+/**
+ * handlers/roster/command.js
+ * /la-roster: fetch a character's roster from lostark.bible. Visible
+ * rosters render the alt list with iLvl + class; hidden rosters fall
+ * back to the hidden-roster card with single-char data. Officer-only
+ * `deep:true` opts into the Stronghold alt-detection scan.
+ */
+
 import { EmbedBuilder } from 'discord.js';
 import { JSDOM, VirtualConsole } from 'jsdom';
 
@@ -52,6 +60,16 @@ function buildScanLimitEmbed(active) {
   });
 }
 
+/**
+ * Handle the /la-roster slash command.
+ * Branches on `rosterVisibility` returned by buildRosterCharacters:
+ * visible → render visible-roster embed (alt list + iLvl + class),
+ * hidden → delegate to handleHiddenRosterResult, missing → not-found
+ * card. When `deep:true` and the roster is visible, opts into
+ * runVisibleRosterDeepScan for Stronghold-based alt detection.
+ * @param {import('discord.js').Interaction} interaction
+ * @returns {Promise<void>}
+ */
 export async function handleRosterCommand(interaction) {
   const raw = interaction.options.getString('name');
   const name = normalizeCharacterName(raw);
