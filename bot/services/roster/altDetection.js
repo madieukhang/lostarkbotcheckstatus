@@ -1,3 +1,14 @@
+/**
+ * services/roster/altDetection.js
+ * Stronghold-based alt detection. Fans out across a target's guild
+ * members + bible meta lookups to find characters that share the same
+ * stronghold name (= same player account). Two modes: 'gentle'
+ * (sequential, 1.5s throttle, transient retry, current default) and
+ * 'fast' (concurrency 3, no retry). Gentle is the default since the
+ * 2026-05-03 peak-hour incident · fast mode should only be used
+ * off-peak when bible is cool.
+ */
+
 import config from '../../config.js';
 import { getClassName } from '../../models/Class.js';
 import {
@@ -8,6 +19,17 @@ import { fetchCharacterMeta } from './characterMeta.js';
 import { fetchGuildMembers } from './guildMembers.js';
 import { inferHiddenRosterItemLevel } from './search.js';
 
+/**
+ * Detect alt characters via the target's stronghold name. Runs inside a
+ * scraperapi-usage scope so per-call counters surface in the audit
+ * trail. Returns null when the target has no guild / no stronghold or
+ * the meta lookup fails.
+ * @param {string} name - target character name
+ * @param {object} [options] - see options destructure inside (mode,
+ *   concurrency, viaWorker, candidateLimit, target/guild meta overrides)
+ * @returns {Promise<object|null>} alt detection result · see callers in
+ *   handlers/list/enrich, handlers/list/multiadd, services/multiadd
+ */
 export async function detectAltsViaStronghold(name, options = {}) {
   return runWithScraperApiUsageScope(() => detectAltsViaStrongholdInScope(name, options));
 }

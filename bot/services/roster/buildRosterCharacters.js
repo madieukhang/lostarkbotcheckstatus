@@ -1,3 +1,13 @@
+/**
+ * services/roster/buildRosterCharacters.js
+ * One-shot roster fetcher used by /la-list add + multiadd. Parses the
+ * bible roster page, falls back to hidden-roster inference (search
+ * API) when the page is gated, and optionally fans out to
+ * detectAltsViaStronghold. Returns a normalised shape with all
+ * possible failure reasons surfaced as `failReason` so the caller
+ * can render a single embed without try/catch sprawl.
+ */
+
 import { JSDOM, VirtualConsole } from 'jsdom';
 
 import { buildBibleFetchOptions } from './bibleFetch.js';
@@ -14,6 +24,18 @@ virtualConsole.on('jsdomError', (err) => {
   console.warn('[jsdom] Parse warning:', err?.message || err);
 });
 
+/**
+ * Resolve a character's roster (siblings) via lostark.bible. Tries the
+ * direct roster page first, then falls back to hidden-roster
+ * inference + optional stronghold-based alt detection. Always returns
+ * a result object (never throws) so callers don't have to wrap.
+ * @param {string} name - target character name
+ * @param {object} [options]
+ * @param {boolean} [options.hiddenRosterFallback=false]
+ * @param {boolean} [options.includeHiddenRosterAlts=false]
+ * @param {boolean} [options.viaWorker] - forwarded to bibleClient
+ * @returns {Promise<{allCharacters: string[], hasValidRoster: boolean, failReason: string|null, targetItemLevel: number|null, targetClassName: string|null, targetCombatScore: number|null, rosterVisibility: string, rosterCharacters: object[]}>}
+ */
 export async function buildRosterCharacters(name, options = {}) {
   const {
     hiddenRosterFallback = false,
