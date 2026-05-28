@@ -1,3 +1,13 @@
+/**
+ * services/multiadd/parser.js
+ * Parse the user-uploaded .xlsx file produced by `/la-list multiadd
+ * action:download`. Tolerates ExcelJS's many cell-value shapes (plain,
+ * hyperlink, richText, formula `result`) so callers don't have to
+ * normalize. Header row is found dynamically by scanning column A for
+ * "name" · keeps the template free to add decorative rows above the
+ * table without breaking the parser.
+ */
+
 import { RAIDS } from '../../models/Raid.js';
 import {
   EXAMPLE_REASON_PREFIX,
@@ -8,6 +18,13 @@ const VALID_RAIDS = new Set(RAIDS);
 const VALID_TYPES = new Set(['black', 'white', 'watch']);
 const VALID_SCOPES = new Set(['global', 'server']);
 
+/**
+ * Coerce an ExcelJS cell value (any of: string, number, boolean,
+ * hyperlink object, richText array, formula result wrapper) to a
+ * trimmed string. Returns '' for null/undefined.
+ * @param {*} value - cell value from ExcelJS
+ * @returns {string}
+ */
 export function cellToString(value) {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value.trim();
@@ -24,6 +41,15 @@ export function cellToString(value) {
   return String(value).trim();
 }
 
+/**
+ * Parse a multiadd .xlsx buffer into validated row records. Returns a
+ * `{ ok, error?, rows, errors }` envelope · `ok: false` covers
+ * transport/file-format failures (no exceljs, not a valid xlsx, no
+ * worksheet), `errors[]` covers per-row validation issues that don't
+ * abort the parse.
+ * @param {Buffer} buffer - raw xlsx bytes
+ * @returns {Promise<{ok: boolean, error?: string, rows: Array, errors: Array}>}
+ */
 export async function parseMultiaddFile(buffer) {
   let ExcelJS;
   try {
