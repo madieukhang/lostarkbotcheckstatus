@@ -1,3 +1,11 @@
+/**
+ * handlers/list/remove/index.js
+ * /la-list remove: officer/senior-only entry to delete a list entry.
+ * Shows a multi-list confirm picker when the name exists on more
+ * than one list, then removes the chosen one and broadcasts the
+ * change.
+ */
+
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -25,6 +33,14 @@ import {
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getListContext } from '../helpers.js';
 
+/**
+ * Build the /la-list remove handler bag.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ * @param {object} deps.services - shared services
+ *   (broadcastListChange for the post-remove guild notification)
+ * @returns {{handleListRemoveCommand: Function}}
+ */
 export function createRemoveHandlers({ client, services }) {
   const { broadcastListChange } = services;
 

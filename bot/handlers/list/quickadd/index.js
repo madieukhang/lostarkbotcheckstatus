@@ -1,3 +1,12 @@
+/**
+ * handlers/list/quickadd/index.js
+ * Quick-Add dropdown on the auto-check / /la-check result card · lets
+ * an officer one-click an unflagged OCR'd name into a list. Opens a
+ * modal for reason + raid + scope, then routes through the same
+ * approval pipeline as /la-list add (auto-approve for officers,
+ * approver DM fan-out for everyone else).
+ */
+
 import { randomUUID } from 'node:crypto';
 import {
   ActionRowBuilder,
@@ -20,6 +29,17 @@ import {
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { isRequesterAutoApprover } from '../helpers.js';
 
+/**
+ * Build the Quick-Add handler bag.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ * @param {object} deps.services - shared approval-flow services
+ *   (sendListAddApprovalToApprovers, executeListAddToDatabase)
+ * @returns {{
+ *   handleQuickAddSelect: Function,
+ *   handleQuickAddModalSubmit: Function,
+ * }}
+ */
 export function createQuickAddHandlers({ client, services }) {
   const { sendListAddApprovalToApprovers, executeListAddToDatabase } = services;
 

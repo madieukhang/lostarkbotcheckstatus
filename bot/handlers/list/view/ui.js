@@ -1,3 +1,17 @@
+/**
+ * handlers/list/view/ui.js
+ * Pure render helpers for /la-list view + the evidence card used by
+ * /la-list view, /la-search, /la-evidence, /la-roster, and the
+ * approval-flow evidence button. Centralising the embed shape here
+ * is what makes those five surfaces stay visually consistent.
+ *
+ * Exports: buildTrustedListEmbed, buildListPageEmbed,
+ * buildListViewComponents, buildEvidenceEmbed, buildExpiredComponents.
+ * Per-helper JSDoc is light here · most are pure embed builders with
+ * obvious inputs · the buildEvidenceEmbed signature is the only one
+ * worth a fuller block (see its declaration).
+ */
+
 import {
   ActionRowBuilder,
   ButtonBuilder,

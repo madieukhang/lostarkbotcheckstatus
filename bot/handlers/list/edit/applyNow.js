@@ -1,3 +1,12 @@
+/**
+ * handlers/list/edit/applyNow.js
+ * Auto-apply branch of /la-list edit · taken when the requester is an
+ * officer (or otherwise auto-approver). Writes the edited entry to
+ * the DB, preserves enrichmentSource + enrichedAt metadata across
+ * cross-list moves so a future stale-loop doesn't treat the entry as
+ * legacy null, then broadcasts the change.
+ */
+
 import {
   getInteractionDisplayName,
 } from '../../../utils/names.js';
@@ -9,6 +18,20 @@ import {
   buildListEditSuccessEmbed,
 } from '../helpers.js';
 
+/**
+ * Apply a list-edit immediately (officer auto-approve path).
+ * @param {object} args - the edit-flow context bag
+ * @param {import('discord.js').Interaction} args.interaction
+ * @param {import('discord.js').Client} args.client
+ * @param {Function} args.broadcastListChange - guild broadcast
+ * @param {object} args.existing - the Mongoose entry being edited
+ * @param {string} args.currentType - blacklist | whitelist | watchlist
+ * @param {string} args.targetType - the destination list type (same as
+ *   currentType for in-place edit, different for cross-list move)
+ *   · plus the rewritten payload fields (reason, raid, scope, image,
+ *   allCharacters, …) and the updater identity.
+ * @returns {Promise<void>}
+ */
 export async function applyListEditNow({
   interaction,
   client,
