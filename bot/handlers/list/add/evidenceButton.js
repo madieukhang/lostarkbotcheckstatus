@@ -1,3 +1,11 @@
+/**
+ * handlers/list/add/evidenceButton.js
+ * "View evidence" button on the approval-DM card · re-renders the
+ * approval request's image + reason via the same buildEvidenceEmbed
+ * used by /la-evidence, /la-search, /la-list view. Approver-gated so
+ * non-approvers can't fetch evidence images via a leaked button id.
+ */
+
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { refreshImageUrl } from '../../../utils/imageRehost.js';
@@ -6,6 +14,13 @@ import { replyAlert, replyEmbed } from '../../../utils/interactionReplies.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import { decorateListEntry } from '../helpers.js';
 
+/**
+ * Build the "View evidence" button handler attached to approval DM cards.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ *   (used to refresh the rehosted evidence image URL if it's expired)
+ * @returns {Function} handleListAddViewEvidenceButton(interaction)
+ */
 export function createListAddViewEvidenceButtonHandler({ client }) {
   async function handleListAddViewEvidenceButton(interaction) {
     const requestId = interaction.customId.split(':')[1];

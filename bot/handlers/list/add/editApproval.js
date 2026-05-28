@@ -1,3 +1,12 @@
+/**
+ * handlers/list/add/editApproval.js
+ * Handles the "approve + edit" path off the approval-button flow: an
+ * approver opens a modal, rewrites the request's reason/raid/scope,
+ * and submits · this module rewrites the PendingApproval doc, runs
+ * the same add-to-DB executor as a plain approve, syncs approver DM
+ * messages, notifies the requester, and broadcasts the change.
+ */
+
 import PendingApproval from '../../../models/PendingApproval.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
@@ -10,6 +19,25 @@ import {
   buildApprovalResultRow,
 } from '../helpers.js';
 
+/**
+ * Process an approver's "edit then approve" submission for a pending
+ * /la-list add request. Rewrites the PendingApproval payload, runs the
+ * add executor, fans out the result to every approver DM, notifies the
+ * requester, and broadcasts the change to the per-guild notify channel.
+ *
+ * @param {object} args
+ * @param {import('discord.js').Client} args.client - Discord client
+ * @param {import('discord.js').Interaction} args.interaction - the
+ *   modal-submit interaction from the approver
+ * @param {object} args.payload - the rewritten add payload (name,
+ *   reason, raid, scope, image, allCharacters, …) replacing the doc's
+ *   original payload
+ * @param {string} args.requestId - PendingApproval document _id
+ * @param {Function} args.syncApproverDmMessages - approver DM sync
+ * @param {Function} args.broadcastListChange - guild broadcast
+ * @param {Function} args.notifyRequesterAboutDecision - requester DM
+ * @returns {Promise<void>}
+ */
 export async function handleApprovedEditRequest({
   client,
   interaction,
