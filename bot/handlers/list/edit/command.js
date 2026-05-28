@@ -1,3 +1,11 @@
+/**
+ * handlers/list/edit/command.js
+ * /la-list edit: slash entry that edits an existing list entry's
+ * reason/raid/scope/image/allCharacters. Auto-approves for officers
+ * (applyListEditNow), otherwise fans out an approval request via
+ * sendListEditApprovalRequest.
+ */
+
 import { connectDB } from '../../../db.js';
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
@@ -26,6 +34,16 @@ import {
 import { applyListEditNow } from './applyNow.js';
 import { sendListEditApprovalRequest } from './approvalRequest.js';
 
+/**
+ * Build the /la-list edit slash-command handler.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ * @param {Function} deps.sendListAddApprovalToApprovers - approver DM
+ *   broadcaster (reused from the /la-list add flow; edit piggybacks on
+ *   the same approval pipeline)
+ * @param {Function} deps.broadcastListChange - guild broadcast
+ * @returns {Function} handleListEditCommand(interaction)
+ */
 export function createListEditCommandHandler({
   client,
   sendListAddApprovalToApprovers,

@@ -1,3 +1,10 @@
+/**
+ * handlers/list/view/index.js
+ * /la-list view: paginated list browser for blacklist / whitelist /
+ * watchlist / trusted. Renders the embed via view/ui.js helpers and
+ * wires the pagination buttons + evidence dropdowns.
+ */
+
 import config from '../../../config.js';
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
@@ -86,6 +93,18 @@ async function buildGuildNameCache({ allEntries, client, isOwnerGuild }) {
   return guildNameCache;
 }
 
+/**
+ * Build the /la-list view handler bag.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ *   (used to refresh rehosted evidence URLs when the dropdown asks
+ *   for an image that's past its CDN expiry)
+ * @returns {{
+ *   handleListViewCommand: Function,
+ *   handleListViewPaginateButton: Function,
+ *   handleListViewEvidenceSelect: Function,
+ * }}
+ */
 export function createViewHandlers({ client }) {
   async function handleListViewCommand(interaction) {
     if (!interaction.guild) {

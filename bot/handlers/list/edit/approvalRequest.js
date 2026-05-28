@@ -1,9 +1,31 @@
+/**
+ * handlers/list/edit/approvalRequest.js
+ * Non-officer branch of /la-list edit · creates a PendingApproval doc
+ * with kind="edit" and fans out the approval DM to approvers using
+ * the SAME sendListAddApprovalToApprovers helper as /la-list add
+ * (so the approver UX stays consistent across add + edit).
+ */
+
 import { randomUUID } from 'node:crypto';
 
 import PendingApproval from '../../../models/PendingApproval.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert } from '../../../utils/interactionReplies.js';
 
+/**
+ * Persist a /la-list edit request as a PendingApproval and fan out the
+ * approval DM to every assigned approver.
+ * @param {object} args - the edit-request context bag
+ * @param {import('discord.js').Interaction} args.interaction
+ * @param {Function} args.sendListAddApprovalToApprovers - reused
+ *   approver DM broadcaster (handles both add + edit kinds)
+ * @param {object} args.existing - the entry being edited
+ * @param {string} args.currentType - blacklist | whitelist | watchlist
+ * @param {string} args.targetType - destination list type
+ *   · plus the rewritten payload fields (newReason, newRaid, newLogs,
+ *   newScope, newImage, additional_names, etc.)
+ * @returns {Promise<void>}
+ */
 export async function sendListEditApprovalRequest({
   interaction,
   sendListAddApprovalToApprovers,
