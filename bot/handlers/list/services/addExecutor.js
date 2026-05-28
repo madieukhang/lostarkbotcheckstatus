@@ -1,3 +1,12 @@
+/**
+ * handlers/list/services/addExecutor.js
+ * The actual add-to-DB executor + the hidden-roster guidance embed
+ * builder. Both /la-list add (auto-approve + approval-approved paths)
+ * and the approval-button handler call into executeListAddToDatabase
+ * here · this is the single place that persists, stamps enrichment
+ * metadata, runs dupe checks, and renders the success card.
+ */
+
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -62,6 +71,18 @@ export function buildHiddenRosterGuidance(entryName, guildName, lang = 'en') {
   return { fields, components };
 }
 
+/**
+ * Build the executeListAddToDatabase executor.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ *   (used by the hidden-roster guidance "Enrich now" button + the
+ *   success card's evidence-rehost path)
+ * @param {Function} deps.broadcastListChange - guild broadcast helper
+ *   called after a successful add so the per-guild notify channel
+ *   gets the update.
+ * @returns {{executeListAddToDatabase: Function}} the executor (shared
+ *   call site between auto-approve + approval-button paths).
+ */
 export function createListAddExecutor({ client, broadcastListChange }) {
   async function executeListAddToDatabase(payload) {
     const { model, label, color, icon } = getListContext(payload.type);

@@ -1,3 +1,12 @@
+/**
+ * handlers/list/services/bulk.js
+ * Bulk multiadd executor + summary embed builder. Called from the
+ * /la-list multiadd modal confirm path · iterates the parsed rows,
+ * runs the same executeListAddToDatabase as a single add per row
+ * (with rehost guarded), collects added / skipped / failed buckets,
+ * and renders the rich summary card.
+ */
+
 import { randomUUID } from 'node:crypto';
 import { EmbedBuilder } from 'discord.js';
 
@@ -6,6 +15,18 @@ import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { COLORS } from '../../../utils/ui.js';
 
+/**
+ * Build the bulk service bag.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ * @param {Function} deps.executeListAddToDatabase - per-row executor
+ *   (reused from the single-add path so bulk obeys all the same dupe
+ *   checks, trusted-block guards, and scope semantics).
+ * @returns {{
+ *   executeBulkMultiadd: Function,
+ *   buildBulkSummaryEmbed: Function,
+ * }}
+ */
 export function createBulkServices({ client, executeListAddToDatabase }) {
   async function executeBulkMultiadd(rows, meta, onProgress = null) {
     const results = { added: [], skipped: [], failed: [], rehostWarnings: [] };
