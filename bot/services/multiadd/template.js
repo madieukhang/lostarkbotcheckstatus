@@ -1,7 +1,6 @@
 /**
  * services/multiadd/template.js
- *
- * Standalone .xlsx template generator + parser for /la-list multiadd.
+ * Standalone .xlsx template generator for /la-list multiadd.
  * Kept in its own module so it has zero dependencies on config/db/discord,
  * making it trivially importable and testable in isolation. The only
  * internal import is the RAIDS enum, which is a pure data module.

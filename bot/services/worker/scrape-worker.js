@@ -1,3 +1,14 @@
+/**
+ * services/worker/scrape-worker.js
+ * Worker-process side of the bot↔residential-IP scrape bridge. Polls
+ * ScrapeJob for pending work, atomically claims the oldest, fetches
+ * the target URL with bible-spoofed headers, and writes the response
+ * back to Mongo for the bot to pick up. Stale in-progress jobs (lease
+ * expired) are re-claimable so a crashed worker doesn't leave jobs
+ * stuck. Lease window controlled by WORKER_JOB_LEASE_MS env (default
+ * 2 min).
+ */
+
 import ScrapeJob from '../../models/ScrapeJob.js';
 import { FETCH_HEADERS } from '../roster/bibleHeaders.js';
 
@@ -26,10 +37,14 @@ export function buildClaimNextJobFilter({
   };
 }
 
-// Atomically grab the oldest pending job and flip it to in_progress.
-// Returns the job document (with the updated state) or null when no
-// pending work is available. Exposed for tests so they can drive a
-// single iteration without spawning a worker process.
+/**
+ * Atomically claim the oldest pending (or stale-in-progress) job and
+ * flip it to in_progress. Returns the updated document or null when no
+ * work is available. Exposed for tests so they can drive a single
+ * iteration without spawning a worker process.
+ * @param {object} [options] - see buildClaimNextJobFilter
+ * @returns {Promise<object|null>} claimed ScrapeJob doc or null
+ */
 export async function claimNextJob(options = {}) {
   return ScrapeJob.findOneAndUpdate(
     buildClaimNextJobFilter(options),
@@ -92,9 +107,15 @@ async function executeJob(job, { logger = console } = {}) {
   }
 }
 
-// One worker iteration: claim oldest pending, process it, or report
-// idle if no work was available. Tests call this directly. The
-// long-running worker process loops over it with a sleep on idle.
+/**
+ * One worker iteration · claim oldest pending, process it, or report
+ * idle when no work is available. The long-running worker process
+ * loops over this with a sleep on idle. Tests call directly to drive
+ * a deterministic single step.
+ * @param {object} [opts]
+ * @param {object} [opts.logger=console]
+ * @returns {Promise<{state: "idle"|"done"|"failed", jobId?: string}>}
+ */
 export async function claimAndProcessOne({ logger = console } = {}) {
   const job = await claimNextJob();
   if (!job) return { state: 'idle' };

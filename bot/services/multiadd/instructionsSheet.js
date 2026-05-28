@@ -1,3 +1,19 @@
+/**
+ * services/multiadd/instructionsSheet.js
+ * Build the Instructions worksheet appended to the /la-list multiadd
+ * .xlsx template. Visual-heavy code (cell colors, fonts, merge regions)
+ * intentionally pushed into its own module so the data-shape concerns
+ * in template.js stay readable.
+ */
+
+/**
+ * Append an 'Instructions' worksheet to the workbook with formatted
+ * usage docs · target audience is whoever opens the template in Excel
+ * without reading the slash-command help embed first.
+ * @param {object} wb - ExcelJS Workbook
+ * @param {{colors: object, gradientBlurple: object, maxRows: number, raids: string[]}} options
+ * @returns {void}
+ */
 export function buildInstructionsSheet(wb, options) {
   const {
     colors,

@@ -1,3 +1,13 @@
+/**
+ * services/worker/heartbeat.js
+ * Mongo-backed liveness signal for the residential-IP scrape worker.
+ * Worker process ticks `lastSeenAt` every 15s · bot side reads with a
+ * 30s stale threshold (2× interval so one missed tick is OK, two
+ * consecutive flips to offline). Used by workerBibleClient as the
+ * gate that decides whether to push a job vs reject with a clear
+ * "worker offline" error.
+ */
+
 import WorkerHeartbeatDefault from '../../models/WorkerHeartbeat.js';
 
 const DEFAULT_INTERVAL_MS = 15_000;
@@ -24,6 +34,18 @@ export async function writeHeartbeat({
   );
 }
 
+/**
+ * Start the heartbeat write loop on the worker side. Writes once
+ * immediately so consumers see a fresh signal as soon as the worker
+ * is up, then ticks every `intervalMs`. Returned handle is `.unref()`-ed
+ * so it never keeps the process alive on its own.
+ * @param {object} [opts]
+ * @param {object} [opts.WorkerHeartbeat] - Mongoose model (test injection)
+ * @param {string} [opts.workerId]
+ * @param {number} [opts.intervalMs=15000]
+ * @param {object} [opts.logger=console]
+ * @returns {*} setInterval handle (pass to stopHeartbeat to cancel)
+ */
 export function startHeartbeat({
   WorkerHeartbeat = WorkerHeartbeatDefault,
   workerId = DEFAULT_WORKER_ID,
@@ -49,10 +71,15 @@ export function stopHeartbeat(handle) {
   if (handle) clearInterval(handle);
 }
 
-// Bot-side read. Returns { online, ageMs, lastSeenAt, startedAt, reason }.
-// `online` is true when the heartbeat is fresher than maxStaleMs.
-// Default 30s = 2x the worker interval so a single missed tick is OK,
-// two consecutive misses flips to offline.
+/**
+ * Bot-side liveness probe. `online` is true when the last heartbeat
+ * is fresher than `maxStaleMs` (default 30s = 2× worker interval).
+ * @param {object} [opts]
+ * @param {object} [opts.WorkerHeartbeat]
+ * @param {string} [opts.workerId]
+ * @param {number} [opts.maxStaleMs=30000]
+ * @returns {Promise<{online: boolean, reason: string, lastSeenAt: Date|null, ageMs: number|null, startedAt: Date|null}>}
+ */
 export async function getWorkerHealth({
   WorkerHeartbeat = WorkerHeartbeatDefault,
   workerId = DEFAULT_WORKER_ID,
