@@ -135,6 +135,12 @@ function setCachedOcrNames(cacheKey, names) {
   });
 }
 
+/**
+ * Drop every cached OCR result. Wired into the test suite so successive
+ * tests start from a clean slate; production code never calls this · the
+ * cache TTLs + LRU eviction handle steady-state churn.
+ * @returns {void}
+ */
 export function clearOcrCache() {
   ocrCache.clear();
 }
