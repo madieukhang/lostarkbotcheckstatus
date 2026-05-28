@@ -1,3 +1,13 @@
+/**
+ * handlers/list/add/overwriteButton.js
+ * "Overwrite" + "Keep existing" buttons on the duplicate-detection
+ * branch of /la-list add. When the requester is adding a name that
+ * already exists on another list (or same list with different reason),
+ * the approval card offers an overwrite path · this handler refreshes
+ * allCharacters via a fresh bible scrape, stamps the enrichment meta,
+ * and rewrites the existing entry in place.
+ */
+
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
@@ -11,6 +21,15 @@ import {
   buildApprovalResultRow,
 } from '../helpers.js';
 
+/**
+ * Build the Overwrite / Keep-existing button handler for the duplicate
+ * branch of /la-list add.
+ * @param {object} deps
+ * @param {Function} deps.syncApproverDmMessages - approver DM sync
+ * @param {Function} deps.broadcastListChange - guild broadcast
+ * @param {Function} deps.notifyRequesterAboutDecision - requester DM
+ * @returns {Function} handleListAddOverwriteButton(interaction)
+ */
 export function createListAddOverwriteButtonHandler({
   syncApproverDmMessages,
   broadcastListChange,

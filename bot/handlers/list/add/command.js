@@ -1,3 +1,12 @@
+/**
+ * handlers/list/add/command.js
+ * /la-list add: slash entry that opens the approval flow for adding
+ * a character to one of the four lists (blacklist / whitelist /
+ * watchlist / trusted). Performs bible roster scrape for `allCharacters`,
+ * resolves evidence image rehost, then either auto-approves (officer)
+ * or fans the request out to approvers via DM.
+ */
+
 import { randomUUID } from 'node:crypto';
 
 import { connectDB } from '../../../db.js';
@@ -22,6 +31,17 @@ import {
   isRequesterAutoApprover,
 } from '../helpers.js';
 
+/**
+ * Build the /la-list add slash-command handler.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client for
+ *   REST resolves + DM fan-out via the approver service
+ * @param {Function} deps.sendListAddApprovalToApprovers - approver DM
+ *   broadcaster (returns the message IDs for sync tracking)
+ * @param {Function} deps.executeListAddToDatabase - the actual
+ *   add-to-DB executor, also called from the approval-button handler
+ * @returns {Function} handleListAddCommand(interaction)
+ */
 export function createListAddCommandHandler({
   client,
   sendListAddApprovalToApprovers,

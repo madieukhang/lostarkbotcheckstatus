@@ -1,3 +1,12 @@
+/**
+ * handlers/list/add/approvalButton.js
+ * Handles the Approve / Reject / Edit buttons attached to a pending
+ * /la-list add request (delivered to approvers via DM). Approve calls
+ * executeListAddToDatabase and broadcasts, Reject closes the request,
+ * Edit hands off to editApproval.js for a modal-based rewrite of
+ * reason/raid/scope before approval.
+ */
+
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -19,6 +28,18 @@ import {
 } from '../helpers.js';
 import { handleApprovedEditRequest } from './editApproval.js';
 
+/**
+ * Build the Approve / Reject / Edit button handler for /la-list add.
+ * @param {object} deps
+ * @param {import('discord.js').Client} deps.client - Discord client
+ * @param {Function} deps.syncApproverDmMessages - fan-out updates to
+ *   every approver DM so the same decision view stays in sync
+ * @param {Function} deps.executeListAddToDatabase - shared add executor
+ * @param {Function} deps.broadcastListChange - guild-broadcast notifier
+ * @param {Function} deps.notifyRequesterAboutDecision - DM the requester
+ *   with the final outcome (approved / rejected / edited)
+ * @returns {Function} handleListAddApprovalButton(interaction)
+ */
 export function createListAddApprovalButtonHandler({
   client,
   syncApproverDmMessages,
