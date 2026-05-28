@@ -1,6 +1,10 @@
 /**
  * handlers/meta/stats.js
- * Handles /la-stats command · shows bot usage statistics.
+ * /la-stats command · shows bot usage statistics. Counts are
+ * Promise.all-batched for one round-trip; the 7-day "growth pulse"
+ * uses a $gte timestamp filter so a missing index would still work
+ * (just slower). Embed is ephemeral · stats are for operators not
+ * channel chat.
  */
 
 import { EmbedBuilder } from 'discord.js';
@@ -26,6 +30,12 @@ function formatUptime(ms) {
   return parts.join(' ');
 }
 
+/**
+ * Handle `/la-stats`. Defers ephemerally (DB roll-up takes a few hundred
+ * ms even on fresh indexes) then edits with the rolled-up embed.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * @returns {Promise<void>}
+ */
 export async function handleStatsCommand(interaction) {
   await deferEphemeralReply(interaction);
   await connectDB();

@@ -1,3 +1,14 @@
+/**
+ * app/interaction-router.js
+ * Central interaction dispatcher for every Discord interaction the bot
+ * cares about. Routes by interaction type (slash command, button,
+ * select-menu, modal, autocomplete) then by command name or component
+ * prefix. Transient 10062/40060 errors (3-second Discord ACK window
+ * expiry, double-ack) are logged + swallowed · everything else
+ * bubbles to a generic error reply so the user never stares at a
+ * silent failure.
+ */
+
 import { InteractionType } from 'discord.js';
 
 import { checkStatus, resetState } from '../monitor/monitor.js';

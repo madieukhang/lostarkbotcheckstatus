@@ -1,3 +1,12 @@
+/**
+ * handlers/meta/help.js
+ * /la-help command + drill-down dropdown. Overview embed appends
+ * owner-only sections only when invoked inside the owner guild
+ * (`config.ownerGuildId`) so admin commands stay out of public help.
+ * All copy is locale-aware via the i18n `t()` helper; sections live
+ * in locales/<lang>.js under the `help.*` namespace.
+ */
+
 import {
   ActionRowBuilder,
   EmbedBuilder,
