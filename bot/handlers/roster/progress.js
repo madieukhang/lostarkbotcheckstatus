@@ -27,18 +27,12 @@ function abortForProgressEditFailures(cancelFlag) {
 }
 
 /**
- * Build the onProgress callback used by both the hidden-roster and the
- * visible-roster deep-scan paths. Wraps Discord editReply with a 15s
- * throttle, preserves the Stop button row, and skips the final 100%
- * tick because the post-scan branch overwrites the embed immediately
- * afterwards (would flicker for ms).
- */
-/**
- * Build a throttled progress callback for a /la-roster deep scan.
- * Returns a function the scan engine calls per candidate; this
- * function rate-limits webhook edits to ~one per 15s and gracefully
- * handles cancellation via cancelFlag.
- * @param {object} args - the scan session context
+ * Build the onProgress callback shared by hidden-roster + visible-
+ * roster deep-scan paths. Wraps Discord editReply with a 15s throttle,
+ * preserves the Stop button row, and skips the final 100% tick (the
+ * post-scan branch overwrites the embed immediately afterwards so
+ * emitting the tick would flicker).
+ * @param {object} args - scan session context
  * @returns {Function} progress callback(scanState)
  */
 export function makeRosterScanProgressCallback({ interaction, replyEditor, name, meta, totalMembers, startedAtRef, lastEditRef, cancelFlag, sessionId, lang = 'en' }) {

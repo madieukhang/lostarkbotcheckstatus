@@ -58,17 +58,13 @@ function buildScanLimitEmbed(active) {
 }
 
 /**
- * Continue button for /la-roster deep:true. Resumes the prior scan with
- * scanned-names fed back as excludeNames so the next pass walks only
- * fresh candidates. Reuses cached meta + guildMembers from the session
- * so we do not pay another roster-page fetch for the resume.
+ * Continue button for /la-roster deep:true. Resumes the prior scan
+ * with scanned-names fed back as excludeNames so the next pass walks
+ * only fresh candidates. Reuses cached meta + guildMembers from the
+ * session so we don't pay another roster-page fetch for the resume.
+ * Officer/senior-only.
  *
  * customId shape: `roster-deep:continue:<sessionId>`
- */
-/**
- * Handle the "Continue scan" button on /la-roster deep-scan cards.
- * Officer/senior-only · resumes detectAltsViaStronghold from the
- * stored session cursor.
  * @param {import('discord.js').Interaction} interaction
  * @returns {Promise<void>}
  */
