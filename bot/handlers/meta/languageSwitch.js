@@ -1,3 +1,13 @@
+/**
+ * handlers/meta/languageSwitch.js
+ * /la-language per-user locale switcher · ephemeral two-step flow.
+ * Step 1 renders an embed showing the user's current locale + a
+ * SUPPORTED_LANGUAGES dropdown. Step 2 (customId
+ * `la-language-switch:select`) persists the new code to UserPreference,
+ * invalidates the in-process cache, and replies in the NEW language so
+ * the user visually confirms the switch took effect.
+ */
+
 import {
   ActionRowBuilder,
   EmbedBuilder,
