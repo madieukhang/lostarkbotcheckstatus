@@ -1,3 +1,14 @@
+/**
+ * services/roster/workerBibleClient.js
+ * Bridge from bot to the residential-IP scrape worker. Pushes jobs into
+ * the ScrapeJob collection, polls until a worker fills in the response,
+ * and re-hydrates a Fetch-Response-like object so callers using
+ * bibleClient.fetch don't need to know the difference. Backpressure
+ * gate (WORKER_QUEUE_BACKPRESSURE_THRESHOLD env, default 100) rejects
+ * new inserts when the queue piles up · prevents callers from eating
+ * 30s timeouts when the worker is offline.
+ */
+
 import ScrapeJobDefault from '../../models/ScrapeJob.js';
 import { getWorkerHealth as getDefaultWorkerHealth } from '../worker/heartbeat.js';
 
@@ -34,9 +45,20 @@ function sanitizeOptions(options = {}) {
   return out;
 }
 
-// Factory that takes injected dependencies so tests can pass a fake
-// ScrapeJob model and shorter intervals. Production singleton below
-// uses the real Mongoose model and live polling cadence.
+/**
+ * Build a worker-routed bible client. Factory takes injected deps so
+ * tests can pass a fake ScrapeJob model + shorter polling cadence.
+ * Production singleton below the factory uses the real Mongoose model
+ * and live cadence.
+ * @param {object} [deps]
+ * @param {object} [deps.ScrapeJob] - Mongoose model · defaults to real
+ * @param {Function|null} [deps.getWorkerHealth] - heartbeat probe
+ * @param {number} [deps.pollIntervalMs=500] - response-poll cadence
+ * @param {number} [deps.defaultTimeoutMs=30000] - per-job ceiling
+ * @param {number} [deps.backpressureThreshold] - max pending queue
+ * @param {Function} [deps.now=Date.now]
+ * @returns {{fetch: Function}} worker-routed fetch shim
+ */
 export function createWorkerBibleClient({
   ScrapeJob = ScrapeJobDefault,
   getWorkerHealth = null,

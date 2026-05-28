@@ -1,14 +1,16 @@
+/**
+ * services/roster/bibleClient.js
+ * Transport selector for bible fetches. BIBLE_WORKER_ENABLED env +
+ * per-call `viaWorker: true` flag together gate the residential-IP
+ * sidecar transport. Narrow gate by design: heavy fan-out commands
+ * (/la-list enrich, /la-roster deep, hidden roster fallback) need the
+ * worker to bypass CF; latency-sensitive surfaces (search autocomplete,
+ * one-off /la-list add) stay direct so UX doesn't collapse.
+ */
+
 import { fetchWithFallback } from './bibleFetch.js';
 import { workerBibleClient } from './workerBibleClient.js';
 
-// Worker mode is a kill-switch for the residential-IP sidecar transport.
-// When BIBLE_WORKER_ENABLED is on, opt-in callers (those that pass
-// `viaWorker: true` in options) get routed to workerBibleClient. All
-// other callers stay on direct fetchWithFallback. This narrow gate is
-// intentional: heavy fan-out commands (/la-list enrich, /la-roster
-// deep, hidden roster fallback) need the residential IP to bypass CF;
-// latency-sensitive commands like search autocomplete and one-off
-// /la-list add must stay direct or the bot's UX collapses.
 function parseBoolEnv(raw) {
   if (!raw || raw.trim() === '') return false;
   return ['1', 'true', 'yes', 'y', 'on'].includes(raw.trim().toLowerCase());

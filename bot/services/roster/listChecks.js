@@ -1,8 +1,24 @@
+/**
+ * services/roster/listChecks.js
+ * Roster-vs-list lookup helpers backing /la-check + auto-check.
+ * Blacklist + whitelist queries are case-insensitive (collation
+ * strength 2) so OCR-folded names land on the right row. Returns the
+ * full entry shape via shapeRosterListHit so callers don't have to
+ * know which Mongoose fields exist on the model.
+ */
+
 import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 
+/**
+ * Project a Blacklist/Whitelist entry to the slim shape the embeds
+ * + handler code consume. Centralises field defaults so adding a new
+ * field on the model only touches this file (plus the new use site).
+ * @param {object} entry - Mongoose lean document
+ * @returns {object} normalised hit payload
+ */
 export function shapeRosterListHit(entry) {
   return {
     name: entry.name,
@@ -23,6 +39,14 @@ export function shapeRosterListHit(entry) {
   };
 }
 
+/**
+ * Look up a roster's names against the Blacklist collection.
+ * Returns the FIRST hit (sorted by scope DESC · guild > global) so
+ * server-scoped entries take precedence over global ones.
+ * @param {string[]} names - character names from the OCR/roster
+ * @param {{guildId?: string}} [options] - scope filter
+ * @returns {Promise<object|null>} shaped hit or null on no match / error
+ */
 export async function handleRosterBlackListCheck(names, options = {}) {
   try {
     await connectDB();

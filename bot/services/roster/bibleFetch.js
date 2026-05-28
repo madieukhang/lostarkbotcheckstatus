@@ -1,3 +1,12 @@
+/**
+ * services/roster/bibleFetch.js
+ * Direct + ScraperAPI fallback transport for lostark.bible. Smart
+ * fallback cache remembers a 403/503 block window (5 min) so the wasted
+ * direct fetch is skipped during a CF squall. ScraperAPI keys are
+ * rotated round-robin · per-key cooldown on 401/403/429 so quota
+ * exhaustion doesn't burn the same key in a tight loop.
+ */
+
 import config from '../../config.js';
 import { recordScraperApiRequest } from '../../utils/scraperApiUsage.js';
 import { FETCH_HEADERS } from './bibleHeaders.js';
@@ -83,6 +92,20 @@ async function fetchViaScraperApi(url) {
   return null;
 }
 
+/**
+ * Main bible fetch path. Tries direct first (unless preferScraperApi),
+ * falls back to ScraperAPI on 403/503/network-error. 429 only falls
+ * back when `fallbackOnRateLimit` is on (most callers don't want to
+ * burn quota on a transient rate-limit). When ScraperAPI fallback also
+ * fails, returns the original direct response so the caller can read
+ * its status code.
+ * @param {string} url
+ * @param {object} [options]
+ * @param {boolean} [options.allowScraperApi=true]
+ * @param {boolean} [options.preferScraperApi=false]
+ * @param {boolean} [options.fallbackOnRateLimit=false]
+ * @returns {Promise<Response>}
+ */
 export async function fetchWithFallback(url, options = {}) {
   const {
     allowScraperApi = true,

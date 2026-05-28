@@ -1,9 +1,27 @@
+/**
+ * services/roster/search.js
+ * Wrappers around the lostark.bible name-search API. The API speaks a
+ * compact reference-payload JSON (numeric indices into a `data` array)
+ * so the decoding here is invariant-critical · break it and search
+ * autocomplete + hidden-roster inference both quietly return null.
+ * Reminder: this API is NFC-only and prefix-based with single-edit
+ * tolerance · see [[reference-bible-api]] for the full behaviour notes.
+ */
+
 import { getClassName } from '../../models/Class.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
 import { parseItemLevelValue } from './parsers.js';
 
+/**
+ * Hit the bible name-search endpoint and decode the reference-payload
+ * JSON into a `[{name, cls, itemLevel}]` array. Returns null on
+ * transport error (caller distinguishes that from "no results").
+ * @param {string} name - prefix or near-match candidate
+ * @param {object} [options] - forwarded to buildBibleFetchOptions
+ * @returns {Promise<Array<{name: string, cls: string, itemLevel: number|string}>|null>}
+ */
 export async function fetchNameSuggestions(name, options = {}) {
   try {
     const payload = Buffer.from(JSON.stringify([{ name: 1, region: 2 }, name, 'NA'])).toString('base64');
@@ -40,6 +58,15 @@ export async function fetchNameSuggestions(name, options = {}) {
   }
 }
 
+/**
+ * Hidden-roster fallback · when a character's full roster page is
+ * private but the name still appears in search results, we can still
+ * recover their item-level. Used by buildRosterCharacters'
+ * hiddenRosterFallback path.
+ * @param {string} name - exact character name (case-insensitive match)
+ * @param {object} [options] - forwarded to fetchNameSuggestions
+ * @returns {Promise<number|null>}
+ */
 export async function inferHiddenRosterItemLevel(name, options = {}) {
   const suggestions = await fetchNameSuggestions(name, options);
   const exact = suggestions?.find((s) => s.name?.toLowerCase() === name.toLowerCase());
