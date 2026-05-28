@@ -1,3 +1,12 @@
+/**
+ * handlers/roster/visibleDeepScan.js
+ * Visible-roster branch of /la-roster deep:true · runs the Stronghold
+ * alt-detection scan, throttled via makeRosterScanProgressCallback,
+ * and renders the final scan-result card. The hidden-roster path has
+ * its own scan branch in hiddenRoster.js; both share the progress +
+ * scan-session primitives in utils/scanProgressEmbed + scanSession.
+ */
+
 import { EmbedBuilder } from 'discord.js';
 
 import { connectDB } from '../../db.js';
@@ -25,6 +34,22 @@ import { createRosterDeepSession } from '../../utils/rosterDeepSession.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { makeRosterScanProgressCallback } from './progress.js';
 
+/**
+ * Run the Stronghold deep-scan branch on a visible /la-roster query.
+ * @param {object} args
+ * @param {import('discord.js').Interaction} args.interaction
+ * @param {Function} args.replyEditor - shared editor (see other roster
+ *   handlers for the same pattern)
+ * @param {string} args.name - the queried character name
+ * @param {object} args.deepOptions - scan tuning (concurrency,
+ *   candidate cap, backoff bounds)
+ * @param {import('discord.js').EmbedBuilder} args.embed - the base
+ *   embed the caller already started (visible-roster card); this
+ *   function appends the deep-scan section.
+ * @param {string[]} args.contentLines - lines accumulated by the
+ *   caller; this function appends scan progress + result lines.
+ * @returns {Promise<void>}
+ */
 export async function runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed, contentLines }) {
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });

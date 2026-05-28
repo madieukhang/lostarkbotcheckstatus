@@ -1,3 +1,13 @@
+/**
+ * handlers/roster/hiddenRoster.js
+ * Hidden-roster branch of /la-roster · fired when the bible roster
+ * page returns no characters (account is hidden). Renders the single
+ * resolved character via fetchCharacterMeta, inlines any blacklist /
+ * whitelist hit's evidence card so the operator sees it without
+ * re-running /la-evidence, and offers the same deep-scan button as
+ * the visible path.
+ */
+
 import { EmbedBuilder } from 'discord.js';
 
 import { connectDB } from '../../db.js';
@@ -32,6 +42,19 @@ import { createRosterDeepSession } from '../../utils/rosterDeepSession.js';
 import { rosterUrl, profileUrl as bibleProfileUrl } from '../../utils/rosterLink.js';
 import { makeRosterScanProgressCallback, formatDeepScanStats } from './progress.js';
 
+/**
+ * Render the hidden-roster card for /la-roster.
+ * @param {object} args
+ * @param {import('discord.js').Interaction} args.interaction
+ * @param {Function} args.replyEditor - shared editor function passed
+ *   by command.js so this module doesn't need to know whether the
+ *   reply has been deferred or not.
+ * @param {string} args.name - the queried character name
+ * @param {boolean} args.deep - whether the caller passed deep:true
+ * @param {object} args.deepOptions - deep-scan tuning (concurrency,
+ *   candidate cap, etc.) forwarded to detectAltsViaStronghold
+ * @returns {Promise<void>}
+ */
 export async function handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions }) {
       await connectDB();
       const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
