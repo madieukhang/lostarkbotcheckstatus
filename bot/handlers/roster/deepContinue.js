@@ -14,7 +14,6 @@ import UserPreference from '../../models/UserPreference.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { getUserLanguage } from '../../services/i18n/index.js';
-import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import { detectAltsViaStronghold } from '../../services/roster/index.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import {
@@ -25,9 +24,12 @@ import {
   buildStopButtonRow,
   newScanSessionId,
   registerScan,
-  reserveUserScan,
   unregisterScan,
 } from '../../utils/scanSession.js';
+import {
+  buildStrongholdScanLimitEmbed,
+  reserveStrongholdScanForInteraction,
+} from '../../utils/strongholdScanGate.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
 import { mergeAltsByName } from '../../utils/alts.js';
@@ -38,24 +40,6 @@ import {
 } from '../../utils/rosterDeepSession.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { makeRosterScanProgressCallback } from './progress.js';
-
-function reserveCallerScan(interaction, label) {
-  return reserveUserScan(interaction.user.id, {
-    label,
-    startedAt: Date.now(),
-  }, {
-    allowMultiple: isPrivilegedStrongholdScanUser(interaction.user.id),
-  });
-}
-
-function buildScanLimitEmbed(active) {
-  return buildAlertEmbed({
-    severity: AlertSeverity.WARNING,
-    title: 'Scan Already Running',
-    description: 'You already have a Stronghold scan running. Wait for it to finish or press **Stop scan** on the active card before starting another.',
-    footer: active?.label ? `Active: ${active.label}` : undefined,
-  });
-}
 
 /**
  * Continue button for /la-roster deep:true. Resumes the prior scan
@@ -108,10 +92,10 @@ export async function handleRosterDeepContinueButton(interaction) {
     return;
   }
 
-  const scanReservation = reserveCallerScan(interaction, `/la-roster deep continue ${session.targetName}`);
+  const scanReservation = reserveStrongholdScanForInteraction(interaction, `/la-roster deep continue ${session.targetName}`);
   if (!scanReservation.ok) {
     await interaction.reply({
-      embeds: [buildScanLimitEmbed(scanReservation.active)],
+      embeds: [buildStrongholdScanLimitEmbed(scanReservation.active)],
       ephemeral: true,
     });
     return;

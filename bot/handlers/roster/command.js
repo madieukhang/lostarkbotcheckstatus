@@ -30,6 +30,10 @@ import {
 } from '../../services/roster/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
+import {
+  buildStrongholdScanLimitEmbed,
+  reserveStrongholdScanForInteraction,
+} from '../../utils/strongholdScanGate.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { buildEvidenceEmbed } from '../list/view/ui.js';
@@ -38,27 +42,8 @@ import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCom
 import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
 import { getUserLanguage } from '../../services/i18n/index.js';
-import { reserveUserScan } from '../../utils/scanSession.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
-
-function reserveCallerScan(interaction, label) {
-  return reserveUserScan(interaction.user.id, {
-    label,
-    startedAt: Date.now(),
-  }, {
-    allowMultiple: isPrivilegedStrongholdScanUser(interaction.user.id),
-  });
-}
-
-function buildScanLimitEmbed(active) {
-  return buildAlertEmbed({
-    severity: AlertSeverity.WARNING,
-    title: 'Scan Already Running',
-    description: 'You already have a Stronghold scan running. Wait for it to finish or press **Stop scan** on the active card before starting another.',
-    footer: active?.label ? `Active: ${active.label}` : undefined,
-  });
-}
 
 /**
  * Handle the /la-roster slash command.
@@ -104,10 +89,10 @@ export async function handleRosterCommand(interaction) {
     useScraperApiForCandidates: false,
   };
 
-  const scanReservation = deep ? reserveCallerScan(interaction, `/la-roster deep ${name}`) : null;
+  const scanReservation = deep ? reserveStrongholdScanForInteraction(interaction, `/la-roster deep ${name}`) : null;
   if (scanReservation && !scanReservation.ok) {
     await interaction.reply({
-      embeds: [buildScanLimitEmbed(scanReservation.active)],
+      embeds: [buildStrongholdScanLimitEmbed(scanReservation.active)],
       ephemeral: true,
     });
     return;
