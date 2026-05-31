@@ -13,6 +13,8 @@ import { bootstrapClassEmoji } from '../services/discord/emoji-bootstrap.js';
 import { connectDB } from '../db.js';
 import Blacklist from '../models/Blacklist.js';
 import RosterCache from '../models/RosterCache.js';
+import TrustedUser from '../models/TrustedUser.js';
+import { backfillTrustedRosterLinks } from '../services/maintenance/trustedBackfill.js';
 import { registerCommands } from './command-registration.js';
 
 /**
@@ -33,10 +35,17 @@ export function createReadyHandler(client) {
     RosterCache.syncIndexes().catch((err) =>
       console.warn('[bot] RosterCache syncIndexes:', err.message),
     );
+    TrustedUser.syncIndexes().catch((err) =>
+      console.warn('[bot] TrustedUser syncIndexes:', err.message),
+    );
 
     await registerCommands(client);
     startMonitor(client);
     setupAutoCheck(client);
+
+    backfillTrustedRosterLinks().catch((err) =>
+      console.warn('[bot] trusted roster backfill rejected (non-fatal):', err?.message || err),
+    );
 
     bootstrapClassEmoji(client).catch((err) =>
       console.warn('[bot] class-emoji bootstrap rejected (non-fatal):', err?.message || err),
