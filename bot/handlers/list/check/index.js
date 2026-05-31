@@ -167,7 +167,7 @@ export function createCheckHandlers({ client }) {
     await deferReply(interaction);
 
     try {
-      names = await extractNamesFromImage(image);
+      names = await extractNamesFromImage(image, { refineAmbiguousDiacritics: true });
     } catch (err) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
