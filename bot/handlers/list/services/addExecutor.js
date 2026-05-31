@@ -97,13 +97,16 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     // results and approval-flow error fallbacks read result.content for
     // a one-line description of why the executor refused.
     {
-      const trustedExact = await TrustedUser.findOne({ name })
+      const trustedExact = await TrustedUser.findOne({ $or: [{ name }, { allCharacters: name }] })
         .collation({ locale: 'en', strength: 2 }).lean();
       if (trustedExact) {
+        const via = trustedExact.name.toLowerCase() === name.toLowerCase()
+          ? {}
+          : { via: trustedExact.name };
         return {
           ok: false,
           content: `${name} is a trusted user and cannot be added to any list.`,
-          embeds: [buildTrustedBlockEmbed(name, trustedExact.reason)],
+          embeds: [buildTrustedBlockEmbed(name, trustedExact.reason, via)],
         };
       }
     }
@@ -187,7 +190,12 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
     // Step 2b: Trusted user guard (alt check · after roster gives us allCharacters)
     if (allCharacters.length > 0) {
-      const trustedAlt = await TrustedUser.findOne({ name: { $in: allCharacters } })
+      const trustedAlt = await TrustedUser.findOne({
+        $or: [
+          { name: { $in: allCharacters } },
+          { allCharacters: { $in: allCharacters } },
+        ],
+      })
         .collation({ locale: 'en', strength: 2 }).lean();
       if (trustedAlt) {
         return {

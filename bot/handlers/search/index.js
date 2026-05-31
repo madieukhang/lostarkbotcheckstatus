@@ -85,14 +85,14 @@ export async function handleSearchCommand(interaction) {
       Blacklist.find(blackQuery).collation(collation).lean(),
       Whitelist.find(nameQuery).collation(collation).lean(),
       Watchlist.find(nameQuery).collation(collation).lean(),
-      TrustedUser.find({ name: { $in: allNames } }).collation(collation).lean(),
+      TrustedUser.find(nameQuery).collation(collation).lean(),
       RosterSnapshot.find({ name: { $in: allNames } }).collation(collation).lean(),
     ]);
 
     const blackMap = buildEntryMap(sortBlacklistForScopePriority(allBlack));
     const whiteMap = buildEntryMap(allWhite);
     const watchMap = buildEntryMap(allWatch);
-    const trustedMap = new Map(allTrusted.map((t) => [t.name.toLowerCase(), t]));
+    const trustedMap = buildEntryMap(allTrusted);
     // Snapshot enrichment surfaces combatScore + a fresher itemLevel
     // from the last /la-roster run on each name. Bible suggestions
     // already carry name/cls/itemLevel but no CP, so the snapshot is

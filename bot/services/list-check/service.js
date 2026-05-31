@@ -826,7 +826,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     Blacklist.find(blackQuery).collation(collation).lean(),
     Whitelist.find(nameQuery).collation(collation).lean(),
     Watchlist.find(nameQuery).collation(collation).lean(),
-    TrustedUser.find({ name: { $in: names } }).collation(collation).lean(),
+    TrustedUser.find(nameQuery).collation(collation).lean(),
     RosterSnapshot.find({ name: { $in: names } }).collation(collation).lean(),
   ]);
   const snapshotMap = new Map(allSnapshots.map((s) => [s.name.toLowerCase(), s]));
@@ -850,7 +850,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const blackMap = buildEntryMap(allBlack);
   const whiteMap = buildEntryMap(allWhite);
   const watchMap = buildEntryMap(allWatch);
-  const trustedMap = new Map(allTrusted.map((t) => [t.name.toLowerCase(), t]));
+  const trustedMap = buildEntryMap(allTrusted);
   const originalNameSet = new Set(names.map((n) => String(n || '').toLowerCase()));
 
   const results = names.map((name) => {
@@ -1194,13 +1194,13 @@ export async function checkNamesAgainstLists(names, options = {}) {
       Blacklist.find(refreshBlackQuery).collation(collation).lean(),
       Whitelist.find(refreshNameQuery).collation(collation).lean(),
       Watchlist.find(refreshNameQuery).collation(collation).lean(),
-      TrustedUser.find({ name: { $in: refreshList } }).collation(collation).lean(),
+      TrustedUser.find(refreshNameQuery).collation(collation).lean(),
     ]);
     refreshBlack.sort((a, b) => (a.scope === 'server' ? 1 : 0) - (b.scope === 'server' ? 1 : 0));
     const refreshBlackMap = buildEntryMap(refreshBlack);
     const refreshWhiteMap = buildEntryMap(refreshWhite);
     const refreshWatchMap = buildEntryMap(refreshWatch);
-    const refreshTrustedMap = new Map(refreshTrusted.map((t) => [t.name.toLowerCase(), t]));
+    const refreshTrustedMap = buildEntryMap(refreshTrusted);
 
     function firstMapped(map, candidates) {
       for (const candidate of candidates) {
@@ -1251,11 +1251,17 @@ export async function checkNamesAgainstLists(names, options = {}) {
   }
 
   if (altNamesForTrustedCheck.size > 0) {
-    const altTrusted = await TrustedUser.find({ name: { $in: [...altNamesForTrustedCheck] } })
+    const trustedNames = [...altNamesForTrustedCheck];
+    const altTrusted = await TrustedUser.find({
+      $or: [
+        { name: { $in: trustedNames } },
+        { allCharacters: { $in: trustedNames } },
+      ],
+    })
       .collation(collation).lean();
 
     if (altTrusted.length > 0) {
-      const altTrustedSet = new Map(altTrusted.map((t) => [t.name.toLowerCase(), t]));
+      const altTrustedSet = buildEntryMap(altTrusted);
 
       for (const item of results) {
         if (item.trustedEntry) continue;

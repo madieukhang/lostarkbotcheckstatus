@@ -193,7 +193,12 @@ export async function handleRosterCommand(interaction) {
     const [blacklistResult, whitelistResult, trustedResult] = await Promise.all([
       handleRosterBlackListCheck(charNames, { guildId: interaction.guild?.id }),
       handleRosterWhiteListCheck(charNames),
-      TrustedUser.findOne({ name: { $in: charNames } }).collation({ locale: 'en', strength: 2 }).lean(),
+      TrustedUser.findOne({
+        $or: [
+          { name: { $in: charNames } },
+          { allCharacters: { $in: charNames } },
+        ],
+      }).collation({ locale: 'en', strength: 2 }).lean(),
     ]);
 
     const embedColor = blacklistResult ? COLORS.danger : whitelistResult ? COLORS.success : trustedResult ? COLORS.trustedSoft : COLORS.info;

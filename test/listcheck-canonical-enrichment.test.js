@@ -431,6 +431,38 @@ test('worker-online enrichment marks chars as trusted via discoveredAlts when th
   }
 });
 
+test('trusted allCharacters match roster alts without a fresh roster scrape', async () => {
+  await TrustedUser.create({
+    name: 'Clauseduk',
+    reason: 'guild officer',
+    allCharacters: ['Clauseduk', 'Morrahduk'],
+    addedByUserId: 'tester',
+    addedByTag: 'tester#0001',
+  });
+  await RosterSnapshot.create({
+    name: 'Morrahduk',
+    classId: 'soul_eater',
+    itemLevel: 1750,
+    rosterName: 'Clauseduk',
+  });
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    throw new Error(`unexpected roster fetch: ${url}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Morrahduk'], { guildId: 'guild-1' });
+    const lines = formatCheckResults(results);
+
+    assert.equal(results[0].trustedEntry?.name, 'Clauseduk');
+    assert.match(lines[0], /Morrahduk/);
+    assert.match(lines[0], /via \*\*Clauseduk\*\* · trusted/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 // Stub that resolves the empty roster page (forces search-direct), returns
 // empty for full-name search, and serves prefix-query candidates so the
 // prefix-indel recovery path can be exercised. `prefixResponses` maps a

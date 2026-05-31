@@ -3,19 +3,44 @@ import { rosterUrl } from '../../../utils/rosterLink.js';
 import config from '../../../config.js';
 import Blacklist from '../../../models/Blacklist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
+import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, replyAlert } from '../../../utils/interactionReplies.js';
 import { COLORS } from '../../../utils/ui.js';
+import {
+  renderTrackedAltsField,
+  statMapFromRosterCharacters,
+} from '../trackedAltsRender.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
 
+function buildNameRosterQuery(names) {
+  const list = [...new Set(
+    names
+      .map((n) => String(n || '').trim())
+      .filter(Boolean)
+  )];
+  return { $or: [{ name: { $in: list } }, { allCharacters: { $in: list } }] };
+}
+
+function normalizeRosterNames(primaryName, rosterNames = []) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of [primaryName, ...rosterNames]) {
+    const clean = normalizeCharacterName(raw);
+    if (!clean) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+  }
+  return out.length > 0 ? out : [primaryName];
+}
+
 export function createTrustHandlers() {
-
-  // ─── Trusted user management ──────────────────────────────────────────────
-
   async function handleListTrustCommand(interaction) {
     const userId = interaction.user.id;
     const isOfficerOrSenior = OFFICER_APPROVER_IDS.includes(userId) || SENIOR_APPROVER_IDS.includes(userId);
@@ -38,7 +63,8 @@ export function createTrustHandlers() {
     await connectDB();
 
     if (action === 'remove') {
-      const deleted = await TrustedUser.findOneAndDelete({ name }).collation({ locale: 'en', strength: 2 });
+      const deleted = await TrustedUser.findOneAndDelete(buildNameRosterQuery([name]))
+        .collation({ locale: 'en', strength: 2 });
       if (!deleted) {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
@@ -60,7 +86,7 @@ export function createTrustHandlers() {
         title: `🛡️ Trusted · Removed · ${deleted.name}`,
         description:
           `**${deleted.name}** is no longer on the trusted list. ` +
-          `This character (and any alts via roster match) can now be added to ` +
+          `This character and any linked roster alts can now be added to ` +
           `the blacklist / watchlist again.`,
         fields: [
           { name: '🧬 Character', value: `[${deleted.name}](${rosterLink})`, inline: true },
@@ -78,53 +104,108 @@ export function createTrustHandlers() {
     }
 
     // action === 'add'
-    const existing = await TrustedUser.findOne({ name }).collation({ locale: 'en', strength: 2 });
+    const existing = await TrustedUser.findOne(buildNameRosterQuery([name]))
+      .collation({ locale: 'en', strength: 2 });
     if (existing) {
+      const isExactExisting = existing.name.toLowerCase() === name.toLowerCase();
+      if (!isExactExisting) {
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Already Trusted',
+          description: `**${name}** is already trusted via roster match with **${existing.name}**.`,
+        });
+        return;
+      }
+    }
+
+    const rosterResult = await buildRosterCharacters(name, {
+      hiddenRosterFallback: true,
+    });
+    const allCharacters = normalizeRosterNames(
+      name,
+      rosterResult?.hasValidRoster ? rosterResult.allCharacters : []
+    );
+
+    const rosterTrustedQuery = existing
+      ? { $and: [buildNameRosterQuery(allCharacters), { _id: { $ne: existing._id } }] }
+      : buildNameRosterQuery(allCharacters);
+    const existingRosterTrusted = await TrustedUser.findOne(rosterTrustedQuery)
+      .collation({ locale: 'en', strength: 2 });
+    if (existingRosterTrusted) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         title: 'Already Trusted',
-        description: `**${existing.name}** is already in the trusted list.`,
+        description: existingRosterTrusted.name.toLowerCase() === name.toLowerCase()
+          ? `**${existingRosterTrusted.name}** is already in the trusted list.`
+          : `**${name}** is already trusted via roster match with **${existingRosterTrusted.name}**.`,
       });
       return;
     }
 
-    // Block trust if character is currently blacklisted (scope-aware)
-    const trustGuildId = interaction.guild?.id || '';
-    const blacklisted = await Blacklist.findOne(
-      buildBlacklistQuery({ $or: [{ name }, { allCharacters: name }] }, trustGuildId)
-    ).collation({ locale: 'en', strength: 2 }).lean();
-    if (blacklisted) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
-        title: 'Blacklisted Character',
-        description: `**${name}** is currently blacklisted (entry: **${blacklisted.name}**).`,
-        footer: 'Remove the blacklist entry first before trusting this character.',
-      });
-      return;
-    }
+    if (!existing) {
+      const trustGuildId = interaction.guild?.id || '';
+      const blacklisted = await Blacklist.findOne(
+        buildBlacklistQuery(buildNameRosterQuery(allCharacters), trustGuildId)
+      ).collation({ locale: 'en', strength: 2 }).lean();
+      if (blacklisted) {
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          title: 'Blacklisted Character',
+          description: `**${name}** is currently blacklisted (entry: **${blacklisted.name}**).`,
+          footer: 'Remove the blacklist entry first before trusting this character.',
+        });
+        return;
+      }
 
-    await TrustedUser.create({
-      name,
-      reason,
-      addedByUserId: userId,
-      addedByTag: interaction.user.tag,
-    });
+      await TrustedUser.create({
+        name,
+        reason,
+        allCharacters,
+        enrichmentSource: rosterResult?.hasValidRoster ? 'bible' : 'manual',
+        enrichedAt: new Date(),
+        addedByUserId: userId,
+        addedByTag: interaction.user.tag,
+      });
+    } else {
+      await TrustedUser.updateOne(
+        { _id: existing._id },
+        {
+          $set: {
+            ...(reason ? { reason } : {}),
+            allCharacters,
+            enrichmentSource: rosterResult?.hasValidRoster ? 'bible' : 'manual',
+            enrichedAt: new Date(),
+          },
+        }
+      );
+    }
 
     const rosterLink = rosterUrl(name);
+    const actionLabel = existing ? 'Refreshed' : 'Added';
+    const displayReason = reason || existing?.reason || '';
+    const altsField = renderTrackedAltsField({
+      names: allCharacters,
+      primaryName: name,
+      statMap: statMapFromRosterCharacters(rosterResult?.rosterCharacters || []),
+      emptySentinel: '_Only this character is linked on this trusted entry._',
+    });
+    const fields = [
+      { name: '🧬 Character', value: `[${name}](${rosterLink})`, inline: true },
+      { name: '📝 Reason', value: (displayReason || 'N/A').slice(0, 1024), inline: true },
+      { name: existing ? '👤 Refreshed by' : '👤 Added by', value: interaction.user.tag, inline: true },
+    ];
+    if (altsField) fields.push(altsField);
+
     const embed = buildAlertEmbed({
       severity: AlertSeverity.SUCCESS,
       titleIcon: '',
       color: COLORS.trustedSoft,
-      title: `🛡️ Trusted · Added · ${name}`,
+      title: `🛡️ Trusted · ${actionLabel} · ${name}`,
       description:
         `**${name}** is now on the trusted list. From this point on, ` +
-        `**${name}** and any character that resolves to the same roster ` +
-        `cannot be added to the blacklist, whitelist, or watchlist by anyone.`,
-      fields: [
-        { name: '🧬 Character', value: `[${name}](${rosterLink})`, inline: true },
-        { name: '📝 Reason', value: (reason || 'N/A').slice(0, 1024), inline: true },
-        { name: '👤 Added by', value: interaction.user.tag, inline: true },
-      ],
+        `**${name}** and any linked roster alt cannot be added to the ` +
+        `blacklist, whitelist, or watchlist by anyone.`,
+      fields,
       footer: 'Tip: /la-list view trusted to browse the trusted roster.',
     });
 
