@@ -179,6 +179,47 @@ test('snapshot lookup does not fold distinct diacritic variants before search', 
   }
 });
 
+test('search enrichment refuses ambiguous same-base diacritic variants', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const data = [
+        [1, 5, 9],
+        [2, 3, 4],
+        'A\u00fcreli\u00e1',
+        'berserker_female',
+        1772.5,
+        [6, 7, 8],
+        'A\u00fcr\u00e9l\u00eda',
+        'battle_master',
+        1721.8334,
+        [10, 11, 12],
+        'A\u00fcr\u00e9li\u00e0',
+        'holyknight_female',
+        1716.6666,
+      ];
+      return Response.json({ type: 'result', result: JSON.stringify(data) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['A\u00fcr\u00e9lia'], { guildId: 'guild-1' });
+    const lines = formatCheckResults(results);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'A\u00fcr\u00e9lia');
+    assert.equal(results[0].snapClassName, '');
+    assert.equal(results[0].snapItemLevel, 0);
+    assert.match(lines[0], /A\u00fcr\u00e9lia/);
+    assert.doesNotMatch(lines[0], /1772\.50/);
+    assert.doesNotMatch(lines[0], /1716\.67/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('worker-online enrichment marks chars as trusted via discoveredAlts when the roster main is trusted', async () => {
   await markWorkerOnline();
   await TrustedUser.create({
