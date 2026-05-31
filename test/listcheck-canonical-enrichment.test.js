@@ -248,6 +248,48 @@ test('prefix-indel recovery picks the unique distance-1 candidate (Lpiiv -> Lpii
   }
 });
 
+test('diaeresis-digraph recovery resolves OCR-collapsed iy names (Qïlyn -> Qiylyn)', async () => {
+  await markWorkerOnline();
+
+  const originalFetch = globalThis.fetch;
+  const searchQueries = [];
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/character/NA/')) {
+      return new Response('<html><body>No roster here</body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const payloadMatch = requestedUrl.match(/payload=([^&]+)/);
+      const decoded = payloadMatch
+        ? Buffer.from(decodeURIComponent(payloadMatch[1]), 'base64').toString('utf8')
+        : '';
+      const query = ((decoded.match(/,"([^"]*)","NA"\]/) || [])[1] || '');
+      searchQueries.push(query);
+      if (query.toLowerCase() === 'qiylyn') {
+        const data = [[1], [2, 3, 4], 'Qiylyn', 'weather_artist', 1751.67];
+        return Response.json({ type: 'result', result: JSON.stringify(data) });
+      }
+      return Response.json({ type: 'result', result: JSON.stringify([[]]) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Qïlyn'], { guildId: 'guild-1' });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Qiylyn');
+    assert.equal(results[0].snapClassName, 'Aeromancer');
+    assert.equal(results[0].snapItemLevel, 1751.67);
+    assert.ok(searchQueries.includes('Qiylyn'), 'expected an iy-expanded retry query');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('prefix-indel recovery rejects a same-length substitution (Viatchu stays bare, not Viatchy)', async () => {
   await markWorkerOnline();
   // prefix "viat" returns Viatchy · a real but DIFFERENT player one
