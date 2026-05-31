@@ -248,6 +248,23 @@ test('prefix-indel recovery picks the unique distance-1 candidate (Lpiiv -> Lpii
   }
 });
 
+test('prefix-transposition recovery resolves adjacent swapped letters (Auroraforymluv -> Auroraformyluv)', async () => {
+  await markWorkerOnline();
+  const stub = installPrefixIndelStub({
+    auro: [[1], [2, 3, 4], 'Auroraformyluv', 'yinyangshi', 1740],
+  });
+  try {
+    const results = await checkNamesAgainstLists(['Auroraforymluv'], { guildId: 'guild-1' });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Auroraformyluv');
+    assert.equal(results[0].snapClassName, 'Artist');
+    assert.equal(results[0].snapItemLevel, 1740);
+  } finally {
+    stub.restore();
+  }
+});
+
 test('diaeresis-digraph recovery resolves OCR-collapsed iy names (Qïlyn -> Qiylyn)', async () => {
   await markWorkerOnline();
 

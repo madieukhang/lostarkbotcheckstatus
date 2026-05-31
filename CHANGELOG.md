@@ -8,6 +8,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ### Fixed
 - Auto-check / `/la-check` canonical recovery now handles the observed OCR case where Gemini collapses `iy` / `yi` into `ï` (`Qïlyn` -> `Qiylyn`) before giving up as not-listed. The retry is search-scoped and only accepts bible's canonical candidate, so real `ï` names still win if bible returns them directly. Quick Add also no longer offers trusted-only rows as addable "unflagged" names. 131/131 green.
+- Auto-check / `/la-check` now recovers one adjacent-letter transposition from bible prefix search before rendering a bare not-listed row, covering the observed `Auroraforymluv` -> `Auroraformyluv` image case while still rejecting ambiguous prefix matches. 132/132 green.
 
 ### Changed
 - Fix two duplicate JSDoc blocks left over from the handlers/roster/* spec batch (`progress.js` · `makeRosterScanProgressCallback`, `deepContinue.js` · `handleRosterDeepContinueButton`). Each function had a legacy prose `/** */` plus the new spec-format `/** @param @returns */` stacked back-to-back with no separator · merged into a single block that keeps the prose plus the typed args. 129/129 green.

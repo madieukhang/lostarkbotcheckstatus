@@ -84,6 +84,20 @@ function isSubsequence(a, b) {
   return i === a.length;
 }
 
+function isSingleAdjacentTransposition(a, b) {
+  if (a.length !== b.length || a === b) return false;
+  const diffs = [];
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) diffs.push(i);
+    if (diffs.length > 2) return false;
+  }
+  if (diffs.length !== 2) return false;
+  const [first, second] = diffs;
+  return second === first + 1
+    && a[first] === b[second]
+    && a[second] === b[first];
+}
+
 /**
  * Levenshtein edit distance · O(m·n) DP with rolling rows. Returns the
  * minimum number of single-character insertions / deletions / swaps to
@@ -294,6 +308,26 @@ async function recoverViaPrefixIndel(name, options = {}) {
     if (Math.abs(cand.length - folded.length) !== 1) return false;
     if (levenshteinDistance(folded, cand) !== 1) return false;
     return isSubsequence(folded, cand) || isSubsequence(cand, folded);
+  });
+  return matches.length === 1 ? matches[0] : null;
+}
+
+/**
+ * Recover a single canonical row when OCR swaps two adjacent letters
+ * and bible's full-name search returns empty, e.g.
+ * "Auroraforymluv" -> "Auroraformyluv". Same prefix-query strategy as
+ * indel recovery, but the filter only accepts one adjacent transposition.
+ * @returns {Promise<{name:string,cls:string,itemLevel:number}|null>}
+ */
+async function recoverViaPrefixTransposition(name, options = {}) {
+  const folded = asciiFoldName(name);
+  if (folded.length < 6) return null;
+  const prefix = folded.slice(0, 4);
+  const suggestions = await fetchNameSuggestions(prefix, options);
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
+  const matches = suggestions.filter((s) => {
+    const cand = asciiFoldName(String(s.name));
+    return isSingleAdjacentTransposition(folded, cand);
   });
   return matches.length === 1 ? matches[0] : null;
 }
@@ -631,6 +665,20 @@ export async function checkNamesAgainstLists(names, options = {}) {
         }
       }
       if (!match) {
+        const transposed = await recoverViaPrefixTransposition(originalName);
+        if (transposed) {
+          const recoveredName = normalizeCharacterName(transposed.name);
+          if (!recoveredName) return false;
+          console.log(
+            `[listcheck] Prefix-transposition recovery: OCR'd "${originalName}" -> canonical "${recoveredName}"`
+          );
+          if (recoveredName !== originalName) item.name = recoveredName;
+          await applyEnrichment(item, {
+            classId: transposed.cls || '',
+            itemLevel: Number(transposed.itemLevel) || 0,
+          });
+          return true;
+        }
         // Last resort: prefix-indel recovery for a single inserted /
         // dropped letter that bible's prefix-based search misses
         // entirely (so there were no suggestions for the 4-pass matcher
