@@ -78,10 +78,13 @@ import {
   buildStopButtonRow,
   newScanSessionId,
   registerScan,
-  reserveUserScan,
   unregisterScan,
   getScan,
 } from '../../../utils/scanSession.js';
+import {
+  reserveStrongholdScanForInteraction,
+  scanLimitAlertOptions,
+} from '../../../utils/strongholdScanGate.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../../utils/scanCompletionDm.js';
 import { createLongRunningReplyEditor } from '../../../utils/longRunningReply.js';
 import { mergeAltsByName } from '../../../utils/alts.js';
@@ -99,22 +102,8 @@ export function createEnrichHandlers({ client, services }) {
   // eslint-disable-next-line no-unused-vars
   const _services = services;
 
-  function reserveCallerScan(interaction, label) {
-    return reserveUserScan(interaction.user.id, {
-      label,
-      startedAt: Date.now(),
-    }, {
-      allowMultiple: isPrivilegedStrongholdScanUser(interaction.user.id),
-    });
-  }
-
   async function replyScanLimit(interaction, active) {
-    await replyAlert(interaction, {
-      severity: AlertSeverity.WARNING,
-      title: 'Scan Already Running',
-      description: 'You already have a Stronghold scan running. Wait for it to finish or press **Stop scan** on the active card before starting another.',
-      footer: active?.label ? `Active: ${active.label}` : undefined,
-    });
+    await replyAlert(interaction, scanLimitAlertOptions(active));
   }
 
   /**
@@ -555,7 +544,7 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
 
-    const scanReservation = reserveCallerScan(interaction, `/la-list enrich ${name}`);
+    const scanReservation = reserveStrongholdScanForInteraction(interaction, `/la-list enrich ${name}`);
     if (!scanReservation.ok) {
       await replyScanLimit(interaction, scanReservation.active);
       return;
@@ -600,7 +589,7 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
 
-    const scanReservation = reserveCallerScan(interaction, `/la-list enrich ${name}`);
+    const scanReservation = reserveStrongholdScanForInteraction(interaction, `/la-list enrich ${name}`);
     if (!scanReservation.ok) {
       await replyScanLimit(interaction, scanReservation.active);
       return;
@@ -650,7 +639,7 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
 
-    const scanReservation = reserveCallerScan(interaction, `/la-list enrich continue ${session.entryName}`);
+    const scanReservation = reserveStrongholdScanForInteraction(interaction, `/la-list enrich continue ${session.entryName}`);
     if (!scanReservation.ok) {
       await replyScanLimit(interaction, scanReservation.active);
       return;

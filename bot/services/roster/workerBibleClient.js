@@ -11,6 +11,7 @@
 
 import ScrapeJobDefault from '../../models/ScrapeJob.js';
 import { getWorkerHealth as getDefaultWorkerHealth } from '../worker/heartbeat.js';
+import { sleep } from '../../utils/async.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 500;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -22,10 +23,6 @@ const DEFAULT_BACKPRESSURE_THRESHOLD = (() => {
   const raw = parseInt(process.env.WORKER_QUEUE_BACKPRESSURE_THRESHOLD, 10);
   return Number.isFinite(raw) && raw > 0 ? raw : 100;
 })();
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 // Convert a Mongoose-stored Map of header name -> value into a plain
 // object that the Response constructor accepts.

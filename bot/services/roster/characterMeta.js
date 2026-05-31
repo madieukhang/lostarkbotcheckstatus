@@ -11,6 +11,7 @@ import {
   parseCharacterMetaFromHtml,
   shapeCharacterMetaFromHeader,
 } from './parsers.js';
+import { sleep } from '../../utils/async.js';
 
 configureMetaCache({
   ttlMs: config.metaCacheTtlMs,
@@ -41,10 +42,6 @@ function buildMetaInflightKey(name, options = {}) {
 function cacheMetaResult(name, meta) {
   if (meta) setCachedMeta(name, meta);
   return meta;
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function parseRetryAfterMs(res, fallbackMs) {

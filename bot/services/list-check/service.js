@@ -20,6 +20,10 @@ import { buildRosterCharacters } from '../roster/buildRosterCharacters.js';
 import { resolveClassId } from '../../models/Class.js';
 import { getWorkerHealth } from '../worker/heartbeat.js';
 import { mapWithConcurrency } from '../../utils/async.js';
+import {
+  buildListEntryMap as buildEntryMap,
+  sortBlacklistForScopePriority,
+} from '../../utils/listEntryMap.js';
 
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
 
@@ -832,21 +836,8 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const snapshotMap = new Map(allSnapshots.map((s) => [s.name.toLowerCase(), s]));
 
   // Build O(1) lookup maps from list entries (once per list, not per name)
-  function buildEntryMap(entries) {
-    const map = new Map();
-    for (const e of entries) {
-      map.set(e.name.toLowerCase(), e);
-      for (const c of (e.allCharacters || [])) {
-        const lower = c.toLowerCase();
-        // Allow overwrite if: key new, or current entry is server-scoped (higher priority)
-        if (!map.has(lower) || e.scope === 'server') map.set(lower, e);
-      }
-    }
-    return map;
-  }
-
   // Sort blacklist: global first, server last → server overwrites in map (higher priority)
-  allBlack.sort((a, b) => (a.scope === 'server' ? 1 : 0) - (b.scope === 'server' ? 1 : 0));
+  sortBlacklistForScopePriority(allBlack);
   const blackMap = buildEntryMap(allBlack);
   const whiteMap = buildEntryMap(allWhite);
   const watchMap = buildEntryMap(allWatch);
@@ -1196,7 +1187,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
       Watchlist.find(refreshNameQuery).collation(collation).lean(),
       TrustedUser.find(refreshNameQuery).collation(collation).lean(),
     ]);
-    refreshBlack.sort((a, b) => (a.scope === 'server' ? 1 : 0) - (b.scope === 'server' ? 1 : 0));
+    sortBlacklistForScopePriority(refreshBlack);
     const refreshBlackMap = buildEntryMap(refreshBlack);
     const refreshWhiteMap = buildEntryMap(refreshWhite);
     const refreshWatchMap = buildEntryMap(refreshWatch);
