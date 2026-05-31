@@ -532,6 +532,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const whiteMap = buildEntryMap(allWhite);
   const watchMap = buildEntryMap(allWatch);
   const trustedMap = new Map(allTrusted.map((t) => [t.name.toLowerCase(), t]));
+  const originalNameSet = new Set(names.map((n) => String(n || '').toLowerCase()));
 
   const results = names.map((name) => {
     const snap = snapshotMap.get(name.toLowerCase()) || null;
@@ -630,9 +631,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
       }
     }
 
-    async function applySearchSuggestionEnrichment(item) {
+    async function applySearchSuggestionEnrichment(item, searchOptions = {}) {
       const originalName = item.name;
-      let suggestions = await fetchNameSuggestions(originalName);
+      let suggestions = await fetchNameSuggestions(originalName, searchOptions);
       // Bible search returns empty `[[]]` when the query bytes do not
       // match its index (observed for NFD-form input and visually-
       // confusable Unicode like Cyrillic look-alikes that survive
@@ -647,13 +648,13 @@ export async function checkNamesAgainstLists(names, options = {}) {
           console.log(
             `[listcheck] Search empty for "${originalName}", retrying with ASCII fold "${folded}"`
           );
-          suggestions = await fetchNameSuggestions(folded);
+          suggestions = await fetchNameSuggestions(folded, searchOptions);
         }
       }
       let match = chooseCanonicalSuggestion(originalName, suggestions);
       if (!match) {
         for (const variant of buildDiaeresisDigraphVariants(originalName)) {
-          const variantSuggestions = await fetchNameSuggestions(variant);
+          const variantSuggestions = await fetchNameSuggestions(variant, searchOptions);
           const variantMatch = chooseCanonicalSuggestion(variant, variantSuggestions);
           if (variantMatch) {
             console.log(
@@ -665,7 +666,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
         }
       }
       if (!match) {
-        const transposed = await recoverViaPrefixTransposition(originalName);
+        const transposed = await recoverViaPrefixTransposition(originalName, searchOptions);
         if (transposed) {
           const recoveredName = normalizeCharacterName(transposed.name);
           if (!recoveredName) return false;
@@ -686,7 +687,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
         // candidate, so accept it directly · the fuzzy pass in
         // chooseCanonicalSuggestion bails under 6 chars and would reject
         // short recoveries like "Lpiiv" -> "Lpiiiv".
-        const recovered = await recoverViaPrefixIndel(originalName);
+        const recovered = await recoverViaPrefixIndel(originalName, searchOptions);
         if (recovered) {
           const recoveredName = normalizeCharacterName(recovered.name);
           if (!recoveredName) return false;
@@ -737,6 +738,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
 
     await mapWithConcurrency(itemsNeedingEnrichment, concurrency, async (item) => {
       try {
+        const searchOptions = { timeoutMs: lookupTimeoutMs };
         if (health.online) {
           // Case 1 · worker online: scrape the roster page via worker.
           // Returns class + ilvl + CP for the target AND the full alt
@@ -765,7 +767,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
             );
           }
           if (!roster || !roster.hasValidRoster) {
-            await applySearchSuggestionEnrichment(item);
+            await applySearchSuggestionEnrichment(item, { ...searchOptions, viaWorker: true });
             return;
           }
           // Resolve classId from the per-character record (parser gives
@@ -790,7 +792,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
             || '';
           const rosterItemLevel = typeof roster.targetItemLevel === 'number' ? roster.targetItemLevel : 0;
           if (!classId && !rosterItemLevel) {
-            await applySearchSuggestionEnrichment(item);
+            await applySearchSuggestionEnrichment(item, { ...searchOptions, viaWorker: true });
             return;
           }
           await applyEnrichment(item, {
@@ -808,7 +810,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
           }
         } else {
           // Case 2: worker offline; use bible search directly.
-          await applySearchSuggestionEnrichment(item);
+          await applySearchSuggestionEnrichment(item, searchOptions);
         }
       } catch (err) {
         // Per-name failure is non-fatal: leave snap fields empty so the
@@ -821,6 +823,65 @@ export async function checkNamesAgainstLists(names, options = {}) {
     console.log(
       `[listcheck] Enriched ${itemsNeedingEnrichment.length} name(s) via ${mode} in ${Date.now() - enrichStartedAt}ms`
     );
+  }
+
+  // Phase 1.6: Enrichment can canonicalize OCR'd names (for example
+  // "Auroraforymluv" -> "Auroraformyluv") or discover visible roster
+  // siblings. The initial DB list query ran before that data existed,
+  // so refresh missing hits against the canonical name + discovered
+  // alts before rendering / Quick Add decisions. Without this pass a
+  // row can show the right character name but still say "not listed".
+  const refreshNames = new Set();
+  for (const item of results) {
+    const canonical = String(item.name || '').trim();
+    if (canonical && !originalNameSet.has(canonical.toLowerCase())) {
+      refreshNames.add(canonical);
+    }
+    for (const alt of (Array.isArray(item.discoveredAlts) ? item.discoveredAlts : [])) {
+      const clean = String(alt || '').trim();
+      if (clean) refreshNames.add(clean);
+    }
+  }
+
+  if (refreshNames.size > 0) {
+    const refreshList = [...refreshNames];
+    const refreshNameQuery = {
+      $or: [
+        { name: { $in: refreshList } },
+        { allCharacters: { $in: refreshList } },
+      ],
+    };
+    const refreshBlackQuery = buildBlacklistQuery(refreshNameQuery, guildId);
+    const [refreshBlack, refreshWhite, refreshWatch, refreshTrusted] = await Promise.all([
+      Blacklist.find(refreshBlackQuery).collation(collation).lean(),
+      Whitelist.find(refreshNameQuery).collation(collation).lean(),
+      Watchlist.find(refreshNameQuery).collation(collation).lean(),
+      TrustedUser.find({ name: { $in: refreshList } }).collation(collation).lean(),
+    ]);
+    refreshBlack.sort((a, b) => (a.scope === 'server' ? 1 : 0) - (b.scope === 'server' ? 1 : 0));
+    const refreshBlackMap = buildEntryMap(refreshBlack);
+    const refreshWhiteMap = buildEntryMap(refreshWhite);
+    const refreshWatchMap = buildEntryMap(refreshWatch);
+    const refreshTrustedMap = new Map(refreshTrusted.map((t) => [t.name.toLowerCase(), t]));
+
+    function firstMapped(map, candidates) {
+      for (const candidate of candidates) {
+        const hit = map.get(String(candidate || '').toLowerCase());
+        if (hit) return hit;
+      }
+      return null;
+    }
+
+    for (const item of results) {
+      const candidates = [
+        item.name,
+        ...(Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []),
+      ].filter(Boolean);
+      if (!item.blackEntry) item.blackEntry = firstMapped(refreshBlackMap, candidates);
+      if (!item.whiteEntry) item.whiteEntry = firstMapped(refreshWhiteMap, candidates);
+      if (!item.watchEntry) item.watchEntry = firstMapped(refreshWatchMap, candidates);
+      if (!item.trustedEntry) item.trustedEntry = firstMapped(refreshTrustedMap, candidates);
+    }
   }
 
   // Phase 2: Resolve trusted status via roster relationships.
