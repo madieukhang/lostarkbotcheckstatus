@@ -8,6 +8,7 @@ process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
 const {
   claimAutoCheckMessage,
   completeAutoCheckMessage,
+  isQuickAddCandidate,
   resetAutoCheckDedupeForTest,
 } = await import('../bot/handlers/list/auto-check.js');
 
@@ -40,4 +41,20 @@ test('auto-check releases inactive-channel claims without marking processed', ()
 
   assert.equal(claimAutoCheckMessage('message-3', 4002), true);
   completeAutoCheckMessage('message-3', { processed: true, now: 4003 });
+});
+
+test('auto-check Quick Add excludes trusted names', () => {
+  assert.equal(isQuickAddCandidate({
+    blackEntry: null,
+    whiteEntry: null,
+    watchEntry: null,
+    trustedEntry: null,
+  }), true);
+
+  assert.equal(isQuickAddCandidate({
+    blackEntry: null,
+    whiteEntry: null,
+    watchEntry: null,
+    trustedEntry: { name: 'Clauseduk' },
+  }), false);
 });

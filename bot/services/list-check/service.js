@@ -58,6 +58,20 @@ function visualNameKey(value) {
     .replace(/0/g, 'o');
 }
 
+function buildDiaeresisDigraphVariants(value) {
+  const source = String(value || '');
+  const variants = new Set();
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch !== '\u00EF' && ch !== '\u00CF') continue;
+    const replacements = ch === '\u00CF' ? ['Iy', 'Yi'] : ['iy', 'yi'];
+    for (const replacement of replacements) {
+      variants.add(`${source.slice(0, i)}${replacement}${source.slice(i + 1)}`);
+    }
+  }
+  return [...variants].filter((variant) => variant !== source);
+}
+
 // Is `a` a subsequence of `b`? (every char of a appears in b in order).
 // Used to distinguish a pure insertion/deletion (indel · subsequence
 // holds one way) from a same-length substitution (subsequence fails
@@ -602,7 +616,20 @@ export async function checkNamesAgainstLists(names, options = {}) {
           suggestions = await fetchNameSuggestions(folded);
         }
       }
-      const match = chooseCanonicalSuggestion(originalName, suggestions);
+      let match = chooseCanonicalSuggestion(originalName, suggestions);
+      if (!match) {
+        for (const variant of buildDiaeresisDigraphVariants(originalName)) {
+          const variantSuggestions = await fetchNameSuggestions(variant);
+          const variantMatch = chooseCanonicalSuggestion(variant, variantSuggestions);
+          if (variantMatch) {
+            console.log(
+              `[listcheck] Diaeresis-digraph recovery: OCR'd "${originalName}" -> query "${variant}"`
+            );
+            match = variantMatch;
+            break;
+          }
+        }
+      }
       if (!match) {
         // Last resort: prefix-indel recovery for a single inserted /
         // dropped letter that bible's prefix-based search misses

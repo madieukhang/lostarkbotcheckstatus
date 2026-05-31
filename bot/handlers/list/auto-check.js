@@ -92,6 +92,10 @@ export function resetAutoCheckDedupeForTest() {
   userCooldowns.clear();
 }
 
+export function isQuickAddCandidate(result) {
+  return !result.blackEntry && !result.whiteEntry && !result.watchEntry && !result.trustedEntry;
+}
+
 /**
  * Check if a channel is configured for auto-check
  * (either via DB GuildConfig or env var fallback).
@@ -198,9 +202,7 @@ export function setupAutoCheck(client) {
       // Quick-Add dropdown for names with no DB list hit. Sits below
       // the embed so an officer can add a suspicious unlisted name
       // without retyping it.
-      const unflaggedNames = results.filter(
-        (r) => !r.blackEntry && !r.whiteEntry && !r.watchEntry
-      );
+      const unflaggedNames = results.filter(isQuickAddCandidate);
       const components = [];
 
       if (unflaggedNames.length > 0) {
