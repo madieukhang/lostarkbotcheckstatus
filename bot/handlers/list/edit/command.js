@@ -248,7 +248,11 @@ export function createListEditCommandHandler({
       const trustedCheck = await TrustedUser.findOne({
         $or: [
           { name: existing.name },
-          ...(existing.allCharacters?.length > 0 ? [{ name: { $in: existing.allCharacters } }] : []),
+          { allCharacters: existing.name },
+          ...(existing.allCharacters?.length > 0 ? [
+            { name: { $in: existing.allCharacters } },
+            { allCharacters: { $in: existing.allCharacters } },
+          ] : []),
         ],
       }).collation({ locale: 'en', strength: 2 }).lean();
       if (trustedCheck) {

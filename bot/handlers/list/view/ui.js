@@ -95,7 +95,12 @@ export function buildTrustedListEmbed(entries, lang = 'en') {
     const link = rosterUrl(entry.name);
     const head = `${ICONS.shield} **[${entry.name}](${link})**`;
     const meta = buildEntryMetaLine({ entry, freshUrl: '', lang });
-    return meta ? [head, meta, ''] : [head, ''];
+    const rosterLine = buildEntryRosterLine(entry, lang);
+    const block = [head];
+    if (meta) block.push(meta);
+    if (rosterLine) block.push(rosterLine);
+    block.push('');
+    return block;
   });
   // Drop trailing blank line for cleaner footer-adjacent rendering.
   if (lines[lines.length - 1] === '') lines.pop();
