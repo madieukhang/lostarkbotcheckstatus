@@ -133,6 +133,34 @@ test('worker-online enrichment canonicalizes the display name to bible spelling'
   }
 });
 
+test('snapshot lookup canonicalizes over-accented OCR names before enrichment', async () => {
+  await RosterSnapshot.create({
+    name: 'A\u00fcreli\u00e1',
+    classId: 'berserker_female',
+    itemLevel: 1772.5,
+    rosterName: 'A\u00fcreli\u00e1',
+  });
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    throw new Error(`unexpected enrichment fetch: ${url}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['A\u00fcr\u00e9li\u00e1'], { guildId: 'guild-1' });
+    const lines = formatCheckResults(results);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'A\u00fcreli\u00e1');
+    assert.equal(results[0].snapClassName, 'Slayer');
+    assert.equal(results[0].snapItemLevel, 1772.5);
+    assert.match(lines[0], /A\u00fcreli\u00e1/);
+    assert.doesNotMatch(lines[0], /A\u00fcr\u00e9li\u00e1/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('worker-online enrichment marks chars as trusted via discoveredAlts when the roster main is trusted', async () => {
   await markWorkerOnline();
   await TrustedUser.create({
