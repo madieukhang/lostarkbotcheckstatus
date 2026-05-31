@@ -133,7 +133,7 @@ test('worker-online enrichment canonicalizes the display name to bible spelling'
   }
 });
 
-test('snapshot lookup canonicalizes over-accented OCR names before enrichment', async () => {
+test('snapshot lookup does not fold distinct diacritic variants before search', async () => {
   await RosterSnapshot.create({
     name: 'A\u00fcreli\u00e1',
     classId: 'berserker_female',
@@ -142,20 +142,38 @@ test('snapshot lookup canonicalizes over-accented OCR names before enrichment', 
   });
 
   const originalFetch = globalThis.fetch;
+  const counts = { searchCalls: 0 };
   globalThis.fetch = async (url) => {
-    throw new Error(`unexpected enrichment fetch: ${url}`);
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      counts.searchCalls += 1;
+      const data = [
+        [1, 5],
+        [2, 3, 4],
+        'A\u00fcreli\u00e1',
+        'berserker_female',
+        1772.5,
+        [6, 7, 8],
+        'A\u00fcr\u00e9li\u00e0',
+        'soul_eater',
+        1716.6666,
+      ];
+      return Response.json({ type: 'result', result: JSON.stringify(data) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
   };
 
   try {
-    const results = await checkNamesAgainstLists(['A\u00fcr\u00e9li\u00e1'], { guildId: 'guild-1' });
+    const results = await checkNamesAgainstLists(['A\u00fcr\u00e9li\u00e0'], { guildId: 'guild-1' });
     const lines = formatCheckResults(results);
 
     assert.equal(results.length, 1);
-    assert.equal(results[0].name, 'A\u00fcreli\u00e1');
-    assert.equal(results[0].snapClassName, 'Slayer');
-    assert.equal(results[0].snapItemLevel, 1772.5);
-    assert.match(lines[0], /A\u00fcreli\u00e1/);
-    assert.doesNotMatch(lines[0], /A\u00fcr\u00e9li\u00e1/);
+    assert.equal(counts.searchCalls, 1, 'distinct accent variants should be verified by bible search');
+    assert.equal(results[0].name, 'A\u00fcr\u00e9li\u00e0');
+    assert.equal(results[0].snapClassName, 'Souleater');
+    assert.equal(results[0].snapItemLevel, 1716.6666);
+    assert.match(lines[0], /A\u00fcr\u00e9li\u00e0/);
+    assert.doesNotMatch(lines[0], /A\u00fcreli\u00e1/);
   } finally {
     globalThis.fetch = originalFetch;
   }
