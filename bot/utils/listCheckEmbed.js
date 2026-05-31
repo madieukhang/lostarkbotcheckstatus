@@ -75,35 +75,33 @@ export function buildListCheckEmbed({
   else if (counts.white > 0 || counts.trusted > 0) { color = 0x57f287; titleIcon = '✅'; }
   else { color = 0x5865f2; titleIcon = '🔍'; }
 
-  // Title verb differs between modes:
-  //   slash command: "List Check" (active, just-ran-the-command)
-  //   auto-check:    "Auto-check" (passive, fired on image post)
-  const titlePrefix = mode === 'auto' ? 'Auto-check' : 'List Check';
-  const title = `${titleIcon} ${titlePrefix} · ${limitedNamesCount} name(s)`;
+  // HUD-merged header. The mode + total name count live on the author kicker
+  // line; the title IS the breakdown, ordered by severity (black -> watch ->
+  // white -> trusted -> notListed). Plain text (embed titles ignore markdown)
+  // so the title's leading emoji is naturally the strongest outcome present -
+  // no separate "Outcome:" line and no redundant count line needed.
+  const titlePrefix = mode === 'auto' ? 'AUTO-CHECK' : 'LIST CHECK';
+  const kicker = `// ${titlePrefix} · ${limitedNamesCount} NAMES`;
 
-  // Breakdown line at the top of the description gives the punchline
-  // before the per-name list. Bolded counts anchor the eye when reading
-  // a long batch; falsy buckets are dropped silently so an unflagged run
-  // doesn't show empty separators.
-  const summaryParts = [];
-  if (counts.black) summaryParts.push(`⛔ **${counts.black}**`);
-  if (counts.watch) summaryParts.push(`⚠️ **${counts.watch}**`);
-  if (counts.white) summaryParts.push(`✅ **${counts.white}**`);
-  if (counts.trusted) summaryParts.push(`🛡️ **${counts.trusted}**`);
-  if (counts.notListed) summaryParts.push(`❓ **${counts.notListed}** not listed`);
-
-  const headerLine = summaryParts.length > 0
-    ? `**Outcome:** ${summaryParts.join(' · ')}`
-    : `Scanned **${limitedNamesCount}** name(s) against the lists.`;
+  const breakdownParts = [];
+  if (counts.black) breakdownParts.push(`⛔ ${counts.black}`);
+  if (counts.watch) breakdownParts.push(`⚠️ ${counts.watch}`);
+  if (counts.white) breakdownParts.push(`✅ ${counts.white}`);
+  if (counts.trusted) breakdownParts.push(`🛡️ ${counts.trusted}`);
+  if (counts.notListed) breakdownParts.push(`❓ ${counts.notListed} not listed`);
+  // breakdown is empty only with zero results -> fall back to a plain count.
+  const title = breakdownParts.length > 0
+    ? breakdownParts.join(' · ')
+    : `${titleIcon} ${limitedNamesCount} name(s)`;
 
   const ignoreNote = ignoredCount > 0
-    ? `\n*Ignored ${ignoredCount} extra name(s) (cap: ${maxNames ?? 'configured'}).*`
+    ? `\n\n*Ignored ${ignoredCount} extra name(s) (cap: ${maxNames ?? 'configured'}).*`
     : '';
 
-  // Description ceiling is 4096; for typical OCR runs (8 names auto,
-  // ~30 slash) the joined lines come in well under that. The slice is
-  // a safety net for long reasons or many similar-name suggestions.
-  const description = (`${headerLine}${ignoreNote}\n\n${formattedLines.join('\n')}`).slice(0, 4096);
+  // Description leads straight with the per-name list now (the breakdown moved
+  // up into the title). Ceiling is 4096; the slice is a safety net for long
+  // reasons / many similar-name suggestions.
+  const description = (`${formattedLines.join('\n')}${ignoreNote}`).slice(0, 4096);
 
   // Stats grid (Checked / Flagged / Cleared) was a 3-up inline field
   // panel pre-v0.5.73. The Outcome breakdown line at the top of the
@@ -119,25 +117,24 @@ export function buildListCheckEmbed({
   //   slash:  Tip toward /la-roster on a flagged hit OR retry hint when unflagged.
   //   auto:   Note that the dropdown below lets you Quick Add unflagged
   //           names (the auto-check pipeline ships a select menu for that).
-  const footerParts = [];
+  // Footer is a HUD status line: a // FLAGGED n (or // CLEAR) tag, the
+  // mode-specific tip, then the source citation.
+  const footerParts = [flaggedCount > 0 ? `// FLAGGED ${flaggedCount}` : '// CLEAR'];
   if (mode === 'auto') {
     if (flaggedCount > 0) {
-      footerParts.push('Use the dropdown to Quick Add unflagged names · /la-roster <name> for full detail.');
+      footerParts.push('Quick Add unflagged via the dropdown · /la-roster <name> for detail');
     } else if (counts.notListed > 0) {
-      footerParts.push('Use the dropdown below to Quick Add unflagged names to a list.');
-    } else {
-      footerParts.push('No flags this image.');
+      footerParts.push('Quick Add unflagged names via the dropdown below');
     }
+  } else if (flaggedCount > 0) {
+    footerParts.push('/la-roster <name> for the full roster of any flagged hit');
   } else {
-    if (flaggedCount > 0) {
-      footerParts.push('Tip: /la-roster <name> for the full roster of any flagged hit.');
-    } else {
-      footerParts.push('No flags. Re-run with a fresh image to re-check.');
-    }
+    footerParts.push('Re-run with a fresh image to re-check');
   }
-  footerParts.push('Source: database blacklist + whitelist + watchlist + trusted');
+  footerParts.push('SRC db blacklist + whitelist + watchlist + trusted');
 
   const embed = new EmbedBuilder()
+    .setAuthor({ name: kicker })
     .setTitle(title)
     .setDescription(description)
     .setColor(color)
