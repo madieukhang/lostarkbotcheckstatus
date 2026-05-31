@@ -30,6 +30,7 @@ import {
 } from 'discord.js';
 
 import { COLORS, ICONS } from './ui.js';
+import { truncateInlineText } from './discordText.js';
 import { rosterUrl } from './rosterLink.js';
 import { getClassEmoji } from '../models/Class.js';
 import { t } from '../services/i18n/index.js';
@@ -108,12 +109,6 @@ function buildAltList(alts, { newAltsSet } = {}) {
     ? `\n*... and ${alts.length - visible.length} more*`
     : '';
   return lines.join('\n') + extra;
-}
-
-function formatFailureReason(reason) {
-  const value = String(reason || '').trim();
-  if (!value) return '';
-  return value.length > 140 ? `${value.slice(0, 137)}...` : value;
 }
 
 /**
@@ -197,7 +192,7 @@ export function buildScanResultEmbed({
     const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
     const failed = result.failedCandidates ?? 0;
     const rate = attempted > 0 ? Math.round((failed / attempted) * 100) : 0;
-    const lastError = formatFailureReason(result.lastFailureReason);
+    const lastError = truncateInlineText(result.lastFailureReason, 140);
     stopHint = `Bible rejected ${failed}/${attempted} profiles (${rate}%); I paused so we don't burn the rest.` +
       (lastError ? ` Last error: \`${lastError}\`.` : '') +
       ` Failed candidates were not marked checked, so **Continue scan** will retry them.`;
