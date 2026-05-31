@@ -98,6 +98,35 @@ function isSingleAdjacentTransposition(a, b) {
     && a[second] === b[first];
 }
 
+function buildRecoveryPrefixes(folded, minLength = 4) {
+  const maxLength = Math.min(folded.length, 10);
+  const prefixes = [];
+  for (let len = maxLength; len >= minLength; len -= 1) {
+    prefixes.push(folded.slice(0, len));
+  }
+  return [...new Set(prefixes)];
+}
+
+async function recoverViaPrefixCandidates(name, predicate, options = {}) {
+  const folded = asciiFoldName(name);
+  if (folded.length < 5) return null;
+
+  const matches = new Map();
+  for (const prefix of buildRecoveryPrefixes(folded)) {
+    const suggestions = await fetchNameSuggestions(prefix, options);
+    if (!Array.isArray(suggestions) || suggestions.length === 0) continue;
+    const before = matches.size;
+    for (const s of suggestions) {
+      const cand = asciiFoldName(String(s.name));
+      if (!predicate(folded, cand)) continue;
+      matches.set(String(s.name).toLowerCase(), s);
+    }
+    if (matches.size > before && suggestions.length < 10) break;
+  }
+
+  return matches.size === 1 ? [...matches.values()][0] : null;
+}
+
 /**
  * Levenshtein edit distance · O(m·n) DP with rolling rows. Returns the
  * minimum number of single-character insertions / deletions / swaps to
@@ -279,9 +308,10 @@ function chooseCanonicalSuggestion(name, suggestions) {
  * dropped · usually a miscounted repeated letter ("Qiyllyn" for
  * "Qiylyn", "Lpiiv" for "Lpiiiv").
  *
- * bible search is prefix-based (a 4-char prefix returns up to ~10
- * candidates; 2 chars returns nothing), so we re-query a 4-char prefix
- * and keep only candidates that are exactly ONE indel away:
+ * bible search is prefix-based and caps suggestions, so a 4-char
+ * prefix can be too broad for long names ("auro" does not surface
+ * "Auroraformyluv"). Try longer prefixes first, then keep only
+ * candidates that are exactly ONE indel away:
  *   - length differs by exactly 1 (rules out same-length substitution),
  *   - Levenshtein distance is exactly 1,
  *   - and a subsequence relationship holds (the shorter is a
@@ -297,19 +327,14 @@ function chooseCanonicalSuggestion(name, suggestions) {
  */
 async function recoverViaPrefixIndel(name, options = {}) {
   const folded = asciiFoldName(name);
-  // Need ≥5 chars so a 4-char prefix still leaves room for the indel
-  // and is specific enough that bible does not fan out to noise.
+  // Need >=5 chars so a short prefix still leaves room for the indel.
   if (folded.length < 5) return null;
-  const prefix = folded.slice(0, 4);
-  const suggestions = await fetchNameSuggestions(prefix, options);
-  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
-  const matches = suggestions.filter((s) => {
-    const cand = asciiFoldName(String(s.name));
+  return recoverViaPrefixCandidates(name, (source, cand) => {
+    if (!cand) return false;
     if (Math.abs(cand.length - folded.length) !== 1) return false;
-    if (levenshteinDistance(folded, cand) !== 1) return false;
-    return isSubsequence(folded, cand) || isSubsequence(cand, folded);
-  });
-  return matches.length === 1 ? matches[0] : null;
+    if (levenshteinDistance(source, cand) !== 1) return false;
+    return isSubsequence(source, cand) || isSubsequence(cand, source);
+  }, options);
 }
 
 /**
@@ -322,14 +347,11 @@ async function recoverViaPrefixIndel(name, options = {}) {
 async function recoverViaPrefixTransposition(name, options = {}) {
   const folded = asciiFoldName(name);
   if (folded.length < 6) return null;
-  const prefix = folded.slice(0, 4);
-  const suggestions = await fetchNameSuggestions(prefix, options);
-  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
-  const matches = suggestions.filter((s) => {
-    const cand = asciiFoldName(String(s.name));
-    return isSingleAdjacentTransposition(folded, cand);
-  });
-  return matches.length === 1 ? matches[0] : null;
+  return recoverViaPrefixCandidates(
+    name,
+    (source, cand) => Boolean(cand) && isSingleAdjacentTransposition(source, cand),
+    options
+  );
 }
 
 /**

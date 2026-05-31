@@ -7,6 +7,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Fixed
+- Auto-check / `/la-check` now recovers long OCR names where one letter is dropped but a 4-character Bible prefix is too broad to return the real character. Observed case: `Aurorafomyluv` -> `Auroraformyluv`; recovery now tries longer prefixes first (`aurorafo`) and still accepts only a single strict indel candidate. 135/135 green.
 - Auto-check / `/la-check` now refreshes DB list hits after OCR canonicalization and worker roster enrichment, so a recovered name like `Auroraforymluv` -> `Auroraformyluv` (or a visible roster sibling like `Auroraforyou`) is checked against blacklist / whitelist / watchlist / trusted before rendering and before Quick Add. Worker-online search fallbacks now stay on the worker route instead of dropping to direct Railway search. 134/134 green.
 - Auto-check / `/la-check` canonical recovery now handles the observed OCR case where Gemini collapses `iy` / `yi` into `ï` (`Qïlyn` -> `Qiylyn`) before giving up as not-listed. The retry is search-scoped and only accepts bible's canonical candidate, so real `ï` names still win if bible returns them directly. Quick Add also no longer offers trusted-only rows as addable "unflagged" names. 131/131 green.
 - Auto-check / `/la-check` now recovers one adjacent-letter transposition from bible prefix search before rendering a bare not-listed row, covering the observed `Auroraforymluv` -> `Auroraformyluv` image case while still rejecting ambiguous prefix matches. 132/132 green.

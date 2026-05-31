@@ -196,7 +196,7 @@ test('worker-online enrichment marks chars as trusted via discoveredAlts when th
 // lowercase query string to the bible result array.
 function installPrefixIndelStub(prefixResponses) {
   const originalFetch = globalThis.fetch;
-  const counts = { searchCalls: 0 };
+  const counts = { searchCalls: 0, queries: [] };
   globalThis.fetch = async (url) => {
     const requestedUrl = String(url);
     if (requestedUrl.includes('/character/NA/')) {
@@ -210,6 +210,7 @@ function installPrefixIndelStub(prefixResponses) {
       const m = requestedUrl.match(/payload=([^&]+)/);
       const decoded = m ? Buffer.from(decodeURIComponent(m[1]), 'base64').toString('utf8') : '';
       const q = ((decoded.match(/,"([^"]*)","NA"\]/) || [])[1] || '').toLowerCase();
+      counts.queries.push(q);
       const result = prefixResponses[q];
       return Response.json({
         type: 'result',
@@ -248,6 +249,25 @@ test('prefix-indel recovery picks the unique distance-1 candidate (Lpiiv -> Lpii
     assert.equal(results.length, 1);
     assert.equal(results[0].name, 'Lpiiiv', 'should pick the single distance-1 indel candidate');
     assert.equal(results[0].snapItemLevel, 1730);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('prefix-indel recovery uses longer prefixes when 4-char search is too broad', async () => {
+  await markWorkerOnline();
+  const stub = installPrefixIndelStub({
+    auro: [[1], [2, 3, 4], 'Auroñ', 'berserker', 1767.5],
+    aurorafo: [[1], [2, 3, 4], 'Auroraformyluv', 'bard', 1754.17],
+  });
+  try {
+    const results = await checkNamesAgainstLists(['Aurorafomyluv'], { guildId: 'guild-1' });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Auroraformyluv');
+    assert.equal(results[0].snapClassName, 'Bard');
+    assert.equal(results[0].snapItemLevel, 1754.17);
+    assert.ok(stub.counts.queries.includes('aurorafo'), 'expected longer-prefix recovery query');
   } finally {
     stub.restore();
   }
