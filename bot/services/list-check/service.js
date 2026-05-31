@@ -530,9 +530,24 @@ export async function checkNamesAgainstLists(names, options = {}) {
     Whitelist.find(nameQuery).collation(collation).lean(),
     Watchlist.find(nameQuery).collation(collation).lean(),
     TrustedUser.find({ name: { $in: names } }).collation(collation).lean(),
-    RosterSnapshot.find({ name: { $in: names } }).collation(collation).lean(),
+    RosterSnapshot.find({ name: { $in: names } }).collation({ locale: 'en', strength: 1 }).lean(),
   ]);
   const snapshotMap = new Map(allSnapshots.map((s) => [s.name.toLowerCase(), s]));
+
+  function chooseSnapshotForName(name) {
+    const exact = snapshotMap.get(name.toLowerCase());
+    if (exact) return { snap: exact, canonicalName: exact.name };
+
+    const targetCanonical = stripDiacritics(name);
+    const candidates = allSnapshots
+      .filter((s) => stripDiacritics(s.name) === targetCanonical)
+      .map((s) => ({ name: s.name, snap: s }));
+    const match = chooseCanonicalSuggestion(name, candidates);
+    if (match?.chosen?.snap) {
+      return { snap: match.chosen.snap, canonicalName: match.chosen.snap.name };
+    }
+    return { snap: null, canonicalName: name };
+  }
 
   // Build O(1) lookup maps from list entries (once per list, not per name)
   function buildEntryMap(entries) {
@@ -556,8 +571,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const trustedMap = new Map(allTrusted.map((t) => [t.name.toLowerCase(), t]));
   const originalNameSet = new Set(names.map((n) => String(n || '').toLowerCase()));
 
-  const results = names.map((name) => {
-    const snap = snapshotMap.get(name.toLowerCase()) || null;
+  const results = names.map((rawName) => {
+    const { snap, canonicalName } = chooseSnapshotForName(rawName);
+    const name = canonicalName || rawName;
     return {
       name,
       blackEntry: blackMap.get(name.toLowerCase()) || null,
