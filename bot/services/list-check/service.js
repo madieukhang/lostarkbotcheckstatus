@@ -287,6 +287,141 @@ function filterAndDeduplicateNames(parsed) {
   return unique;
 }
 
+async function findAmbiguousOcrChoices(names) {
+  const choices = [];
+
+  for (const name of names) {
+    // This refinement is only for the dangerous case where Gemini
+    // dropped a visible mark entirely (e.g. Crüelfighter -> Cruelfighter)
+    // and Bible also has a real unmarked character. If the OCR already
+    // contains a mark, the normal canonical matcher can rank it safely.
+    if (hasAnyDiacritic(name)) continue;
+
+    let suggestions = null;
+    try {
+      suggestions = await fetchNameSuggestions(name, { timeoutMs: 5000 });
+    } catch (err) {
+      console.warn(`[listcheck] OCR refine search skipped for ${name}: ${err.message}`);
+      continue;
+    }
+    if (!Array.isArray(suggestions) || suggestions.length === 0) continue;
+
+    const lower = name.toLowerCase();
+    const exact = suggestions.find((s) => String(s.name).toLowerCase() === lower);
+    if (!exact) continue;
+
+    const base = stripDiacritics(name);
+    const markedSiblings = suggestions
+      .filter((s) => {
+        const candidate = String(s.name || '');
+        return candidate.toLowerCase() !== lower
+          && stripDiacritics(candidate) === base
+          && hasAnyDiacritic(candidate);
+      })
+      .map((s) => String(s.name));
+
+    if (markedSiblings.length === 0) continue;
+    choices.push({
+      original: name,
+      candidates: [String(exact.name), ...markedSiblings],
+    });
+  }
+
+  return choices;
+}
+
+async function requestGeminiObject(prompt, imageBase64, mimeType) {
+  const requestBody = {
+    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType, data: imageBase64 } }] }],
+    generationConfig: { temperature: 0, topP: 0.1, maxOutputTokens: 512 },
+  };
+
+  const models = config.geminiModels.length > 0
+    ? config.geminiModels
+    : ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview'];
+
+  const failures = [];
+  for (let i = 0; i < models.length; i += 1) {
+    const model = models[i];
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
+
+    let aiRes;
+    try {
+      aiRes = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch (err) {
+      failures.push(`${model}: ${err.name || err.message}`);
+      continue;
+    }
+
+    if (!aiRes.ok) {
+      const errBody = await aiRes.text().catch(() => '');
+      failures.push(`${model}: HTTP ${aiRes.status}`);
+      if (i < models.length - 1 && shouldFailoverGeminiModel(aiRes.status, errBody)) continue;
+      return null;
+    }
+
+    const payload = await aiRes.json();
+    const text = (payload?.candidates?.[0]?.content?.parts || [])
+      .filter((part) => !part.thought)
+      .map((part) => part?.text ?? '')
+      .join('')
+      .trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      failures.push(`${model}: non-JSON object`);
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      failures.push(`${model}: invalid JSON object`);
+    }
+  }
+
+  console.warn(`[listcheck] OCR ambiguity refinement failed: ${failures.join(' | ')}`);
+  return null;
+}
+
+async function refineAmbiguousOcrNames(names, { imageBase64, mimeType } = {}) {
+  const choices = await findAmbiguousOcrChoices(names);
+  if (choices.length === 0) return names;
+
+  const choiceLines = choices
+    .map((choice) => `- ${JSON.stringify(choice.original)}: ${choice.candidates.map((c) => JSON.stringify(c)).join(', ')}`)
+    .join('\n');
+
+  const prompt = [
+    'This is a targeted correction pass for Lost Ark raid lobby OCR.',
+    'The first OCR pass may have DROPPED visible diacritics from character names.',
+    'Inspect only the visible player-name text in the image. Do not choose by item level, class, roster popularity, or search ranking.',
+    'For each key below, choose exactly one candidate from its candidate list. If the visible glyphs are unclear, keep the original key.',
+    'Pay special attention to two-dot umlauts above letters, especially ü versus plain u.',
+    'Return a JSON object only, mapping each original key to the chosen candidate.',
+    'Candidates:',
+    choiceLines,
+  ].join('\n');
+
+  const resolved = await requestGeminiObject(prompt, imageBase64, mimeType);
+  if (!resolved) return names;
+
+  const allowed = new Map(choices.map((choice) => [choice.original, new Set(choice.candidates)]));
+  return names.map((name) => {
+    const raw = typeof resolved[name] === 'string' ? normalizeCharacterName(resolved[name]) : '';
+    if (!raw || !allowed.get(name)?.has(raw)) return name;
+    if (raw !== name) {
+      console.log(`[listcheck] OCR targeted diacritic correction: "${name}" -> "${raw}"`);
+    }
+    return raw;
+  });
+}
+
 function chooseCanonicalSuggestion(name, suggestions) {
   if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
 
@@ -410,9 +545,11 @@ async function recoverViaPrefixTransposition(name, options = {}) {
  * Handles model failover on quota/rate limits and network errors.
  *
  * @param {object} image - Discord attachment or { url, contentType }
+ * @param {object} [options]
+ * @param {boolean} [options.refineAmbiguousDiacritics=false] - second-pass OCR for exact unmarked names with marked Bible siblings
  * @returns {Promise<string[]>} Array of normalized character names
  */
-export async function extractNamesFromImage(image) {
+export async function extractNamesFromImage(image, options = {}) {
   if (!config.geminiApiKey) {
     throw new Error('GEMINI_API_KEY is not configured.');
   }
@@ -421,7 +558,8 @@ export async function extractNamesFromImage(image) {
     throw new Error('Attachment must be an image file.');
   }
 
-  const cacheKey = image.url || '';
+  const refineAmbiguousDiacritics = options.refineAmbiguousDiacritics === true;
+  const cacheKey = image.url ? `${image.url}|refine:${refineAmbiguousDiacritics ? '1' : '0'}` : '';
   const cachedNames = getCachedOcrNames(cacheKey);
   if (cachedNames !== undefined) {
     console.log(`[listcheck] OCR cache hit for attachment ${image.id || cacheKey.slice(0, 32)}`);
@@ -528,7 +666,10 @@ export async function extractNamesFromImage(image) {
     }
     if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
 
-    const names = filterAndDeduplicateNames(parsed);
+    let names = filterAndDeduplicateNames(parsed);
+    if (refineAmbiguousDiacritics) {
+      names = await refineAmbiguousOcrNames(names, { imageBase64, mimeType });
+    }
     setCachedOcrNames(cacheKey, names);
     return names;
   }

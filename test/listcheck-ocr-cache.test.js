@@ -254,6 +254,82 @@ test('extractNamesFromImage repairs observed Banhcanhcua umlaut collapses', asyn
   }
 });
 
+test('extractNamesFromImage can refine dropped umlauts with a targeted candidate pass', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  let geminiCalls = 0;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/ambiguous-diacritic-image.png') {
+      return new Response(new Uint8Array([16, 17, 18]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const m = requestedUrl.match(/payload=([^&]+)/);
+      const decoded = m ? Buffer.from(decodeURIComponent(m[1]), 'base64').toString('utf8') : '';
+      const q = ((decoded.match(/,"([^"]*)","NA"\]/) || [])[1] || '').toLowerCase();
+      if (q === 'cruelfighter') {
+        const data = [
+          [1, 5],
+          [2, 3, 4],
+          'Cr\u00fcelfighter',
+          'infighter_male',
+          1768.3334,
+          [6, 7, 8],
+          'Cruelfighter',
+          'blade',
+          1640,
+        ];
+        return Response.json({ type: 'result', result: JSON.stringify(data) });
+      }
+      if (q === 'qiylyn') {
+        const data = [[1], [2, 3, 4], 'Qiylyn', 'weather_artist', 1753.3334];
+        return Response.json({ type: 'result', result: JSON.stringify(data) });
+      }
+      return Response.json({ type: 'result', result: JSON.stringify([[]]) });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      geminiCalls += 1;
+      const text = geminiCalls === 1
+        ? JSON.stringify(['Cruelfighter', 'Qiylyn'])
+        : JSON.stringify({ Cruelfighter: 'Cr\u00fcelfighter' });
+      return Response.json({
+        candidates: [
+          {
+            finishReason: 'STOP',
+            content: { parts: [{ text }] },
+          },
+        ],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'image-ambiguous-diacritic',
+      url: 'https://cdn.discordapp.com/ambiguous-diacritic-image.png',
+      contentType: 'image/png',
+    }, { refineAmbiguousDiacritics: true });
+
+    assert.deepEqual(names, ['Cr\u00fcelfighter', 'Qiylyn']);
+    assert.equal(geminiCalls, 2);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
+});
+
 test('extractNamesFromImage rejects oversized downloads even when content-length is missing', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;

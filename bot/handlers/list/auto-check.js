@@ -166,7 +166,7 @@ export function setupAutoCheck(client) {
 
       await message.react('🔍').catch(() => {});
 
-      const names = await extractNamesFromImage(image);
+      const names = await extractNamesFromImage(image, { refineAmbiguousDiacritics: true });
 
       if (names.length === 0) {
         await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
