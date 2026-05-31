@@ -1,6 +1,6 @@
 import TrustedUser from '../../models/TrustedUser.js';
 import { buildRosterCharacters } from '../roster/index.js';
-import { normalizeCharacterName } from '../../utils/names.js';
+import { normalizeRosterNames } from '../../utils/names.js';
 
 const MISSING_TRUSTED_ROSTER_QUERY = {
   $or: [
@@ -8,20 +8,6 @@ const MISSING_TRUSTED_ROSTER_QUERY = {
     { allCharacters: { $size: 0 } },
   ],
 };
-
-function normalizeTrustedRosterNames(primaryName, rosterNames = []) {
-  const out = [];
-  const seen = new Set();
-  for (const raw of [primaryName, ...rosterNames]) {
-    const clean = normalizeCharacterName(raw);
-    if (!clean) continue;
-    const key = clean.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(clean);
-  }
-  return out.length > 0 ? out : [primaryName];
-}
 
 export async function backfillTrustedRosterLinks({
   TrustedUserModel = TrustedUser,
@@ -45,7 +31,7 @@ export async function backfillTrustedRosterLinks({
         hiddenRosterFallback: true,
         timeoutMs: 10000,
       });
-      const allCharacters = normalizeTrustedRosterNames(
+      const allCharacters = normalizeRosterNames(
         entry.name,
         roster?.hasValidRoster ? roster.allCharacters : []
       );

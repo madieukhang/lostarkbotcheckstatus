@@ -26,6 +26,20 @@ export function normalizeCharacterName(raw) {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
+export function normalizeRosterNames(primaryName, rosterNames = []) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of [primaryName, ...rosterNames]) {
+    const clean = normalizeCharacterName(raw);
+    if (!clean) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+  }
+  return out.length > 0 ? out : [primaryName];
+}
+
 export function getInteractionDisplayName(interaction) {
   const member = interaction.member;
   if (member && typeof member === 'object') {

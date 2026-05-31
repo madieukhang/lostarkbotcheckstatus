@@ -4,7 +4,7 @@ import config from '../../../config.js';
 import Blacklist from '../../../models/Blacklist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
-import { normalizeCharacterName } from '../../../utils/names.js';
+import { normalizeCharacterName, normalizeRosterNames } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, replyAlert } from '../../../utils/interactionReplies.js';
@@ -24,20 +24,6 @@ function buildNameRosterQuery(names) {
       .filter(Boolean)
   )];
   return { $or: [{ name: { $in: list } }, { allCharacters: { $in: list } }] };
-}
-
-function normalizeRosterNames(primaryName, rosterNames = []) {
-  const out = [];
-  const seen = new Set();
-  for (const raw of [primaryName, ...rosterNames]) {
-    const clean = normalizeCharacterName(raw);
-    if (!clean) continue;
-    const key = clean.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(clean);
-  }
-  return out.length > 0 ? out : [primaryName];
 }
 
 export function createTrustHandlers() {

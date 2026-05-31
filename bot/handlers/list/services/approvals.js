@@ -18,6 +18,7 @@ import {
   buildListAddApprovalEmbed,
   getApproverRecipientIds,
   getSeniorApproverIds,
+  listTypeIcon,
 } from '../helpers.js';
 import { COLORS } from '../../../utils/ui.js';
 import UserPreference from '../../../models/UserPreference.js';
@@ -118,8 +119,6 @@ export function createApprovalServices({ client }) {
           .setEmoji('✖️')
       );
 
-    const typeIcon = (type) => (type === 'black' ? '⛔' : type === 'white' ? '✅' : '⚠️');
-
     // Per-type breakdown gives the senior a quick "what am I about to
     // approve?" read before they parse the line list. A bulk batch of
     // 30 rows skewed heavily blacklist deserves visible warning vs an
@@ -140,7 +139,7 @@ export function createApprovalServices({ client }) {
       const reasonShort = (r.reason || '').length > 40 ? (r.reason || '').slice(0, 37) + '...' : (r.reason || '');
       const scopeTag = r.scope === 'server' ? ' `[Local]`' : '';
       const raidTag = r.raid ? ` \`${r.raid}\`` : '';
-      return `\`${String(i + 1).padStart(2, ' ')}.\` ${typeIcon(r.type)} **${r.name}**${scopeTag}${raidTag} · ${reasonShort}`;
+      return `\`${String(i + 1).padStart(2, ' ')}.\` ${listTypeIcon(r.type)} **${r.name}**${scopeTag}${raidTag} · ${reasonShort}`;
     });
     if (pending.rows.length > 20) {
       previewLines.push(`*... and ${pending.rows.length - 20} more rows*`);
