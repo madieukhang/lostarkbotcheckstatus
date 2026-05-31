@@ -38,5 +38,5 @@ test('formatCheckResults renders roster-match branch context', () => {
   assert.match(lines[0], /^⛔/u);
   assert.match(lines[0], /\(Local\)/);
   assert.match(lines[0], /via \*\*Mainchar\*\*/);
-  assert.match(lines[0], /CP 90000/);
+  assert.match(lines[0], /CP `90000`/);
 });

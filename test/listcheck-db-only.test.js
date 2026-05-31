@@ -61,7 +61,7 @@ test('unmatched OCR names render as not listed instead of roster lookup status',
   assert.equal(formattedLines.length, 1);
   assert.match(formattedLines[0], /Unlistedname/);
   assert.match(formattedLines[0], /1740\.50/);
-  assert.match(formattedLines[0], /CP 4246\.54/);
+  assert.match(formattedLines[0], /CP `4246\.54`/);
   assert.doesNotMatch(formattedLines[0], /lookup issue|no roster|unchecked|worker offline/i);
 
   const { counts, embed } = buildListCheckEmbed({
@@ -80,7 +80,8 @@ test('unmatched OCR names render as not listed instead of roster lookup status',
   });
 
   const rendered = embed.toJSON();
-  assert.match(rendered.description, /not listed/);
-  assert.match(rendered.footer.text, /database blacklist/);
+  // "not listed" now lives in the merged title (the breakdown), not the description.
+  assert.match(rendered.title, /not listed/);
+  assert.match(rendered.footer.text, /blacklist \+ whitelist \+ watchlist \+ trusted/);
   assert.doesNotMatch(rendered.description, /lookup issue|no roster|unchecked|worker offline/i);
 });

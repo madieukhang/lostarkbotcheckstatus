@@ -49,7 +49,7 @@ function formatResultLine(item) {
     : '';
 
   const statSuffix = item.snapItemLevel > 0
-    ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP ${item.snapCombatScore}` : ''}`
+    ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP \`${item.snapCombatScore}\`` : ''}`
     : '';
 
   const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 🛡️' : '';

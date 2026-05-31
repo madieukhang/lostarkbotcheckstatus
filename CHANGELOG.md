@@ -6,6 +6,9 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Changed
+- List-check output (`/la-list check` + auto-check) restyled toward an Endfield-HUD frame, English-first: an author kicker carries the mode + name count (`// AUTO-CHECK · 8 NAMES` / `// LIST CHECK · N NAMES`); the title now IS the outcome breakdown (`⚠️ 1 · 🛡️ 2 · ❓ 5 not listed`, leading emoji = strongest outcome) so the redundant count + `Outcome:` lines are dropped; the footer is a status line (`// FLAGGED n` or `// CLEAR` · tip · source); CP renders as a mono chip like the item level. Per-name lines (status icon + class emoji + name + ilvl + via/reason/alts) and the Quick Add dropdown are unchanged. 148 tests green.
+
 ### Fixed
 - `/la-list trust` now stores and uses `allCharacters` like the other list types: trust add refreshes the target roster, trust remove accepts any linked alt, trusted view shows linked alts, and `/la-check`, auto-check, `/la-search`, `/la-roster`, add/edit guards all match trusted users by both primary name and roster alts. Legacy trusted entries are auto-backfilled on startup, so old saved characters do not need to be re-entered manually. 146/146 green.
 - Auto-check / `/la-check` now recovers the observed OCR substitution `Qiqlyn` -> `Qiylyn` via a narrow one-character `q -> y` retry. The retry only accepts one exact/diacritic canonical Bible candidate, then refreshes list/trusted hits before rendering, so `Qiylyn` keeps its Aeromancer item level and trusted shield instead of showing as bare not-listed. 143/143 green.
