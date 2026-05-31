@@ -69,6 +69,17 @@ function diacriticDistance(a, b) {
   return score;
 }
 
+function medianNumber(values) {
+  const sorted = values
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  if (sorted.length === 0) return null;
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 // Aggressive ASCII fallback for bible search retries. Strips combining
 // marks AND any remaining non-ASCII codepoint (catches Cyrillic
 // look-alikes and other Unicode confusables that survive Gemini's OCR
@@ -420,6 +431,70 @@ async function refineAmbiguousOcrNames(names, { imageBase64, mimeType } = {}) {
     }
     return raw;
   });
+}
+
+async function applyMarkedSiblingLevelCorrections(results) {
+  const exactUnmarked = results.filter(
+    (item) => item?.name
+      && !hasAnyDiacritic(item.name)
+      && item.snapItemLevel > 0
+  );
+  if (exactUnmarked.length === 0) return;
+
+  const names = exactUnmarked.map((item) => item.name);
+  const siblingSnapshots = await RosterSnapshot.find({ name: { $in: names } })
+    .collation({ locale: 'en', strength: 1 })
+    .lean();
+  if (siblingSnapshots.length === 0) return;
+
+  const snapshotsByBase = new Map();
+  for (const snap of siblingSnapshots) {
+    const base = stripDiacritics(snap.name);
+    if (!snap.itemLevel || !snap.classId) continue;
+    if (!snapshotsByBase.has(base)) snapshotsByBase.set(base, []);
+    snapshotsByBase.get(base).push(snap);
+  }
+
+  for (const item of exactUnmarked) {
+    const otherLevels = results
+      .filter((other) => other !== item && other.snapItemLevel > 0)
+      .map((other) => Number(other.snapItemLevel));
+    if (otherLevels.length < 3) continue;
+
+    const partyMedian = medianNumber(otherLevels);
+    if (!Number.isFinite(partyMedian)) continue;
+
+    const base = stripDiacritics(item.name);
+    const candidates = (snapshotsByBase.get(base) || [])
+      .filter((snap) => {
+        const sameExact = String(snap.name).toLowerCase() === String(item.name).toLowerCase();
+        return !sameExact && hasAnyDiacritic(snap.name) && Number(snap.itemLevel) > 0;
+      })
+      .map((snap) => ({
+        snap,
+        distance: Math.abs(Number(snap.itemLevel) - partyMedian),
+      }))
+      .sort((a, b) => a.distance - b.distance);
+
+    if (candidates.length === 0) continue;
+    if (candidates.length > 1 && candidates[0].distance === candidates[1].distance) continue;
+
+    const exactDistance = Math.abs(Number(item.snapItemLevel) - partyMedian);
+    const best = candidates[0];
+    const exactIsLowOutlier = Number(item.snapItemLevel) <= partyMedian - 50;
+    const markedFitsParty = best.distance <= 40;
+    const markedIsMuchCloser = exactDistance - best.distance >= 50;
+    if (!exactIsLowOutlier || !markedFitsParty || !markedIsMuchCloser) continue;
+
+    console.log(
+      `[listcheck] Party-level accent correction: "${item.name}" (${Number(item.snapItemLevel).toFixed(2)}) -> "${best.snap.name}" (${Number(best.snap.itemLevel).toFixed(2)}), median ${partyMedian.toFixed(2)}`
+    );
+    item.name = best.snap.name;
+    item.snapClassId = best.snap.classId || '';
+    item.snapClassName = best.snap.classId ? getClassName(best.snap.classId) : '';
+    item.snapItemLevel = Number(best.snap.itemLevel) || 0;
+    item.snapCombatScore = best.snap.combatScore || '';
+  }
 }
 
 function chooseCanonicalSuggestion(name, suggestions) {
@@ -776,6 +851,8 @@ export async function checkNamesAgainstLists(names, options = {}) {
     };
   });
 
+  await applyMarkedSiblingLevelCorrections(results);
+
   // Phase 1.5: Targeted meta enrichment for items missing class+ilvl data.
   // Re-introduces a SINGLE-character bible meta lookup (per name) for
   // entries whose stored snapshot is missing or incomplete. Items that
@@ -1037,6 +1114,8 @@ export async function checkNamesAgainstLists(names, options = {}) {
     console.log(
       `[listcheck] Enriched ${itemsNeedingEnrichment.length} name(s) via ${mode} in ${Date.now() - enrichStartedAt}ms`
     );
+
+    await applyMarkedSiblingLevelCorrections(results);
   }
 
   // Phase 1.6: Enrichment can canonicalize OCR'd names (for example

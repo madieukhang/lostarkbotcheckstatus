@@ -304,6 +304,76 @@ test('search enrichment still resolves exact Crüelfighter and Qiylyn metadata',
   }
 });
 
+test('party-level context corrects unmarked exact OCR when marked sibling fits the lobby', async () => {
+  await RosterSnapshot.insertMany([
+    { name: 'Cruelfighter', classId: 'blade', itemLevel: 1640, rosterName: 'Cruelfighter' },
+    { name: 'Cr\u00fcelfighter', classId: 'infighter_male', itemLevel: 1768.3334, rosterName: 'Cr\u00fcelfighter' },
+    { name: 'Qiylyn', classId: 'weather_artist', itemLevel: 1753.3334, rosterName: 'Qiylyn' },
+    { name: 'Seulwa', classId: 'reaper', itemLevel: 1720, rosterName: 'Seulwa' },
+    { name: 'Episduk', classId: 'soul_eater', itemLevel: 1748.3334, rosterName: 'Episduk' },
+    { name: 'Misoon', classId: 'elemental_master', itemLevel: 1754.1666, rosterName: 'Misoon' },
+    { name: 'Leign', classId: 'berserker', itemLevel: 1732.5, rosterName: 'Leign' },
+    { name: 'Auroraformyluv', classId: 'bard', itemLevel: 1754.1666, rosterName: 'Auroraformyluv' },
+  ]);
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    throw new Error(`unexpected enrichment fetch: ${url}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists([
+      'Cruelfighter',
+      'Qiylyn',
+      'Seulwa',
+      'Episduk',
+      'Misoon',
+      'Leign',
+      'Auroraformyluv',
+    ], { guildId: 'guild-1' });
+    const corrected = results[0];
+    const lines = formatCheckResults(results);
+
+    assert.equal(corrected.name, 'Cr\u00fcelfighter');
+    assert.equal(corrected.snapClassName, 'Breaker');
+    assert.equal(corrected.snapItemLevel, 1768.3334);
+    assert.match(lines.join('\n'), /Cr\u00fcelfighter/);
+    assert.doesNotMatch(lines.join('\n'), /Cruelfighter · `1640\.00`/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('party-level context keeps unmarked exact names when they fit the lobby', async () => {
+  await RosterSnapshot.insertMany([
+    { name: 'Cruelfighter', classId: 'blade', itemLevel: 1640, rosterName: 'Cruelfighter' },
+    { name: 'Cr\u00fcelfighter', classId: 'infighter_male', itemLevel: 1768.3334, rosterName: 'Cr\u00fcelfighter' },
+    { name: 'Lowone', classId: 'blade', itemLevel: 1645, rosterName: 'Lowone' },
+    { name: 'Lowtwo', classId: 'blade', itemLevel: 1650, rosterName: 'Lowtwo' },
+    { name: 'Lowthree', classId: 'blade', itemLevel: 1635, rosterName: 'Lowthree' },
+  ]);
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    throw new Error(`unexpected enrichment fetch: ${url}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists([
+      'Cruelfighter',
+      'Lowone',
+      'Lowtwo',
+      'Lowthree',
+    ], { guildId: 'guild-1' });
+
+    assert.equal(results[0].name, 'Cruelfighter');
+    assert.equal(results[0].snapClassName, 'Deathblade');
+    assert.equal(results[0].snapItemLevel, 1640);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('worker-online enrichment marks chars as trusted via discoveredAlts when the roster main is trusted', async () => {
   await markWorkerOnline();
   await TrustedUser.create({
