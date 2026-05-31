@@ -4,6 +4,7 @@
  */
 
 import { buildAlertEmbed, AlertSeverity } from './alertEmbed.js';
+import { truncateInlineText } from './discordText.js';
 import { rosterUrl } from './rosterLink.js';
 import { ICONS, buildProgressBar, relativeTime } from './ui.js';
 import { getClassEmoji } from '../models/Class.js';
@@ -26,12 +27,6 @@ function buildAltsBlock(alts) {
   return `\n\n**Matches so far (${alts.length}):**\n${lines.join('\n')}${extra}`;
 }
 
-function formatFailureReason(reason) {
-  const value = String(reason || '').trim();
-  if (!value) return '';
-  return value.length > 120 ? `${value.slice(0, 117)}...` : value;
-}
-
 export function buildScanProgressEmbed({
   title,
   subtitle,
@@ -48,7 +43,7 @@ export function buildScanProgressEmbed({
     ? `\n*Started ${relativeTime(progress.startedAt)}*`
     : '';
   const altsBlock = buildAltsBlock(progress.alts);
-  const failureReason = formatFailureReason(progress.lastFailureReason);
+  const failureReason = truncateInlineText(progress.lastFailureReason, 120);
   const failureLine = failureReason && (progress.failedCandidates ?? 0) > 0
     ? `\nLast error: \`${failureReason}\``
     : '';

@@ -18,7 +18,6 @@
  * respects the scope boundary.
  */
 
-import config from '../../../config.js';
 import { connectDB } from '../../../db.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
@@ -28,6 +27,7 @@ import { buildEvidenceEmbed } from '../view/ui.js';
 import {
   decorateListEntry,
   getListContext,
+  isOfficerOrSenior,
   parseListEntryRef,
 } from '../helpers.js';
 
@@ -35,12 +35,6 @@ const KNOWN_TYPES = ['black', 'white', 'watch'];
 const COLLATION = { locale: 'en', strength: 2 };
 const AUTOCOMPLETE_MAX = 25;
 const PER_LIST_FETCH_CAP = 25;
-
-function isOfficerOrSenior(userId) {
-  if (!userId) return false;
-  if (config.seniorApproverIds.includes(userId)) return true;
-  return config.officerApproverIds.includes(userId);
-}
 
 /**
  * Apply the blacklist scope filter on top of a base name query. Whitelist

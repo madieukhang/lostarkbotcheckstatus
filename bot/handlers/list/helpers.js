@@ -25,14 +25,14 @@ const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
 const MEMBER_APPROVER_IDS = config.memberApproverIds;
 
+const LIST_CONTEXTS = Object.freeze({
+  black: { model: Blacklist, label: 'blacklist', color: COLORS.danger, icon: '⛔' },
+  white: { model: Whitelist, label: 'whitelist', color: COLORS.success, icon: '✅' },
+  watch: { model: Watchlist, label: 'watchlist', color: COLORS.warning, icon: '⚠️' },
+});
+
 export function getListContext(type) {
-  if (type === 'black') {
-    return { model: Blacklist, label: 'blacklist', color: COLORS.danger, icon: '⛔' };
-  }
-  if (type === 'watch') {
-    return { model: Watchlist, label: 'watchlist', color: COLORS.warning, icon: '⚠️' };
-  }
-  return { model: Whitelist, label: 'whitelist', color: COLORS.success, icon: '✅' };
+  return LIST_CONTEXTS[type] || LIST_CONTEXTS.white;
 }
 
 /**
@@ -172,14 +172,12 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   const includeRequestedBy = options.includeRequestedBy ?? true;
   const isEdit = payload.action === 'edit';
 
-  // List-type vocabulary derived locally so we don't import the full
-  // getListContext (which lives below this fn and would create a cycle).
-  let listIcon = '🛡️';
-  let listLabel = 'list';
-  let listColor = COLORS.info;
-  if (payload.type === 'black') { listIcon = '⛔'; listLabel = 'blacklist'; listColor = COLORS.danger; }
-  else if (payload.type === 'white') { listIcon = '✅'; listLabel = 'whitelist'; listColor = COLORS.success; }
-  else if (payload.type === 'watch') { listIcon = '⚠️'; listLabel = 'watchlist'; listColor = COLORS.warning; }
+  const listContext = LIST_CONTEXTS[payload.type] || {
+    icon: ICONS.shield,
+    label: 'list',
+    color: COLORS.info,
+  };
+  const { icon: listIcon, label: listLabel, color: listColor } = listContext;
 
   const titleVerb = isEdit ? 'Edit' : 'Add';
   const title = options.title || `${listIcon} ${titleVerb} approval · ${payload.name}`;
