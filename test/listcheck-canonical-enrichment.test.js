@@ -478,6 +478,28 @@ test('prefix-indel recovery resolves a doubled letter (Qiyllyn -> Qiylyn)', asyn
   }
 });
 
+test('visual-substitution recovery resolves y read as q (Qiqlyn -> Qiylyn)', async () => {
+  await markWorkerOnline();
+  await TrustedUser.create({ name: 'Qiylyn', reason: 'trusted test' });
+  const stub = installPrefixIndelStub({
+    qiylyn: [[1], [2, 3, 4], 'Qiylyn', 'weather_artist', 1753.3334],
+  });
+  try {
+    const results = await checkNamesAgainstLists(['Qiqlyn'], { guildId: 'guild-1' });
+    const lines = formatCheckResults(results);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Qiylyn', 'should recover canonical via q -> y visual substitution');
+    assert.equal(results[0].snapClassName, 'Aeromancer');
+    assert.equal(results[0].snapItemLevel, 1753.3334);
+    assert.equal(results[0].trustedEntry?.name, 'Qiylyn');
+    assert.match(lines.join('\n'), /Qiylyn/);
+    assert.doesNotMatch(lines.join('\n'), /Qiqlyn/);
+  } finally {
+    stub.restore();
+  }
+});
+
 test('prefix-indel recovery picks the unique distance-1 candidate (Lpiiv -> Lpiiiv, not Lpiiiiv)', async () => {
   await markWorkerOnline();
   // prefix "lpii" returns Lpiiiv (dist 1, recover) AND Lpiiiiv (dist 2,

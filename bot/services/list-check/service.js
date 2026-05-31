@@ -116,6 +116,17 @@ function buildDiaeresisDigraphVariants(value) {
   return [...variants].filter((variant) => variant !== source);
 }
 
+function buildSingleVisualSubstitutionVariants(value) {
+  const source = String(value || '');
+  const variants = new Set();
+  for (let i = 1; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === 'q') variants.add(`${source.slice(0, i)}y${source.slice(i + 1)}`);
+    if (ch === 'Q') variants.add(`${source.slice(0, i)}Y${source.slice(i + 1)}`);
+  }
+  return [...variants].filter((variant) => variant !== source);
+}
+
 // Is `a` a subsequence of `b`? (every char of a appears in b in order).
 // Used to distinguish a pure insertion/deletion (indel · subsequence
 // holds one way) from a same-length substitution (subsequence fails
@@ -615,6 +626,25 @@ async function recoverViaPrefixTransposition(name, options = {}) {
   );
 }
 
+async function recoverViaVisualSubstitution(name, options = {}) {
+  const source = stripDiacritics(name);
+  if (source.length < 5) return null;
+
+  const matches = new Map();
+  for (const variant of buildSingleVisualSubstitutionVariants(name)) {
+    const suggestions = await fetchNameSuggestions(variant, options);
+    const match = chooseCanonicalSuggestion(variant, suggestions);
+    if (!match || !['exact', 'diacritic'].includes(match.reason)) continue;
+
+    const candidateBase = stripDiacritics(String(match.chosen.name));
+    if (candidateBase !== stripDiacritics(variant)) continue;
+    if (levenshteinDistance(source, candidateBase) !== 1) continue;
+    matches.set(String(match.chosen.name).toLowerCase(), match.chosen);
+  }
+
+  return matches.size === 1 ? [...matches.values()][0] : null;
+}
+
 /**
  * Extract character names from an image using Gemini OCR.
  * Handles model failover on quota/rate limits and network errors.
@@ -957,6 +987,21 @@ export async function checkNamesAgainstLists(names, options = {}) {
         }
       }
       if (!match) {
+        const substituted = await recoverViaVisualSubstitution(originalName, searchOptions);
+        if (substituted) {
+          const recoveredName = normalizeCharacterName(substituted.name);
+          if (!recoveredName) return false;
+          console.log(
+            `[listcheck] Visual-substitution recovery: OCR'd "${originalName}" -> canonical "${recoveredName}"`
+          );
+          if (recoveredName !== originalName) item.name = recoveredName;
+          await applyEnrichment(item, {
+            classId: substituted.cls || '',
+            itemLevel: Number(substituted.itemLevel) || 0,
+          });
+          return true;
+        }
+
         const transposed = await recoverViaPrefixTransposition(originalName, searchOptions);
         if (transposed) {
           const recoveredName = normalizeCharacterName(transposed.name);
