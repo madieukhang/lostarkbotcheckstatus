@@ -220,6 +220,90 @@ test('search enrichment refuses ambiguous same-base diacritic variants', async (
   }
 });
 
+test('search enrichment keeps unique nearest marked candidate over unmarked same-base names', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const data = [
+        [1, 5],
+        [2, 3, 4],
+        'Cr\u00fcelfighter',
+        'infighter_male',
+        1768.3334,
+        [6, 7, 8],
+        'Cruelfighter',
+        'blade',
+        1640,
+      ];
+      return Response.json({ type: 'result', result: JSON.stringify(data) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Cr\u00faelfighter'], { guildId: 'guild-1' });
+    const lines = formatCheckResults(results);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Cr\u00fcelfighter');
+    assert.equal(results[0].snapClassName, 'Breaker');
+    assert.equal(results[0].snapItemLevel, 1768.3334);
+    assert.match(lines[0], /Cr\u00fcelfighter/);
+    assert.match(lines[0], /1768\.33/);
+    assert.doesNotMatch(lines[0], /Cruelfighter/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('search enrichment still resolves exact Crüelfighter and Qiylyn metadata', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const m = requestedUrl.match(/payload=([^&]+)/);
+      const decoded = m ? Buffer.from(decodeURIComponent(m[1]), 'base64').toString('utf8') : '';
+      const q = ((decoded.match(/,"([^"]*)","NA"\]/) || [])[1] || '').toLowerCase();
+      if (q.includes('cr')) {
+        const data = [
+          [1, 5],
+          [2, 3, 4],
+          'Cr\u00fcelfighter',
+          'infighter_male',
+          1768.3334,
+          [6, 7, 8],
+          'Cruelfighter',
+          'blade',
+          1640,
+        ];
+        return Response.json({ type: 'result', result: JSON.stringify(data) });
+      }
+      if (q.includes('qiy')) {
+        const data = [[1], [2, 3, 4], 'Qiylyn', 'weather_artist', 1753.3334];
+        return Response.json({ type: 'result', result: JSON.stringify(data) });
+      }
+      return Response.json({ type: 'result', result: JSON.stringify([[]]) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Cr\u00fcelfighter', 'Qiylyn'], { guildId: 'guild-1' });
+    const lines = formatCheckResults(results);
+
+    assert.equal(results.length, 2);
+    assert.equal(results[0].snapClassName, 'Breaker');
+    assert.equal(results[0].snapItemLevel, 1768.3334);
+    assert.equal(results[1].snapClassName, 'Aeromancer');
+    assert.equal(results[1].snapItemLevel, 1753.3334);
+    assert.match(lines[0], /1768\.33/);
+    assert.match(lines[1], /1753\.33/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('worker-online enrichment marks chars as trusted via discoveredAlts when the roster main is trusted', async () => {
   await markWorkerOnline();
   await TrustedUser.create({

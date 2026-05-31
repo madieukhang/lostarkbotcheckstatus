@@ -36,6 +36,39 @@ function stripDiacritics(value) {
     .toLowerCase();
 }
 
+function diacriticGroups(value) {
+  const groups = [];
+  for (const ch of String(value || '').normalize('NFD').toLowerCase()) {
+    if (/[\u0300-\u036f]/u.test(ch)) {
+      if (groups.length > 0) groups[groups.length - 1] += ch;
+    } else {
+      groups.push('');
+    }
+  }
+  return groups;
+}
+
+function hasAnyDiacritic(value) {
+  return diacriticGroups(value).some(Boolean);
+}
+
+function diacriticDistance(a, b) {
+  if (stripDiacritics(a) !== stripDiacritics(b)) return Infinity;
+  const left = diacriticGroups(a);
+  const right = diacriticGroups(b);
+  if (left.length !== right.length) return Infinity;
+  let score = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] === right[i]) continue;
+    // A wrong accent type on the same glyph is safer than inventing or
+    // deleting a mark. This lets OCR "Crúelfighter" snap to
+    // "Crüelfighter" over the real unmarked "Cruelfighter", while
+    // still refusing tied cases such as "Aürélia".
+    score += left[i] && right[i] ? 1 : 2;
+  }
+  return score;
+}
+
 // Aggressive ASCII fallback for bible search retries. Strips combining
 // marks AND any remaining non-ASCII codepoint (catches Cyrillic
 // look-alikes and other Unicode confusables that survive Gemini's OCR
@@ -278,6 +311,14 @@ function chooseCanonicalSuggestion(name, suggestions) {
     return { chosen: diacriticMatches[0], reason: 'diacritic' };
   }
   const ambiguousDiacriticMatch = diacriticMatches.length > 1;
+  if (ambiguousDiacriticMatch && hasAnyDiacritic(name)) {
+    const ranked = diacriticMatches
+      .map((s) => ({ suggestion: s, distance: diacriticDistance(name, String(s.name)) }))
+      .sort((a, b) => a.distance - b.distance);
+    if (ranked[0]?.distance < ranked[1]?.distance) {
+      return { chosen: ranked[0].suggestion, reason: 'diacritic' };
+    }
+  }
 
   // Third pass: targeted visual look-alike match for short names where
   // a full edit-distance pass would be too loose.
