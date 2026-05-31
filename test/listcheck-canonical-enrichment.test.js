@@ -14,6 +14,8 @@ let formatCheckResults;
 let connectDB;
 let RosterSnapshot;
 let WorkerHeartbeat;
+let Blacklist;
+let TrustedUser;
 
 test.before(async () => {
   mongod = await MongoMemoryServer.create();
@@ -23,6 +25,8 @@ test.before(async () => {
   ({ checkNamesAgainstLists, formatCheckResults } = await import('../bot/services/list-check/service.js'));
   ({ default: RosterSnapshot } = await import('../bot/models/RosterSnapshot.js'));
   ({ default: WorkerHeartbeat } = await import('../bot/models/WorkerHeartbeat.js'));
+  ({ default: Blacklist } = await import('../bot/models/Blacklist.js'));
+  ({ default: TrustedUser } = await import('../bot/models/TrustedUser.js'));
 
   await connectDB();
 });
@@ -36,6 +40,8 @@ test.beforeEach(async () => {
   await Promise.all([
     RosterSnapshot.deleteMany({}),
     WorkerHeartbeat.deleteMany({}),
+    Blacklist.deleteMany({}),
+    TrustedUser.deleteMany({}),
   ]);
 });
 
@@ -129,7 +135,6 @@ test('worker-online enrichment canonicalizes the display name to bible spelling'
 
 test('worker-online enrichment marks chars as trusted via discoveredAlts when the roster main is trusted', async () => {
   await markWorkerOnline();
-  const TrustedUser = (await import('../bot/models/TrustedUser.js')).default;
   await TrustedUser.create({
     name: 'Clauseduk',
     reason: 'guild officer',
@@ -262,6 +267,71 @@ test('prefix-transposition recovery resolves adjacent swapped letters (Aurorafor
     assert.equal(results[0].snapItemLevel, 1740);
   } finally {
     stub.restore();
+  }
+});
+
+test('canonical recovery refreshes list hits before rendering not-listed', async () => {
+  await markWorkerOnline();
+  await Blacklist.create({
+    name: 'Auroraformyluv',
+    reason: 'prior evidence',
+    addedByUserId: 'tester',
+    addedByTag: 'tester#0001',
+  });
+  const stub = installPrefixIndelStub({
+    auro: [[1], [2, 3, 4], 'Auroraformyluv', 'bard', 1754.17],
+  });
+  try {
+    const results = await checkNamesAgainstLists(['Auroraforymluv'], { guildId: 'guild-1' });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Auroraformyluv');
+    assert.equal(results[0].blackEntry?.name, 'Auroraformyluv');
+    assert.equal(results[0].blackEntry?.reason, 'prior evidence');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('worker-online discovered alts refresh list hits before Quick Add', async () => {
+  await markWorkerOnline();
+  await Blacklist.create({
+    name: 'Auroraforyou',
+    reason: 'same roster evidence',
+    addedByUserId: 'tester',
+    addedByTag: 'tester#0001',
+  });
+
+  const rosterHtml = [
+    '<html><body>',
+    '<script>name:"Auroraforyou",class:"bard"</script>',
+    '<script>name:"Auroraformyluv",class:"bard"</script>',
+    '<a href="/character/NA/Auroraforyou/roster">',
+    '  <div class="text-lg font-semibold">Auroraforyou<span>1770.00</span><span>5868.87</span></div>',
+    '</a>',
+    '<a href="/character/NA/Auroraformyluv/roster">',
+    '  <div class="text-lg font-semibold">Auroraformyluv<span>1754.17</span><span>5144.30</span></div>',
+    '</a>',
+    '</body></html>',
+  ].join('\n');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/character/NA/')) {
+      return new Response(rosterHtml, { status: 200, headers: { 'content-type': 'text/html' } });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Auroraformyluv'], { guildId: 'guild-1' });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Auroraformyluv');
+    assert.equal(results[0].blackEntry?.name, 'Auroraforyou');
+    assert.ok(results[0].discoveredAlts.includes('Auroraforyou'));
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 
