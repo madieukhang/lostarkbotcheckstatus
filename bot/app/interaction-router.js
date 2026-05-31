@@ -1,12 +1,8 @@
 /**
  * app/interaction-router.js
  * Central interaction dispatcher for every Discord interaction the bot
- * cares about. Routes by interaction type (slash command, button,
- * select-menu, modal, autocomplete) then by command name or component
- * prefix. Transient 10062/40060 errors (3-second Discord ACK window
- * expiry, double-ack) are logged + swallowed · everything else
- * bubbles to a generic error reply so the user never stares at a
- * silent failure.
+ * cares about. Route tables keep the command/component surface visible
+ * without growing another long if/else chain.
  */
 
 import { InteractionType } from 'discord.js';
@@ -52,28 +48,39 @@ async function replyOrEdit(interaction, content) {
   await interaction.reply({ content, ephemeral: true }).catch(() => {});
 }
 
-async function handleButton(interaction, label, handler, failureContent = null) {
+async function handleRoute(interaction, route) {
   try {
-    await handler(interaction);
+    await route.handle(interaction);
   } catch (err) {
-    console.error(label, err?.message || err);
-    if (failureContent) {
-      await replyOrEdit(interaction, failureContent);
+    if (route.onError) {
+      await route.onError(interaction, err);
+      return;
+    }
+    console.error(route.label, err?.message || err);
+    if (route.failureContent) {
+      await replyOrEdit(interaction, route.failureContent);
     }
   }
 }
 
-async function handleAutocomplete(interaction) {
-  try {
-    if (interaction.commandName === 'la-search') {
+function createAutocompleteRoutes() {
+  return {
+    'la-search': async (interaction) => {
       const focused = interaction.options.getFocused(true);
-      if (focused?.name === 'class') {
-        await interaction.respond(getClassAutocompleteChoices(focused.value));
-        return;
-      }
-    }
-    if (interaction.commandName === 'la-evidence') {
-      await handleListEvidenceAutocomplete(interaction);
+      const choices = focused?.name === 'class'
+        ? getClassAutocompleteChoices(focused.value)
+        : [];
+      await interaction.respond(choices);
+    },
+    'la-evidence': handleListEvidenceAutocomplete,
+  };
+}
+
+async function handleAutocomplete(interaction, autocompleteRoutes = createAutocompleteRoutes()) {
+  try {
+    const handler = autocompleteRoutes[interaction.commandName];
+    if (handler) {
+      await handler(interaction);
       return;
     }
     await interaction.respond([]);
@@ -83,6 +90,175 @@ async function handleAutocomplete(interaction) {
   }
 }
 
+function createListEnrichButtonHandler(listHandlers) {
+  return async (interaction) => {
+    const customId = interaction.customId || '';
+    if (customId.startsWith('list-enrich:confirm:')) {
+      await listHandlers.handleListEnrichConfirmButton(interaction);
+      return;
+    }
+    if (customId.startsWith('list-enrich:continue:')) {
+      await listHandlers.handleListEnrichContinueButton(interaction);
+      return;
+    }
+    await listHandlers.handleListEnrichCancelButton(interaction);
+  };
+}
+
+export function findCustomIdRoute(routes, customId) {
+  return routes.find((route) => {
+    if (route.exact && customId === route.exact) return true;
+    if (route.prefixes && hasPrefix(customId, route.prefixes)) return true;
+    return false;
+  });
+}
+
+export function createButtonRoutes(listHandlers) {
+  return [
+    {
+      prefixes: ['listadd_overwrite:', 'listadd_keep:'],
+      label: '[list] Overwrite button error:',
+      handle: (interaction) => listHandlers.handleListAddOverwriteButton(interaction),
+    },
+    {
+      prefixes: ['listadd_approve:', 'listadd_reject:'],
+      label: '[list] Unhandled button approval error:',
+      handle: (interaction) => listHandlers.handleListAddApprovalButton(interaction),
+      failureContent: '\u274c Failed to process approval action.',
+    },
+    {
+      prefixes: ['listadd_viewevidence:'],
+      label: '[list] View evidence button error:',
+      handle: (interaction) => listHandlers.handleListAddViewEvidenceButton(interaction),
+      failureContent: '\u274c Failed to load evidence.',
+    },
+    {
+      prefixes: [
+        'list-enrich:confirm:',
+        'list-enrich:cancel:',
+        'list-enrich:continue:',
+      ],
+      label: '[list] Enrich button error:',
+      handle: createListEnrichButtonHandler(listHandlers),
+      failureContent: '\u274c Failed to process enrich action.',
+    },
+    {
+      prefixes: ['roster-deep:continue:'],
+      label: '[roster] deep continue button error:',
+      handle: handleRosterDeepContinueButton,
+      failureContent: '\u274c Failed to continue deep scan.',
+    },
+    {
+      prefixes: ['list-add:enrich-hidden:'],
+      label: '[list] add->enrich button error:',
+      handle: (interaction) => listHandlers.handleListAddEnrichHiddenButton(interaction),
+      failureContent: '\u274c Failed to start enrich scan.',
+    },
+    {
+      prefixes: ['scan-cancel:'],
+      label: '[scan] cancel button error:',
+      handle: (interaction) => listHandlers.handleScanCancelButton(interaction),
+      failureContent: '\u274c Failed to send stop signal.',
+    },
+    {
+      prefixes: ['multiadd_confirm:', 'multiadd_cancel:'],
+      label: '[multiadd] Button handler error:',
+      handle: (interaction) => listHandlers.handleMultiaddConfirmButton(interaction),
+      failureContent: '\u274c Failed to process button action.',
+    },
+    {
+      prefixes: [
+        'multiaddapprove_approve:',
+        'multiaddapprove_reject:',
+      ],
+      label: '[multiadd] Approval button error:',
+      handle: (interaction) => listHandlers.handleMultiaddApprovalButton(interaction),
+      failureContent: '\u274c Failed to process approval action.',
+    },
+  ];
+}
+
+export function createSelectRoutes(listHandlers) {
+  return [
+    {
+      exact: 'quickadd_select',
+      label: '[quickadd] Select error:',
+      handle: (interaction) => listHandlers.handleQuickAddSelect(interaction),
+    },
+    {
+      exact: 'autocheck_evidence',
+      label: '[autocheck] Evidence select error:',
+      handle: (interaction) => listHandlers.handleAutoCheckEvidenceSelect(interaction),
+      failureContent: '\u274c Failed to load evidence.',
+    },
+    {
+      prefixes: ['la-help:select:'],
+      label: '[la-help] Select error:',
+      handle: handleHelpSelect,
+    },
+    {
+      exact: LANGUAGE_SWITCH_SELECT_CUSTOM_ID,
+      label: '[la-language-switch] Select error:',
+      handle: handleLanguageSwitchSelect,
+    },
+  ];
+}
+
+function createModalRoutes(listHandlers) {
+  return [
+    {
+      prefixes: ['quickadd_modal:'],
+      handle: (interaction) => listHandlers.handleQuickAddModal(interaction),
+      onError: async (interaction, err) => {
+        console.error('[quickadd] Modal error:', err.message);
+        await replyOrEdit(interaction, `\u26a0\ufe0f Failed: \`${err.message}\``);
+      },
+    },
+  ];
+}
+
+export function createCommandRoutes({ systemHandlers, listHandlers }) {
+  return {
+    'la-status': systemHandlers.handleStatusCommand,
+    'la-reset': systemHandlers.handleResetCommand,
+    'la-roster': handleRosterCommand,
+    'la-search': handleSearchCommand,
+    'la-evidence': listHandlers.handleListEvidenceCommand,
+    'la-list': {
+      subcommands: {
+        add: listHandlers.handleListAddCommand,
+        edit: listHandlers.handleListEditCommand,
+        remove: listHandlers.handleListRemoveCommand,
+        view: listHandlers.handleListViewCommand,
+        trust: listHandlers.handleListTrustCommand,
+        multiadd: listHandlers.handleListMultiaddCommand,
+        enrich: listHandlers.handleListEnrichCommand,
+      },
+    },
+    'la-check': listHandlers.handleListCheckCommand,
+    'la-stats': handleStatsCommand,
+    'la-setup': handleSetupCommand,
+    'la-remote': handleSetupRemoteCommand,
+    'la-help': handleHelpCommand,
+    'la-language-switch': handleLanguageSwitchCommand,
+  };
+}
+
+export async function dispatchCommandRoute(interaction, commandRoutes) {
+  const route = commandRoutes[interaction.commandName];
+  if (!route) return false;
+
+  if (route.subcommands) {
+    const subcommand = interaction.options.getSubcommand();
+    const handler = route.subcommands[subcommand];
+    if (handler) await handler(interaction);
+    return true;
+  }
+
+  await route(interaction);
+  return true;
+}
+
 export function createInteractionRouter({ client }) {
   const systemHandlers = createSystemHandlers({
     checkStatus,
@@ -90,146 +266,35 @@ export function createInteractionRouter({ client }) {
     client,
   });
   const listHandlers = createListHandlers({ client });
+  const autocompleteRoutes = createAutocompleteRoutes();
+  const buttonRoutes = createButtonRoutes(listHandlers);
+  const selectRoutes = createSelectRoutes(listHandlers);
+  const modalRoutes = createModalRoutes(listHandlers);
+  const commandRoutes = createCommandRoutes({ systemHandlers, listHandlers });
 
   return async function handleInteraction(interaction) {
     const customId = interaction.customId || '';
 
-    if (interaction.isButton() && hasPrefix(customId, ['listadd_overwrite:', 'listadd_keep:'])) {
-      await handleButton(interaction, '[list] Overwrite button error:', (i) =>
-        listHandlers.handleListAddOverwriteButton(i),
-      );
+    if (interaction.isButton()) {
+      const route = findCustomIdRoute(buttonRoutes, customId);
+      if (route) await handleRoute(interaction, route);
       return;
     }
 
-    if (interaction.isButton() && hasPrefix(customId, ['listadd_approve:', 'listadd_reject:'])) {
-      await handleButton(
-        interaction,
-        '[list] Unhandled button approval error:',
-        (i) => listHandlers.handleListAddApprovalButton(i),
-        '❌ Failed to process approval action.',
-      );
+    if (interaction.isStringSelectMenu()) {
+      const route = findCustomIdRoute(selectRoutes, customId);
+      if (route) await handleRoute(interaction, route);
       return;
     }
 
-    if (interaction.isButton() && customId.startsWith('listadd_viewevidence:')) {
-      await handleButton(
-        interaction,
-        '[list] View evidence button error:',
-        (i) => listHandlers.handleListAddViewEvidenceButton(i),
-        '❌ Failed to load evidence.',
-      );
-      return;
-    }
-
-    if (interaction.isButton() && hasPrefix(customId, [
-      'list-enrich:confirm:',
-      'list-enrich:cancel:',
-      'list-enrich:continue:',
-    ])) {
-      await handleButton(interaction, '[list] Enrich button error:', async (i) => {
-        if (customId.startsWith('list-enrich:confirm:')) {
-          await listHandlers.handleListEnrichConfirmButton(i);
-        } else if (customId.startsWith('list-enrich:continue:')) {
-          await listHandlers.handleListEnrichContinueButton(i);
-        } else {
-          await listHandlers.handleListEnrichCancelButton(i);
-        }
-      }, '❌ Failed to process enrich action.');
-      return;
-    }
-
-    if (interaction.isButton() && customId.startsWith('roster-deep:continue:')) {
-      await handleButton(
-        interaction,
-        '[roster] deep continue button error:',
-        handleRosterDeepContinueButton,
-        '❌ Failed to continue deep scan.',
-      );
-      return;
-    }
-
-    if (interaction.isButton() && customId.startsWith('list-add:enrich-hidden:')) {
-      await handleButton(
-        interaction,
-        '[list] add->enrich button error:',
-        (i) => listHandlers.handleListAddEnrichHiddenButton(i),
-        '❌ Failed to start enrich scan.',
-      );
-      return;
-    }
-
-    if (interaction.isButton() && customId.startsWith('scan-cancel:')) {
-      await handleButton(
-        interaction,
-        '[scan] cancel button error:',
-        (i) => listHandlers.handleScanCancelButton(i),
-        '❌ Failed to send stop signal.',
-      );
-      return;
-    }
-
-    if (interaction.isButton() && hasPrefix(customId, ['multiadd_confirm:', 'multiadd_cancel:'])) {
-      await handleButton(
-        interaction,
-        '[multiadd] Button handler error:',
-        (i) => listHandlers.handleMultiaddConfirmButton(i),
-        '❌ Failed to process button action.',
-      );
-      return;
-    }
-
-    if (interaction.isButton() && hasPrefix(customId, [
-      'multiaddapprove_approve:',
-      'multiaddapprove_reject:',
-    ])) {
-      await handleButton(
-        interaction,
-        '[multiadd] Approval button error:',
-        (i) => listHandlers.handleMultiaddApprovalButton(i),
-        '❌ Failed to process approval action.',
-      );
-      return;
-    }
-
-    if (interaction.isStringSelectMenu() && customId === 'quickadd_select') {
-      await handleButton(interaction, '[quickadd] Select error:', (i) =>
-        listHandlers.handleQuickAddSelect(i),
-      );
-      return;
-    }
-
-    if (interaction.isStringSelectMenu() && customId === 'autocheck_evidence') {
-      await handleButton(
-        interaction,
-        '[autocheck] Evidence select error:',
-        (i) => listHandlers.handleAutoCheckEvidenceSelect(i),
-        '❌ Failed to load evidence.',
-      );
-      return;
-    }
-
-    if (interaction.isStringSelectMenu() && customId.startsWith('la-help:select:')) {
-      await handleButton(interaction, '[la-help] Select error:', handleHelpSelect);
-      return;
-    }
-
-    if (interaction.isStringSelectMenu() && customId === LANGUAGE_SWITCH_SELECT_CUSTOM_ID) {
-      await handleButton(interaction, '[la-language-switch] Select error:', handleLanguageSwitchSelect);
-      return;
-    }
-
-    if (interaction.isModalSubmit() && customId.startsWith('quickadd_modal:')) {
-      try {
-        await listHandlers.handleQuickAddModal(interaction);
-      } catch (err) {
-        console.error('[quickadd] Modal error:', err.message);
-        await replyOrEdit(interaction, `⚠️ Failed: \`${err.message}\``);
-      }
+    if (interaction.isModalSubmit()) {
+      const route = findCustomIdRoute(modalRoutes, customId);
+      if (route) await handleRoute(interaction, route);
       return;
     }
 
     if (interaction.isAutocomplete()) {
-      await handleAutocomplete(interaction);
+      await handleAutocomplete(interaction, autocompleteRoutes);
       return;
     }
 
@@ -238,46 +303,7 @@ export function createInteractionRouter({ client }) {
     const { commandName } = interaction;
 
     try {
-      if (commandName === 'la-status') {
-        await systemHandlers.handleStatusCommand(interaction);
-      } else if (commandName === 'la-reset') {
-        await systemHandlers.handleResetCommand(interaction);
-      } else if (commandName === 'la-roster') {
-        await handleRosterCommand(interaction);
-      } else if (commandName === 'la-search') {
-        await handleSearchCommand(interaction);
-      } else if (commandName === 'la-evidence') {
-        await listHandlers.handleListEvidenceCommand(interaction);
-      } else if (commandName === 'la-list') {
-        const subcommand = interaction.options.getSubcommand();
-        if (subcommand === 'add') {
-          await listHandlers.handleListAddCommand(interaction);
-        } else if (subcommand === 'edit') {
-          await listHandlers.handleListEditCommand(interaction);
-        } else if (subcommand === 'remove') {
-          await listHandlers.handleListRemoveCommand(interaction);
-        } else if (subcommand === 'view') {
-          await listHandlers.handleListViewCommand(interaction);
-        } else if (subcommand === 'trust') {
-          await listHandlers.handleListTrustCommand(interaction);
-        } else if (subcommand === 'multiadd') {
-          await listHandlers.handleListMultiaddCommand(interaction);
-        } else if (subcommand === 'enrich') {
-          await listHandlers.handleListEnrichCommand(interaction);
-        }
-      } else if (commandName === 'la-check') {
-        await listHandlers.handleListCheckCommand(interaction);
-      } else if (commandName === 'la-stats') {
-        await handleStatsCommand(interaction);
-      } else if (commandName === 'la-setup') {
-        await handleSetupCommand(interaction);
-      } else if (commandName === 'la-remote') {
-        await handleSetupRemoteCommand(interaction);
-      } else if (commandName === 'la-help') {
-        await handleHelpCommand(interaction);
-      } else if (commandName === 'la-language-switch') {
-        await handleLanguageSwitchCommand(interaction);
-      }
+      await dispatchCommandRoute(interaction, commandRoutes);
     } catch (err) {
       if (isTransientInteractionError(err)) {
         logTransientInteraction(`/${commandName}`, err);
@@ -287,7 +313,7 @@ export function createInteractionRouter({ client }) {
       console.error(`[bot] Unhandled error in /${commandName}:`, err);
 
       try {
-        await replyOrEdit(interaction, '❌ An unexpected error occurred.');
+        await replyOrEdit(interaction, '\u274c An unexpected error occurred.');
       } catch (replyErr) {
         if (!isTransientInteractionError(replyErr)) {
           console.warn(`[bot] Failed to send error reply on /${commandName}:`, replyErr.message);
