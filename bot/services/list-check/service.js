@@ -212,7 +212,8 @@ const GEMINI_PROMPT = [
   'Lost Ark character names do not contain spaces; if letters appear as one character name, return them as one continuous string.',
   'Look-alike characters: distinguish lowercase L (l), uppercase i (I), and digit 1 (1) by context. Distinguish digit 0 (0) from uppercase O (O).',
   'Lowercase letter pairs that lobby fonts can blur are NOT interchangeable: a vs e, a vs o, c vs e, u vs v, rn vs m. Pick the letter whose silhouette actually matches the pixel cluster · a has a closed bowl, e has a horizontal crossbar, o is fully round.',
-  'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, â, î. Pay close attention to dots/marks above letters.',
+  'Lost Ark names frequently use diacritics: ë, ï, ö, ü, í, é, à, è, ì, á, é, â, î. Pay close attention to dots/marks above letters.',
+  'Accent direction matters because different players can have the same base letters: acute rises to the right (á, é, í), grave falls to the right (à, è, ì). Do NOT swap acute and grave. Example: Aürélià is not Aüreliá, Aürélía, or Aürélia.',
   'Keep umlaut letters exactly: ë, ö, ü.',
   'Do NOT convert umlauts to grave-accent letters: ë!=è, ö!=ò, ü!=ù.',
   'If a mark looks like two horizontal dots above a letter, treat it as an umlaut on that letter, not as punctuation.',
@@ -264,15 +265,24 @@ function chooseCanonicalSuggestion(name, suggestions) {
 
   // Second pass: diacritic-tolerant match. Gemini sometimes adds,
   // drops, or swaps marks; bible's search can still return the real
-  // canonical name as a nearby candidate.
+  // canonical name as a nearby candidate. Accept this only when the
+  // ASCII-folded base maps to ONE suggestion. If Bible returns multiple
+  // real characters that differ only by marks (e.g. Aüreliá, Aürélía,
+  // Aürélià), the OCR string must be exact; otherwise guessing from
+  // search order silently assigns the wrong class/ilvl to a real player.
   const targetCanonical = stripDiacritics(name);
-  chosen = suggestions.find(
+  const diacriticMatches = suggestions.filter(
     (s) => stripDiacritics(String(s.name)) === targetCanonical
   );
-  if (chosen) return { chosen, reason: 'diacritic' };
+  if (diacriticMatches.length === 1) {
+    return { chosen: diacriticMatches[0], reason: 'diacritic' };
+  }
+  const ambiguousDiacriticMatch = diacriticMatches.length > 1;
 
   // Third pass: targeted visual look-alike match for short names where
   // a full edit-distance pass would be too loose.
+  if (ambiguousDiacriticMatch) return null;
+
   const targetVisual = visualNameKey(name);
   if (targetVisual !== targetCanonical) {
     chosen = suggestions.find((s) => visualNameKey(String(s.name)) === targetVisual);
