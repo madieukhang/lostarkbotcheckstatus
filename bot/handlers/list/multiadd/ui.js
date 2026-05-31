@@ -13,6 +13,7 @@ import {
 import { COLORS, ICONS, buildSessionFooter } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { t } from '../../../services/i18n/index.js';
+import { listTypeIcon } from '../helpers.js';
 
 export async function buildTemplateReply() {
   const buffer = await buildMultiaddTemplate();
@@ -71,17 +72,11 @@ export function buildNoValidRowsEmbed(errors) {
   });
 }
 
-function typeIcon(type) {
-  if (type === 'black') return '⛔';
-  if (type === 'white') return '✅';
-  return '⚠️';
-}
-
 export function buildPreviewReply(parsed, requestId, lang = 'en') {
   const previewLines = parsed.rows.slice(0, 20).map((row, index) => {
     const reasonShort = row.reason.length > 50 ? `${row.reason.slice(0, 47)}...` : row.reason;
     const scopeTag = row.scope === 'server' ? ' `[S]`' : '';
-    return `\`${String(index + 1).padStart(2, ' ')}.\` ${typeIcon(row.type)} **${row.name}**${scopeTag} · ${reasonShort}`;
+    return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${row.name}**${scopeTag} · ${reasonShort}`;
   });
   if (parsed.rows.length > 20) {
     previewLines.push(`*... and ${parsed.rows.length - 20} more rows*`);

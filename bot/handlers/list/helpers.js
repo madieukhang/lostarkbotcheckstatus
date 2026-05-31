@@ -35,6 +35,12 @@ export function getListContext(type) {
   return LIST_CONTEXTS[type] || LIST_CONTEXTS.white;
 }
 
+export function listTypeIcon(type) {
+  if (type === 'black') return LIST_CONTEXTS.black.icon;
+  if (type === 'white') return LIST_CONTEXTS.white.icon;
+  return LIST_CONTEXTS.watch.icon;
+}
+
 /**
  * Tack the visual tokens onto a list-entry document so it can flow into
  * `buildEvidenceEmbed` (and any other renderer that reads `_icon` /

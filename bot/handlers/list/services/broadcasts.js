@@ -16,7 +16,7 @@ import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
-import { getListContext } from '../helpers.js';
+import { getListContext, listTypeIcon } from '../helpers.js';
 import {
   formatAltLine,
   renderTrackedAltsField,
@@ -275,8 +275,6 @@ export function createBroadcastServices({ client }) {
     const globalEntries = addedResults.filter((r) => r.entry?.scope !== 'server');
     const serverEntries = addedResults.filter((r) => r.entry?.scope === 'server');
 
-    const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');
-
     // Snapshot enrichment for the bulk preview line: one query for all
     // names in the batch instead of N. When snapshot data is present,
     // each row picks up a class-icon prefix (matches v0.5.67 vocab);
@@ -302,7 +300,7 @@ export function createBroadcastServices({ client }) {
       const reasonShort = (r.entry?.reason || '').length > 60
         ? (r.entry?.reason || '').slice(0, 57) + '...'
         : (r.entry?.reason || '');
-      return `${i + 1}. ${typeIcon(t)} ${classPrefix}**${name}** · ${reasonShort}`;
+      return `${i + 1}. ${listTypeIcon(t)} ${classPrefix}**${name}** · ${reasonShort}`;
     };
 
     const buildBulkEmbed = (entries, isLocal) => {

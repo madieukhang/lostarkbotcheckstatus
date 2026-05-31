@@ -14,6 +14,7 @@ import { connectDB } from '../../../db.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { COLORS } from '../../../utils/ui.js';
+import { listTypeIcon } from '../helpers.js';
 
 /**
  * Build the bulk service bag.
@@ -161,12 +162,10 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
       .setFooter({ text: `Submitted by ${meta.requesterDisplayName || 'Unknown'}` })
       .setTimestamp(new Date());
 
-    const typeIcon = (t) => (t === 'black' ? '⛔' : t === 'white' ? '✅' : '⚠️');
-
     if (results.added.length > 0) {
       const addedLines = results.added
         .slice(0, 15)
-        .map((r, i) => `${i + 1}. ${typeIcon(r.type)} **${r.name}**`)
+        .map((r, i) => `${i + 1}. ${listTypeIcon(r.type)} **${r.name}**`)
         .join('\n');
       const suffix = results.added.length > 15 ? `\n*... and ${results.added.length - 15} more*` : '';
       embed.addFields({
