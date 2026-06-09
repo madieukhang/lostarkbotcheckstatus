@@ -11,7 +11,13 @@ import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
 import { COLORS } from '../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../utils/alertEmbed.js';
+import {
+  deferEphemeralReply,
+  editContent,
+  editEmbed,
+  replyAlert,
+} from '../../utils/interactionReplies.js';
 
 /**
  * Check if the bot has required permissions in a channel.
@@ -60,13 +66,10 @@ async function handleSetupAutoChannel(interaction) {
   const channel = interaction.options.getChannel('channel', true);
 
   if (channel.type !== ChannelType.GuildText) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.ERROR,
-        title: 'Wrong Channel Type',
-        description: 'Please select a **text channel**.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.ERROR,
+      title: 'Wrong Channel Type',
+      description: 'Please select a **text channel**.',
     });
     return;
   }
@@ -74,24 +77,21 @@ async function handleSetupAutoChannel(interaction) {
   // Check bot permissions before saving
   const { ok, missing } = checkBotPermissions(channel, interaction.guild);
   if (!ok) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.ERROR,
-        title: 'Missing Permissions',
-        description: `Bot is missing permissions in <#${channel.id}>.`,
-        fields: [{
-          name: 'Missing',
-          value: missing.map((m) => `• ${m}`).join('\n'),
-          inline: false,
-        }],
-        footer: 'Fix the channel permissions and re-run the command.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.ERROR,
+      title: 'Missing Permissions',
+      description: `Bot is missing permissions in <#${channel.id}>.`,
+      fields: [{
+        name: 'Missing',
+        value: missing.map((m) => `• ${m}`).join('\n'),
+        inline: false,
+      }],
+      footer: 'Fix the channel permissions and re-run the command.',
     });
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await deferEphemeralReply(interaction);
   await connectDB();
 
   // Warn if same channel as notify (allow but warn)
@@ -115,11 +115,9 @@ async function handleSetupAutoChannel(interaction) {
 
   const warning = sameAsNotify ? '\n⚠️ This is the same channel as notifications · consider using separate channels to avoid clutter.' : '';
 
-  await interaction.editReply({
-    content: testOk
-      ? `✅ Auto-check channel set to <#${channel.id}>.\nBot will automatically check screenshots posted in this channel.${warning}\n\n*A test message was sent to verify · it will auto-delete in 30s.*`
-      : `✅ Auto-check channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message · please verify bot permissions.`,
-  });
+  await editContent(interaction, testOk
+    ? `✅ Auto-check channel set to <#${channel.id}>.\nBot will automatically check screenshots posted in this channel.${warning}\n\n*A test message was sent to verify · it will auto-delete in 30s.*`
+    : `✅ Auto-check channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message · please verify bot permissions.`);
 
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) set autoCheckChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);
@@ -132,13 +130,10 @@ async function handleSetupNotifyChannel(interaction) {
   const channel = interaction.options.getChannel('channel', true);
 
   if (channel.type !== ChannelType.GuildText) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.ERROR,
-        title: 'Wrong Channel Type',
-        description: 'Please select a **text channel**.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.ERROR,
+      title: 'Wrong Channel Type',
+      description: 'Please select a **text channel**.',
     });
     return;
   }
@@ -146,24 +141,21 @@ async function handleSetupNotifyChannel(interaction) {
   // Check bot permissions before saving
   const { ok, missing } = checkBotPermissions(channel, interaction.guild);
   if (!ok) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.ERROR,
-        title: 'Missing Permissions',
-        description: `Bot is missing permissions in <#${channel.id}>.`,
-        fields: [{
-          name: 'Missing',
-          value: missing.map((m) => `• ${m}`).join('\n'),
-          inline: false,
-        }],
-        footer: 'Fix the channel permissions and re-run the command.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.ERROR,
+      title: 'Missing Permissions',
+      description: `Bot is missing permissions in <#${channel.id}>.`,
+      fields: [{
+        name: 'Missing',
+        value: missing.map((m) => `• ${m}`).join('\n'),
+        inline: false,
+      }],
+      footer: 'Fix the channel permissions and re-run the command.',
     });
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await deferEphemeralReply(interaction);
   await connectDB();
 
   // Warn if same channel as auto-check (allow but warn)
@@ -187,11 +179,9 @@ async function handleSetupNotifyChannel(interaction) {
   const testOk = await sendTestMessage(channel, 'notification');
   const warning = sameAsAutoCheck ? '\n⚠️ This is the same channel as auto-check · consider using separate channels to avoid clutter.' : '';
 
-  await interaction.editReply({
-    content: testOk
-      ? `✅ Notification channel set to <#${channel.id}>.\nList add/remove actions will be broadcast here.${warning}\n\n*A test message was sent to verify · it will auto-delete in 30s.*`
-      : `✅ Notification channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message · please verify bot permissions.`,
-  });
+  await editContent(interaction, testOk
+    ? `✅ Notification channel set to <#${channel.id}>.\nList add/remove actions will be broadcast here.${warning}\n\n*A test message was sent to verify · it will auto-delete in 30s.*`
+    : `✅ Notification channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message · please verify bot permissions.`);
 
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) set listNotifyChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);
@@ -201,7 +191,7 @@ async function handleSetupNotifyChannel(interaction) {
  * Handle /la-setup off · toggle global notifications on/off
  */
 async function handleSetupOff(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await deferEphemeralReply(interaction);
   await connectDB();
 
   const existing = await GuildConfig.findOne({ guildId: interaction.guild.id });
@@ -223,13 +213,9 @@ async function handleSetupOff(interaction) {
   );
 
   if (newState) {
-    await interaction.editReply({
-      content: '🔔 Global list notifications **enabled** for this server.\nYou will receive broadcast notifications when entries are added/removed/edited on other servers.',
-    });
+    await editContent(interaction, '🔔 Global list notifications **enabled** for this server.\nYou will receive broadcast notifications when entries are added/removed/edited on other servers.');
   } else {
-    await interaction.editReply({
-      content: '🔕 Global list notifications **disabled** for this server.\nYou will no longer receive broadcast notifications from other servers.\n\nRun `/la-setup off` again or `/la-setup notifychannel #channel` to re-enable.',
-    });
+    await editContent(interaction, '🔕 Global list notifications **disabled** for this server.\nYou will no longer receive broadcast notifications from other servers.\n\nRun `/la-setup off` again or `/la-setup notifychannel #channel` to re-enable.');
   }
 
   invalidateGuildConfig(interaction.guild.id);
@@ -240,7 +226,7 @@ async function handleSetupOff(interaction) {
  * Handle /la-setup view
  */
 async function handleSetupView(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await deferEphemeralReply(interaction);
   await connectDB();
 
   const guildConfig = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
@@ -316,18 +302,15 @@ async function handleSetupView(interaction) {
     .setFooter({ text: footerParts.join(' · ') })
     .setTimestamp();
 
-  await interaction.editReply({ embeds: [embed] });
+  await editEmbed(interaction, embed);
 }
 
 export async function handleSetupCommand(interaction) {
   if (!interaction.guild) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.ERROR,
-        title: 'Server-Only Command',
-        description: 'This command can only be used inside a Discord server, not in DMs.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.ERROR,
+      title: 'Server-Only Command',
+      description: 'This command can only be used inside a Discord server, not in DMs.',
     });
     return;
   }
@@ -338,13 +321,10 @@ export async function handleSetupCommand(interaction) {
   if (subcommand !== 'remote') {
     const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
     if (!hasManageGuild) {
-      await interaction.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Permission Required',
-          description: 'You need the **Manage Server** permission to use this command.',
-        })],
-        ephemeral: true,
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Permission Required',
+        description: 'You need the **Manage Server** permission to use this command.',
       });
       return;
     }
@@ -369,7 +349,7 @@ export async function handleSetupCommand(interaction) {
 async function handleSetupDefaultScope(interaction) {
   const scope = interaction.options.getString('scope', true);
 
-  await interaction.deferReply({ ephemeral: true });
+  await deferEphemeralReply(interaction);
   await connectDB();
 
   await GuildConfig.findOneAndUpdate(
@@ -385,11 +365,8 @@ async function handleSetupDefaultScope(interaction) {
   );
 
   const emoji = scope === 'server' ? '🔒' : '🌐';
-  await interaction.editReply({
-    content: `${emoji} Default blacklist scope set to **${scope}**.\nWhen \`/la-list add type:black\` is used without specifying scope, entries will default to **${scope}**.`,
-  });
+  await editContent(interaction, `${emoji} Default blacklist scope set to **${scope}**.\nWhen \`/la-list add type:black\` is used without specifying scope, entries will default to **${scope}**.`);
 
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) defaultBlacklistScope → ${scope} by ${interaction.user.tag}`);
 }
-

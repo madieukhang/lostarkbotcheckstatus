@@ -6,7 +6,7 @@ import {
 
 import { COLORS, ICONS } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
-import { replyAlert, replyContent, replyEmbed } from '../../utils/interactionReplies.js';
+import { editPayload, replyAlert, replyContent, replyEmbed } from '../../utils/interactionReplies.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { t } from '../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../list/view/ui.js';
@@ -127,6 +127,6 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
   });
 
   collector.on('end', async () => {
-    await interaction.editReply({ components: [] }).catch(() => {});
+    await editPayload(interaction, { components: [] }).catch(() => {});
   });
 }

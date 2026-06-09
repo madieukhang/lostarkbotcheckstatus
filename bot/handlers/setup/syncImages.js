@@ -3,6 +3,7 @@ import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import config from '../../config.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { editPayload } from '../../utils/interactionReplies.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
@@ -118,7 +119,7 @@ async function markEntryAsRehosted(model, entry, rehosted, stats) {
 }
 
 async function sendProgress(interaction, current, total, stats) {
-  await interaction.editReply({
+  await editPayload(interaction, {
     embeds: [
       new EmbedBuilder()
         .setTitle('🔄 Sync Images · In Progress')
@@ -191,7 +192,7 @@ function buildSummaryPayload(interaction, total, stats) {
 export async function handleSyncImagesAction(interaction) {
   const ownerCfg = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
   if (!ownerCfg?.evidenceChannelId) {
-    await interaction.editReply({
+    await editPayload(interaction, {
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.ERROR,
         title: 'Evidence Channel Missing',
@@ -218,7 +219,7 @@ export async function handleSyncImagesAction(interaction) {
   ];
 
   if (legacyEntries.length === 0) {
-    await interaction.editReply({
+    await editPayload(interaction, {
       embeds: [
         new EmbedBuilder()
           .setTitle('✅ Sync Images · Nothing to do')
@@ -231,7 +232,7 @@ export async function handleSyncImagesAction(interaction) {
     return;
   }
 
-  await interaction.editReply({
+  await editPayload(interaction, {
     embeds: [
       new EmbedBuilder()
         .setTitle('🔄 Sync Images · Starting')
@@ -275,6 +276,6 @@ export async function handleSyncImagesAction(interaction) {
     }
   }
 
-  await interaction.editReply(buildSummaryPayload(interaction, legacyEntries.length, stats));
+  await editPayload(interaction, buildSummaryPayload(interaction, legacyEntries.length, stats));
   console.log(`[syncimages] Done by ${interaction.user.tag}: ${stats.synced} synced, ${stats.skippedDead} dead, ${stats.skippedRaced} raced, ${stats.failed} failed`);
 }
