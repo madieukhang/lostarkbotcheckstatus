@@ -531,20 +531,21 @@ export function createEnrichHandlers({ client, services }) {
     return true;
   }
 
-  async function handleListEnrichCommand(interaction) {
-    if (await denyIfNotOfficer(interaction, '/la-list enrich')) return;
-
-    const rawName = interaction.options.getString('name', true).trim();
-    const name = normalizeCharacterName(rawName);
-    const cap = interaction.options.getInteger('deep_limit') ?? config.strongholdDeepCandidateLimit;
-
+  async function startReservedEnrichFlow(interaction, {
+    name,
+    cap,
+    reservationLabel,
+    deferInteraction = deferReply,
+    existingSession = null,
+    cooldownMessage,
+  }) {
     const cooldownWait = getCooldownWaitSeconds(name);
     if (cooldownWait > 0) {
-      await replyContent(interaction, `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`);
+      await replyContent(interaction, cooldownMessage(cooldownWait));
       return;
     }
 
-    const scanReservation = reserveStrongholdScanForInteraction(interaction, `/la-list enrich ${name}`);
+    const scanReservation = reserveStrongholdScanForInteraction(interaction, reservationLabel);
     if (!scanReservation.ok) {
       await replyScanLimit(interaction, scanReservation.active);
       return;
@@ -553,11 +554,48 @@ export function createEnrichHandlers({ client, services }) {
     markCooldown(name);
 
     try {
-      await deferReply(interaction);
-      await runEnrichFlow(interaction, { name, cap });
+      await deferInteraction(interaction);
+      await runEnrichFlow(interaction, { name, cap, existingSession });
     } finally {
       scanReservation.release();
     }
+  }
+
+  async function requireOwnedEnrichSession(interaction, sessionId, actionLabel) {
+    const session = getEnrichSession(sessionId);
+    if (!session) {
+      await replyAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        title: 'Session Expired',
+        description: 'This enrich preview is older than the 5-minute session window.',
+        footer: 'Re-run /la-list enrich to start a fresh scan.',
+      });
+      return null;
+    }
+    if (session.callerId !== interaction.user.id) {
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Not Your Session',
+        description: `Only the user who started this enrich session can ${actionLabel}.`,
+      });
+      return null;
+    }
+    return session;
+  }
+
+  async function handleListEnrichCommand(interaction) {
+    if (await denyIfNotOfficer(interaction, '/la-list enrich')) return;
+
+    const rawName = interaction.options.getString('name', true).trim();
+    const name = normalizeCharacterName(rawName);
+    const cap = interaction.options.getInteger('deep_limit') ?? config.strongholdDeepCandidateLimit;
+
+    await startReservedEnrichFlow(interaction, {
+      name,
+      cap,
+      reservationLabel: `/la-list enrich ${name}`,
+      cooldownMessage: (wait) => `⏳ Please wait ${wait}s before re-enriching **${name}**.`,
+    });
   }
 
   /**
@@ -583,26 +621,12 @@ export function createEnrichHandlers({ client, services }) {
     const name = normalizeCharacterName(rawName);
     const cap = config.strongholdDeepCandidateLimit;
 
-    const cooldownWait = getCooldownWaitSeconds(name);
-    if (cooldownWait > 0) {
-      await replyContent(interaction, `⏳ Please wait ${cooldownWait}s before re-enriching **${name}**.`);
-      return;
-    }
-
-    const scanReservation = reserveStrongholdScanForInteraction(interaction, `/la-list enrich ${name}`);
-    if (!scanReservation.ok) {
-      await replyScanLimit(interaction, scanReservation.active);
-      return;
-    }
-
-    markCooldown(name);
-
-    try {
-      await deferReply(interaction);
-      await runEnrichFlow(interaction, { name, cap });
-    } finally {
-      scanReservation.release();
-    }
+    await startReservedEnrichFlow(interaction, {
+      name,
+      cap,
+      reservationLabel: `/la-list enrich ${name}`,
+      cooldownMessage: (wait) => `⏳ Please wait ${wait}s before re-enriching **${name}**.`,
+    });
   }
 
   /**
@@ -613,72 +637,24 @@ export function createEnrichHandlers({ client, services }) {
    */
   async function handleListEnrichContinueButton(interaction) {
     const sessionId = interaction.customId.split(':')[2];
-    const session = getEnrichSession(sessionId);
-    if (!session) {
-      await replyAlert(interaction, {
-        severity: AlertSeverity.WARNING,
-        title: 'Session Expired',
-        description: 'This enrich preview is older than the 5-minute session window.',
-        footer: 'Re-run /la-list enrich to start a fresh scan.',
-      });
-      return;
-    }
-    if (session.callerId !== interaction.user.id) {
-      await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        title: 'Not Your Session',
-        description: 'Only the user who started this enrich session can continue it.',
-      });
-      return;
-    }
+    const session = await requireOwnedEnrichSession(interaction, sessionId, 'continue it');
+    if (!session) return;
     refreshEnrichSession(session);
 
-    const cooldownWait = getCooldownWaitSeconds(session.entryName);
-    if (cooldownWait > 0) {
-      await replyContent(interaction, `⏳ Please wait ${cooldownWait}s before continuing the scan for **${session.entryName}**.`);
-      return;
-    }
-
-    const scanReservation = reserveStrongholdScanForInteraction(interaction, `/la-list enrich continue ${session.entryName}`);
-    if (!scanReservation.ok) {
-      await replyScanLimit(interaction, scanReservation.active);
-      return;
-    }
-
-    markCooldown(session.entryName);
-
-    try {
-      await deferUpdate(interaction);
-      await runEnrichFlow(interaction, {
-        name: session.entryName,
-        cap: session.cap,
-        existingSession: session,
-      });
-    } finally {
-      scanReservation.release();
-    }
+    await startReservedEnrichFlow(interaction, {
+      name: session.entryName,
+      cap: session.cap,
+      reservationLabel: `/la-list enrich continue ${session.entryName}`,
+      deferInteraction: deferUpdate,
+      existingSession: session,
+      cooldownMessage: (wait) => `⏳ Please wait ${wait}s before continuing the scan for **${session.entryName}**.`,
+    });
   }
 
   async function handleListEnrichConfirmButton(interaction) {
     const sessionId = interaction.customId.split(':')[2];
-    const session = getEnrichSession(sessionId);
-    if (!session) {
-      await replyAlert(interaction, {
-        severity: AlertSeverity.WARNING,
-        title: 'Session Expired',
-        description: 'This enrich preview is older than the 5-minute session window.',
-        footer: 'Re-run /la-list enrich to start a fresh scan.',
-      });
-      return;
-    }
-    if (session.callerId !== interaction.user.id) {
-      await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        title: 'Not Your Session',
-        description: 'Only the user who started this enrich session can confirm it.',
-      });
-      return;
-    }
+    const session = await requireOwnedEnrichSession(interaction, sessionId, 'confirm it');
+    if (!session) return;
 
     await deferUpdate(interaction);
 

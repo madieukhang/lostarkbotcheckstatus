@@ -19,6 +19,7 @@ virtualConsole.on('jsdomError', (err) => {
 import { connectDB } from '../../db.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { deferReply, replyAlert, replyEmbed } from '../../utils/interactionReplies.js';
 import TrustedUser from '../../models/TrustedUser.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import UserPreference from '../../models/UserPreference.js';
@@ -65,16 +66,13 @@ export async function handleRosterCommand(interaction) {
   // Plain /la-roster (no deep) stays open to everyone since it only
   // does a single-page roster fetch with no fan-out.
   if (deep && !isPrivilegedStrongholdScanUser(interaction.user.id)) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        title: 'Officers / Seniors only',
-        description:
-          '`/la-roster deep:true` runs a long Stronghold scan that depends on the bot owner\'s ' +
-          'residential-IP worker. The deep flag is restricted to officers and seniors. ' +
-          'Re-run without `deep:true` for the basic roster view.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      title: 'Officers / Seniors only',
+      description:
+        '`/la-roster deep:true` runs a long Stronghold scan that depends on the bot owner\'s ' +
+        'residential-IP worker. The deep flag is restricted to officers and seniors. ' +
+        'Re-run without `deep:true` for the basic roster view.',
     });
     return;
   }
@@ -91,14 +89,11 @@ export async function handleRosterCommand(interaction) {
 
   const scanReservation = deep ? reserveStrongholdScanForInteraction(interaction, `/la-roster deep ${name}`) : null;
   if (scanReservation && !scanReservation.ok) {
-    await interaction.reply({
-      embeds: [buildStrongholdScanLimitEmbed(scanReservation.active)],
-      ephemeral: true,
-    });
+    await replyEmbed(interaction, buildStrongholdScanLimitEmbed(scanReservation.active));
     return;
   }
 
-  await interaction.deferReply().catch((err) => {
+  await deferReply(interaction).catch((err) => {
     scanReservation?.release();
     throw err;
   });

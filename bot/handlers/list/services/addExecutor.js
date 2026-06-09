@@ -88,6 +88,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     const { model, label, color, icon } = getListContext(payload.type);
     const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
     const name = normalizeCharacterName(payload.name);
+    await connectDB();
 
     // Step 0: Trusted user guard (exact name check · fast, before roster fetch)
     //
@@ -207,8 +208,6 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     }
 
     // Step 3: Check if already in list (scope-aware for blacklist)
-    await connectDB();
-
     const entryScope = payload.scope || 'global';
     const entryGuildId = entryScope === 'server' ? (payload.guildId || '') : '';
 

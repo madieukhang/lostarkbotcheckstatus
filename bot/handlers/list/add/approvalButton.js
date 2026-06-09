@@ -19,7 +19,7 @@ import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { editPayload, replyAlert } from '../../../utils/interactionReplies.js';
+import { deferUpdate, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   getListContext,
@@ -83,7 +83,7 @@ export function createListAddApprovalButtonHandler({
     const isApproveAction = action === 'listadd_approve';
 
     // Acknowledge immediately, then show processing state to avoid 3s timeout issues.
-    await interaction.deferUpdate();
+    await deferUpdate(interaction);
 
     await editPayload(interaction, {
       content: isApproveAction

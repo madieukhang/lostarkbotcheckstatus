@@ -6,7 +6,15 @@ import GuildConfig from '../../models/GuildConfig.js';
 import UserPreference from '../../models/UserPreference.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
 import { COLORS } from '../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../utils/alertEmbed.js';
+import {
+  deferEphemeralReply,
+  editAlert,
+  editEmbed,
+  editPayload,
+  replyAlert,
+  updatePayload,
+} from '../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { handleSyncImagesAction } from './syncImages.js';
 /**
@@ -15,13 +23,10 @@ import { handleSyncImagesAction } from './syncImages.js';
 export async function handleSetupRemoteCommand(interaction) {
   const seniorIds = config.seniorApproverIds || [];
   if (!seniorIds.includes(interaction.user.id)) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.ERROR,
-        title: 'Senior-Only Command',
-        description: 'Only seniors can use remote config management.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.ERROR,
+      title: 'Senior-Only Command',
+      description: 'Only seniors can use remote config management.',
     });
     return;
   }
@@ -31,7 +36,7 @@ export async function handleSetupRemoteCommand(interaction) {
   const scopeValue = interaction.options.getString('scope') || '';
   const channelOpt = interaction.options.getChannel('channel');
 
-  await interaction.deferReply({ ephemeral: true });
+  await deferEphemeralReply(interaction);
   await connectDB();
   const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
@@ -47,9 +52,10 @@ export async function handleSetupRemoteCommand(interaction) {
     const configMap = new Map(allConfigs.map((gc) => [gc.guildId, gc]));
 
     if (allGuilds.length === 0) {
-      await interaction.editReply({ embeds: [
+      await editEmbed(
+        interaction,
         new EmbedBuilder().setTitle('🛰️ Remote Control · Dashboard').setDescription('*Bot is not in any server.*').setColor(COLORS.greyDark),
-      ] });
+      );
       return;
     }
 
@@ -119,29 +125,26 @@ export async function handleSetupRemoteCommand(interaction) {
       )];
     }
 
-    const msg = await interaction.editReply({ embeds: buildPage(0), components: buildNav(0) });
+    const msg = await editPayload(interaction, { embeds: buildPage(0), components: buildNav(0) });
 
     if (totalPages <= 1) return;
 
     const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120_000 });
     collector.on('collect', async (i) => {
       if (i.user.id !== interaction.user.id) {
-        await i.reply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.ERROR,
-            title: 'Not Your Session',
-            description: 'Only the senior who ran this command can use these controls.',
-          })],
-          ephemeral: true,
+        await replyAlert(i, {
+          severity: AlertSeverity.ERROR,
+          title: 'Not Your Session',
+          description: 'Only the senior who ran this command can use these controls.',
         });
         return;
       }
       if (i.customId === 'remote_prev') currentPage = Math.max(0, currentPage - 1);
       else if (i.customId === 'remote_next') currentPage = Math.min(totalPages - 1, currentPage + 1);
-      await i.update({ embeds: buildPage(currentPage), components: buildNav(currentPage) });
+      await updatePayload(i, { embeds: buildPage(currentPage), components: buildNav(currentPage) });
     });
     collector.on('end', () => {
-      interaction.editReply({ components: [] }).catch(() => {});
+      editPayload(interaction, { components: [] }).catch(() => {});
     });
     return;
   }
@@ -151,36 +154,30 @@ export async function handleSetupRemoteCommand(interaction) {
   // Sets where the bot rehosts /la-list add evidence images for permanent storage.
   if (action === 'evidencechannel') {
     if (!config.ownerGuildId) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Config Missing',
-          description: '`OWNER_GUILD_ID` is not configured.',
-          footer: 'Set it in env vars and restart the bot, then retry.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Config Missing',
+        description: '`OWNER_GUILD_ID` is not configured.',
+        footer: 'Set it in env vars and restart the bot, then retry.',
       });
       return;
     }
 
     if (!channelOpt) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Channel Option Required',
-          description: 'Provide `channel:` option for this action.',
-          footer: 'Pick the hidden channel where evidence images will be stored.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Channel Option Required',
+        description: 'Provide `channel:` option for this action.',
+        footer: 'Pick the hidden channel where evidence images will be stored.',
       });
       return;
     }
 
     if (!channelOpt.isTextBased?.()) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Wrong Channel Type',
-          description: `Channel <#${channelOpt.id}> is not a text channel.`,
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Wrong Channel Type',
+        description: `Channel <#${channelOpt.id}> is not a text channel.`,
       });
       return;
     }
@@ -192,14 +189,12 @@ export async function handleSetupRemoteCommand(interaction) {
       const need = ['ViewChannel', 'SendMessages', 'AttachFiles', 'ReadMessageHistory'];
       const missing = need.filter((p) => !perms?.has(p));
       if (missing.length > 0) {
-        await interaction.editReply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.ERROR,
-            title: 'Missing Permissions',
-            description: `Bot is missing permissions in <#${channelOpt.id}>.`,
-            fields: [{ name: 'Missing', value: missing.join(', '), inline: false }],
-            footer: 'Grant these permissions and retry the command.',
-          })],
+        await editAlert(interaction, {
+          severity: AlertSeverity.ERROR,
+          title: 'Missing Permissions',
+          description: `Bot is missing permissions in <#${channelOpt.id}>.`,
+          fields: [{ name: 'Missing', value: missing.join(', '), inline: false }],
+          footer: 'Grant these permissions and retry the command.',
         });
         return;
       }
@@ -234,7 +229,7 @@ export async function handleSetupRemoteCommand(interaction) {
       .setFooter({ text: `Set by ${interaction.user.tag} · bot-wide setting` })
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
+    await editEmbed(interaction, embed);
     console.log(`[la-remote] evidenceChannelId → ${channelOpt.id} by ${interaction.user.tag}`);
     return;
   }
@@ -257,7 +252,7 @@ export async function handleSetupRemoteCommand(interaction) {
         { name: 'Sync legacy images', value: '`/la-remote action:syncimages` (no guild ID needed)', inline: false },
       )
       .setColor(COLORS.danger);
-    await interaction.editReply({ embeds: [helpEmbed] });
+    await editEmbed(interaction, helpEmbed);
     return;
   }
 
@@ -268,7 +263,7 @@ export async function handleSetupRemoteCommand(interaction) {
       .setTitle('❌ Guild Not Found')
       .setDescription(`Bot is not in a server with ID \`${targetGuildId}\`.\nUse \`action:view\` to see valid guild IDs.`)
       .setColor(COLORS.danger);
-    await interaction.editReply({ embeds: [embed] });
+    await editEmbed(interaction, embed);
     return;
   }
 
@@ -297,7 +292,7 @@ export async function handleSetupRemoteCommand(interaction) {
       .setFooter({ text: `Changed by ${interaction.user.tag} · silent · server not notified` })
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
+    await editEmbed(interaction, embed);
     console.log(`[la-remote] ${targetGuildId} globalNotify → ${newState ? 'ON' : 'OFF'} by ${interaction.user.tag}`);
     return;
   }
@@ -305,12 +300,10 @@ export async function handleSetupRemoteCommand(interaction) {
   // ── ACTION: defaultscope ─────────────────────────────────
   if (action === 'defaultscope') {
     if (!scopeValue) {
-      await interaction.editReply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          title: 'Scope Required',
-          description: 'Provide `scope` value (global/server) for this action.',
-        })],
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: 'Scope Required',
+        description: 'Provide `scope` value (global/server) for this action.',
       });
       return;
     }
@@ -333,7 +326,7 @@ export async function handleSetupRemoteCommand(interaction) {
       .setFooter({ text: `Changed by ${interaction.user.tag} · silent · server not notified` })
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
+    await editEmbed(interaction, embed);
     console.log(`[la-remote] ${targetGuildId} defaultBlacklistScope → ${scopeValue} by ${interaction.user.tag}`);
   }
 }

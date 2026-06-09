@@ -14,7 +14,7 @@ import UserPreference from '../../../models/UserPreference.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { editPayload, replyAlert } from '../../../utils/interactionReplies.js';
+import { deferUpdate, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage } from '../../../services/i18n/index.js';
 import {
   getListContext,
@@ -52,7 +52,7 @@ export function createListAddOverwriteButtonHandler({
       return;
     }
 
-    await interaction.deferUpdate();
+    await deferUpdate(interaction);
 
     if (!isOverwrite) {
       // Keep existing · just clean up

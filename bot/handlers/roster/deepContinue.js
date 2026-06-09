@@ -13,6 +13,7 @@ import config from '../../config.js';
 import UserPreference from '../../models/UserPreference.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { deferUpdate, replyAlert, replyEmbed } from '../../utils/interactionReplies.js';
 import { getUserLanguage } from '../../services/i18n/index.js';
 import { detectAltsViaStronghold } from '../../services/roster/index.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
@@ -58,50 +59,38 @@ export async function handleRosterDeepContinueButton(interaction) {
   const sessionId = interaction.customId.split(':')[2];
   const session = getRosterDeepSession(sessionId);
   if (!session) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        title: 'Session Expired',
-        description: 'This deep-scan session is older than the 5-minute window.',
-        footer: 'Re-run /la-roster deep:true to start a fresh scan.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      title: 'Session Expired',
+      description: 'This deep-scan session is older than the 5-minute window.',
+      footer: 'Re-run /la-roster deep:true to start a fresh scan.',
     });
     return;
   }
   if (session.callerId !== interaction.user.id) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.ERROR,
-        title: 'Not Your Session',
-        description: 'Only the user who started this scan can continue it.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.ERROR,
+      title: 'Not Your Session',
+      description: 'Only the user who started this scan can continue it.',
     });
     return;
   }
   if (session.inProgress) {
-    await interaction.reply({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.INFO,
-        title: 'Scan Already Running',
-        description: 'A Continue pass is already running for this result card. Wait for it to finish before clicking again.',
-      })],
-      ephemeral: true,
+    await replyAlert(interaction, {
+      severity: AlertSeverity.INFO,
+      title: 'Scan Already Running',
+      description: 'A Continue pass is already running for this result card. Wait for it to finish before clicking again.',
     });
     return;
   }
 
   const scanReservation = reserveStrongholdScanForInteraction(interaction, `/la-roster deep continue ${session.targetName}`);
   if (!scanReservation.ok) {
-    await interaction.reply({
-      embeds: [buildStrongholdScanLimitEmbed(scanReservation.active)],
-      ephemeral: true,
-    });
+    await replyEmbed(interaction, buildStrongholdScanLimitEmbed(scanReservation.active));
     return;
   }
 
-  await interaction.deferUpdate().catch((err) => {
+  await deferUpdate(interaction).catch((err) => {
     scanReservation.release();
     throw err;
   });
