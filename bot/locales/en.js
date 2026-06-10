@@ -227,41 +227,72 @@ const en = {
     overview: {
       title: 'Lost Ark Check - Help (EN)',
       footer: 'Switch language: /la-language-switch (persistent) - /la-help lang:vi (one-off)',
-      lines: [
-        '**Available Commands:**',
-        'All bot commands use the `/la-` prefix so Discord groups them under `/la` autocomplete.',
-        '',
-        '`/la-status` - Show live server status for all monitored servers',
-        '`/la-reset` - Reset the stored status state',
-        '`/la-language-switch` - Switch LoaLogs language for your account',
-        '',
-        '`/la-roster name [deep] [deep_limit]` - Fetch roster + progression tracking + list check. `deep:true` runs Stronghold alt scan (officers/seniors only).',
-        '`/la-search name [min_ilvl] [max_ilvl] [class]` - Search similar names with filters',
-        '`/la-evidence name [public]` - Direct evidence lookup (autocomplete-driven, bypasses list view paging). `public:true` is officer/senior only.',
-        '',
-        '`/la-list add type name reason [raid] [logs] [image] [scope]` - Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only).',
-        '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` - Edit an existing entry. `additional_names` appends alts manually for hidden-roster/no-guild edges.',
-        '`/la-list remove name` - Remove an entry from a list',
-        '`/la-list view type [scope]` - View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
-        '`/la-list trust action name [reason]` - Manage trusted list (add/remove, officer only)',
-        '`/la-list enrich name [deep_limit]` - Stronghold deep-scan an existing entry and append discovered alts (officers/seniors only, about 10-15 minutes).',
-        '`/la-list multiadd action [file]` - Bulk add via Excel template (see dropdown for details)',
-        '',
-        '`/la-check image` - Check names from screenshot against all lists',
-        '',
-        '`/la-setup autochannel #channel` - Set auto-check channel for this server',
-        '`/la-setup notifychannel #channel` - Set notification channel for this server',
-        '`/la-setup view` - View current channel configuration',
-        '`/la-setup off` - Toggle global list notifications on/off',
-        '`/la-setup defaultscope global/server` - Set default blacklist scope for /la-list add',
+      intro: 'All bot commands use the `/la-` prefix so Discord groups them under `/la` autocomplete.',
+      groups: [
+        {
+          name: '📡 Server Monitoring',
+          lines: [
+            '`/la-status` - Show live server status for all monitored servers',
+            '`/la-reset` - Reset the stored status state',
+          ],
+        },
+        {
+          name: '🔍 Roster & Search',
+          lines: [
+            '`/la-roster name [deep] [deep_limit]` - Fetch roster + progression tracking + list check. `deep:true` runs Stronghold alt scan (officers/seniors only).',
+            '`/la-search name [min_ilvl] [max_ilvl] [class]` - Search similar names with filters',
+            '`/la-evidence name [public]` - Direct evidence lookup (autocomplete-driven, bypasses list view paging). `public:true` is officer/senior only.',
+          ],
+        },
+        {
+          name: '📒 Lists',
+          lines: [
+            '`/la-list add type name reason [raid] [logs] [image] [scope]` - Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only).',
+            '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` - Edit an existing entry. `additional_names` appends alts manually for hidden-roster/no-guild edges.',
+            '`/la-list remove name` - Remove an entry from a list',
+            '`/la-list view type [scope]` - View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
+          ],
+        },
+        {
+          name: '📦 Lists · Trust & Bulk',
+          lines: [
+            '`/la-list trust action name [reason]` - Manage trusted list (add/remove, officer only)',
+            '`/la-list enrich name [deep_limit]` - Stronghold deep-scan an existing entry and append discovered alts (officers/seniors only, about 10-15 minutes).',
+            '`/la-list multiadd action [file]` - Bulk add via Excel template (see dropdown for details)',
+          ],
+        },
+        {
+          name: '🖼️ Screenshot Check',
+          lines: [
+            '`/la-check image` - Check names from screenshot against all lists',
+          ],
+        },
+        {
+          name: '⚙️ Server Setup',
+          lines: [
+            '`/la-setup autochannel #channel` - Set auto-check channel for this server',
+            '`/la-setup notifychannel #channel` - Set notification channel for this server',
+            '`/la-setup view` - View current channel configuration',
+            '`/la-setup off` - Toggle global list notifications on/off',
+            '`/la-setup defaultscope global/server` - Set default blacklist scope for /la-list add',
+          ],
+        },
+        {
+          name: '🌐 Personal',
+          lines: [
+            '`/la-language-switch` - Switch LoaLogs language for your account',
+          ],
+        },
       ],
-      ownerLines: [
-        '**Owner Server Only:**',
-        '`/la-stats` - Show bot usage statistics',
-        '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
-        '`/la-remote action:evidencechannel channel:#...` - Set evidence storage channel (bot rehosts here to avoid Discord CDN expiry)',
-        '`/la-remote action:syncimages` - Migrate legacy images to rehost storage. See dropdown for the detailed flow.',
-      ],
+      ownerGroup: {
+        name: '👑 Owner Server Only',
+        lines: [
+          '`/la-stats` - Show bot usage statistics',
+          '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
+          '`/la-remote action:evidencechannel channel:#...` - Set evidence storage channel (bot rehosts here to avoid Discord CDN expiry)',
+          '`/la-remote action:syncimages` - Migrate legacy images to rehost storage. See dropdown for the detailed flow.',
+        ],
+      },
     },
     dropdown: {
       placeholder: 'Pick a section for details...',
@@ -408,9 +439,8 @@ const en = {
       trusted: 'Trusted Users',
     },
     summary: {
-      header: 'Showing **{shown}** of **{total}** {entryLabel} · page **{page}** / {totalPages}',
+      header: 'Page **{page}** / {totalPages} · showing **{shown}**',
       entries: 'entries',
-      typedEntries: '{label} entries',
       footer: 'Refresh with /la-list view · navigate with the buttons below',
     },
     scope: {
@@ -435,7 +465,7 @@ const en = {
     },
     trusted: {
       title: 'Trusted Users',
-      footer: '{count} trusted characters · cannot be added to any list',
+      footer: 'Cannot be added to any list · manage via /la-list trust action:add',
       emptyTitle: 'Trusted List Empty',
       emptyDescription: 'No trusted users yet.',
       emptyFooter: 'Use /la-list trust action:add to mark a character trusted (officer-only).',

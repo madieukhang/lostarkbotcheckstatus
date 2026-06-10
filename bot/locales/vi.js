@@ -55,41 +55,72 @@ const vi = {
     overview: {
       title: 'Lost Ark Check - Help (VI)',
       footer: 'Đổi ngôn ngữ: /la-language-switch (cố định) - /la-help lang:en (xem 1 lần)',
-      lines: [
-        '**Danh sách lệnh:**',
-        'Tất cả lệnh bot dùng prefix `/la-` để Discord gom vào nhóm `/la` autocomplete.',
-        '',
-        '`/la-status` - Xem trạng thái server Lost Ark đang monitor',
-        '`/la-reset` - Reset trạng thái đã lưu',
-        '`/la-language-switch` - Đổi ngôn ngữ LoaLogs cho account của cậu',
-        '',
-        '`/la-roster name [deep] [deep_limit]` - Tra roster + progression + list check. `deep:true` chạy Stronghold alt scan (chỉ officer/senior).',
-        '`/la-search name [min_ilvl] [max_ilvl] [class]` - Tìm tên tương tự với filter',
-        '`/la-evidence name [public]` - Xem evidence trực tiếp bằng autocomplete, không cần vào list view. `public:true` chỉ officer/senior.',
-        '',
-        '`/la-list add type name reason [raid] [logs] [image] [scope]` - Thêm vào blacklist/whitelist/watchlist. Scope global/server chỉ áp dụng blacklist.',
-        '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` - Sửa entry đã có. `additional_names` dùng để append alt thủ công cho case hidden roster/no-guild.',
-        '`/la-list remove name` - Xoá entry khỏi list',
-        '`/la-list view type [scope]` - Xem list (type: all/black/white/watch/trusted, scope: all/global/server)',
-        '`/la-list trust action name [reason]` - Quản lý trusted list (add/remove, chỉ officer)',
-        '`/la-list enrich name [deep_limit]` - Stronghold deep-scan entry đã có và append alt tìm được (chỉ officer/senior, khoảng 10-15 phút).',
-        '`/la-list multiadd action [file]` - Bulk add qua Excel template (xem dropdown để biết chi tiết)',
-        '',
-        '`/la-check image` - Trích tên từ ảnh chụp rồi check với tất cả list',
-        '',
-        '`/la-setup autochannel #channel` - Set channel auto-check ảnh cho server này',
-        '`/la-setup notifychannel #channel` - Set channel nhận thông báo list',
-        '`/la-setup view` - Xem config hiện tại',
-        '`/la-setup off` - Bật/tắt global list notifications',
-        '`/la-setup defaultscope global/server` - Set default blacklist scope cho /la-list add',
+      intro: 'Tất cả lệnh bot dùng prefix `/la-` để Discord gom vào nhóm `/la` autocomplete.',
+      groups: [
+        {
+          name: '📡 Theo dõi server',
+          lines: [
+            '`/la-status` - Xem trạng thái server Lost Ark đang monitor',
+            '`/la-reset` - Reset trạng thái đã lưu',
+          ],
+        },
+        {
+          name: '🔍 Roster & Tìm kiếm',
+          lines: [
+            '`/la-roster name [deep] [deep_limit]` - Tra roster + progression + list check. `deep:true` chạy Stronghold alt scan (chỉ officer/senior).',
+            '`/la-search name [min_ilvl] [max_ilvl] [class]` - Tìm tên tương tự với filter',
+            '`/la-evidence name [public]` - Xem evidence trực tiếp bằng autocomplete, không cần vào list view. `public:true` chỉ officer/senior.',
+          ],
+        },
+        {
+          name: '📒 Lists',
+          lines: [
+            '`/la-list add type name reason [raid] [logs] [image] [scope]` - Thêm vào blacklist/whitelist/watchlist. Scope global/server chỉ áp dụng blacklist.',
+            '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` - Sửa entry đã có. `additional_names` dùng để append alt thủ công cho case hidden roster/no-guild.',
+            '`/la-list remove name` - Xoá entry khỏi list',
+            '`/la-list view type [scope]` - Xem list (type: all/black/white/watch/trusted, scope: all/global/server)',
+          ],
+        },
+        {
+          name: '📦 Lists · Trust & Bulk',
+          lines: [
+            '`/la-list trust action name [reason]` - Quản lý trusted list (add/remove, chỉ officer)',
+            '`/la-list enrich name [deep_limit]` - Stronghold deep-scan entry đã có và append alt tìm được (chỉ officer/senior, khoảng 10-15 phút).',
+            '`/la-list multiadd action [file]` - Bulk add qua Excel template (xem dropdown để biết chi tiết)',
+          ],
+        },
+        {
+          name: '🖼️ Check ảnh chụp',
+          lines: [
+            '`/la-check image` - Trích tên từ ảnh chụp rồi check với tất cả list',
+          ],
+        },
+        {
+          name: '⚙️ Cài đặt server',
+          lines: [
+            '`/la-setup autochannel #channel` - Set channel auto-check ảnh cho server này',
+            '`/la-setup notifychannel #channel` - Set channel nhận thông báo list',
+            '`/la-setup view` - Xem config hiện tại',
+            '`/la-setup off` - Bật/tắt global list notifications',
+            '`/la-setup defaultscope global/server` - Set default blacklist scope cho /la-list add',
+          ],
+        },
+        {
+          name: '🌐 Cá nhân',
+          lines: [
+            '`/la-language-switch` - Đổi ngôn ngữ LoaLogs cho account của cậu',
+          ],
+        },
       ],
-      ownerLines: [
-        '**Chỉ Owner Server:**',
-        '`/la-stats` - Xem thống kê bot',
-        '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
-        '`/la-remote action:evidencechannel channel:#...` - Set channel lưu evidence (bot rehost ảnh ở đây để tránh Discord CDN expire)',
-        '`/la-remote action:syncimages` - Migrate ảnh legacy sang rehost storage. Xem chi tiết trong dropdown.',
-      ],
+      ownerGroup: {
+        name: '👑 Chỉ Owner Server',
+        lines: [
+          '`/la-stats` - Xem thống kê bot',
+          '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
+          '`/la-remote action:evidencechannel channel:#...` - Set channel lưu evidence (bot rehost ảnh ở đây để tránh Discord CDN expire)',
+          '`/la-remote action:syncimages` - Migrate ảnh legacy sang rehost storage. Xem chi tiết trong dropdown.',
+        ],
+      },
     },
     dropdown: {
       placeholder: 'Chọn section để xem chi tiết...',
@@ -231,9 +262,8 @@ const vi = {
       trusted: 'Trusted users',
     },
     summary: {
-      header: 'Đang hiện **{shown}** / **{total}** {entryLabel} · trang **{page}** / {totalPages}',
+      header: 'Trang **{page}** / {totalPages} · đang hiện **{shown}**',
       entries: 'entry',
-      typedEntries: 'entry {label}',
       footer: 'Refresh bằng /la-list view · dùng nút bên dưới để chuyển trang',
     },
     scope: {
@@ -258,7 +288,7 @@ const vi = {
     },
     trusted: {
       title: 'Trusted users',
-      footer: '{count} trusted character · không thể thêm vào bất kỳ list nào',
+      footer: 'Không thể thêm vào bất kỳ list nào · quản lý bằng /la-list trust action:add',
       emptyTitle: 'Trusted list đang trống',
       emptyDescription: 'Chưa có trusted user nào.',
       emptyFooter: 'Dùng /la-list trust action:add để đánh dấu character trusted (chỉ officer).',

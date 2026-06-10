@@ -46,11 +46,6 @@ function getListTypeLabel(type, fallback, lang) {
   return translated === `listView.labels.${type}` ? capitalizeLabel(fallback) : translated;
 }
 
-function getEntryLabel(type, fallback, lang) {
-  if (!type || type === 'all') return t('listView.summary.entries', lang);
-  return t('listView.summary.typedEntries', lang, { label: fallback || type });
-}
-
 function buildEntryMetaLine({ entry, freshUrl, lang = 'en' }) {
   const parts = [];
   if (entry.reason) parts.push(entry.reason.length > 80 ? entry.reason.slice(0, 77) + '...' : entry.reason);
@@ -105,12 +100,14 @@ export function buildTrustedListEmbed(entries, lang = 'en') {
   // Drop trailing blank line for cleaner footer-adjacent rendering.
   if (lines[lines.length - 1] === '') lines.pop();
 
+  // Count rides the title (matches the list-page card); the footer keeps
+  // the "what trusted means" reminder + the manage hint.
   return new EmbedBuilder()
-    .setTitle(`${ICONS.shield} ${t('listView.trusted.title', lang)}`)
+    .setTitle(`${ICONS.shield} ${t('listView.trusted.title', lang)} · ${entries.length}`)
     .setDescription(lines.join('\n').slice(0, 4096))
     .setColor(COLORS.trustedSoft)
     .setFooter({
-      text: t('listView.trusted.footer', lang, { count: entries.length }),
+      text: t('listView.trusted.footer', lang),
     })
     .setTimestamp();
 }
@@ -178,20 +175,18 @@ export async function buildListPageEmbed(options) {
   const labelCap = getListTypeLabel(currentType, ctx?.label, lang);
   const titleIcon = ctx?.icon || ICONS.search;
 
-  // Showing-N-of-M header line at the top of the description gives
-  // immediate context (filter scope, count, page) without having to
-  // scan the footer. Empty line below to separate from the entry block.
+  // Total count lives in the title (same `Subject · count` shape as the
+  // /la-list add result card), so the description header only carries
+  // page context. Empty line below separates it from the entry block.
   const headerLine = t('listView.summary.header', lang, {
-    shown: pageEntries.length,
-    total: allEntries.length,
-    entryLabel: getEntryLabel(currentType, ctx?.label, lang),
     page: page + 1,
     totalPages,
+    shown: pageEntries.length,
   });
   const description = [headerLine, '', ...lines].join('\n').slice(0, 4096);
 
   return new EmbedBuilder()
-    .setTitle(`${titleIcon} ${labelCap}`)
+    .setTitle(`${titleIcon} ${labelCap} · ${allEntries.length} ${t('listView.summary.entries', lang)}`)
     .setDescription(description)
     .setColor(currentType === 'all' ? COLORS.info : ctx.color)
     .setFooter({
