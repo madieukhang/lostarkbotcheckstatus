@@ -36,19 +36,27 @@ function fieldValue(value) {
   return Array.isArray(value) ? value.join('\n') : String(value || '');
 }
 
-function buildOverviewLines(lang, isOwnerGuild) {
-  const lines = [...toLines(t('help.overview.lines', lang))];
-  if (isOwnerGuild) {
-    lines.push('', ...toLines(t('help.overview.ownerLines', lang)));
-  }
-  return lines;
-}
-
+// One field per command family (locale `help.overview.groups`) instead of
+// the old single description wall. Discord's 1024-char field cap is the
+// per-group budget guard; groups are sized in the locale files so the
+// longest (Lists, vi) stays well under it.
 function buildOverviewEmbed(lang, isOwnerGuild) {
+  const groups = [...t('help.overview.groups', lang)];
+  if (isOwnerGuild) {
+    groups.push(t('help.overview.ownerGroup', lang));
+  }
+
   return new EmbedBuilder()
     .setTitle(t('help.overview.title', lang))
-    .setDescription(buildOverviewLines(lang, isOwnerGuild).join('\n').slice(0, 4096))
+    .setDescription(String(t('help.overview.intro', lang)).slice(0, 4096))
     .setColor(COLORS.info)
+    .addFields(
+      groups.map((group) => ({
+        name: group.name,
+        value: toLines(group.lines).join('\n').slice(0, 1024),
+        inline: false,
+      }))
+    )
     .setFooter({ text: t('help.overview.footer', lang) });
 }
 

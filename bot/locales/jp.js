@@ -55,41 +55,72 @@ const jp = {
     overview: {
       title: 'Lost Ark Check - Help (JP)',
       footer: '言語変更: /la-language-switch (保存) - /la-help lang:en (一度だけ)',
-      lines: [
-        '**コマンド一覧:**',
-        'すべての bot コマンドは `/la-` prefix を使うので、Discord の autocomplete では `/la` の下にまとまります。',
-        '',
-        '`/la-status` - 監視中の Lost Ark サーバー状態を見る',
-        '`/la-reset` - 保存済みステータスをリセット',
-        '`/la-language-switch` - あなたの LoaLogs 表示言語を切り替え',
-        '',
-        '`/la-roster name [deep] [deep_limit]` - roster + progression + list check。`deep:true` は Stronghold alt scan (officer/senior のみ)。',
-        '`/la-search name [min_ilvl] [max_ilvl] [class]` - filter 付きで似た名前を検索',
-        '`/la-evidence name [public]` - list view を通さず evidence を直接表示。`public:true` は officer/senior のみ。',
-        '',
-        '`/la-list add type name reason [raid] [logs] [image] [scope]` - blacklist/whitelist/watchlist に追加。scope global/server は blacklist のみ。',
-        '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` - 既存 entry を編集。`additional_names` は hidden roster/no-guild 用の手動 alt 追加。',
-        '`/la-list remove name` - list から entry を削除',
-        '`/la-list view type [scope]` - list 表示 (type: all/black/white/watch/trusted, scope: all/global/server)',
-        '`/la-list trust action name [reason]` - trusted list 管理 (add/remove, officer のみ)',
-        '`/la-list enrich name [deep_limit]` - 既存 entry を Stronghold deep-scan し、見つかった alt を追加 (officer/senior のみ、約10-15分)。',
-        '`/la-list multiadd action [file]` - Excel template で bulk add (詳細は dropdown)',
-        '',
-        '`/la-check image` - スクリーンショットから名前を抽出し、すべての list と照合',
-        '',
-        '`/la-setup autochannel #channel` - この server の auto-check channel を設定',
-        '`/la-setup notifychannel #channel` - list notification channel を設定',
-        '`/la-setup view` - 現在の config を表示',
-        '`/la-setup off` - global list notifications の on/off',
-        '`/la-setup defaultscope global/server` - /la-list add の default blacklist scope を設定',
+      intro: 'すべての bot コマンドは `/la-` prefix を使うので、Discord の autocomplete では `/la` の下にまとまります。',
+      groups: [
+        {
+          name: '📡 サーバー監視',
+          lines: [
+            '`/la-status` - 監視中の Lost Ark サーバー状態を見る',
+            '`/la-reset` - 保存済みステータスをリセット',
+          ],
+        },
+        {
+          name: '🔍 Roster & 検索',
+          lines: [
+            '`/la-roster name [deep] [deep_limit]` - roster + progression + list check。`deep:true` は Stronghold alt scan (officer/senior のみ)。',
+            '`/la-search name [min_ilvl] [max_ilvl] [class]` - filter 付きで似た名前を検索',
+            '`/la-evidence name [public]` - list view を通さず evidence を直接表示。`public:true` は officer/senior のみ。',
+          ],
+        },
+        {
+          name: '📒 Lists',
+          lines: [
+            '`/la-list add type name reason [raid] [logs] [image] [scope]` - blacklist/whitelist/watchlist に追加。scope global/server は blacklist のみ。',
+            '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` - 既存 entry を編集。`additional_names` は hidden roster/no-guild 用の手動 alt 追加。',
+            '`/la-list remove name` - list から entry を削除',
+            '`/la-list view type [scope]` - list 表示 (type: all/black/white/watch/trusted, scope: all/global/server)',
+          ],
+        },
+        {
+          name: '📦 Lists · Trust & Bulk',
+          lines: [
+            '`/la-list trust action name [reason]` - trusted list 管理 (add/remove, officer のみ)',
+            '`/la-list enrich name [deep_limit]` - 既存 entry を Stronghold deep-scan し、見つかった alt を追加 (officer/senior のみ、約10-15分)。',
+            '`/la-list multiadd action [file]` - Excel template で bulk add (詳細は dropdown)',
+          ],
+        },
+        {
+          name: '🖼️ スクショ Check',
+          lines: [
+            '`/la-check image` - スクリーンショットから名前を抽出し、すべての list と照合',
+          ],
+        },
+        {
+          name: '⚙️ サーバー設定',
+          lines: [
+            '`/la-setup autochannel #channel` - この server の auto-check channel を設定',
+            '`/la-setup notifychannel #channel` - list notification channel を設定',
+            '`/la-setup view` - 現在の config を表示',
+            '`/la-setup off` - global list notifications の on/off',
+            '`/la-setup defaultscope global/server` - /la-list add の default blacklist scope を設定',
+          ],
+        },
+        {
+          name: '🌐 個人設定',
+          lines: [
+            '`/la-language-switch` - あなたの LoaLogs 表示言語を切り替え',
+          ],
+        },
       ],
-      ownerLines: [
-        '**Owner Server のみ:**',
-        '`/la-stats` - bot 統計を見る',
-        '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
-        '`/la-remote action:evidencechannel channel:#...` - evidence 保存 channel を設定 (Discord CDN expiry 回避のため bot が rehost)',
-        '`/la-remote action:syncimages` - legacy image を rehost storage へ migrate。詳細は dropdown へ。',
-      ],
+      ownerGroup: {
+        name: '👑 Owner Server のみ',
+        lines: [
+          '`/la-stats` - bot 統計を見る',
+          '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
+          '`/la-remote action:evidencechannel channel:#...` - evidence 保存 channel を設定 (Discord CDN expiry 回避のため bot が rehost)',
+          '`/la-remote action:syncimages` - legacy image を rehost storage へ migrate。詳細は dropdown へ。',
+        ],
+      },
     },
     dropdown: {
       placeholder: '詳細を見たい section を選んでね...',
@@ -231,9 +262,8 @@ const jp = {
       trusted: 'Trusted users',
     },
     summary: {
-      header: '**{shown}** / **{total}** {entryLabel} を表示中 · page **{page}** / {totalPages}',
+      header: 'Page **{page}** / {totalPages} · **{shown}** 件を表示中',
       entries: 'entries',
-      typedEntries: '{label} entries',
       footer: '/la-list view で更新 · 下のボタンで page 移動',
     },
     scope: {
@@ -258,7 +288,7 @@ const jp = {
     },
     trusted: {
       title: 'Trusted users',
-      footer: '{count} trusted characters · どの list にも追加できません',
+      footer: 'どの list にも追加できません · 管理は /la-list trust action:add で',
       emptyTitle: 'Trusted list は空です',
       emptyDescription: 'trusted user はまだいません。',
       emptyFooter: '/la-list trust action:add で character を trusted にできます (officer only)。',

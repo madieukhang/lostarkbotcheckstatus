@@ -63,12 +63,12 @@ export async function handleStatsCommand(interaction) {
     .map((key) => `Key #${key.keyNumber}: **${key.totalRequests}** (${key.successResponses} ok / ${key.failedResponses} fail)`)
     .join('\n');
 
+  // Same card anatomy as the /la-list add result: icon title + one-line
+  // hero description; the refresh hint lives in the footer tip instead
+  // of eating a second description line.
   const embed = new EmbedBuilder()
-    .setAuthor({ name: 'Lost Ark Check · Bot Statistics' })
-    .setDescription(
-      `Live snapshot of the bot's persistence + cache state.\n` +
-      `Refresh by re-running \`/la-stats\`.`,
-    )
+    .setTitle('📊 Bot Statistics')
+    .setDescription(`Live snapshot of the bot's persistence + cache state.`)
     .addFields(
       {
         name: `${ICONS.shield} Lists`,
@@ -116,7 +116,7 @@ export async function handleStatsCommand(interaction) {
       },
     )
     .setColor(COLORS.info)
-    .setFooter({ text: 'Officer-only command · ephemeral reply' })
+    .setFooter({ text: 'Officer-only · ephemeral · re-run /la-stats to refresh' })
     .setTimestamp();
 
   await editEmbed(interaction, embed);

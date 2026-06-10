@@ -150,16 +150,16 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
       ? 'No rows processed.'
       : `**${results.added.length}** of **${totalAttempted}** rows added (${successRate}%)`;
 
+    // Same card anatomy as the /la-list add result: counts ride the title,
+    // the headline restates them in plain English, and the per-outcome
+    // fields below carry the detail. The old bare-number Added/Skipped/
+    // Failed 3-up was dropped · each detail field's header already shows
+    // its count, so the 3-up said the same thing twice.
     const embed = new EmbedBuilder()
-      .setTitle('📋 Bulk Add Complete')
+      .setTitle(`📋 Bulk Add Complete · ${results.added.length}/${totalAttempted}`)
       .setDescription(headline)
       .setColor(color)
-      .addFields(
-        { name: '✅ Added', value: String(results.added.length), inline: true },
-        { name: '⚠️ Skipped', value: String(results.skipped.length), inline: true },
-        { name: '❌ Failed', value: String(results.failed.length), inline: true },
-      )
-      .setFooter({ text: `Submitted by ${meta.requesterDisplayName || 'Unknown'}` })
+      .setFooter({ text: `Submitted by ${meta.requesterDisplayName || 'Unknown'} · verify with /la-list view` })
       .setTimestamp(new Date());
 
     if (results.added.length > 0) {
@@ -169,7 +169,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         .join('\n');
       const suffix = results.added.length > 15 ? `\n*... and ${results.added.length - 15} more*` : '';
       embed.addFields({
-        name: `Added (${results.added.length})`,
+        name: `✅ Added (${results.added.length})`,
         value: (addedLines + suffix).slice(0, 1024),
       });
     }
@@ -181,7 +181,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         .join('\n');
       const suffix = results.skipped.length > 10 ? `\n*... and ${results.skipped.length - 10} more*` : '';
       embed.addFields({
-        name: `Skipped (${results.skipped.length})`,
+        name: `⚠️ Skipped (${results.skipped.length})`,
         value: (skippedLines + suffix).slice(0, 1024),
       });
     }
@@ -193,7 +193,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         .join('\n');
       const suffix = results.failed.length > 10 ? `\n*... and ${results.failed.length - 10} more*` : '';
       embed.addFields({
-        name: `Failed (${results.failed.length})`,
+        name: `❌ Failed (${results.failed.length})`,
         value: (failedLines + suffix).slice(0, 1024),
       });
     }

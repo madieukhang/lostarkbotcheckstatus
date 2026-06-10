@@ -87,7 +87,7 @@ export function buildPreviewReply(parsed, requestId, lang = 'en') {
     : `**${parsed.rows.length}** valid row${parsed.rows.length === 1 ? '' : 's'} ready to add`;
 
   const previewEmbed = new EmbedBuilder()
-    .setTitle(`📋 Bulk Add Preview`)
+    .setTitle(`📋 Bulk Add Preview · ${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'}`)
     .setDescription([headerLine, '', previewLines.join('\n')].join('\n').slice(0, 4096))
     .setColor(COLORS.info)
     .setFooter({ text: buildSessionFooter(5, 'only the uploader can confirm') })
