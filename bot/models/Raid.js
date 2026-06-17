@@ -10,6 +10,12 @@ export const RAIDS = [
   'Secra Nor',
   'Secra Hard',
   'Secra NM',
+  // Horizon ships with three level tiers (Lv1/Lv2/Lv3) instead of
+  // Nor/Hard/NM difficulties · mirrors the RaidManage catalog's
+  // Horizon Level 1/2/3. Newest content, so it sorts last like in-game.
+  'Horizon Lv1',
+  'Horizon Lv2',
+  'Horizon Lv3',
 ];
 
 /**

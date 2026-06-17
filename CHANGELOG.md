@@ -6,6 +6,9 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Added
+- Horizon raid added to the raid list (`models/Raid.js` RAIDS) with its three level tiers - `Horizon Lv1`, `Horizon Lv2`, `Horizon Lv3` (mirrors the RaidManage Horizon Level 1/2/3 catalog). Flows automatically to the `/la-list add` raid dropdown and the `/la-list multiadd` Excel template + validation since RAIDS is the single source of truth. 11 raids total; Excel inline-validation formula is 123/255 chars. 151 tests green.
+
 ### Changed
 - Plain-embed polish pass, aligned with the `/la-list add` result-card anatomy (icon title with the headline count, one-line hero, emoji fields, footer tip) - no HUD kickers. `/la-help` overview rebuilt from a 25-line description wall into intro + one field per command family (📡 Server Monitoring · 🔍 Roster & Search · 📒 Lists · 📦 Lists Trust & Bulk · 🖼️ Screenshot Check · ⚙️ Server Setup · 🌐 Personal, plus 👑 Owner Server Only inside the owner guild); locale shape `help.overview.lines/ownerLines` -> `intro` + `groups[]` + `ownerGroup` across vi/en/jp, longest group (Lists EN, 488 chars) well under the 1024 field cap.
 - `/la-list view`: total count moves into the title (`🔍 All Lists · 47 entries`), the description header slims to page context (`Page 1 / 5 · showing 10`); trusted view gets the same title shape (`🛡️ Trusted Users · 14`) and its footer now carries the manage hint instead of repeating the count. Unused `listView.summary.typedEntries` key dropped from all three locales.
