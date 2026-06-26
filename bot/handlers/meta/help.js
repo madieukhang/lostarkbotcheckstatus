@@ -17,7 +17,11 @@ import config from '../../config.js';
 import { connectDB } from '../../db.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t, resolveLocale } from '../../services/i18n/index.js';
-import { replyEmbed, updateEmbed } from '../../utils/interactionReplies.js';
+import {
+  deferEphemeralReply,
+  editEmbed,
+  updateEmbed,
+} from '../../utils/interactionReplies.js';
 import { COLORS } from '../../utils/ui.js';
 
 function pickLang(value) {
@@ -122,10 +126,11 @@ async function resolveHelpLanguage(interaction) {
 }
 
 export async function handleHelpCommand(interaction) {
+  await deferEphemeralReply(interaction);
   const lang = await resolveHelpLanguage(interaction);
   const isOwnerGuild = isOwnerGuildInteraction(interaction);
 
-  await replyEmbed(interaction, buildOverviewEmbed(lang, isOwnerGuild), {
+  await editEmbed(interaction, buildOverviewEmbed(lang, isOwnerGuild), {
     components: [buildHelpDropdown(lang, isOwnerGuild)],
   });
 }

@@ -22,7 +22,11 @@ import {
   setUserLanguage,
   t,
 } from '../../services/i18n/index.js';
-import { replyEmbed, updateEmbed } from '../../utils/interactionReplies.js';
+import {
+  deferEphemeralReply,
+  deferUpdate,
+  editEmbed,
+} from '../../utils/interactionReplies.js';
 import { COLORS } from '../../utils/ui.js';
 
 export const LANGUAGE_SWITCH_SELECT_CUSTOM_ID = 'la-language-switch:select';
@@ -61,17 +65,19 @@ export function buildLanguageDropdown(lang) {
 }
 
 export async function handleLanguageSwitchCommand(interaction) {
+  await deferEphemeralReply(interaction);
   await connectDB();
   const lang = await getUserLanguage(interaction.user.id, {
     UserPreferenceModel: UserPreference,
   });
 
-  await replyEmbed(interaction, buildLanguageEmbed(lang), {
+  await editEmbed(interaction, buildLanguageEmbed(lang), {
     components: [buildLanguageDropdown(lang)],
   });
 }
 
 export async function handleLanguageSwitchSelect(interaction) {
+  await deferUpdate(interaction);
   await connectDB();
   const requested = interaction.values?.[0];
   const previous = await getUserLanguage(interaction.user.id, {
@@ -101,7 +107,7 @@ export async function handleLanguageSwitchSelect(interaction) {
     )
     .setFooter({ text: t('languageSwitch.footer', next) });
 
-  await updateEmbed(interaction, embed, {
+  await editEmbed(interaction, embed, {
     components: [buildLanguageDropdown(next)],
   });
 }
