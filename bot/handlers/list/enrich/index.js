@@ -98,9 +98,9 @@ const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
 const PROGRESS_EDIT_FAILURE_LIMIT = 3;
 
 export function createEnrichHandlers({ client, services }) {
-  // services may grow Phase 3.5 broadcast support later; not used today.
-  // eslint-disable-next-line no-unused-vars
-  const _services = services;
+  // Guild-broadcast notifier shared with /la-list add/edit. Fired on Confirm
+  // so the notify channels learn an entry just gained newly-discovered alts.
+  const { broadcastListChange } = services || {};
 
   async function replyScanLimit(interaction, active) {
     await replyAlert(interaction, scanLimitAlertOptions(active));
@@ -692,6 +692,29 @@ export function createEnrichHandlers({ client, services }) {
         $set: { enrichmentSource: 'bible', enrichedAt: new Date() },
       }
     );
+
+    // Broadcast the enrichment to the guild notify channels, mirroring the
+    // /la-list add/edit cards. Fetch the just-updated entry so the card's
+    // headline count + scope routing reflect the appended alts. The scan
+    // session carries {name, classId, itemLevel} for each new alt, passed as
+    // rosterCharacters so the "🆕 New alts" field shows class icon + ilvl even
+    // when those alts aren't in RosterSnapshot yet. Best-effort: a channel
+    // failure must not break the Confirm reply, so it's fire-and-forget.
+    if (typeof broadcastListChange === 'function') {
+      const enrichedEntry = await Model.findById(session.entryId).lean().catch(() => null);
+      if (enrichedEntry) {
+        broadcastListChange(
+          'enriched',
+          enrichedEntry,
+          { type: session.type, guildId: enrichedEntry.guildId || '' },
+          {
+            onlyOwner: enrichedEntry.scope === 'server',
+            newAltNames: altNames,
+            rosterCharacters: session.newAlts || [],
+          }
+        ).catch((err) => console.warn('[enrich] Broadcast failed:', err?.message || err));
+      }
+    }
 
     clearEnrichSession(sessionId);
 

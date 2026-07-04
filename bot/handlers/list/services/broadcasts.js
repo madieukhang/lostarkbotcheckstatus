@@ -26,6 +26,10 @@ const ACTION_VERB = Object.freeze({
   added:   'added to',
   removed: 'removed from',
   edited:  'edited in',
+  // 'enriched' uses a bespoke headline (see broadcastListChange) that names the
+  // new-alt count instead of the generic "was <verb> <list>" phrasing; the verb
+  // here only feeds the card title ("List enriched broadcast").
+  enriched: 'enriched',
 });
 
 function normalizeNameKey(value) {
@@ -104,7 +108,9 @@ export function createBroadcastServices({ client }) {
       onlyOwner = false,
       displayUrl: preResolvedUrl,
       rosterCharacters = [],
+      newAltNames = [],
     } = options;
+    const isEnrich = action === 'enriched';
     const { label, color, icon } = getListContext(payload.type);
     const rosterLink = rosterUrl(entry.name);
 
@@ -137,15 +143,25 @@ export function createBroadcastServices({ client }) {
     // sees "What changed in which list" without parsing the fields.
     // Class icon (when known) sits between the list-status icon and
     // the linked name to match the rest of the v0.5.67 vocabulary.
-    const headline = `${icon} ${classPrefix}**[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}.`;
+    // Enrich gets a bespoke headline naming the new-alt count + running
+    // total (deliberately does NOT name the officer who ran it - the
+    // guild only needs to know the entry grew, not by whom).
+    const newAlts = (Array.isArray(newAltNames) ? newAltNames : []).filter(Boolean);
+    const newCount = newAlts.length;
+    const totalTracked = Math.max(0, allChars.filter((n) => normalizeNameKey(n) !== normalizeNameKey(entry.name)).length);
+    const headline = isEnrich
+      ? `${icon} ${classPrefix}**[${entry.name}](${rosterLink})** gained **${newCount}** new tracked alt${newCount === 1 ? '' : 's'} in **${labelCap}**${scopeTag} via enrich · now **${totalTracked}** tracked.`
+      : `${icon} ${classPrefix}**[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}.`;
 
     const fields = [
       { name: '📝 Reason', value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
     ];
     if (entry.raid) fields.push({ name: '🗡️ Raid', value: `\`${entry.raid}\``, inline: true });
     if (entry.addedAt) {
+      // enrich shows the original add time (how long they've been listed) under
+      // the same "Added" label as the add card; only manual edits say "Edited".
       fields.push({
-        name: action === 'added' ? '🕐 Added' : '🕐 Edited',
+        name: action === 'edited' ? '🕐 Edited' : '🕐 Added',
         value: relativeTime(entry.addedAt),
         inline: true,
       });
@@ -175,8 +191,23 @@ export function createBroadcastServices({ client }) {
     // someone in their guild is the same account. Capped at 12 visible
     // names with a `+N more` overflow line; rich rows are trimmed
     // dynamically so the field stays under Discord's 1024-char limit.
-    const trackedAltsField = buildTrackedAltsField(entry, statMap);
-    if (trackedAltsField) fields.push(trackedAltsField);
+    // Non-enrich: full tracked-alts roster. Enrich: only the alts THIS scan
+    // just appended (label swapped to "🆕 New alts"), rendered through the same
+    // renderer so class icon + ilvl match the add card exactly. The new alts'
+    // class/ilvl ride in via options.rosterCharacters (the enrich session
+    // carries {name, classId, itemLevel}); RosterSnapshot may not have them yet.
+    if (isEnrich) {
+      const newAltsField = renderTrackedAltsField({
+        names: newAlts,
+        primaryName: entry.name,
+        statMap,
+        label: '🆕 New alts',
+      });
+      if (newAltsField) fields.push(newAltsField);
+    } else {
+      const trackedAltsField = buildTrackedAltsField(entry, statMap);
+      if (trackedAltsField) fields.push(trackedAltsField);
+    }
 
     const embed = new EmbedBuilder()
       .setTitle(`${ICONS.dm} List ${verb.split(' ')[0]} broadcast`)
