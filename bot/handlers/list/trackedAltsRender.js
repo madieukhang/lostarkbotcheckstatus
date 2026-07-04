@@ -80,6 +80,9 @@ export function formatAltLine(name, index, record) {
  * @param {string} options.primaryName - Entry's own name (filtered out).
  * @param {Map<string, object>} [options.statMap] - Lowercase-name → snapshot record.
  * @param {string|null} [options.emptySentinel] - Field value when no alts.
+ * @param {string} [options.label='🧬 Tracked alts'] - Field-name prefix. Lets
+ *   the enrich broadcast reuse this renderer as a "🆕 New alts" field while
+ *   every other surface keeps the tracked-alts wording.
  * @returns {{name: string, value: string, inline: boolean} | null}
  */
 export function renderTrackedAltsField({
@@ -87,6 +90,7 @@ export function renderTrackedAltsField({
   primaryName,
   statMap = new Map(),
   emptySentinel = null,
+  label = '🧬 Tracked alts',
 } = {}) {
   const all = Array.isArray(names) ? names : [];
   const primaryKey = lcKey(primaryName);
@@ -97,7 +101,7 @@ export function renderTrackedAltsField({
   if (others.length === 0) {
     if (emptySentinel == null) return null;
     return {
-      name: '🧬 Tracked alts',
+      name: label,
       value: emptySentinel,
       inline: false,
     };
@@ -120,7 +124,7 @@ export function renderTrackedAltsField({
   const hiddenCount = others.length - lines.length;
   const extra = hiddenCount > 0 ? `\n*... and ${hiddenCount} more*` : '';
   return {
-    name: `🧬 Tracked alts (${others.length})`,
+    name: `${label} (${others.length})`,
     value: (lines.join('\n') + extra).slice(0, FIELD_VALUE_LIMIT),
     inline: false,
   };

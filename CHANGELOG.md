@@ -7,6 +7,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Added
+- `/la-list enrich` now broadcasts to the guild notify channels when you Confirm the discovered alts, mirroring the `/la-list add` / edit cards. New `enriched` action in `broadcastListChange`: a bespoke headline (`X gained N new tracked alts in <List> [Local] via enrich · now M tracked.`) plus a `🆕 New alts` field rendered through the shared tracked-alts renderer so each new alt carries its class icon + item level (class/ilvl ride in from the scan session, so it works even before RosterSnapshot has them). Deliberately does NOT name the officer who ran it. Fires only when ≥1 new alt is actually appended; best-effort (a channel failure can't break the Confirm). `renderTrackedAltsField` gained an optional `label` param for the reused field. 153 tests green.
 - Horizon raid added to the raid list (`models/Raid.js` RAIDS) with its three level tiers - `Horizon Lv1`, `Horizon Lv2`, `Horizon Lv3` (mirrors the RaidManage Horizon Level 1/2/3 catalog). Flows automatically to the `/la-list add` raid dropdown and the `/la-list multiadd` Excel template + validation since RAIDS is the single source of truth. 11 raids total; Excel inline-validation formula is 123/255 chars. 151 tests green.
 
 ### Changed
