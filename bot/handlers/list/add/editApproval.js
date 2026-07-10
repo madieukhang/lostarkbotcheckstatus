@@ -9,14 +9,13 @@
 
 import PendingApproval from '../../../models/PendingApproval.js';
 import TrustedUser from '../../../models/TrustedUser.js';
-import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
+import { t } from '../../../services/i18n/index.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
-  buildListEditSuccessEmbed,
   buildApprovalResultRow,
 } from '../helpers.js';
 
@@ -40,7 +39,6 @@ import {
  * @returns {Promise<void>}
  */
 export async function handleApprovedEditRequest({
-  client,
   interaction,
   payload,
   requestId,
@@ -50,7 +48,7 @@ export async function handleApprovedEditRequest({
   lang = 'en',
 }) {
   const { model: oldModel } = getListContext(payload.currentType || payload.type);
-  const { model: newModel, label: newLabel } = getListContext(payload.type);
+  const { model: newModel } = getListContext(payload.type);
   const isTypeChange = payload.currentType && payload.currentType !== payload.type;
 
   const existingEntry = await oldModel.findById(payload.existingEntryId);
@@ -60,16 +58,13 @@ export async function handleApprovedEditRequest({
       content: '',
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
-        title: 'Original Entry Missing',
-        description: 'The entry referenced by this approval request no longer exists - it may have been removed.',
+        ...t('dialogue.listEdit.originalMissing', lang),
+        lang,
       })],
       components: [buildApprovalResultRow('Failed', lang)],
     });
     return;
   }
-
-  // Captured per-branch for the rich success embed below.
-  let postEditEntry = null;
 
   if (isTypeChange) {
     // Preflight: scope-aware duplicate check on target list
@@ -92,9 +87,8 @@ export async function handleApprovedEditRequest({
         content: '',
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.WARNING,
-          title: 'Move Blocked',
-          description: `**${existingEntry.name}** already exists in the target list. Edit aborted.`,
-          footer: 'Remove the conflicting target entry first, then resubmit.',
+          ...t('dialogue.listEdit.moveBlocked', lang, { name: existingEntry.name }),
+          lang,
         })],
         components: [buildApprovalResultRow('Failed', lang)],
       });
@@ -111,7 +105,7 @@ export async function handleApprovedEditRequest({
         await PendingApproval.deleteOne({ requestId });
         await editPayload(interaction, {
           content: '',
-          embeds: [buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason)],
+          embeds: [buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason, { lang })],
           components: [buildApprovalResultRow('Blocked', lang)],
         });
         return;
@@ -129,7 +123,7 @@ export async function handleApprovedEditRequest({
       : (payload.imageUrl || existingEntry.imageUrl || '');
 
     // Create first, then delete old (safe order · if create fails, old preserved)
-    postEditEntry = await newModel.create({
+    await newModel.create({
       name: existingEntry.name,
       reason: payload.reason || existingEntry.reason,
       raid: payload.raid || existingEntry.raid,
@@ -191,9 +185,8 @@ export async function handleApprovedEditRequest({
             content: '',
             embeds: [buildAlertEmbed({
               severity: AlertSeverity.WARNING,
-              title: 'Scope Change Raced',
-              description: 'Another entry with this name claimed the target scope between approval and persist. Approval aborted.',
-              footer: 'Resubmit the edit, or remove the conflicting entry first.',
+              ...t('dialogue.listEdit.scopeRaced', lang),
+              lang,
             })],
             components: [buildApprovalResultRow('Failed', lang)],
           });
@@ -202,9 +195,6 @@ export async function handleApprovedEditRequest({
         throw err;
       }
     }
-    // Capture for the rich success embed below · virtual post-edit
-    // entry is the pre-edit snapshot merged with updateFields.
-    postEditEntry = { ...(existingEntry.toObject?.() || existingEntry), ...updateFields };
   }
 
   // Broadcast edit: routing decided by the FINAL scope (after any scope
@@ -221,68 +211,15 @@ export async function handleApprovedEditRequest({
 
   await PendingApproval.deleteOne({ requestId });
 
-  // Derive changes summary by comparing payload to the pre-edit snapshot.
-  // The original /la-list edit command's `changes` array doesn't survive
-  // the PendingApproval round trip, so we reconstruct it here for the
-  // rich success embed.
-  const approvalChanges = [];
-  if (payload.reason && payload.reason !== existingEntry.reason) {
-    approvalChanges.push(`Reason: "${existingEntry.reason || ''}" → "${payload.reason}"`);
-  }
-  if (isTypeChange) {
-    const oldLabel = getListContext(payload.currentType).label;
-    approvalChanges.push(`List: ${oldLabel} → ${newLabel}`);
-  }
-  if (payload.raid && payload.raid !== existingEntry.raid) {
-    approvalChanges.push(`Raid: "${existingEntry.raid || 'N/A'}" → "${payload.raid}"`);
-  }
-  if (payload.logsUrl && payload.logsUrl !== (existingEntry.logsUrl || '')) {
-    approvalChanges.push('Logs: updated');
-  }
-  const evidenceChanged =
-    (payload.imageMessageId && payload.imageMessageId !== existingEntry.imageMessageId)
-    || (payload.imageUrl && !payload.imageMessageId && payload.imageUrl !== existingEntry.imageUrl);
-  if (evidenceChanged) {
-    approvalChanges.push('Evidence: updated');
-  }
-  if (
-    payload.type === 'black'
-    && payload.scope
-    && payload.scope !== (existingEntry.scope || 'global')
-  ) {
-    approvalChanges.push(`Scope: ${existingEntry.scope || 'global'} → ${payload.scope}`);
-  }
-
-  // Build the rich success embed for the requester reply. Falls back
-  // to plain text if postEditEntry is somehow null (shouldn't happen
-  // but defensive · null embeds[] is handled by notifyRequester).
-  let approvalSuccessEmbed = null;
-  if (postEditEntry) {
-    const entryForEmbed = postEditEntry.toObject?.() || postEditEntry;
-    const approvalFreshUrl = await resolveDisplayImageUrl(entryForEmbed, client);
-    approvalSuccessEmbed = buildListEditSuccessEmbed(entryForEmbed, {
-      changes: approvalChanges,
-      type: payload.type,
-      freshDisplayUrl: approvalFreshUrl,
-      requesterDisplayName: payload.requestedByDisplayName || payload.requestedByTag || 'Unknown',
-      isMove: isTypeChange,
-    });
-  }
-
-  const editResult = {
-    ok: true,
-    content: `✅ Edit approved: **${existingEntry.name}**${isTypeChange ? ` moved to ${newLabel}` : ' updated'}.`,
-    embeds: approvalSuccessEmbed ? [approvalSuccessEmbed] : [],
-  };
-
-  await editPayload(interaction, {
-    content: `✅ Edit approved by **${interaction.user.tag}**.`,
+  const buildApprovedPayload = (targetLang) => ({
+    content: `✅ ${t('dialogue.listEdit.approvedBy', targetLang, { user: interaction.user.tag })}`,
     components: [buildApprovalResultRow('Approved', lang)],
   });
-  await syncApproverDmMessages(payload, {
-    content: `✅ Edit approved by **${interaction.user.tag}**.`,
-    components: [buildApprovalResultRow('Approved', lang)],
-  }, { excludeMessageId: interaction.message.id });
-  await notifyRequesterAboutDecision(payload, editResult, false);
+  await editPayload(interaction, buildApprovedPayload(lang));
+  await syncApproverDmMessages(payload, (targetLang) => ({
+    ...buildApprovedPayload(targetLang),
+    components: [buildApprovalResultRow('Approved', targetLang)],
+  }), { excludeMessageId: interaction.message.id });
+  await notifyRequesterAboutDecision(payload, { ok: true }, false);
   return;
 }

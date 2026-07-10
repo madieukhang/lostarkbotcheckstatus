@@ -3,9 +3,10 @@ import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { getClassName, getClassEmoji } from '../../models/Class.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { COLORS } from '../../utils/ui.js';
+import { t } from '../../services/i18n/index.js';
 import { pickEvidenceEntry } from './evidence.js';
 
-export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter }) {
+export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang = 'en' }) {
   const lines = results.map((result, index) => {
     const cls = getClassName(result.cls);
     const classPrefix = getClassEmoji(cls) || cls;
@@ -32,8 +33,8 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
     for (const entry of [result.black, result.white, result.watch]) {
       if (!entry) continue;
       const isRosterMatch = entry.name.toLowerCase() !== result.name.toLowerCase();
-      const via = isRosterMatch ? `via **${entry.name}** · ` : '';
-      line += `\n    ↳ ${via}*${entry.reason || 'no reason'}*`;
+      const via = isRosterMatch ? t('dialogue.search.via', lang, { name: entry.name }) : '';
+      line += `\n    ↳ ${via}*${entry.reason || t('dialogue.search.noReason', lang)}*`;
       if (entry.raid) line += ` [${entry.raid}]`;
     }
 
@@ -61,19 +62,20 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
   if (hasWatch) breakdown.push(`⚠️ **${watchCount}**`);
   if (hasWhite) breakdown.push(`✅ **${whiteCount}**`);
   if (trustedCount > 0) breakdown.push(`🛡️ **${trustedCount}**`);
-  if (cleanCount > 0) breakdown.push(`❓ **${cleanCount}** clean`);
+  if (cleanCount > 0) breakdown.push(`❓ **${cleanCount}** ${t('dialogue.search.clean', lang)}`);
+  const matchWord = t(`dialogue.search.${results.length === 1 ? 'matchOne' : 'matchMany'}`, lang);
   const summaryLine = breakdown.length > 0
-    ? `Found **${results.length}** match${results.length === 1 ? '' : 'es'}: ${breakdown.join(' · ')}`
-    : `Found **${results.length}** match${results.length === 1 ? '' : 'es'}`;
+    ? t('dialogue.search.summary', lang, { count: results.length, word: matchWord, breakdown: breakdown.join(' · ') })
+    : t('dialogue.search.summaryPlain', lang, { count: results.length, word: matchWord });
 
   const description = `${summaryLine}\n\n${lines.join('\n')}`.slice(0, 4096);
 
-  return createArtistEmbed()
-    .setTitle(`🔍 Search · "${name}"`)
+  return createArtistEmbed(lang)
+    .setTitle(`🔍 ${t('dialogue.search.title', lang, { name })}`)
     .setDescription(description)
     .setColor(color)
     .setFooter({
-      text: `Filters: ${filterParts.join(' · ')} · Source: lostark.bible`,
+      text: t('dialogue.search.footer', lang, { filters: filterParts.join(' · ') }),
     })
     .setTimestamp();
 }

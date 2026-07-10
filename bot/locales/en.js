@@ -1,4 +1,7 @@
+import dialogue from './dialogue/en.js';
+
 const en = {
+  dialogue,
   language: {
     code: 'en',
     label: 'English',
@@ -237,19 +240,19 @@ const en = {
   autoCheckWelcome: {
     title: '🎨 Artist was only passing by...',
     description: [
-      'Artist happened to walk past this channel and left a small sign behind. LoaLogs is the one staying here to watch the screenshots.',
-      'Drop a screenshot containing character names here and the bot will read it, then check those names against the server lists.',
+      'Artist happened to walk past this channel and left a small sign behind. LoaLogs is the one staying here to watch the checks.',
+      'Drop a screenshot, or type `check abcxyz`; the bot will compare those character names against the server lists.',
     ],
-    howName: '🔍 What happens after an image is posted',
+    howName: '🔍 What happens after a check request',
     howValue: [
-      '1. LoaLogs reacts with 🔍 and extracts up to 8 character names.',
+      '1. LoaLogs reacts with 🔍 and reads up to 8 character names from the image or text.',
       '2. The names are checked against blacklist, whitelist, watchlist, and trusted records.',
       '3. Eligible unlisted names may expose a Quick Add control for officers.',
     ],
     listsName: '📚 Reading the result',
     listsValue: [
       'Black and watch results deserve attention; white and trusted results provide the matching context.',
-      'Use /la-search name:<character> when you need a manual lookup without an image.',
+      'Type `check abcxyz` here for a direct list check; use /la-search for fuzzy Bible search and filters.',
     ],
     cleanupName: '🧹 This channel resets once a day',
     cleanupValue: [
@@ -259,6 +262,7 @@ const en = {
     commandsName: '🧭 Useful commands',
     commandsValue: [
       '/la-check image:<screenshot> - run the same check manually',
+      'check abcxyz - check a typed character name in this channel',
       '/la-roster name:<character> - inspect a roster',
       '/la-search name:<character> - search and cross-check lists',
       '/la-help - open the full command guide',
@@ -305,15 +309,16 @@ const en = {
           ],
         },
         {
-          name: '🖼️ Screenshot Check',
+          name: '🖼️ Screenshot & Text Check',
           lines: [
             '`/la-check image` - Check names from screenshot against all lists',
+            '`check abcxyz` in the configured auto-check channel - Check a typed character name',
           ],
         },
         {
           name: '⚙️ Server Setup',
           lines: [
-            '`/la-setup autochannel #channel` - Set auto-check channel for this server',
+            '`/la-setup autochannel #channel` - Set the screenshot + `check <name>` channel for this server',
             '`/la-setup notifychannel #channel` - Set notification channel for this server',
             '`/la-setup view` - View current channel configuration',
             '`/la-setup repin` - Refresh the pinned Artist guide',

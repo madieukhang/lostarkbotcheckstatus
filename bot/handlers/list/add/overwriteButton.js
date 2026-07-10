@@ -16,7 +16,7 @@ import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferUpdate, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
-import { getUserLanguage } from '../../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   getListContext,
   buildApprovalResultRow,
@@ -47,8 +47,8 @@ export function createListAddOverwriteButtonHandler({
     if (!payload) {
       await replyAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Request Expired',
-        description: 'This approval request was already processed or has expired.',
+        ...t('dialogue.approval.flow.expired', lang),
+        lang,
       });
       return;
     }
@@ -57,19 +57,19 @@ export function createListAddOverwriteButtonHandler({
 
     if (!isOverwrite) {
       // Keep existing · just clean up
-      await editPayload(interaction, {
-        content: `✅ Kept existing entry. New request for **${payload.name}** discarded.`,
+      const buildKeptPayload = (targetLang) => ({
+        content: `✅ ${t('dialogue.approval.flow.keptExisting', targetLang, { name: payload.name })}`,
         embeds: [],
         components: [buildApprovalResultRow('Kept Existing', lang)],
       });
+      await editPayload(interaction, buildKeptPayload(lang));
 
       await syncApproverDmMessages(
         payload,
-        {
-          content: `✅ Kept existing entry. New request for **${payload.name}** discarded.`,
-          embeds: [],
-          components: [buildApprovalResultRow('Kept Existing', lang)],
-        },
+        (targetLang) => ({
+          ...buildKeptPayload(targetLang),
+          components: [buildApprovalResultRow('Kept Existing', targetLang)],
+        }),
         { excludeMessageId: interaction.message.id }
       );
 
@@ -106,9 +106,8 @@ export function createListAddOverwriteButtonHandler({
           content: '',
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
-            title: 'Original Entry Missing',
-            description: 'The duplicate entry no longer exists - it may have been removed in a parallel session.',
-            footer: 'Re-run /la-list add to create a fresh entry.',
+            ...t('dialogue.approval.flow.originalMissing', lang),
+            lang,
           })],
           components: [buildApprovalResultRow('Failed', lang)],
         });
@@ -156,20 +155,19 @@ export function createListAddOverwriteButtonHandler({
 
       console.log(`[list] Overwrite: updated ${payload.type} entry for ${dupeEntry.name} in-place`);
 
-      const resultMsg = `✅ Overwritten by **${interaction.user.tag}**. Entry updated.`;
-      await editPayload(interaction, {
-        content: resultMsg,
+      const buildOverwrittenPayload = (targetLang) => ({
+        content: `✅ ${t('dialogue.approval.flow.overwritten', targetLang, { user: interaction.user.tag })}`,
         embeds: [],
         components: [buildApprovalResultRow('Overwritten', lang)],
       });
+      await editPayload(interaction, buildOverwrittenPayload(lang));
 
       await syncApproverDmMessages(
         payload,
-        {
-          content: resultMsg,
-          embeds: [],
-          components: [buildApprovalResultRow('Overwritten', lang)],
-        },
+        (targetLang) => ({
+          ...buildOverwrittenPayload(targetLang),
+          components: [buildApprovalResultRow('Overwritten', targetLang)],
+        }),
         { excludeMessageId: interaction.message.id }
       );
 
@@ -184,16 +182,16 @@ export function createListAddOverwriteButtonHandler({
         rosterCharacters: rosterResult?.rosterCharacters || [],
       }).catch(() => {});
 
-      await notifyRequesterAboutDecision(payload, { ok: true, content: resultMsg }, false);
+      await notifyRequesterAboutDecision(payload, { ok: true }, false);
     } catch (err) {
       console.error('[list] Overwrite failed:', err.message);
       await editPayload(interaction, {
         content: '',
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.WARNING,
-          title: 'Overwrite Failed',
-          description: 'Could not overwrite the existing entry.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+          ...t('dialogue.approval.flow.overwriteFailed', lang),
+          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+          lang,
         })],
         components: [buildApprovalResultRow('Failed', lang)],
       });

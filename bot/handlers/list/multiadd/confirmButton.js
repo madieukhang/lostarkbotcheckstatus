@@ -2,9 +2,11 @@ import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import UserPreference from '../../../models/UserPreference.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   editPayload,
   replyAlert,
@@ -29,14 +31,14 @@ export function createMultiaddConfirmButtonHandler(deps) {
 
   return async function handleMultiaddConfirmButton(interaction) {
     const [prefix, requestId] = interaction.customId.split(':');
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     const pending = multiaddPending.get(requestId);
 
     if (!pending) {
       await updateAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Request Expired',
-        description: 'This bulk-add preview has expired or was already processed.',
-        footer: 'Re-upload the file with /la-list multiadd action:file to start over.',
+        ...t('dialogue.multiadd.confirm.expired', lang),
+        lang,
       }, {
         content: '',
         components: [],
@@ -47,8 +49,8 @@ export function createMultiaddConfirmButtonHandler(deps) {
     if (interaction.user.id !== pending.requesterId) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Not Your Request',
-        description: 'Only the original uploader can use these buttons.',
+        ...t('dialogue.multiadd.confirm.notYours', lang),
+        lang,
       });
       return;
     }
@@ -60,8 +62,8 @@ export function createMultiaddConfirmButtonHandler(deps) {
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.INFO,
           titleIcon: '✖️',
-          title: 'Bulk Add Cancelled',
-          description: 'No entries were added.',
+          ...t('dialogue.multiadd.confirm.cancelled', lang),
+          lang,
         })],
         components: [],
       });
@@ -74,7 +76,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
 
     if (isOfficerOrSenior(pending.requesterId)) {
       await updatePayload(interaction, {
-        content: `⏳ Processing ${pending.rows.length} rows... (this may take up to ${Math.ceil(pending.rows.length * 0.7)}s)`,
+        content: `⏳ ${t('dialogue.multiadd.confirm.processing', lang, { count: pending.rows.length, seconds: Math.ceil(pending.rows.length * 0.7) })}`,
         embeds: [],
         components: [],
       });
@@ -83,7 +85,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
         if (current % 5 !== 0 && current !== total) return;
         try {
           await editPayload(interaction, {
-            content: `⏳ Processing... ${current}/${total} rows done`,
+            content: `⏳ ${t('dialogue.multiadd.confirm.progress', lang, { current, total })}`,
           });
         } catch { /* ignore progress errors */ }
       };
@@ -104,7 +106,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
         requestedByDisplayName: pending.requesterDisplayName,
       }).catch((err) => console.warn('[multiadd] Bulk broadcast failed:', err.message));
 
-      const summaryEmbed = buildBulkSummaryEmbed(results, pending);
+      const summaryEmbed = buildBulkSummaryEmbed(results, pending, lang);
       await editPayload(interaction, {
         content: null,
         embeds: [summaryEmbed],
@@ -121,9 +123,8 @@ export function createMultiaddConfirmButtonHandler(deps) {
         await updatePayload(interaction, {
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
-            title: 'Approval Routing Misconfigured',
-            description: 'No Senior approver user IDs are configured.',
-            footer: 'Set SENIOR_APPROVER_IDS in the bot env, then retry the upload.',
+            ...t('dialogue.multiadd.confirm.routing', lang),
+            lang,
           })],
           components: [],
         });
@@ -195,10 +196,9 @@ export function createMultiaddConfirmButtonHandler(deps) {
         await updatePayload(interaction, {
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
-            title: 'Approval Delivery Failed',
-            description: 'Could not deliver the bulk-approval request.',
-            fields: [{ name: 'Reason', value: sent.reason || 'unknown', inline: false }],
-            footer: 'No entries were added. Try again or contact a senior directly.',
+            ...t('dialogue.multiadd.confirm.delivery', lang),
+            fields: [{ name: t('dialogue.broadcast.fields.reason', lang), value: sent.reason || t('dialogue.common.unknown', lang), inline: false }],
+            lang,
           })],
           components: [],
         });
@@ -215,14 +215,11 @@ export function createMultiaddConfirmButtonHandler(deps) {
         }
       );
 
-      const waitEmbed = createArtistEmbed()
-        .setTitle('⏳ Bulk Add · Awaiting Senior Approval')
-        .setDescription(
-          `Your bulk add of **${pending.rows.length} rows** has been sent to Senior for approval.\n\n` +
-            `You'll be notified in this channel when the decision is made.`
-        )
+      const waitEmbed = createArtistEmbed(lang)
+        .setTitle(`⏳ ${t('dialogue.multiadd.confirm.awaiting.title', lang)}`)
+        .setDescription(t('dialogue.multiadd.confirm.awaiting.description', lang, { count: pending.rows.length }))
         .setColor(COLORS.warning)
-        .setFooter({ text: `Request ID: ${requestId.slice(0, 8)}` })
+        .setFooter({ text: t('dialogue.multiadd.confirm.awaiting.footer', lang, { id: requestId.slice(0, 8) }) })
         .setTimestamp();
 
       await updatePayload(interaction, {
@@ -236,10 +233,9 @@ export function createMultiaddConfirmButtonHandler(deps) {
       await updatePayload(interaction, {
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.WARNING,
-          title: 'Approval Request Failed',
-          description: 'Could not create the bulk-approval request.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-          footer: 'No entries were added. Retry the upload; if it persists, contact a senior.',
+          ...t('dialogue.multiadd.confirm.requestFailed', lang),
+          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+          lang,
         })],
         components: [],
       }).catch(() => {});

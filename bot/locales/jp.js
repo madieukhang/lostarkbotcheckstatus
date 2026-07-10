@@ -1,4 +1,8 @@
+import dialogue from './dialogue/jp.js';
+import commands from './commands/jp.js';
+
 const jp = {
+  dialogue,
   language: {
     code: 'jp',
     label: '日本語',
@@ -42,33 +46,24 @@ const jp = {
     },
   },
 
-  commands: {
-    help: {
-      options: {
-        lang: '言語 (既定: 保存した設定)',
-      },
-    },
-    languageSwitch: {
-      description: 'LoaLogs があなたへ返す言語を切り替えます',
-    },
-  },
+  commands,
 
   autoCheckWelcome: {
     title: '🎨 Artist は通りすがりですわ～',
     description: [
-      'Artist はこの channel をたまたま通りかかって、小さな案内板を残しただけですの。Screenshot を見守るのは LoaLogs ですわ。',
-      'Character 名が写った screenshot をここへ投稿すると、bot が画像を読み取り、server の各 list と照合しますの。',
+      'Artist はこの channel をたまたま通りかかって、小さな案内板を残しただけですの。Check を見守るのは LoaLogs ですわ。',
+      'Screenshot を投稿するか `check abcxyz` と入力すると、character 名を server の各 list と照合しますの。',
     ],
-    howName: '🔍 画像を投稿した後',
+    howName: '🔍 Check request を送った後',
     howValue: [
-      '1. LoaLogs が 🔍 reaction を付け、最大8名の character 名を抽出しますわ。',
+      '1. LoaLogs が 🔍 reaction を付け、画像または text から最大8名の character 名を読み取りますわ。',
       '2. Blacklist、whitelist、watchlist、trusted record と照合しますの。',
       '3. List 未登録の対象には officer 用 Quick Add が表示される場合がありますわ。',
     ],
     listsName: '📚 結果の読み方',
     listsValue: [
       'Black と watch は要注意、white と trusted は照合 context として表示されますの。',
-      '画像なしで手動検索する場合は /la-search name:<character> を使ってね♪',
+      '`check abcxyz` は直接 list check、/la-search は Bible の fuzzy search と filter 用ですの。',
     ],
     cleanupName: '🧹 この channel は毎日リセット',
     cleanupValue: [
@@ -78,6 +73,7 @@ const jp = {
     commandsName: '🧭 便利なコマンド',
     commandsValue: [
       '/la-check image:<screenshot> - 手動で画像を check',
+      'check abcxyz - この channel で character 名を直接 check',
       '/la-roster name:<character> - roster を確認',
       '/la-search name:<character> - search と list 照合',
       '/la-help - 全コマンド guide',
@@ -124,15 +120,16 @@ const jp = {
           ],
         },
         {
-          name: '🖼️ スクショ Check',
+          name: '🖼️ Screenshot & Text Check',
           lines: [
             '`/la-check image` - スクリーンショットから名前を抽出し、すべての list と照合',
+            '設定済み auto-check channel の `check abcxyz` - 入力した character 名を直接照合',
           ],
         },
         {
           name: '⚙️ サーバー設定',
           lines: [
-            '`/la-setup autochannel #channel` - この server の auto-check channel を設定',
+            '`/la-setup autochannel #channel` - screenshot と `check <name>` 用 channel を設定',
             '`/la-setup notifychannel #channel` - list notification channel を設定',
             '`/la-setup view` - 現在の config を表示',
             '`/la-setup repin` - pinned Artist guide を更新',
@@ -163,12 +160,17 @@ const jp = {
       overview: {
         label: 'コマンド一覧',
         description: 'コマンド overview に戻る',
+        emoji: '📋',
       },
       multiadd: {
+        label: '/la-list multiadd',
         description: 'Excel template で複数 entry を bulk add',
+        emoji: '📦',
       },
       syncimages: {
+        label: '/la-remote syncimages',
         description: 'Legacy image migration (owner-only)',
+        emoji: '🔄',
       },
     },
     sections: {

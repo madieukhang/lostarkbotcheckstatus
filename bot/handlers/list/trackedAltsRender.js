@@ -83,6 +83,8 @@ export function formatAltLine(name, index, record) {
  * @param {string} [options.label='🧬 Tracked alts'] - Field-name prefix. Lets
  *   the enrich broadcast reuse this renderer as a "🆕 New alts" field while
  *   every other surface keeps the tracked-alts wording.
+ * @param {string} [options.overflowTemplate='... and {count} more'] - Localized
+ *   overflow copy. `{count}` is replaced after the renderer knows the fit.
  * @returns {{name: string, value: string, inline: boolean} | null}
  */
 export function renderTrackedAltsField({
@@ -91,6 +93,7 @@ export function renderTrackedAltsField({
   statMap = new Map(),
   emptySentinel = null,
   label = '🧬 Tracked alts',
+  overflowTemplate = '... and {count} more',
 } = {}) {
   const all = Array.isArray(names) ? names : [];
   const primaryKey = lcKey(primaryName);
@@ -112,17 +115,18 @@ export function renderTrackedAltsField({
   // services/broadcasts.js's buildTrackedAltsField so deep rosters
   // with rich stat rows still render gracefully.
   const lines = [];
+  const overflowText = (count) => String(overflowTemplate).replace('{count}', String(count));
   for (const name of others) {
     const line = formatAltLine(name, lines.length, statMap.get(lcKey(name)));
     const hiddenAfterThis = others.length - lines.length - 1;
-    const overflowLine = hiddenAfterThis > 0 ? `\n*... and ${hiddenAfterThis} more*` : '';
+    const overflowLine = hiddenAfterThis > 0 ? `\n*${overflowText(hiddenAfterThis)}*` : '';
     const candidate = [...lines, line].join('\n') + overflowLine;
     if (candidate.length > FIELD_VALUE_LIMIT && lines.length > 0) break;
     lines.push(line);
   }
 
   const hiddenCount = others.length - lines.length;
-  const extra = hiddenCount > 0 ? `\n*... and ${hiddenCount} more*` : '';
+  const extra = hiddenCount > 0 ? `\n*${overflowText(hiddenCount)}*` : '';
   return {
     name: `${label} (${others.length})`,
     value: (lines.join('\n') + extra).slice(0, FIELD_VALUE_LIMIT),

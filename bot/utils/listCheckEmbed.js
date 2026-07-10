@@ -23,6 +23,7 @@
  */
 
 import { createArtistEmbed } from './artistVoice.js';
+import { t } from '../services/i18n/index.js';
 
 /**
  * @typedef ListCheckRender
@@ -47,6 +48,7 @@ export function buildListCheckEmbed({
   ignoredCount = 0,
   maxNames,
   mode = 'slash',
+  lang = 'en',
 }) {
   // Per-category counts. Mirrors the priority logic in formatCheckResults
   // so the badge counts and the line-list categorisation never drift.
@@ -80,22 +82,26 @@ export function buildListCheckEmbed({
   // white -> trusted -> notListed). Plain text (embed titles ignore markdown)
   // so the title's leading emoji is naturally the strongest outcome present -
   // no separate "Outcome:" line and no redundant count line needed.
-  const titlePrefix = mode === 'auto' ? 'AUTO-CHECK' : 'LIST CHECK';
-  const kicker = `// ${titlePrefix} · ${limitedNamesCount} NAMES`;
+  const titlePrefix = t(`dialogue.check.embed.${mode === 'auto' ? 'autoKicker' : 'slashKicker'}`, lang);
+  const kicker = `// ${titlePrefix} · ${limitedNamesCount} ${t('dialogue.check.embed.names', lang)}`;
 
   const breakdownParts = [];
   if (counts.black) breakdownParts.push(`⛔ ${counts.black}`);
   if (counts.watch) breakdownParts.push(`⚠️ ${counts.watch}`);
   if (counts.white) breakdownParts.push(`✅ ${counts.white}`);
   if (counts.trusted) breakdownParts.push(`🛡️ ${counts.trusted}`);
-  if (counts.notListed) breakdownParts.push(`❓ ${counts.notListed} not listed`);
+  if (counts.notListed) breakdownParts.push(`❓ ${counts.notListed} ${t('dialogue.check.embed.notListed', lang)}`);
   // breakdown is empty only with zero results -> fall back to a plain count.
   const title = breakdownParts.length > 0
     ? breakdownParts.join(' · ')
-    : `${titleIcon} ${limitedNamesCount} name(s)`;
+    : `${titleIcon} ${limitedNamesCount} ${t(`dialogue.check.${limitedNamesCount === 1 ? 'nameOne' : 'nameMany'}`, lang)}`;
 
   const ignoreNote = ignoredCount > 0
-    ? `\n\n*Ignored ${ignoredCount} extra name(s) (cap: ${maxNames ?? 'configured'}).*`
+    ? `\n\n*${t('dialogue.check.embed.ignored', lang, {
+        count: ignoredCount,
+        word: t(`dialogue.check.${ignoredCount === 1 ? 'nameOne' : 'nameMany'}`, lang),
+        limit: maxNames ?? t('dialogue.check.embed.configured', lang),
+      })}*`
     : '';
 
   // Description leads straight with the per-name list now (the breakdown moved
@@ -119,21 +125,21 @@ export function buildListCheckEmbed({
   //           names (the auto-check pipeline ships a select menu for that).
   // Footer is a HUD status line: a // FLAGGED n (or // CLEAR) tag, the
   // mode-specific tip, then the source citation.
-  const footerParts = [flaggedCount > 0 ? `// FLAGGED ${flaggedCount}` : '// CLEAR'];
+  const footerParts = [`// ${t(`dialogue.check.embed.${flaggedCount > 0 ? 'flagged' : 'clear'}`, lang, { count: flaggedCount })}`];
   if (mode === 'auto') {
     if (flaggedCount > 0) {
-      footerParts.push('Quick Add unflagged via the dropdown · /la-roster <name> for detail');
+      footerParts.push(t('dialogue.check.embed.quickFlagged', lang));
     } else if (counts.notListed > 0) {
-      footerParts.push('Quick Add unflagged names via the dropdown below');
+      footerParts.push(t('dialogue.check.embed.quickClean', lang));
     }
   } else if (flaggedCount > 0) {
-    footerParts.push('/la-roster <name> for the full roster of any flagged hit');
+    footerParts.push(t('dialogue.check.embed.rosterTip', lang));
   } else {
-    footerParts.push('Re-run with a fresh image to re-check');
+    footerParts.push(t('dialogue.check.embed.rerunTip', lang));
   }
-  footerParts.push('SRC db blacklist + whitelist + watchlist + trusted');
+  footerParts.push(t('dialogue.check.embed.source', lang));
 
-  const embed = createArtistEmbed()
+  const embed = createArtistEmbed(lang)
     .setAuthor({ name: kicker })
     .setTitle(title)
     .setDescription(description)

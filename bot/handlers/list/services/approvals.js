@@ -21,8 +21,9 @@ import {
   listTypeIcon,
 } from '../helpers.js';
 import { COLORS } from '../../../utils/ui.js';
+import GuildConfig from '../../../models/GuildConfig.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { getUserLanguage, t } from '../../../services/i18n/index.js';
+import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 
 /**
  * Build the approval DM service bag.
@@ -36,7 +37,13 @@ import { getUserLanguage, t } from '../../../services/i18n/index.js';
  *   notifyRequesterAboutDecision: Function,
  * }}
  */
-export function createApprovalServices({ client }) {
+export function createApprovalServices({
+  client,
+  getUserLanguageFn = getUserLanguage,
+  getGuildLanguageFn = getGuildLanguage,
+  UserPreferenceModel = UserPreference,
+  GuildConfigModel = GuildConfig,
+}) {
   async function sendListAddApprovalToApprovers(guild, payload, options = {}) {
     const approverIds = getApproverRecipientIds();
     if (approverIds.length === 0) {
@@ -66,7 +73,6 @@ export function createApprovalServices({ client }) {
       return new ActionRowBuilder().addComponents(buttons);
     };
 
-    const embed = buildListAddApprovalEmbed(guild, payload, options);
     const deliveredApproverIds = [];
     const deliveredDmMessages = [];
 
@@ -75,7 +81,8 @@ export function createApprovalServices({ client }) {
         try {
           const user = await client.users.fetch(approverId);
           if (!user || user.bot) return;
-          const lang = await getUserLanguage(user.id, { UserPreferenceModel: UserPreference });
+          const lang = await getUserLanguageFn(user.id, { UserPreferenceModel });
+          const embed = buildListAddApprovalEmbed(guild, payload, { ...options, lang });
 
           const sentMessage = await user.send({ embeds: [embed], components: [buildRow(lang)] });
           deliveredApproverIds.push(user.id);
@@ -129,22 +136,6 @@ export function createApprovalServices({ client }) {
       if (typeCounts[r.type] !== undefined) typeCounts[r.type]++;
       if (r.scope === 'server') serverScopedCount++;
     }
-    const breakdownParts = [];
-    if (typeCounts.black) breakdownParts.push(`⛔ **${typeCounts.black}**`);
-    if (typeCounts.watch) breakdownParts.push(`⚠️ **${typeCounts.watch}**`);
-    if (typeCounts.white) breakdownParts.push(`✅ **${typeCounts.white}**`);
-    if (serverScopedCount > 0) breakdownParts.push(`🏠 **${serverScopedCount}** local`);
-
-    const previewLines = pending.rows.slice(0, 20).map((r, i) => {
-      const reasonShort = (r.reason || '').length > 40 ? (r.reason || '').slice(0, 37) + '...' : (r.reason || '');
-      const scopeTag = r.scope === 'server' ? ' `[Local]`' : '';
-      const raidTag = r.raid ? ` \`${r.raid}\`` : '';
-      return `\`${String(i + 1).padStart(2, ' ')}.\` ${listTypeIcon(r.type)} **${r.name}**${scopeTag}${raidTag} · ${reasonShort}`;
-    });
-    if (pending.rows.length > 20) {
-      previewLines.push(`*... and ${pending.rows.length - 20} more rows*`);
-    }
-
     // Color follows the dominant outcome: blacklist-heavy batches tint
     // red, whitelist-heavy go green, watch-heavy yellow. Mixed batches
     // fall back to blurple. Approvers reading a stack of DMs scan
@@ -154,38 +145,39 @@ export function createApprovalServices({ client }) {
     else if (typeCounts.watch >= typeCounts.white) color = COLORS.warning;
     else color = COLORS.success;
 
-    const headerLine = breakdownParts.length > 0
-      ? `**Outcome:** ${breakdownParts.join(' · ')}`
-      : `Reviewing **${pending.rows.length}** entries.`;
+    const buildBulkEmbed = (lang) => {
+      const breakdownParts = [];
+      if (typeCounts.black) breakdownParts.push(`⛔ **${typeCounts.black}**`);
+      if (typeCounts.watch) breakdownParts.push(`⚠️ **${typeCounts.watch}**`);
+      if (typeCounts.white) breakdownParts.push(`✅ **${typeCounts.white}**`);
+      if (serverScopedCount > 0) breakdownParts.push(`🏠 **${serverScopedCount}** ${t('dialogue.approval.bulk.local', lang)}`);
 
-    const embed = createArtistEmbed()
-      .setTitle(`📋 Bulk Add Approval · ${pending.rows.length} rows`)
-      .setDescription(`${headerLine}\n\n${previewLines.join('\n').slice(0, 3800)}`)
-      .setColor(color)
-      .addFields(
-        {
-          name: '👤 Requested by',
-          value: `${pending.requesterDisplayName || pending.requesterTag || 'Unknown'} (<@${pending.requesterId}>)`,
-          inline: false,
-        },
-        {
-          name: '🏠 Server',
-          value: guild?.name || pending.guildId || 'Unknown',
-          inline: true,
-        },
-        {
-          name: '📊 Total',
-          value: String(pending.rows.length),
-          inline: true,
-        },
-        {
-          name: '🆔 Request ID',
-          value: `\`${pending.requestId.slice(0, 8)}\``,
-          inline: true,
-        },
-      )
-      .setFooter({ text: '🛡️ Approve / Reject buttons below · Lost Ark Check approval flow' })
-      .setTimestamp(new Date());
+      const previewLines = pending.rows.slice(0, 20).map((row, index) => {
+        const reasonShort = (row.reason || '').length > 40 ? `${(row.reason || '').slice(0, 37)}...` : (row.reason || '');
+        const scopeTag = row.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
+        const raidTag = row.raid ? ` \`${row.raid}\`` : '';
+        return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${row.name}**${scopeTag}${raidTag} · ${reasonShort}`;
+      });
+      if (pending.rows.length > 20) {
+        previewLines.push(`*${t('dialogue.approval.bulk.more', lang, { count: pending.rows.length - 20 })}*`);
+      }
+      const headerLine = breakdownParts.length > 0
+        ? `**${t('dialogue.approval.bulk.outcome', lang, { breakdown: breakdownParts.join(' · ') })}**`
+        : t('dialogue.approval.bulk.reviewing', lang, { count: pending.rows.length });
+
+      return createArtistEmbed(lang)
+        .setTitle(`📋 ${t('dialogue.approval.bulk.title', lang, { count: pending.rows.length })}`)
+        .setDescription([headerLine, '', previewLines.join('\n').slice(0, 3800)].join('\n'))
+        .setColor(color)
+        .addFields(
+          { name: `👤 ${t('dialogue.approval.fields.requestedBy', lang)}`, value: `${pending.requesterDisplayName || pending.requesterTag || t('dialogue.common.unknown', lang)} (<@${pending.requesterId}>)`, inline: false },
+          { name: `🏠 ${t('dialogue.approval.fields.server', lang)}`, value: guild?.name || pending.guildId || t('dialogue.common.unknown', lang), inline: true },
+          { name: `📊 ${t('dialogue.approval.fields.total', lang)}`, value: String(pending.rows.length), inline: true },
+          { name: `🆔 ${t('dialogue.approval.fields.requestId', lang)}`, value: `\`${pending.requestId.slice(0, 8)}\``, inline: true },
+        )
+        .setFooter({ text: `🛡️ ${t('dialogue.approval.footer', lang)}` })
+        .setTimestamp(new Date());
+    };
 
     const deliveredApproverIds = [];
     const deliveredDmMessages = [];
@@ -195,7 +187,8 @@ export function createApprovalServices({ client }) {
         try {
           const user = await client.users.fetch(approverId);
           if (!user || user.bot) return;
-          const lang = await getUserLanguage(user.id, { UserPreferenceModel: UserPreference });
+          const lang = await getUserLanguageFn(user.id, { UserPreferenceModel });
+          const embed = buildBulkEmbed(lang);
 
           const sentMessage = await user.send({ embeds: [embed], components: [buildRow(lang)] });
           deliveredApproverIds.push(user.id);
@@ -220,7 +213,7 @@ export function createApprovalServices({ client }) {
     return { success: true, deliveredApproverIds, deliveredDmMessages };
   }
 
-  async function syncApproverDmMessages(payload, messageOptions, options = {}) {
+  async function syncApproverDmMessages(payload, messageOptionsOrBuilder, options = {}) {
     const refs = payload.approverDmMessages || [];
     if (refs.length === 0) return;
 
@@ -236,6 +229,12 @@ export function createApprovalServices({ client }) {
           if (!dmChannel || !dmChannel.isTextBased()) return;
 
           const dmMessage = await dmChannel.messages.fetch(ref.messageId);
+          const messageOptions = typeof messageOptionsOrBuilder === 'function'
+            ? await messageOptionsOrBuilder(
+                await getUserLanguageFn(ref.approverId, { UserPreferenceModel }),
+                ref,
+              )
+            : messageOptionsOrBuilder;
           await dmMessage.edit(messageOptions);
         } catch (err) {
           console.warn(`[list] Failed to sync approver DM ${ref.messageId}:`, err.message);
@@ -251,15 +250,20 @@ export function createApprovalServices({ client }) {
 
       if (!channel || !channel.isTextBased()) return;
 
-      const actionLabel = payload.action === 'edit' ? 'edit' : 'add';
-      const decisionContent = rejected
-        ? `<@${payload.requestedByUserId}> ❌ Your list ${actionLabel} request for **${payload.name}** was rejected by Officer.`
-        : `<@${payload.requestedByUserId}> ${result.content}`;
+      const lang = await getGuildLanguageFn(guild.id, { GuildConfigModel });
+      const actionLabel = t(`dialogue.approval.public.${payload.action === 'edit' ? 'edit' : 'add'}`, lang);
+      const decisionContent = `${rejected ? '❌' : '✅'} ${t(`dialogue.approval.public.${rejected ? 'rejected' : 'approved'}`, lang, {
+        user: payload.requestedByUserId,
+        action: actionLabel,
+        name: payload.name,
+      })}`;
 
       const decisionPayload = {
         content: decisionContent,
-        embeds: rejected ? [] : (result.embeds ?? []),
-        components: rejected ? [] : (result.components ?? []),
+        // The executor result is rendered for the approver's private locale.
+        // Keep the channel announcement locale-pure instead of leaking that DM.
+        embeds: [],
+        components: [],
       };
 
       if (payload.requestMessageId && 'messages' in channel) {

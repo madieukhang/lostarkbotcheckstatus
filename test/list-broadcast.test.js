@@ -123,3 +123,31 @@ test('sendEmbedToChannels reuses one delivery path and isolates channel failures
   assert.match(warnings[0], /^\[test broadcast\] channel fetch-fails failed:/);
   assert.match(warnings[1], /^\[test broadcast\] channel send-fails failed:/);
 });
+
+test('sendEmbedToChannels resolves public copy from each destination guild language', async () => {
+  const delivered = [];
+  const client = {
+    channels: {
+      async fetch(channelId) {
+        return {
+          guild: { id: `guild-${channelId}` },
+          isTextBased: () => true,
+          async send(payload) { delivered.push([channelId, payload]); },
+        };
+      },
+    },
+  };
+
+  await sendEmbedToChannels({
+    client,
+    channelIds: new Set(['a', 'b']),
+    buildPayload: async ({ channel, channelId }) => ({
+      content: `${channel.guild.id}:${channelId}`,
+    }),
+  });
+
+  assert.deepEqual(delivered, [
+    ['a', { content: 'guild-a:a' }],
+    ['b', { content: 'guild-b:b' }],
+  ]);
+});

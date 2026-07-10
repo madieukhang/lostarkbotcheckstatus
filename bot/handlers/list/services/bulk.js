@@ -14,6 +14,7 @@ import { connectDB } from '../../../db.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { COLORS } from '../../../utils/ui.js';
+import { t } from '../../../services/i18n/index.js';
 import { listTypeIcon } from '../helpers.js';
 
 /**
@@ -135,7 +136,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     return results;
   }
 
-  function buildBulkSummaryEmbed(results, meta) {
+  function buildBulkSummaryEmbed(results, meta, lang = 'en') {
     const totalAttempted = results.added.length + results.skipped.length + results.failed.length;
     const hasFailures = results.failed.length > 0;
     const color = hasFailures ? COLORS.warning : results.added.length > 0 ? COLORS.success : COLORS.danger;
@@ -147,19 +148,19 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     // "12 of 15 added (80%)". Per-list-type breakdown stays in the
     // Added/Skipped/Failed fields below.
     const headline = totalAttempted === 0
-      ? 'No rows processed.'
-      : `**${results.added.length}** of **${totalAttempted}** rows added (${successRate}%)`;
+      ? t('dialogue.multiadd.summary.none', lang)
+      : t('dialogue.multiadd.summary.headline', lang, { added: results.added.length, total: totalAttempted, rate: successRate });
 
     // Same card anatomy as the /la-list add result: counts ride the title,
     // the headline restates them in plain English, and the per-outcome
     // fields below carry the detail. The old bare-number Added/Skipped/
     // Failed 3-up was dropped · each detail field's header already shows
     // its count, so the 3-up said the same thing twice.
-    const embed = createArtistEmbed()
-      .setTitle(`📋 Bulk Add Complete · ${results.added.length}/${totalAttempted}`)
+    const embed = createArtistEmbed(lang)
+      .setTitle(`📋 ${t('dialogue.multiadd.summary.title', lang, { added: results.added.length, total: totalAttempted })}`)
       .setDescription(headline)
       .setColor(color)
-      .setFooter({ text: `Submitted by ${meta.requesterDisplayName || 'Unknown'} · verify with /la-list view` })
+      .setFooter({ text: t('dialogue.multiadd.summary.footer', lang, { user: meta.requesterDisplayName || t('dialogue.common.unknown', lang) }) })
       .setTimestamp(new Date());
 
     if (results.added.length > 0) {
@@ -167,9 +168,9 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         .slice(0, 15)
         .map((r, i) => `${i + 1}. ${listTypeIcon(r.type)} **${r.name}**`)
         .join('\n');
-      const suffix = results.added.length > 15 ? `\n*... and ${results.added.length - 15} more*` : '';
+      const suffix = results.added.length > 15 ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: results.added.length - 15 })}*` : '';
       embed.addFields({
-        name: `✅ Added (${results.added.length})`,
+        name: `✅ ${t('dialogue.multiadd.summary.added', lang, { count: results.added.length })}`,
         value: (addedLines + suffix).slice(0, 1024),
       });
     }
@@ -179,9 +180,9 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         .slice(0, 10)
         .map((r) => `• **${r.name}** · ${r.reason}`)
         .join('\n');
-      const suffix = results.skipped.length > 10 ? `\n*... and ${results.skipped.length - 10} more*` : '';
+      const suffix = results.skipped.length > 10 ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: results.skipped.length - 10 })}*` : '';
       embed.addFields({
-        name: `⚠️ Skipped (${results.skipped.length})`,
+        name: `⚠️ ${t('dialogue.multiadd.summary.skipped', lang, { count: results.skipped.length })}`,
         value: (skippedLines + suffix).slice(0, 1024),
       });
     }
@@ -191,9 +192,9 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         .slice(0, 10)
         .map((r) => `• **${r.name}** · ${r.error}`)
         .join('\n');
-      const suffix = results.failed.length > 10 ? `\n*... and ${results.failed.length - 10} more*` : '';
+      const suffix = results.failed.length > 10 ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: results.failed.length - 10 })}*` : '';
       embed.addFields({
-        name: `❌ Failed (${results.failed.length})`,
+        name: `❌ ${t('dialogue.multiadd.summary.failed', lang, { count: results.failed.length })}`,
         value: (failedLines + suffix).slice(0, 1024),
       });
     }
@@ -204,13 +205,13 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         .map((r) => `• **${r.name}** · ${r.error}`)
         .join('\n');
       const suffix = results.rehostWarnings.length > 10
-        ? `\n*... and ${results.rehostWarnings.length - 10} more*`
+        ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: results.rehostWarnings.length - 10 })}*`
         : '';
       embed.addFields({
-        name: `🖼️ Image rehost failed (${results.rehostWarnings.length})`,
+        name: `🖼️ ${t('dialogue.multiadd.summary.imageFailed', lang, { count: results.rehostWarnings.length })}`,
         value: (
           warnLines + suffix +
-          '\n*Entries added OK but images stored as legacy URLs · will expire in ~24h.*'
+          `\n*${t('dialogue.multiadd.summary.imageLegacy', lang)}*`
         ).slice(0, 1024),
       });
     }

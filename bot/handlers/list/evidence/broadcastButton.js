@@ -16,7 +16,8 @@ import { refreshImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, editEmbed } from '../../../utils/interactionReplies.js';
 import { ICONS } from '../../../utils/ui.js';
-import { t } from '../../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
+import UserPreference from '../../../models/UserPreference.js';
 
 export const BROADCAST_EVIDENCE_PREFIX = 'listbroadcast_evidence';
 
@@ -56,9 +57,12 @@ function parseEvidenceCustomId(customId) {
 export function createBroadcastEvidenceButtonHandler({
   client,
   refreshImageUrlFn = refreshImageUrl,
+  getUserLanguageFn = getUserLanguage,
+  UserPreferenceModel = UserPreference,
 }) {
   return async function handleBroadcastEvidenceButton(interaction) {
     await deferEphemeralReply(interaction);
+    const lang = await getUserLanguageFn(interaction.user?.id, { UserPreferenceModel });
 
     const ids = parseEvidenceCustomId(interaction.customId);
     const displayUrl = ids
@@ -68,11 +72,8 @@ export function createBroadcastEvidenceButtonHandler({
     if (!displayUrl) {
       await editEmbed(interaction, buildAlertEmbed({
         severity: AlertSeverity.WARNING,
-        title: 'Evidence slipped away',
-        description:
-          'I could not reopen this archived screenshot. It may have been deleted, ' +
-          'or LoaLogs may no longer have access to its storage channel.',
-        footer: 'Ask an officer to attach fresh evidence to the entry.',
+        ...t('dialogue.evidence.missing', lang),
+        lang,
       }));
       return;
     }
@@ -80,11 +81,8 @@ export function createBroadcastEvidenceButtonHandler({
     const embed = buildAlertEmbed({
       severity: AlertSeverity.INFO,
       titleIcon: ICONS.evidence,
-      title: 'Evidence archive',
-      description:
-        'I kept this screenshot separate so the broadcast stays easy to read. ' +
-        'Open the image to inspect it at its natural size.',
-      footer: 'Private view · refreshed from the LoaLogs evidence archive',
+      ...t('dialogue.evidence.archive', lang),
+      lang,
     }).setImage(displayUrl);
 
     await editEmbed(interaction, embed);

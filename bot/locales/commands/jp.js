@@ -1,0 +1,46 @@
+export default {
+  status: { description: 'Lost Ark server の live status を表示します' },
+  reset: { description: '保存済み server status を初期状態へ戻します' },
+  roster: {
+    description: 'Lost Ark character の roster と progression を確認します',
+    options: { name: '確認する character 名', deep: 'Hidden alt を探す Stronghold scan を実行します', deepLimit: 'Candidate 上限; 0 は全 candidate を scan' },
+  },
+  list: {
+    description: 'Blacklist / whitelist / watchlist を管理します',
+    subcommands: {
+      add: { description: 'Character を blacklist / whitelist / watchlist に追加します', options: { type: '追加先 list', name: '追加する character 名', reason: 'Entry の理由', raid: '任意 raid tag', logs: '任意 lostark.bible logs URL', image: '任意 evidence screenshot', scope: 'Global またはこの Server のみ; blacklist 専用' } },
+      edit: { description: '既存 list entry を編集します', options: { name: '編集する character 名', reason: '新しい理由; 空欄なら維持', type: '別の list へ移動', raid: '新しい raid tag', logs: '新しい logs URL', image: '新しい evidence screenshot', scope: 'Global / server を切り替え; blacklist 専用', additionalNames: '追加 alt をカンマ区切りで入力; officer/owner のみ' } },
+      remove: { description: 'Character を list から削除します', options: { name: '削除する character 名' } },
+      view: { description: 'List entry を表示します', options: { type: '表示する list', scope: 'Blacklist を scope で filter' } },
+      trust: { description: 'Trusted list を管理します; trusted character は他 list へ追加不可', options: { action: 'Trusted list へ追加または削除', name: 'Character 名', reason: 'Trust 理由; add のみ' } },
+      enrich: { description: '既存 entry を Stronghold deep-scan し発見 alt を追加します', options: { name: '既存 entry の character 名', deepLimit: '既定 candidate cap を上書き' } },
+      multiadd: { description: 'Excel で一括追加; officer は自動、member は Senior 承認', options: { action: 'template は空 file download; file は完成 file upload', file: '完成済み .xlsx; 最大30 rows' } },
+    },
+  },
+  search: { description: 'Filter 付き character 検索と list 照合', options: { name: '検索する character 名', minIlvl: '最低 item level; 既定1700', maxIlvl: '最高 item level', class: 'Class filter' } },
+  evidence: { description: 'List character の evidence を直接表示します', options: { name: 'Character 名; autocomplete は全 list entry を表示', public: 'Channel に public 投稿; officer/senior のみ、既定 private' } },
+  check: { description: 'Screenshot の名前を全 list と照合します', options: { image: 'Raid waiting-room screenshot' } },
+  help: { description: 'LoaLogs の全 command を表示します', options: { lang: '言語; 既定は保存 preference' } },
+  languageSwitch: { description: 'LoaLogs があなたへ返す言語を変更します' },
+  setup: {
+    description: 'この server の LoaLogs を設定します',
+    subcommands: {
+      autochannel: { description: 'Screenshot auto-check channel を設定します', options: { channel: 'Screenshot を自動 check する channel' } },
+      notifychannel: { description: 'List change notification channel を設定します', options: { channel: 'List notification を送る channel' } },
+      view: { description: '現在の LoaLogs 設定を表示します' },
+      repin: { description: 'Auto-check channel の pinned guide を更新します' },
+      language: { description: 'Public notification と pinned guide の global 言語を設定します', options: { language: 'Server public message の言語' } },
+      off: { description: 'この server の global list notification を切り替えます' },
+      defaultscope: { description: '/la-list add の既定 blacklist scope を設定します', options: { scope: 'Scope 未指定時の既定値' } },
+    },
+  },
+  stats: { description: 'Bot usage statistics を表示します' },
+  remote: { description: 'Senior: 対象 server へ通知せず remote config を管理します', options: { action: '実行 action', guild: '対象 server ID; off/defaultscope で必須', scope: 'Defaultscope action の scope', channel: 'Evidencechannel action の channel' } },
+  choices: {
+    listTypes: { all: 'すべて', black: 'blacklist', white: 'whitelist', watch: 'watchlist', trusted: 'trusted' },
+    listActions: { add: '追加', remove: '削除' },
+    scopes: { all: 'すべて', global: 'global', server: 'server' },
+    multiaddActions: { template: 'template - 空 file を download', file: 'file - 完成 file を upload' },
+    remoteActions: { view: 'view - server と config を表示', off: 'off - server notify を切替', defaultscope: 'defaultscope - server scope を設定', evidencechannel: 'evidencechannel - bot 全体の image rehost channel', syncimages: 'syncimages - legacy URL を rehost evidence へ移行' },
+  },
+};

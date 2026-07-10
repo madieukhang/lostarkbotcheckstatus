@@ -11,6 +11,7 @@ import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
+import UserPreference from '../../../models/UserPreference.js';
 import {
   normalizeCharacterName,
   getInteractionDisplayName,
@@ -34,6 +35,7 @@ import {
 } from '../helpers.js';
 import { applyListEditNow } from './applyNow.js';
 import { sendListEditApprovalRequest } from './approvalRequest.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 
 /**
  * Build the /la-list edit slash-command handler.
@@ -51,11 +53,12 @@ export function createListEditCommandHandler({
   broadcastListChange,
 }) {
   async function handleListEditCommand(interaction) {
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     if (!interaction.guild) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Server-Only Command',
-        description: 'This command can only be used inside a Discord server, not in DMs.',
+        ...t('dialogue.common.serverOnly', lang),
+        lang,
       });
       return;
     }
@@ -112,15 +115,14 @@ export function createListEditCommandHandler({
     if (!existing) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Entry Not Found',
-        description: `**${name}** is not in any list (blacklist, whitelist, or watchlist).`,
-        footer: 'Use /la-list view to browse existing entries.',
+        ...t('dialogue.listEdit.command.notFound', lang, { name }),
+        lang,
       });
       return;
     }
 
     const currentType = blackEntry ? 'black' : whiteEntry ? 'white' : 'watch';
-    const { label: currentLabel } = getListContext(currentType);
+    const currentLabel = t(`dialogue.broadcast.list.${currentType}`, lang);
 
     // Permission gate for additional_names: officer/senior or entry
     // owner only. The approval flow used for member edits does not
@@ -132,9 +134,8 @@ export function createListEditCommandHandler({
       if (!isOwnerForAdd && !isApproverForAdd) {
         await editAlert(interaction, {
           severity: AlertSeverity.TRUSTED,
-          title: 'Officer-Only Option',
-          description: 'The `additional_names` option is restricted to officers and the entry owner.',
-          footer: 'Ask an officer to append the alts for you.',
+          ...t('dialogue.listEdit.command.additionalRestricted', lang),
+          lang,
         });
         return;
       }
@@ -150,9 +151,8 @@ export function createListEditCommandHandler({
     if (!newReason && !newType && !newRaid && !newLogs && !newImageUrl && !newScope && !additionalNamesRaw) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'No Changes Provided',
-        description: 'You ran `/la-list edit` without setting any of the optional fields, so there is nothing to apply.',
-        footer: 'Set at least one of: reason / type / raid / logs / image / scope / additional_names.',
+        ...t('dialogue.listEdit.command.noChanges', lang),
+        lang,
       });
       return;
     }
@@ -166,9 +166,8 @@ export function createListEditCommandHandler({
     if (newScope && targetType !== 'black') {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Scope Not Applicable',
-        description: `The \`scope\` option only applies to blacklist entries. ${targetType === 'white' ? 'Whitelist' : 'Watchlist'} entries are always global.`,
-        footer: 'Drop the scope option, or change type:black if you want a server-scoped entry.',
+        ...t('dialogue.listEdit.command.scopeNotApplicable', lang, { list: t(`dialogue.broadcast.list.${targetType}`, lang) }),
+        lang,
       });
       return;
     }
@@ -204,13 +203,14 @@ export function createListEditCommandHandler({
         .lean();
       if (conflict) {
         const conflictDesc = targetScope === 'global'
-          ? 'A global blacklist entry with this name already exists.'
-          : 'A server-scoped blacklist entry with this name already exists in this server.';
+          ? t('dialogue.listEdit.command.scopeBlockedGlobal', lang)
+          : t('dialogue.listEdit.command.scopeBlockedServer', lang);
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Scope Change Blocked',
+          title: t('dialogue.listEdit.command.scopeBlocked.title', lang),
           description: conflictDesc,
-          footer: 'Remove the conflicting entry first, or merge them manually.',
+          footer: t('dialogue.listEdit.command.scopeBlocked.footer', lang),
+          lang,
         });
         return;
       }
@@ -218,16 +218,16 @@ export function createListEditCommandHandler({
 
     // Build changes summary
     const changes = [];
-    if (newReason) changes.push(`Reason: "${existing.reason}" → "${newReason}"`);
-    if (isTypeChange) changes.push(`List: ${currentLabel} → ${getListContext(targetType).label}`);
-    if (newRaid) changes.push(`Raid: "${existing.raid || 'N/A'}" → "${newRaid}"`);
-    if (newLogs) changes.push(`Logs: updated`);
-    if (newImageUrl) changes.push(`Evidence: updated`);
-    if (isScopeChange) changes.push(`Scope: ${existingObjForScope.scope || 'global'} → ${targetScope}`);
+    if (newReason) changes.push(t('dialogue.listEdit.change.reason', lang, { old: existing.reason, next: newReason }));
+    if (isTypeChange) changes.push(t('dialogue.listEdit.change.list', lang, { old: currentLabel, next: t(`dialogue.broadcast.list.${targetType}`, lang) }));
+    if (newRaid) changes.push(t('dialogue.listEdit.change.raid', lang, { old: existing.raid || t('dialogue.broadcast.notAvailable', lang), next: newRaid }));
+    if (newLogs) changes.push(t('dialogue.listEdit.change.logs', lang));
+    if (newImageUrl) changes.push(t('dialogue.listEdit.change.evidence', lang));
+    if (isScopeChange) changes.push(t('dialogue.listEdit.change.scope', lang, { old: existingObjForScope.scope || 'global', next: targetScope }));
     if (additionalNamesParsed.added.length > 0) {
       const line = additionalNamesParsed.duplicates.length > 0
-        ? `Append alts: ${additionalNamesParsed.added.join(', ')} (skipped duplicates: ${additionalNamesParsed.duplicates.join(', ')})`
-        : `Append alts: ${additionalNamesParsed.added.join(', ')}`;
+        ? t('dialogue.listEdit.change.appendWithDuplicates', lang, { names: additionalNamesParsed.added.join(', '), duplicates: additionalNamesParsed.duplicates.join(', ') })
+        : t('dialogue.listEdit.change.append', lang, { names: additionalNamesParsed.added.join(', ') });
       changes.push(line);
     }
 
@@ -238,8 +238,8 @@ export function createListEditCommandHandler({
     if (changes.length === 0) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'No Effective Changes',
-        description: 'The values you provided already match the current entry.',
+        ...t('dialogue.listEdit.command.noEffective', lang),
+        lang,
       });
       return;
     }
@@ -254,7 +254,7 @@ export function createListEditCommandHandler({
         const isSelf = trustedCheck.name.toLowerCase() === existing.name.toLowerCase();
         await editEmbed(
           interaction,
-          buildTrustedBlockEmbed(existing.name, trustedCheck.reason, isSelf ? {} : { via: trustedCheck.name })
+          buildTrustedBlockEmbed(existing.name, trustedCheck.reason, isSelf ? { lang } : { via: trustedCheck.name, lang })
         );
         return;
       }
@@ -294,6 +294,7 @@ export function createListEditCommandHandler({
         additionalNamesParsed,
         changes,
         isOwner,
+        lang,
       });
     } else {
       await sendListEditApprovalRequest({
@@ -310,6 +311,7 @@ export function createListEditCommandHandler({
         newScope,
         editGuildDefaultScope,
         changes,
+        lang,
       });
     }
   }

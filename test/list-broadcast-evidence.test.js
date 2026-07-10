@@ -80,3 +80,26 @@ test('broadcast evidence handler explains when archived evidence is gone', async
   assert.match(embed.title, /Evidence slipped away/i);
   assert.match(embed.description, /deleted|access/i);
 });
+
+test('broadcast evidence button uses the clicker language, not the message author language', async () => {
+  let resolvedUserId = null;
+  let editedPayload;
+  const handler = createBroadcastEvidenceButtonHandler({
+    client: {},
+    refreshImageUrlFn: async () => null,
+    getUserLanguageFn: async (userId) => {
+      resolvedUserId = userId;
+      return 'vi';
+    },
+  });
+
+  await handler({
+    user: { id: 'clicker-b' },
+    customId: `${BROADCAST_EVIDENCE_PREFIX}:123:456`,
+    async deferReply() {},
+    async editReply(payload) { editedPayload = payload; },
+  });
+
+  assert.equal(resolvedUserId, 'clicker-b');
+  assert.match(editedPayload.embeds[0].toJSON().title, /bằng chứng|evidence/i);
+});

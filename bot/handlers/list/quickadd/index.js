@@ -98,8 +98,8 @@ export function createQuickAddHandlers({ client, services }) {
     if (!reason) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Reason Required',
-        description: 'Every list entry needs a reason.',
+        ...t('dialogue.listAdd.command.reasonRequired', lang),
+        lang,
       });
       return;
     }
@@ -154,8 +154,9 @@ export function createQuickAddHandlers({ client, services }) {
       if (!sent.success) {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Approval Delivery Failed',
-          description: sent.reason || 'Could not deliver the approval request.',
+          title: t('dialogue.quickAdd.deliveryFailed.title', lang),
+          description: sent.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
+          lang,
         });
         return;
       }
@@ -170,16 +171,16 @@ export function createQuickAddHandlers({ client, services }) {
       await editAlert(interaction, {
         severity: AlertSeverity.INFO,
         titleIcon: '📨',
-        title: 'Approval Request Sent',
-        description: `Request to add **${name}** to **${type}list** is awaiting approval.`,
+        ...t('dialogue.quickAdd.sent', lang, { name, list: t(`dialogue.broadcast.list.${type}`, lang) }),
+        lang,
       });
     } catch (err) {
       console.error('[quickadd] Failed:', err.message);
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Quick Add Failed',
-        description: 'Could not process the quick-add request.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        ...t('dialogue.quickAdd.failed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
       });
     }
   }

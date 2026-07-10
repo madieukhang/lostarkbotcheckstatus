@@ -10,6 +10,7 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import { rehostImage } from '../../utils/imageRehost.js';
+import { t } from '../../services/i18n/index.js';
 
 function isDiscordCdnUrl(url) {
   try {
@@ -119,17 +120,17 @@ async function markEntryAsRehosted(model, entry, rehosted, stats) {
   console.warn(`[syncimages] Race detected for ${entry.name} - CAS update was no-op, orphan upload at ${rehosted.channelId}/${rehosted.messageId}`);
 }
 
-async function sendProgress(interaction, current, total, stats) {
+async function sendProgress(interaction, current, total, stats, lang) {
   await editPayload(interaction, {
     embeds: [
-      createArtistEmbed()
-        .setTitle('🔄 Sync Images · In Progress')
-        .setDescription(`Processing **${current}/${total}** entries…`)
+      createArtistEmbed(lang)
+        .setTitle(`🔄 ${t('dialogue.syncImages.progressTitle', lang)}`)
+        .setDescription(t('dialogue.syncImages.progressDescription', lang, { current, total }))
         .addFields(
-          { name: '✅ Synced', value: String(stats.synced), inline: true },
-          { name: '⚠️ Dead URLs', value: String(stats.skippedDead), inline: true },
-          { name: '🔀 Raced', value: String(stats.skippedRaced), inline: true },
-          { name: '❌ Failed', value: String(stats.failed), inline: true },
+          { name: `✅ ${t('dialogue.syncImages.fields.synced', lang)}`, value: String(stats.synced), inline: true },
+          { name: `⚠️ ${t('dialogue.syncImages.fields.dead', lang)}`, value: String(stats.skippedDead), inline: true },
+          { name: `🔀 ${t('dialogue.syncImages.fields.raced', lang)}`, value: String(stats.skippedRaced), inline: true },
+          { name: `❌ ${t('dialogue.syncImages.fields.failed', lang)}`, value: String(stats.failed), inline: true },
         )
         .setColor(COLORS.warning)
         .setTimestamp(),
@@ -137,30 +138,32 @@ async function sendProgress(interaction, current, total, stats) {
   }).catch(() => {});
 }
 
-function buildSummaryPayload(interaction, total, stats) {
+function buildSummaryPayload(interaction, total, stats, lang) {
   const summaryColor =
     stats.failed > 0 || stats.skippedDead > 0 || stats.skippedRaced > 0
       ? COLORS.warning
       : COLORS.success;
 
-  const summaryEmbed = createArtistEmbed()
-    .setTitle('✅ Sync Images · Complete')
-    .setDescription(`Processed **${total}** legacy entries.`)
+  const summaryEmbed = createArtistEmbed(lang)
+    .setTitle(`✅ ${t('dialogue.syncImages.completeTitle', lang)}`)
+    .setDescription(t('dialogue.syncImages.completeDescription', lang, { total }))
     .addFields(
-      { name: '✅ Synced', value: String(stats.synced), inline: true },
-      { name: '⚠️ Skipped (dead URLs)', value: String(stats.skippedDead), inline: true },
-      { name: '🔀 Skipped (raced)', value: String(stats.skippedRaced), inline: true },
-      { name: '❌ Failed', value: String(stats.failed), inline: true },
+      { name: `✅ ${t('dialogue.syncImages.fields.synced', lang)}`, value: String(stats.synced), inline: true },
+      { name: `⚠️ ${t('dialogue.syncImages.fields.dead', lang)}`, value: String(stats.skippedDead), inline: true },
+      { name: `🔀 ${t('dialogue.syncImages.fields.raced', lang)}`, value: String(stats.skippedRaced), inline: true },
+      { name: `❌ ${t('dialogue.syncImages.fields.failed', lang)}`, value: String(stats.failed), inline: true },
     )
     .setColor(summaryColor)
-    .setFooter({ text: `Migration by ${interaction.user.tag} · re-runs are safe (idempotent)` })
+    .setFooter({ text: t('dialogue.syncImages.summaryFooter', lang, { user: interaction.user.tag }) })
     .setTimestamp();
 
   if (stats.errors.length > 0) {
     const errorLines = stats.errors.slice(0, 10).map((e) => `• ${e}`).join('\n');
-    const truncated = stats.errors.length > 10 ? `\n*…and ${stats.errors.length - 10} more*` : '';
+    const truncated = stats.errors.length > 10
+      ? `\n*${t('dialogue.syncImages.moreErrors', lang, { count: stats.errors.length - 10 })}*`
+      : '';
     summaryEmbed.addFields({
-      name: `Errors (${stats.errors.length})`,
+      name: t('dialogue.syncImages.fields.errors', lang, { count: stats.errors.length }),
       value: (errorLines + truncated).slice(0, 1024),
       inline: false,
     });
@@ -190,15 +193,14 @@ function buildSummaryPayload(interaction, total, stats) {
   return replyPayload;
 }
 
-export async function handleSyncImagesAction(interaction) {
+export async function handleSyncImagesAction(interaction, lang = 'en') {
   const ownerCfg = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
   if (!ownerCfg?.evidenceChannelId) {
     await editPayload(interaction, {
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.ERROR,
-        title: 'Evidence Channel Missing',
-        description: 'Evidence channel is not configured.',
-        footer: 'Run /la-remote action:evidencechannel channel:#... first, then retry.',
+        ...t('dialogue.syncImages.missingChannel', lang),
+        lang,
       })],
     });
     return;
@@ -222,11 +224,11 @@ export async function handleSyncImagesAction(interaction) {
   if (legacyEntries.length === 0) {
     await editPayload(interaction, {
       embeds: [
-        createArtistEmbed()
-          .setTitle('✅ Sync Images · Nothing to do')
-          .setDescription('All entries with images already have rehost refs. Nothing to migrate.')
+        createArtistEmbed(lang)
+          .setTitle(`✅ ${t('dialogue.syncImages.nothingTitle', lang)}`)
+          .setDescription(t('dialogue.syncImages.nothingDescription', lang))
           .setColor(COLORS.success)
-          .setFooter({ text: 'Idempotent · re-runs are safe.' })
+          .setFooter({ text: t('dialogue.syncImages.nothingFooter', lang) })
           .setTimestamp(),
       ],
     });
@@ -235,16 +237,16 @@ export async function handleSyncImagesAction(interaction) {
 
   await editPayload(interaction, {
     embeds: [
-      createArtistEmbed()
-        .setTitle('🔄 Sync Images · Starting')
-        .setDescription(`Found **${legacyEntries.length}** legacy entries across all lists. Migrating now…`)
+      createArtistEmbed(lang)
+        .setTitle(`🔄 ${t('dialogue.syncImages.startingTitle', lang)}`)
+        .setDescription(t('dialogue.syncImages.startingDescription', lang, { count: legacyEntries.length }))
         .addFields(
-          { name: 'Blacklist', value: String(blackLegacy.length), inline: true },
-          { name: 'Whitelist', value: String(whiteLegacy.length), inline: true },
-          { name: 'Watchlist', value: String(watchLegacy.length), inline: true },
+          { name: t('dialogue.syncImages.fields.blacklist', lang), value: String(blackLegacy.length), inline: true },
+          { name: t('dialogue.syncImages.fields.whitelist', lang), value: String(whiteLegacy.length), inline: true },
+          { name: t('dialogue.syncImages.fields.watchlist', lang), value: String(watchLegacy.length), inline: true },
         )
         .setColor(COLORS.warning)
-        .setFooter({ text: 'Each entry: refresh URL → download → rehost. ~1-2s per entry.' })
+        .setFooter({ text: t('dialogue.syncImages.startingFooter', lang) })
         .setTimestamp(),
     ],
   });
@@ -273,10 +275,10 @@ export async function handleSyncImagesAction(interaction) {
     }
 
     if ((i + 1) % 10 === 0 && i + 1 < legacyEntries.length) {
-      await sendProgress(interaction, i + 1, legacyEntries.length, stats);
+      await sendProgress(interaction, i + 1, legacyEntries.length, stats, lang);
     }
   }
 
-  await editPayload(interaction, buildSummaryPayload(interaction, legacyEntries.length, stats));
+  await editPayload(interaction, buildSummaryPayload(interaction, legacyEntries.length, stats, lang));
   console.log(`[syncimages] Done by ${interaction.user.tag}: ${stats.synced} synced, ${stats.skippedDead} dead, ${stats.skippedRaced} raced, ${stats.failed} failed`);
 }

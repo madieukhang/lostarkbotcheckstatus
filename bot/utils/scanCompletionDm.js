@@ -40,11 +40,11 @@ import { t } from '../services/i18n/index.js';
  */
 
 const OUTCOME_STYLE = {
-  'completed':         { icon: ICONS.done,   headline: 'Scan complete',        color: 'success' },
-  'enrich-saved':      { icon: ICONS.done,   headline: 'Saved to entry',       color: 'success' },
-  'no-alts':           { icon: ICONS.search, headline: 'Scan finished · 0 alts', color: 'info'    },
-  'stopped-with-alts': { icon: '🛑',         headline: 'Stopped (partial)',    color: 'warning' },
-  'stopped-no-alts':   { icon: '🛑',         headline: 'Stopped · 0 alts',     color: 'muted'   },
+  'completed':         { icon: ICONS.done, localeKey: 'completed', color: 'success' },
+  'enrich-saved':      { icon: ICONS.done, localeKey: 'saved', color: 'success' },
+  'no-alts':           { icon: ICONS.search, localeKey: 'noAlts', color: 'info' },
+  'stopped-with-alts': { icon: '🛑', localeKey: 'stoppedWith', color: 'warning' },
+  'stopped-no-alts':   { icon: '🛑', localeKey: 'stoppedNone', color: 'muted' },
 };
 
 function pickColor(token) {
@@ -57,7 +57,7 @@ function pickColor(token) {
  * tray six hours later can still tell at a glance which class /
  * ilvl bucket each alt falls into without re-running the command.
  */
-function buildAltLines(alts = []) {
+function buildAltLines(alts = [], lang = 'en') {
   if (!alts.length) return '';
   const visible = alts.slice(0, 10);
   const lines = visible.map((alt, i) => {
@@ -70,9 +70,9 @@ function buildAltLines(alts = []) {
     return `**${i + 1}.** ${classPrefix} [${alt.name}](${link}) · \`${ilvl}\``;
   });
   const extra = alts.length > visible.length
-    ? `\n*... and ${alts.length - visible.length} more*`
+    ? `\n*${t('dialogue.scan.dm.more', lang, { count: alts.length - visible.length })}*`
     : '';
-  return `\n\n**🎯 Matches (${alts.length}):**\n${lines.join('\n')}${extra}`;
+  return `\n\n**🎯 ${t('dialogue.scan.dm.matches', lang, { count: alts.length })}**\n${lines.join('\n')}${extra}`;
 }
 
 /**
@@ -95,7 +95,8 @@ export async function sendScanCompletionDm(opts) {
 
   const style = OUTCOME_STYLE[outcome] ?? OUTCOME_STYLE.completed;
   const alts = altsOverride ?? result.alts ?? [];
-  const altsBlock = buildAltLines(alts);
+  const altsBlock = buildAltLines(alts, lang);
+  const headline = t(`dialogue.scan.dm.outcomes.${style.localeKey}`, lang);
 
   // DM description has 3 visual blocks separated by blank lines:
   //   1. Hero line with command + channel link
@@ -104,31 +105,32 @@ export async function sendScanCompletionDm(opts) {
   // Anything technical (counts, retries, ScraperAPI) goes into the
   // addFields stats grid below — keeps the description tight.
   const heroLines = [];
-  heroLines.push(
-    `Your \`${commandLabel}\` scan${channelMention ? ` in ${channelMention}` : ''} just finished.`
-  );
+  heroLines.push(t('dialogue.scan.dm.hero', lang, {
+    command: commandLabel,
+    channel: channelMention ? t('dialogue.scan.dm.inChannel', lang, { channel: channelMention }) : '',
+  }));
   if (guildName) {
     heroLines.push('');
-    heroLines.push(`📍 Guild: **${guildName}**`);
+    heroLines.push(`📍 ${t('dialogue.scan.dm.guild', lang, { guild: guildName })}`);
   }
 
   const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
   const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
   const statFields = [
-    { name: '🔍 Checked', value: String(checkedCandidates), inline: true },
-    { name: '🎯 Found', value: String(alts.length), inline: true },
-    { name: '⚠️ Failed', value: String(result.failedCandidates ?? 0), inline: true },
+    { name: `🔍 ${t('dialogue.scan.dm.fields.checked', lang)}`, value: String(checkedCandidates), inline: true },
+    { name: `🎯 ${t('dialogue.scan.dm.fields.found', lang)}`, value: String(alts.length), inline: true },
+    { name: `⚠️ ${t('dialogue.scan.dm.fields.failed', lang)}`, value: String(result.failedCandidates ?? 0), inline: true },
   ];
   if (attemptedCandidates > checkedCandidates) {
     statFields.push({
-      name: '🔁 Attempts',
+      name: `🔁 ${t('dialogue.scan.dm.fields.attempts', lang)}`,
       value: String(attemptedCandidates),
       inline: true,
     });
   }
   if ((result.scraperApiRequests ?? 0) > 0) {
     statFields.push({
-      name: '🌐 ScraperAPI',
+      name: `🌐 ${t('dialogue.scan.dm.fields.scraper', lang)}`,
       value: String(result.scraperApiRequests),
       inline: true,
     });
@@ -137,19 +139,19 @@ export async function sendScanCompletionDm(opts) {
     // Abort details deserve a full-width line because the explanation
     // can run long ("Bible 503 storm: 78% failure across 120 attempts").
     statFields.push({
-      name: '🛑 Stop reason',
+      name: `🛑 ${t('dialogue.scan.dm.fields.stopReason', lang)}`,
       value: String(result.abortLabel).slice(0, 1024),
       inline: false,
     });
   }
 
-  const embed = createArtistEmbed()
-    .setAuthor({ name: 'Lost Ark Check · Scan notification' })
-    .setTitle(`${style.icon}  ${style.headline} · ${scanTargetName}`)
+  const embed = createArtistEmbed(lang)
+    .setAuthor({ name: t('dialogue.scan.dm.author', lang) })
+    .setTitle(`${style.icon}  ${headline} · ${scanTargetName}`)
     .setDescription(heroLines.join('\n') + altsBlock)
     .setColor(pickColor(style.color))
     .addFields(...statFields)
-    .setFooter({ text: 'You started the command, so I sent you the heads-up. Block the bot if these DMs are unwanted.' })
+    .setFooter({ text: t('dialogue.scan.dm.footer', lang) })
     .setTimestamp();
 
   const components = [];

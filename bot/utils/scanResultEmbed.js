@@ -74,11 +74,11 @@ export function deriveScanState(result) {
 }
 
 const STATE_STYLE = {
-  completed: { icon: ICONS.done,    color: COLORS.success, label: 'Scan complete' },
-  'cap-hit': { icon: ICONS.search,  color: COLORS.warning, label: 'Scan paused at candidate limit' },
-  'failure-storm': { icon: ICONS.warn, color: COLORS.warning, label: 'Scan paused: bible is rejecting profiles' },
-  'scan-aborted': { icon: ICONS.warn, color: COLORS.warning, label: 'Scan stopped: issue detected' },
-  stopped:   { icon: '🛑',          color: COLORS.warning, label: 'Scan stopped early' },
+  completed: { icon: ICONS.done, color: COLORS.success, localeKey: 'completed' },
+  'cap-hit': { icon: ICONS.search, color: COLORS.warning, localeKey: 'capHit' },
+  'failure-storm': { icon: ICONS.warn, color: COLORS.warning, localeKey: 'failureStorm' },
+  'scan-aborted': { icon: ICONS.warn, color: COLORS.warning, localeKey: 'aborted' },
+  stopped: { icon: '🛑', color: COLORS.warning, localeKey: 'stopped' },
 };
 
 /**
@@ -88,7 +88,7 @@ const STATE_STYLE = {
  * description stays well under Discord's 4096-char ceiling even with
  * the surrounding stats + notice blocks.
  */
-function buildAltList(alts, { newAltsSet } = {}) {
+function buildAltList(alts, { newAltsSet, lang = 'en' } = {}) {
   if (!Array.isArray(alts) || alts.length === 0) return '';
   const visible = alts.slice(0, 25);
   const lines = visible.map((alt, i) => {
@@ -102,11 +102,11 @@ function buildAltList(alts, { newAltsSet } = {}) {
     const ilvl = typeof alt.itemLevel === 'number'
       ? alt.itemLevel.toFixed(2)
       : (alt.itemLevel || '?');
-    const isNewMark = newAltsSet?.has(String(alt.name).toLowerCase()) ? ' `new`' : '';
+    const isNewMark = newAltsSet?.has(String(alt.name).toLowerCase()) ? ` \`${t('dialogue.scan.result.newTag', lang)}\`` : '';
     return `${i + 1}. ${classPrefix} **[${alt.name}](${link})** · \`${ilvl}\`${isNewMark}`;
   });
   const extra = alts.length > visible.length
-    ? `\n*... and ${alts.length - visible.length} more*`
+    ? `\n*${t('dialogue.scan.result.more', lang, { count: alts.length - visible.length })}*`
     : '';
   return lines.join('\n') + extra;
 }
@@ -135,12 +135,13 @@ export function buildScanResultEmbed({
   contextStyle,
   summaryLine,
   actionHint,
+  lang = 'en',
 }) {
   const state = deriveScanState(result);
   const style = STATE_STYLE[state.stopReason];
 
   const alts = Array.isArray(altsOverride) ? altsOverride : (result?.alts ?? []);
-  const altList = buildAltList(alts, { newAltsSet });
+  const altList = buildAltList(alts, { newAltsSet, lang });
 
   // Color precedence: the list-type tint (blacklist red, watch yellow) wins
   // for enrich because a watcher reading their list cares more about the
@@ -153,9 +154,10 @@ export function buildScanResultEmbed({
   // is enough state signal that we no longer need a separate bolded
   // banner line in the description — saves one paragraph break.
   let kindLabel;
-  if (kind === 'enrich') kindLabel = 'Enrich result';
-  else if (kind === 'roster-hidden') kindLabel = 'Hidden roster scan';
-  else kindLabel = 'Deep scan result';
+  if (kind === 'enrich') kindLabel = t('dialogue.scan.result.kinds.enrich', lang);
+  else if (kind === 'roster-hidden') kindLabel = t('dialogue.scan.result.kinds.hidden', lang);
+  else kindLabel = t('dialogue.scan.result.kinds.deep', lang);
+  const stateLabel = t(`dialogue.scan.result.states.${style.localeKey}`, lang);
 
   const sections = [];
 
@@ -163,9 +165,9 @@ export function buildScanResultEmbed({
   // for Y") with state label so the reader knows in one paragraph what
   // happened and how it ended.
   if (summaryLine) {
-    sections.push(`${summaryLine}\n*${style.label}.*`);
+    sections.push(`${summaryLine}\n*${stateLabel}.*`);
   } else {
-    sections.push(`*${style.label}.*`);
+    sections.push(`*${stateLabel}.*`);
   }
 
   // 2. Hidden roster notice. Single-line italic, less verbose than the
@@ -174,7 +176,7 @@ export function buildScanResultEmbed({
   // this card doesn't need to repeat the whole spiel.
   if (target.isHidden) {
     sections.push(
-      `${ICONS.locked} *Target's roster is hidden; alts below come from stronghold fingerprint match (same SH + RL).*`
+      `${ICONS.locked} *${t('dialogue.scan.result.hiddenNotice', lang)}*`
     );
   }
 
@@ -183,28 +185,35 @@ export function buildScanResultEmbed({
   // tighten the copy here vs the older multi-sentence version.
   let stopHint = '';
   if (state.stopReason === 'stopped') {
-    stopHint = `Stopped before the end. **${state.remaining}** eligible candidate(s) unchecked · hit **Continue scan** to resume.`;
+    stopHint = t('dialogue.scan.result.stoppedHint', lang, { remaining: state.remaining });
   } else if (state.stopReason === 'scan-aborted') {
-    stopHint = `Stopped: **${result.abortLabel || 'Issue detected'}**.` +
-      (result.abortDetail ? ` ${result.abortDetail}` : '') +
-      ` Hit **Continue scan** later if the issue clears.`;
+    stopHint = t('dialogue.scan.result.abortedHint', lang, {
+      label: result.abortLabel || t('dialogue.scan.result.issue', lang),
+      detail: result.abortDetail || '',
+    });
   } else if (state.stopReason === 'failure-storm') {
     const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
     const failed = result.failedCandidates ?? 0;
     const rate = attempted > 0 ? Math.round((failed / attempted) * 100) : 0;
     const lastError = truncateInlineText(result.lastFailureReason, 140);
-    stopHint = `Bible rejected ${failed}/${attempted} profiles (${rate}%); I paused so we don't burn the rest.` +
-      (lastError ? ` Last error: \`${lastError}\`.` : '') +
-      ` Failed candidates were not marked checked, so **Continue scan** will retry them.`;
+    stopHint = t('dialogue.scan.result.failureHint', lang, {
+      failed,
+      attempted,
+      rate,
+      lastError: lastError ? t('dialogue.scan.result.lastError', lang, { error: lastError }) : '',
+    });
   } else if (state.stopReason === 'cap-hit') {
-    stopHint = `Hit the candidate cap (${result.candidateLimit ?? 'configured limit'}). **${state.remaining}** eligible candidate(s) above the cap unchecked · hit **Continue scan** to walk the rest.`;
+    stopHint = t('dialogue.scan.result.capHint', lang, {
+      cap: result.candidateLimit ?? t('dialogue.scan.result.configured', lang),
+      remaining: state.remaining,
+    });
   }
   if (stopHint) sections.push(stopHint);
 
   // 4. Alt list block. Header doubles as a count so a reader scrolling
   // through history can see at a glance how many came back.
   if (altList) {
-    sections.push(`**🎯 Alts found (${alts.length}):**\n${altList}`);
+    sections.push(`**🎯 ${t('dialogue.scan.result.altsFound', lang, { count: alts.length })}**\n${altList}`);
   }
 
   // 5. Action hint. Reserved for caller-specific next-step copy
@@ -219,7 +228,7 @@ export function buildScanResultEmbed({
   // exotic encoding overhead.
   const description = sections.join('\n\n').slice(0, 4096);
 
-  const embed = createArtistEmbed()
+  const embed = createArtistEmbed(lang)
     .setTitle(`${finalIcon}  ${kindLabel} · ${target.name}`)
     .setDescription(description)
     .setColor(finalColor)
@@ -237,30 +246,30 @@ export function buildScanResultEmbed({
   const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
   const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
   const fields = [
-    { name: '🔍 Checked', value: String(checkedCandidates), inline: true },
-    { name: '🎯 Found', value: String(alts.length), inline: true },
-    { name: '⚠️ Failed', value: String(result.failedCandidates ?? 0), inline: true },
+    { name: `🔍 ${t('dialogue.scan.result.fields.checked', lang)}`, value: String(checkedCandidates), inline: true },
+    { name: `🎯 ${t('dialogue.scan.result.fields.found', lang)}`, value: String(alts.length), inline: true },
+    { name: `⚠️ ${t('dialogue.scan.result.fields.failed', lang)}`, value: String(result.failedCandidates ?? 0), inline: true },
   ];
   if (state.remaining > 0) {
-    fields.push({ name: '📋 Remaining', value: String(state.remaining), inline: true });
+    fields.push({ name: `📋 ${t('dialogue.scan.result.fields.remaining', lang)}`, value: String(state.remaining), inline: true });
   }
   if (attemptedCandidates > checkedCandidates) {
-    fields.push({ name: '🔁 Attempts', value: String(attemptedCandidates), inline: true });
+    fields.push({ name: `🔁 ${t('dialogue.scan.result.fields.attempts', lang)}`, value: String(attemptedCandidates), inline: true });
   }
   if ((result.rateLimitRetries ?? 0) > 0) {
-    fields.push({ name: '⏱️ 429 retries', value: String(result.rateLimitRetries), inline: true });
+    fields.push({ name: `⏱️ ${t('dialogue.scan.result.fields.retries', lang)}`, value: String(result.rateLimitRetries), inline: true });
   }
   if ((result.scraperApiRequests ?? 0) > 0) {
-    fields.push({ name: '🌐 ScraperAPI', value: String(result.scraperApiRequests), inline: true });
+    fields.push({ name: `🌐 ${t('dialogue.scan.result.fields.scraper', lang)}`, value: String(result.scraperApiRequests), inline: true });
   }
   embed.addFields(...fields);
 
   const footerParts = [];
-  if (target.guildName) footerParts.push(`Guild ${target.guildName}`);
-  if (Number.isFinite(result.totalMembers)) footerParts.push(`${result.totalMembers} members`);
-  if (result.candidateLimit) footerParts.push(`Cap ${result.candidateLimit}`);
+  if (target.guildName) footerParts.push(t('dialogue.scan.result.footer.guild', lang, { guild: target.guildName }));
+  if (Number.isFinite(result.totalMembers)) footerParts.push(t('dialogue.scan.result.footer.members', lang, { count: result.totalMembers }));
+  if (result.candidateLimit) footerParts.push(t('dialogue.scan.result.footer.cap', lang, { count: result.candidateLimit }));
   if (Number.isFinite(result.excludedCandidates) && result.excludedCandidates > 0) {
-    footerParts.push(`Excluded ${result.excludedCandidates} from prior pass`);
+    footerParts.push(t('dialogue.scan.result.footer.excluded', lang, { count: result.excludedCandidates }));
   }
   if (footerParts.length > 0) {
     embed.setFooter({ text: footerParts.join(' · ') });

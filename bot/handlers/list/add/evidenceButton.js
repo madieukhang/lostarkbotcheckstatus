@@ -8,9 +8,11 @@
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import UserPreference from '../../../models/UserPreference.js';
 import { refreshImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
-import { replyAlert, replyEmbed } from '../../../utils/interactionReplies.js';
+import { deferEphemeralReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import { decorateListEntry } from '../helpers.js';
 
@@ -24,7 +26,9 @@ import { decorateListEntry } from '../helpers.js';
 export function createListAddViewEvidenceButtonHandler({ client }) {
   async function handleListAddViewEvidenceButton(interaction) {
     const requestId = interaction.customId.split(':')[1];
+    await deferEphemeralReply(interaction);
     await connectDB();
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     // Restrict to assigned approvers only · same permission model as
     // Approve/Reject. Avoids leaking evidence images to non-approvers who
@@ -37,16 +41,16 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     if (!payload) {
       const stillExists = await PendingApproval.exists({ requestId });
       if (stillExists) {
-        await replyAlert(interaction, {
+        await editAlert(interaction, {
           severity: AlertSeverity.ERROR,
-          title: 'Not Authorised',
-          description: 'You are not on the approver list for this request, so you cannot view its evidence.',
+          ...t('dialogue.approval.flow.evidenceNotAuthorized', lang),
+          lang,
         });
       } else {
-        await replyAlert(interaction, {
+        await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Request Expired',
-          description: 'This approval request was already processed or has expired.',
+          ...t('dialogue.approval.flow.expired', lang),
+          lang,
         });
       }
       return;
@@ -64,10 +68,10 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     }
 
     if (!freshUrl) {
-      await replyAlert(interaction, {
+      await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'No Evidence Available',
-        description: 'No evidence image attached to this request, or the rehosted message was removed.',
+        ...t('dialogue.approval.flow.noEvidence', lang),
+        lang,
       });
       return;
     }
@@ -83,14 +87,14 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
       addedAt: payload.createdAt || payload.addedAt,
       addedByDisplayName: payload.requestedByDisplayName || payload.addedByDisplayName || '',
     };
-    const evidenceEmbed = buildEvidenceEmbed(decorated, freshUrl, { includeAddedBy: true });
+    const evidenceEmbed = buildEvidenceEmbed(decorated, freshUrl, { includeAddedBy: true, lang });
     evidenceEmbed.setFooter({
       text: isLegacy
-        ? 'Legacy image (may have expired) · submitted before evidence rehost'
-        : 'Fresh URL just resolved from evidence channel',
+        ? t('dialogue.approval.flow.evidenceFooterLegacy', lang)
+        : t('dialogue.approval.flow.evidenceFooterFresh', lang),
     });
 
-    await replyEmbed(interaction, evidenceEmbed);
+    await editEmbed(interaction, evidenceEmbed);
   }
 
   return handleListAddViewEvidenceButton;

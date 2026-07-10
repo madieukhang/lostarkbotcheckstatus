@@ -16,7 +16,7 @@ import {
   normalizeCharacterName,
   getInteractionDisplayName,
 } from '../../../utils/names.js';
-import { getUserLanguage } from '../../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
@@ -58,12 +58,13 @@ export function createListAddCommandHandler({
     const name = normalizeCharacterName(rawName);
 
     await deferReply(interaction);
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     if (!interaction.guild) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Server-Only Command',
-        description: 'This command can only be used inside a Discord server, not in DMs.',
+        ...t('dialogue.common.serverOnly', lang),
+        lang,
       });
       return;
     }
@@ -80,8 +81,8 @@ export function createListAddCommandHandler({
     if (!reason) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Reason Required',
-        description: 'Every list entry needs a reason. Re-run the command and fill the `reason` option.',
+        ...t('dialogue.listAdd.command.reasonRequired', lang),
+        lang,
       });
       return;
     }
@@ -89,8 +90,8 @@ export function createListAddCommandHandler({
     if (image?.contentType && !image.contentType.startsWith('image/')) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Invalid Attachment',
-        description: `The \`image\` option only accepts image files. Detected content type: \`${image.contentType}\`.`,
+        ...t('dialogue.listAdd.command.invalidImage', lang, { type: image.contentType }),
+        lang,
       });
       return;
     }
@@ -98,7 +99,6 @@ export function createListAddCommandHandler({
     try {
       await connectDB();
       const requestId = randomUUID();
-      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
       // Rehost the image NOW (while the Discord CDN URL is still valid).
       // If rehost fails or no evidence channel is configured, we fall back to
@@ -164,10 +164,9 @@ export function createListAddCommandHandler({
       if (!sent.success) {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Approval Request Failed',
-          description: `Could not deliver the approval request to approvers.`,
-          fields: [{ name: 'Reason', value: sent.reason || 'unknown', inline: false }],
-          footer: 'No entry was created. Try again or contact an officer directly.',
+          ...t('dialogue.listAdd.command.deliveryFailed', lang),
+          fields: [{ name: t('dialogue.broadcast.fields.reason', lang), value: sent.reason || t('dialogue.common.unknown', lang), inline: false }],
+          lang,
         });
         return;
       }
@@ -182,8 +181,9 @@ export function createListAddCommandHandler({
       await editEmbed(
         interaction,
         buildListAddApprovalEmbed(interaction.guild, payload, {
-          title: 'List Add · Proposal Submitted',
+          title: t('dialogue.listAdd.command.submittedTitle', lang),
           includeRequestedBy: false,
+          lang,
         })
       );
 
@@ -200,10 +200,9 @@ export function createListAddCommandHandler({
       console.error('[list] ❌ Proposal create/send failed:', err.message);
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Proposal Failed',
-        description: 'Could not create the approval request.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-        footer: 'No entry was created. Retry the command; if the error persists, contact an officer.',
+        ...t('dialogue.listAdd.command.proposalFailed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
       });
     }
   }

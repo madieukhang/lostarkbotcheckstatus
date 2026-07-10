@@ -1,4 +1,5 @@
 import { getClassEmoji, isSupportClass } from '../../models/Class.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Pick the alt list to display for an item, in this priority order:
@@ -39,7 +40,7 @@ function pickAltsForDisplay(item) {
  *
  * @returns {{ line: string, priority: number }}
  */
-function formatResultLine(item) {
+function formatResultLine(item, lang = 'en') {
   const isBlack = Boolean(item.blackEntry);
   const isWhite = Boolean(item.whiteEntry);
   const isWatch = Boolean(item.watchEntry);
@@ -59,7 +60,7 @@ function formatResultLine(item) {
     if (!entry) continue;
     const isRosterMatch = entry.name.toLowerCase() !== item.name.toLowerCase();
     const parts = [];
-    if (isRosterMatch) parts.push(`via **${entry.name}**`);
+    if (isRosterMatch) parts.push(t('dialogue.check.format.via', lang, { name: entry.name }));
     if (entry.reason?.trim()) parts.push(`*${entry.reason.trim()}*`);
     if (entry.raid?.trim()) parts.push(`[${entry.raid.trim()}]`);
     if (parts.length > 0) branches.push(`   ↳ ${parts.join(' · ')}`);
@@ -72,14 +73,14 @@ function formatResultLine(item) {
   const alts = pickAltsForDisplay(item);
   if (alts.length > 0) {
     const visible = alts.slice(0, 3);
-    const tail = alts.length > visible.length ? ` *+${alts.length - visible.length} more*` : '';
-    branches.push(`   ↳ alts: ${visible.join(', ')}${tail}`);
+    const tail = alts.length > visible.length ? ` *${t('dialogue.check.format.more', lang, { count: alts.length - visible.length })}*` : '';
+    branches.push(`   ↳ ${t('dialogue.check.format.alts', lang)}: ${visible.join(', ')}${tail}`);
   }
 
   const branchBlock = branches.length > 0 ? `\n${branches.join('\n')}` : '';
 
   if (isBlack) {
-    const scopeTag = item.blackEntry?.scope === 'server' ? ' (Local)' : '';
+    const scopeTag = item.blackEntry?.scope === 'server' ? ` (${t('dialogue.check.format.local', lang)})` : '';
     return {
       line: `⛔ ${classPrefix}**${item.name}**${scopeTag}${trustedTag}${statSuffix}${branchBlock}`,
       priority: 0,
@@ -99,12 +100,12 @@ function formatResultLine(item) {
   }
   if (item.trustedEntry) {
     const isVia = item.trustedEntry.name.toLowerCase() !== item.name.toLowerCase();
-    const directTag = isVia ? '' : ' · trusted';
+    const directTag = isVia ? '' : ` · ${t('dialogue.check.format.trusted', lang)}`;
     // Trusted-only branch reuses the same `branches` block built above
     // so the alts line (if any) renders. Prepend the via-trusted note
     // so it shows above alts in the same sub-list.
     const trustedBranches = [];
-    if (isVia) trustedBranches.push(`   ↳ via **${item.trustedEntry.name}** · trusted`);
+    if (isVia) trustedBranches.push(`   ↳ ${t('dialogue.check.format.via', lang, { name: item.trustedEntry.name })} · ${t('dialogue.check.format.trusted', lang)}`);
     for (const b of branches) trustedBranches.push(b);
     const trustedBlock = trustedBranches.length > 0 ? `\n${trustedBranches.join('\n')}` : '';
     return {
@@ -122,8 +123,8 @@ function formatResultLine(item) {
  * @param {Array<object>} results - Output from checkNamesAgainstLists
  * @returns {string[]} Formatted lines sorted by display priority
  */
-export function formatCheckResults(results) {
-  const formatted = results.map((item) => ({ ...formatResultLine(item), item }));
+export function formatCheckResults(results, lang = 'en') {
+  const formatted = results.map((item) => ({ ...formatResultLine(item, lang), item }));
 
   formatted.sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;

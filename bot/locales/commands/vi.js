@@ -1,0 +1,46 @@
+export default {
+  status: { description: 'Xem trạng thái server Lost Ark trực tiếp' },
+  reset: { description: 'Đặt lại trạng thái server đã lưu về mặc định' },
+  roster: {
+    description: 'Tra roster của character Lost Ark kèm theo dõi tiến triển',
+    options: { name: 'Tên character cần tra', deep: 'Chạy Stronghold scan để tìm alt ẩn (chậm hơn)', deepLimit: 'Giới hạn candidate; 0 = quét toàn bộ' },
+  },
+  list: {
+    description: 'Quản lý blacklist, whitelist và watchlist',
+    subcommands: {
+      add: { description: 'Thêm character vào blacklist, whitelist hoặc watchlist', options: { type: 'List cần thêm vào', name: 'Tên character cần thêm', reason: 'Lý do tạo entry', raid: 'Nhãn raid tùy chọn', logs: 'URL logs lostark.bible tùy chọn', image: 'Screenshot evidence tùy chọn', scope: 'Global cho mọi server hoặc Server chỉ cho server này; chỉ blacklist' } },
+      edit: { description: 'Chỉnh sửa entry đang có', options: { name: 'Tên character cần sửa', reason: 'Lý do mới; để trống để giữ nguyên', type: 'Chuyển sang list khác', raid: 'Nhãn raid mới', logs: 'URL logs mới', image: 'Screenshot evidence mới', scope: 'Đổi giữa global và server; chỉ blacklist', additionalNames: 'Danh sách alt phân cách bằng dấu phẩy; chỉ officer/chủ entry' } },
+      remove: { description: 'Xóa character khỏi blacklist, whitelist hoặc watchlist', options: { name: 'Tên character cần xóa' } },
+      view: { description: 'Xem các entry trong list', options: { type: 'List cần xem', scope: 'Lọc blacklist theo scope' } },
+      trust: { description: 'Quản lý trusted list; trusted character không thể bị thêm vào list', options: { action: 'Thêm hoặc xóa khỏi trusted list', name: 'Tên character', reason: 'Lý do trust; chỉ dùng khi thêm' } },
+      enrich: { description: 'Stronghold deep-scan một entry rồi thêm alt tìm được', options: { name: 'Tên character đã có entry', deepLimit: 'Ghi đè giới hạn candidate mặc định' } },
+      multiadd: { description: 'Thêm hàng loạt qua Excel; officer tự duyệt, member cần Senior', options: { action: 'template để tải file trắng; file để tải file đã điền lên', file: 'File .xlsx đã điền, tối đa 30 dòng' } },
+    },
+  },
+  search: { description: 'Tìm tên character theo bộ lọc và đối chiếu các list', options: { name: 'Tên character cần tìm', minIlvl: 'Item level tối thiểu; mặc định 1700', maxIlvl: 'Item level tối đa', class: 'Lọc theo class' } },
+  evidence: { description: 'Tra trực tiếp evidence của character trong list', options: { name: 'Tên character; autocomplete hiển thị entry từ mọi list', public: 'Đăng công khai trong channel; chỉ officer/senior, mặc định riêng tư' } },
+  check: { description: 'Đọc tên từ screenshot và kiểm tra với mọi list', options: { image: 'Screenshot phòng chờ raid' } },
+  help: { description: 'Xem toàn bộ command LoaLogs', options: { lang: 'Ngôn ngữ; mặc định theo preference đã lưu' } },
+  languageSwitch: { description: 'Đổi ngôn ngữ LoaLogs dùng khi phản hồi cậu' },
+  setup: {
+    description: 'Cấu hình LoaLogs cho server này',
+    subcommands: {
+      autochannel: { description: 'Đặt channel tự kiểm tra screenshot', options: { channel: 'Channel nhận screenshot để tự kiểm tra' } },
+      notifychannel: { description: 'Đặt channel nhận thông báo thay đổi list', options: { channel: 'Channel nhận thông báo list' } },
+      view: { description: 'Xem cấu hình LoaLogs hiện tại' },
+      repin: { description: 'Làm mới bảng hướng dẫn được ghim trong auto-check channel' },
+      language: { description: 'Đặt ngôn ngữ global cho thông báo và bảng ghim', options: { language: 'Ngôn ngữ dùng cho message public của server' } },
+      off: { description: 'Bật hoặc tắt thông báo list toàn cục của server' },
+      defaultscope: { description: 'Đặt scope blacklist mặc định cho /la-list add', options: { scope: 'Scope dùng khi /la-list add không chỉ định' } },
+    },
+  },
+  stats: { description: 'Xem thống kê sử dụng bot' },
+  remote: { description: 'Senior: xem và chỉnh cấu hình server từ xa, không thông báo server đích', options: { action: 'Thao tác cần thực hiện', guild: 'ID server đích; cần cho off/defaultscope', scope: 'Scope cho action defaultscope', channel: 'Channel dùng cho action evidencechannel' } },
+  choices: {
+    listTypes: { all: 'tất cả', black: 'blacklist', white: 'whitelist', watch: 'watchlist', trusted: 'trusted' },
+    listActions: { add: 'thêm', remove: 'xóa' },
+    scopes: { all: 'tất cả', global: 'global', server: 'server' },
+    multiaddActions: { template: 'template - tải file trắng', file: 'file - tải file đã điền lên' },
+    remoteActions: { view: 'view - xem server và cấu hình', off: 'off - bật/tắt notify của server', defaultscope: 'defaultscope - đặt scope của server', evidencechannel: 'evidencechannel - đặt channel rehost ảnh toàn bot', syncimages: 'syncimages - chuyển URL legacy sang evidence đã rehost' },
+  },
+};

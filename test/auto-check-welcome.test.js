@@ -55,6 +55,7 @@ test('auto-check welcome carries Artist as a passerby and explains daily cleanup
   assert.match(embed.description, /đi ngang/i);
   assert.match(embed.fields.map((field) => field.value).join('\n'), /00:00/);
   assert.match(embed.fields.map((field) => field.value).join('\n'), /\/la-help/);
+  assert.match(embed.fields.map((field) => field.value).join('\n'), /check abcxyz/i);
 });
 
 test('auto-check welcome stays within Discord embed limits in every language', () => {

@@ -10,49 +10,41 @@ import {
   buildMultiaddTemplate,
   MULTIADD_MAX_ROWS,
 } from '../../../services/multiadd/index.js';
-import { COLORS, ICONS, buildSessionFooter } from '../../../utils/ui.js';
+import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { t } from '../../../services/i18n/index.js';
 import { listTypeIcon } from '../helpers.js';
 
-export async function buildTemplateReply() {
+export async function buildTemplateReply(lang = 'en') {
   const buffer = await buildMultiaddTemplate();
   const attachment = new AttachmentBuilder(buffer, {
     name: 'multiadd_template.xlsx',
-    description: 'Lost Ark Bot · bulk add template',
+    description: t('dialogue.multiadd.template.attachmentDescription', lang),
   });
 
-  const templateEmbed = createArtistEmbed()
-    .setTitle('📋 Bulk Add Template')
-    .setDescription(
-      `Fill in up to **${MULTIADD_MAX_ROWS} rows**, then upload via:\n` +
-        '`/la-list multiadd action:file file:<your.xlsx>`'
-    )
+  const templateEmbed = createArtistEmbed(lang)
+    .setTitle(`📋 ${t('dialogue.multiadd.template.title', lang)}`)
+    .setDescription(t('dialogue.multiadd.template.description', lang, { count: MULTIADD_MAX_ROWS }))
     .setColor(COLORS.info)
     .addFields(
       {
-        name: '✅ Required Columns',
+        name: `✅ ${t('dialogue.multiadd.template.required', lang)}`,
         value: '`name` · `type` · `reason`',
         inline: true,
       },
       {
-        name: '🔹 Optional Columns',
+        name: `🔹 ${t('dialogue.multiadd.template.optional', lang)}`,
         value: '`raid` · `logs` · `image` · `scope`',
         inline: true,
       },
       {
-        name: '💡 Tips',
-        value: [
-          '• Use the **dropdown** in the `type` and `scope` columns.',
-          '• Delete the yellow **example row** before uploading.',
-          '• See the *Instructions* sheet inside the file for full details.',
-          '• Upload evidence images to Discord first, then paste the link.',
-        ].join('\n'),
+        name: `💡 ${t('dialogue.multiadd.template.tips', lang)}`,
+        value: t('dialogue.multiadd.template.tipsValue', lang),
         inline: false,
       }
     )
     .setFooter({
-      text: `Max ${MULTIADD_MAX_ROWS} rows · 1 MB file limit · .xlsx only`,
+      text: t('dialogue.multiadd.template.footer', lang, { count: MULTIADD_MAX_ROWS }),
     });
 
   return {
@@ -61,14 +53,15 @@ export async function buildTemplateReply() {
   };
 }
 
-export function buildNoValidRowsEmbed(errors) {
+export function buildNoValidRowsEmbed(errors, lang = 'en') {
   return buildAlertEmbed({
     severity: AlertSeverity.ERROR,
-    title: 'No Valid Rows Found',
+    title: t('dialogue.multiadd.errors.noRows.title', lang),
     description: errors.length > 0
       ? errors.slice(0, 15).join('\n').slice(0, 4000)
-      : 'The file appears to be empty or has no data rows.',
-    footer: 'Fix the errors and re-upload.',
+      : t('dialogue.multiadd.errors.noRows.empty', lang),
+    footer: t('dialogue.multiadd.errors.noRows.footer', lang),
+    lang,
   });
 }
 
@@ -79,25 +72,31 @@ export function buildPreviewReply(parsed, requestId, lang = 'en') {
     return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${row.name}**${scopeTag} · ${reasonShort}`;
   });
   if (parsed.rows.length > 20) {
-    previewLines.push(`*... and ${parsed.rows.length - 20} more rows*`);
+    previewLines.push(`*${t('dialogue.multiadd.preview.more', lang, { count: parsed.rows.length - 20 })}*`);
   }
 
+  const rowWord = (count) => t(`dialogue.multiadd.preview.${count === 1 ? 'rowOne' : 'rowMany'}`, lang);
   const headerLine = parsed.errors.length > 0
-    ? `**${parsed.rows.length}** valid row${parsed.rows.length === 1 ? '' : 's'} · **${parsed.errors.length}** error${parsed.errors.length === 1 ? '' : 's'} (see field below)`
-    : `**${parsed.rows.length}** valid row${parsed.rows.length === 1 ? '' : 's'} ready to add`;
+    ? t('dialogue.multiadd.preview.withErrors', lang, {
+        valid: parsed.rows.length,
+        validWord: rowWord(parsed.rows.length),
+        errors: parsed.errors.length,
+        errorWord: t(`dialogue.multiadd.preview.${parsed.errors.length === 1 ? 'errorOne' : 'errorMany'}`, lang),
+      })
+    : t('dialogue.multiadd.preview.ready', lang, { count: parsed.rows.length, rowWord: rowWord(parsed.rows.length) });
 
-  const previewEmbed = createArtistEmbed()
-    .setTitle(`📋 Bulk Add Preview · ${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'}`)
+  const previewEmbed = createArtistEmbed(lang)
+    .setTitle(`📋 ${t('dialogue.multiadd.preview.title', lang, { count: parsed.rows.length, rowWord: rowWord(parsed.rows.length) })}`)
     .setDescription([headerLine, '', previewLines.join('\n')].join('\n').slice(0, 4096))
     .setColor(COLORS.info)
-    .setFooter({ text: buildSessionFooter(5, 'only the uploader can confirm') })
+    .setFooter({ text: t('dialogue.multiadd.preview.sessionFooter', lang) })
     .setTimestamp();
 
   if (parsed.errors.length > 0) {
     const errText = parsed.errors.slice(0, 10).join('\n').slice(0, 1024);
-    const suffix = parsed.errors.length > 10 ? `\n*... and ${parsed.errors.length - 10} more*` : '';
+    const suffix = parsed.errors.length > 10 ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: parsed.errors.length - 10 })}*` : '';
     previewEmbed.addFields({
-      name: `⚠️ Validation Errors (${parsed.errors.length})`,
+      name: `⚠️ ${t('dialogue.multiadd.preview.validationErrors', lang, { count: parsed.errors.length })}`,
       value: (errText + suffix).slice(0, 1024),
     });
   }

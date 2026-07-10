@@ -8,7 +8,8 @@ import { COLORS, ICONS } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
 import { editPayload, replyAlert, replyContent, replyEmbed } from '../../utils/interactionReplies.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
-import { t } from '../../services/i18n/index.js';
+import UserPreference from '../../models/UserPreference.js';
+import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../list/view/ui.js';
 
 /** Detect whether an entry has any image evidence (rehosted OR legacy). */
@@ -77,10 +78,11 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
 
   collector.on('collect', async (sel) => {
     if (sel.user.id !== interaction.user.id) {
+      const clickerLang = await getUserLanguage(sel.user.id, { UserPreferenceModel: UserPreference });
       await replyAlert(sel, {
         severity: AlertSeverity.ERROR,
-        title: 'Not Your Session',
-        description: 'Only the command user can view evidence on this search.',
+        ...t('dialogue.search.session', clickerLang),
+        lang: clickerLang,
       });
       return;
     }
@@ -101,9 +103,8 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
     if (!displayUrl) {
       await replyAlert(sel, {
         severity: AlertSeverity.WARNING,
-        title: 'Evidence Unavailable',
-        description: 'The evidence image link expired or the rehosted message was removed.',
-        footer: 'Re-upload via /la-list edit name:<entry> image:<file>.',
+        ...t('dialogue.search.evidenceUnavailable', lang),
+        lang,
       });
       return;
     }

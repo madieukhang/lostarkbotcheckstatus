@@ -3,6 +3,7 @@ import { rosterUrl } from '../../../utils/rosterLink.js';
 import config from '../../../config.js';
 import Blacklist from '../../../models/Blacklist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
+import UserPreference from '../../../models/UserPreference.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName, normalizeRosterNames } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
@@ -10,6 +11,7 @@ import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, replyAlert } from '../../../utils/interactionReplies.js';
 import { COLORS } from '../../../utils/ui.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   renderTrackedAltsField,
   statMapFromRosterCharacters,
@@ -22,12 +24,13 @@ export function createTrustHandlers() {
   async function handleListTrustCommand(interaction) {
     const userId = interaction.user.id;
     const isOfficerOrSenior = OFFICER_APPROVER_IDS.includes(userId) || SENIOR_APPROVER_IDS.includes(userId);
+    const lang = await getUserLanguage(userId, { UserPreferenceModel: UserPreference });
 
     if (!isOfficerOrSenior) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Officer-Only Command',
-        description: 'Only officers and seniors can manage the trusted list.',
+        ...t('dialogue.trust.officerOnly', lang),
+        lang,
       });
       return;
     }
@@ -46,8 +49,8 @@ export function createTrustHandlers() {
       if (!deleted) {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Not Trusted',
-          description: `**${name}** is not in the trusted list, so there's nothing to remove.`,
+          ...t('dialogue.trust.notTrusted', lang, { name }),
+          lang,
         });
         return;
       }
@@ -55,24 +58,22 @@ export function createTrustHandlers() {
       const rosterLink = rosterUrl(deleted.name);
       const trustedSince = deleted.createdAt
         ? `<t:${Math.floor(new Date(deleted.createdAt).getTime() / 1000)}:R>`
-        : 'unknown';
+        : t('dialogue.trust.removed.unknown', lang);
 
       const embed = buildAlertEmbed({
         severity: AlertSeverity.WARNING,
         titleIcon: '',
         color: COLORS.muted,
-        title: `🛡️ Trusted · Removed · ${deleted.name}`,
-        description:
-          `**${deleted.name}** is no longer on the trusted list. ` +
-          `This character and any linked roster alts can now be added to ` +
-          `the blacklist / watchlist again.`,
+        title: `🛡️ ${t('dialogue.trust.removed.title', lang, { name: deleted.name })}`,
+        description: t('dialogue.trust.removed.description', lang, { name: deleted.name }),
         fields: [
-          { name: '🧬 Character', value: `[${deleted.name}](${rosterLink})`, inline: true },
-          { name: '📝 Was trusted for', value: (deleted.reason || 'N/A').slice(0, 1024), inline: true },
-          { name: '🕐 Trusted since', value: trustedSince, inline: true },
-          { name: '👤 Removed by', value: interaction.user.tag, inline: false },
+          { name: `🧬 ${t('dialogue.trust.removed.character', lang)}`, value: `[${deleted.name}](${rosterLink})`, inline: true },
+          { name: `📝 ${t('dialogue.trust.removed.reason', lang)}`, value: (deleted.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: true },
+          { name: `🕐 ${t('dialogue.trust.removed.since', lang)}`, value: trustedSince, inline: true },
+          { name: `👤 ${t('dialogue.trust.removed.removedBy', lang)}`, value: interaction.user.tag, inline: false },
         ],
-        footer: 'Tip: /la-list trust action:add to re-trust if this was a mistake.',
+        footer: t('dialogue.trust.removed.footer', lang),
+        lang,
       });
 
       await editEmbed(interaction, embed);
@@ -89,8 +90,9 @@ export function createTrustHandlers() {
       if (!isExactExisting) {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Already Trusted',
-          description: `**${name}** is already trusted via roster match with **${existing.name}**.`,
+          title: t('dialogue.trust.already.title', lang),
+          description: t('dialogue.trust.already.via', lang, { name, matched: existing.name }),
+          lang,
         });
         return;
       }
@@ -112,10 +114,11 @@ export function createTrustHandlers() {
     if (existingRosterTrusted) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Already Trusted',
+        title: t('dialogue.trust.already.title', lang),
         description: existingRosterTrusted.name.toLowerCase() === name.toLowerCase()
-          ? `**${existingRosterTrusted.name}** is already in the trusted list.`
-          : `**${name}** is already trusted via roster match with **${existingRosterTrusted.name}**.`,
+          ? t('dialogue.trust.already.direct', lang, { name: existingRosterTrusted.name })
+          : t('dialogue.trust.already.via', lang, { name, matched: existingRosterTrusted.name }),
+        lang,
       });
       return;
     }
@@ -128,9 +131,8 @@ export function createTrustHandlers() {
       if (blacklisted) {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Blacklisted Character',
-          description: `**${name}** is currently blacklisted (entry: **${blacklisted.name}**).`,
-          footer: 'Remove the blacklist entry first before trusting this character.',
+          ...t('dialogue.trust.blacklisted', lang, { name, matched: blacklisted.name }),
+          lang,
         });
         return;
       }
@@ -159,18 +161,20 @@ export function createTrustHandlers() {
     }
 
     const rosterLink = rosterUrl(name);
-    const actionLabel = existing ? 'Refreshed' : 'Added';
+    const actionLabel = t(`dialogue.trust.${existing ? 'actionRefreshed' : 'actionAdded'}`, lang);
     const displayReason = reason || existing?.reason || '';
     const altsField = renderTrackedAltsField({
       names: allCharacters,
       primaryName: name,
       statMap: statMapFromRosterCharacters(rosterResult?.rosterCharacters || []),
-      emptySentinel: '_Only this character is linked on this trusted entry._',
+      emptySentinel: `_${t('dialogue.trust.success.onlyCharacter', lang)}_`,
+      label: `🧬 ${t('dialogue.trust.success.trackedAlts', lang)}`,
+      overflowTemplate: t('dialogue.broadcast.more', lang),
     });
     const fields = [
-      { name: '🧬 Character', value: `[${name}](${rosterLink})`, inline: true },
-      { name: '📝 Reason', value: (displayReason || 'N/A').slice(0, 1024), inline: true },
-      { name: existing ? '👤 Refreshed by' : '👤 Added by', value: interaction.user.tag, inline: true },
+      { name: `🧬 ${t('dialogue.trust.success.character', lang)}`, value: `[${name}](${rosterLink})`, inline: true },
+      { name: `📝 ${t('dialogue.trust.success.reason', lang)}`, value: (displayReason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: true },
+      { name: `👤 ${t(`dialogue.trust.success.${existing ? 'refreshedBy' : 'addedBy'}`, lang)}`, value: interaction.user.tag, inline: true },
     ];
     if (altsField) fields.push(altsField);
 
@@ -178,13 +182,11 @@ export function createTrustHandlers() {
       severity: AlertSeverity.SUCCESS,
       titleIcon: '',
       color: COLORS.trustedSoft,
-      title: `🛡️ Trusted · ${actionLabel} · ${name}`,
-      description:
-        `**${name}** is now on the trusted list. From this point on, ` +
-        `**${name}** and any linked roster alt cannot be added to the ` +
-        `blacklist, whitelist, or watchlist by anyone.`,
+      title: `🛡️ ${t('dialogue.trust.success.title', lang, { action: actionLabel, name })}`,
+      description: t('dialogue.trust.success.description', lang, { name }),
       fields,
-      footer: 'Tip: /la-list view trusted to browse the trusted roster.',
+      footer: t('dialogue.trust.success.footer', lang),
+      lang,
     });
 
     await editEmbed(interaction, embed);
