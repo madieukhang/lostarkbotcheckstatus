@@ -23,6 +23,7 @@ import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { buildBlacklistScopeFilter } from '../../../utils/scope.js';
+import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import {
   decorateListEntry,
@@ -64,7 +65,7 @@ function parseNameValue(raw) {
 }
 
 export function buildListEvidenceNameQuery(name) {
-  return { $or: [{ name }, { allCharacters: name }] };
+  return buildNameRosterQuery(name);
 }
 
 /**

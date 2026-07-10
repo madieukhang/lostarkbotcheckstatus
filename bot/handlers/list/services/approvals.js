@@ -11,8 +11,8 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
 } from 'discord.js';
+import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import {
   buildListAddApprovalEmbed,
@@ -158,7 +158,7 @@ export function createApprovalServices({ client }) {
       ? `**Outcome:** ${breakdownParts.join(' · ')}`
       : `Reviewing **${pending.rows.length}** entries.`;
 
-    const embed = new EmbedBuilder()
+    const embed = createArtistEmbed()
       .setTitle(`📋 Bulk Add Approval · ${pending.rows.length} rows`)
       .setDescription(`${headerLine}\n\n${previewLines.join('\n').slice(0, 3800)}`)
       .setColor(color)

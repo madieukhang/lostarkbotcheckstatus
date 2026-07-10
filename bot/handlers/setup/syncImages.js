@@ -1,4 +1,5 @@
-import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
+import { AttachmentBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 
 import config from '../../config.js';
 import { COLORS } from '../../utils/ui.js';
@@ -121,7 +122,7 @@ async function markEntryAsRehosted(model, entry, rehosted, stats) {
 async function sendProgress(interaction, current, total, stats) {
   await editPayload(interaction, {
     embeds: [
-      new EmbedBuilder()
+      createArtistEmbed()
         .setTitle('🔄 Sync Images · In Progress')
         .setDescription(`Processing **${current}/${total}** entries…`)
         .addFields(
@@ -142,7 +143,7 @@ function buildSummaryPayload(interaction, total, stats) {
       ? COLORS.warning
       : COLORS.success;
 
-  const summaryEmbed = new EmbedBuilder()
+  const summaryEmbed = createArtistEmbed()
     .setTitle('✅ Sync Images · Complete')
     .setDescription(`Processed **${total}** legacy entries.`)
     .addFields(
@@ -221,7 +222,7 @@ export async function handleSyncImagesAction(interaction) {
   if (legacyEntries.length === 0) {
     await editPayload(interaction, {
       embeds: [
-        new EmbedBuilder()
+        createArtistEmbed()
           .setTitle('✅ Sync Images · Nothing to do')
           .setDescription('All entries with images already have rehost refs. Nothing to migrate.')
           .setColor(COLORS.success)
@@ -234,7 +235,7 @@ export async function handleSyncImagesAction(interaction) {
 
   await editPayload(interaction, {
     embeds: [
-      new EmbedBuilder()
+      createArtistEmbed()
         .setTitle('🔄 Sync Images · Starting')
         .setDescription(`Found **${legacyEntries.length}** legacy entries across all lists. Migrating now…`)
         .addFields(

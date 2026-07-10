@@ -1,0 +1,208 @@
+import { EmbedBuilder } from 'discord.js';
+
+import GuildConfig from '../../models/GuildConfig.js';
+import {
+  getGuildLanguage,
+  getSupportedLanguages,
+  t,
+} from '../i18n/index.js';
+import { COLORS } from '../../utils/ui.js';
+
+function asText(value) {
+  return Array.isArray(value) ? value.join('\n') : String(value || '');
+}
+
+export function buildAutoCheckWelcomeEmbed(lang) {
+  return new EmbedBuilder()
+    .setColor(COLORS.info)
+    .setTitle(t('autoCheckWelcome.title', lang))
+    .setDescription(asText(t('autoCheckWelcome.description', lang)))
+    .addFields(
+      {
+        name: t('autoCheckWelcome.howName', lang),
+        value: asText(t('autoCheckWelcome.howValue', lang)),
+      },
+      {
+        name: t('autoCheckWelcome.listsName', lang),
+        value: asText(t('autoCheckWelcome.listsValue', lang)),
+      },
+      {
+        name: t('autoCheckWelcome.cleanupName', lang),
+        value: asText(t('autoCheckWelcome.cleanupValue', lang)),
+      },
+      {
+        name: t('autoCheckWelcome.commandsName', lang),
+        value: asText(t('autoCheckWelcome.commandsValue', lang)),
+      }
+    )
+    .setFooter({ text: t('autoCheckWelcome.footer', lang) });
+}
+
+function pinnedMessages(response) {
+  const items = response?.items;
+  if (!items) return [];
+  const pins = typeof items.values === 'function'
+    ? [...items.values()]
+    : Array.isArray(items)
+      ? items
+      : [];
+  return pins.map((pin) => pin?.message || pin).filter(Boolean);
+}
+
+export function createAutoCheckWelcomeService({
+  GuildConfigModel = GuildConfig,
+  buildWelcomeEmbed = buildAutoCheckWelcomeEmbed,
+  getGuildLanguageFn = getGuildLanguage,
+  supportedLanguageCodes = getSupportedLanguages().map((entry) => entry.code),
+  logger = console,
+} = {}) {
+  const titleSignatures = new Set(
+    supportedLanguageCodes
+      .map((lang) => {
+        try {
+          const embed = buildWelcomeEmbed(lang);
+          return embed?.toJSON?.()?.title || embed?.data?.title || '';
+        } catch {
+          return '';
+        }
+      })
+      .filter(Boolean)
+  );
+
+  function isOwnedWelcome(message, botUserId) {
+    if (!message || message.author?.id !== botUserId) return false;
+    const title = message.embeds?.[0]?.title || '';
+    return titleSignatures.has(title);
+  }
+
+  async function loadStoredConfig(guildId) {
+    try {
+      return await GuildConfigModel.findOne({ guildId }).lean();
+    } catch (err) {
+      logger.warn?.('[auto-check welcome] config read failed:', err?.message || err);
+      return null;
+    }
+  }
+
+  async function collectStaleRefs(channel, botUserId, stored) {
+    const refs = new Map();
+    const add = (channelId, messageId, message = null) => {
+      if (!channelId || !messageId) return;
+      refs.set(channelId + ':' + messageId, { channelId, messageId, message });
+    };
+
+    add(
+      stored?.autoCheckWelcomeChannelId || channel.id,
+      stored?.autoCheckWelcomeMessageId
+    );
+
+    try {
+      const response = await channel.messages.fetchPins();
+      for (const message of pinnedMessages(response)) {
+        if (isOwnedWelcome(message, botUserId)) {
+          add(channel.id, message.id, message);
+        }
+      }
+    } catch (err) {
+      logger.warn?.('[auto-check welcome] pin scan failed:', err?.message || err);
+    }
+    return refs;
+  }
+
+  async function rollbackFresh(sent) {
+    try {
+      await sent.unpin();
+    } catch (err) {
+      logger.warn?.('[auto-check welcome] fresh unpin rollback failed:', err?.message || err);
+    }
+    try {
+      await sent.delete();
+    } catch (err) {
+      logger.warn?.('[auto-check welcome] fresh delete rollback failed:', err?.message || err);
+    }
+  }
+
+  async function resolveStaleMessage(ref, channel, client) {
+    if (ref.message) return ref.message;
+    try {
+      const sourceChannel = ref.channelId === channel.id
+        ? channel
+        : await client?.channels?.fetch?.(ref.channelId);
+      return await sourceChannel?.messages?.fetch?.(ref.messageId);
+    } catch {
+      return null;
+    }
+  }
+
+  async function deleteStaleRefs(refs, channel, client, outcome) {
+    for (const ref of refs.values()) {
+      const message = await resolveStaleMessage(ref, channel, client);
+      if (!message) continue;
+      try {
+        await message.delete();
+        outcome.removedOldCount += 1;
+      } catch {
+        // Already gone or no longer accessible.
+      }
+    }
+  }
+
+  async function postWelcome({ botUserId, channel, client, guildId }) {
+    const outcome = {
+      posted: false,
+      pinned: false,
+      persisted: false,
+      removedOldCount: 0,
+    };
+    const stored = await loadStoredConfig(guildId);
+    const staleRefs = await collectStaleRefs(channel, botUserId, stored);
+    const lang = await getGuildLanguageFn(guildId, {
+      GuildConfigModel,
+    });
+
+    let sent;
+    try {
+      sent = await channel.send({ embeds: [buildWelcomeEmbed(lang)] });
+      outcome.posted = true;
+      await sent.pin();
+      outcome.pinned = true;
+    } catch (err) {
+      logger.warn?.('[auto-check welcome] send or pin failed:', err?.message || err);
+      if (sent) await rollbackFresh(sent);
+      outcome.pinned = false;
+      return outcome;
+    }
+
+    try {
+      await GuildConfigModel.findOneAndUpdate(
+        { guildId },
+        {
+          $set: {
+            autoCheckWelcomeMessageId: sent.id,
+            autoCheckWelcomeChannelId: channel.id,
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+      outcome.persisted = true;
+    } catch (err) {
+      logger.warn?.('[auto-check welcome] pin persistence failed:', err?.message || err);
+      await rollbackFresh(sent);
+      outcome.pinned = false;
+      return outcome;
+    }
+
+    await deleteStaleRefs(staleRefs, channel, client, outcome);
+    return outcome;
+  }
+
+  return {
+    postWelcome,
+  };
+}
+
+const productionWelcomeService = createAutoCheckWelcomeService();
+
+export function postAutoCheckWelcome(options) {
+  return productionWelcomeService.postWelcome(options);
+}

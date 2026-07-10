@@ -16,9 +16,9 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
   StringSelectMenuBuilder,
 } from 'discord.js';
+import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import {
   refreshImageUrl,
@@ -102,7 +102,7 @@ export function buildTrustedListEmbed(entries, lang = 'en') {
 
   // Count rides the title (matches the list-page card); the footer keeps
   // the "what trusted means" reminder + the manage hint.
-  return new EmbedBuilder()
+  return createArtistEmbed()
     .setTitle(`${ICONS.shield} ${t('listView.trusted.title', lang)} · ${entries.length}`)
     .setDescription(lines.join('\n').slice(0, 4096))
     .setColor(COLORS.trustedSoft)
@@ -185,7 +185,7 @@ export async function buildListPageEmbed(options) {
   });
   const description = [headerLine, '', ...lines].join('\n').slice(0, 4096);
 
-  return new EmbedBuilder()
+  return createArtistEmbed()
     .setTitle(`${titleIcon} ${labelCap} · ${allEntries.length} ${t('listView.summary.entries', lang)}`)
     .setDescription(description)
     .setColor(currentType === 'all' ? COLORS.info : ctx.color)
@@ -297,7 +297,7 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false, 
   });
   if (altsField) fields.push(altsField);
 
-  const embed = new EmbedBuilder()
+  const embed = createArtistEmbed()
     .setTitle(`${entry._icon} ${entry.name}`)
     .setURL(link)
     .addFields(fields)

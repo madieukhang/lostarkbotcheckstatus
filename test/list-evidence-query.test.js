@@ -10,6 +10,11 @@ const { buildListEvidenceNameQuery } = await import('../bot/handlers/list/eviden
 test('/la-evidence free-typed lookup checks primary name and tracked alts', () => {
   assert.deepEqual(
     buildListEvidenceNameQuery('Altname'),
-    { $or: [{ name: 'Altname' }, { allCharacters: 'Altname' }] }
+    {
+      $or: [
+        { name: { $in: ['Altname'] } },
+        { allCharacters: { $in: ['Altname'] } },
+      ],
+    }
   );
 });

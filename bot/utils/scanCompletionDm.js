@@ -16,10 +16,10 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
 } from 'discord.js';
 
 import { COLORS, ICONS } from './ui.js';
+import { createArtistEmbed } from './artistVoice.js';
 import { rosterUrl } from './rosterLink.js';
 import { getClassEmoji } from '../models/Class.js';
 import { t } from '../services/i18n/index.js';
@@ -143,7 +143,7 @@ export async function sendScanCompletionDm(opts) {
     });
   }
 
-  const embed = new EmbedBuilder()
+  const embed = createArtistEmbed()
     .setAuthor({ name: 'Lost Ark Check · Scan notification' })
     .setTitle(`${style.icon}  ${style.headline} · ${scanTargetName}`)
     .setDescription(heroLines.join('\n') + altsBlock)

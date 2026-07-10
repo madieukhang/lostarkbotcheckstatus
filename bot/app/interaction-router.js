@@ -133,6 +133,12 @@ export function createButtonRoutes(listHandlers) {
       failureContent: '\u274c Failed to load evidence.',
     },
     {
+      prefixes: ['listbroadcast_evidence:'],
+      label: '[list] Broadcast evidence button error:',
+      handle: (interaction) => listHandlers.handleBroadcastEvidenceButton(interaction),
+      failureContent: '\u274c Failed to load evidence.',
+    },
+    {
       prefixes: [
         'list-enrich:confirm:',
         'list-enrich:cancel:',

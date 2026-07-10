@@ -10,11 +10,11 @@
 
 import {
   ActionRowBuilder,
-  EmbedBuilder,
   StringSelectMenuBuilder,
 } from 'discord.js';
 
 import { connectDB } from '../../db.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 import UserPreference from '../../models/UserPreference.js';
 import {
   getSupportedLanguages,
@@ -35,7 +35,7 @@ export function buildLanguageEmbed(lang) {
   const supported = getSupportedLanguages();
   const current = supported.find((entry) => entry.code === lang) || supported[0];
 
-  return new EmbedBuilder()
+  return createArtistEmbed()
     .setColor(COLORS.info)
     .setTitle(t('languageSwitch.title', lang))
     .setDescription(
@@ -92,7 +92,7 @@ export async function handleLanguageSwitchSelect(interaction) {
   const target = supported.find((entry) => entry.code === next) || supported[0];
   const unchanged = next === previous;
 
-  const embed = new EmbedBuilder()
+  const embed = createArtistEmbed()
     .setColor(unchanged ? COLORS.info : COLORS.success)
     .setTitle(t(unchanged ? 'languageSwitch.unchangedTitle' : 'languageSwitch.successTitle', next))
     .setDescription(

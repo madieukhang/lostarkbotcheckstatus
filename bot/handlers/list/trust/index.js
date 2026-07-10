@@ -6,6 +6,7 @@ import TrustedUser from '../../../models/TrustedUser.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName, normalizeRosterNames } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
+import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, replyAlert } from '../../../utils/interactionReplies.js';
 import { COLORS } from '../../../utils/ui.js';
@@ -16,15 +17,6 @@ import {
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
-
-function buildNameRosterQuery(names) {
-  const list = [...new Set(
-    names
-      .map((n) => String(n || '').trim())
-      .filter(Boolean)
-  )];
-  return { $or: [{ name: { $in: list } }, { allCharacters: { $in: list } }] };
-}
 
 export function createTrustHandlers() {
   async function handleListTrustCommand(interaction) {

@@ -17,6 +17,7 @@ import {
   parseAdditionalNames,
 } from '../../../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
+import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
@@ -96,7 +97,7 @@ export function createListEditCommandHandler({
 
     // Find existing entry across all lists (scope-aware for blacklist)
     const collation = { locale: 'en', strength: 2 };
-    const query = { $or: [{ name }, { allCharacters: name }] };
+    const query = buildNameRosterQuery(name);
     const editGuildId = interaction.guild.id;
     const editGuildConfig = await getGuildConfig(editGuildId);
     const editGuildDefaultScope = editGuildConfig?.defaultBlacklistScope || 'global';
@@ -245,16 +246,10 @@ export function createListEditCommandHandler({
 
     // Trusted user guard: block adding/moving trusted users to any list
     if (isTypeChange) {
-      const trustedCheck = await TrustedUser.findOne({
-        $or: [
-          { name: existing.name },
-          { allCharacters: existing.name },
-          ...(existing.allCharacters?.length > 0 ? [
-            { name: { $in: existing.allCharacters } },
-            { allCharacters: { $in: existing.allCharacters } },
-          ] : []),
-        ],
-      }).collation({ locale: 'en', strength: 2 }).lean();
+      const trustedCheck = await TrustedUser.findOne(buildNameRosterQuery([
+        existing.name,
+        ...(existing.allCharacters || []),
+      ])).collation({ locale: 'en', strength: 2 }).lean();
       if (trustedCheck) {
         const isSelf = trustedCheck.name.toLowerCase() === existing.name.toLowerCase();
         await editEmbed(

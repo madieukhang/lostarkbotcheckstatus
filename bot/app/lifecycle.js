@@ -10,12 +10,23 @@
 import { startMonitor } from '../monitor/monitor.js';
 import { setupAutoCheck } from '../handlers/list/auto-check.js';
 import { bootstrapClassEmoji } from '../services/discord/emoji-bootstrap.js';
+import { startAutoCheckCleanup } from '../services/setup/autoCheckCleanup.js';
 import { connectDB } from '../db.js';
 import Blacklist from '../models/Blacklist.js';
 import RosterCache from '../models/RosterCache.js';
 import TrustedUser from '../models/TrustedUser.js';
 import { backfillTrustedRosterLinks } from '../services/maintenance/trustedBackfill.js';
 import { registerCommands } from './command-registration.js';
+
+export function startReadyBackgroundServices(client, {
+  startMonitorFn = startMonitor,
+  setupAutoCheckFn = setupAutoCheck,
+  startAutoCheckCleanupFn = startAutoCheckCleanup,
+} = {}) {
+  startMonitorFn(client);
+  setupAutoCheckFn(client);
+  startAutoCheckCleanupFn(client);
+}
 
 /**
  * Build the `ready` event handler. Returned async function takes no
@@ -40,8 +51,7 @@ export function createReadyHandler(client) {
     );
 
     await registerCommands(client);
-    startMonitor(client);
-    setupAutoCheck(client);
+    startReadyBackgroundServices(client);
 
     backfillTrustedRosterLinks().catch((err) =>
       console.warn('[bot] trusted roster backfill rejected (non-fatal):', err?.message || err),

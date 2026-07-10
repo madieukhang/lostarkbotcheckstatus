@@ -3,8 +3,8 @@ import {
   AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
 } from 'discord.js';
+import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import {
   buildMultiaddTemplate,
@@ -22,7 +22,7 @@ export async function buildTemplateReply() {
     description: 'Lost Ark Bot · bulk add template',
   });
 
-  const templateEmbed = new EmbedBuilder()
+  const templateEmbed = createArtistEmbed()
     .setTitle('📋 Bulk Add Template')
     .setDescription(
       `Fill in up to **${MULTIADD_MAX_ROWS} rows**, then upload via:\n` +
@@ -86,7 +86,7 @@ export function buildPreviewReply(parsed, requestId, lang = 'en') {
     ? `**${parsed.rows.length}** valid row${parsed.rows.length === 1 ? '' : 's'} · **${parsed.errors.length}** error${parsed.errors.length === 1 ? '' : 's'} (see field below)`
     : `**${parsed.rows.length}** valid row${parsed.rows.length === 1 ? '' : 's'} ready to add`;
 
-  const previewEmbed = new EmbedBuilder()
+  const previewEmbed = createArtistEmbed()
     .setTitle(`📋 Bulk Add Preview · ${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'}`)
     .setDescription([headerLine, '', previewLines.join('\n')].join('\n').slice(0, 4096))
     .setColor(COLORS.info)

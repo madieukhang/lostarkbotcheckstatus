@@ -1,10 +1,10 @@
 import config from '../../config.js';
-import RosterSnapshot from '../../models/RosterSnapshot.js';
 import { getClassName, resolveClassId } from '../../models/Class.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 import { buildRosterCharacters } from '../roster/buildRosterCharacters.js';
+import { upsertRosterSnapshots } from '../roster/rosterSnapshots.js';
 import { getWorkerHealth } from '../worker/heartbeat.js';
 import { applyMarkedSiblingLevelCorrections } from './partyCorrections.js';
 import {
@@ -52,20 +52,12 @@ export async function enrichListCheckResults(results) {
         item.snapCombatScore = String(combatScore);
       }
       try {
-        const setOps = {
-          itemLevel: itemLevel || 0,
-          classId: classId || '',
-          rosterName: item.name,
-          updatedAt: new Date(),
-        };
-        if (combatScore && combatScore !== '?') {
-          setOps.combatScore = String(combatScore);
-        }
-        await RosterSnapshot.updateOne(
-          { name: item.name },
-          { $set: setOps },
-          { upsert: true, collation: { locale: 'en', strength: 2 } }
-        );
+        await upsertRosterSnapshots([{
+          name: item.name,
+          itemLevel,
+          classId,
+          combatScore,
+        }], item.name);
       } catch (saveErr) {
         // Snapshot upsert failure is non-fatal · in-memory enrichment
         // still renders for THIS call; next call just re-fetches.

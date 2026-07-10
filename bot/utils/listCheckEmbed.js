@@ -22,7 +22,7 @@
  *   nothing to celebrate).
  */
 
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from './artistVoice.js';
 
 /**
  * @typedef ListCheckRender
@@ -133,7 +133,7 @@ export function buildListCheckEmbed({
   }
   footerParts.push('SRC db blacklist + whitelist + watchlist + trusted');
 
-  const embed = new EmbedBuilder()
+  const embed = createArtistEmbed()
     .setAuthor({ name: kicker })
     .setTitle(title)
     .setDescription(description)

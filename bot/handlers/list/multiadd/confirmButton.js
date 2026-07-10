@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
@@ -215,7 +215,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
         }
       );
 
-      const waitEmbed = new EmbedBuilder()
+      const waitEmbed = createArtistEmbed()
         .setTitle('⏳ Bulk Add · Awaiting Senior Approval')
         .setDescription(
           `Your bulk add of **${pending.rows.length} rows** has been sent to Senior for approval.\n\n` +

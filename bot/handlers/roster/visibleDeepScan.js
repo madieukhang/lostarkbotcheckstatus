@@ -7,7 +7,7 @@
  * scan-session primitives in utils/scanProgressEmbed + scanSession.
  */
 
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
@@ -214,7 +214,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
           deepScanResultEmbed = scanEmbed;
         }
       } catch (err) {
-        deepScanResultEmbed = new EmbedBuilder()
+        deepScanResultEmbed = createArtistEmbed()
           .setTitle(`❌ Deep scan failed · ${name}`)
           .setDescription(`The detector threw: \`${err.message}\``)
           .setColor(COLORS.danger)

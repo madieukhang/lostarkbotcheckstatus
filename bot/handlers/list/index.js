@@ -28,6 +28,7 @@ import {
   createEvidenceHandlers,
   handleListEvidenceAutocomplete,
 } from './evidence/command.js';
+import { createBroadcastEvidenceButtonHandler } from './evidence/broadcastButton.js';
 import { createMultiaddHandlers } from './multiadd/index.js';
 import { createQuickAddHandlers } from './quickadd/index.js';
 import { createRemoveHandlers } from './remove/index.js';
@@ -44,6 +45,7 @@ export function createListHandlers({ client }) {
   const edit = createEditHandlers({ client, services });
   const enrich = createEnrichHandlers({ client, services });
   const evidence = createEvidenceHandlers({ client });
+  const handleBroadcastEvidenceButton = createBroadcastEvidenceButtonHandler({ client });
   const multiadd = createMultiaddHandlers({ client, services });
   const quickadd = createQuickAddHandlers({ client, services });
   const remove = createRemoveHandlers({ client, services });
@@ -57,6 +59,7 @@ export function createListHandlers({ client }) {
     handleListEditCommand: edit.handleListEditCommand,
     handleListEnrichCommand: enrich.handleListEnrichCommand,
     handleListEvidenceCommand: evidence.handleListEvidenceCommand,
+    handleBroadcastEvidenceButton,
     handleListRemoveCommand: remove.handleListRemoveCommand,
     handleListViewCommand: view.handleListViewCommand,
     handleListTrustCommand: trust.handleListTrustCommand,

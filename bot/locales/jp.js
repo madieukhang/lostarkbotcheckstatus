@@ -28,6 +28,8 @@ const jp = {
       keptExisting: '既存を維持済み',
       overwritten: '上書き済み',
       viewEvidenceFresh: '📎 evidence を見る (fresh)',
+      viewEvidence: 'evidence を見る',
+      openEvidence: 'evidence を開く',
       approveAdd: '承認 · {count} 件追加',
       confirmAdd: '{count} 件追加を確定',
       confirmAddCompact: '確定 · {count} 件追加',
@@ -49,6 +51,38 @@ const jp = {
     languageSwitch: {
       description: 'LoaLogs があなたへ返す言語を切り替えます',
     },
+  },
+
+  autoCheckWelcome: {
+    title: '🎨 Artist は通りすがりですわ～',
+    description: [
+      'Artist はこの channel をたまたま通りかかって、小さな案内板を残しただけですの。Screenshot を見守るのは LoaLogs ですわ。',
+      'Character 名が写った screenshot をここへ投稿すると、bot が画像を読み取り、server の各 list と照合しますの。',
+    ],
+    howName: '🔍 画像を投稿した後',
+    howValue: [
+      '1. LoaLogs が 🔍 reaction を付け、最大8名の character 名を抽出しますわ。',
+      '2. Blacklist、whitelist、watchlist、trusted record と照合しますの。',
+      '3. List 未登録の対象には officer 用 Quick Add が表示される場合がありますわ。',
+    ],
+    listsName: '📚 結果の読み方',
+    listsValue: [
+      'Black と watch は要注意、white と trusted は照合 context として表示されますの。',
+      '画像なしで手動検索する場合は /la-search name:<character> を使ってね♪',
+    ],
+    cleanupName: '🧹 この channel は毎日リセット',
+    cleanupValue: [
+      '毎日 **00:00 Asia/Ho_Chi_Minh (日本時間 02:00)** に、LoaLogs が pinned 以外の全 message を削除しますわ。',
+      'Pinned message は残りますの。大切な内容は cleanup 前に別の場所へ移してね♪',
+    ],
+    commandsName: '🧭 便利なコマンド',
+    commandsValue: [
+      '/la-check image:<screenshot> - 手動で画像を check',
+      '/la-roster name:<character> - roster を確認',
+      '/la-search name:<character> - search と list 照合',
+      '/la-help - 全コマンド guide',
+    ],
+    footer: 'Artist は先へ行きますわ～ この案内板は残しておきますの♪',
   },
 
   help: {
@@ -101,6 +135,8 @@ const jp = {
             '`/la-setup autochannel #channel` - この server の auto-check channel を設定',
             '`/la-setup notifychannel #channel` - list notification channel を設定',
             '`/la-setup view` - 現在の config を表示',
+            '`/la-setup repin` - pinned Artist guide を更新',
+            '`/la-setup language` - public message と pin の言語を変更',
             '`/la-setup off` - global list notifications の on/off',
             '`/la-setup defaultscope global/server` - /la-list add の default blacklist scope を設定',
           ],

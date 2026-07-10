@@ -1,5 +1,6 @@
-﻿import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder } from 'discord.js';
+﻿import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
@@ -54,7 +55,7 @@ export async function handleSetupRemoteCommand(interaction) {
     if (allGuilds.length === 0) {
       await editEmbed(
         interaction,
-        new EmbedBuilder().setTitle('🛰️ Remote Control · Dashboard').setDescription('*Bot is not in any server.*').setColor(COLORS.greyDark),
+        createArtistEmbed().setTitle('🛰️ Remote Control · Dashboard').setDescription('*Bot is not in any server.*').setColor(COLORS.greyDark),
       );
       return;
     }
@@ -70,7 +71,7 @@ export async function handleSetupRemoteCommand(interaction) {
       const updated = gc?.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '-';
       const configured = gc ? '✅' : '⚪';
 
-      const embed = new EmbedBuilder()
+      const embed = createArtistEmbed()
         .setTitle(`${isOwner ? '👑' : '🖥️'} ${guild.name} ${configured}`)
         .setDescription(`\`${guild.id}\`${isOwner ? ' · **Owner Server**' : ''}${!gc ? ' · *No config yet*' : ''}`)
         .addFields(
@@ -214,7 +215,7 @@ export async function handleSetupRemoteCommand(interaction) {
     );
     invalidateGuildConfig(config.ownerGuildId);
 
-    const embed = new EmbedBuilder()
+    const embed = createArtistEmbed()
       .setTitle('🖼️ Evidence Channel Updated')
       .setDescription(
         `New /la-list add image attachments will be rehosted to <#${channelOpt.id}> ` +
@@ -242,7 +243,7 @@ export async function handleSetupRemoteCommand(interaction) {
 
   // ── Need guild ID for off/defaultscope ───────────────────
   if (!targetGuildId) {
-    const helpEmbed = new EmbedBuilder()
+    const helpEmbed = createArtistEmbed()
       .setTitle('❌ Missing Guild ID')
       .setDescription('Use `action:view` first to see all guild IDs, then copy the ID here.')
       .addFields(
@@ -259,7 +260,7 @@ export async function handleSetupRemoteCommand(interaction) {
   // Validate target guild · bot must be in it
   const guildName = await resolveGuildName(targetGuildId);
   if (!guildName) {
-    const embed = new EmbedBuilder()
+    const embed = createArtistEmbed()
       .setTitle('❌ Guild Not Found')
       .setDescription(`Bot is not in a server with ID \`${targetGuildId}\`.\nUse \`action:view\` to see valid guild IDs.`)
       .setColor(COLORS.danger);
@@ -282,7 +283,7 @@ export async function handleSetupRemoteCommand(interaction) {
     );
     invalidateGuildConfig(targetGuildId);
 
-    const embed = new EmbedBuilder()
+    const embed = createArtistEmbed()
       .setTitle(`${newState ? '🔔' : '🔕'} Remote · Notify ${newState ? 'Enabled' : 'Disabled'}`)
       .addFields(
         { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
@@ -316,7 +317,7 @@ export async function handleSetupRemoteCommand(interaction) {
     invalidateGuildConfig(targetGuildId);
 
     const scopeDisplay = scopeValue === 'server' ? '🔒 Server (Local)' : '🌐 Global';
-    const embed = new EmbedBuilder()
+    const embed = createArtistEmbed()
       .setTitle(`${scopeValue === 'server' ? '🔒' : '🌐'} Remote · Scope Updated`)
       .addFields(
         { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },

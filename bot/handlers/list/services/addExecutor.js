@@ -20,8 +20,10 @@ import {
   buildRosterCharacters,
   fetchCharacterMeta,
   fetchNameSuggestions,
+  upsertRosterSnapshots,
 } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
+import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { ICONS } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
@@ -98,7 +100,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     // results and approval-flow error fallbacks read result.content for
     // a one-line description of why the executor refused.
     {
-      const trustedExact = await TrustedUser.findOne({ $or: [{ name }, { allCharacters: name }] })
+      const trustedExact = await TrustedUser.findOne(buildNameRosterQuery(name))
         .collation({ locale: 'en', strength: 2 }).lean();
       if (trustedExact) {
         const via = trustedExact.name.toLowerCase() === name.toLowerCase()
@@ -167,6 +169,16 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       };
     }
 
+    // Preserve the rich roster data while it is already in hand. Future
+    // edit/remove broadcasts can then render real class icons, ilvl, and CP
+    // without another bible request. Snapshot failure must not block a list
+    // moderation action, so this remains best-effort.
+    try {
+      await upsertRosterSnapshots(rosterCharacters, name);
+    } catch (err) {
+      console.warn('[list] Snapshot save after roster fetch failed (non-fatal):', err.message);
+    }
+
     // Step 2: Check ilvl >= 1700 (using exact ilvl from roster, not regex on HTML)
     if (targetItemLevel !== null && targetItemLevel < 1700) {
       return {
@@ -191,12 +203,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
     // Step 2b: Trusted user guard (alt check · after roster gives us allCharacters)
     if (allCharacters.length > 0) {
-      const trustedAlt = await TrustedUser.findOne({
-        $or: [
-          { name: { $in: allCharacters } },
-          { allCharacters: { $in: allCharacters } },
-        ],
-      })
+      const trustedAlt = await TrustedUser.findOne(buildNameRosterQuery(allCharacters))
         .collation({ locale: 'en', strength: 2 }).lean();
       if (trustedAlt) {
         return {
@@ -216,7 +223,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       // For blacklist: check global + this server's entries (avoid redundant adds)
       dupeQuery = {
         $and: [
-          { $or: [{ name }, { allCharacters: name }] },
+          buildNameRosterQuery(name),
           { $or: [
             { scope: 'global' },
             { scope: { $exists: false } }, // backward compat: old entries without scope
@@ -225,7 +232,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
         ],
       };
     } else {
-      dupeQuery = { $or: [{ name }, { allCharacters: name }] };
+      dupeQuery = buildNameRosterQuery(name);
     }
 
     const existed = await model.findOne(dupeQuery)

@@ -13,6 +13,7 @@ import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
+import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferUpdate, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage } from '../../../services/i18n/index.js';
@@ -88,7 +89,7 @@ export function createListAddOverwriteButtonHandler({
       if (!dupeEntry) {
         // Fallback: scope-aware find
         const name = normalizeCharacterName(payload.name);
-        const nameMatch = { $or: [{ name }, { allCharacters: name }] };
+        const nameMatch = buildNameRosterQuery(name);
         if (payload.type === 'black') {
           const entryScope = payload.scope || 'global';
           const scopeMatch = entryScope === 'server'

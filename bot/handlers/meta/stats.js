@@ -7,7 +7,7 @@
  * channel chat.
  */
 
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { connectDB } from '../../db.js';
 import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
 import { deferEphemeralReply, editEmbed } from '../../utils/interactionReplies.js';
@@ -66,7 +66,7 @@ export async function handleStatsCommand(interaction) {
   // Same card anatomy as the /la-list add result: icon title + one-line
   // hero description; the refresh hint lives in the footer tip instead
   // of eating a second description line.
-  const embed = new EmbedBuilder()
+  const embed = createArtistEmbed()
     .setTitle('📊 Bot Statistics')
     .setDescription(`Live snapshot of the bot's persistence + cache state.`)
     .addFields(

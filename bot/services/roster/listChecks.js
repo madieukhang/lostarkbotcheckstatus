@@ -11,6 +11,7 @@ import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
+import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 
 /**
  * Project a Blacklist/Whitelist entry to the slim shape the embeds
@@ -52,7 +53,7 @@ export async function handleRosterBlackListCheck(names, options = {}) {
     await connectDB();
 
     const { guildId } = options;
-    const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
+    const nameQuery = buildNameRosterQuery(names);
 
     const entry = await Blacklist.findOne(buildBlacklistQuery(nameQuery, guildId))
       .sort({ scope: -1 })
@@ -77,12 +78,7 @@ export async function handleRosterWhiteListCheck(names) {
     console.log(`[whitelist] Checking ${names.length} character(s):`, names.join(', '));
     await connectDB();
 
-    const entry = await Whitelist.findOne({
-      $or: [
-        { name: { $in: names } },
-        { allCharacters: { $in: names } },
-      ],
-    })
+    const entry = await Whitelist.findOne(buildNameRosterQuery(names))
       .collation({ locale: 'en', strength: 2 })
       .lean();
 

@@ -6,7 +6,7 @@
  * `deep:true` opts into the Stronghold alt-detection scan.
  */
 
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { JSDOM, VirtualConsole } from 'jsdom';
 
 const virtualConsole = new VirtualConsole();
@@ -28,8 +28,10 @@ import {
   parseRosterCharactersFromHtml,
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
+  upsertRosterSnapshots,
 } from '../../services/roster/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
+import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import {
   buildStrongholdScanLimitEmbed,
@@ -146,25 +148,10 @@ export async function handleRosterCommand(interaction) {
       description = description.slice(0, 4000) + '\n…';
     }
 
-    // Save/update snapshots in background
-    (async () => {
-      for (const c of characters) {
-        const ilvl = parseFloat((c.itemLevel ?? '0').replace(/,/g, ''));
-        await RosterSnapshot.updateOne(
-          { name: c.name },
-          {
-            $set: {
-              itemLevel: ilvl,
-              classId: c.classId || '',
-              combatScore: c.combatScore || '',
-              rosterName: name,
-              updatedAt: new Date(),
-            },
-          },
-          { upsert: true, collation: { locale: 'en', strength: 2 } }
-        );
-      }
-    })().catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
+    // Save/update snapshots in one shared bulk write. List broadcasts use the
+    // same cache, so class icons and stats stay consistent across surfaces.
+    upsertRosterSnapshots(characters, name)
+      .catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
 
     const charNames = characters
       .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1700)
@@ -173,12 +160,9 @@ export async function handleRosterCommand(interaction) {
     const [blacklistResult, whitelistResult, trustedResult] = await Promise.all([
       handleRosterBlackListCheck(charNames, { guildId: interaction.guild?.id }),
       handleRosterWhiteListCheck(charNames),
-      TrustedUser.findOne({
-        $or: [
-          { name: { $in: charNames } },
-          { allCharacters: { $in: charNames } },
-        ],
-      }).collation({ locale: 'en', strength: 2 }).lean(),
+      TrustedUser.findOne(buildNameRosterQuery(charNames))
+        .collation({ locale: 'en', strength: 2 })
+        .lean(),
     ]);
 
     const embedColor = blacklistResult ? COLORS.danger : whitelistResult ? COLORS.success : trustedResult ? COLORS.trustedSoft : COLORS.info;
@@ -198,7 +182,7 @@ export async function handleRosterCommand(interaction) {
       ? `${summaryLine}\n\n${description}`.slice(0, 4096)
       : description;
 
-    const embed = new EmbedBuilder()
+    const embed = createArtistEmbed()
       .setTitle(`🛡️ ${name}'s Roster · ${characters.length} character${characters.length === 1 ? '' : 's'}`)
       // Display URL goes through the helper so BIBLE_BASE_URL swaps cascade
       // here too. targetUrl above is intentionally still hardcoded · it's

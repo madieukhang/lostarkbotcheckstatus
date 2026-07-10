@@ -17,6 +17,13 @@ const guildConfigSchema = new mongoose.Schema({
   /** Channel ID where screenshots are auto-checked (OCR → list check) */
   autoCheckChannelId: { type: String, default: '' },
 
+  /** Tracked Artist welcome pin for the auto-check channel */
+  autoCheckWelcomeMessageId: { type: String, default: '' },
+  autoCheckWelcomeChannelId: { type: String, default: '' },
+
+  /** YYYY-MM-DD in Asia/Ho_Chi_Minh for the last completed daily cleanup */
+  lastAutoCheckCleanupKey: { type: String, default: '' },
+
   /** Channel ID where list add/remove notifications are broadcast */
   listNotifyChannelId: { type: String, default: '' },
 

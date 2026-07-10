@@ -8,7 +8,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { connectDB } from '../../../db.js';
 import { getGuildConfig } from '../../../utils/scope.js';
@@ -155,7 +155,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     // fields below carry the detail. The old bare-number Added/Skipped/
     // Failed 3-up was dropped · each detail field's header already shows
     // its count, so the 3-up said the same thing twice.
-    const embed = new EmbedBuilder()
+    const embed = createArtistEmbed()
       .setTitle(`📋 Bulk Add Complete · ${results.added.length}/${totalAttempted}`)
       .setDescription(headline)
       .setColor(color)
