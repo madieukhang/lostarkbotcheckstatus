@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { buildCommands } from '../bot/commands/index.js';
 import GuildConfig from '../bot/models/GuildConfig.js';
@@ -43,4 +44,17 @@ test('ready background services include the daily auto-check cleanup scheduler',
     ['auto-check', client],
     ['cleanup', client],
   ]);
+});
+
+test('/la-setup autochannel does not claim the cleanup day before cleanup runs', () => {
+  const source = readFileSync(
+    new URL('../bot/handlers/setup/guildSetup.js', import.meta.url),
+    'utf8'
+  );
+  const start = source.indexOf('async function handleSetupAutoChannel');
+  const end = source.indexOf('async function handleSetupNotifyChannel');
+  const handlerSource = source.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.doesNotMatch(handlerSource, /lastAutoCheckCleanupKey|getVietnamDayKey/);
 });

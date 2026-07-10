@@ -6,6 +6,10 @@ import {
   getSupportedLanguages,
   t,
 } from '../i18n/index.js';
+import {
+  cleanupAutoCheckChannelMessages,
+  getVietnamDayKey,
+} from './autoCheckCleanup.js';
 import { COLORS } from '../../utils/ui.js';
 
 function asText(value) {
@@ -39,7 +43,7 @@ export function buildAutoCheckWelcomeEmbed(lang) {
 }
 
 function pinnedMessages(response) {
-  const items = response?.items;
+  const items = response?.items || response;
   if (!items) return [];
   const pins = typeof items.values === 'function'
     ? [...items.values()]
@@ -53,6 +57,8 @@ export function createAutoCheckWelcomeService({
   GuildConfigModel = GuildConfig,
   buildWelcomeEmbed = buildAutoCheckWelcomeEmbed,
   getGuildLanguageFn = getGuildLanguage,
+  cleanupMessages = cleanupAutoCheckChannelMessages,
+  getCleanupDayKey = getVietnamDayKey,
   supportedLanguageCodes = getSupportedLanguages().map((entry) => entry.code),
   logger = console,
 } = {}) {
@@ -86,6 +92,8 @@ export function createAutoCheckWelcomeService({
 
   async function collectStaleRefs(channel, botUserId, stored) {
     const refs = new Map();
+    let pinScanSucceeded = false;
+    let hadOwnedWelcomePin = false;
     const add = (channelId, messageId, message = null) => {
       if (!channelId || !messageId) return;
       refs.set(channelId + ':' + messageId, { channelId, messageId, message });
@@ -98,15 +106,17 @@ export function createAutoCheckWelcomeService({
 
     try {
       const response = await channel.messages.fetchPins();
+      pinScanSucceeded = true;
       for (const message of pinnedMessages(response)) {
         if (isOwnedWelcome(message, botUserId)) {
+          hadOwnedWelcomePin = true;
           add(channel.id, message.id, message);
         }
       }
     } catch (err) {
       logger.warn?.('[auto-check welcome] pin scan failed:', err?.message || err);
     }
-    return refs;
+    return { refs, pinScanSucceeded, hadOwnedWelcomePin };
   }
 
   async function rollbackFresh(sent) {
@@ -153,12 +163,48 @@ export function createAutoCheckWelcomeService({
       pinned: false,
       persisted: false,
       removedOldCount: 0,
+      pinScanSucceeded: false,
+      hadOwnedWelcomePin: false,
+      cleanupAttempted: false,
+      cleanupComplete: false,
+      cleanupDeleted: 0,
+      cleanupFailed: 0,
+      cleanupTruncated: false,
     };
     const stored = await loadStoredConfig(guildId);
-    const staleRefs = await collectStaleRefs(channel, botUserId, stored);
+    const pinState = await collectStaleRefs(channel, botUserId, stored);
+    const { refs: staleRefs } = pinState;
+    outcome.pinScanSucceeded = pinState.pinScanSucceeded;
+    outcome.hadOwnedWelcomePin = pinState.hadOwnedWelcomePin;
     const lang = await getGuildLanguageFn(guildId, {
       GuildConfigModel,
     });
+
+    // A channel without a live LoaLogs welcome pin is considered a first-time
+    // setup surface. Clean non-pinned traffic before creating the guide so the
+    // guide becomes the stable top-level anchor instead of landing below an
+    // inherited wall of messages. If pin discovery itself failed, skip this
+    // destructive step and let the daily scheduler retry safely later.
+    if (outcome.pinScanSucceeded && !outcome.hadOwnedWelcomePin) {
+      outcome.cleanupAttempted = true;
+      try {
+        const cleanup = await cleanupMessages(channel);
+        outcome.cleanupDeleted = Number(cleanup?.deleted) || 0;
+        outcome.cleanupFailed = Number(cleanup?.failed) || 0;
+        outcome.cleanupTruncated = Boolean(cleanup?.truncated);
+        outcome.cleanupComplete = outcome.cleanupFailed === 0 && !outcome.cleanupTruncated;
+        if (!outcome.cleanupComplete) {
+          logger.warn?.(
+            '[auto-check welcome] initial cleanup incomplete: deleted=' + outcome.cleanupDeleted +
+            ' failed=' + outcome.cleanupFailed +
+            ' truncated=' + outcome.cleanupTruncated
+          );
+        }
+      } catch (err) {
+        outcome.cleanupFailed = 1;
+        logger.warn?.('[auto-check welcome] initial cleanup failed:', err?.message || err);
+      }
+    }
 
     let sent;
     try {
@@ -174,13 +220,17 @@ export function createAutoCheckWelcomeService({
     }
 
     try {
+      const persistedState = {
+        autoCheckWelcomeMessageId: sent.id,
+        autoCheckWelcomeChannelId: channel.id,
+      };
+      if (outcome.cleanupComplete) {
+        persistedState.lastAutoCheckCleanupKey = getCleanupDayKey();
+      }
       await GuildConfigModel.findOneAndUpdate(
         { guildId },
         {
-          $set: {
-            autoCheckWelcomeMessageId: sent.id,
-            autoCheckWelcomeChannelId: channel.id,
-          },
+          $set: persistedState,
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );

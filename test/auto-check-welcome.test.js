@@ -171,6 +171,137 @@ test('welcome replacement persists the fresh pin before deleting tracked and orp
   });
 });
 
+test('first welcome cleans non-pinned messages before posting and records the cleanup day', async () => {
+  const fresh = createMessage('fresh', 'Welcome vi');
+  const events = [];
+  const channel = {
+    id: 'channel-1',
+    messages: {
+      fetchPins: async () => ({ items: [] }),
+    },
+    async send() {
+      events.push('send:fresh');
+      return fresh;
+    },
+  };
+  const originalPin = fresh.pin.bind(fresh);
+  fresh.pin = async () => {
+    events.push('pin:fresh');
+    await originalPin();
+  };
+  const GuildConfigModel = createGuildConfig();
+  const originalPersist = GuildConfigModel.findOneAndUpdate.bind(GuildConfigModel);
+  GuildConfigModel.findOneAndUpdate = async (...args) => {
+    events.push('persist:fresh');
+    return originalPersist(...args);
+  };
+  const service = createAutoCheckWelcomeService({
+    GuildConfigModel,
+    buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
+    getGuildLanguageFn: async () => 'vi',
+    cleanupMessages: async () => {
+      events.push('cleanup:first');
+      return { deleted: 12, failed: 0, truncated: false };
+    },
+    getCleanupDayKey: () => '2026-07-10',
+    supportedLanguageCodes: ['en', 'vi', 'jp'],
+    logger: { warn() {} },
+  });
+
+  const outcome = await service.postWelcome({
+    botUserId: 'bot',
+    channel,
+    client: { channels: { fetch: async () => channel } },
+    guildId: 'guild-1',
+  });
+
+  assert.deepEqual(events, [
+    'cleanup:first',
+    'send:fresh',
+    'pin:fresh',
+    'persist:fresh',
+  ]);
+  assert.equal(outcome.hadOwnedWelcomePin, false);
+  assert.equal(outcome.cleanupAttempted, true);
+  assert.equal(outcome.cleanupComplete, true);
+  assert.equal(outcome.cleanupDeleted, 12);
+  assert.deepEqual(GuildConfigModel.updates[0].update.$set, {
+    autoCheckWelcomeMessageId: 'fresh',
+    autoCheckWelcomeChannelId: 'channel-1',
+    lastAutoCheckCleanupKey: '2026-07-10',
+  });
+});
+
+test('first welcome skips destructive cleanup when pin discovery fails', async () => {
+  const fresh = createMessage('fresh', 'Welcome en');
+  let cleanupCalls = 0;
+  const channel = {
+    id: 'channel-1',
+    messages: {
+      fetchPins: async () => {
+        throw new Error('pins unavailable');
+      },
+    },
+    send: async () => fresh,
+  };
+  const GuildConfigModel = createGuildConfig();
+  const service = createAutoCheckWelcomeService({
+    GuildConfigModel,
+    buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
+    getGuildLanguageFn: async () => 'en',
+    cleanupMessages: async () => {
+      cleanupCalls += 1;
+      return { deleted: 1, failed: 0, truncated: false };
+    },
+    getCleanupDayKey: () => '2026-07-10',
+    supportedLanguageCodes: ['en', 'vi', 'jp'],
+    logger: { warn() {} },
+  });
+
+  const outcome = await service.postWelcome({
+    botUserId: 'bot',
+    channel,
+    client: { channels: { fetch: async () => channel } },
+    guildId: 'guild-1',
+  });
+
+  assert.equal(cleanupCalls, 0);
+  assert.equal(outcome.pinScanSucceeded, false);
+  assert.equal(outcome.cleanupAttempted, false);
+  assert.equal(GuildConfigModel.updates[0].update.$set.lastAutoCheckCleanupKey, undefined);
+});
+
+test('incomplete first cleanup leaves the day unclaimed so the scheduler can retry', async () => {
+  const fresh = createMessage('fresh', 'Welcome en');
+  const channel = {
+    id: 'channel-1',
+    messages: { fetchPins: async () => ({ items: [] }) },
+    send: async () => fresh,
+  };
+  const GuildConfigModel = createGuildConfig();
+  const service = createAutoCheckWelcomeService({
+    GuildConfigModel,
+    buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
+    getGuildLanguageFn: async () => 'en',
+    cleanupMessages: async () => ({ deleted: 3, failed: 1, truncated: false }),
+    getCleanupDayKey: () => '2026-07-10',
+    supportedLanguageCodes: ['en', 'vi', 'jp'],
+    logger: { warn() {} },
+  });
+
+  const outcome = await service.postWelcome({
+    botUserId: 'bot',
+    channel,
+    client: { channels: { fetch: async () => channel } },
+    guildId: 'guild-1',
+  });
+
+  assert.equal(outcome.cleanupAttempted, true);
+  assert.equal(outcome.cleanupComplete, false);
+  assert.equal(outcome.pinned, true);
+  assert.equal(GuildConfigModel.updates[0].update.$set.lastAutoCheckCleanupKey, undefined);
+});
+
 test('welcome replacement rolls back the fresh message and preserves old pins on DB failure', async () => {
   const old = createMessage('old', 'Welcome en');
   const fresh = createMessage('fresh', 'Welcome vi');
