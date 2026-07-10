@@ -142,7 +142,7 @@ const vi = {
         {
           name: '🌐 Cá nhân',
           lines: [
-            '`/la-language-switch` - Đổi ngôn ngữ LoaLogs cho account của cậu',
+            '`/la-language-switch` - Đổi ngôn ngữ Artist dùng với cậu',
           ],
         },
       ],
@@ -365,8 +365,8 @@ const vi = {
   },
 
   languageSwitch: {
-    title: '🌐 Đổi ngôn ngữ LoaLogs',
-    description: 'Chọn ngôn ngữ cậu muốn LoaLogs dùng. Những phần đã hỗ trợ locale sẽ hiển thị bằng ngôn ngữ này từ giờ.',
+    title: '🌐 Đổi ngôn ngữ Artist',
+    description: 'Chọn ngôn ngữ cậu muốn tớ dùng. Những phần đã hỗ trợ locale sẽ hiển thị bằng ngôn ngữ này từ giờ.',
     currentLine: 'Hiện tại: **{flag} {label}**',
     placeholder: '🌐 Chọn ngôn ngữ...',
     options: {
@@ -375,7 +375,7 @@ const vi = {
       jp: '日本語 (giọng Senko)',
     },
     successTitle: '🌐 Đã đổi ngôn ngữ',
-    successDescription: 'Từ giờ LoaLogs sẽ nói với cậu bằng **{flag} {label}**.',
+    successDescription: 'Từ giờ tớ sẽ nói với cậu bằng **{flag} {label}** nha~',
     unchangedTitle: '🌐 Ngôn ngữ không đổi',
     unchangedDescription: 'Cậu vẫn đang dùng **{flag} {label}** mà.',
     footer: '/la-language-switch để đổi lại bất cứ lúc nào',

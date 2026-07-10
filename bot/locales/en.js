@@ -154,7 +154,7 @@ const en = {
       },
     },
     languageSwitch: {
-      description: 'Switch the language LoaLogs uses for your responses',
+      description: 'Switch the language Artist uses for your responses',
     },
     setup: {
       description: 'Configure bot channels for this server',
@@ -331,7 +331,7 @@ const en = {
         {
           name: '🌐 Personal',
           lines: [
-            '`/la-language-switch` - Switch LoaLogs language for your account',
+            '`/la-language-switch` - Switch the language Artist uses with you',
           ],
         },
       ],
@@ -554,8 +554,8 @@ const en = {
   },
 
   languageSwitch: {
-    title: '🌐 Switch LoaLogs language',
-    description: 'Pick the language you want LoaLogs to use. Supported responses will display in that language going forward.',
+    title: '🌐 Switch the language Artist uses',
+    description: 'Pick the language you want me to use. Supported responses will display in that language going forward.',
     currentLine: 'Current: **{flag} {label}**',
     placeholder: '🌐 Pick a language...',
     options: {
@@ -564,7 +564,7 @@ const en = {
       jp: '日本語 (Senko-flavored)',
     },
     successTitle: '🌐 Language updated',
-    successDescription: 'LoaLogs will speak **{flag} {label}** with you from now on.',
+    successDescription: 'I will speak **{flag} {label}** with you from now on.',
     unchangedTitle: '🌐 Language unchanged',
     unchangedDescription: "You're already using **{flag} {label}**.",
     footer: 'Run /la-language-switch any time to switch back',

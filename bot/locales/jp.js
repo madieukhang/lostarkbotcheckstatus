@@ -142,7 +142,7 @@ const jp = {
         {
           name: '🌐 個人設定',
           lines: [
-            '`/la-language-switch` - あなたの LoaLogs 表示言語を切り替え',
+            '`/la-language-switch` - Artist の表示言語を切り替え',
           ],
         },
       ],
@@ -365,8 +365,8 @@ const jp = {
   },
 
   languageSwitch: {
-    title: '🌐 LoaLogs の言語を変更',
-    description: 'LoaLogs に使ってほしい言語を選んでくださいませ。Locale 対応済みの response はこれからその言語で表示されますわ。',
+    title: '🌐 Artist の言語を変更',
+    description: 'わたくしに使ってほしい言語を選んでくださいませ。Locale 対応済みの response はこれからその言語で表示されますわ。',
     currentLine: '現在: **{flag} {label}**',
     placeholder: '🌐 言語を選んでください...',
     options: {
@@ -375,7 +375,7 @@ const jp = {
       jp: '日本語 (Senko 風)',
     },
     successTitle: '🌐 言語を変更しました',
-    successDescription: 'これから LoaLogs は **{flag} {label}** でお話しますわ。',
+    successDescription: 'これからわたくしは **{flag} {label}** でお話しますわ。',
     unchangedTitle: '🌐 言語は変わっていません',
     unchangedDescription: 'もう **{flag} {label}** を使っていますわ。',
     footer: 'いつでも /la-language-switch で変更できます',
