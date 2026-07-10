@@ -66,8 +66,8 @@ test('LoaLogs locale supports en, vi, and jp with English default', () => {
 
 test('t resolves nested strings, arrays, objects, and fallback keys', () => {
   assert.equal(t('commands.status.description'), 'Show live server status');
-  assert.equal(t('languageSwitch.title', 'vi'), '🌐 Đổi ngôn ngữ LoaLogs');
-  assert.equal(t('languageSwitch.title', 'jp'), '🌐 LoaLogs の言語を変更');
+  assert.equal(t('languageSwitch.title', 'vi'), '🌐 Đổi ngôn ngữ Artist');
+  assert.equal(t('languageSwitch.title', 'jp'), '🌐 Artist の言語を変更');
   assert.deepEqual(t('help.sections.multiadd.fields.0.value').slice(0, 2), [
     '**1.** `/la-list multiadd action:template` -> Bot sends a blank template file',
     '**2.** Open in Excel, delete the yellow example row, fill in up to 30 rows',
