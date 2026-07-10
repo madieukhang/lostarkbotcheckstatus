@@ -59,7 +59,7 @@ const SEVERITY_CONFIG = Object.freeze({
  *
  * @param {Object} options
  * @param {string} options.severity - One of AlertSeverity.*
- * @param {string} options.title - Short title, shown with severity icon prefix
+ * @param {string} [options.title] - Short title, shown with severity icon prefix
  * @param {string} [options.description] - Body text, markdown allowed
  * @param {Array<{name: string, value: string, inline?: boolean}>} [options.fields] - Structured data fields
  * @param {string} [options.footer] - Footer hint (e.g. "Use /la-list view ...")
@@ -87,9 +87,11 @@ export function buildAlertEmbed({
   const finalIcon = titleIcon ?? config.icon;
   const finalColor = color ?? config.color;
 
-  const embed = new EmbedBuilder()
-    .setTitle(finalIcon ? `${finalIcon}  ${title}` : title)
-    .setColor(finalColor);
+  const embed = new EmbedBuilder().setColor(finalColor);
+
+  if (title) {
+    embed.setTitle(finalIcon ? `${finalIcon}  ${title}` : title);
+  }
 
   if (description) {
     embed.setDescription(description);
@@ -112,4 +114,42 @@ export function buildAlertEmbed({
   }
 
   return decorateArtistEmbed(embed, { lang });
+}
+
+const LEADING_NOTICE_ICON = /^(?:✅|⚠️|❌|ℹ️|🛡️|⏳|🔍|🔔|🔕|🌐|🔒|🛑|✖️)\s*/u;
+
+/**
+ * Turn a localized text notice into the same compact embed shape used by
+ * RaidManage. The first short line becomes the title; any remaining lines
+ * become the description. This keeps simple command results readable without
+ * forcing every handler to invent a one-off title/description pair.
+ */
+export function buildNoticeEmbed(content, {
+  severity = AlertSeverity.INFO,
+  title,
+  titleIcon,
+  color,
+  footer,
+  timestamp = false,
+  lang = 'en',
+} = {}) {
+  const text = String(content ?? '').trim();
+  const lines = text.split(/\r?\n/);
+  const firstLine = (lines[0] || '').replace(LEADING_NOTICE_ICON, '').trim();
+  const canPromoteFirstLine = !title && firstLine.length > 0 && firstLine.length <= 256;
+  const resolvedTitle = title || (canPromoteFirstLine ? firstLine : undefined);
+  const description = canPromoteFirstLine
+    ? lines.slice(1).join('\n').trim()
+    : text;
+
+  return buildAlertEmbed({
+    severity,
+    title: resolvedTitle,
+    description: description || undefined,
+    titleIcon,
+    color,
+    footer,
+    timestamp,
+    lang,
+  });
 }

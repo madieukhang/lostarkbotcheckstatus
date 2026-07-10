@@ -6,7 +6,7 @@ import {
 
 import { COLORS, ICONS } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
-import { editPayload, replyAlert, replyContent, replyEmbed } from '../../utils/interactionReplies.js';
+import { editPayload, replyAlert, replyEmbed, replyNotice } from '../../utils/interactionReplies.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
@@ -92,7 +92,10 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
     const entry = pickEvidenceEntry(result);
 
     if (!entryHasImage(entry)) {
-      await replyContent(sel, t('listView.evidence.noImage', lang));
+      await replyNotice(sel, t('listView.evidence.noImage', lang), {
+        severity: AlertSeverity.WARNING,
+        lang,
+      });
       return;
     }
 

@@ -21,6 +21,7 @@ import {
   listTypeIcon,
 } from '../helpers.js';
 import { COLORS } from '../../../utils/ui.js';
+import { AlertSeverity, buildNoticeEmbed } from '../../../utils/alertEmbed.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
@@ -259,10 +260,17 @@ export function createApprovalServices({
       })}`;
 
       const decisionPayload = {
-        content: decisionContent,
-        // The executor result is rendered for the approver's private locale.
-        // Keep the channel announcement locale-pure instead of leaking that DM.
-        embeds: [],
+        // Keep only the ping outside the card; all readable copy belongs to
+        // the guild-language embed so the requester still gets notified.
+        content: `<@${payload.requestedByUserId}>`,
+        allowedMentions: { users: [payload.requestedByUserId] },
+        embeds: [buildNoticeEmbed(
+          decisionContent.replace(`<@${payload.requestedByUserId}>`, '').trim(),
+          {
+            severity: rejected ? AlertSeverity.ERROR : AlertSeverity.SUCCESS,
+            lang,
+          }
+        )],
         components: [],
       };
 

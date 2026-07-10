@@ -8,7 +8,7 @@
  *
  * Each session caches the meta + guild member fetches from the original
  * scan so a Continue click does not re-fetch them. The primary-embed
- * payload (roster card + content lines) is stored as a serialized
+ * payload is stored as a serialized
  * snapshot so the resume can re-edit the message without re-running
  * the visible-roster scrape or the blacklist/whitelist match.
  *
@@ -36,7 +36,6 @@ function newSessionId() {
  * @property {Array<object>} allDiscoveredAlts - cumulative alts
  * @property {number} [cap] - candidate limit for the scan
  * @property {Array<object>} primaryEmbedJSON - first-embed snapshot rebuilt on Continue
- * @property {string} [contentText] - optional message content prefix (visible path)
  * @property {NodeJS.Timeout} expireTimer
  */
 

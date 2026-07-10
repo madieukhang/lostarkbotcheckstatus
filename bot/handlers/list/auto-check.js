@@ -17,7 +17,7 @@ import {
   formatCheckResults,
 } from '../../services/list-check/service.js';
 import { getGuildConfig } from '../../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 import { getGuildLanguage, t } from '../../services/i18n/index.js';
@@ -242,11 +242,13 @@ export function createAutoCheckMessageHandler({
 
       const limitedNames = names.slice(0, maxNames);
 
-      // Send progress message immediately after OCR. Plain content here
-      // (not an embed) because this is a transient "working on it" line
-      // that gets edited into a full embed below within seconds.
+      // Send progress immediately after OCR using the same notice-card
+      // surface as slash commands. It is replaced by the full result card.
       const progressMsg = await message.reply({
-        content: `🔍 ${t(textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
+        embeds: [buildNoticeEmbed(
+          `🔍 ${t(textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
+          { severity: AlertSeverity.INFO, titleIcon: '🔍', lang }
+        )],
       });
 
       const results = await checkNamesAgainstListsFn(limitedNames, { guildId: message.guild.id });
@@ -295,7 +297,7 @@ export function createAutoCheckMessageHandler({
       const evidenceRow = buildAutoCheckEvidenceRowFn(results, lang);
       if (evidenceRow) components.push(evidenceRow);
 
-      await progressMsg.edit({ content: '', embeds: [embed], components });
+      await progressMsg.edit({ content: null, embeds: [embed], components });
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
       await message.react('✅').catch(() => {});
     } catch (err) {

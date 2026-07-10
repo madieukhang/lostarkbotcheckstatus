@@ -9,8 +9,10 @@ import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   editPayload,
+  editNotice,
   replyAlert,
   updateAlert,
+  updateNotice,
   updatePayload,
 } from '../../../utils/interactionReplies.js';
 import {
@@ -75,17 +77,26 @@ export function createMultiaddConfirmButtonHandler(deps) {
     clearMultiaddPending(requestId);
 
     if (isOfficerOrSenior(pending.requesterId)) {
-      await updatePayload(interaction, {
-        content: `⏳ ${t('dialogue.multiadd.confirm.processing', lang, { count: pending.rows.length, seconds: Math.ceil(pending.rows.length * 0.7) })}`,
-        embeds: [],
+      await updateNotice(interaction, t('dialogue.multiadd.confirm.processing', lang, {
+        count: pending.rows.length,
+        seconds: Math.ceil(pending.rows.length * 0.7),
+      }), {
+        severity: AlertSeverity.INFO,
+        titleIcon: '⏳',
+        lang,
         components: [],
       });
 
       const onProgress = async (current, total) => {
         if (current % 5 !== 0 && current !== total) return;
         try {
-          await editPayload(interaction, {
-            content: `⏳ ${t('dialogue.multiadd.confirm.progress', lang, { current, total })}`,
+          await editNotice(interaction, t('dialogue.multiadd.confirm.progress', lang, {
+            current,
+            total,
+          }), {
+            severity: AlertSeverity.INFO,
+            titleIcon: '⏳',
+            lang,
           });
         } catch { /* ignore progress errors */ }
       };

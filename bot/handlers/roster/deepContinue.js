@@ -135,7 +135,7 @@ export async function handleRosterDeepContinueButton(interaction) {
 
   const primaryEmbed = EmbedBuilder.from(session.primaryEmbedJSON);
   await replyEditor.edit({
-    content: session.contentText || '',
+    content: null,
     embeds: [primaryEmbed, progressEmbed],
     components: [buildStopButtonRow(scanSessionId, { lang })],
   }).catch(() => {});
@@ -175,7 +175,7 @@ export async function handleRosterDeepContinueButton(interaction) {
 
   if (scanThrownError) {
     await replyEditor.edit({
-      content: session.contentText || '',
+      content: null,
       embeds: [
         primaryEmbed,
         buildAlertEmbed({
@@ -192,7 +192,7 @@ export async function handleRosterDeepContinueButton(interaction) {
 
   if (!altResult) {
     await replyEditor.edit({
-      content: session.contentText || '',
+      content: null,
       embeds: [primaryEmbed],
       components: [],
     }).catch(() => {});
@@ -256,7 +256,7 @@ export async function handleRosterDeepContinueButton(interaction) {
   }
 
   await replyEditor.edit({
-    content: session.contentText || '',
+    content: null,
     embeds: [primaryEmbed, resultEmbed],
     components,
   });

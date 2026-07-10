@@ -17,8 +17,8 @@ import {
   editComponents,
   editEmbed,
   replyAlert,
-  replyContent,
   replyEmbed,
+  replyNotice,
 } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getListContext } from '../helpers.js';
@@ -219,7 +219,10 @@ export function createViewHandlers({ client }) {
           const index = parseInt(componentInteraction.values[0], 10);
           const entry = allEntries[index];
           if (!entry?.imageMessageId && !entry?.imageUrl) {
-            await replyContent(componentInteraction, t('listView.evidence.noImage', lang));
+            await replyNotice(componentInteraction, t('listView.evidence.noImage', lang), {
+              severity: AlertSeverity.WARNING,
+              lang,
+            });
             return;
           }
 

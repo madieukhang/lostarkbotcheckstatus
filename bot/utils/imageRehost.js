@@ -23,6 +23,7 @@
 import { AttachmentBuilder } from 'discord.js';
 import config from '../config.js';
 import { getGuildConfig } from './scope.js';
+import { AlertSeverity, buildNoticeEmbed } from './alertEmbed.js';
 
 /**
  * Resolve the configured evidence channel ID, or null if not configured.
@@ -124,12 +125,12 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     return fail(`evidence channel ${channelId} is not a text channel`);
   }
 
-  // Step 3: Send the file with metadata in the message content for audit trail
+  // Step 3: Send the file with metadata in an embed for the audit trail.
   try {
     const attachment = new AttachmentBuilder(buffer, { name: filename });
 
     // Audit metadata so a human looking at #evidence-archive can see what each
-    // image is for. Plain text only · no embed, no mentions, no spam pings.
+    // image is for. Mentions remain disabled to avoid archive-channel pings.
     const auditLines = [];
     if (meta.entryName) {
       const icon = meta.listType === 'black' ? '⛔'
@@ -142,7 +143,10 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     auditLines.push(`<t:${Math.floor(Date.now() / 1000)}:f>`);
 
     const sentMessage = await channel.send({
-      content: auditLines.join(' · '),
+      embeds: [buildNoticeEmbed(auditLines.join('\n'), {
+        severity: AlertSeverity.INFO,
+        titleIcon: '📎',
+      })],
       files: [attachment],
       allowedMentions: { parse: [] }, // suppress all pings
     });

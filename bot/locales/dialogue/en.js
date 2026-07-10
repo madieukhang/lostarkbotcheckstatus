@@ -3,6 +3,10 @@ export default {
     errorField: 'Error',
     missingField: 'Missing',
     unknown: 'Unknown',
+    unexpected: {
+      title: 'That action slipped away',
+      description: 'I could not finish it this time. Please try again; if it keeps happening, let an officer know.',
+    },
     serverOnly: {
       title: 'This belongs in a server',
       description: 'I can only use this command inside a Discord server, not in DMs.',

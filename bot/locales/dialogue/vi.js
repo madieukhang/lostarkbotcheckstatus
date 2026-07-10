@@ -3,6 +3,10 @@ export default {
     errorField: 'Lỗi',
     missingField: 'Còn thiếu',
     unknown: 'Không rõ',
+    unexpected: {
+      title: 'Thao tác này vừa trượt mất rồi',
+      description: 'Tớ chưa thể hoàn tất lần này. Cậu thử lại nhé; nếu vẫn lặp lại, báo cho officer giúp tớ.',
+    },
     serverOnly: {
       title: 'Chỗ này chỉ dùng trong server thôi',
       description: 'Lệnh này chỉ hoạt động trong Discord server, không dùng được trong DM đâu nhé.',

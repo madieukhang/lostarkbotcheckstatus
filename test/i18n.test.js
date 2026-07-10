@@ -12,6 +12,7 @@ import rawJp from '../bot/locales/jp.js';
 import {
   clearGuildLanguageCache,
   clearUserLanguageCache,
+  getCachedUserLanguage,
   getGuildLanguage,
   getSupportedLanguages,
   getUserLanguage,
@@ -137,7 +138,9 @@ test('user language helpers normalize and cache through the UserPreference model
     },
   };
 
+  assert.equal(getCachedUserLanguage('user-1'), 'en');
   assert.equal(await getUserLanguage('user-1', { UserPreferenceModel }), 'jp');
+  assert.equal(getCachedUserLanguage('user-1'), 'jp');
   assert.equal(await getUserLanguage('user-1', { UserPreferenceModel }), 'jp');
   assert.equal(findCount, 1);
 
@@ -145,6 +148,7 @@ test('user language helpers normalize and cache through the UserPreference model
     UserPreferenceModel,
     user: { username: 'senko', globalName: 'Senko', displayName: 'Senko Bot' },
   }), 'vi');
+  assert.equal(getCachedUserLanguage('user-1'), 'vi');
   assert.deepEqual(updates[0][1], {
     $set: {
       language: 'vi',

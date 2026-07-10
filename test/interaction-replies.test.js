@@ -7,13 +7,14 @@ import {
   deferUpdate,
   editAlert,
   editComponents,
-  editContent,
   editEmbed,
+  editNotice,
   editPayload,
   replyAlert,
-  replyContent,
   replyEmbed,
+  replyNotice,
   updateEmbed,
+  updateNotice,
   updatePayload,
 } from '../bot/utils/interactionReplies.js';
 import { AlertSeverity } from '../bot/utils/alertEmbed.js';
@@ -45,16 +46,19 @@ test('replyEmbed can send public replies without nesting embeds', async () => {
   });
 });
 
-test('replyContent keeps ephemeral content replies consistent', async () => {
+test('replyNotice keeps simple replies inside an ephemeral embed', async () => {
   const calls = [];
   const interaction = { reply: async (payload) => calls.push(payload) };
 
-  await replyContent(interaction, 'No image', { ephemeral: true });
-
-  assert.deepEqual(calls[0], {
-    content: 'No image',
+  await replyNotice(interaction, 'No image', {
+    severity: AlertSeverity.WARNING,
     ephemeral: true,
   });
+
+  assert.equal(calls[0].content, undefined);
+  assert.equal(calls[0].ephemeral, true);
+  assert.equal(calls[0].embeds.length, 1);
+  assert.match(calls[0].embeds[0].toJSON().title, /No image/);
 });
 
 test('editEmbed and updateEmbed preserve extra payload fields', async () => {
@@ -73,16 +77,32 @@ test('editEmbed and updateEmbed preserve extra payload fields', async () => {
   assert.deepEqual(updateCalls[0], { components: [], embeds: [embed] });
 });
 
-test('editContent preserves content-only edit payloads', async () => {
-  const calls = [];
-  const interaction = { editReply: async (payload) => calls.push(payload) };
+test('editNotice and updateNotice clear legacy content and preserve components', async () => {
+  const editCalls = [];
+  const updateCalls = [];
+  const interaction = {
+    editReply: async (payload) => editCalls.push(payload),
+    update: async (payload) => updateCalls.push(payload),
+  };
 
-  await editContent(interaction, 'Working...', { components: [] });
-
-  assert.deepEqual(calls[0], {
-    content: 'Working...',
+  await editNotice(interaction, 'Working...\nPlease wait.', {
+    titleIcon: '⏳',
     components: [],
   });
+  await updateNotice(interaction, 'Cancelled', {
+    severity: AlertSeverity.WARNING,
+    components: [],
+  });
+
+  assert.equal(editCalls[0].content, null);
+  assert.equal(editCalls[0].embeds.length, 1);
+  assert.match(editCalls[0].embeds[0].toJSON().title, /Working/);
+  assert.equal(editCalls[0].embeds[0].toJSON().description, 'Please wait.');
+  assert.deepEqual(editCalls[0].components, []);
+
+  assert.equal(updateCalls[0].content, null);
+  assert.equal(updateCalls[0].embeds.length, 1);
+  assert.match(updateCalls[0].embeds[0].toJSON().title, /Cancelled/);
 });
 
 test('editComponents preserves component-only edit payloads', async () => {

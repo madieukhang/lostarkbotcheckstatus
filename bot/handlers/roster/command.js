@@ -192,16 +192,16 @@ export async function handleRosterCommand(interaction) {
       .setTimestamp();
 
     const embeds = [embed];
-    const contentLines = [];
+    const statusLines = [];
 
     if (trustedResult) {
-      contentLines.push(`🛡️ ${t('dialogue.roster.trusted', lang, { name: trustedResult.name })}${trustedResult.reason ? ` · *${trustedResult.reason}*` : ''}`);
+      statusLines.push(`🛡️ ${t('dialogue.roster.trusted', lang, { name: trustedResult.name })}${trustedResult.reason ? ` · *${trustedResult.reason}*` : ''}`);
     }
 
     if (blacklistResult) {
       const reason = blacklistResult.reason ? ` · *${blacklistResult.reason}*` : '';
       const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
-      contentLines.push(`⛔ ${t('dialogue.roster.blacklisted', lang, { name })}${raid}${reason}`);
+      statusLines.push(`⛔ ${t('dialogue.roster.blacklisted', lang, { name })}${raid}${reason}`);
 
       // Use the shared buildEvidenceEmbed so the inline evidence card
       // matches /la-evidence, /la-search, /la-list view, /la-check.
@@ -216,7 +216,7 @@ export async function handleRosterCommand(interaction) {
     if (whitelistResult) {
       const reason = whitelistResult.reason ? ` · *${whitelistResult.reason}*` : '';
       const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
-      contentLines.push(`✅ ${t('dialogue.roster.whitelisted', lang, { name })}${raid}${reason}`);
+      statusLines.push(`✅ ${t('dialogue.roster.whitelisted', lang, { name })}${raid}${reason}`);
 
       const whiteImageUrl = await resolveDisplayImageUrl(whitelistResult, interaction.client);
       if (whiteImageUrl) {
@@ -224,14 +224,18 @@ export async function handleRosterCommand(interaction) {
       }
     }
 
+    if (statusLines.length > 0) {
+      const statusBlock = statusLines.join('\n');
+      const remaining = Math.max(0, 4096 - statusBlock.length - 2);
+      embed.setDescription([statusBlock, fullDescription.slice(0, remaining)].join('\n\n'));
+    }
+
     const visibleDeep = deep
-      ? await runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed, contentLines })
+      ? await runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed })
       : { resultEmbed: null, components: [], result: null, meta: null };
 
-    const content = contentLines.length > 0 ? contentLines.join('\n') : undefined;
-
     if (visibleDeep.resultEmbed) embeds.push(visibleDeep.resultEmbed);
-    await replyEditor.edit({ content, embeds, components: visibleDeep.components });
+    await replyEditor.edit({ content: null, embeds, components: visibleDeep.components });
 
     // DM the caller when a deep scan was actually run (skip plain
     // /la-roster which finishes in seconds and doesn't warrant a

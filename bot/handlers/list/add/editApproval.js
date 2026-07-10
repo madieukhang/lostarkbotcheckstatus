@@ -9,7 +9,7 @@
 
 import PendingApproval from '../../../models/PendingApproval.js';
 import TrustedUser from '../../../models/TrustedUser.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { t } from '../../../services/i18n/index.js';
@@ -212,7 +212,11 @@ export async function handleApprovedEditRequest({
   await PendingApproval.deleteOne({ requestId });
 
   const buildApprovedPayload = (targetLang) => ({
-    content: `✅ ${t('dialogue.listEdit.approvedBy', targetLang, { user: interaction.user.tag })}`,
+    content: null,
+    embeds: [buildNoticeEmbed(
+      t('dialogue.listEdit.approvedBy', targetLang, { user: interaction.user.tag }),
+      { severity: AlertSeverity.SUCCESS, lang: targetLang }
+    )],
     components: [buildApprovalResultRow('Approved', lang)],
   });
   await editPayload(interaction, buildApprovedPayload(lang));
