@@ -49,25 +49,26 @@ const jp = {
   commands,
 
   autoCheckWelcome: {
-    title: '🎨 Artist は通りすがりですわ～',
+    title: '🎨 皆さん、こんにちは～ この channel は Artist が見ておりますわ',
     description: [
-      'Artist はこの channel をたまたま通りかかって、小さな案内板を残しただけですの。Check を見守るのは LoaLogs ですわ。',
-      'Screenshot を投稿するか `check abcxyz` と入力すると、character 名を server の各 list と照合しますの。',
+      'Screenshot をこちらに投げるか、`check abcxyz` と入力してくださいませ。わたくしが character 名を読み取り、この server の list と照らし合わせますわ。',
+      '',
+      '初めての方は、下の field で check の流れと結果の読み方をご確認くださいませ。',
     ],
     howName: '🔍 Check request を送った後',
     howValue: [
-      '1. LoaLogs が 🔍 reaction を付け、画像または text から最大8名の character 名を読み取りますわ。',
-      '2. Blacklist、whitelist、watchlist、trusted record と照合しますの。',
-      '3. List 未登録の対象には officer 用 Quick Add が表示される場合がありますわ。',
+      '1. わたくしが 🔍 reaction を付け、画像または text から最大8名の character 名を読み取りますわ。',
+      '2. 各名前を blacklist、whitelist、watchlist、trusted record と照合いたしますの。',
+      '3. List 未登録で条件を満たす名前には、officer 用 Quick Add が表示されますわ。',
     ],
     listsName: '📚 結果の読み方',
     listsValue: [
       'Black と watch は要注意、white と trusted は照合 context として表示されますの。',
       '`check abcxyz` は直接 list check、/la-search は Bible の fuzzy search と filter 用ですの。',
     ],
-    cleanupName: '🧹 この channel は毎日リセット',
+    cleanupName: '🧹 この channel は毎日わたくしが片付けますわ',
     cleanupValue: [
-      '毎日 **00:00 Asia/Ho_Chi_Minh (日本時間 02:00)** に、LoaLogs が pinned 以外の全 message を削除しますわ。',
+      '毎日 **00:00 Asia/Ho_Chi_Minh (日本時間 02:00)** に、pinned 以外の全 message をわたくしが削除しますわ。',
       'Pinned message は残りますの。大切な内容は cleanup 前に別の場所へ移してね♪',
     ],
     commandsName: '🧭 便利なコマンド',
@@ -78,7 +79,7 @@ const jp = {
       '/la-search name:<character> - search と list 照合',
       '/la-help - 全コマンド guide',
     ],
-    footer: 'Artist は先へ行きますわ～ この案内板は残しておきますの♪',
+    footer: '全コマンドの案内が必要でしたら /la-help をどうぞ～',
   },
 
   help: {
