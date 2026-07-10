@@ -1,5 +1,6 @@
 import GuildConfig from '../../models/GuildConfig.js';
 import { autoCheckChannelGuard } from './autoCheckChannelGuard.js';
+import { checkBotPermissions } from './channelPermissions.js';
 
 export const AUTO_CHECK_CLEANUP_TICK_MS = 15 * 60 * 1000;
 export const AUTO_CHECK_CLEANUP_TIME_ZONE = 'Asia/Ho_Chi_Minh';
@@ -21,6 +22,23 @@ export function getVietnamDayKey(date = new Date()) {
   return parts.year + '-' + parts.month + '-' + parts.day;
 }
 
+function cleanupFailureKey(err) {
+  const code = err?.code ?? err?.rawError?.code ?? 'unknown';
+  const message = String(
+    err?.message || err?.rawError?.message || err?.name || 'Unknown error'
+  )
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+  return String(code) + ':' + message;
+}
+
+export function formatCleanupFailureReasons(failureReasons = {}) {
+  return Object.entries(failureReasons)
+    .map(([reason, count]) => reason + ' x' + count)
+    .join(', ');
+}
+
 export async function cleanupAutoCheckChannelMessages(
   channel,
   { maxPages = 20, protectedMessageIds = [] } = {}
@@ -33,6 +51,7 @@ export async function cleanupAutoCheckChannelMessages(
   let failed = 0;
   let scanned = 0;
   let truncated = false;
+  const failureReasons = {};
 
   for (let page = 0; page < maxPages; page += 1) {
     const fetchOptions = { limit: 100 };
@@ -47,8 +66,10 @@ export async function cleanupAutoCheckChannelMessages(
       try {
         await message.delete();
         deleted += 1;
-      } catch {
+      } catch (err) {
         failed += 1;
+        const reason = cleanupFailureKey(err);
+        failureReasons[reason] = (failureReasons[reason] || 0) + 1;
       }
     }
 
@@ -60,7 +81,7 @@ export async function cleanupAutoCheckChannelMessages(
     if (page === maxPages - 1) truncated = true;
   }
 
-  return { deleted, failed, scanned, truncated };
+  return { deleted, failed, scanned, truncated, failureReasons };
 }
 
 async function resolveConfiguredChannel(client, config) {
@@ -80,6 +101,7 @@ export function createAutoCheckCleanupService({
   nowDate = () => new Date(),
   resolveChannel = resolveConfiguredChannel,
   channelGuard = autoCheckChannelGuard,
+  checkPermissions = checkBotPermissions,
   logger = console,
 } = {}) {
   async function releaseClaim(guildId, dayKey) {
@@ -113,6 +135,20 @@ export function createAutoCheckCleanupService({
         continue;
       }
 
+      const permissionCheck = checkPermissions(
+        channel,
+        channel.guild || client.guilds?.cache?.get?.(config.guildId),
+        { cleanup: true }
+      );
+      if (!permissionCheck.ok) {
+        logger.warn?.(
+          '[auto-check cleanup] permissions missing guild=' + config.guildId +
+          ' channel=' + config.autoCheckChannelId +
+          ' missing=' + permissionCheck.missing.join(', ')
+        );
+        continue;
+      }
+
       try {
         await channelGuard.runExclusive(channel.id, async () => {
           let claimed = false;
@@ -124,7 +160,7 @@ export function createAutoCheckCleanupService({
                 lastAutoCheckCleanupKey: { $ne: dayKey },
               },
               { $set: { lastAutoCheckCleanupKey: dayKey } },
-              { new: true }
+              { returnDocument: 'after' }
             );
             if (!claim) return;
             claimed = true;
@@ -135,10 +171,12 @@ export function createAutoCheckCleanupService({
             ].filter(Boolean);
             const outcome = await cleanupMessages(channel, { protectedMessageIds });
             if (outcome.failed > 0 || outcome.truncated) {
+              const failureSummary = formatCleanupFailureReasons(outcome.failureReasons);
               throw new Error(
                 'incomplete cleanup deleted=' + outcome.deleted +
                 ' failed=' + outcome.failed +
-                ' truncated=' + Boolean(outcome.truncated)
+                ' truncated=' + Boolean(outcome.truncated) +
+                (failureSummary ? ' errors=' + failureSummary : '')
               );
             }
             logger.info?.(

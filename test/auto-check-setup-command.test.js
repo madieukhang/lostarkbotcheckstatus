@@ -57,4 +57,7 @@ test('/la-setup autochannel does not claim the cleanup day before cleanup runs',
 
   assert.ok(start >= 0 && end > start);
   assert.doesNotMatch(handlerSource, /lastAutoCheckCleanupKey|getVietnamDayKey/);
+  assert.doesNotMatch(handlerSource, /GuildConfig\.findOneAndUpdate/);
+  assert.match(handlerSource, /configSet:\s*\{/);
+  assert.match(handlerSource, /!welcome\.pinned\s*\|\|\s*!welcome\.persisted/);
 });

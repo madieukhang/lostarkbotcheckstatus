@@ -214,6 +214,10 @@ test('first welcome cleans non-pinned messages before posting and records the cl
     botUserId: 'bot',
     channel,
     client: { channels: { fetch: async () => channel } },
+    configSet: {
+      autoCheckChannelId: channel.id,
+      updatedByUserId: 'officer-1',
+    },
     guildId: 'guild-1',
   });
 
@@ -228,6 +232,8 @@ test('first welcome cleans non-pinned messages before posting and records the cl
   assert.equal(outcome.cleanupComplete, true);
   assert.equal(outcome.cleanupDeleted, 12);
   assert.deepEqual(GuildConfigModel.updates[0].update.$set, {
+    autoCheckChannelId: 'channel-1',
+    updatedByUserId: 'officer-1',
     autoCheckWelcomeMessageId: 'fresh',
     autoCheckWelcomeChannelId: 'channel-1',
     lastAutoCheckCleanupKey: '2026-07-10',
@@ -301,6 +307,7 @@ test('welcome setup and daily cleanup cannot race across the send-to-pin window'
     channelGuard: guard,
     nowDate: () => new Date('2026-07-09T17:05:00Z'),
     resolveChannel: async () => channel,
+    checkPermissions: () => ({ ok: true, missing: [] }),
     cleanupMessages: async () => {
       scheduledCleanupCalls += 1;
       return { deleted: 0, failed: 0, truncated: false };
@@ -329,6 +336,40 @@ test('welcome setup and daily cleanup cannot race across the send-to-pin window'
   assert.equal(state.lastAutoCheckCleanupKey, dayKey);
   assert.equal(scheduledCleanupCalls, 0);
   assert.equal(fresh.state.deleted, 0);
+});
+
+test('autochannel config is not persisted when the fresh welcome cannot be pinned', async () => {
+  const fresh = createMessage('fresh', 'Welcome en');
+  fresh.pin = async () => {
+    throw Object.assign(new Error('Missing Permissions'), { code: 50013 });
+  };
+  const channel = {
+    id: 'channel-1',
+    messages: { fetchPins: async () => ({ items: [] }) },
+    send: async () => fresh,
+  };
+  const GuildConfigModel = createGuildConfig();
+  const service = createAutoCheckWelcomeService({
+    GuildConfigModel,
+    buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
+    getGuildLanguageFn: async () => 'en',
+    cleanupMessages: async () => ({ deleted: 0, failed: 0, truncated: false }),
+    supportedLanguageCodes: ['en', 'vi', 'jp'],
+    logger: { warn() {} },
+  });
+
+  const outcome = await service.postWelcome({
+    botUserId: 'bot',
+    channel,
+    client: { channels: { fetch: async () => channel } },
+    configSet: { autoCheckChannelId: channel.id },
+    guildId: 'guild-1',
+  });
+
+  assert.equal(outcome.pinned, false);
+  assert.equal(outcome.persisted, false);
+  assert.equal(GuildConfigModel.updates.length, 0);
+  assert.equal(fresh.state.deleted, 1);
 });
 
 test('first welcome skips destructive cleanup when pin discovery fails', async () => {

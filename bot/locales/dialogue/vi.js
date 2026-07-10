@@ -68,6 +68,7 @@ export default {
     welcomeCleaned: 'Lần dọn đầu đã xóa **{count}** tin nhắn không ghim trước khi đăng bảng hướng dẫn.',
     welcomeCleanupIncomplete: 'Lần dọn đầu chưa hoàn tất sau khi xóa **{count}** tin; bộ dọn hằng ngày sẽ thử lại.',
     sameChannelWarning: 'Đây cũng là channel {other}. Tách riêng hai channel sẽ dễ đọc hơn.',
+    autoChannelNotSet: 'Auto-check channel chưa được thay đổi vì tớ không thể tạo và lưu welcome pin trong <#{channel}>.\n{welcome}',
     autoChannelSet: 'Đã đặt auto-check channel thành <#{channel}>.\nLoaLogs sẽ tự kiểm tra screenshot gửi tại đó.{warning}\n{welcome}\nMỗi ngày lúc 00:00 Asia/Ho_Chi_Minh, mọi tin nhắn không ghim sẽ được dọn.',
     notifyChannelSet: 'Đã đặt notification channel thành <#{channel}>.\nCác thay đổi danh sách sẽ được gửi tại đó.{warning}\n\nTớ đã gửi tin nhắn thử; nó sẽ tự biến mất sau 30 giây.',
     notifyChannelSetTestFailed: 'Đã đặt notification channel thành <#{channel}>.{warning}\nTớ chưa gửi được tin nhắn thử, cậu kiểm tra lại quyền của LoaLogs nhé.',

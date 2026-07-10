@@ -5,7 +5,7 @@
  * without needing to modify environment variables.
  */
 
-import { ChannelType, PermissionFlagsBits } from 'discord.js';
+import { ChannelType } from 'discord.js';
 import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
@@ -21,37 +21,13 @@ import {
   setGuildLanguage,
 } from '../../services/i18n/index.js';
 import { postAutoCheckWelcome } from '../../services/setup/autoCheckWelcome.js';
+import { checkBotPermissions } from '../../services/setup/channelPermissions.js';
 import {
   deferEphemeralReply,
   editAlert,
   editEmbed,
   editNotice,
 } from '../../utils/interactionReplies.js';
-
-/**
- * Check if the bot has required permissions in a channel.
- * @param {import('discord.js').GuildChannel} channel
- * @param {import('discord.js').Guild} guild
- * @returns {{ ok: boolean, missing: string[] }}
- */
-function checkBotPermissions(channel, guild, { welcomePin = false } = {}) {
-  const botMember = guild.members.me;
-  if (!botMember) return { ok: false, missing: ['Cannot resolve bot member'] };
-
-  const perms = channel.permissionsFor(botMember);
-  const required = [
-    { flag: PermissionFlagsBits.ViewChannel, name: 'View Channel' },
-    { flag: PermissionFlagsBits.SendMessages, name: 'Send Messages' },
-    { flag: PermissionFlagsBits.ReadMessageHistory, name: 'Read Message History' },
-    { flag: PermissionFlagsBits.EmbedLinks, name: 'Embed Links' },
-  ];
-  if (welcomePin) {
-    required.push({ flag: PermissionFlagsBits.ManageMessages, name: 'Manage Messages' });
-  }
-
-  const missing = required.filter((r) => !perms.has(r.flag)).map((r) => r.name);
-  return { ok: missing.length === 0, missing };
-}
 
 /**
  * Send a test message to verify the channel is working.
@@ -147,24 +123,29 @@ async function handleSetupAutoChannel(interaction, lang) {
   const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
   const sameAsNotify = existing?.listNotifyChannelId === channel.id;
 
-  await GuildConfig.findOneAndUpdate(
-    { guildId: interaction.guild.id },
-    {
-      $set: {
-        autoCheckChannelId: channel.id,
-        updatedByUserId: interaction.user.id,
-        updatedByTag: interaction.user.tag,
-      },
-    },
-    { upsert: true, returnDocument: 'after' }
-  );
-
   const welcome = await postAutoCheckWelcome({
     botUserId: interaction.client.user.id,
     channel,
     client: interaction.client,
+    configSet: {
+      autoCheckChannelId: channel.id,
+      updatedByUserId: interaction.user.id,
+      updatedByTag: interaction.user.tag,
+    },
     guildId: interaction.guild.id,
   });
+
+  if (!welcome.pinned || !welcome.persisted) {
+    await editNotice(
+      interaction,
+      `⚠️ ${t('dialogue.setup.autoChannelNotSet', lang, {
+        channel: channel.id,
+        welcome: welcomeOutcomeText(welcome, lang),
+      })}`,
+      { severity: AlertSeverity.ERROR, lang }
+    );
+    return;
+  }
 
   const warning = sameAsNotify
     ? `\n⚠️ ${t('dialogue.setup.sameChannelWarning', lang, { other: t('dialogue.setup.purpose.notification', lang) })}`
@@ -481,7 +462,7 @@ async function handleSetupLanguage(interaction) {
         updatedByTag: interaction.user.tag,
       },
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   ).lean();
   invalidateGuildConfig(interaction.guild.id);
 

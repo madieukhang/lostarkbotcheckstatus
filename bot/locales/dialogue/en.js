@@ -101,6 +101,7 @@ export default {
     welcomeCleaned: 'Initial cleanup removed **{count}** non-pinned message(s) before the guide was posted.',
     welcomeCleanupIncomplete: 'Initial cleanup was incomplete after removing **{count}** message(s); the daily cleaner will retry.',
     sameChannelWarning: 'This is also the {other} channel. Separate channels will be easier to read.',
+    autoChannelNotSet: 'Auto-check channel was not changed because I could not create and save a welcome pin in <#{channel}>.\n{welcome}',
     autoChannelSet: 'Auto-check channel set to <#{channel}>.\nLoaLogs will check screenshots posted there automatically.{warning}\n{welcome}\nEvery non-pinned message is cleared daily at 00:00 Asia/Ho_Chi_Minh.',
     notifyChannelSet: 'Notification channel set to <#{channel}>.\nList changes will be broadcast there.{warning}\n\nI sent a test message; it will disappear in 30 seconds.',
     notifyChannelSetTestFailed: 'Notification channel set to <#{channel}>.{warning}\nI could not send the test message, so please check LoaLogs permissions.',
