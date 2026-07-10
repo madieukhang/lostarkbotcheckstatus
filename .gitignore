@@ -20,3 +20,6 @@ docs/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Local design artifacts (specs, plans, mockups) - not part of the shipped bot
+.claude/
