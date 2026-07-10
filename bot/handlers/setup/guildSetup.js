@@ -13,7 +13,7 @@ import GuildConfig from '../../models/GuildConfig.js';
 import UserPreference from '../../models/UserPreference.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
 import { COLORS } from '../../utils/ui.js';
-import { AlertSeverity } from '../../utils/alertEmbed.js';
+import { AlertSeverity, buildNoticeEmbed } from '../../utils/alertEmbed.js';
 import {
   getSupportedLanguages,
   getUserLanguage,
@@ -25,8 +25,8 @@ import { postAutoCheckWelcome } from '../../services/setup/autoCheckWelcome.js';
 import {
   deferEphemeralReply,
   editAlert,
-  editContent,
   editEmbed,
+  editNotice,
 } from '../../utils/interactionReplies.js';
 
 /**
@@ -44,12 +44,10 @@ function checkBotPermissions(channel, guild, { welcomePin = false } = {}) {
     { flag: PermissionFlagsBits.ViewChannel, name: 'View Channel' },
     { flag: PermissionFlagsBits.SendMessages, name: 'Send Messages' },
     { flag: PermissionFlagsBits.ReadMessageHistory, name: 'Read Message History' },
+    { flag: PermissionFlagsBits.EmbedLinks, name: 'Embed Links' },
   ];
   if (welcomePin) {
-    required.push(
-      { flag: PermissionFlagsBits.ManageMessages, name: 'Manage Messages' },
-      { flag: PermissionFlagsBits.EmbedLinks, name: 'Embed Links' }
-    );
+    required.push({ flag: PermissionFlagsBits.ManageMessages, name: 'Manage Messages' });
   }
 
   const missing = required.filter((r) => !perms.has(r.flag)).map((r) => r.name);
@@ -65,7 +63,11 @@ function checkBotPermissions(channel, guild, { welcomePin = false } = {}) {
 async function sendTestMessage(channel, purpose, lang) {
   try {
     const msg = await channel.send({
-      content: t('dialogue.setup.testMessage', lang, { purpose }),
+      embeds: [buildNoticeEmbed(t('dialogue.setup.testMessage', lang, { purpose }), {
+        severity: AlertSeverity.INFO,
+        titleIcon: '🧪',
+        lang,
+      })],
     });
     // Auto-delete test message after 30 seconds to keep channel clean
     setTimeout(() => msg.delete().catch(() => {}), 30_000);
@@ -161,13 +163,14 @@ async function handleSetupAutoChannel(interaction, lang) {
     ? `\n⚠️ ${t('dialogue.setup.sameChannelWarning', lang, { other: t('dialogue.setup.purpose.notification', lang) })}`
     : '';
 
-  await editContent(
+  await editNotice(
     interaction,
     `✅ ${t('dialogue.setup.autoChannelSet', lang, {
       channel: channel.id,
       warning,
       welcome: welcomeOutcomeText(welcome, lang),
-    })}`
+    })}`,
+    { severity: AlertSeverity.SUCCESS, lang }
   );
 
   invalidateGuildConfig(interaction.guild.id);
@@ -234,11 +237,14 @@ async function handleSetupNotifyChannel(interaction, lang) {
     ? `\n⚠️ ${t('dialogue.setup.sameChannelWarning', lang, { other: t('dialogue.setup.purpose.autoCheck', lang) })}`
     : '';
 
-  await editContent(interaction, `✅ ${t(
+  await editNotice(interaction, `✅ ${t(
     testOk ? 'dialogue.setup.notifyChannelSet' : 'dialogue.setup.notifyChannelSetTestFailed',
     lang,
     { channel: channel.id, warning },
-  )}`);
+  )}`, {
+    severity: testOk ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
+    lang,
+  });
 
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) set listNotifyChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);
@@ -269,9 +275,17 @@ async function handleSetupOff(interaction, lang) {
   );
 
   if (newState) {
-    await editContent(interaction, `🔔 ${t('dialogue.setup.notificationsEnabled', lang)}`);
+    await editNotice(interaction, `🔔 ${t('dialogue.setup.notificationsEnabled', lang)}`, {
+      severity: AlertSeverity.SUCCESS,
+      titleIcon: '🔔',
+      lang,
+    });
   } else {
-    await editContent(interaction, `🔕 ${t('dialogue.setup.notificationsDisabled', lang)}`);
+    await editNotice(interaction, `🔕 ${t('dialogue.setup.notificationsDisabled', lang)}`, {
+      severity: AlertSeverity.INFO,
+      titleIcon: '🔕',
+      lang,
+    });
   }
 
   invalidateGuildConfig(interaction.guild.id);
@@ -406,9 +420,10 @@ async function handleSetupRepin(interaction, lang) {
     guildConfig?.autoCheckChannelId
   );
   if (!channel) {
-    await editContent(
+    await editNotice(
       interaction,
-      `⚠️ ${t('dialogue.setup.repin.noChannel', lang)}`
+      `⚠️ ${t('dialogue.setup.repin.noChannel', lang)}`,
+      { severity: AlertSeverity.WARNING, lang }
     );
     return;
   }
@@ -417,12 +432,13 @@ async function handleSetupRepin(interaction, lang) {
     welcomePin: true,
   });
   if (!ok) {
-    await editContent(
+    await editNotice(
       interaction,
       `⚠️ ${t('dialogue.setup.repin.missingPermissions', lang, {
         channel: channel.id,
         missing: missing.join(', '),
-      })}`
+      })}`,
+      { severity: AlertSeverity.WARNING, lang }
     );
     return;
   }
@@ -433,12 +449,13 @@ async function handleSetupRepin(interaction, lang) {
     client: interaction.client,
     guildId: interaction.guild.id,
   });
-  await editContent(
+  await editNotice(
     interaction,
     t('dialogue.setup.repin.result', lang, {
       outcome: welcomeOutcomeText(welcome, lang),
       channel: channel.id,
-    })
+    }),
+    { severity: AlertSeverity.SUCCESS, lang }
   );
 }
 
@@ -473,9 +490,10 @@ async function handleSetupLanguage(interaction) {
     guildConfig?.autoCheckChannelId
   );
   if (!channel) {
-    await editContent(
+    await editNotice(
       interaction,
-      `${prefix}\n${t('dialogue.setup.language.noChannel', language)}`
+      `${prefix}\n${t('dialogue.setup.language.noChannel', language)}`,
+      { severity: AlertSeverity.WARNING, titleIcon: '🌐', lang: language }
     );
     return;
   }
@@ -484,12 +502,13 @@ async function handleSetupLanguage(interaction) {
     welcomePin: true,
   });
   if (!ok) {
-    await editContent(
+    await editNotice(
       interaction,
       `${prefix}\n⚠️ ${t('dialogue.setup.language.pinFailed', language, {
         channel: channel.id,
         missing: missing.join(', '),
-      })}`
+      })}`,
+      { severity: AlertSeverity.WARNING, titleIcon: '🌐', lang: language }
     );
     return;
   }
@@ -500,12 +519,13 @@ async function handleSetupLanguage(interaction) {
     client: interaction.client,
     guildId: interaction.guild.id,
   });
-  await editContent(
+  await editNotice(
     interaction,
     `${prefix}\n${t('dialogue.setup.language.pinResult', language, {
       outcome: welcomeOutcomeText(welcome, language),
       channel: channel.id,
-    })}`
+    })}`,
+    { severity: AlertSeverity.SUCCESS, titleIcon: '🌐', lang: language }
   );
 }
 
@@ -574,7 +594,11 @@ async function handleSetupDefaultScope(interaction, lang) {
   );
 
   const emoji = scope === 'server' ? '🔒' : '🌐';
-  await editContent(interaction, `${emoji} ${t('dialogue.setup.defaultScopeSet', lang, { scope })}`);
+  await editNotice(interaction, `${emoji} ${t('dialogue.setup.defaultScopeSet', lang, { scope })}`, {
+    severity: AlertSeverity.SUCCESS,
+    titleIcon: emoji,
+    lang,
+  });
 
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) defaultBlacklistScope → ${scope} by ${interaction.user.tag}`);

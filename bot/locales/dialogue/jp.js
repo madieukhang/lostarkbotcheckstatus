@@ -1,6 +1,10 @@
 export default {
   common: {
     errorField: 'エラー', missingField: '不足', unknown: '不明',
+    unexpected: {
+      title: 'その操作がすり抜けてしまいましたの',
+      description: '今回は最後まで完了できませんでしたわ。もう一度お試しいただき、続くようでしたら officer へお知らせくださいませ。',
+    },
     serverOnly: { title: 'サーバー内でのみ使えますわ', description: 'このコマンドは Discord サーバー内専用で、DM では使えませんの。' },
     notYourSession: { title: 'あなたのセッションではありませんの', description: 'この画面を開いた方だけが操作できますわ。' },
     wrongTextChannel: { title: 'そのチャンネルは使えませんの', description: 'LoaLogs が読んで返事できる **テキストチャンネル** を選んでくださいませ。' },

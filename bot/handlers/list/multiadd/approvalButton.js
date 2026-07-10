@@ -5,13 +5,13 @@ import PendingApproval from '../../../models/PendingApproval.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { COLORS } from '../../../utils/ui.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { AlertSeverity, buildNoticeEmbed } from '../../../utils/alertEmbed.js';
 import {
   editPayload,
   replyAlert,
   updateAlert,
   updateEmbed,
-  updatePayload,
+  updateNotice,
 } from '../../../utils/interactionReplies.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 
@@ -107,8 +107,18 @@ export function createMultiaddApprovalButtonHandler(deps) {
         const channel = await guild.channels.fetch(payload.channelId);
         if (channel?.isTextBased()) {
           const guildLang = await getGuildLanguage(guild.id, { GuildConfigModel: GuildConfig });
+          const mention = `<@${payload.requestedByUserId}>`;
+          const copy = t('dialogue.multiadd.approval.publicRejected', guildLang, {
+            user: payload.requestedByUserId,
+            count: payload.bulkRows.length,
+          });
           await channel.send({
-            content: `❌ ${t('dialogue.multiadd.approval.publicRejected', guildLang, { user: payload.requestedByUserId, count: payload.bulkRows.length })}`,
+            content: mention,
+            allowedMentions: { users: [payload.requestedByUserId] },
+            embeds: [buildNoticeEmbed(copy.replace(mention, '').trim(), {
+              severity: AlertSeverity.ERROR,
+              lang: guildLang,
+            })],
           });
         }
       } catch (err) {
@@ -119,9 +129,12 @@ export function createMultiaddApprovalButtonHandler(deps) {
 
     if (prefix !== 'multiaddapprove_approve') return;
 
-    await updatePayload(interaction, {
-      content: `⏳ ${t('dialogue.multiadd.approval.processing', lang, { count: payload.bulkRows.length })}`,
-      embeds: [],
+    await updateNotice(interaction, t('dialogue.multiadd.approval.processing', lang, {
+      count: payload.bulkRows.length,
+    }), {
+      severity: AlertSeverity.INFO,
+      titleIcon: '⏳',
+      lang,
       components: [],
     }).catch(() => {});
 
@@ -169,9 +182,20 @@ export function createMultiaddApprovalButtonHandler(deps) {
       const channel = await guild.channels.fetch(payload.channelId);
       if (channel?.isTextBased()) {
         const guildLang = await getGuildLanguage(guild.id, { GuildConfigModel: GuildConfig });
+        const mention = `<@${payload.requestedByUserId}>`;
+        const copy = t('dialogue.multiadd.approval.publicApproved', guildLang, {
+          user: payload.requestedByUserId,
+        });
         await channel.send({
-          content: `✅ ${t('dialogue.multiadd.approval.publicApproved', guildLang, { user: payload.requestedByUserId })}`,
-          embeds: [buildApprovedSummary(guildLang)],
+          content: mention,
+          allowedMentions: { users: [payload.requestedByUserId] },
+          embeds: [
+            buildNoticeEmbed(copy.replace(mention, '').trim(), {
+              severity: AlertSeverity.SUCCESS,
+              lang: guildLang,
+            }),
+            buildApprovedSummary(guildLang),
+          ],
         });
       }
     } catch (err) {

@@ -1,4 +1,8 @@
-import { buildAlertEmbed } from './alertEmbed.js';
+import {
+  AlertSeverity,
+  buildAlertEmbed,
+  buildNoticeEmbed,
+} from './alertEmbed.js';
 
 function toEmbedArray(embedOrEmbeds) {
   return Array.isArray(embedOrEmbeds) ? embedOrEmbeds : [embedOrEmbeds];
@@ -16,24 +20,10 @@ export function replyEmbed(interaction, embedOrEmbeds, { ephemeral = true, ...ex
   }, ephemeral));
 }
 
-export function replyContent(interaction, content, { ephemeral = true, ...extras } = {}) {
-  return interaction.reply(withEphemeral({
-    content,
-    ...extras,
-  }, ephemeral));
-}
-
 export function editEmbed(interaction, embedOrEmbeds, extras = {}) {
   return interaction.editReply({
     ...extras,
     embeds: toEmbedArray(embedOrEmbeds),
-  });
-}
-
-export function editContent(interaction, content, extras = {}) {
-  return interaction.editReply({
-    content,
-    ...extras,
   });
 }
 
@@ -82,4 +72,44 @@ export function editAlert(interaction, alertOptions, extras = {}) {
 
 export function updateAlert(interaction, alertOptions, extras = {}) {
   return updateEmbed(interaction, buildAlertEmbed(alertOptions), extras);
+}
+
+function resolveNotice(content, options = {}) {
+  const {
+    severity = AlertSeverity.INFO,
+    lang = 'en',
+    title,
+    titleIcon,
+    color,
+    footer,
+    timestamp,
+    ...extras
+  } = options;
+  return {
+    embed: buildNoticeEmbed(content, {
+      severity,
+      lang,
+      title,
+      titleIcon,
+      color,
+      footer,
+      timestamp,
+    }),
+    extras,
+  };
+}
+
+export function replyNotice(interaction, content, { ephemeral = true, ...options } = {}) {
+  const { embed, extras } = resolveNotice(content, options);
+  return replyEmbed(interaction, embed, { ephemeral, ...extras });
+}
+
+export function editNotice(interaction, content, options = {}) {
+  const { embed, extras } = resolveNotice(content, options);
+  return editEmbed(interaction, embed, { content: null, ...extras });
+}
+
+export function updateNotice(interaction, content, options = {}) {
+  const { embed, extras } = resolveNotice(content, options);
+  return updateEmbed(interaction, embed, { content: null, ...extras });
 }

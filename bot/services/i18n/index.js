@@ -83,6 +83,11 @@ export async function getUserLanguage(discordId, { UserPreferenceModel } = {}) {
   }
 }
 
+export function getCachedUserLanguage(discordId) {
+  if (!discordId) return DEFAULT_LANGUAGE;
+  return userLanguageCache.get(discordId) || DEFAULT_LANGUAGE;
+}
+
 export async function setUserLanguage(discordId, lang, { UserPreferenceModel, user } = {}) {
   const code = normalizeLanguage(lang);
   if (!discordId) return code;

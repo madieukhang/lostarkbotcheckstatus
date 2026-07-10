@@ -34,11 +34,11 @@ import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
   editAlert,
-  editContent,
   editEmbed,
+  editNotice,
   replyAlert,
-  replyContent,
   replyEmbed,
+  replyNotice,
 } from '../../../utils/interactionReplies.js';
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
@@ -126,7 +126,10 @@ export function createAutoCheckEvidenceHandler({ client }) {
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     if (!parsed) {
-      await replyContent(interaction, t('dialogue.check.malformed', lang));
+      await replyNotice(interaction, t('dialogue.check.malformed', lang), {
+        severity: AlertSeverity.WARNING,
+        lang,
+      });
       return;
     }
 
@@ -144,7 +147,10 @@ export function createAutoCheckEvidenceHandler({ client }) {
     }
 
     if (!entry.imageMessageId && !entry.imageUrl) {
-      await replyContent(interaction, t('listView.evidence.noImage', lang));
+      await replyNotice(interaction, t('listView.evidence.noImage', lang), {
+        severity: AlertSeverity.WARNING,
+        lang,
+      });
       return;
     }
 
@@ -189,10 +195,14 @@ export function createCheckHandlers({ client }) {
 
     const maxNames = config.listcheckMaxNames;
     const limitedNames = names.slice(0, maxNames);
-    await editContent(interaction, [
+    await editNotice(interaction, [
       `🔍 ${t('dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
       limitedNames.length < names.length ? t('dialogue.check.ignored', lang, { count: names.length - limitedNames.length, word: t(`dialogue.check.${names.length - limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang), limit: maxNames }) : null,
-    ].filter(Boolean).join('\n'));
+    ].filter(Boolean).join('\n'), {
+      severity: AlertSeverity.INFO,
+      titleIcon: '🔍',
+      lang,
+    });
 
     try {
       const results = await checkNamesAgainstLists(limitedNames, { guildId: interaction.guild?.id });

@@ -46,11 +46,9 @@ import { makeRosterScanProgressCallback } from './progress.js';
  * @param {import('discord.js').EmbedBuilder} args.embed - the base
  *   embed the caller already started (visible-roster card); this
  *   function appends the deep-scan section.
- * @param {string[]} args.contentLines - lines accumulated by the
- *   caller; this function appends scan progress + result lines.
  * @returns {Promise<void>}
  */
-export async function runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed, contentLines }) {
+export async function runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed }) {
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     // Visible-roster deep scan: hoist these to the function scope so
@@ -191,7 +189,6 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
               // a Continue click can re-render the same card without
               // re-scraping the visible roster page.
               primaryEmbedJSON: embed.toJSON(),
-              contentText: contentLines.length > 0 ? contentLines.join('\n') : '',
             });
             const buttonRow = buildScanResultButtons({
               kind: 'roster',

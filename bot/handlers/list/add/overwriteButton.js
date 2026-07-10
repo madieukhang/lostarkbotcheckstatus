@@ -14,7 +14,7 @@ import UserPreference from '../../../models/UserPreference.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferUpdate, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
@@ -58,8 +58,11 @@ export function createListAddOverwriteButtonHandler({
     if (!isOverwrite) {
       // Keep existing · just clean up
       const buildKeptPayload = (targetLang) => ({
-        content: `✅ ${t('dialogue.approval.flow.keptExisting', targetLang, { name: payload.name })}`,
-        embeds: [],
+        content: null,
+        embeds: [buildNoticeEmbed(
+          t('dialogue.approval.flow.keptExisting', targetLang, { name: payload.name }),
+          { severity: AlertSeverity.SUCCESS, lang: targetLang }
+        )],
         components: [buildApprovalResultRow('Kept Existing', lang)],
       });
       await editPayload(interaction, buildKeptPayload(lang));
@@ -156,8 +159,11 @@ export function createListAddOverwriteButtonHandler({
       console.log(`[list] Overwrite: updated ${payload.type} entry for ${dupeEntry.name} in-place`);
 
       const buildOverwrittenPayload = (targetLang) => ({
-        content: `✅ ${t('dialogue.approval.flow.overwritten', targetLang, { user: interaction.user.tag })}`,
-        embeds: [],
+        content: null,
+        embeds: [buildNoticeEmbed(
+          t('dialogue.approval.flow.overwritten', targetLang, { user: interaction.user.tag }),
+          { severity: AlertSeverity.SUCCESS, lang: targetLang }
+        )],
         components: [buildApprovalResultRow('Overwritten', lang)],
       });
       await editPayload(interaction, buildOverwrittenPayload(lang));

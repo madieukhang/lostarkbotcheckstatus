@@ -23,8 +23,8 @@ import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   deferEphemeralReply,
   editAlert,
-  editContent,
   editEmbed,
+  editNotice,
 } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { isRequesterAutoApprover } from '../helpers.js';
@@ -141,8 +141,9 @@ export function createQuickAddHandlers({ client, services }) {
             components: result.components ?? [],
           });
         } else {
-          await editContent(interaction, result.content, {
-            embeds: [],
+          await editNotice(interaction, result.content, {
+            severity: result.ok ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
+            lang,
             components: result.components ?? [],
           });
         }

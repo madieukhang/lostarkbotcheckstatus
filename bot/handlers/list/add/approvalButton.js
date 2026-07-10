@@ -18,7 +18,7 @@ import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { COLORS } from '../../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferUpdate, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
@@ -85,7 +85,11 @@ export function createListAddApprovalButtonHandler({
     await deferUpdate(interaction);
 
     const buildProcessingPayload = (targetLang) => ({
-      content: `⏳ ${t(`dialogue.approval.flow.${isApproveAction ? 'processingApprove' : 'processingReject'}`, targetLang, { user: interaction.user.tag })}`,
+      content: null,
+      embeds: [buildNoticeEmbed(
+        t(`dialogue.approval.flow.${isApproveAction ? 'processingApprove' : 'processingReject'}`, targetLang, { user: interaction.user.tag }),
+        { severity: AlertSeverity.INFO, titleIcon: '⏳', lang: targetLang }
+      )],
       components: [buildApprovalProcessingRow(action, lang)],
     });
     await editPayload(interaction, buildProcessingPayload(lang));
@@ -103,7 +107,11 @@ export function createListAddApprovalButtonHandler({
       await PendingApproval.deleteOne({ requestId });
 
       const buildRejectedPayload = (targetLang) => ({
-        content: `❌ ${t('dialogue.approval.flow.rejectedBy', targetLang, { user: interaction.user.tag })}`,
+        content: null,
+        embeds: [buildNoticeEmbed(
+          t('dialogue.approval.flow.rejectedBy', targetLang, { user: interaction.user.tag }),
+          { severity: AlertSeverity.ERROR, titleIcon: '✖️', lang: targetLang }
+        )],
         components: [buildApprovalResultRow('Rejected', lang)],
       });
       await editPayload(interaction, buildRejectedPayload(lang));
@@ -154,6 +162,10 @@ export function createListAddApprovalButtonHandler({
           const fallback = t('dialogue.broadcast.notAvailable', targetLang);
           const compareEmbed = createArtistEmbed(targetLang)
             .setTitle(`⚠️ ${t('dialogue.approval.flow.duplicateTitle', targetLang)}`)
+            .setDescription(t('dialogue.approval.flow.duplicatePrompt', targetLang, {
+              name: payload.name,
+              list: t(`dialogue.broadcast.list.${payload.type}`, targetLang),
+            }))
             .addFields(
               {
                 name: `📌 ${t('dialogue.approval.flow.existingEntry', targetLang)}${scopeTag(existing.scope)}`,
@@ -172,10 +184,7 @@ export function createListAddApprovalButtonHandler({
             new ButtonBuilder().setCustomId(`listadd_keep:${requestId}`).setLabel(t('common.actions.keepExisting', targetLang)).setStyle(ButtonStyle.Secondary),
           );
           return {
-            content: `⚠️ ${t('dialogue.approval.flow.duplicatePrompt', targetLang, {
-              name: payload.name,
-              list: t(`dialogue.broadcast.list.${payload.type}`, targetLang),
-            })}`,
+            content: null,
             embeds: [compareEmbed],
             components: [overwriteRow],
           };
@@ -196,10 +205,17 @@ export function createListAddApprovalButtonHandler({
       await PendingApproval.deleteOne({ requestId });
 
       const buildCompletedPayload = (targetLang) => ({
-        content: `${result.ok ? '✅' : '⚠️'} ${t(`dialogue.approval.flow.${result.ok ? 'approvedSuccess' : 'approvedReturned'}`, targetLang, {
-          user: interaction.user.tag,
-          result: result.content,
-        })}`,
+        content: null,
+        embeds: [buildNoticeEmbed(
+          t(`dialogue.approval.flow.${result.ok ? 'approvedSuccess' : 'approvedReturned'}`, targetLang, {
+            user: interaction.user.tag,
+            result: result.content,
+          }),
+          {
+            severity: result.ok ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
+            lang: targetLang,
+          }
+        )],
         components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', lang)],
       });
       await editPayload(interaction, buildCompletedPayload(lang));

@@ -8,6 +8,8 @@
 import { InteractionType } from 'discord.js';
 
 import { checkStatus, resetState } from '../monitor/monitor.js';
+import { AlertSeverity, buildAlertEmbed } from '../utils/alertEmbed.js';
+import { getCachedUserLanguage, t } from '../services/i18n/index.js';
 import { createSystemHandlers } from '../handlers/system/index.js';
 import { handleRosterCommand, handleRosterDeepContinueButton } from '../handlers/roster/index.js';
 import {
@@ -40,12 +42,20 @@ function logTransientInteraction(scope, err) {
   console.warn(`[bot] Transient on ${scope}: ${label} (${err.code})`);
 }
 
-async function replyOrEdit(interaction, content) {
+async function replyOrEdit(interaction) {
+  const lang = getCachedUserLanguage(interaction.user?.id);
+  const payload = {
+    embeds: [buildAlertEmbed({
+      severity: AlertSeverity.ERROR,
+      ...t('dialogue.common.unexpected', lang),
+      lang,
+    })],
+  };
   if (interaction.deferred || interaction.replied) {
-    await interaction.editReply({ content }).catch(() => {});
+    await interaction.editReply({ content: null, ...payload }).catch(() => {});
     return;
   }
-  await interaction.reply({ content, ephemeral: true }).catch(() => {});
+  await interaction.reply({ ...payload, ephemeral: true }).catch(() => {});
 }
 
 async function handleRoute(interaction, route) {
@@ -57,9 +67,7 @@ async function handleRoute(interaction, route) {
       return;
     }
     console.error(route.label, err?.message || err);
-    if (route.failureContent) {
-      await replyOrEdit(interaction, route.failureContent);
-    }
+    await replyOrEdit(interaction);
   }
 }
 
@@ -124,19 +132,16 @@ export function createButtonRoutes(listHandlers) {
       prefixes: ['listadd_approve:', 'listadd_reject:'],
       label: '[list] Unhandled button approval error:',
       handle: (interaction) => listHandlers.handleListAddApprovalButton(interaction),
-      failureContent: '\u274c Failed to process approval action.',
     },
     {
       prefixes: ['listadd_viewevidence:'],
       label: '[list] View evidence button error:',
       handle: (interaction) => listHandlers.handleListAddViewEvidenceButton(interaction),
-      failureContent: '\u274c Failed to load evidence.',
     },
     {
       prefixes: ['listbroadcast_evidence:'],
       label: '[list] Broadcast evidence button error:',
       handle: (interaction) => listHandlers.handleBroadcastEvidenceButton(interaction),
-      failureContent: '\u274c Failed to load evidence.',
     },
     {
       prefixes: [
@@ -146,31 +151,26 @@ export function createButtonRoutes(listHandlers) {
       ],
       label: '[list] Enrich button error:',
       handle: createListEnrichButtonHandler(listHandlers),
-      failureContent: '\u274c Failed to process enrich action.',
     },
     {
       prefixes: ['roster-deep:continue:'],
       label: '[roster] deep continue button error:',
       handle: handleRosterDeepContinueButton,
-      failureContent: '\u274c Failed to continue deep scan.',
     },
     {
       prefixes: ['list-add:enrich-hidden:'],
       label: '[list] add->enrich button error:',
       handle: (interaction) => listHandlers.handleListAddEnrichHiddenButton(interaction),
-      failureContent: '\u274c Failed to start enrich scan.',
     },
     {
       prefixes: ['scan-cancel:'],
       label: '[scan] cancel button error:',
       handle: (interaction) => listHandlers.handleScanCancelButton(interaction),
-      failureContent: '\u274c Failed to send stop signal.',
     },
     {
       prefixes: ['multiadd_confirm:', 'multiadd_cancel:'],
       label: '[multiadd] Button handler error:',
       handle: (interaction) => listHandlers.handleMultiaddConfirmButton(interaction),
-      failureContent: '\u274c Failed to process button action.',
     },
     {
       prefixes: [
@@ -179,7 +179,6 @@ export function createButtonRoutes(listHandlers) {
       ],
       label: '[multiadd] Approval button error:',
       handle: (interaction) => listHandlers.handleMultiaddApprovalButton(interaction),
-      failureContent: '\u274c Failed to process approval action.',
     },
   ];
 }
@@ -195,7 +194,6 @@ export function createSelectRoutes(listHandlers) {
       exact: 'autocheck_evidence',
       label: '[autocheck] Evidence select error:',
       handle: (interaction) => listHandlers.handleAutoCheckEvidenceSelect(interaction),
-      failureContent: '\u274c Failed to load evidence.',
     },
     {
       prefixes: ['la-help:select:'],
@@ -217,7 +215,7 @@ function createModalRoutes(listHandlers) {
       handle: (interaction) => listHandlers.handleQuickAddModal(interaction),
       onError: async (interaction, err) => {
         console.error('[quickadd] Modal error:', err.message);
-        await replyOrEdit(interaction, `\u26a0\ufe0f Failed: \`${err.message}\``);
+        await replyOrEdit(interaction);
       },
     },
   ];
@@ -319,7 +317,7 @@ export function createInteractionRouter({ client }) {
       console.error(`[bot] Unhandled error in /${commandName}:`, err);
 
       try {
-        await replyOrEdit(interaction, '\u274c An unexpected error occurred.');
+        await replyOrEdit(interaction);
       } catch (replyErr) {
         if (!isTransientInteractionError(replyErr)) {
           console.warn(`[bot] Failed to send error reply on /${commandName}:`, replyErr.message);

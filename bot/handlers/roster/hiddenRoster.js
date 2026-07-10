@@ -259,7 +259,6 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
                 rateLimitRetries: altResult.rateLimitRetries || 0,
               },
               primaryEmbedJSON: primaryEmbed.toJSON(),
-              contentText: '',
             });
             const buttonRow = buildScanResultButtons({
               kind: 'roster',

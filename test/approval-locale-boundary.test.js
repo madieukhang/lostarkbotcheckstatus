@@ -66,10 +66,17 @@ test('approval result posted in a guild channel uses guild-global language', asy
   await services.notifyRequesterAboutDecision(payload, {}, false);
 
   assert.equal(sent.length, 1);
-  assert.equal(sent[0].content, `✅ ${t('dialogue.approval.public.approved', 'vi', {
+  const localizedCopy = t('dialogue.approval.public.approved', 'vi', {
     user: payload.requestedByUserId,
     action: t('dialogue.approval.public.add', 'vi'),
     name: payload.name,
-  })}`);
-  assert.deepEqual(sent[0].embeds, []);
+  });
+  assert.equal(sent[0].content, `<@${payload.requestedByUserId}>`);
+  assert.deepEqual(sent[0].allowedMentions, { users: [payload.requestedByUserId] });
+  assert.equal(sent[0].embeds.length, 1);
+  assert.ok(
+    sent[0].embeds[0].toJSON().title.includes(
+      localizedCopy.replace(`<@${payload.requestedByUserId}>`, '').trim()
+    )
+  );
 });

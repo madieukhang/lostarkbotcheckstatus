@@ -23,8 +23,8 @@ import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
   editAlert,
-  editContent,
   editEmbed,
+  editNotice,
 } from '../../../utils/interactionReplies.js';
 import {
   buildListAddApprovalEmbed,
@@ -141,8 +141,8 @@ export function createListAddCommandHandler({
       // Auto-approve: officers always, OR server-scoped entries (local = no approval needed)
       if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
         const result = await executeListAddToDatabase(payload);
-        // Prefer rich embed when available; fall back to plain content for
-        // simple success messages that don't need a structured alert.
+        // Prefer the domain-rich embed; unexpected content-only executor
+        // results still render through the shared notice embed.
         // Components carry the optional "Enrich now" button on hidden-
         // roster success cards (see addExecutor.js).
         const hasEmbed = (result.embeds?.length ?? 0) > 0;
@@ -152,8 +152,9 @@ export function createListAddCommandHandler({
             components: result.components ?? [],
           });
         } else {
-          await editContent(interaction, result.content, {
-            embeds: [],
+          await editNotice(interaction, result.content, {
+            severity: result.ok ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
+            lang,
             components: result.components ?? [],
           });
         }

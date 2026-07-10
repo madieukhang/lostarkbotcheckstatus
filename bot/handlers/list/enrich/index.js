@@ -49,8 +49,9 @@ import {
   editAlert,
   editEmbed,
   replyAlert,
-  replyContent,
+  replyNotice,
   updateAlert,
+  updateNotice,
   updatePayload,
 } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
@@ -539,7 +540,10 @@ export function createEnrichHandlers({ client, services }) {
   }) {
     const cooldownWait = getCooldownWaitSeconds(name);
     if (cooldownWait > 0) {
-      await replyContent(interaction, cooldownMessage(cooldownWait));
+      await replyNotice(interaction, cooldownMessage(cooldownWait), {
+        severity: AlertSeverity.WARNING,
+        lang: await resolveInteractionLang(interaction),
+      });
       return;
     }
 
@@ -748,9 +752,10 @@ export function createEnrichHandlers({ client, services }) {
 
     clearEnrichSession(sessionId);
 
-    await updatePayload(interaction, {
-      content: t('dialogue.enrich.cancelled', lang),
-      embeds: [],
+    await updateNotice(interaction, t('dialogue.enrich.cancelled', lang), {
+      severity: AlertSeverity.INFO,
+      titleIcon: '✖️',
+      lang,
       components: [],
     });
   }
@@ -782,7 +787,11 @@ export function createEnrichHandlers({ client, services }) {
     }
 
     if (scan.cancelFlag.cancelled) {
-      await replyContent(interaction, t('dialogue.enrich.alreadyStopping', lang));
+      await replyNotice(interaction, t('dialogue.enrich.alreadyStopping', lang), {
+        severity: AlertSeverity.INFO,
+        titleIcon: '🛑',
+        lang,
+      });
       return;
     }
 
