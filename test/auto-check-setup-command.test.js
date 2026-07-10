@@ -61,3 +61,16 @@ test('/la-setup autochannel does not claim the cleanup day before cleanup runs',
   assert.match(handlerSource, /configSet:\s*\{/);
   assert.match(handlerSource, /!welcome\.pinned\s*\|\|\s*!welcome\.persisted/);
 });
+
+test('/la-setup imports the Discord permission flags used by its guild guard', () => {
+  const source = readFileSync(
+    new URL('../bot/handlers/setup/guildSetup.js', import.meta.url),
+    'utf8'
+  );
+
+  assert.match(
+    source,
+    /import\s*\{[^}]*\bPermissionFlagsBits\b[^}]*\}\s*from\s*['"]discord\.js['"]/
+  );
+  assert.match(source, /PermissionFlagsBits\.ManageGuild/);
+});

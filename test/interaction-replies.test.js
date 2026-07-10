@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { MessageFlags } from 'discord.js';
 
 import {
   deferEphemeralReply,
@@ -29,7 +30,7 @@ test('replyEmbed wraps one or many embeds and defaults to ephemeral', async () =
   assert.deepEqual(calls[0], {
     embeds,
     components: [{ row: true }],
-    ephemeral: true,
+    flags: MessageFlags.Ephemeral,
   });
 });
 
@@ -42,7 +43,6 @@ test('replyEmbed can send public replies without nesting embeds', async () => {
 
   assert.deepEqual(calls[0], {
     embeds: [embed],
-    ephemeral: false,
   });
 });
 
@@ -56,7 +56,7 @@ test('replyNotice keeps simple replies inside an ephemeral embed', async () => {
   });
 
   assert.equal(calls[0].content, undefined);
-  assert.equal(calls[0].ephemeral, true);
+  assert.equal(calls[0].flags, MessageFlags.Ephemeral);
   assert.equal(calls[0].embeds.length, 1);
   assert.match(calls[0].embeds[0].toJSON().title, /No image/);
 });
@@ -142,7 +142,7 @@ test('defer helpers centralize public and ephemeral defer payloads', async () =>
   await deferReply(interaction);
   await deferEphemeralReply(interaction);
 
-  assert.deepEqual(calls, [undefined, { ephemeral: true }]);
+  assert.deepEqual(calls, [undefined, { flags: MessageFlags.Ephemeral }]);
 });
 
 test('deferUpdate routes through the interaction update defer API', async () => {
@@ -172,7 +172,7 @@ test('alert helpers route through the shared alert embed builder', async () => {
     title: 'Done',
   });
 
-  assert.equal(replyCalls[0].ephemeral, true);
+  assert.equal(replyCalls[0].flags, MessageFlags.Ephemeral);
   assert.equal(replyCalls[0].embeds.length, 1);
   assert.equal(editCalls[0].embeds.length, 1);
 });

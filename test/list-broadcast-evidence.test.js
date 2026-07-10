@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { MessageFlags } from 'discord.js';
 
 process.env.DISCORD_TOKEN ||= 'test';
 process.env.CHANNEL_ID ||= 'test';
@@ -47,14 +48,14 @@ test('broadcast evidence handler acknowledges before refreshing and returns the 
   });
   const interaction = {
     customId: `${BROADCAST_EVIDENCE_PREFIX}:123456789:987654321`,
-    async deferReply(options) { calls.push(`defer:${options.ephemeral}`); },
+    async deferReply(options) { calls.push(`defer:${options.flags}`); },
     async editReply(payload) { editedPayload = payload; },
   };
 
   await handler(interaction);
 
   assert.deepEqual(calls, [
-    'defer:true',
+    `defer:${MessageFlags.Ephemeral}`,
     'refresh:123456789/987654321',
   ]);
   const embed = editedPayload.embeds[0].toJSON();

@@ -5,7 +5,7 @@
  * without growing another long if/else chain.
  */
 
-import { InteractionType } from 'discord.js';
+import { InteractionType, MessageFlags } from 'discord.js';
 
 import { checkStatus, resetState } from '../monitor/monitor.js';
 import { AlertSeverity, buildAlertEmbed } from '../utils/alertEmbed.js';
@@ -55,7 +55,7 @@ async function replyOrEdit(interaction) {
     await interaction.editReply({ content: null, ...payload }).catch(() => {});
     return;
   }
-  await interaction.reply({ ...payload, ephemeral: true }).catch(() => {});
+  await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral }).catch(() => {});
 }
 
 async function handleRoute(interaction, route) {

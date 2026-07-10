@@ -1,3 +1,5 @@
+import { MessageFlags } from 'discord.js';
+
 import {
   AlertSeverity,
   buildAlertEmbed,
@@ -9,8 +11,8 @@ function toEmbedArray(embedOrEmbeds) {
 }
 
 function withEphemeral(payload, ephemeral) {
-  if (ephemeral === undefined) return payload;
-  return { ...payload, ephemeral };
+  if (!ephemeral) return payload;
+  return { ...payload, flags: MessageFlags.Ephemeral };
 }
 
 export function replyEmbed(interaction, embedOrEmbeds, { ephemeral = true, ...extras } = {}) {
@@ -50,8 +52,8 @@ export function updatePayload(interaction, payload) {
 }
 
 export function deferReply(interaction, { ephemeral } = {}) {
-  if (ephemeral === undefined) return interaction.deferReply();
-  return interaction.deferReply({ ephemeral });
+  if (!ephemeral) return interaction.deferReply();
+  return interaction.deferReply({ flags: MessageFlags.Ephemeral });
 }
 
 export function deferEphemeralReply(interaction) {

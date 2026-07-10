@@ -5,7 +5,7 @@
  * without needing to modify environment variables.
  */
 
-import { ChannelType } from 'discord.js';
+import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
