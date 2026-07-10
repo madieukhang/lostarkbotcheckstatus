@@ -8,6 +8,7 @@ import {
   createAutoCheckCleanupService,
   getVietnamDayKey,
 } from '../bot/services/setup/autoCheckCleanup.js';
+import { createAutoCheckChannelGuard } from '../bot/services/setup/autoCheckChannelGuard.js';
 
 function createMessage(id, { pinned = false, deleteError = null } = {}) {
   const state = { deleted: 0 };
@@ -66,6 +67,51 @@ test('daily cleanup paginates and deletes every non-pinned message', async () =>
   assert.equal(oldTwo.state.deleted, 1);
 });
 
+test('daily cleanup never deletes an explicitly protected welcome ID', async () => {
+  const stalePinnedSnapshot = createMessage('welcome', { pinned: false });
+  const regular = createMessage('regular');
+  const pages = [collectionOf([stalePinnedSnapshot, regular])];
+  const channel = {
+    messages: {
+      async fetch() {
+        return pages.shift() || new Collection();
+      },
+    },
+  };
+
+  const outcome = await cleanupAutoCheckChannelMessages(channel, {
+    protectedMessageIds: ['welcome'],
+  });
+
+  assert.equal(outcome.deleted, 1);
+  assert.equal(stalePinnedSnapshot.state.deleted, 0);
+  assert.equal(regular.state.deleted, 1);
+});
+
+test('per-channel guard serializes cleanup work and releases after completion', async () => {
+  const guard = createAutoCheckChannelGuard();
+  const events = [];
+  let releaseFirst;
+  const first = guard.runExclusive('channel-1', async () => {
+    events.push('first:start');
+    await new Promise((resolve) => {
+      releaseFirst = resolve;
+    });
+    events.push('first:end');
+  });
+  await Promise.resolve();
+
+  const second = guard.runExclusive('channel-1', async () => {
+    events.push('second');
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(events, ['first:start']);
+
+  releaseFirst();
+  await Promise.all([first, second]);
+  assert.deepEqual(events, ['first:start', 'first:end', 'second']);
+});
+
 test('daily cleanup claims one VN day once even when the scheduler ticks again', async () => {
   const config = { guildId: 'guild-1', autoCheckChannelId: 'channel-1' };
   let claimed = false;
@@ -101,6 +147,42 @@ test('daily cleanup claims one VN day once even when the scheduler ticks again',
   assert.deepEqual(updates[0].update, {
     $set: { lastAutoCheckCleanupKey: '2026-07-10' },
   });
+});
+
+test('daily scheduler forwards stored and in-process welcome IDs as protected', async () => {
+  const config = {
+    guildId: 'guild-1',
+    autoCheckChannelId: 'channel-1',
+    autoCheckWelcomeMessageId: 'stored-welcome',
+  };
+  const GuildConfigModel = {
+    find() {
+      return { lean: async () => [config] };
+    },
+    async findOneAndUpdate() {
+      return config;
+    },
+  };
+  const guard = createAutoCheckChannelGuard();
+  guard.rememberWelcome('channel-1', 'fresh-welcome');
+  let cleanupOptions;
+  const service = createAutoCheckCleanupService({
+    GuildConfigModel,
+    channelGuard: guard,
+    cleanupMessages: async (_channel, options) => {
+      cleanupOptions = options;
+      return { deleted: 0, failed: 0, truncated: false };
+    },
+    resolveChannel: async () => ({ id: 'channel-1', guildId: 'guild-1' }),
+    logger: { info() {}, warn() {}, error() {} },
+  });
+
+  await service.runDailyCleanupTick({});
+
+  assert.deepEqual(
+    new Set(cleanupOptions.protectedMessageIds),
+    new Set(['stored-welcome', 'fresh-welcome'])
+  );
 });
 
 test('daily cleanup releases the day claim when any deletion fails', async () => {

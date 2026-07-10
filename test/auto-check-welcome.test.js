@@ -5,6 +5,8 @@ import {
   buildAutoCheckWelcomeEmbed,
   createAutoCheckWelcomeService,
 } from '../bot/services/setup/autoCheckWelcome.js';
+import { createAutoCheckCleanupService } from '../bot/services/setup/autoCheckCleanup.js';
+import { createAutoCheckChannelGuard } from '../bot/services/setup/autoCheckChannelGuard.js';
 
 function fakeEmbed(title) {
   return {
@@ -230,6 +232,103 @@ test('first welcome cleans non-pinned messages before posting and records the cl
     autoCheckWelcomeChannelId: 'channel-1',
     lastAutoCheckCleanupKey: '2026-07-10',
   });
+});
+
+test('welcome setup and daily cleanup cannot race across the send-to-pin window', async () => {
+  const dayKey = '2026-07-10';
+  const state = {
+    guildId: 'guild-1',
+    autoCheckChannelId: 'channel-1',
+  };
+  const GuildConfigModel = {
+    find() {
+      return {
+        lean: async () => state.lastAutoCheckCleanupKey === dayKey
+          ? []
+          : [{ ...state }],
+      };
+    },
+    findOne() {
+      return { lean: async () => ({ ...state }) };
+    },
+    async findOneAndUpdate(query, update) {
+      if (
+        query.lastAutoCheckCleanupKey?.$ne === dayKey &&
+        state.lastAutoCheckCleanupKey === dayKey
+      ) {
+        return null;
+      }
+      Object.assign(state, update.$set || {});
+      if (update.$unset) {
+        for (const key of Object.keys(update.$unset)) delete state[key];
+      }
+      return { ...state };
+    },
+  };
+  const guard = createAutoCheckChannelGuard();
+  const fresh = createMessage('fresh', 'Welcome vi');
+  const channel = {
+    id: 'channel-1',
+    guildId: 'guild-1',
+    messages: { fetchPins: async () => ({ items: [] }) },
+    send: async () => fresh,
+  };
+  let initialCleanupStarted;
+  const initialCleanupReady = new Promise((resolve) => {
+    initialCleanupStarted = resolve;
+  });
+  let releaseInitialCleanup;
+  const initialCleanupGate = new Promise((resolve) => {
+    releaseInitialCleanup = resolve;
+  });
+  let scheduledCleanupCalls = 0;
+  const welcomeService = createAutoCheckWelcomeService({
+    GuildConfigModel,
+    channelGuard: guard,
+    buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
+    getGuildLanguageFn: async () => 'vi',
+    getCleanupDayKey: () => dayKey,
+    cleanupMessages: async () => {
+      initialCleanupStarted();
+      await initialCleanupGate;
+      return { deleted: 0, failed: 0, truncated: false };
+    },
+    supportedLanguageCodes: ['en', 'vi', 'jp'],
+    logger: { warn() {} },
+  });
+  const cleanupService = createAutoCheckCleanupService({
+    GuildConfigModel,
+    channelGuard: guard,
+    nowDate: () => new Date('2026-07-09T17:05:00Z'),
+    resolveChannel: async () => channel,
+    cleanupMessages: async () => {
+      scheduledCleanupCalls += 1;
+      return { deleted: 0, failed: 0, truncated: false };
+    },
+    logger: { info() {}, warn() {}, error() {} },
+  });
+
+  const welcomePromise = welcomeService.postWelcome({
+    botUserId: 'bot',
+    channel,
+    client: { channels: { fetch: async () => channel } },
+    guildId: 'guild-1',
+  });
+  await initialCleanupReady;
+  const cleanupPromise = cleanupService.runDailyCleanupTick({});
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fresh.state.pinned, 0);
+  assert.equal(scheduledCleanupCalls, 0);
+
+  releaseInitialCleanup();
+  const [welcomeOutcome] = await Promise.all([welcomePromise, cleanupPromise]);
+
+  assert.equal(welcomeOutcome.pinned, true);
+  assert.equal(welcomeOutcome.persisted, true);
+  assert.equal(state.autoCheckWelcomeMessageId, 'fresh');
+  assert.equal(state.lastAutoCheckCleanupKey, dayKey);
+  assert.equal(scheduledCleanupCalls, 0);
+  assert.equal(fresh.state.deleted, 0);
 });
 
 test('first welcome skips destructive cleanup when pin discovery fails', async () => {
