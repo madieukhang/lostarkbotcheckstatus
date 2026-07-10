@@ -12,6 +12,7 @@ import TrustedUser from '../../../models/TrustedUser.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
+import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -102,16 +103,10 @@ export async function handleApprovedEditRequest({
 
     // Recheck trusted guard at approval time (status may have changed)
     {
-      const trustedNow = await TrustedUser.findOne({
-        $or: [
-          { name: existingEntry.name },
-          { allCharacters: existingEntry.name },
-          ...(existingEntry.allCharacters?.length > 0 ? [
-            { name: { $in: existingEntry.allCharacters } },
-            { allCharacters: { $in: existingEntry.allCharacters } },
-          ] : []),
-        ],
-      }).collation({ locale: 'en', strength: 2 }).lean();
+      const trustedNow = await TrustedUser.findOne(buildNameRosterQuery([
+        existingEntry.name,
+        ...(existingEntry.allCharacters || []),
+      ])).collation({ locale: 'en', strength: 2 }).lean();
       if (trustedNow) {
         await PendingApproval.deleteOne({ requestId });
         await editPayload(interaction, {

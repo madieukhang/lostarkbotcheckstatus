@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 
 import { getClassName, getClassEmoji } from '../../models/Class.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
@@ -68,7 +68,7 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
 
   const description = `${summaryLine}\n\n${lines.join('\n')}`.slice(0, 4096);
 
-  return new EmbedBuilder()
+  return createArtistEmbed()
     .setTitle(`🔍 Search · "${name}"`)
     .setDescription(description)
     .setColor(color)

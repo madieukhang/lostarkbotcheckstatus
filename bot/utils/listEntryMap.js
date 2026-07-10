@@ -1,3 +1,23 @@
+export function buildNameRosterQuery(names = []) {
+  const values = Array.isArray(names) ? names : [names];
+  const list = [];
+  const seen = new Set();
+  for (const value of values) {
+    const name = String(value || '').trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    list.push(name);
+  }
+  return {
+    $or: [
+      { name: { $in: list } },
+      { allCharacters: { $in: list } },
+    ],
+  };
+}
+
 export function buildListEntryMap(entries) {
   const map = new Map();
   for (const entry of entries || []) {

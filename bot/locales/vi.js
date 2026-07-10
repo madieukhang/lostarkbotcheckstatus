@@ -28,6 +28,8 @@ const vi = {
       keptExisting: 'Đã giữ entry cũ',
       overwritten: 'Đã ghi đè',
       viewEvidenceFresh: '📎 Xem evidence (fresh)',
+      viewEvidence: 'Xem evidence',
+      openEvidence: 'Mở evidence',
       approveAdd: 'Duyệt · thêm {count}',
       confirmAdd: 'Xác nhận thêm {count}',
       confirmAddCompact: 'Xác nhận · thêm {count}',
@@ -49,6 +51,38 @@ const vi = {
     languageSwitch: {
       description: 'Đổi ngôn ngữ LoaLogs dùng cho phản hồi của cậu',
     },
+  },
+
+  autoCheckWelcome: {
+    title: '🎨 Artist chỉ đi ngang qua thôi~',
+    description: [
+      'Artist tình cờ đi ngang channel này rồi để lại một tấm bảng nhỏ. LoaLogs mới là người ở lại trông screenshot cho các cậu nhé.',
+      'Cứ thả screenshot có tên character vào đây; bot sẽ đọc ảnh rồi đối chiếu từng tên với các list của server.',
+    ],
+    howName: '🔍 Sau khi cậu gửi ảnh',
+    howValue: [
+      '1. LoaLogs thả reaction 🔍 và đọc tối đa 8 tên character.',
+      '2. Các tên được kiểm tra với blacklist, whitelist, watchlist và trusted.',
+      '3. Tên chưa nằm trong list có thể hiện Quick Add cho officer xử lý ngay.',
+    ],
+    listsName: '📚 Đọc kết quả thế nào',
+    listsValue: [
+      'Kết quả black và watch cần chú ý; white và trusted cung cấp ngữ cảnh đối chiếu.',
+      'Muốn kiểm tra thủ công không cần ảnh thì dùng /la-search name:<character>.',
+    ],
+    cleanupName: '🧹 Channel được dọn mỗi ngày',
+    cleanupValue: [
+      'Đúng **00:00 Asia/Ho_Chi_Minh (17:00 UTC)**, LoaLogs sẽ xóa toàn bộ tin nhắn không ghim trong channel này.',
+      'Tin đã ghim được giữ lại. Nội dung quan trọng thì cậu chuyển sang nơi khác trước giờ dọn nhé.',
+    ],
+    commandsName: '🧭 Các lệnh hữu ích',
+    commandsValue: [
+      '/la-check image:<screenshot> - kiểm tra ảnh thủ công',
+      '/la-roster name:<character> - xem roster',
+      '/la-search name:<character> - tìm và đối chiếu list',
+      '/la-help - mở hướng dẫn đầy đủ',
+    ],
+    footer: 'Artist đi tiếp đây~ Tấm bảng này cứ để lại nhé.',
   },
 
   help: {
@@ -101,6 +135,8 @@ const vi = {
             '`/la-setup autochannel #channel` - Set channel auto-check ảnh cho server này',
             '`/la-setup notifychannel #channel` - Set channel nhận thông báo list',
             '`/la-setup view` - Xem config hiện tại',
+            '`/la-setup repin` - Làm mới bảng hướng dẫn Artist đã ghim',
+            '`/la-setup language` - Đổi ngôn ngữ public và tin ghim của server',
             '`/la-setup off` - Bật/tắt global list notifications',
             '`/la-setup defaultscope global/server` - Set default blacklist scope cho /la-list add',
           ],

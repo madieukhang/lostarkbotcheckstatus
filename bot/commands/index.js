@@ -431,6 +431,26 @@ function setupCommand(name) {
     )
     .addSubcommand((sub) =>
       sub
+        .setName('repin')
+        .setDescription(commandText('setup.subcommands.repin.description'))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('language')
+        .setDescription(commandText('setup.subcommands.language.description'))
+        .addStringOption((opt) =>
+          opt
+            .setName('language')
+            .setDescription(commandText('setup.subcommands.language.options.language'))
+            .setRequired(true)
+            .addChoices(...getSupportedLanguages().map((language) => ({
+              name: language.flag + ' ' + language.label,
+              value: language.code,
+            })))
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName('off')
         .setDescription(commandText('setup.subcommands.off.description'))
     )

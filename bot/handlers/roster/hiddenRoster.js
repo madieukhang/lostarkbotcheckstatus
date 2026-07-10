@@ -8,11 +8,12 @@
  * the visible path.
  */
 
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
+import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import Blacklist from '../../models/Blacklist.js';
@@ -81,17 +82,12 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         // Step 2: Quick DB check · are any guild members already in the lists?
         await connectDB();
         const rosterGuildId = interaction.guild?.id || '';
-        const memberNameQuery = { $or: [{ name: { $in: memberNames } }, { allCharacters: { $in: memberNames } }] };
+        const memberNameQuery = buildNameRosterQuery(memberNames);
         const [guildBlackHits, guildWhiteHits] = await Promise.all([
           Blacklist.find(buildBlacklistQuery(memberNameQuery, rosterGuildId))
             .collation({ locale: 'en', strength: 2 })
             .lean(),
-          Whitelist.find({
-            $or: [
-              { name: { $in: memberNames } },
-              { allCharacters: { $in: memberNames } },
-            ],
-          })
+          Whitelist.find(memberNameQuery)
             .collation({ locale: 'en', strength: 2 })
             .lean(),
         ]);
@@ -209,7 +205,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         const color = hasBlack ? COLORS.danger : hasWhite ? COLORS.success : COLORS.warning;
         const deepStats = formatDeepScanStats(altResult);
 
-        const primaryEmbed = new EmbedBuilder()
+        const primaryEmbed = createArtistEmbed()
           .setTitle(`🔒 Hidden Roster · ${name}`)
           .setURL(bibleProfileUrl(name))
           .setDescription(description.length > 4000 ? description.slice(0, 4000) + '\n…' : description)

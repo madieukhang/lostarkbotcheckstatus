@@ -12,6 +12,7 @@ import { getClassName, resolveClassId } from '../../models/Class.js';
 import { fetchNameSuggestions } from '../../services/roster/index.js';
 import { getUserLanguage } from '../../services/i18n/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
+import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import {
   attachSearchEvidenceCollector,
   buildSearchEvidenceComponents,
@@ -78,7 +79,7 @@ export async function handleSearchCommand(interaction) {
     const sliced = suggestions.slice(0, 15);
     const allNames = sliced.map((s) => s.name);
     const collation = { locale: 'en', strength: 2 };
-    const nameQuery = { $or: [{ name: { $in: allNames } }, { allCharacters: { $in: allNames } }] };
+    const nameQuery = buildNameRosterQuery(allNames);
     const blackQuery = buildBlacklistQuery(nameQuery, searchGuildId);
 
     const [allBlack, allWhite, allWatch, allTrusted, allSnapshots] = await Promise.all([

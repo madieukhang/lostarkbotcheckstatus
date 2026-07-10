@@ -16,6 +16,7 @@ export { clearOcrCache, extractNamesFromImage } from './ocr.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 import {
   buildListEntryMap as buildEntryMap,
+  buildNameRosterQuery,
   sortBlacklistForScopePriority,
 } from '../../utils/listEntryMap.js';
 import { applyMarkedSiblingLevelCorrections } from './partyCorrections.js';
@@ -51,7 +52,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const { guildId } = options;
 
   // Phase 1: Batch list check · 3 queries for ALL names instead of 3 × N
-  const nameQuery = { $or: [{ name: { $in: names } }, { allCharacters: { $in: names } }] };
+  const nameQuery = buildNameRosterQuery(names);
   const collation = { locale: 'en', strength: 2 };
 
   // Blacklist: scope-aware query (owner sees all, others see global + own server)
@@ -134,12 +135,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
 
   if (refreshNames.size > 0) {
     const refreshList = [...refreshNames];
-    const refreshNameQuery = {
-      $or: [
-        { name: { $in: refreshList } },
-        { allCharacters: { $in: refreshList } },
-      ],
-    };
+    const refreshNameQuery = buildNameRosterQuery(refreshList);
     const refreshBlackQuery = buildBlacklistQuery(refreshNameQuery, guildId);
     const [refreshBlack, refreshWhite, refreshWatch, refreshTrusted] = await Promise.all([
       Blacklist.find(refreshBlackQuery).collation(collation).lean(),
@@ -203,12 +199,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
 
   if (altNamesForTrustedCheck.size > 0) {
     const trustedNames = [...altNamesForTrustedCheck];
-    const altTrusted = await TrustedUser.find({
-      $or: [
-        { name: { $in: trustedNames } },
-        { allCharacters: { $in: trustedNames } },
-      ],
-    })
+    const altTrusted = await TrustedUser.find(buildNameRosterQuery(trustedNames))
       .collation(collation).lean();
 
     if (altTrusted.length > 0) {

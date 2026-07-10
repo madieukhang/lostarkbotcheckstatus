@@ -11,8 +11,8 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
-  EmbedBuilder,
 } from 'discord.js';
+import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { connectDB } from '../../../db.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
@@ -23,6 +23,7 @@ import Watchlist from '../../../models/Watchlist.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
+import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
@@ -55,19 +56,16 @@ export function createRemoveHandlers({ client, services }) {
       const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
       const removeGuildId = interaction.guild?.id || '';
+      const nameQuery = buildNameRosterQuery(name);
       const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
-        Blacklist.findOne(buildBlacklistQuery({ $or: [{ name }, { allCharacters: name }] }, removeGuildId))
+        Blacklist.findOne(buildBlacklistQuery(nameQuery, removeGuildId))
           .sort({ scope: -1 })
           .collation({ locale: 'en', strength: 2 })
           .lean(),
-        Whitelist.findOne({
-          $or: [{ name }, { allCharacters: name }],
-        })
+        Whitelist.findOne(nameQuery)
           .collation({ locale: 'en', strength: 2 })
           .lean(),
-        Watchlist.findOne({
-          $or: [{ name }, { allCharacters: name }],
-        })
+        Watchlist.findOne(nameQuery)
           .collation({ locale: 'en', strength: 2 })
           .lean(),
       ]);
@@ -183,7 +181,7 @@ export function createRemoveHandlers({ client, services }) {
           }
         }
 
-        return new EmbedBuilder()
+        return createArtistEmbed()
           .setTitle(`${titleIcon} ${title}`)
           .setDescription(sections.join('\n\n').slice(0, 4096))
           .setColor(color)
@@ -226,7 +224,7 @@ export function createRemoveHandlers({ client, services }) {
         const reason = f.entry.reason ? ` *${(f.entry.reason || '').slice(0, 80)}${f.entry.reason.length > 80 ? '...' : ''}*` : '';
         return `${i + 1}. ${ctx.icon} **${ctx.label}**${scopeTag}${reason}`;
       });
-      const pickerEmbed = new EmbedBuilder()
+      const pickerEmbed = createArtistEmbed()
         .setTitle(`🔎 Found · ${name}`)
         .setDescription(
           `**${name}** is in ${found.length} list(s). Pick which to remove:\n\n` +

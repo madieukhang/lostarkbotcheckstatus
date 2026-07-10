@@ -7,16 +7,17 @@
  * the multiadd reject/summary embeds.
  */
 
-import { EmbedBuilder } from 'discord.js';
-
 import config from '../../../config.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
-import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
+import { upsertRosterSnapshots } from '../../../services/roster/rosterSnapshots.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
+import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { getListContext, listTypeIcon } from '../helpers.js';
+import { buildBroadcastEvidenceComponents } from '../evidence/broadcastButton.js';
 import {
   formatAltLine,
   renderTrackedAltsField,
@@ -67,6 +68,56 @@ export function mergeRosterStatRecords(records = [], baseMap = new Map()) {
   return baseMap;
 }
 
+function withTimeout(promise, timeoutMs) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(null), timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Merge cached + caller-provided roster stats and, when any tracked name is
+ * still missing, perform one bounded roster read to self-heal old entries.
+ * The hydrated roster is persisted so edit/remove broadcasts do not pay this
+ * network cost again.
+ */
+export async function hydrateBroadcastStatMap({
+  entry,
+  initialRecords = [],
+  buildRosterCharactersFn = buildRosterCharacters,
+  upsertRosterSnapshotsFn = upsertRosterSnapshots,
+  timeoutMs = 8_000,
+}) {
+  const statMap = mergeRosterStatRecords(initialRecords);
+  const names = [...new Set([
+    entry?.name,
+    ...(Array.isArray(entry?.allCharacters) ? entry.allCharacters : []),
+  ].filter(Boolean))];
+  const isComplete = names.every((name) => statMap.has(normalizeNameKey(name)));
+  if (isComplete || !entry?.name) return statMap;
+
+  try {
+    const result = await withTimeout(
+      buildRosterCharactersFn(entry.name, { hiddenRosterFallback: true, viaWorker: true }),
+      timeoutMs,
+    );
+    const hydrated = Array.isArray(result?.rosterCharacters)
+      ? result.rosterCharacters
+      : [];
+    if (result?.hasValidRoster && hydrated.length > 0) {
+      mergeRosterStatRecords(hydrated, statMap);
+      await upsertRosterSnapshotsFn(hydrated, entry.name);
+    }
+  } catch (err) {
+    console.warn('[list] Broadcast roster hydration failed (non-fatal):', err.message);
+  }
+
+  return statMap;
+}
+
 function getBroadcastClassName(record) {
   if (!record) return '';
   return record.className || (record.classId ? getClassName(record.classId) : '');
@@ -90,6 +141,31 @@ export function buildTrackedAltsField(entry, statMap = new Map()) {
   });
 }
 
+export async function sendEmbedToChannels({
+  client,
+  channelIds,
+  embed,
+  components = [],
+  logLabel = '[list broadcast]',
+  logger = console,
+}) {
+  await Promise.all(
+    [...(channelIds || [])].map(async (channelId) => {
+      try {
+        const channel = await client.channels.fetch(channelId);
+        if (channel?.isTextBased()) {
+          await channel.send({
+            embeds: [embed],
+            ...(components.length > 0 ? { components } : {}),
+          });
+        }
+      } catch (err) {
+        logger.warn?.(`${logLabel} channel ${channelId} failed: ${err.message}`);
+      }
+    })
+  );
+}
+
 /**
  * Build the broadcast service bag.
  * @param {object} deps
@@ -102,7 +178,11 @@ export function buildTrackedAltsField(entry, statMap = new Map()) {
  *   broadcastBulkAdd: Function,
  * }}
  */
-export function createBroadcastServices({ client }) {
+export function createBroadcastServices({
+  client,
+  buildRosterCharactersFn = buildRosterCharacters,
+  upsertRosterSnapshotsFn = upsertRosterSnapshots,
+}) {
   async function broadcastListChange(action, entry, payload, options = {}) {
     const {
       onlyOwner = false,
@@ -124,16 +204,20 @@ export function createBroadcastServices({ client }) {
     // Otherwise fall back to the older name-only headline.
     const allChars = Array.isArray(entry.allCharacters) ? entry.allCharacters : [];
     const lookupNames = [...new Set([entry.name, ...allChars].filter(Boolean))];
-    let statMap = new Map();
+    let snapshots = [];
     try {
-      const snaps = await RosterSnapshot.find({ name: { $in: lookupNames } })
+      snapshots = await RosterSnapshot.find({ name: { $in: lookupNames } })
         .collation({ locale: 'en', strength: 2 })
         .lean();
-      statMap = mergeRosterStatRecords(snaps);
     } catch (err) {
       console.warn('[list] Snapshot lookup for broadcast failed (non-fatal):', err.message);
     }
-    mergeRosterStatRecords(rosterCharacters, statMap);
+    const statMap = await hydrateBroadcastStatMap({
+      entry,
+      initialRecords: [...snapshots, ...rosterCharacters],
+      buildRosterCharactersFn,
+      upsertRosterSnapshotsFn,
+    });
 
     const snap = statMap.get(normalizeNameKey(entry.name)) || null;
     const className = getBroadcastClassName(snap);
@@ -150,8 +234,8 @@ export function createBroadcastServices({ client }) {
     const newCount = newAlts.length;
     const totalTracked = Math.max(0, allChars.filter((n) => normalizeNameKey(n) !== normalizeNameKey(entry.name)).length);
     const headline = isEnrich
-      ? `${icon} ${classPrefix}**[${entry.name}](${rosterLink})** gained **${newCount}** new tracked alt${newCount === 1 ? '' : 's'} in **${labelCap}**${scopeTag} via enrich · now **${totalTracked}** tracked.`
-      : `${icon} ${classPrefix}**[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}.`;
+      ? `${icon} I found **${newCount}** new tracked alt${newCount === 1 ? '' : 's'} for ${classPrefix}**[${entry.name}](${rosterLink})** in **${labelCap}**${scopeTag}. There are **${totalTracked}** tracked now.`
+      : `${icon} I noted that ${classPrefix}**[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}. The useful context is gathered below.`;
 
     const fields = [
       { name: '📝 Reason', value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
@@ -209,33 +293,33 @@ export function createBroadcastServices({ client }) {
       if (trackedAltsField) fields.push(trackedAltsField);
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle(`${ICONS.dm} List ${verb.split(' ')[0]} broadcast`)
+    const titleByAction = {
+      added: `A new note · ${labelCap}`,
+      removed: `A name leaves · ${labelCap}`,
+      edited: `A note was revised · ${labelCap}`,
+      enriched: `The roster trail grew · ${labelCap}`,
+    };
+    const embed = createArtistEmbed()
+      .setTitle(`🎨 ${titleByAction[action] || `List update · ${labelCap}`}`)
       .setDescription(headline)
       .addFields(fields)
       .setColor(color)
       .setTimestamp(new Date());
 
-    const displayUrl = preResolvedUrl !== undefined
-      ? preResolvedUrl
-      : await resolveDisplayImageUrl(entry, client);
-    if (displayUrl) embed.setImage(displayUrl);
+    const components = buildBroadcastEvidenceComponents(entry, {
+      legacyUrl: preResolvedUrl !== undefined ? preResolvedUrl : entry.imageUrl,
+    });
 
     const channelIds = await resolveBroadcastChannels(payload.guildId || '', { onlyOwner });
     if (channelIds.size === 0) return;
 
-    await Promise.all(
-      [...channelIds].map(async (channelId) => {
-        try {
-          const channel = await client.channels.fetch(channelId);
-          if (channel?.isTextBased()) {
-            await channel.send({ embeds: [embed] });
-          }
-        } catch (err) {
-          console.warn(`[list] Failed to broadcast to channel ${channelId}:`, err.message);
-        }
-      })
-    );
+    await sendEmbedToChannels({
+      client,
+      channelIds,
+      embed,
+      components,
+      logLabel: '[list] Broadcast',
+    });
   }
 
   async function resolveBroadcastChannels(originGuildId, { onlyOwner = false } = {}) {
@@ -341,7 +425,7 @@ export function createBroadcastServices({ client }) {
         if (grouped[t]) grouped[t].push(r);
       }
 
-      const embed = new EmbedBuilder()
+      const embed = createArtistEmbed()
         .setTitle(`📢 Bulk Add${isLocal ? ' (Local)' : ''} · ${entries.length} entries`)
         .setColor(COLORS.info)
         .setTimestamp(new Date());
@@ -369,18 +453,12 @@ export function createBroadcastServices({ client }) {
       const channelIds = await resolveBroadcastChannels(originGuildId, { onlyOwner: false });
       if (channelIds.size > 0) {
         const embed = buildBulkEmbed(globalEntries, false);
-        await Promise.all(
-          [...channelIds].map(async (channelId) => {
-            try {
-              const channel = await client.channels.fetch(channelId);
-              if (channel?.isTextBased()) {
-                await channel.send({ embeds: [embed] });
-              }
-            } catch (err) {
-              console.warn(`[multiadd] Bulk broadcast to ${channelId} failed:`, err.message);
-            }
-          })
-        );
+        await sendEmbedToChannels({
+          client,
+          channelIds,
+          embed,
+          logLabel: '[multiadd] Bulk broadcast',
+        });
       }
     }
 
@@ -388,18 +466,12 @@ export function createBroadcastServices({ client }) {
       const channelIds = await resolveBroadcastChannels(originGuildId, { onlyOwner: true });
       if (channelIds.size > 0) {
         const embed = buildBulkEmbed(serverEntries, true);
-        await Promise.all(
-          [...channelIds].map(async (channelId) => {
-            try {
-              const channel = await client.channels.fetch(channelId);
-              if (channel?.isTextBased()) {
-                await channel.send({ embeds: [embed] });
-              }
-            } catch (err) {
-              console.warn(`[multiadd] Bulk local broadcast to ${channelId} failed:`, err.message);
-            }
-          })
-        );
+        await sendEmbedToChannels({
+          client,
+          channelIds,
+          embed,
+          logLabel: '[multiadd] Bulk local broadcast',
+        });
       }
     }
   }

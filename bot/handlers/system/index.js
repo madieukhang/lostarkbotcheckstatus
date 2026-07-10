@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 
 import { STATUS } from '../../monitor/serverStatus.js';
 import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
@@ -82,7 +82,7 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
         fields.push({ name: server, value: formatStatus(status), inline: true });
       }
 
-      const embed = new EmbedBuilder()
+      const embed = createArtistEmbed()
         .setTitle(`${titleIcon} Lost Ark · Server Status`)
         .setDescription(`${headline}\n\nChecked ${relativeTime(Date.now())}.`)
         .addFields(fields)

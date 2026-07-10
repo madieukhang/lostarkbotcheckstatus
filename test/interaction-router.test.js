@@ -41,6 +41,19 @@ test('interaction router button table dispatches list-enrich actions by customId
   }
 });
 
+test('interaction router dispatches compact broadcast evidence buttons', async () => {
+  let received = null;
+  const routes = createButtonRoutes({
+    handleBroadcastEvidenceButton: async (interaction) => { received = interaction.customId; },
+  });
+
+  const customId = 'listbroadcast_evidence:123456789:987654321';
+  const route = findCustomIdRoute(routes, customId);
+  assert.ok(route);
+  await route.handle({ customId });
+  assert.equal(received, customId);
+});
+
 test('interaction router select table supports exact and prefixed customIds', async () => {
   let quickAddCalls = 0;
   const routes = createSelectRoutes({

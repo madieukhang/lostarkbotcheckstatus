@@ -32,6 +32,7 @@
 import { EmbedBuilder } from 'discord.js';
 
 import { COLORS, ICONS } from './ui.js';
+import { decorateArtistEmbed } from './artistVoice.js';
 
 /**
  * Severity levels for alert embeds. Each level maps to a specific color +
@@ -109,5 +110,5 @@ export function buildAlertEmbed({
     embed.setTimestamp(new Date());
   }
 
-  return embed;
+  return decorateArtistEmbed(embed);
 }

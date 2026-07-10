@@ -5,13 +5,20 @@
  * without needing to modify environment variables.
  */
 
-import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { ChannelType, PermissionFlagsBits } from 'discord.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
 import { COLORS } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
+import {
+  getSupportedLanguages,
+  setGuildLanguage,
+} from '../../services/i18n/index.js';
+import { getVietnamDayKey } from '../../services/setup/autoCheckCleanup.js';
+import { postAutoCheckWelcome } from '../../services/setup/autoCheckWelcome.js';
 import {
   deferEphemeralReply,
   editContent,
@@ -25,7 +32,7 @@ import {
  * @param {import('discord.js').Guild} guild
  * @returns {{ ok: boolean, missing: string[] }}
  */
-function checkBotPermissions(channel, guild) {
+function checkBotPermissions(channel, guild, { welcomePin = false } = {}) {
   const botMember = guild.members.me;
   if (!botMember) return { ok: false, missing: ['Cannot resolve bot member'] };
 
@@ -35,6 +42,12 @@ function checkBotPermissions(channel, guild) {
     { flag: PermissionFlagsBits.SendMessages, name: 'Send Messages' },
     { flag: PermissionFlagsBits.ReadMessageHistory, name: 'Read Message History' },
   ];
+  if (welcomePin) {
+    required.push(
+      { flag: PermissionFlagsBits.ManageMessages, name: 'Manage Messages' },
+      { flag: PermissionFlagsBits.EmbedLinks, name: 'Embed Links' }
+    );
+  }
 
   const missing = required.filter((r) => !perms.has(r.flag)).map((r) => r.name);
   return { ok: missing.length === 0, missing };
@@ -59,6 +72,29 @@ async function sendTestMessage(channel, purpose) {
   }
 }
 
+async function resolveGuildTextChannel(interaction, channelId) {
+  if (!channelId) return null;
+  let channel = interaction.guild?.channels?.cache?.get(channelId) || null;
+  if (!channel && interaction.guild?.channels?.fetch) {
+    try {
+      channel = await interaction.guild.channels.fetch(channelId);
+    } catch {
+      channel = null;
+    }
+  }
+  return channel?.type === ChannelType.GuildText ? channel : null;
+}
+
+function welcomeOutcomeText(outcome) {
+  if (outcome?.pinned && outcome?.persisted) {
+    return '🎨 Artist welcome pinned safely' +
+      (outcome.removedOldCount > 0
+        ? ' · replaced ' + outcome.removedOldCount + ' old pin(s)'
+        : '');
+  }
+  return '⚠️ Welcome pin could not be replaced safely; any previous pin was kept';
+}
+
 /**
  * Handle /la-setup autochannel #channel
  */
@@ -75,7 +111,9 @@ async function handleSetupAutoChannel(interaction) {
   }
 
   // Check bot permissions before saving
-  const { ok, missing } = checkBotPermissions(channel, interaction.guild);
+  const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
+    welcomePin: true,
+  });
   if (!ok) {
     await replyAlert(interaction, {
       severity: AlertSeverity.ERROR,
@@ -103,6 +141,7 @@ async function handleSetupAutoChannel(interaction) {
     {
       $set: {
         autoCheckChannelId: channel.id,
+        lastAutoCheckCleanupKey: getVietnamDayKey(),
         updatedByUserId: interaction.user.id,
         updatedByTag: interaction.user.tag,
       },
@@ -110,14 +149,22 @@ async function handleSetupAutoChannel(interaction) {
     { upsert: true, returnDocument: 'after' }
   );
 
-  // Send test message to verify channel works
-  const testOk = await sendTestMessage(channel, 'auto-check');
+  const welcome = await postAutoCheckWelcome({
+    botUserId: interaction.client.user.id,
+    channel,
+    client: interaction.client,
+    guildId: interaction.guild.id,
+  });
 
   const warning = sameAsNotify ? '\n⚠️ This is the same channel as notifications · consider using separate channels to avoid clutter.' : '';
 
-  await editContent(interaction, testOk
-    ? `✅ Auto-check channel set to <#${channel.id}>.\nBot will automatically check screenshots posted in this channel.${warning}\n\n*A test message was sent to verify · it will auto-delete in 30s.*`
-    : `✅ Auto-check channel set to <#${channel.id}>.${warning}\n⚠️ Could not send a test message · please verify bot permissions.`);
+  await editContent(
+    interaction,
+    '✅ Auto-check channel set to <#' + channel.id + '>.\n' +
+      'Bot will automatically check screenshots posted here.' + warning + '\n' +
+      welcomeOutcomeText(welcome) + '\n' +
+      '🧹 Every non-pinned message is deleted daily at 00:00 Asia/Ho_Chi_Minh.'
+  );
 
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) set autoCheckChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);
@@ -238,9 +285,25 @@ async function handleSetupView(interaction) {
   const notifyEnabled = guildConfig?.globalNotifyEnabled ?? true;
   const defaultScope = guildConfig?.defaultBlacklistScope || 'global';
   const scopeEmoji = defaultScope === 'server' ? '🔒' : '🌐';
+  const languageEntry =
+    getSupportedLanguages().find((entry) => entry.code === guildConfig?.language) ||
+    getSupportedLanguages()[0];
+  const welcomePinValue =
+    guildConfig?.autoCheckWelcomeMessageId &&
+    guildConfig?.autoCheckWelcomeChannelId
+      ? '<#' + guildConfig.autoCheckWelcomeChannelId + '> · ' +
+        '[Jump to message](https://discord.com/channels/' +
+        interaction.guild.id + '/' +
+        guildConfig.autoCheckWelcomeChannelId + '/' +
+        guildConfig.autoCheckWelcomeMessageId + ')'
+      : '*Not tracked yet · run /la-setup repin*';
+  const cleanupValue = autoCheckDb
+    ? '**00:00 Asia/Ho_Chi_Minh daily**\nLast completed: ' +
+      (guildConfig?.lastAutoCheckCleanupKey || '*not yet*')
+    : '*Inactive until autochannel is persisted via /la-setup*';
 
   // Each setting renders as its own field so the dashboard reads as a
-  // 2x2 grid of "what's configured here?" cards instead of a wall of
+  // compact grid of "what's configured here?" cards instead of a wall of
   // bullet points. The source qualifier (set via /la-setup vs env var
   // fallback vs not configured) goes on a second line in italics so
   // an admin scanning the grid can tell at a glance how each value
@@ -284,6 +347,21 @@ async function handleSetupView(interaction) {
       value: '​',
       inline: true,
     },
+    {
+      name: '🎨 Pinned welcome',
+      value: welcomePinValue,
+      inline: true,
+    },
+    {
+      name: '🧹 Daily cleanup',
+      value: cleanupValue,
+      inline: true,
+    },
+    {
+      name: '🌐 Public language',
+      value: languageEntry.flag + ' **' + languageEntry.label + '**',
+      inline: true,
+    },
   ];
 
   const footerParts = [];
@@ -294,7 +372,7 @@ async function handleSetupView(interaction) {
     footerParts.push('No persisted config yet · values shown are env / defaults');
   }
 
-  const embed = new EmbedBuilder()
+  const embed = createArtistEmbed()
     .setAuthor({ name: `${interaction.guild.name} · Bot Configuration` })
     .setDescription('Per-server settings for the Lost Ark Check bot. Use the matching `/la-setup` subcommand to change any of these.')
     .addFields(fields)
@@ -303,6 +381,111 @@ async function handleSetupView(interaction) {
     .setTimestamp();
 
   await editEmbed(interaction, embed);
+}
+
+async function handleSetupRepin(interaction) {
+  await deferEphemeralReply(interaction);
+  await connectDB();
+
+  const guildConfig = await GuildConfig.findOne({
+    guildId: interaction.guild.id,
+  }).lean();
+  const channel = await resolveGuildTextChannel(
+    interaction,
+    guildConfig?.autoCheckChannelId
+  );
+  if (!channel) {
+    await editContent(
+      interaction,
+      '⚠️ No accessible persisted auto-check channel. Run /la-setup autochannel first.'
+    );
+    return;
+  }
+
+  const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
+    welcomePin: true,
+  });
+  if (!ok) {
+    await editContent(
+      interaction,
+      '⚠️ Cannot refresh the welcome pin in <#' + channel.id + '>. Missing: ' +
+        missing.join(', ') + '.'
+    );
+    return;
+  }
+
+  const welcome = await postAutoCheckWelcome({
+    botUserId: interaction.client.user.id,
+    channel,
+    client: interaction.client,
+    guildId: interaction.guild.id,
+  });
+  await editContent(
+    interaction,
+    welcomeOutcomeText(welcome) + ' in <#' + channel.id + '>.'
+  );
+}
+
+async function handleSetupLanguage(interaction) {
+  const requested = interaction.options.getString('language', true);
+  await deferEphemeralReply(interaction);
+  await connectDB();
+
+  const language = await setGuildLanguage(interaction.guild.id, requested, {
+    GuildConfigModel: GuildConfig,
+  });
+  const guildConfig = await GuildConfig.findOneAndUpdate(
+    { guildId: interaction.guild.id },
+    {
+      $set: {
+        updatedByUserId: interaction.user.id,
+        updatedByTag: interaction.user.tag,
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  ).lean();
+  invalidateGuildConfig(interaction.guild.id);
+
+  const languageEntry =
+    getSupportedLanguages().find((entry) => entry.code === language) ||
+    getSupportedLanguages()[0];
+  const prefix =
+    '🌐 Public guild language set to ' +
+    languageEntry.flag + ' **' + languageEntry.label + '**.';
+  const channel = await resolveGuildTextChannel(
+    interaction,
+    guildConfig?.autoCheckChannelId
+  );
+  if (!channel) {
+    await editContent(
+      interaction,
+      prefix + '\nNo persisted auto-check channel is configured, so there is no pin to refresh.'
+    );
+    return;
+  }
+
+  const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
+    welcomePin: true,
+  });
+  if (!ok) {
+    await editContent(
+      interaction,
+      prefix + '\n⚠️ The pin was not refreshed. Missing in <#' + channel.id +
+        '>: ' + missing.join(', ') + '.'
+    );
+    return;
+  }
+
+  const welcome = await postAutoCheckWelcome({
+    botUserId: interaction.client.user.id,
+    channel,
+    client: interaction.client,
+    guildId: interaction.guild.id,
+  });
+  await editContent(
+    interaction,
+    prefix + '\n' + welcomeOutcomeText(welcome) + ' in <#' + channel.id + '>.'
+  );
 }
 
 export async function handleSetupCommand(interaction) {
@@ -340,6 +523,10 @@ export async function handleSetupCommand(interaction) {
     await handleSetupDefaultScope(interaction);
   } else if (subcommand === 'view') {
     await handleSetupView(interaction);
+  } else if (subcommand === 'repin') {
+    await handleSetupRepin(interaction);
+  } else if (subcommand === 'language') {
+    await handleSetupLanguage(interaction);
   }
 }
 

@@ -21,6 +21,10 @@ export {
 } from './buildRosterCharacters.js';
 
 export {
+  upsertRosterSnapshots,
+} from './rosterSnapshots.js';
+
+export {
   fetchCharacterMeta,
 } from './characterMeta.js';
 

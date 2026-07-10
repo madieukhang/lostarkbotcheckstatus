@@ -9,11 +9,11 @@
 
 import {
   ActionRowBuilder,
-  EmbedBuilder,
   StringSelectMenuBuilder,
 } from 'discord.js';
 
 import config from '../../config.js';
+import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { connectDB } from '../../db.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t, resolveLocale } from '../../services/i18n/index.js';
@@ -50,7 +50,7 @@ function buildOverviewEmbed(lang, isOwnerGuild) {
     groups.push(t('help.overview.ownerGroup', lang));
   }
 
-  return new EmbedBuilder()
+  return createArtistEmbed()
     .setTitle(t('help.overview.title', lang))
     .setDescription(String(t('help.overview.intro', lang)).slice(0, 4096))
     .setColor(COLORS.info)
@@ -66,7 +66,7 @@ function buildOverviewEmbed(lang, isOwnerGuild) {
 
 function buildDetailEmbed(sectionKey, lang) {
   const section = t(`help.sections.${sectionKey}`, lang);
-  const embed = new EmbedBuilder()
+  const embed = createArtistEmbed()
     .setTitle(section.title)
     .setDescription(section.description)
     .setColor(COLORS.info)

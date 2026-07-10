@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
@@ -75,7 +75,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
       if (rejectCounts.watch > 0) breakdown.push(`⚠️ **${rejectCounts.watch}**`);
       if (rejectCounts.white > 0) breakdown.push(`✅ **${rejectCounts.white}**`);
 
-      const rejectEmbed = new EmbedBuilder()
+      const rejectEmbed = createArtistEmbed()
         .setTitle(`✖️ Bulk Add · Rejected · ${payload.bulkRows.length} rows`)
         .setDescription(`<@${interaction.user.id}> rejected the bulk-add request.`)
         .setColor(COLORS.danger)

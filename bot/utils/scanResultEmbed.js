@@ -26,10 +26,10 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
 } from 'discord.js';
 
 import { COLORS, ICONS } from './ui.js';
+import { createArtistEmbed } from './artistVoice.js';
 import { truncateInlineText } from './discordText.js';
 import { rosterUrl } from './rosterLink.js';
 import { getClassEmoji } from '../models/Class.js';
@@ -219,7 +219,7 @@ export function buildScanResultEmbed({
   // exotic encoding overhead.
   const description = sections.join('\n\n').slice(0, 4096);
 
-  const embed = new EmbedBuilder()
+  const embed = createArtistEmbed()
     .setTitle(`${finalIcon}  ${kindLabel} · ${target.name}`)
     .setDescription(description)
     .setColor(finalColor)

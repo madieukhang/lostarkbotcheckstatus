@@ -28,6 +28,8 @@ const en = {
       keptExisting: 'Kept Existing',
       overwritten: 'Overwritten',
       viewEvidenceFresh: '📎 View Evidence (Fresh)',
+      viewEvidence: 'View evidence',
+      openEvidence: 'Open evidence',
       approveAdd: 'Approve · Add {count}',
       confirmAdd: 'Confirm Add {count}',
       confirmAddCompact: 'Confirm · Add {count}',
@@ -169,6 +171,15 @@ const en = {
         view: {
           description: 'View current bot channel configuration',
         },
+        repin: {
+          description: 'Refresh the pinned Artist guide in the auto-check channel',
+        },
+        language: {
+          description: 'Set the language for public guild messages and the pinned guide',
+          options: {
+            language: 'Language used by public guild messages',
+          },
+        },
         off: {
           description: 'Toggle global list notifications on/off for this server',
         },
@@ -223,6 +234,38 @@ const en = {
     },
   },
 
+  autoCheckWelcome: {
+    title: '🎨 Artist was only passing by...',
+    description: [
+      'Artist happened to walk past this channel and left a small sign behind. LoaLogs is the one staying here to watch the screenshots.',
+      'Drop a screenshot containing character names here and the bot will read it, then check those names against the server lists.',
+    ],
+    howName: '🔍 What happens after an image is posted',
+    howValue: [
+      '1. LoaLogs reacts with 🔍 and extracts up to 8 character names.',
+      '2. The names are checked against blacklist, whitelist, watchlist, and trusted records.',
+      '3. Eligible unlisted names may expose a Quick Add control for officers.',
+    ],
+    listsName: '📚 Reading the result',
+    listsValue: [
+      'Black and watch results deserve attention; white and trusted results provide the matching context.',
+      'Use /la-search name:<character> when you need a manual lookup without an image.',
+    ],
+    cleanupName: '🧹 This channel resets once a day',
+    cleanupValue: [
+      'At **00:00 Asia/Ho_Chi_Minh (17:00 UTC)**, LoaLogs deletes every non-pinned message in this channel.',
+      'Pinned messages stay. Move anything important elsewhere before the daily sweep.',
+    ],
+    commandsName: '🧭 Useful commands',
+    commandsValue: [
+      '/la-check image:<screenshot> - run the same check manually',
+      '/la-roster name:<character> - inspect a roster',
+      '/la-search name:<character> - search and cross-check lists',
+      '/la-help - open the full command guide',
+    ],
+    footer: 'Artist is moving on now~ The sign can stay.',
+  },
+
   help: {
     overview: {
       title: 'Lost Ark Check - Help (EN)',
@@ -273,6 +316,8 @@ const en = {
             '`/la-setup autochannel #channel` - Set auto-check channel for this server',
             '`/la-setup notifychannel #channel` - Set notification channel for this server',
             '`/la-setup view` - View current channel configuration',
+            '`/la-setup repin` - Refresh the pinned Artist guide',
+            '`/la-setup language` - Set public guild and pinned-guide language',
             '`/la-setup off` - Toggle global list notifications on/off',
             '`/la-setup defaultscope global/server` - Set default blacklist scope for /la-list add',
           ],

@@ -11,8 +11,8 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
 } from 'discord.js';
+import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
@@ -155,7 +155,7 @@ export function createListAddApprovalButtonHandler({
 
         const existingScopeTag = existing.scope === 'server' ? ' [Server]' : ' [Global]';
         const requestScopeTag = payload.scope === 'server' ? ' [Server]' : ' [Global]';
-        const compareEmbed = new EmbedBuilder()
+        const compareEmbed = createArtistEmbed()
           .setTitle('⚠️ Duplicate Found · Compare')
           .addFields(
             { name: `📌 Existing Entry${existingScopeTag}`, value: `**${existing.name}**\nReason: ${existing.reason || 'N/A'}\nRaid: ${existing.raid || 'N/A'}\nAdded: <t:${Math.floor(new Date(existing.addedAt || 0).getTime() / 1000)}:R>`, inline: true },
