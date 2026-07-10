@@ -8,6 +8,7 @@ import {
 } from '../i18n/index.js';
 import {
   cleanupAutoCheckChannelMessages,
+  formatCleanupFailureReasons,
   getVietnamDayKey,
 } from './autoCheckCleanup.js';
 import { autoCheckChannelGuard } from './autoCheckChannelGuard.js';
@@ -161,7 +162,13 @@ export function createAutoCheckWelcomeService({
     }
   }
 
-  async function postWelcomeLocked({ botUserId, channel, client, guildId }) {
+  async function postWelcomeLocked({
+    botUserId,
+    channel,
+    client,
+    configSet = {},
+    guildId,
+  }) {
     const outcome = {
       posted: false,
       pinned: false,
@@ -174,6 +181,7 @@ export function createAutoCheckWelcomeService({
       cleanupDeleted: 0,
       cleanupFailed: 0,
       cleanupTruncated: false,
+      cleanupFailureReasons: {},
     };
     const stored = await loadStoredConfig(guildId);
     const pinState = await collectStaleRefs(channel, botUserId, stored);
@@ -198,12 +206,15 @@ export function createAutoCheckWelcomeService({
         outcome.cleanupDeleted = Number(cleanup?.deleted) || 0;
         outcome.cleanupFailed = Number(cleanup?.failed) || 0;
         outcome.cleanupTruncated = Boolean(cleanup?.truncated);
+        outcome.cleanupFailureReasons = cleanup?.failureReasons || {};
         outcome.cleanupComplete = outcome.cleanupFailed === 0 && !outcome.cleanupTruncated;
         if (!outcome.cleanupComplete) {
+          const failureSummary = formatCleanupFailureReasons(outcome.cleanupFailureReasons);
           logger.warn?.(
             '[auto-check welcome] initial cleanup incomplete: deleted=' + outcome.cleanupDeleted +
             ' failed=' + outcome.cleanupFailed +
-            ' truncated=' + outcome.cleanupTruncated
+            ' truncated=' + outcome.cleanupTruncated +
+            (failureSummary ? ' errors=' + failureSummary : '')
           );
         }
       } catch (err) {
@@ -227,6 +238,7 @@ export function createAutoCheckWelcomeService({
 
     try {
       const persistedState = {
+        ...(configSet && typeof configSet === 'object' ? configSet : {}),
         autoCheckWelcomeMessageId: sent.id,
         autoCheckWelcomeChannelId: channel.id,
       };
@@ -238,7 +250,7 @@ export function createAutoCheckWelcomeService({
         {
           $set: persistedState,
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
       );
       outcome.persisted = true;
       channelGuard.rememberWelcome(channel.id, sent.id);

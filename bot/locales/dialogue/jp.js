@@ -47,6 +47,7 @@ export default {
     welcomeCleaned: 'ガイドを投稿する前に、最初の掃除で未ピン留めメッセージを **{count}** 件削除しましたわ。',
     welcomeCleanupIncomplete: '最初の掃除は **{count}** 件削除したところで未完了でしたの。毎日の cleaner が再試行しますわ。',
     sameChannelWarning: 'ここは {other} チャンネルと同じですの。分けた方が読みやすいですわ。',
+    autoChannelNotSet: '<#{channel}> に welcome pin を作成して保存できなかったため、auto-check チャンネルは変更していませんの。\n{welcome}',
     autoChannelSet: 'Auto-check チャンネルを <#{channel}> に設定しました。\nLoaLogs が投稿された screenshot を自動確認しますの。{warning}\n{welcome}\n毎日 00:00 Asia/Ho_Chi_Minh に、ピン留め以外のメッセージを片づけますわ。',
     notifyChannelSet: '通知チャンネルを <#{channel}> に設定しました。\nリスト変更をここへ送りますの。{warning}\n\nテストメッセージは30秒後に消えますわ。',
     notifyChannelSetTestFailed: '通知チャンネルを <#{channel}> に設定しました。{warning}\nテストメッセージを送れなかったため、LoaLogs の権限をご確認くださいませ。',
