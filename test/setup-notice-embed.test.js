@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { AlertSeverity, buildNoticeEmbed } from '../bot/utils/alertEmbed.js';
 import { getSupportedLanguages, t } from '../bot/services/i18n/index.js';
 import { COLORS } from '../bot/utils/ui.js';
+import { welcomeOutcomeText } from '../bot/handlers/setup/guildSetup.js';
 
 test('/la-setup language renders a localized embed in every supported language', () => {
   for (const language of getSupportedLanguages()) {
@@ -27,4 +28,19 @@ test('/la-setup language renders a localized embed in every supported language',
     assert.equal(embed.author, undefined);
     assert.equal(embed.footer, undefined);
   }
+});
+
+test('first-pin outcome reports cleanup without claiming that an old pin was kept', () => {
+  const text = welcomeOutcomeText({
+    pinned: false,
+    persisted: false,
+    hadOwnedWelcomePin: false,
+    cleanupAttempted: true,
+    cleanupComplete: true,
+    cleanupDeleted: 8,
+  }, 'vi');
+
+  assert.match(text, /8/);
+  assert.ok(text.includes(t('dialogue.setup.welcomeCreateFailed', 'vi')));
+  assert.equal(text.includes(t('dialogue.setup.welcomeFailed', 'vi')), false);
 });

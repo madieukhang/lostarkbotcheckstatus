@@ -20,7 +20,6 @@ import {
   t,
   setGuildLanguage,
 } from '../../services/i18n/index.js';
-import { getVietnamDayKey } from '../../services/setup/autoCheckCleanup.js';
 import { postAutoCheckWelcome } from '../../services/setup/autoCheckWelcome.js';
 import {
   deferEphemeralReply,
@@ -90,14 +89,23 @@ async function resolveGuildTextChannel(interaction, channelId) {
   return channel?.type === ChannelType.GuildText ? channel : null;
 }
 
-function welcomeOutcomeText(outcome, lang) {
+export function welcomeOutcomeText(outcome, lang) {
+  const cleanupLine = outcome?.cleanupAttempted
+    ? outcome.cleanupComplete
+      ? `🧹 ${t('dialogue.setup.welcomeCleaned', lang, { count: outcome.cleanupDeleted })}`
+      : `⚠️ ${t('dialogue.setup.welcomeCleanupIncomplete', lang, { count: outcome.cleanupDeleted })}`
+    : '';
   if (outcome?.pinned && outcome?.persisted) {
-    return `🎨 ${t('dialogue.setup.welcomePinned', lang)}` +
+    const pinLine = `🎨 ${t('dialogue.setup.welcomePinned', lang)}` +
       (outcome.removedOldCount > 0
         ? ` · ${t('dialogue.setup.welcomeReplaced', lang, { count: outcome.removedOldCount })}`
         : '');
+    return [pinLine, cleanupLine].filter(Boolean).join('\n');
   }
-  return `⚠️ ${t('dialogue.setup.welcomeFailed', lang)}`;
+  const failureKey = outcome?.hadOwnedWelcomePin
+    ? 'dialogue.setup.welcomeFailed'
+    : 'dialogue.setup.welcomeCreateFailed';
+  return [cleanupLine, `⚠️ ${t(failureKey, lang)}`].filter(Boolean).join('\n');
 }
 
 /**
@@ -144,7 +152,6 @@ async function handleSetupAutoChannel(interaction, lang) {
     {
       $set: {
         autoCheckChannelId: channel.id,
-        lastAutoCheckCleanupKey: getVietnamDayKey(),
         updatedByUserId: interaction.user.id,
         updatedByTag: interaction.user.tag,
       },
