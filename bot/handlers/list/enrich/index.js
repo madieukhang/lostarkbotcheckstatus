@@ -102,8 +102,11 @@ export function createEnrichHandlers({ client, services }) {
   // so the notify channels learn an entry just gained newly-discovered alts.
   const { broadcastListChange } = services || {};
 
+  const resolveInteractionLang = (interaction) => getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+
   async function replyScanLimit(interaction, active) {
-    await replyAlert(interaction, scanLimitAlertOptions(active));
+    const lang = await resolveInteractionLang(interaction);
+    await replyAlert(interaction, scanLimitAlertOptions(active, lang));
   }
 
   /**
@@ -132,9 +135,8 @@ export function createEnrichHandlers({ client, services }) {
       await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
-          title: 'No List Entry',
-          description: `**${name}** has no entry in any list.`,
-          footer: 'Use /la-list add to create the entry first; enrich only appends to existing entries.',
+          ...t('dialogue.enrich.noEntry', lang, { name }),
+          lang,
         })],
         components: [],
       });
@@ -156,9 +158,8 @@ export function createEnrichHandlers({ client, services }) {
         await replyEditor.edit({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.ERROR,
-            title: 'Profile Not Found',
-            description: `Could not load lostark.bible profile for **${name}**.`,
-            footer: 'Profile may be hidden behind a private flag, the name may be misspelled, or bible may be down.',
+            ...t('dialogue.enrich.profileMissing', lang, { name }),
+            lang,
           })],
           components: [],
         });
@@ -179,9 +180,8 @@ export function createEnrichHandlers({ client, services }) {
       await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
-          title: 'Profile Not Found',
-          description: `Could not fetch character meta for **${name}** from lostark.bible.`,
-          footer: 'Profile may be hidden, the name may be misspelled, or bible may be temporarily down.',
+          ...t('dialogue.enrich.metaMissing', lang, { name }),
+          lang,
         })],
         components: [],
       });
@@ -191,9 +191,8 @@ export function createEnrichHandlers({ client, services }) {
       await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
-          title: 'No Guild on Bible',
-          description: `**${name}** has no guild listed on lostark.bible. Stronghold deep scan requires a guild member list to walk.`,
-          footer: 'Use /la-list edit additional_names to manually append known alts when auto-discovery is impossible.',
+          ...t('dialogue.enrich.noGuild', lang, { name }),
+          lang,
         })],
         components: [],
       });
@@ -212,9 +211,8 @@ export function createEnrichHandlers({ client, services }) {
       await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
-          title: 'Guild Member List Unavailable',
-          description: `Could not fetch the guild member list for **${name}** even with ScraperAPI fallback.`,
-          footer: 'Bible may be down or the guild is empty; try again in a few minutes.',
+          ...t('dialogue.enrich.guildUnavailable', lang, { name }),
+          lang,
         })],
         components: [],
       });
@@ -258,6 +256,7 @@ export function createEnrichHandlers({ client, services }) {
         foundType: found.type,
         meta,
         progress: initialProgress,
+        lang,
       })],
       components: [stopRow],
     });
@@ -280,6 +279,7 @@ export function createEnrichHandlers({ client, services }) {
           foundType: found.type,
           meta,
           progress: { ...progress, totalMembers: guildMembers.length, startedAt },
+          lang,
         })],
         components: [buttonRow],
       }).then(() => {
@@ -320,9 +320,8 @@ export function createEnrichHandlers({ client, services }) {
         content: '',
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
-          title: `Scan stopped · ${name}`,
-          description: `Reason: **${scanThrownError.message || 'unexpected detector error'}**`,
-          footer: 'No list changes were made. Try again after bible cools down.',
+          ...t('dialogue.enrich.scanStopped', lang, { name, reason: scanThrownError.message || t('dialogue.scan.unexpectedError', lang) }),
+          lang,
         })],
         components: [],
       });
@@ -337,9 +336,8 @@ export function createEnrichHandlers({ client, services }) {
       await replyEditor.edit({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
-          title: `Scan failed · ${name}`,
-          description: 'The detector returned no result. Bible may have rejected the meta probe mid-scan.',
-          footer: 'Re-run /la-list enrich; the cooldown will pass in 30s.',
+          ...t('dialogue.enrich.scanFailed', lang, { name }),
+          lang,
         })],
         components: [],
       });
@@ -442,18 +440,19 @@ export function createEnrichHandlers({ client, services }) {
     const newAltsSet = new Set(newAlts.map((a) => String(a.name).toLowerCase()));
     const profileUrl = rosterUrl(name);
 
-    const summaryLine =
-      `I scanned **${meta.guildName}** for stronghold matches with **${name}**` +
-      (existingSession ? ' (resumed from prior pass).' : '.');
+    const summaryLine = t('dialogue.enrich.summary', lang, {
+      guild: meta.guildName,
+      name,
+      resumed: existingSession ? t('dialogue.enrich.resumed', lang) : '',
+    });
 
     let actionHint = '';
     if (cumulativeAlts.length === 0) {
-      actionHint = 'No alts matched the target stronghold yet.';
+      actionHint = t('dialogue.enrich.noAlts', lang);
     } else if (newAlts.length === 0) {
-      actionHint = `All ${cumulativeAlts.length} discovered alt(s) are already on this ${ctx.label} entry.`;
+      actionHint = t('dialogue.enrich.allKnown', lang, { count: cumulativeAlts.length, list: t(`dialogue.broadcast.list.${found.type}`, lang) });
     } else {
-      actionHint = `**${newAlts.length}** of ${cumulativeAlts.length} discovered alt(s) are not on this ${ctx.label} entry yet. ` +
-        `Confirm to append them to \`allCharacters\`.`;
+      actionHint = t('dialogue.enrich.newAlts', lang, { newCount: newAlts.length, total: cumulativeAlts.length, list: t(`dialogue.broadcast.list.${found.type}`, lang) });
     }
 
     const { embed, state } = buildScanResultEmbed({
@@ -470,6 +469,7 @@ export function createEnrichHandlers({ client, services }) {
       contextStyle: { icon: ctx.icon, color: ctx.color },
       summaryLine,
       actionHint,
+      lang,
     });
 
     const buttonRow = buildScanResultButtons({
@@ -520,13 +520,11 @@ export function createEnrichHandlers({ client, services }) {
   // the ephemeral reply lands cleanly.
   async function denyIfNotOfficer(interaction, commandLabel) {
     if (isPrivilegedStrongholdScanUser(interaction.user.id)) return false;
+    const lang = await resolveInteractionLang(interaction);
     await replyAlert(interaction, {
       severity: AlertSeverity.WARNING,
-      title: 'Officers / Seniors only',
-      description:
-        `\`${commandLabel}\` runs a long Stronghold scan that depends on the bot owner's ` +
-        `residential-IP worker. The command is restricted to officers and seniors so a regular ` +
-        `user does not see a confusing error when the worker is offline. Ask an officer to run it for you.`,
+      ...t('dialogue.enrich.restricted', lang, { command: commandLabel }),
+      lang,
     });
     return true;
   }
@@ -562,21 +560,21 @@ export function createEnrichHandlers({ client, services }) {
   }
 
   async function requireOwnedEnrichSession(interaction, sessionId, actionLabel) {
+    const lang = await resolveInteractionLang(interaction);
     const session = getEnrichSession(sessionId);
     if (!session) {
       await replyAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Session Expired',
-        description: 'This enrich preview is older than the 5-minute session window.',
-        footer: 'Re-run /la-list enrich to start a fresh scan.',
+        ...t('dialogue.enrich.sessionExpired', lang),
+        lang,
       });
       return null;
     }
     if (session.callerId !== interaction.user.id) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Not Your Session',
-        description: `Only the user who started this enrich session can ${actionLabel}.`,
+        ...t('dialogue.enrich.notYourSession', lang, { action: t(`dialogue.enrich.${actionLabel}`, lang) }),
+        lang,
       });
       return null;
     }
@@ -585,6 +583,7 @@ export function createEnrichHandlers({ client, services }) {
 
   async function handleListEnrichCommand(interaction) {
     if (await denyIfNotOfficer(interaction, '/la-list enrich')) return;
+    const lang = await resolveInteractionLang(interaction);
 
     const rawName = interaction.options.getString('name', true).trim();
     const name = normalizeCharacterName(rawName);
@@ -594,7 +593,7 @@ export function createEnrichHandlers({ client, services }) {
       name,
       cap,
       reservationLabel: `/la-list enrich ${name}`,
-      cooldownMessage: (wait) => `⏳ Please wait ${wait}s before re-enriching **${name}**.`,
+      cooldownMessage: (wait) => `⏳ ${t('dialogue.enrich.cooldown', lang, { seconds: wait, name })}`,
     });
   }
 
@@ -605,15 +604,17 @@ export function createEnrichHandlers({ client, services }) {
    */
   async function handleListAddEnrichHiddenButton(interaction) {
     if (await denyIfNotOfficer(interaction, '/la-list enrich')) return;
+    const lang = await resolveInteractionLang(interaction);
 
     const parts = interaction.customId.split(':');
     const encoded = parts.slice(2).join(':');
     const rawName = decodeURIComponent(encoded || '').trim();
     if (!rawName) {
+      const lang = await resolveInteractionLang(interaction);
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Invalid Button',
-        description: 'Could not read the entry name from the button. Use `/la-list enrich` directly.',
+        ...t('dialogue.enrich.invalidButton', lang),
+        lang,
       });
       return;
     }
@@ -625,7 +626,7 @@ export function createEnrichHandlers({ client, services }) {
       name,
       cap,
       reservationLabel: `/la-list enrich ${name}`,
-      cooldownMessage: (wait) => `⏳ Please wait ${wait}s before re-enriching **${name}**.`,
+      cooldownMessage: (wait) => `⏳ ${t('dialogue.enrich.cooldown', lang, { seconds: wait, name })}`,
     });
   }
 
@@ -636,8 +637,9 @@ export function createEnrichHandlers({ client, services }) {
    * gate + cooldown and refreshes the session TTL.
    */
   async function handleListEnrichContinueButton(interaction) {
+    const lang = await resolveInteractionLang(interaction);
     const sessionId = interaction.customId.split(':')[2];
-    const session = await requireOwnedEnrichSession(interaction, sessionId, 'continue it');
+    const session = await requireOwnedEnrichSession(interaction, sessionId, 'actionContinue');
     if (!session) return;
     refreshEnrichSession(session);
 
@@ -647,14 +649,15 @@ export function createEnrichHandlers({ client, services }) {
       reservationLabel: `/la-list enrich continue ${session.entryName}`,
       deferInteraction: deferUpdate,
       existingSession: session,
-      cooldownMessage: (wait) => `⏳ Please wait ${wait}s before continuing the scan for **${session.entryName}**.`,
+      cooldownMessage: (wait) => `⏳ ${t('dialogue.enrich.continueCooldown', lang, { seconds: wait, name: session.entryName })}`,
     });
   }
 
   async function handleListEnrichConfirmButton(interaction) {
     const sessionId = interaction.customId.split(':')[2];
-    const session = await requireOwnedEnrichSession(interaction, sessionId, 'confirm it');
+    const session = await requireOwnedEnrichSession(interaction, sessionId, 'actionConfirm');
     if (!session) return;
+    const lang = await resolveInteractionLang(interaction);
 
     await deferUpdate(interaction);
 
@@ -662,9 +665,8 @@ export function createEnrichHandlers({ client, services }) {
     if (!Model) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Internal Error',
-        description: `Unknown list type "${session.type}".`,
-        footer: 'Report this to an officer; the entry was not modified.',
+        ...t('dialogue.enrich.internalType', lang, { type: session.type }),
+        lang,
       }, { components: [] });
       return;
     }
@@ -674,9 +676,8 @@ export function createEnrichHandlers({ client, services }) {
     if (altNames.length === 0) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Nothing to Save',
-        description: 'No new alts were discovered, so the entry was not modified.',
-        footer: 'Re-run /la-list enrich if bible has cooled down and you want a fresh pass.',
+        ...t('dialogue.enrich.nothing', lang),
+        lang,
       }, { components: [] });
       clearEnrichSession(sessionId);
       return;
@@ -718,28 +719,29 @@ export function createEnrichHandlers({ client, services }) {
 
     clearEnrichSession(sessionId);
 
-    await editEmbed(interaction, buildEnrichSuccessEmbed(session, updateResult), {
+    await editEmbed(interaction, buildEnrichSuccessEmbed(session, updateResult, lang), {
       content: '',
       components: [],
     });
   }
 
   async function handleListEnrichCancelButton(interaction) {
+    const lang = await resolveInteractionLang(interaction);
     const sessionId = interaction.customId.split(':')[2];
     const session = getEnrichSession(sessionId);
     if (!session) {
       await updateAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Session Expired',
-        description: 'This enrich preview is older than the 5-minute session window.',
+        ...t('dialogue.enrich.sessionExpired', lang),
+        lang,
       }, { content: '', components: [] });
       return;
     }
     if (session.callerId !== interaction.user.id) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Not Your Session',
-        description: 'Only the user who started this enrich session can cancel it.',
+        ...t('dialogue.enrich.notYourSession', lang, { action: t('dialogue.enrich.actionCancel', lang) }),
+        lang,
       });
       return;
     }
@@ -747,7 +749,7 @@ export function createEnrichHandlers({ client, services }) {
     clearEnrichSession(sessionId);
 
     await updatePayload(interaction, {
-      content: 'Cancelled · no changes made to the entry.',
+      content: t('dialogue.enrich.cancelled', lang),
       embeds: [],
       components: [],
     });
@@ -759,27 +761,28 @@ export function createEnrichHandlers({ client, services }) {
    * scan without waiting for the 15-min Discord webhook timeout.
    */
   async function handleScanCancelButton(interaction) {
+    const lang = await resolveInteractionLang(interaction);
     const sessionId = interaction.customId.split(':')[1];
     const scan = getScan(sessionId);
     if (!scan) {
       await replyAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Scan Already Finished',
-        description: 'This scan has already completed or was cancelled. Re-run the command if you want a fresh scan.',
+        ...t('dialogue.enrich.scanFinished', lang),
+        lang,
       });
       return;
     }
     if (!isOfficerOrSenior(interaction.user.id) && scan.callerId !== interaction.user.id) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Not Authorised',
-        description: 'Only the user who started this scan (or an officer/senior) can stop it.',
+        ...t('dialogue.enrich.stopRestricted', lang),
+        lang,
       });
       return;
     }
 
     if (scan.cancelFlag.cancelled) {
-      await replyContent(interaction, 'Already stopping...');
+      await replyContent(interaction, t('dialogue.enrich.alreadyStopping', lang));
       return;
     }
 
@@ -791,8 +794,8 @@ export function createEnrichHandlers({ client, services }) {
     await replyAlert(interaction, {
       severity: AlertSeverity.INFO,
       titleIcon: '🛑',
-      title: 'Stop signal sent',
-      description: 'The scan worker will exit at the end of its current candidate fetch (a few seconds at most).',
+      ...t('dialogue.enrich.stopSent', lang),
+      lang,
     });
   }
 

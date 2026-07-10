@@ -14,7 +14,7 @@ import UserPreference from '../../models/UserPreference.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { deferUpdate, replyAlert, replyEmbed } from '../../utils/interactionReplies.js';
-import { getUserLanguage } from '../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { detectAltsViaStronghold } from '../../services/roster/index.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import {
@@ -61,32 +61,31 @@ export async function handleRosterDeepContinueButton(interaction) {
   if (!session) {
     await replyAlert(interaction, {
       severity: AlertSeverity.WARNING,
-      title: 'Session Expired',
-      description: 'This deep-scan session is older than the 5-minute window.',
-      footer: 'Re-run /la-roster deep:true to start a fresh scan.',
+      ...t('dialogue.scan.sessionExpired', lang),
+      lang,
     });
     return;
   }
   if (session.callerId !== interaction.user.id) {
     await replyAlert(interaction, {
       severity: AlertSeverity.ERROR,
-      title: 'Not Your Session',
-      description: 'Only the user who started this scan can continue it.',
+      ...t('dialogue.scan.notYourSession', lang),
+      lang,
     });
     return;
   }
   if (session.inProgress) {
     await replyAlert(interaction, {
       severity: AlertSeverity.INFO,
-      title: 'Scan Already Running',
-      description: 'A Continue pass is already running for this result card. Wait for it to finish before clicking again.',
+      ...t('dialogue.scan.continueRunning', lang),
+      lang,
     });
     return;
   }
 
   const scanReservation = reserveStrongholdScanForInteraction(interaction, `/la-roster deep continue ${session.targetName}`);
   if (!scanReservation.ok) {
-    await replyEmbed(interaction, buildStrongholdScanLimitEmbed(scanReservation.active));
+    await replyEmbed(interaction, buildStrongholdScanLimitEmbed(scanReservation.active, lang));
     return;
   }
 
@@ -119,9 +118,10 @@ export async function handleRosterDeepContinueButton(interaction) {
   const passLimit = session.cap || passEligible;
 
   const progressEmbed = buildScanProgressEmbed({
-    title: `Stronghold scan resuming · ${session.targetName}`,
-    subtitle: `Guild **${session.meta.guildName}** (${session.guildMembers.length} members) · Continue pass`,
+    title: t('dialogue.scan.resuming', lang, { name: session.targetName }),
+    subtitle: `${t('dialogue.scan.guildMembers', lang, { guild: session.meta.guildName, count: session.guildMembers.length })} · ${t('dialogue.scan.continuePass', lang)}`,
     color: COLORS.info,
+    lang,
     progress: {
       scannedCandidates: 0,
       totalCandidates: Math.min(passEligible, passLimit),
@@ -180,9 +180,9 @@ export async function handleRosterDeepContinueButton(interaction) {
         primaryEmbed,
         buildAlertEmbed({
           severity: AlertSeverity.ERROR,
-          title: `Deep scan stopped · ${session.targetName}`,
-          description: `Reason: **${scanThrownError.message || 'unexpected detector error'}**`,
-          footer: 'Continue can be retried after the issue clears.',
+          ...t('dialogue.scan.stopped', lang, { name: session.targetName, reason: scanThrownError.message || t('dialogue.scan.unexpectedError', lang) }),
+          footer: t('dialogue.scan.stopped.retry', lang),
+          lang,
         }),
       ],
       components: [],
@@ -235,7 +235,8 @@ export async function handleRosterDeepContinueButton(interaction) {
     target: { name: session.targetName, isHidden: session.isHidden, guildName: session.meta.guildName, profileUrl },
     result: cumulativeResult,
     kind: session.isHidden ? 'roster-hidden' : 'roster-visible',
-    summaryLine: `Resumed scan of **${session.meta.guildName}** for stronghold matches with **${session.targetName}**.`,
+    summaryLine: t('dialogue.enrich.summary', lang, { guild: session.meta.guildName, name: session.targetName, resumed: t('dialogue.enrich.resumed', lang) }),
+    lang,
   });
 
   const components = [];

@@ -1,4 +1,8 @@
+import dialogue from './dialogue/vi.js';
+import commands from './commands/vi.js';
+
 const vi = {
+  dialogue,
   language: {
     code: 'vi',
     label: 'Tiếng Việt',
@@ -42,33 +46,24 @@ const vi = {
     },
   },
 
-  commands: {
-    help: {
-      options: {
-        lang: 'Ngôn ngữ (mặc định: preference đã lưu)',
-      },
-    },
-    languageSwitch: {
-      description: 'Đổi ngôn ngữ LoaLogs dùng cho phản hồi của cậu',
-    },
-  },
+  commands,
 
   autoCheckWelcome: {
     title: '🎨 Artist chỉ đi ngang qua thôi~',
     description: [
-      'Artist tình cờ đi ngang channel này rồi để lại một tấm bảng nhỏ. LoaLogs mới là người ở lại trông screenshot cho các cậu nhé.',
-      'Cứ thả screenshot có tên character vào đây; bot sẽ đọc ảnh rồi đối chiếu từng tên với các list của server.',
+      'Artist tình cờ đi ngang channel này rồi để lại một tấm bảng nhỏ. LoaLogs mới là người ở lại trông các lượt check nhé.',
+      'Cứ thả screenshot hoặc gõ `check abcxyz`; bot sẽ đối chiếu các tên character với list của server.',
     ],
-    howName: '🔍 Sau khi cậu gửi ảnh',
+    howName: '🔍 Sau khi cậu gửi yêu cầu check',
     howValue: [
-      '1. LoaLogs thả reaction 🔍 và đọc tối đa 8 tên character.',
+      '1. LoaLogs thả reaction 🔍 và đọc tối đa 8 tên character từ ảnh hoặc text.',
       '2. Các tên được kiểm tra với blacklist, whitelist, watchlist và trusted.',
       '3. Tên chưa nằm trong list có thể hiện Quick Add cho officer xử lý ngay.',
     ],
     listsName: '📚 Đọc kết quả thế nào',
     listsValue: [
       'Kết quả black và watch cần chú ý; white và trusted cung cấp ngữ cảnh đối chiếu.',
-      'Muốn kiểm tra thủ công không cần ảnh thì dùng /la-search name:<character>.',
+      'Gõ `check abcxyz` để kiểm tra list trực tiếp; /la-search dành cho tìm gần đúng trên Bible và filter.',
     ],
     cleanupName: '🧹 Channel được dọn mỗi ngày',
     cleanupValue: [
@@ -78,6 +73,7 @@ const vi = {
     commandsName: '🧭 Các lệnh hữu ích',
     commandsValue: [
       '/la-check image:<screenshot> - kiểm tra ảnh thủ công',
+      'check abcxyz - kiểm tra tên character ngay trong channel',
       '/la-roster name:<character> - xem roster',
       '/la-search name:<character> - tìm và đối chiếu list',
       '/la-help - mở hướng dẫn đầy đủ',
@@ -124,15 +120,16 @@ const vi = {
           ],
         },
         {
-          name: '🖼️ Check ảnh chụp',
+          name: '🖼️ Check ảnh và text',
           lines: [
             '`/la-check image` - Trích tên từ ảnh chụp rồi check với tất cả list',
+            '`check abcxyz` trong auto-check channel - Check trực tiếp tên character đã gõ',
           ],
         },
         {
           name: '⚙️ Cài đặt server',
           lines: [
-            '`/la-setup autochannel #channel` - Set channel auto-check ảnh cho server này',
+            '`/la-setup autochannel #channel` - Set channel nhận screenshot và `check <tên>` cho server',
             '`/la-setup notifychannel #channel` - Set channel nhận thông báo list',
             '`/la-setup view` - Xem config hiện tại',
             '`/la-setup repin` - Làm mới bảng hướng dẫn Artist đã ghim',
@@ -163,12 +160,17 @@ const vi = {
       overview: {
         label: 'Danh sách lệnh',
         description: 'Quay lại overview lệnh',
+        emoji: '📋',
       },
       multiadd: {
+        label: '/la-list multiadd',
         description: 'Bulk add nhiều entry qua Excel template',
+        emoji: '📦',
       },
       syncimages: {
+        label: '/la-remote syncimages',
         description: 'Migrate ảnh legacy (owner-only)',
+        emoji: '🔄',
       },
     },
     sections: {

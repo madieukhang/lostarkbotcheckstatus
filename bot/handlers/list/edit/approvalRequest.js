@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert } from '../../../utils/interactionReplies.js';
+import { t } from '../../../services/i18n/index.js';
 
 /**
  * Persist a /la-list edit request as a PendingApproval and fan out the
@@ -40,6 +41,7 @@ export async function sendListEditApprovalRequest({
   newScope,
   editGuildDefaultScope,
   changes,
+  lang = 'en',
 }) {
 
   // Not owner, not approver → send approval request
@@ -74,19 +76,22 @@ export async function sendListEditApprovalRequest({
     requestedByTag: interaction.user.tag,
     requestedByName: interaction.user.username,
     requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+    lang,
     createdAt: Date.now(),
   };
 
   const sent = await sendListAddApprovalToApprovers(interaction.guild, payload, {
-    title: 'List Edit · Approval Required',
+    title: t('dialogue.listEdit.approval.requiredTitle', lang),
+    lang,
   });
 
   if (!sent.success) {
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,
-      title: 'Approval Delivery Failed',
-      description: sent.reason || 'Could not deliver the approval request.',
-      footer: 'No edit was applied. Try again or contact an officer directly.',
+      title: t('dialogue.listEdit.approval.deliveryFailed.title', lang),
+      description: sent.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
+      footer: t('dialogue.listEdit.approval.deliveryFailed.footer', lang),
+      lang,
     });
     return;
   }
@@ -100,12 +105,13 @@ export async function sendListEditApprovalRequest({
   await editAlert(interaction, {
     severity: AlertSeverity.INFO,
     titleIcon: '📨',
-    title: 'Edit Request Sent',
-    description: 'An approver has been notified. The edit will apply once approved.',
+    title: t('dialogue.listEdit.approval.sent.title', lang),
+    description: t('dialogue.listEdit.approval.sent.description', lang),
     fields: [{
-      name: `Pending changes (${changes.length})`,
+      name: t('dialogue.listEdit.approval.sent.pending', lang, { count: changes.length }),
       value: changes.map((c) => `• ${c}`).join('\n').slice(0, 1024),
       inline: false,
     }],
+    lang,
   });
 }

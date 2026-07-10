@@ -50,10 +50,10 @@ export function createRemoveHandlers({ client, services }) {
     const name = normalizeCharacterName(rawName);
 
     await deferReply(interaction);
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     try {
       await connectDB();
-      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
       const removeGuildId = interaction.guild?.id || '';
       const nameQuery = buildNameRosterQuery(name);
@@ -79,9 +79,8 @@ export function createRemoveHandlers({ client, services }) {
       if (found.length === 0) {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Not Found',
-          description: `**${name}** is not in any list, so there's nothing to remove.`,
-          footer: 'Use /la-list view to browse existing entries.',
+          ...t('dialogue.remove.notFound', lang, { name }),
+          lang,
         });
         return;
       }
@@ -95,7 +94,8 @@ export function createRemoveHandlers({ client, services }) {
       //   { ok: false, reason: 'legacy' | 'not-owner', entry, type }
       //   { ok: true, entry, type }
       const removeOne = async (entry, type) => {
-        const { model, label, icon } = getListContext(type);
+        const { model, icon } = getListContext(type);
+        const label = t(`dialogue.broadcast.list.${type}`, lang);
 
         if (!entry.addedByUserId) {
           return { ok: false, reason: 'legacy', entry, type, label, icon };
@@ -130,39 +130,39 @@ export function createRemoveHandlers({ client, services }) {
         if (fails.length > 0 && oks.length === 0) {
           color = 0xfee75c;
           titleIcon = '⚠️';
-          title = `Removal blocked · ${name}`;
+          title = t('dialogue.remove.titles.blocked', lang, { name });
         } else if (oks.length === 1 && fails.length === 0) {
           color = oks[0].type === 'black' ? 0xed4245 : oks[0].type === 'white' ? 0x57f287 : 0xfee75c;
           titleIcon = oks[0].icon;
-          title = `Removed from ${oks[0].label} · ${name}`;
+          title = t('dialogue.remove.titles.one', lang, { list: oks[0].label, name });
         } else if (oks.length > 1) {
           color = 0x57f287;
           titleIcon = '🗑️';
-          title = `Removed from ${oks.length} list(s) · ${name}`;
+          title = t('dialogue.remove.titles.many', lang, { count: oks.length, name });
         } else {
           color = 0xfee75c;
           titleIcon = '⚠️';
-          title = `Mixed result · ${name}`;
+          title = t('dialogue.remove.titles.mixed', lang, { name });
         }
 
         const sections = [];
         if (oks.length > 0) {
           const removedLines = oks.map((o) => {
-            const scopeTag = o.entry.scope === 'server' ? ' `[Local]`' : '';
+            const scopeTag = o.entry.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
             const reason = o.entry.reason ? ` *${(o.entry.reason || '').slice(0, 80)}${o.entry.reason.length > 80 ? '...' : ''}*` : '';
             return `${o.icon} **${o.label}**${scopeTag}${reason}`;
           });
-          sections.push(`✅ **Successfully removed:**\n${removedLines.join('\n')}`);
+          sections.push(`✅ **${t('dialogue.remove.successSection', lang)}**\n${removedLines.join('\n')}`);
         }
         if (fails.length > 0) {
           const failLines = fails.map((o) => {
             if (o.reason === 'legacy') {
-              return `⚠️ **${o.label}**: Legacy entry (no owner metadata). Use /la-list edit to remove.`;
+              return `⚠️ ${t('dialogue.remove.legacy', lang, { list: o.label })}`;
             }
             const owner = o.entry.addedByTag || o.entry.addedByUserId;
-            return `⛔ **${o.label}**: Only **${owner}** (who added it) can remove this entry.`;
+            return `⛔ ${t('dialogue.remove.ownerOnly', lang, { list: o.label, owner })}`;
           });
-          sections.push(`🚫 **Could not remove:**\n${failLines.join('\n')}`);
+          sections.push(`🚫 **${t('dialogue.remove.failedSection', lang)}**\n${failLines.join('\n')}`);
         }
 
         // Roster preview helps verify "did I remove the right entry?"
@@ -176,19 +176,19 @@ export function createRemoveHandlers({ client, services }) {
           if (others.length > 0) {
             const visible = others.slice(0, 6);
             const linked = visible.map((n) => `[${n}](${rosterUrl(n)})`);
-            const tail = others.length > visible.length ? ` *+${others.length - visible.length} more*` : '';
-            sections.push(`🧬 **Tracked alts on this entry (${others.length}):**\n${linked.join(', ')}${tail}`);
+            const tail = others.length > visible.length ? ` *${t('dialogue.remove.more', lang, { count: others.length - visible.length })}*` : '';
+            sections.push(`🧬 **${t('dialogue.remove.trackedAlts', lang, { count: others.length })}**\n${linked.join(', ')}${tail}`);
           }
         }
 
-        return createArtistEmbed()
+        return createArtistEmbed(lang)
           .setTitle(`${titleIcon} ${title}`)
           .setDescription(sections.join('\n\n').slice(0, 4096))
           .setColor(color)
           .setFooter({
             text: oks.length > 0
-              ? 'Use /la-list view to confirm the removal landed.'
-              : 'Use /la-list view to inspect the entry; /la-list edit to modify legacy entries.',
+              ? t('dialogue.remove.footerSuccess', lang)
+              : t('dialogue.remove.footerBlocked', lang),
           })
           .setTimestamp();
       };
@@ -206,7 +206,7 @@ export function createRemoveHandlers({ client, services }) {
       const buttonStyles = { black: ButtonStyle.Danger, white: ButtonStyle.Success, watch: ButtonStyle.Secondary };
       const row = new ActionRowBuilder().addComponents(
         ...found.map((f, i) => {
-          const { label } = getListContext(f.type);
+          const label = t(`dialogue.broadcast.list.${f.type}`, lang);
           return new ButtonBuilder()
             .setCustomId(`remove_${f.type}`)
             .setLabel(t('remove.removeFrom', lang, { index: i + 1, label }))
@@ -220,18 +220,15 @@ export function createRemoveHandlers({ client, services }) {
 
       const listLines = found.map((f, i) => {
         const ctx = getListContext(f.type);
-        const scopeTag = f.entry.scope === 'server' ? ' `[Local]`' : '';
+        const scopeTag = f.entry.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
         const reason = f.entry.reason ? ` *${(f.entry.reason || '').slice(0, 80)}${f.entry.reason.length > 80 ? '...' : ''}*` : '';
-        return `${i + 1}. ${ctx.icon} **${ctx.label}**${scopeTag}${reason}`;
+        return `${i + 1}. ${ctx.icon} **${t(`dialogue.broadcast.list.${f.type}`, lang)}**${scopeTag}${reason}`;
       });
-      const pickerEmbed = createArtistEmbed()
-        .setTitle(`🔎 Found · ${name}`)
-        .setDescription(
-          `**${name}** is in ${found.length} list(s). Pick which to remove:\n\n` +
-          listLines.join('\n')
-        )
+      const pickerEmbed = createArtistEmbed(lang)
+        .setTitle(`🔎 ${t('dialogue.remove.pickerTitle', lang, { name })}`)
+        .setDescription(`${t('dialogue.remove.pickerDescription', lang, { name, count: found.length })}\n\n${listLines.join('\n')}`)
         .setColor(COLORS.info)
-        .setFooter({ text: '30s timeout · only you can act on this picker.' })
+        .setFooter({ text: t('dialogue.remove.pickerFooter', lang) })
         .setTimestamp();
 
       await editEmbed(interaction, pickerEmbed, { content: '', components: [row] });
@@ -250,7 +247,7 @@ export function createRemoveHandlers({ client, services }) {
         const target = found.find((f) => button.customId === `remove_${f.type}`);
         outcomes = target
           ? [await removeOne(target.entry, target.type)]
-          : [{ ok: false, reason: 'unknown-selection', entry: { name }, type: 'black', label: 'unknown', icon: '⚠️' }];
+          : [{ ok: false, reason: 'unknown-selection', entry: { name }, type: 'black', label: t('dialogue.remove.unknown', lang), icon: '⚠️' }];
       }
 
       await updateEmbed(button, buildRemoveResultEmbed(outcomes), {
@@ -262,9 +259,9 @@ export function createRemoveHandlers({ client, services }) {
       console.error('[list] ❌ Remove failed:', err.message);
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Remove Failed',
-        description: 'Could not remove the entry.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        ...t('dialogue.remove.failed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
       });
     }
   }

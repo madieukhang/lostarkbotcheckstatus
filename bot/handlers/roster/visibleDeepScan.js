@@ -13,7 +13,7 @@ import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import UserPreference from '../../models/UserPreference.js';
 import { COLORS } from '../../utils/ui.js';
-import { getUserLanguage } from '../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../services/i18n/index.js';
 import {
   detectAltsViaStronghold,
   fetchCharacterMeta,
@@ -105,9 +105,10 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
           await replyEditor.edit({
             content: '',
             embeds: [buildScanProgressEmbed({
-              title: `Stronghold scan in progress · ${name}`,
-              subtitle: `Guild **${visMeta.guildName}** (${visGuildMembers.length} members) · visible roster`,
+              title: t('dialogue.scan.progress', lang, { name }),
+              subtitle: `${t('dialogue.scan.guildMembers', lang, { guild: visMeta.guildName, count: visGuildMembers.length })} · ${t('dialogue.scan.visibleRoster', lang)}`,
               color: COLORS.info,
+              lang,
               progress: {
                 scannedCandidates: 0,
                 totalCandidates: Math.min(visFilteredCount, visCap || visFilteredCount),
@@ -164,7 +165,8 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
             target: { name, isHidden: false, guildName: visMeta.guildName, profileUrl },
             result: altResult,
             kind: 'roster-visible',
-            summaryLine: `I scanned **${visMeta.guildName}** for stronghold matches with **${name}**.`,
+            summaryLine: t('dialogue.enrich.summary', lang, { guild: visMeta.guildName, name, resumed: '' }),
+            lang,
           });
           deepScanResultEmbed = scanEmbed;
 
@@ -209,14 +211,15 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
             target: { name, isHidden: false, guildName: visMeta?.guildName, profileUrl: rosterUrl(name) },
             result: altResult,
             kind: 'roster-visible',
-            summaryLine: `Stronghold scan ran without a guild member list.`,
+            summaryLine: t('dialogue.enrich.noGuild.description', lang, { name }),
+            lang,
           });
           deepScanResultEmbed = scanEmbed;
         }
       } catch (err) {
-        deepScanResultEmbed = createArtistEmbed()
-          .setTitle(`❌ Deep scan failed · ${name}`)
-          .setDescription(`The detector threw: \`${err.message}\``)
+        deepScanResultEmbed = createArtistEmbed(lang)
+          .setTitle(`❌ ${t('dialogue.scan.failed.title', lang, { name })}`)
+          .setDescription(t('dialogue.scan.failed.description', lang, { error: err.message }))
           .setColor(COLORS.danger)
           .setTimestamp();
       }

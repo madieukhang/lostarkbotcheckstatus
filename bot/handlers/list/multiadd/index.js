@@ -9,10 +9,9 @@ import {
   editAlert,
   editEmbed,
   editPayload,
-  replyAlert,
 } from '../../../utils/interactionReplies.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { getUserLanguage } from '../../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   downloadMultiaddAttachment,
   validateMultiaddAttachment,
@@ -46,27 +45,28 @@ export function createMultiaddHandlers({ client, services }) {
 
   async function handleListMultiaddCommand(interaction) {
     const action = interaction.options.getString('action', true);
+    await deferEphemeralReply(interaction);
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     if (!interaction.guild) {
-      await replyAlert(interaction, {
+      await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Server-Only Command',
-        description: 'This command can only be used inside a Discord server, not in DMs.',
+        ...t('dialogue.common.serverOnly', lang),
+        lang,
       });
       return;
     }
 
     if (action === 'template') {
-      await deferEphemeralReply(interaction);
       try {
-        await editPayload(interaction, await buildTemplateReply());
+        await editPayload(interaction, await buildTemplateReply(lang));
       } catch (err) {
         console.error('[multiadd] Template generation failed:', err);
         await editAlert(interaction, {
           severity: AlertSeverity.ERROR,
-          title: 'Template Generation Failed',
-          description: 'Could not produce the bulk-add template file.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+          ...t('dialogue.multiadd.errors.template', lang),
+          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+          lang,
         });
       }
       return;
@@ -74,24 +74,24 @@ export function createMultiaddHandlers({ client, services }) {
 
     if (action === 'file') {
       const file = interaction.options.getAttachment('file');
-      const validationError = validateMultiaddAttachment(file);
+      const validationError = validateMultiaddAttachment(file, lang);
       if (validationError) {
-        await replyAlert(interaction, {
+        await editAlert(interaction, {
           severity: AlertSeverity.ERROR,
-          title: 'Invalid Attachment',
+          title: t('dialogue.multiadd.errors.invalidAttachment', lang),
           description: validationError,
+          lang,
         });
         return;
       }
 
-      await deferEphemeralReply(interaction);
-
-      const download = await downloadMultiaddAttachment(file);
+      const download = await downloadMultiaddAttachment(file, lang);
       if (!download.ok) {
         await editAlert(interaction, {
           severity: AlertSeverity.ERROR,
-          title: 'Download Failed',
+          title: t('dialogue.multiadd.errors.download', lang),
           description: download.content,
+          lang,
         });
         return;
       }
@@ -100,22 +100,20 @@ export function createMultiaddHandlers({ client, services }) {
       if (!parsed.ok) {
         await editAlert(interaction, {
           severity: AlertSeverity.ERROR,
-          title: 'Parse Failed',
-          description: 'Could not read the uploaded file.',
-          fields: [{ name: 'Error', value: parsed.error || 'unknown', inline: false }],
-          footer: 'Make sure the file is the unmodified template, .xlsx format.',
+          ...t('dialogue.multiadd.errors.parse', lang),
+          fields: [{ name: t('dialogue.common.errorField', lang), value: parsed.error || t('dialogue.common.unknown', lang), inline: false }],
+          lang,
         });
         return;
       }
 
       if (parsed.rows.length === 0) {
-        await editEmbed(interaction, buildNoValidRowsEmbed(parsed.errors));
+        await editEmbed(interaction, buildNoValidRowsEmbed(parsed.errors, lang));
         return;
       }
 
       const requestId = randomUUID();
       await connectDB();
-      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       const expiryTimer = setTimeout(() => {
         multiaddPending.delete(requestId);
       }, MULTIADD_PENDING_TTL_MS);
@@ -137,11 +135,10 @@ export function createMultiaddHandlers({ client, services }) {
       return;
     }
 
-    await replyAlert(interaction, {
+    await editAlert(interaction, {
       severity: AlertSeverity.ERROR,
-      title: 'Unknown Action',
-      description: `\`${action}\` is not a valid multiadd action.`,
-      footer: 'Valid actions: template (download blank), file (upload filled).',
+      ...t('dialogue.multiadd.errors.unknownAction', lang, { action }),
+      lang,
     });
   }
 

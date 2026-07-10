@@ -1,7 +1,7 @@
 /**
  * handlers/list/auto-check.js
- * Listens for image attachments in designated channels and
- * automatically runs listcheck (Gemini OCR → blacklist/whitelist/watchlist check).
+ * Listens for image attachments or explicit `check <name>` messages in
+ * designated channels and runs the shared blacklist/whitelist/watchlist check.
  *
  * Channel resolution (per message):
  *   1. Check GuildConfig in DB for this guild's autoCheckChannelId
@@ -19,6 +19,7 @@ import {
 import { getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
+import { normalizeCharacterName } from '../../utils/names.js';
 import { getGuildLanguage, t } from '../../services/i18n/index.js';
 import { buildAutoCheckEvidenceRow } from './check/index.js';
 
@@ -31,6 +32,42 @@ const COOLDOWN_MS = 10_000; // 10 seconds between checks per user
 const processedMessages = new Map(); // messageId -> timestamp
 const inFlightMessages = new Set();
 const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
+export const AUTO_CHECK_MAX_NAMES = 8;
+const TEXT_NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}\p{N}]{1,19}$/u;
+
+/**
+ * Parse an explicit auto-check text request. Bare names and words such as
+ * `checkmate` are intentionally ignored so ordinary channel chatter cannot
+ * trigger list checks.
+ * @param {string} content
+ * @returns {null|{names: string[], invalidTokens: string[]}}
+ */
+export function parseAutoCheckText(content) {
+  const raw = String(content || '').trim();
+  if (!/^check(?=$|[\s:])/iu.test(raw)) return null;
+
+  const payload = raw.slice('check'.length).replace(/^\s*:\s*/u, '').trim();
+  if (!payload) return { names: [], invalidTokens: [] };
+
+  const tokens = payload.split(/[\s,;]+/u).filter(Boolean);
+  const names = [];
+  const invalidTokens = [];
+  const seen = new Set();
+
+  for (const token of tokens) {
+    if (!TEXT_NAME_RE.test(token)) {
+      invalidTokens.push(token);
+      continue;
+    }
+    const name = normalizeCharacterName(token);
+    const key = name.toLocaleLowerCase('en');
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+
+  return { names, invalidTokens };
+}
 
 function pruneProcessedMessages(now = Date.now()) {
   for (const [messageId, ts] of processedMessages) {
@@ -45,8 +82,8 @@ function pruneProcessedMessages(now = Date.now()) {
  * caller has exclusive ownership and should proceed, false when the
  * message is already in flight or has been processed within the TTL
  * window. Discord can deliver MessageCreate twice (gateway retries +
- * duplicate listeners in dev); this guard prevents double-OCR for the
- * same attachment.
+ * duplicate listeners in dev); this guard prevents duplicate OCR/text checks
+ * for the same source message.
  * @param {string} messageId - Discord message snowflake
  * @param {number} [now=Date.now()] - timestamp override for tests
  * @returns {boolean} true if claimed, false if already claimed/processed
@@ -120,39 +157,41 @@ async function isAutoCheckChannel(channelId, guildId) {
   return envChannelSet.has(channelId);
 }
 
-/**
- * Set up the auto-check message listener.
- * @param {import('discord.js').Client} client
- */
-export function setupAutoCheck(client) {
-  if (!config.geminiApiKey) {
-    console.log('[auto-check] GEMINI_API_KEY not set · disabled.');
-    return;
-  }
-
-  if (envChannelSet.size > 0) {
-    console.log(`[auto-check] Env fallback channels: ${[...envChannelSet].join(', ')}`);
-  }
-  console.log('[auto-check] Listener active (checks DB GuildConfig + env fallback per message).');
-
-  client.on(Events.MessageCreate, async (message) => {
+export function createAutoCheckMessageHandler({
+  client,
+  isAutoCheckChannelFn = isAutoCheckChannel,
+  getGuildLanguageFn = getGuildLanguage,
+  extractNamesFromImageFn = extractNamesFromImage,
+  checkNamesAgainstListsFn = checkNamesAgainstLists,
+  formatCheckResultsFn = formatCheckResults,
+  buildListCheckEmbedFn = buildListCheckEmbed,
+  buildAutoCheckEvidenceRowFn = buildAutoCheckEvidenceRow,
+  maxNames = AUTO_CHECK_MAX_NAMES,
+  imageChecksEnabled = Boolean(config.geminiApiKey),
+} = {}) {
+  return async function handleAutoCheckMessage(message) {
     if (message.author.bot) return;
     if (!message.guild) return;
 
     const images = message.attachments.filter(
       (a) => a.contentType && a.contentType.startsWith('image/')
     );
+    const image = images.first() || null;
+    const textRequest = image ? null : parseAutoCheckText(message.content);
 
-    if (images.size === 0) return;
+    if (!image && !textRequest) return;
+    if (image && !imageChecksEnabled) return;
 
     if (!claimAutoCheckMessage(message.id)) return;
     let shouldRememberMessage = false;
+    let lang = 'en';
 
     try {
       // Check if this channel is configured for auto-check
-      const isActive = await isAutoCheckChannel(message.channelId, message.guild.id);
+      const isActive = await isAutoCheckChannelFn(message.channelId, message.guild.id);
       if (!isActive) return;
       shouldRememberMessage = true;
+      lang = await getGuildLanguageFn(message.guild.id, { GuildConfigModel: GuildConfig });
 
       // Per-user cooldown to prevent spam. The message claim above runs
       // before this async channel lookup can race with duplicate
@@ -161,42 +200,69 @@ export function setupAutoCheck(client) {
       if (Date.now() - lastCheck < COOLDOWN_MS) return;
       userCooldowns.set(message.author.id, Date.now());
 
-      const image = images.first();
-      console.log(`[auto-check] Image detected from ${message.author.tag} in #${message.channel.name}, processing...`);
+      const inputKind = image ? 'image' : 'text';
+      console.log(`[auto-check] ${inputKind} request from ${message.author.tag} in #${message.channel.name}, processing...`);
 
       await message.react('🔍').catch(() => {});
 
-      const names = await extractNamesFromImage(image, { refineAmbiguousDiacritics: true });
-
-      if (names.length === 0) {
+      if (textRequest?.invalidTokens.length > 0) {
+        const tokens = textRequest.invalidTokens
+          .slice(0, 5)
+          .map((token) => `\`${String(token).slice(0, 40)}\``)
+          .join(', ');
+        await message.reply({
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            ...t('dialogue.check.text.invalid', lang, { tokens }),
+            lang,
+          })],
+        });
         await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
         return;
       }
 
-      const MAX_AUTO_NAMES = 8;
-      const limitedNames = names.slice(0, MAX_AUTO_NAMES);
+      let names = textRequest?.names || [];
+      if (image) {
+        names = await extractNamesFromImageFn(image, { refineAmbiguousDiacritics: true });
+      }
+
+      if (names.length === 0) {
+        if (textRequest) {
+          await message.reply({
+            embeds: [buildAlertEmbed({
+              severity: AlertSeverity.WARNING,
+              ...t('dialogue.check.text.empty', lang),
+              lang,
+            })],
+          });
+        }
+        await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
+        return;
+      }
+
+      const limitedNames = names.slice(0, maxNames);
 
       // Send progress message immediately after OCR. Plain content here
       // (not an embed) because this is a transient "working on it" line
       // that gets edited into a full embed below within seconds.
       const progressMsg = await message.reply({
-        content: `🔍 Extracted **${limitedNames.length}** name(s) · checking database lists...`,
+        content: `🔍 ${t(textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
       });
 
-      const results = await checkNamesAgainstLists(limitedNames, { guildId: message.guild.id });
-      const lang = await getGuildLanguage(message.guild.id, { GuildConfigModel: GuildConfig });
-      const formattedLines = formatCheckResults(results);
+      const results = await checkNamesAgainstListsFn(limitedNames, { guildId: message.guild.id });
+      const formattedLines = formatCheckResultsFn(results, lang);
 
       // Same embed builder as /la-list check; mode: 'auto' tweaks the
       // title verb ("Auto-check" vs "List Check") and the footer copy
       // (mentions the Quick-Add dropdown below).
-      const { embed } = buildListCheckEmbed({
+      const { embed } = buildListCheckEmbedFn({
         results,
         formattedLines,
         limitedNamesCount: limitedNames.length,
         ignoredCount: names.length - limitedNames.length,
-        maxNames: MAX_AUTO_NAMES,
+        maxNames,
         mode: 'auto',
+        lang,
       });
 
       // Quick-Add dropdown for names with no DB list hit. Sits below
@@ -226,26 +292,42 @@ export function setupAutoCheck(client) {
       // attached image. Mirrors /la-list view's design so officers can
       // audit evidence right from the auto-check card instead of
       // re-running /la-list view.
-      const evidenceRow = buildAutoCheckEvidenceRow(results, lang);
+      const evidenceRow = buildAutoCheckEvidenceRowFn(results, lang);
       if (evidenceRow) components.push(evidenceRow);
 
       await progressMsg.edit({ content: '', embeds: [embed], components });
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
       await message.react('✅').catch(() => {});
     } catch (err) {
-      console.error('[auto-check] Error processing image:', err.message);
+      console.error('[auto-check] Error processing request:', err.message);
       await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
       await message.react('❌').catch(() => {});
       await message.reply({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
-          title: 'Auto-Check Failed',
-          description: 'Could not run the automatic list check on this image.',
-          fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+          ...t('dialogue.check.autoFailed', lang),
+          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+          lang,
         })],
       }).catch(() => {});
     } finally {
       completeAutoCheckMessage(message.id, { processed: shouldRememberMessage });
     }
-  });
+  };
+}
+
+/**
+ * Set up the auto-check message listener.
+ * @param {import('discord.js').Client} client
+ */
+export function setupAutoCheck(client) {
+  if (!config.geminiApiKey) {
+    console.log('[auto-check] GEMINI_API_KEY not set · screenshot OCR disabled; text check remains active.');
+  }
+
+  if (envChannelSet.size > 0) {
+    console.log(`[auto-check] Env fallback channels: ${[...envChannelSet].join(', ')}`);
+  }
+  console.log('[auto-check] Listener active (checks DB GuildConfig + env fallback per message).');
+  client.on(Events.MessageCreate, createAutoCheckMessageHandler({ client }));
 }

@@ -7,9 +7,11 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { EmbedBuilder } from 'discord.js';
 import config from '../config.js';
 import { COLORS } from '../utils/ui.js';
+import { createArtistEmbed } from '../utils/artistVoice.js';
+import GuildConfig from '../models/GuildConfig.js';
+import { getGuildLanguage, t } from '../services/i18n/index.js';
 import { getServerStatus, getMultiServerStatus, STATUS } from './serverStatus.js';
 
 // ─── State helpers ────────────────────────────────────────────────────────────
@@ -58,6 +60,7 @@ async function sendOnlineNotification(client, serverName) {
       console.error('[monitor] Notification channel not found or is not a text channel.');
       return;
     }
+    const lang = await getGuildLanguage(channel.guild?.id, { GuildConfigModel: GuildConfig });
 
     // The other monitored servers, listed so the embed surfaces "is the
     // rest of the cluster also up?" context without forcing the reader
@@ -68,31 +71,31 @@ async function sendOnlineNotification(client, serverName) {
 
     const fields = [
       {
-        name: '🌐 Server',
+        name: `🌐 ${t('dialogue.system.onlineNotice.serverField', lang)}`,
         value: `**${serverName}**`,
         inline: true,
       },
       {
-        name: '🕐 Came online',
+        name: `🕐 ${t('dialogue.system.onlineNotice.onlineAtField', lang)}`,
         value: `<t:${Math.floor(Date.now() / 1000)}:R>`,
         inline: true,
       },
     ];
     if (otherServers.length > 0) {
       fields.push({
-        name: '📡 Also monitored',
+        name: `📡 ${t('dialogue.system.onlineNotice.monitoredField', lang)}`,
         value: otherServers.map((s) => `\`${s}\``).join(' · '),
         inline: false,
       });
     }
 
-    const embed = new EmbedBuilder()
-      .setAuthor({ name: 'Lost Ark · Status Monitor' })
-      .setTitle(`🟢 ${serverName} is back online`)
-      .setDescription(`Logins are open on **${serverName}**. Time to raid!`)
+    const embed = createArtistEmbed(lang)
+      .setAuthor({ name: t('dialogue.system.onlineNotice.author', lang) })
+      .setTitle(`🟢 ${t('dialogue.system.onlineNotice.title', lang, { server: serverName })}`)
+      .setDescription(t('dialogue.system.onlineNotice.description', lang, { server: serverName }))
       .addFields(fields)
       .setColor(COLORS.success)
-      .setFooter({ text: 'Source: playlostark.com · /la-status for live state' })
+      .setFooter({ text: t('dialogue.system.onlineNotice.footer', lang) })
       .setTimestamp();
 
     await channel.send({ content: '@here', embeds: [embed] });

@@ -20,6 +20,7 @@ import { rosterUrl } from '../../../utils/rosterLink.js';
 import { ICONS } from '../../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../../utils/scanProgressEmbed.js';
 import { getClassName, getClassEmoji } from '../../../models/Class.js';
+import { t } from '../../../services/i18n/index.js';
 
 /**
  * Enrich-flavoured wrapper around `buildScanProgressEmbed`. Carries the
@@ -27,15 +28,17 @@ import { getClassName, getClassEmoji } from '../../../models/Class.js';
  * stay visually consistent with the rest of the alert family while
  * sharing the generic progress-bar layout with `/la-roster deep:true`.
  */
-export function buildEnrichProgressEmbed({ entry, foundType, meta, progress }) {
+export function buildEnrichProgressEmbed({ entry, foundType, meta, progress, lang = 'en' }) {
   const ctx = LIST_LABELS[foundType];
   return buildScanProgressEmbed({
-    title: `Stronghold scan in progress · ${entry.name}`,
-    subtitle: `Guild **${meta.guildName}**` +
-      (progress.totalMembers ? ` (${progress.totalMembers} members)` : ''),
+    title: t('dialogue.scan.progress', lang, { name: entry.name }),
+    subtitle: progress.totalMembers
+      ? t('dialogue.scan.guildMembers', lang, { guild: meta.guildName, count: progress.totalMembers })
+      : t('dialogue.scan.guild', lang, { guild: meta.guildName }),
     color: ctx.color,
     titleIcon: ICONS.search,
     progress,
+    lang,
   });
 }
 
@@ -63,7 +66,7 @@ export function buildEnrichProgressEmbed({ entry, foundType, meta, progress }) {
  *
  *   💡 Tip: /la-list view <type> to browse the full list.
  */
-export function buildEnrichSuccessEmbed(session, updateResult) {
+export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en') {
   const ctx = LIST_LABELS[session.type];
 
   // Per-alt rendering: bring back class + ilvl that the success card
@@ -76,7 +79,7 @@ export function buildEnrichSuccessEmbed(session, updateResult) {
       // "warlord"). Try the known-id lookup first; fall back to
       // string-stringify so non-string ids don't crash getClassName.
       const idStr = alt.classId == null ? '' : String(alt.classId);
-      const cls = alt.className || getClassName(idStr) || idStr || 'Unknown';
+      const cls = alt.className || getClassName(idStr) || idStr || t('dialogue.enrich.success.unknown', lang);
       const classPrefix = getClassEmoji(cls) || cls;
       const ilvl = typeof alt.itemLevel === 'number'
         ? alt.itemLevel.toFixed(2)
@@ -92,23 +95,23 @@ export function buildEnrichSuccessEmbed(session, updateResult) {
   const sections = [];
 
   sections.push(
-    `${ICONS.fox || '✨'} I appended **${session.newAlts.length} new alt(s)** to the **${ctx.label}** entry.`
+    `${ICONS.fox || '✨'} ${t('dialogue.enrich.success.appended', lang, { count: session.newAlts.length, list: t(`dialogue.broadcast.list.${session.type}`, lang) })}`
   );
 
   const contextLines = [];
   if (session.scanStats?.guildName) {
-    contextLines.push(`📍 Source: Stronghold scan in **${session.scanStats.guildName}**`);
+    contextLines.push(`📍 ${t('dialogue.enrich.success.source', lang, { guild: session.scanStats.guildName })}`);
   }
   if (session.targetIsHidden) {
-    contextLines.push(`${ICONS.locked} Roster was hidden, matched via stronghold fingerprint.`);
+    contextLines.push(`${ICONS.locked} ${t('dialogue.enrich.success.hidden', lang)}`);
   }
   if (contextLines.length > 0) sections.push(contextLines.join('\n'));
 
   if (altLines) {
-    sections.push(`**🆕 Newly tracked characters:**\n${altLines}`);
+    sections.push(`**🆕 ${t('dialogue.enrich.success.newlyTracked', lang)}**\n${altLines}`);
   }
 
-  sections.push(`💡 Tip: \`/la-list view ${session.type}\` to browse the full list.`);
+  sections.push(`💡 ${t('dialogue.enrich.success.tip', lang, { type: session.type })}`);
 
   // Server-side trace for the Mongoose write outcome. Useful when
   // diagnosing "I clicked Confirm but nothing seemed to save"; surfacing
@@ -124,8 +127,9 @@ export function buildEnrichSuccessEmbed(session, updateResult) {
     severity: AlertSeverity.SUCCESS,
     titleIcon: ctx.icon,
     color: ctx.color,
-    title: `Saved · ${session.entryName}`,
+    title: t('dialogue.enrich.success.title', lang, { name: session.entryName }),
     description: sections.join('\n\n'),
-    footer: `Lost Ark Check · enrich complete`,
+    footer: t('dialogue.enrich.success.footer', lang),
+    lang,
   });
 }

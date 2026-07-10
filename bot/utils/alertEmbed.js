@@ -81,6 +81,7 @@ export function buildAlertEmbed({
   timestamp = true,
   titleIcon,
   color,
+  lang = 'en',
 }) {
   const config = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.info;
   const finalIcon = titleIcon ?? config.icon;
@@ -110,5 +111,5 @@ export function buildAlertEmbed({
     embed.setTimestamp(new Date());
   }
 
-  return decorateArtistEmbed(embed);
+  return decorateArtistEmbed(embed, { lang });
 }

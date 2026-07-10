@@ -41,19 +41,8 @@ import {
 export function buildHiddenRosterGuidance(entryName, guildName, lang = 'en') {
   const hasGuild = Boolean(String(guildName || '').trim());
   const fields = [{
-    name: `${ICONS.search} Hidden roster detected`,
-    value: hasGuild
-      ? (
-          'Only the typed name is on the entry right now. ' +
-          `Bible shows guild **${guildName}**, so you can run ` +
-          `\`/la-list enrich name:${entryName}\` or press **Enrich now** below ` +
-          'to scan guildmates for same-stronghold alts and append matches to `allCharacters`.'
-        )
-      : (
-          'Only the typed name is on the entry right now. ' +
-          '`/la-list enrich` needs a visible guild member list, but bible does not show a guild for this character. ' +
-          `Use \`/la-list edit name:${entryName} additional_names:Alt1, Alt2\` to append known alts manually.`
-        ),
+    name: `${ICONS.search} ${t('dialogue.listAdd.hidden.title', lang)}`,
+    value: t(`dialogue.listAdd.hidden.${hasGuild ? 'withGuild' : 'withoutGuild'}`, lang, { guild: guildName, name: entryName }),
     inline: false,
   }];
 
@@ -87,8 +76,9 @@ export function buildHiddenRosterGuidance(entryName, guildName, lang = 'en') {
  */
 export function createListAddExecutor({ client, broadcastListChange }) {
   async function executeListAddToDatabase(payload) {
-    const { model, label, color, icon } = getListContext(payload.type);
-    const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+    const lang = payload.lang || 'en';
+    const { model, color, icon } = getListContext(payload.type);
+    const labelCap = t(`dialogue.broadcast.list.${payload.type}`, lang);
     const name = normalizeCharacterName(payload.name);
     await connectDB();
 
@@ -108,8 +98,8 @@ export function createListAddExecutor({ client, broadcastListChange }) {
           : { via: trustedExact.name };
         return {
           ok: false,
-          content: `${name} is a trusted user and cannot be added to any list.`,
-          embeds: [buildTrustedBlockEmbed(name, trustedExact.reason, via)],
+          content: t('dialogue.trustedBlock.direct', lang, { name }),
+          embeds: [buildTrustedBlockEmbed(name, trustedExact.reason, { ...via, lang })],
         };
       }
     }
@@ -140,16 +130,17 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
         return {
           ok: false,
-          content: `No roster found for ${name}; ${suggestions.length} similar name(s) suggested.`,
+          content: t('dialogue.listAdd.noRoster.contentSuggestions', lang, { name, count: suggestions.length }),
           embeds: [
             buildAlertEmbed({
               severity: AlertSeverity.ERROR,
-              title: 'No Roster Found',
-              description: `No character named **${name}** was found on lostark.bible. Here are some similar names:`,
+              title: t('dialogue.listAdd.noRoster.title', lang),
+              description: t('dialogue.listAdd.noRoster.withSuggestions', lang, { name }),
               fields: [
-                { name: 'Suggestions', value: suggestionLines.slice(0, 1024), inline: false },
+                { name: t('dialogue.listAdd.noRoster.suggestions', lang), value: suggestionLines.slice(0, 1024), inline: false },
               ],
-              footer: 'Pick one of the suggested names and re-run the command.',
+              footer: t('dialogue.listAdd.noRoster.suggestionFooter', lang),
+              lang,
             }),
           ],
         };
@@ -157,13 +148,14 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
       return {
         ok: false,
-        content: `No roster found for ${name}, no similar names suggested.`,
+        content: t('dialogue.listAdd.noRoster.contentNone', lang, { name }),
         embeds: [
           buildAlertEmbed({
             severity: AlertSeverity.ERROR,
-            title: 'No Roster Found',
-            description: `No character named **${name}** was found on lostark.bible, and no similar names were suggested.`,
-            footer: 'Check the spelling (Lost Ark names are case-sensitive and include diacritics).',
+            title: t('dialogue.listAdd.noRoster.title', lang),
+            description: t('dialogue.listAdd.noRoster.withoutSuggestions', lang, { name }),
+            footer: t('dialogue.listAdd.noRoster.spellingFooter', lang),
+            lang,
           }),
         ],
       };
@@ -183,19 +175,20 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     if (targetItemLevel !== null && targetItemLevel < 1700) {
       return {
         ok: false,
-        content: `${name} has item level ${targetItemLevel.toFixed(2)} (below 1700).`,
+        content: t('dialogue.listAdd.itemLevel.content', lang, { name, level: targetItemLevel.toFixed(2) }),
         embeds: [
           buildAlertEmbed({
             severity: AlertSeverity.ERROR,
-            title: 'Item Level Too Low',
-            description: `**${name}** does not meet the minimum item level required to be added to any list.`,
+            title: t('dialogue.listAdd.itemLevel.title', lang),
+            description: t('dialogue.listAdd.itemLevel.description', lang, { name }),
             fields: [
-              { name: 'Character', value: `[${name}](${rosterUrl(name)})`, inline: true },
-              { name: 'Item level', value: `\`${targetItemLevel.toFixed(2)}\``, inline: true },
-              { name: 'Minimum required', value: '`1700.00`', inline: true },
-              { name: 'Target list', value: labelCap, inline: true },
+              { name: t('dialogue.listAdd.itemLevel.character', lang), value: `[${name}](${rosterUrl(name)})`, inline: true },
+              { name: t('dialogue.listAdd.itemLevel.itemLevel', lang), value: `\`${targetItemLevel.toFixed(2)}\``, inline: true },
+              { name: t('dialogue.listAdd.itemLevel.minimum', lang), value: '`1700.00`', inline: true },
+              { name: t('dialogue.listAdd.itemLevel.targetList', lang), value: labelCap, inline: true },
             ],
-            footer: 'ilvl gate prevents spam entries for inactive or unleveled alts.',
+            footer: t('dialogue.listAdd.itemLevel.footer', lang),
+            lang,
           }),
         ],
       };
@@ -208,8 +201,8 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       if (trustedAlt) {
         return {
           ok: false,
-          content: `${name} shares a roster with trusted user ${trustedAlt.name}.`,
-          embeds: [buildTrustedBlockEmbed(name, trustedAlt.reason, { via: trustedAlt.name })],
+          content: t('dialogue.trustedBlock.via', lang, { name, via: trustedAlt.name }),
+          embeds: [buildTrustedBlockEmbed(name, trustedAlt.reason, { via: trustedAlt.name, lang })],
         };
       }
     }
@@ -247,58 +240,58 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       const dupFields = [];
       if (isRosterMatch) {
         dupFields.push({
-          name: 'Match type',
-          value: 'Roster alt',
+          name: t('dialogue.listAdd.duplicate.matchType', lang),
+          value: t('dialogue.listAdd.duplicate.rosterAlt', lang),
           inline: true,
         });
         dupFields.push({
-          name: 'Matched name',
+          name: t('dialogue.listAdd.duplicate.matchedName', lang),
           value: `[${existed.name}](${existedRosterLink})`,
           inline: true,
         });
       } else {
         dupFields.push({
-          name: 'Match type',
-          value: 'Exact name',
+          name: t('dialogue.listAdd.duplicate.matchType', lang),
+          value: t('dialogue.listAdd.duplicate.exactName', lang),
           inline: true,
         });
       }
       if (existed.scope) {
         dupFields.push({
-          name: 'Scope',
-          value: existed.scope === 'server' ? '`[Server]`' : '`[Global]`',
+          name: t('dialogue.listAdd.duplicate.scope', lang),
+          value: `\`[${t(`dialogue.approval.scopeTag.${existed.scope === 'server' ? 'local' : 'global'}`, lang)}]\``,
           inline: true,
         });
       }
       if (existed.addedByDisplayName || existed.addedByTag) {
         dupFields.push({
-          name: 'Added by',
+          name: t('dialogue.listAdd.duplicate.addedBy', lang),
           value: existed.addedByDisplayName || existed.addedByTag,
           inline: true,
         });
       }
       if (existed.reason) {
         dupFields.push({
-          name: 'Existing reason',
+          name: t('dialogue.listAdd.duplicate.existingReason', lang),
           value: existed.reason.slice(0, 1024),
           inline: false,
         });
       }
       if (existed.raid) {
         dupFields.push({
-          name: 'Raid',
+          name: t('dialogue.listAdd.duplicate.raid', lang),
           value: existed.raid,
           inline: true,
         });
       }
 
       const dupDescription = isRosterMatch
-        ? `**${name}** is already in ${label} via roster match with **${existed.name}**.`
-        : `**${name}** is already in ${label}.`;
+        ? t('dialogue.listAdd.duplicate.roster', lang, { name, list: labelCap, matched: existed.name })
+        : t('dialogue.listAdd.duplicate.direct', lang, { name, list: labelCap });
 
       const dupContent = isRosterMatch
-        ? `${name} already exists in ${label} (roster match: ${existed.name}).`
-        : `${name} already exists in ${label}.`;
+        ? t('dialogue.listAdd.duplicate.contentRoster', lang, { name, list: labelCap, matched: existed.name })
+        : t('dialogue.listAdd.duplicate.contentDirect', lang, { name, list: labelCap });
 
       return {
         ok: false,
@@ -308,10 +301,11 @@ export function createListAddExecutor({ client, broadcastListChange }) {
         embeds: [
           buildAlertEmbed({
             severity: AlertSeverity.WARNING,
-            title: `Already in ${labelCap}`,
+            title: t('dialogue.listAdd.duplicate.title', lang, { list: labelCap }),
             description: dupDescription,
             fields: dupFields,
-            footer: `Use /la-list view ${payload.type} to see the full entry, or /la-list edit to modify it.`,
+            footer: t('dialogue.listAdd.duplicate.footer', lang, { type: payload.type }),
+            lang,
           }),
         ],
       };
@@ -358,15 +352,15 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     const rosterLink = rosterUrl(entry.name);
     const autoLogsLink = logsUrl(entry.name);
 
-    const linkParts = [`[Roster](${rosterLink})`, `[Logs](${autoLogsLink})`];
-    if (payload.logsUrl) linkParts.push(`[Evidence Logs](${payload.logsUrl})`);
+    const linkParts = [`[${t('dialogue.listAdd.success.roster', lang)}](${rosterLink})`, `[${t('dialogue.listAdd.success.logs', lang)}](${autoLogsLink})`];
+    if (payload.logsUrl) linkParts.push(`[${t('dialogue.listAdd.success.evidenceLogs', lang)}](${payload.logsUrl})`);
 
     const scopeTag = (payload.type === 'black' && entryScope === 'server')
-      ? ' `[Local]`'
-      : payload.type === 'black' ? ' `[Global]`' : '';
+      ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\``
+      : payload.type === 'black' ? ` \`[${t('dialogue.approval.scopeTag.global', lang)}]\`` : '';
     const rosterSourceLabel = rosterVisibility === 'hidden'
-      ? 'hidden roster fallback'
-      : 'visible roster';
+      ? t('dialogue.listAdd.success.sourceHidden', lang)
+      : t('dialogue.listAdd.success.sourceVisible', lang);
 
     // Tracked alts via shared renderer · class icon + ilvl come from the
     // rosterCharacters parse buildRosterCharacters returned for this name.
@@ -376,22 +370,24 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       names: allCharacters,
       primaryName: entry.name,
       statMap: statMapFromRosterCharacters(rosterCharacters),
-      emptySentinel: '_Only this character is tracked on this entry._',
+      emptySentinel: `_${t('dialogue.listAdd.success.onlyCharacter', lang)}_`,
+      label: `🧬 ${t('dialogue.listAdd.success.fields.trackedAlts', lang)}`,
+      overflowTemplate: t('dialogue.broadcast.more', lang),
     });
 
-    const requesterName = payload.requestedByDisplayName || payload.requestedByName || 'an officer';
-    const heroLine = `**${requesterName}** added **${entry.name}** to the **${label}**${scopeTag}.`;
+    const requesterName = payload.requestedByDisplayName || payload.requestedByName || t('dialogue.listAdd.success.officerFallback', lang);
+    const heroLine = t('dialogue.listAdd.success.hero', lang, { user: requesterName, name: entry.name, list: labelCap, scope: scopeTag });
 
     const fields = [
-      { name: '📒 List', value: `${icon} ${label}`, inline: true },
-      { name: '🗡️ Raid', value: payload.raid ? `\`${payload.raid}\`` : 'N/A', inline: true },
+      { name: `📒 ${t('dialogue.listAdd.success.fields.list', lang)}`, value: `${icon} ${labelCap}`, inline: true },
+      { name: `🗡️ ${t('dialogue.listAdd.success.fields.raid', lang)}`, value: payload.raid ? `\`${payload.raid}\`` : t('dialogue.broadcast.notAvailable', lang), inline: true },
     ];
     if (payload.type === 'black') {
-      fields.push({ name: '🌐 Scope', value: entryScope, inline: true });
+      fields.push({ name: `🌐 ${t('dialogue.listAdd.success.fields.scope', lang)}`, value: t(`dialogue.approval.scopeTag.${entryScope === 'server' ? 'local' : 'global'}`, lang), inline: true });
     }
-    fields.push({ name: '📝 Reason', value: (payload.reason || 'N/A').slice(0, 1024), inline: false });
+    fields.push({ name: `📝 ${t('dialogue.listAdd.success.fields.reason', lang)}`, value: (payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false });
     if (altsField) fields.push(altsField);
-    fields.push({ name: '🔗 Links', value: linkParts.join(' · '), inline: false });
+    fields.push({ name: `🔗 ${t('dialogue.listAdd.success.fields.links', lang)}`, value: linkParts.join(' · '), inline: false });
 
     // titleIcon prefixes done + list-type. For whitelist (✅) we drop
     // the done prefix to avoid a doubled tick (✅ ✅) and let the list
@@ -402,10 +398,11 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       severity: AlertSeverity.SUCCESS,
       titleIcon,
       color,
-      title: `${labelCap} · Added · ${entry.name}`,
+      title: t('dialogue.listAdd.success.title', lang, { list: labelCap, name: entry.name }),
       description: heroLine,
       fields,
-      footer: `${ICONS.shield} Added by ${requesterName} · ${rosterSourceLabel}`,
+      footer: `${ICONS.shield} ${t('dialogue.listAdd.success.footer', lang, { user: requesterName, source: rosterSourceLabel })}`,
+      lang,
     });
 
     // Resolve the freshest possible image URL from the just-created entry.
@@ -449,7 +446,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       // content honors the executor contract documented above: every return
       // path (ok or not) carries a one-line string so approval-flow notifiers
       // can render `<@requester> ${content}` without a literal "undefined".
-      content: `✅ Add approved: **${entry.name}** added to ${label}.`,
+      content: `✅ ${t('dialogue.listAdd.success.content', lang, { name: entry.name, list: labelCap })}`,
       embeds: [embed],
       components,
     };

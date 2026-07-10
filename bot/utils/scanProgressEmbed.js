@@ -8,12 +8,13 @@ import { truncateInlineText } from './discordText.js';
 import { rosterUrl } from './rosterLink.js';
 import { ICONS, buildProgressBar, relativeTime } from './ui.js';
 import { getClassEmoji } from '../models/Class.js';
+import { t } from '../services/i18n/index.js';
 
-function buildAltsBlock(alts) {
+function buildAltsBlock(alts, lang) {
   if (!Array.isArray(alts) || alts.length === 0) return '';
   const visible = alts.slice(0, 12);
   const lines = visible.map((alt) => {
-    const cls = alt.className || alt.classId || 'Unknown';
+    const cls = alt.className || alt.classId || t('dialogue.scan.progressUi.unknown', lang);
     const classPrefix = getClassEmoji(cls) || cls;
     const ilvl = typeof alt.itemLevel === 'number'
       ? alt.itemLevel.toFixed(2)
@@ -22,9 +23,9 @@ function buildAltsBlock(alts) {
     return `- ${classPrefix} **[${alt.name}](${link})** - \`${ilvl}\``;
   });
   const extra = alts.length > visible.length
-    ? `\n*... and ${alts.length - visible.length} more*`
+    ? `\n*${t('dialogue.scan.progressUi.more', lang, { count: alts.length - visible.length })}*`
     : '';
-  return `\n\n**Matches so far (${alts.length}):**\n${lines.join('\n')}${extra}`;
+  return `\n\n**${t('dialogue.scan.progressUi.matches', lang, { count: alts.length })}**\n${lines.join('\n')}${extra}`;
 }
 
 export function buildScanProgressEmbed({
@@ -33,6 +34,7 @@ export function buildScanProgressEmbed({
   color,
   titleIcon,
   progress,
+  lang = 'en',
 }) {
   const total = Math.max(1, progress.totalCandidates || 1);
   const attemptedCandidates = progress.attemptedCandidates ?? progress.scannedCandidates ?? 0;
@@ -40,24 +42,24 @@ export function buildScanProgressEmbed({
   const pct = Math.round((attemptedCandidates / total) * 100);
   const bar = buildProgressBar(pct);
   const startedLine = progress.startedAt
-    ? `\n*Started ${relativeTime(progress.startedAt)}*`
+    ? `\n*${t('dialogue.scan.progressUi.started', lang, { time: relativeTime(progress.startedAt) })}*`
     : '';
-  const altsBlock = buildAltsBlock(progress.alts);
+  const altsBlock = buildAltsBlock(progress.alts, lang);
   const failureReason = truncateInlineText(progress.lastFailureReason, 120);
   const failureLine = failureReason && (progress.failedCandidates ?? 0) > 0
-    ? `\nLast error: \`${failureReason}\``
+    ? `\n${t('dialogue.scan.progressUi.lastError', lang, { error: failureReason })}`
     : '';
-  const footerParts = [`Backoff ${progress.currentBackoffMs}ms`];
+  const footerParts = [t('dialogue.scan.progressUi.backoff', lang, { ms: progress.currentBackoffMs })];
   if ((progress.rateLimitRetries ?? 0) > 0) {
-    footerParts.push(`429 retries ${progress.rateLimitRetries}`);
+    footerParts.push(t('dialogue.scan.progressUi.retries', lang, { count: progress.rateLimitRetries }));
   }
-  footerParts.push('15s update interval');
+  footerParts.push(t('dialogue.scan.progressUi.interval', lang));
 
   const statsLine = [
-    `Checked **${checkedCandidates}** / ${progress.totalCandidates} candidates`,
-    attemptedCandidates > checkedCandidates ? `Attempts **${attemptedCandidates}**` : null,
-    `Found **${progress.altsFound}** match`,
-    `Failed **${progress.failedCandidates}**`,
+    t('dialogue.scan.progressUi.checked', lang, { checked: checkedCandidates, total: progress.totalCandidates }),
+    attemptedCandidates > checkedCandidates ? t('dialogue.scan.progressUi.attempts', lang, { count: attemptedCandidates }) : null,
+    t('dialogue.scan.progressUi.found', lang, { count: progress.altsFound }),
+    t('dialogue.scan.progressUi.failed', lang, { count: progress.failedCandidates }),
   ].filter(Boolean).join(' - ');
 
   return buildAlertEmbed({
@@ -75,5 +77,6 @@ export function buildScanProgressEmbed({
     ).slice(0, 4096),
     footer: footerParts.join(' - '),
     timestamp: false,
+    lang,
   });
 }

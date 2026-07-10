@@ -25,6 +25,9 @@ import { deferReply, editAlert, editEmbed } from '../../../utils/interactionRepl
 import { buildBlacklistScopeFilter } from '../../../utils/scope.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
+import GuildConfig from '../../../models/GuildConfig.js';
+import UserPreference from '../../../models/UserPreference.js';
+import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   decorateListEntry,
   getListContext,
@@ -143,7 +146,7 @@ async function lookupAutocompleteCandidates(query, guildId) {
  * can fetch unambiguously even when the same name exists across types
  * or scopes.
  */
-function buildAutocompleteChoices(rawResults) {
+function buildAutocompleteChoices(rawResults, lang = 'en') {
   const seen = new Set();
   const choices = [];
 
@@ -157,7 +160,7 @@ function buildAutocompleteChoices(rawResults) {
       ? doc.reason.length > 50
         ? doc.reason.slice(0, 47) + '...'
         : doc.reason
-      : 'No reason';
+      : t('listView.navigation.noReason', lang);
     // Local-scope tag helps an officer tell apart the same name appearing
     // under global vs server scope (rare but possible for blacklist).
     const scopeTag = type === 'black' && doc.scope === 'server' ? ' [S]' : '';
@@ -180,7 +183,8 @@ export async function handleListEvidenceAutocomplete(interaction) {
       return;
     }
     const raw = await lookupAutocompleteCandidates(focused.value, interaction.guild?.id);
-    const choices = buildAutocompleteChoices(raw);
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+    const choices = buildAutocompleteChoices(raw, lang);
     await interaction.respond(choices);
   } catch (err) {
     console.error('[evidence] Autocomplete error:', err.message);
@@ -195,6 +199,9 @@ export function createEvidenceHandlers({ client }) {
     const isPrivileged = isOfficerOrSenior(interaction.user.id);
     const usePublic = requestedPublic && isPrivileged;
     const viewerGuildId = interaction.guild?.id || '';
+    const lang = usePublic
+      ? await getGuildLanguage(viewerGuildId, { GuildConfigModel: GuildConfig })
+      : await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     await deferReply(interaction, { ephemeral: !usePublic });
 
@@ -223,8 +230,8 @@ export function createEvidenceHandlers({ client }) {
       } else {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Name Required',
-          description: 'Pass a character name. Use autocomplete to pick from existing list entries.',
+          ...t('dialogue.evidenceCommand.nameRequired', lang),
+          lang,
         });
         return;
       }
@@ -233,9 +240,8 @@ export function createEvidenceHandlers({ client }) {
         const displayName = name || rawNameOpt;
         await editAlert(interaction, {
           severity: AlertSeverity.INFO,
-          title: 'Not Listed',
-          description: `**${displayName}** is not in any list visible to this server (blacklist / whitelist / watchlist).`,
-          footer: 'Try /la-search for fuzzy-match across the bible name index.',
+          ...t('dialogue.evidenceCommand.notListed', lang, { name: displayName }),
+          lang,
         });
         return;
       }
@@ -248,6 +254,7 @@ export function createEvidenceHandlers({ client }) {
       // ephemeral reply path).
       const evidenceEmbed = buildEvidenceEmbed(decorated, displayUrl, {
         includeAddedBy: isPrivileged,
+        lang,
       });
 
       // If the requester asked for public but is not privileged, render
@@ -257,8 +264,8 @@ export function createEvidenceHandlers({ client }) {
       if (requestedPublic && !isPrivileged) {
         embeds.unshift(buildAlertEmbed({
           severity: AlertSeverity.INFO,
-          title: 'Public Mode Restricted',
-          description: 'Only officers and seniors can broadcast evidence publicly. Showing privately instead.',
+          ...t('dialogue.evidenceCommand.publicRestricted', lang),
+          lang,
         }));
       }
 
@@ -267,9 +274,9 @@ export function createEvidenceHandlers({ client }) {
       console.error('[evidence] Lookup failed:', err.message);
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Lookup Failed',
-        description: 'Could not load the evidence record.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        ...t('dialogue.evidenceCommand.failed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
       });
     }
   }

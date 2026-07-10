@@ -10,7 +10,7 @@ import UserPreference from '../../models/UserPreference.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import { getClassName, resolveClassId } from '../../models/Class.js';
 import { fetchNameSuggestions } from '../../services/roster/index.js';
-import { getUserLanguage } from '../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import {
@@ -29,6 +29,7 @@ export async function handleSearchCommand(interaction) {
   const classFilter = resolveClassId(interaction.options.getString('class'));
 
   await deferReply(interaction);
+  const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   try {
     let suggestions = await fetchNameSuggestions(name);
@@ -36,8 +37,8 @@ export async function handleSearchCommand(interaction) {
     if (suggestions === null) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Bible Unavailable',
-        description: 'lostark.bible is currently unavailable. Please try again later.',
+        ...t('dialogue.search.bibleUnavailable', lang),
+        lang,
       });
       return;
     }
@@ -45,8 +46,8 @@ export async function handleSearchCommand(interaction) {
     if (suggestions.length === 0) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'No Results',
-        description: `No characters matching **${name}** were found.`,
+        ...t('dialogue.search.noResults', lang, { name }),
+        lang,
       });
       return;
     }
@@ -65,15 +66,14 @@ export async function handleSearchCommand(interaction) {
       if (classFilter) filterDesc.push(`class: ${getClassName(classFilter)}`);
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'No Results With Filters',
-        description: `No characters matching **${name}** with the applied filters.`,
-        fields: [{ name: 'Filters', value: filterDesc.join(', '), inline: false }],
+        ...t('dialogue.search.noFilteredResults', lang, { name }),
+        fields: [{ name: t('dialogue.search.noFilteredResults.filters', lang), value: filterDesc.join(', '), inline: false }],
+        lang,
       });
       return;
     }
 
     await connectDB();
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     const searchGuildId = interaction.guild?.id || '';
     const sliced = suggestions.slice(0, 15);
@@ -114,7 +114,7 @@ export async function handleSearchCommand(interaction) {
       };
     });
 
-    const embed = buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter });
+    const embed = buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang });
 
     // Build evidence dropdown for flagged entries with images (rehosted OR legacy)
     const flaggedWithImages = getFlaggedResultsWithImages(results);
@@ -126,9 +126,9 @@ export async function handleSearchCommand(interaction) {
     console.error('[search] ❌ Search failed:', err.message);
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,
-      title: 'Search Failed',
-      description: 'Could not run the name search.',
-      fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+      ...t('dialogue.search.failed', lang),
+      fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+      lang,
     });
   }
 }

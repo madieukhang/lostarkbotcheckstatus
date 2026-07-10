@@ -107,23 +107,23 @@ async function buildGuildNameCache({ allEntries, client, isOwnerGuild }) {
  */
 export function createViewHandlers({ client }) {
   async function handleListViewCommand(interaction) {
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     if (!interaction.guild) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Server-Only Command',
-        description: 'This command can only be used inside a Discord server, not in DMs.',
+        ...t('dialogue.common.serverOnly', lang),
+        lang,
       });
       return;
     }
 
+    await deferReply(interaction);
+
     const type = interaction.options.getString('type', true);
     const scopeFilter = interaction.options.getString('scope') || '';
 
-    await deferReply(interaction);
-
     try {
       await connectDB();
-      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
       if (type === 'trusted') {
         const trustedEntries = await TrustedUser.find({}).sort({ addedAt: -1 }).lean();
@@ -195,10 +195,11 @@ export function createViewHandlers({ client }) {
 
       collector.on('collect', async (componentInteraction) => {
         if (componentInteraction.user.id !== interaction.user.id) {
+          const clickerLang = await getUserLanguage(componentInteraction.user.id, { UserPreferenceModel: UserPreference });
           await replyAlert(componentInteraction, {
             severity: AlertSeverity.ERROR,
-            title: 'Not Your Session',
-            description: 'Only the command user can navigate this list view.',
+            ...t('dialogue.listView.session', clickerLang),
+            lang: clickerLang,
           });
           return;
         }
@@ -236,9 +237,9 @@ export function createViewHandlers({ client }) {
       console.error('[list] View failed:', err.message);
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'View Failed',
-        description: 'Could not load the list.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        ...t('dialogue.listView.failed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
       });
     }
   }

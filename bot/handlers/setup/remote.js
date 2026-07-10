@@ -22,12 +22,14 @@ import { handleSyncImagesAction } from './syncImages.js';
  * Handle /la-remote · Senior-only remote config management
  */
 export async function handleSetupRemoteCommand(interaction) {
+  await deferEphemeralReply(interaction);
+  const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
   const seniorIds = config.seniorApproverIds || [];
   if (!seniorIds.includes(interaction.user.id)) {
-    await replyAlert(interaction, {
+    await editAlert(interaction, {
       severity: AlertSeverity.ERROR,
-      title: 'Senior-Only Command',
-      description: 'Only seniors can use remote config management.',
+      ...t('dialogue.remote.seniorOnly', lang),
+      lang,
     });
     return;
   }
@@ -37,9 +39,7 @@ export async function handleSetupRemoteCommand(interaction) {
   const scopeValue = interaction.options.getString('scope') || '';
   const channelOpt = interaction.options.getChannel('channel');
 
-  await deferEphemeralReply(interaction);
   await connectDB();
-  const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   // Helper: resolve guild name from ID
   async function resolveGuildName(gid) {
@@ -55,7 +55,10 @@ export async function handleSetupRemoteCommand(interaction) {
     if (allGuilds.length === 0) {
       await editEmbed(
         interaction,
-        createArtistEmbed().setTitle('🛰️ Remote Control · Dashboard').setDescription('*Bot is not in any server.*').setColor(COLORS.greyDark),
+        createArtistEmbed(lang)
+          .setTitle(`🛰️ ${t('dialogue.remote.dashboardTitle', lang)}`)
+          .setDescription(`*${t('dialogue.remote.noServers', lang)}*`)
+          .setColor(COLORS.greyDark),
       );
       return;
     }
@@ -63,24 +66,28 @@ export async function handleSetupRemoteCommand(interaction) {
     function buildServerEmbed(guild) {
       const gc = configMap.get(guild.id);
       const isOwner = guild.id === config.ownerGuildId;
-      const notify = gc?.globalNotifyEnabled === false ? '🔕 Disabled' : '🔔 Enabled';
+      const notify = gc?.globalNotifyEnabled === false
+        ? `🔕 ${t('dialogue.remote.state.disabled', lang)}`
+        : `🔔 ${t('dialogue.remote.state.enabled', lang)}`;
       const scope = gc?.defaultBlacklistScope || 'global';
-      const scopeDisplay = scope === 'server' ? '🔒 Server (Local)' : '🌐 Global';
-      const autoCheck = gc?.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : '*Not set*';
-      const notifyCh = gc?.listNotifyChannelId ? `<#${gc.listNotifyChannelId}>` : '*Not set*';
+      const scopeDisplay = scope === 'server'
+        ? `🔒 ${t('dialogue.remote.state.local', lang)}`
+        : `🌐 ${t('dialogue.remote.state.global', lang)}`;
+      const autoCheck = gc?.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : `*${t('dialogue.remote.notSet', lang)}*`;
+      const notifyCh = gc?.listNotifyChannelId ? `<#${gc.listNotifyChannelId}>` : `*${t('dialogue.remote.notSet', lang)}*`;
       const updated = gc?.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '-';
       const configured = gc ? '✅' : '⚪';
 
-      const embed = createArtistEmbed()
+      const embed = createArtistEmbed(lang)
         .setTitle(`${isOwner ? '👑' : '🖥️'} ${guild.name} ${configured}`)
-        .setDescription(`\`${guild.id}\`${isOwner ? ' · **Owner Server**' : ''}${!gc ? ' · *No config yet*' : ''}`)
+        .setDescription(`\`${guild.id}\`${isOwner ? ` · **${t('dialogue.remote.ownerServer', lang)}**` : ''}${!gc ? ` · *${t('dialogue.remote.noConfig', lang)}*` : ''}`)
         .addFields(
-          { name: '📡 Global Notify', value: notify, inline: true },
-          { name: '🎯 Default Scope', value: scopeDisplay, inline: true },
-          { name: '📸 Auto-check', value: autoCheck, inline: true },
-          { name: '🔔 Notify Channel', value: notifyCh, inline: true },
-          { name: '🕐 Last Updated', value: updated, inline: true },
-          { name: '👤 Updated By', value: gc?.updatedByTag || '-', inline: true },
+          { name: `📡 ${t('dialogue.remote.fields.globalNotify', lang)}`, value: notify, inline: true },
+          { name: `🎯 ${t('dialogue.remote.fields.defaultScope', lang)}`, value: scopeDisplay, inline: true },
+          { name: `📸 ${t('dialogue.remote.fields.autoCheck', lang)}`, value: autoCheck, inline: true },
+          { name: `🔔 ${t('dialogue.remote.fields.notifyChannel', lang)}`, value: notifyCh, inline: true },
+          { name: `🕐 ${t('dialogue.remote.fields.lastUpdated', lang)}`, value: updated, inline: true },
+          { name: `👤 ${t('dialogue.remote.fields.updatedBy', lang)}`, value: gc?.updatedByTag || '-', inline: true },
         )
         .setColor(isOwner ? COLORS.gold : gc ? COLORS.info : COLORS.greyDark);
 
@@ -88,9 +95,9 @@ export async function handleSetupRemoteCommand(interaction) {
       if (isOwner) {
         const evidenceCh = gc?.evidenceChannelId
           ? `<#${gc.evidenceChannelId}>`
-          : '*Not set · images use legacy URL (expire ~24h)*';
+          : `*${t('dialogue.remote.evidenceLegacy', lang)}*`;
         embed.addFields({
-          name: '🖼️ Evidence Channel (bot-wide)',
+          name: `🖼️ ${t('dialogue.remote.fields.evidenceChannel', lang)}`,
           value: evidenceCh,
           inline: false,
         });
@@ -133,10 +140,11 @@ export async function handleSetupRemoteCommand(interaction) {
     const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120_000 });
     collector.on('collect', async (i) => {
       if (i.user.id !== interaction.user.id) {
+        const clickerLang = await getUserLanguage(i.user.id, { UserPreferenceModel: UserPreference });
         await replyAlert(i, {
           severity: AlertSeverity.ERROR,
-          title: 'Not Your Session',
-          description: 'Only the senior who ran this command can use these controls.',
+          ...t('dialogue.common.notYourSession', clickerLang),
+          lang: clickerLang,
         });
         return;
       }
@@ -157,9 +165,8 @@ export async function handleSetupRemoteCommand(interaction) {
     if (!config.ownerGuildId) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Config Missing',
-        description: '`OWNER_GUILD_ID` is not configured.',
-        footer: 'Set it in env vars and restart the bot, then retry.',
+        ...t('dialogue.remote.configMissing', lang),
+        lang,
       });
       return;
     }
@@ -167,9 +174,8 @@ export async function handleSetupRemoteCommand(interaction) {
     if (!channelOpt) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Channel Option Required',
-        description: 'Provide `channel:` option for this action.',
-        footer: 'Pick the hidden channel where evidence images will be stored.',
+        ...t('dialogue.remote.channelRequired', lang),
+        lang,
       });
       return;
     }
@@ -177,8 +183,8 @@ export async function handleSetupRemoteCommand(interaction) {
     if (!channelOpt.isTextBased?.()) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Wrong Channel Type',
-        description: `Channel <#${channelOpt.id}> is not a text channel.`,
+        ...t('dialogue.remote.channelWrongType', lang, { channel: channelOpt.id }),
+        lang,
       });
       return;
     }
@@ -192,10 +198,9 @@ export async function handleSetupRemoteCommand(interaction) {
       if (missing.length > 0) {
         await editAlert(interaction, {
           severity: AlertSeverity.ERROR,
-          title: 'Missing Permissions',
-          description: `Bot is missing permissions in <#${channelOpt.id}>.`,
-          fields: [{ name: 'Missing', value: missing.join(', '), inline: false }],
-          footer: 'Grant these permissions and retry the command.',
+          ...t('dialogue.common.missingPermissions', lang, { channel: channelOpt.id }),
+          fields: [{ name: t('dialogue.common.missingField', lang), value: missing.join(', '), inline: false }],
+          lang,
         });
         return;
       }
@@ -215,19 +220,16 @@ export async function handleSetupRemoteCommand(interaction) {
     );
     invalidateGuildConfig(config.ownerGuildId);
 
-    const embed = createArtistEmbed()
-      .setTitle('🖼️ Evidence Channel Updated')
-      .setDescription(
-        `New /la-list add image attachments will be rehosted to <#${channelOpt.id}> ` +
-        `for permanent storage. Existing entries are unaffected.`
-      )
+    const embed = createArtistEmbed(lang)
+      .setTitle(`🖼️ ${t('dialogue.remote.evidenceUpdated.title', lang)}`)
+      .setDescription(t('dialogue.remote.evidenceUpdated.description', lang, { channel: channelOpt.id }))
       .addFields(
-        { name: 'Channel', value: `<#${channelOpt.id}>`, inline: true },
-        { name: 'Channel ID', value: `\`${channelOpt.id}\``, inline: true },
-        { name: 'Server', value: channelOpt.guild?.name || '*Unknown*', inline: true },
+        { name: t('dialogue.remote.fields.channel', lang), value: `<#${channelOpt.id}>`, inline: true },
+        { name: t('dialogue.remote.fields.channelId', lang), value: `\`${channelOpt.id}\``, inline: true },
+        { name: t('dialogue.remote.fields.server', lang), value: channelOpt.guild?.name || `*${t('dialogue.common.unknown', lang)}*`, inline: true },
       )
       .setColor(COLORS.info)
-      .setFooter({ text: `Set by ${interaction.user.tag} · bot-wide setting` })
+      .setFooter({ text: t('dialogue.remote.evidenceUpdated.footer', lang, { user: interaction.user.tag }) })
       .setTimestamp();
 
     await editEmbed(interaction, embed);
@@ -237,20 +239,20 @@ export async function handleSetupRemoteCommand(interaction) {
 
   // ── ACTION: syncimages ───────────────────────────────────
   if (action === 'syncimages') {
-    await handleSyncImagesAction(interaction);
+    await handleSyncImagesAction(interaction, lang);
     return;
   }
 
   // ── Need guild ID for off/defaultscope ───────────────────
   if (!targetGuildId) {
-    const helpEmbed = createArtistEmbed()
-      .setTitle('❌ Missing Guild ID')
-      .setDescription('Use `action:view` first to see all guild IDs, then copy the ID here.')
+    const helpEmbed = createArtistEmbed(lang)
+      .setTitle(`❌ ${t('dialogue.remote.missingGuild.title', lang)}`)
+      .setDescription(t('dialogue.remote.missingGuild.description', lang))
       .addFields(
-        { name: 'Toggle notify', value: '`/la-remote action:off guild:<ID>`', inline: false },
-        { name: 'Set scope', value: '`/la-remote action:defaultscope guild:<ID> scope:server`', inline: false },
-        { name: 'Set evidence channel', value: '`/la-remote action:evidencechannel channel:#...`', inline: false },
-        { name: 'Sync legacy images', value: '`/la-remote action:syncimages` (no guild ID needed)', inline: false },
+        { name: t('dialogue.remote.missingGuild.toggleNotify', lang), value: '`/la-remote action:off guild:<ID>`', inline: false },
+        { name: t('dialogue.remote.missingGuild.setScope', lang), value: '`/la-remote action:defaultscope guild:<ID> scope:server`', inline: false },
+        { name: t('dialogue.remote.missingGuild.setEvidence', lang), value: '`/la-remote action:evidencechannel channel:#...`', inline: false },
+        { name: t('dialogue.remote.missingGuild.syncImages', lang), value: `\`/la-remote action:syncimages\` (${t('dialogue.remote.missingGuild.noGuildNeeded', lang)})`, inline: false },
       )
       .setColor(COLORS.danger);
     await editEmbed(interaction, helpEmbed);
@@ -260,9 +262,9 @@ export async function handleSetupRemoteCommand(interaction) {
   // Validate target guild · bot must be in it
   const guildName = await resolveGuildName(targetGuildId);
   if (!guildName) {
-    const embed = createArtistEmbed()
-      .setTitle('❌ Guild Not Found')
-      .setDescription(`Bot is not in a server with ID \`${targetGuildId}\`.\nUse \`action:view\` to see valid guild IDs.`)
+    const embed = createArtistEmbed(lang)
+      .setTitle(`❌ ${t('dialogue.remote.guildNotFound.title', lang)}`)
+      .setDescription(t('dialogue.remote.guildNotFound.description', lang, { guild: targetGuildId }))
       .setColor(COLORS.danger);
     await editEmbed(interaction, embed);
     return;
@@ -283,14 +285,15 @@ export async function handleSetupRemoteCommand(interaction) {
     );
     invalidateGuildConfig(targetGuildId);
 
-    const embed = createArtistEmbed()
-      .setTitle(`${newState ? '🔔' : '🔕'} Remote · Notify ${newState ? 'Enabled' : 'Disabled'}`)
+    const stateLabel = t(`dialogue.remote.state.${newState ? 'enabled' : 'disabled'}`, lang);
+    const embed = createArtistEmbed(lang)
+      .setTitle(`${newState ? '🔔' : '🔕'} ${t('dialogue.remote.notifyTitle', lang, { state: stateLabel })}`)
       .addFields(
-        { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
-        { name: 'Status', value: newState ? '🔔 Receiving broadcasts' : '🔕 Silent · no broadcasts', inline: true },
+        { name: t('dialogue.remote.fields.server', lang), value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
+        { name: t('dialogue.remote.fields.status', lang), value: `${newState ? '🔔' : '🔕'} ${t(`dialogue.remote.state.${newState ? 'receiving' : 'silent'}`, lang)}`, inline: true },
       )
       .setColor(newState ? COLORS.success : COLORS.danger)
-      .setFooter({ text: `Changed by ${interaction.user.tag} · silent · server not notified` })
+      .setFooter({ text: t('dialogue.remote.changedFooter', lang, { user: interaction.user.tag }) })
       .setTimestamp();
 
     await editEmbed(interaction, embed);
@@ -303,8 +306,8 @@ export async function handleSetupRemoteCommand(interaction) {
     if (!scopeValue) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        title: 'Scope Required',
-        description: 'Provide `scope` value (global/server) for this action.',
+        ...t('dialogue.remote.scopeRequired', lang),
+        lang,
       });
       return;
     }
@@ -316,15 +319,15 @@ export async function handleSetupRemoteCommand(interaction) {
     );
     invalidateGuildConfig(targetGuildId);
 
-    const scopeDisplay = scopeValue === 'server' ? '🔒 Server (Local)' : '🌐 Global';
-    const embed = createArtistEmbed()
-      .setTitle(`${scopeValue === 'server' ? '🔒' : '🌐'} Remote · Scope Updated`)
+    const scopeDisplay = `${scopeValue === 'server' ? '🔒' : '🌐'} ${t(`dialogue.remote.state.${scopeValue === 'server' ? 'local' : 'global'}`, lang)}`;
+    const embed = createArtistEmbed(lang)
+      .setTitle(`${scopeValue === 'server' ? '🔒' : '🌐'} ${t('dialogue.remote.scopeUpdatedTitle', lang)}`)
       .addFields(
-        { name: 'Server', value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
-        { name: 'Default Scope', value: scopeDisplay, inline: true },
+        { name: t('dialogue.remote.fields.server', lang), value: `**${guildName}**\n\`${targetGuildId}\``, inline: true },
+        { name: t('dialogue.remote.fields.defaultScope', lang), value: scopeDisplay, inline: true },
       )
       .setColor(scopeValue === 'server' ? COLORS.warning : COLORS.info)
-      .setFooter({ text: `Changed by ${interaction.user.tag} · silent · server not notified` })
+      .setFooter({ text: t('dialogue.remote.changedFooter', lang, { user: interaction.user.tag }) })
       .setTimestamp();
 
     await editEmbed(interaction, embed);

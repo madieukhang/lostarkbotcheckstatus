@@ -92,20 +92,19 @@ export function parseListEntryRef(raw) {
  * Wraps the shared buildAlertEmbed with severity:'trusted' so trusted
  * blocks have consistent styling with the rest of the bot's alerts.
  */
-export function buildTrustedBlockEmbed(name, reason, { via } = {}) {
+export function buildTrustedBlockEmbed(name, reason, { via, lang = 'en' } = {}) {
   const rosterLink = rosterUrl(name);
-  const description = via
-    ? `**${name}** shares a roster with trusted user **${via}** and cannot be added to any list.`
-    : `**${name}** is a trusted user and cannot be added to any list.`;
+  const description = t(`dialogue.trustedBlock.${via ? 'via' : 'direct'}`, lang, { name, via });
 
   return buildAlertEmbed({
     severity: AlertSeverity.TRUSTED,
-    title: 'Trusted User · Blocked',
+    title: t('dialogue.trustedBlock.title', lang),
     description,
     fields: [
-      { name: 'Name', value: `[${name}](${rosterLink})`, inline: true },
-      { name: 'Trust reason', value: reason || 'N/A', inline: true },
+      { name: t('dialogue.trustedBlock.name', lang), value: `[${name}](${rosterLink})`, inline: true },
+      { name: t('dialogue.trustedBlock.reason', lang), value: reason || t('dialogue.broadcast.notAvailable', lang), inline: true },
     ],
+    lang,
   });
 }
 
@@ -116,24 +115,23 @@ export function buildTrustedBlockEmbed(name, reason, { via } = {}) {
  * the changes applied, and (when available) the fresh evidence image.
  */
 export function buildListEditSuccessEmbed(entry, options = {}) {
-  const { changes = [], type, freshDisplayUrl, requesterDisplayName, isMove = false } = options;
-  const { color, label, icon } = getListContext(type);
-  const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
-  const scopeTag = entry.scope === 'server' ? ' (Local)' : '';
-  const titleAction = isMove ? 'Edited & Moved' : 'Edited';
+  const { changes = [], type, freshDisplayUrl, requesterDisplayName, isMove = false, lang = 'en' } = options;
+  const { color, icon } = getListContext(type);
+  const labelCap = t(`dialogue.broadcast.list.${type}`, lang);
+  const scopeTag = entry.scope === 'server' ? ` (${t('dialogue.broadcast.localTag', lang)})` : '';
   const rosterLink = rosterUrl(entry.name);
 
   const fields = [
-    { name: 'Name', value: `[${entry.name}](${rosterLink})`, inline: true },
-    { name: 'Reason', value: entry.reason || 'N/A', inline: true },
+    { name: t('dialogue.listEdit.success.name', lang), value: `[${entry.name}](${rosterLink})`, inline: true },
+    { name: t('dialogue.listEdit.success.reason', lang), value: entry.reason || t('dialogue.broadcast.notAvailable', lang), inline: true },
   ];
   if (entry.raid) {
-    fields.push({ name: 'Raid', value: entry.raid, inline: true });
+    fields.push({ name: t('dialogue.listEdit.success.raid', lang), value: entry.raid, inline: true });
   }
   if (changes.length > 0) {
     const changesText = changes.map((c) => `• ${c}`).join('\n');
     fields.push({
-      name: `Changes (${changes.length})`,
+      name: t('dialogue.listEdit.success.changes', lang, { count: changes.length }),
       value: changesText.length > 1024 ? changesText.slice(0, 1020) + '…' : changesText,
       inline: false,
     });
@@ -143,9 +141,10 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
     severity: AlertSeverity.SUCCESS,
     titleIcon: `${ICONS.edit} ${icon}`,
     color,
-    title: `${labelCap}${scopeTag} · ${titleAction}`,
+    title: t(`dialogue.listEdit.success.${isMove ? 'titleMoved' : 'titleEdited'}`, lang, { list: labelCap, scope: scopeTag }),
     fields,
-    footer: requesterDisplayName ? `Edited by ${requesterDisplayName}` : undefined,
+    footer: requesterDisplayName ? t('dialogue.listEdit.success.footer', lang, { user: requesterDisplayName }) : undefined,
+    lang,
   });
 
   if (freshDisplayUrl) {
@@ -176,6 +175,7 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
  */
 export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   const includeRequestedBy = options.includeRequestedBy ?? true;
+  const lang = options.lang || 'en';
   const isEdit = payload.action === 'edit';
 
   const listContext = LIST_CONTEXTS[payload.type] || {
@@ -183,21 +183,31 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     label: 'list',
     color: COLORS.info,
   };
-  const { icon: listIcon, label: listLabel, color: listColor } = listContext;
+  const { icon: listIcon, color: listColor } = listContext;
+  const listLabel = t(`dialogue.broadcast.list.${payload.type}`, lang);
 
-  const titleVerb = isEdit ? 'Edit' : 'Add';
-  const title = options.title || `${listIcon} ${titleVerb} approval · ${payload.name}`;
-  const scopeTag = payload.scope === 'server' ? ' `[Local]`' : payload.scope === 'global' ? ' `[Global]`' : '';
+  const title = options.title || t(`dialogue.approval.${isEdit ? 'titleEdit' : 'titleAdd'}`, lang, {
+    icon: listIcon,
+    name: payload.name,
+  });
+  const scopeTag = payload.scope === 'server'
+    ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\``
+    : payload.scope === 'global'
+      ? ` \`[${t('dialogue.approval.scopeTag.global', lang)}]\``
+      : '';
 
-  const heroLine = isEdit
-    ? `An officer in **${guild.name}** wants to **edit** **${payload.name}** on the ${listLabel}${scopeTag}.`
-    : `An officer in **${guild.name}** wants to **add** **${payload.name}** to the ${listLabel}${scopeTag}.`;
+  const heroLine = t(`dialogue.approval.${isEdit ? 'heroEdit' : 'heroAdd'}`, lang, {
+    guild: guild.name,
+    name: payload.name,
+    list: listLabel,
+    scope: scopeTag,
+  });
 
   const fields = [
-    { name: '📒 List', value: `${listIcon} ${listLabel}`, inline: true },
-    { name: '🗡️ Raid', value: payload.raid ? `\`${payload.raid}\`` : 'N/A', inline: true },
-    { name: '🌐 Scope', value: payload.scope || 'global', inline: true },
-    { name: '📝 Reason', value: (payload.reason || 'N/A').slice(0, 1024), inline: false },
+    { name: `📒 ${t('dialogue.approval.fields.list', lang)}`, value: `${listIcon} ${listLabel}`, inline: true },
+    { name: `🗡️ ${t('dialogue.approval.fields.raid', lang)}`, value: payload.raid ? `\`${payload.raid}\`` : t('dialogue.broadcast.notAvailable', lang), inline: true },
+    { name: `🌐 ${t('dialogue.approval.fields.scope', lang)}`, value: t(`dialogue.approval.scopeTag.${payload.scope === 'server' ? 'local' : 'global'}`, lang), inline: true },
+    { name: `📝 ${t('dialogue.approval.fields.reason', lang)}`, value: (payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false },
   ];
 
   // Tracked alts give the approver "is this the right person?" context
@@ -209,12 +219,14 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   const altsField = renderTrackedAltsField({
     names: payload.allCharacters,
     primaryName: payload.name,
+    label: `🧬 ${t('dialogue.approval.fields.trackedAlts', lang)}`,
+    overflowTemplate: t('dialogue.broadcast.more', lang),
   });
   if (altsField) fields.push(altsField);
 
   if (includeRequestedBy) {
     fields.push({
-      name: '👤 Requested by',
+      name: `👤 ${t('dialogue.approval.fields.requestedBy', lang)}`,
       value: `${payload.requestedByDisplayName} (<@${payload.requestedByUserId}>)`,
       inline: false,
     });
@@ -225,7 +237,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   // and copy-paste-friendly when an approver wants to look the row
   // up server-side.
   fields.push({
-    name: '🆔 Request ID',
+    name: `🆔 ${t('dialogue.approval.fields.requestId', lang)}`,
     value: `\`${payload.requestId}\``,
     inline: false,
   });
@@ -241,7 +253,8 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     title,
     description: heroLine,
     fields,
-    footer: `${ICONS.shield} Approve / Reject buttons below · Lost Ark Check approval flow`,
+    footer: `${ICONS.shield} ${t('dialogue.approval.footer', lang)}`,
+    lang,
   });
 
   if (payload.imageUrl) {

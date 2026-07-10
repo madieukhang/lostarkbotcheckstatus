@@ -4,6 +4,8 @@ import { STATUS } from '../../monitor/serverStatus.js';
 import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../utils/interactionReplies.js';
+import UserPreference from '../../models/UserPreference.js';
+import { getUserLanguage, t } from '../../services/i18n/index.js';
 
 const STATUS_GLYPH = Object.freeze({
   [STATUS.ONLINE]:      '🟢',
@@ -11,18 +13,19 @@ const STATUS_GLYPH = Object.freeze({
   [STATUS.MAINTENANCE]: '🟡',
 });
 
-function formatStatus(status) {
+function formatStatus(status, lang) {
   switch (status) {
-    case STATUS.ONLINE:      return `${STATUS_GLYPH[STATUS.ONLINE]} Online`;
-    case STATUS.OFFLINE:     return `${STATUS_GLYPH[STATUS.OFFLINE]} Offline`;
-    case STATUS.MAINTENANCE: return `${STATUS_GLYPH[STATUS.MAINTENANCE]} Maintenance`;
-    default:                 return '❓ Unknown';
+    case STATUS.ONLINE:      return `${STATUS_GLYPH[STATUS.ONLINE]} ${t('dialogue.system.status.labels.online', lang)}`;
+    case STATUS.OFFLINE:     return `${STATUS_GLYPH[STATUS.OFFLINE]} ${t('dialogue.system.status.labels.offline', lang)}`;
+    case STATUS.MAINTENANCE: return `${STATUS_GLYPH[STATUS.MAINTENANCE]} ${t('dialogue.system.status.labels.maintenance', lang)}`;
+    default:                 return `❓ ${t('dialogue.system.status.labels.unknown', lang)}`;
   }
 }
 
 export function createSystemHandlers({ checkStatus, resetState, client }) {
   async function handleStatusCommand(interaction) {
     await deferReply(interaction);
+    const lang = await getUserLanguage(interaction.user?.id, { UserPreferenceModel: UserPreference });
 
     try {
       const statusMap = await checkStatus(client);
@@ -48,13 +51,13 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
       // reader the punchline before the per-server breakdown.
       let headline;
       if (offlineCount > 0) {
-        headline = `**${offlineCount}** server(s) are offline.`;
+        headline = t('dialogue.system.status.headline.offline', lang, { count: offlineCount });
       } else if (maintenanceCount > 0) {
-        headline = `Maintenance window in progress for **${maintenanceCount}** server(s).`;
+        headline = t('dialogue.system.status.headline.maintenance', lang, { count: maintenanceCount });
       } else if (allOnline) {
-        headline = `All **${allStatuses.length}** monitored servers online.`;
+        headline = t('dialogue.system.status.headline.online', lang, { count: allStatuses.length });
       } else {
-        headline = `Some servers did not report. **${unknownCount}** unknown.`;
+        headline = t('dialogue.system.status.headline.unknown', lang, { count: unknownCount });
       }
 
       const fields = [];
@@ -64,10 +67,10 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
       // 3 inline fields on one line which gives a quick visual grid
       // before the per-server detail block kicks in.
       const stats = [];
-      if (onlineCount > 0) stats.push({ name: '🟢 Online', value: String(onlineCount), inline: true });
-      if (maintenanceCount > 0) stats.push({ name: '🟡 Maintenance', value: String(maintenanceCount), inline: true });
-      if (offlineCount > 0) stats.push({ name: '🔴 Offline', value: String(offlineCount), inline: true });
-      if (unknownCount > 0) stats.push({ name: '❓ Unknown', value: String(unknownCount), inline: true });
+      if (onlineCount > 0) stats.push({ name: `🟢 ${t('dialogue.system.status.labels.online', lang)}`, value: String(onlineCount), inline: true });
+      if (maintenanceCount > 0) stats.push({ name: `🟡 ${t('dialogue.system.status.labels.maintenance', lang)}`, value: String(maintenanceCount), inline: true });
+      if (offlineCount > 0) stats.push({ name: `🔴 ${t('dialogue.system.status.labels.offline', lang)}`, value: String(offlineCount), inline: true });
+      if (unknownCount > 0) stats.push({ name: `❓ ${t('dialogue.system.status.labels.unknown', lang)}`, value: String(unknownCount), inline: true });
       fields.push(...stats);
 
       // Per-server status grid follows. Sorted by status priority so
@@ -79,35 +82,36 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
         return pa - pb;
       });
       for (const [server, status] of sortedServers) {
-        fields.push({ name: server, value: formatStatus(status), inline: true });
+        fields.push({ name: server, value: formatStatus(status, lang), inline: true });
       }
 
-      const embed = createArtistEmbed()
-        .setTitle(`${titleIcon} Lost Ark · Server Status`)
-        .setDescription(`${headline}\n\nChecked ${relativeTime(Date.now())}.`)
+      const embed = createArtistEmbed(lang)
+        .setTitle(`${titleIcon} ${t('dialogue.system.status.title', lang)}`)
+        .setDescription(`${headline}\n\n${t('dialogue.system.status.checked', lang, { time: relativeTime(Date.now()) })}`)
         .addFields(fields)
         .setColor(color)
-        .setFooter({ text: `Source: playlostark.com · ${ICONS.refresh} re-run /la-status to refresh` })
+        .setFooter({ text: t('dialogue.system.status.footer', lang, { refresh: ICONS.refresh }) })
         .setTimestamp();
 
       await editEmbed(interaction, embed);
     } catch (err) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Status Fetch Failed',
-        description: 'Could not fetch server status.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        ...t('dialogue.system.status.failed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
       });
     }
   }
 
   async function handleResetCommand(interaction) {
     await deferReply(interaction);
+    const lang = await getUserLanguage(interaction.user?.id, { UserPreferenceModel: UserPreference });
     await resetState();
     await editAlert(interaction, {
       severity: AlertSeverity.SUCCESS,
-      title: 'State Reset',
-      description: 'The stored server status was cleared. The bot will start tracking from the next monitor cycle.',
+      ...t('dialogue.system.reset', lang),
+      lang,
     });
   }
 

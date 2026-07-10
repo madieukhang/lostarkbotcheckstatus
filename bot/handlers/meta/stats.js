@@ -16,7 +16,9 @@ import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import RosterCache from '../../models/RosterCache.js';
 import GuildConfig from '../../models/GuildConfig.js';
+import UserPreference from '../../models/UserPreference.js';
 import { getScraperApiUsageSnapshot } from '../../utils/scraperApiUsage.js';
+import { getUserLanguage, t } from '../../services/i18n/index.js';
 
 function formatUptime(ms) {
   if (!ms || ms < 0) return '0m';
@@ -39,6 +41,7 @@ function formatUptime(ms) {
 export async function handleStatsCommand(interaction) {
   await deferEphemeralReply(interaction);
   await connectDB();
+  const lang = await getUserLanguage(interaction.user?.id, { UserPreferenceModel: UserPreference });
 
   const [blackCount, whiteCount, watchCount, cacheCount, guildConfigCount, recentBlackCount] = await Promise.all([
     Blacklist.countDocuments(),
@@ -60,63 +63,79 @@ export async function handleStatsCommand(interaction) {
   const scraperApiUsage = getScraperApiUsageSnapshot();
   const scraperApiHasActivity = scraperApiUsage.totalRequests > 0;
   const scraperKeyLines = scraperApiUsage.keyCounts
-    .map((key) => `Key #${key.keyNumber}: **${key.totalRequests}** (${key.successResponses} ok / ${key.failedResponses} fail)`)
+    .map((key) => t('dialogue.stats.keyLine', lang, {
+      key: key.keyNumber,
+      requests: key.totalRequests,
+      ok: key.successResponses,
+      failed: key.failedResponses,
+    }))
     .join('\n');
 
   // Same card anatomy as the /la-list add result: icon title + one-line
   // hero description; the refresh hint lives in the footer tip instead
   // of eating a second description line.
-  const embed = createArtistEmbed()
-    .setTitle('📊 Bot Statistics')
-    .setDescription(`Live snapshot of the bot's persistence + cache state.`)
+  const embed = createArtistEmbed(lang)
+    .setTitle(`📊 ${t('dialogue.stats.title', lang)}`)
+    .setDescription(t('dialogue.stats.description', lang))
     .addFields(
       {
-        name: `${ICONS.shield} Lists`,
+        name: `${ICONS.shield} ${t('dialogue.stats.listsField', lang)}`,
         value: [
-          `⛔ Blacklist: **${blackCount}**`,
-          `✅ Whitelist: **${whiteCount}**`,
-          `⚠️ Watchlist: **${watchCount}**`,
-          `**Total:** ${totalList}`,
+          `⛔ ${t('dialogue.stats.blacklistLine', lang, { count: blackCount })}`,
+          `✅ ${t('dialogue.stats.whitelistLine', lang, { count: whiteCount })}`,
+          `⚠️ ${t('dialogue.stats.watchlistLine', lang, { count: watchCount })}`,
+          t('dialogue.stats.totalLine', lang, { count: totalList }),
         ].join('\n'),
         inline: true,
       },
       {
-        name: `${ICONS.refresh} Cache`,
+        name: `${ICONS.refresh} ${t('dialogue.stats.cacheField', lang)}`,
         value: [
-          `Roster Cache: **${cacheCount}**`,
-          `Guild Configs: **${guildConfigCount}**`,
+          t('dialogue.stats.rosterCacheLine', lang, { count: cacheCount }),
+          t('dialogue.stats.guildConfigsLine', lang, { count: guildConfigCount }),
         ].join('\n'),
         inline: true,
       },
       {
-        name: `${ICONS.info} Bot`,
+        name: `${ICONS.info} ${t('dialogue.stats.botField', lang)}`,
         value: [
-          `Servers: **${guildCount}**`,
-          `Uptime: **${formatUptime(uptimeMs)}**`,
-          startedAt ? `Started ${relativeTime(startedAt)}` : null,
+          t('dialogue.stats.serversLine', lang, { count: guildCount }),
+          t('dialogue.stats.uptimeLine', lang, { uptime: formatUptime(uptimeMs) }),
+          startedAt ? t('dialogue.stats.startedLine', lang, { time: relativeTime(startedAt) }) : null,
         ].filter(Boolean).join('\n'),
         inline: true,
       },
       {
-        name: `${ICONS.search} Activity (last 7 days)`,
-        value: `**${recentBlackCount}** new blacklist entr${recentBlackCount === 1 ? 'y' : 'ies'}`,
+        name: `${ICONS.search} ${t('dialogue.stats.activityField', lang)}`,
+        value: t('dialogue.stats.recentBlacklist', lang, {
+          count: recentBlackCount,
+          entryWord: t(recentBlackCount === 1 ? 'dialogue.stats.entryOne' : 'dialogue.stats.entryMany', lang),
+        }),
         inline: true,
       },
       {
-        name: `${ICONS.refresh} ScraperAPI`,
+        name: `${ICONS.refresh} ${t('dialogue.stats.scraperField', lang)}`,
         value: scraperApiHasActivity
           ? [
-              `**${scraperApiUsage.totalRequests}** req · ${scraperApiUsage.successResponses} ok / ${scraperApiUsage.failedResponses} fail` +
-                (scraperApiUsage.networkErrors > 0 ? ` / ${scraperApiUsage.networkErrors} net err` : ''),
-              scraperApiUsage.lastRequestAt ? `Last used ${relativeTime(scraperApiUsage.lastRequestAt)}` : null,
+              t('dialogue.stats.scraperSummary', lang, {
+                requests: scraperApiUsage.totalRequests,
+                ok: scraperApiUsage.successResponses,
+                failed: scraperApiUsage.failedResponses,
+                networkTail: scraperApiUsage.networkErrors > 0
+                  ? t('dialogue.stats.networkTail', lang, { count: scraperApiUsage.networkErrors })
+                  : '',
+              }),
+              scraperApiUsage.lastRequestAt
+                ? t('dialogue.stats.lastUsed', lang, { time: relativeTime(scraperApiUsage.lastRequestAt) })
+                : null,
               scraperKeyLines || null,
             ].filter(Boolean).join('\n').slice(0, 1024)
-          : 'Idle this process.',
+          : t('dialogue.stats.scraperIdle', lang),
         inline: true,
       },
     )
     .setColor(COLORS.info)
-    .setFooter({ text: 'Officer-only · ephemeral · re-run /la-stats to refresh' })
+    .setFooter({ text: t('dialogue.stats.footer', lang) })
     .setTimestamp();
 
   await editEmbed(interaction, embed);

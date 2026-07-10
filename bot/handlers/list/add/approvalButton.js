@@ -22,7 +22,6 @@ import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferUpdate, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
-  getListContext,
   buildApprovalResultRow,
   buildApprovalProcessingRow,
 } from '../helpers.js';
@@ -66,16 +65,16 @@ export function createListAddApprovalButtonHandler({
       if (stillExists) {
         await replyAlert(interaction, {
           severity: AlertSeverity.ERROR,
-          title: 'Not Authorised',
-          description: 'You are not on the approver list for this request.',
+          ...t('dialogue.approval.flow.notAuthorized', lang),
+          lang,
         });
         return;
       }
 
       await replyAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Request Expired',
-        description: 'This approval request was already processed or has expired.',
+        ...t('dialogue.approval.flow.expired', lang),
+        lang,
       });
       return;
     }
@@ -85,38 +84,36 @@ export function createListAddApprovalButtonHandler({
     // Acknowledge immediately, then show processing state to avoid 3s timeout issues.
     await deferUpdate(interaction);
 
-    await editPayload(interaction, {
-      content: isApproveAction
-        ? `⏳ Processing approval by **${interaction.user.tag}**...`
-        : `⏳ Processing rejection by **${interaction.user.tag}**...`,
+    const buildProcessingPayload = (targetLang) => ({
+      content: `⏳ ${t(`dialogue.approval.flow.${isApproveAction ? 'processingApprove' : 'processingReject'}`, targetLang, { user: interaction.user.tag })}`,
       components: [buildApprovalProcessingRow(action, lang)],
     });
+    await editPayload(interaction, buildProcessingPayload(lang));
 
     await syncApproverDmMessages(
       payload,
-      {
-        content: isApproveAction
-          ? `⏳ Processing approval by **${interaction.user.tag}**...`
-          : `⏳ Processing rejection by **${interaction.user.tag}**...`,
-        components: [buildApprovalProcessingRow(action, lang)],
-      },
+      (targetLang) => ({
+        ...buildProcessingPayload(targetLang),
+        components: [buildApprovalProcessingRow(action, targetLang)],
+      }),
       { excludeMessageId: interaction.message.id }
     );
 
     if (!isApproveAction) {
       await PendingApproval.deleteOne({ requestId });
 
-      await editPayload(interaction, {
-        content: `❌ Rejected by **${interaction.user.tag}**`,
+      const buildRejectedPayload = (targetLang) => ({
+        content: `❌ ${t('dialogue.approval.flow.rejectedBy', targetLang, { user: interaction.user.tag })}`,
         components: [buildApprovalResultRow('Rejected', lang)],
       });
+      await editPayload(interaction, buildRejectedPayload(lang));
 
       await syncApproverDmMessages(
         payload,
-        {
-          content: `❌ Rejected by **${interaction.user.tag}**`,
-          components: [buildApprovalResultRow('Rejected', lang)],
-        },
+        (targetLang) => ({
+          ...buildRejectedPayload(targetLang),
+          components: [buildApprovalResultRow('Rejected', targetLang)],
+        }),
         { excludeMessageId: interaction.message.id }
       );
 
@@ -145,48 +142,50 @@ export function createListAddApprovalButtonHandler({
       // Duplicate found · show comparison and overwrite option
       if (!result.ok && result.isDuplicate) {
         const existing = result.existingEntry;
-        const { label } = getListContext(payload.type);
-
         // Save duplicate entry _id for scope-safe deletion during overwrite
         await PendingApproval.updateOne(
           { requestId },
           { $set: { duplicateEntryId: String(existing._id) } }
         );
 
-        const existingScopeTag = existing.scope === 'server' ? ' [Server]' : ' [Global]';
-        const requestScopeTag = payload.scope === 'server' ? ' [Server]' : ' [Global]';
-        const compareEmbed = createArtistEmbed()
-          .setTitle('⚠️ Duplicate Found · Compare')
-          .addFields(
-            { name: `📌 Existing Entry${existingScopeTag}`, value: `**${existing.name}**\nReason: ${existing.reason || 'N/A'}\nRaid: ${existing.raid || 'N/A'}\nAdded: <t:${Math.floor(new Date(existing.addedAt || 0).getTime() / 1000)}:R>`, inline: true },
-            { name: `🆕 New Request${requestScopeTag}`, value: `**${payload.name}**\nReason: ${payload.reason || 'N/A'}\nRaid: ${payload.raid || 'N/A'}\nBy: ${payload.requestedByDisplayName || 'Unknown'}`, inline: true },
-          )
-          .setColor(COLORS.warning);
+        const buildDuplicatePayload = (targetLang) => {
+          const scopeKey = (scope) => scope === 'server' ? 'local' : 'global';
+          const scopeTag = (scope) => ` [${t(`dialogue.approval.scopeTag.${scopeKey(scope)}`, targetLang)}]`;
+          const fallback = t('dialogue.broadcast.notAvailable', targetLang);
+          const compareEmbed = createArtistEmbed(targetLang)
+            .setTitle(`⚠️ ${t('dialogue.approval.flow.duplicateTitle', targetLang)}`)
+            .addFields(
+              {
+                name: `📌 ${t('dialogue.approval.flow.existingEntry', targetLang)}${scopeTag(existing.scope)}`,
+                value: `**${existing.name}**\n${t('dialogue.approval.flow.compareReason', targetLang)}: ${existing.reason || fallback}\n${t('dialogue.approval.flow.compareRaid', targetLang)}: ${existing.raid || fallback}\n${t('dialogue.approval.flow.compareAdded', targetLang)}: <t:${Math.floor(new Date(existing.addedAt || 0).getTime() / 1000)}:R>`,
+                inline: true,
+              },
+              {
+                name: `🆕 ${t('dialogue.approval.flow.newRequest', targetLang)}${scopeTag(payload.scope)}`,
+                value: `**${payload.name}**\n${t('dialogue.approval.flow.compareReason', targetLang)}: ${payload.reason || fallback}\n${t('dialogue.approval.flow.compareRaid', targetLang)}: ${payload.raid || fallback}\n${t('dialogue.approval.flow.compareBy', targetLang)}: ${payload.requestedByDisplayName || t('dialogue.common.unknown', targetLang)}`,
+                inline: true,
+              },
+            )
+            .setColor(COLORS.warning);
+          const overwriteRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`listadd_overwrite:${requestId}`).setLabel(t('common.actions.overwrite', targetLang)).setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`listadd_keep:${requestId}`).setLabel(t('common.actions.keepExisting', targetLang)).setStyle(ButtonStyle.Secondary),
+          );
+          return {
+            content: `⚠️ ${t('dialogue.approval.flow.duplicatePrompt', targetLang, {
+              name: payload.name,
+              list: t(`dialogue.broadcast.list.${payload.type}`, targetLang),
+            })}`,
+            embeds: [compareEmbed],
+            components: [overwriteRow],
+          };
+        };
 
-        const overwriteRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`listadd_overwrite:${requestId}`)
-            .setLabel(t('common.actions.overwrite', lang))
-            .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder()
-            .setCustomId(`listadd_keep:${requestId}`)
-            .setLabel(t('common.actions.keepExisting', lang))
-            .setStyle(ButtonStyle.Secondary),
-        );
-
-        await editPayload(interaction, {
-          content: `⚠️ **${payload.name}** already in ${label}. Overwrite or keep?`,
-          embeds: [compareEmbed],
-          components: [overwriteRow],
-        });
+        await editPayload(interaction, buildDuplicatePayload(lang));
 
         await syncApproverDmMessages(
           payload,
-          {
-            content: `⚠️ **${payload.name}** already in ${label}. Overwrite or keep?`,
-            embeds: [compareEmbed],
-            components: [overwriteRow],
-          },
+          buildDuplicatePayload,
           { excludeMessageId: interaction.message.id }
         );
         // Don't delete PendingApproval · needed for overwrite flow
@@ -196,21 +195,21 @@ export function createListAddApprovalButtonHandler({
       // Success or non-duplicate error · clean up
       await PendingApproval.deleteOne({ requestId });
 
-      await editPayload(interaction, {
-        content: result.ok
-          ? `✅ Approved by **${interaction.user.tag}** and executed successfully.`
-          : `⚠️ Approved by **${interaction.user.tag}** but execution returned: ${result.content}`,
+      const buildCompletedPayload = (targetLang) => ({
+        content: `${result.ok ? '✅' : '⚠️'} ${t(`dialogue.approval.flow.${result.ok ? 'approvedSuccess' : 'approvedReturned'}`, targetLang, {
+          user: interaction.user.tag,
+          result: result.content,
+        })}`,
         components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', lang)],
       });
+      await editPayload(interaction, buildCompletedPayload(lang));
 
       await syncApproverDmMessages(
         payload,
-        {
-          content: result.ok
-            ? `✅ Approved by **${interaction.user.tag}** and executed successfully.`
-            : `⚠️ Approved by **${interaction.user.tag}** but execution returned: ${result.content}`,
-          components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', lang)],
-        },
+        (targetLang) => ({
+          ...buildCompletedPayload(targetLang),
+          components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', targetLang)],
+        }),
         { excludeMessageId: interaction.message.id }
       );
 
@@ -218,41 +217,28 @@ export function createListAddApprovalButtonHandler({
     } catch (err) {
       await PendingApproval.deleteOne({ requestId });
 
-      const failureEmbed = buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        title: 'Approval Execution Failed',
-        description: `Approval was confirmed by **${interaction.user.tag}** but the executor threw.`,
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+      const buildFailurePayload = (targetLang) => ({
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          ...t('dialogue.approval.flow.executionFailed', targetLang, { user: interaction.user.tag }),
+          fields: [{ name: t('dialogue.common.errorField', targetLang), value: `\`${err.message}\``, inline: false }],
+          lang: targetLang,
+        })],
+        components: [buildApprovalResultRow('Failed', targetLang)],
       });
 
-      await editPayload(interaction, {
-        content: '',
-        embeds: [failureEmbed],
-        components: [buildApprovalResultRow('Failed', lang)],
-      });
+      await editPayload(interaction, buildFailurePayload(lang));
 
       await syncApproverDmMessages(
         payload,
-        {
-          content: '',
-          embeds: [failureEmbed],
-          components: [buildApprovalResultRow('Failed', lang)],
-        },
+        buildFailurePayload,
         { excludeMessageId: interaction.message.id }
       );
 
       await notifyRequesterAboutDecision(
         payload,
-        {
-          content: `Approval ran but the executor threw: \`${err.message}\``,
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: 'Approval Execution Failed',
-            description: 'The senior approved your request, but persisting it threw.',
-            fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-            footer: 'No entry was created. Try resubmitting, or contact a senior.',
-          })],
-        },
+        { ok: false },
         false
       );
     }

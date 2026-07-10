@@ -44,7 +44,7 @@ import { decorateListEntry } from '../list/helpers.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
-import { getUserLanguage } from '../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
 
@@ -63,6 +63,7 @@ export async function handleRosterCommand(interaction) {
   const name = normalizeCharacterName(raw);
   const deep = interaction.options.getBoolean('deep') ?? false;
   const deepLimit = interaction.options.getInteger('deep_limit');
+  const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   // Hard gate: deep scans hit the bot owner's residential-IP worker.
   // Plain /la-roster (no deep) stays open to everyone since it only
@@ -70,11 +71,8 @@ export async function handleRosterCommand(interaction) {
   if (deep && !isPrivilegedStrongholdScanUser(interaction.user.id)) {
     await replyAlert(interaction, {
       severity: AlertSeverity.WARNING,
-      title: 'Officers / Seniors only',
-      description:
-        '`/la-roster deep:true` runs a long Stronghold scan that depends on the bot owner\'s ' +
-        'residential-IP worker. The deep flag is restricted to officers and seniors. ' +
-        'Re-run without `deep:true` for the basic roster view.',
+      ...t('dialogue.roster.deepRestricted', lang),
+      lang,
     });
     return;
   }
@@ -91,7 +89,7 @@ export async function handleRosterCommand(interaction) {
 
   const scanReservation = deep ? reserveStrongholdScanForInteraction(interaction, `/la-roster deep ${name}`) : null;
   if (scanReservation && !scanReservation.ok) {
-    await replyEmbed(interaction, buildStrongholdScanLimitEmbed(scanReservation.active));
+    await replyEmbed(interaction, buildStrongholdScanLimitEmbed(scanReservation.active, lang));
     return;
   }
 
@@ -138,7 +136,7 @@ export async function handleRosterCommand(interaction) {
         else if (diff < 0) delta = ` *(${diff.toFixed(2)})*`;
       }
 
-      const cls = c.className || 'Unknown';
+      const cls = c.className || t('dialogue.common.unknown', lang);
       const classPrefix = getClassEmoji(cls) || cls;
       return `**${i + 1}.** ${classPrefix} ${c.name} · \`${c.itemLevel}\`${delta} · ${c.combatScore}`;
     });
@@ -175,35 +173,35 @@ export async function handleRosterCommand(interaction) {
     const topClass = topChar?.className || topChar?.classId || '?';
     const topClassPrefix = getClassEmoji(topClass) || topClass;
     const summaryLine = topChar
-      ? `Top character: ${topClassPrefix} **${topChar.name}** · \`${topIlvl}\``
+      ? t('dialogue.roster.topCharacter', lang, { class: topClassPrefix, name: topChar.name, ilvl: topIlvl })
       : '';
 
     const fullDescription = summaryLine
       ? `${summaryLine}\n\n${description}`.slice(0, 4096)
       : description;
 
-    const embed = createArtistEmbed()
-      .setTitle(`🛡️ ${name}'s Roster · ${characters.length} character${characters.length === 1 ? '' : 's'}`)
+    const embed = createArtistEmbed(lang)
+      .setTitle(`🛡️ ${t('dialogue.roster.title', lang, { name, count: characters.length, word: t(`dialogue.roster.${characters.length === 1 ? 'characterOne' : 'characterMany'}`, lang) })}`)
       // Display URL goes through the helper so BIBLE_BASE_URL swaps cascade
       // here too. targetUrl above is intentionally still hardcoded · it's
       // the actual fetch endpoint, controlled by the scraper/worker layer.
       .setURL(rosterUrl(name))
       .setDescription(fullDescription)
       .setColor(embedColor)
-      .setFooter({ text: 'Source: lostark.bible · re-run /la-roster to refresh' })
+      .setFooter({ text: t('dialogue.roster.footer', lang) })
       .setTimestamp();
 
     const embeds = [embed];
     const contentLines = [];
 
     if (trustedResult) {
-      contentLines.push(`🛡️ **${trustedResult.name}** is a trusted user.${trustedResult.reason ? ` · *${trustedResult.reason}*` : ''}`);
+      contentLines.push(`🛡️ ${t('dialogue.roster.trusted', lang, { name: trustedResult.name })}${trustedResult.reason ? ` · *${trustedResult.reason}*` : ''}`);
     }
 
     if (blacklistResult) {
       const reason = blacklistResult.reason ? ` · *${blacklistResult.reason}*` : '';
       const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
-      contentLines.push(`⛔ **${name}** is on the blacklist.${raid}${reason}`);
+      contentLines.push(`⛔ ${t('dialogue.roster.blacklisted', lang, { name })}${raid}${reason}`);
 
       // Use the shared buildEvidenceEmbed so the inline evidence card
       // matches /la-evidence, /la-search, /la-list view, /la-check.
@@ -211,18 +209,18 @@ export async function handleRosterCommand(interaction) {
       // /la-roster hit would see less context than they would elsewhere.
       const blackImageUrl = await resolveDisplayImageUrl(blacklistResult, interaction.client);
       if (blackImageUrl) {
-        embeds.unshift(buildEvidenceEmbed(decorateListEntry(blacklistResult, 'black'), blackImageUrl));
+        embeds.unshift(buildEvidenceEmbed(decorateListEntry(blacklistResult, 'black'), blackImageUrl, { lang }));
       }
     }
 
     if (whitelistResult) {
       const reason = whitelistResult.reason ? ` · *${whitelistResult.reason}*` : '';
       const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
-      contentLines.push(`✅ **${name}** is on the whitelist.${raid}${reason}`);
+      contentLines.push(`✅ ${t('dialogue.roster.whitelisted', lang, { name })}${raid}${reason}`);
 
       const whiteImageUrl = await resolveDisplayImageUrl(whitelistResult, interaction.client);
       if (whiteImageUrl) {
-        embeds.unshift(buildEvidenceEmbed(decorateListEntry(whitelistResult, 'white'), whiteImageUrl));
+        embeds.unshift(buildEvidenceEmbed(decorateListEntry(whitelistResult, 'white'), whiteImageUrl, { lang }));
       }
     }
 
@@ -239,7 +237,6 @@ export async function handleRosterCommand(interaction) {
     // /la-roster which finishes in seconds and doesn't warrant a
     // notification ping).
     if (deep && visibleDeep.result) {
-      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       const replyMsg = replyEditor.getMessage();
       let outcome;
       if (visibleDeep.result.cancelled || visibleDeep.result.pausedForFailureStorm) {
@@ -263,9 +260,9 @@ export async function handleRosterCommand(interaction) {
     await replyEditor.edit({
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
-        title: 'Roster Fetch Failed',
-        description: 'Could not fetch the roster from lostark.bible.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        ...t('dialogue.roster.fetchFailed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
       })],
     });
   } finally {

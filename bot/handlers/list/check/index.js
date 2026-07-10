@@ -123,22 +123,22 @@ export function createAutoCheckEvidenceHandler({ client }) {
   return async function handleAutoCheckEvidenceSelect(interaction) {
     const raw = interaction.values?.[0] || '';
     const parsed = parseListEntryRef(raw);
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     if (!parsed) {
-      await replyContent(interaction, 'Evidence selection malformed (please re-run the check).');
+      await replyContent(interaction, t('dialogue.check.malformed', lang));
       return;
     }
 
     await connectDB();
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     const ctx = getListContext(parsed.listType);
     const entry = await ctx.model.findOne({ _id: parsed.id }).lean();
 
     if (!entry) {
       await replyAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Entry Removed',
-        description: 'The list entry behind this evidence row no longer exists.',
+        ...t('dialogue.check.entryRemoved', lang),
+        lang,
       });
       return;
     }
@@ -164,16 +164,16 @@ export function createCheckHandlers({ client }) {
     let names = [];
 
     await deferReply(interaction);
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     try {
       names = await extractNamesFromImage(image, { refineAmbiguousDiacritics: true });
     } catch (err) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'OCR Failed',
-        description: 'Could not extract names from the uploaded image.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
-        footer: 'Try a clearer screenshot, or check that the image is the raid waiting room.',
+        ...t('dialogue.check.ocrFailed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
       });
       return;
     }
@@ -181,9 +181,8 @@ export function createCheckHandlers({ client }) {
     if (names.length === 0) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'No Names Detected',
-        description: 'OCR ran but found no valid names in the image.',
-        footer: 'Try a clearer screenshot of the raid waiting room.',
+        ...t('dialogue.check.noNames', lang),
+        lang,
       });
       return;
     }
@@ -191,14 +190,13 @@ export function createCheckHandlers({ client }) {
     const maxNames = config.listcheckMaxNames;
     const limitedNames = names.slice(0, maxNames);
     await editContent(interaction, [
-      `🔍 Extracted **${limitedNames.length}** name(s) · checking database lists...`,
-      limitedNames.length < names.length ? `Ignored **${names.length - limitedNames.length}** extra name(s) (limit: ${maxNames}).` : null,
+      `🔍 ${t('dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
+      limitedNames.length < names.length ? t('dialogue.check.ignored', lang, { count: names.length - limitedNames.length, word: t(`dialogue.check.${names.length - limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang), limit: maxNames }) : null,
     ].filter(Boolean).join('\n'));
 
     try {
       const results = await checkNamesAgainstLists(limitedNames, { guildId: interaction.guild?.id });
-      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-      const formattedLines = formatCheckResults(results);
+      const formattedLines = formatCheckResults(results, lang);
 
       const { embed } = buildListCheckEmbed({
         results,
@@ -207,6 +205,7 @@ export function createCheckHandlers({ client }) {
         ignoredCount: names.length - limitedNames.length,
         maxNames,
         mode: 'slash',
+        lang,
       });
 
       // Evidence dropdown · mirror of /la-list view's evidence row.
@@ -221,9 +220,9 @@ export function createCheckHandlers({ client }) {
       console.error('[listcheck] ❌ Check failed:', err.message);
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
-        title: 'Check Failed',
-        description: 'Could not run the list check after OCR succeeded.',
-        fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+        ...t('dialogue.check.failed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
       });
     }
   }

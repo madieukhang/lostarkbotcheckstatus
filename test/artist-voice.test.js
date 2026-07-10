@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 const { buildAlertEmbed, AlertSeverity } = await import('../bot/utils/alertEmbed.js');
 
-test('shared alert embeds carry the Artist identity without replacing operational footers', () => {
+test('shared alert embeds avoid repeated Artist branding and preserve operational footers', () => {
   const defaultEmbed = buildAlertEmbed({
     severity: AlertSeverity.INFO,
     title: 'A small update',
@@ -15,8 +15,8 @@ test('shared alert embeds carry the Artist identity without replacing operationa
     footer: 'Source: lostark.bible',
   }).toJSON();
 
-  assert.equal(defaultEmbed.author.name, 'Artist · LoaLogs');
-  assert.match(defaultEmbed.footer.text, /Artist/i);
-  assert.equal(explicitFooter.author.name, 'Artist · LoaLogs');
+  assert.equal(defaultEmbed.author, undefined);
+  assert.equal(defaultEmbed.footer, undefined);
+  assert.equal(explicitFooter.author, undefined);
   assert.equal(explicitFooter.footer.text, 'Source: lostark.bible');
 });

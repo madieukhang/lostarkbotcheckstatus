@@ -55,11 +55,13 @@ export function makeRosterScanProgressCallback({ interaction, replyEditor, name,
     edit({
       content: '',
       embeds: [buildScanProgressEmbed({
-        title: `Stronghold scan in progress · ${name}`,
-        subtitle: `Guild **${meta.guildName}**` +
-          (totalMembers ? ` (${totalMembers} members)` : ''),
+        title: t('dialogue.scan.progress', lang, { name }),
+        subtitle: totalMembers
+          ? t('dialogue.scan.guildMembers', lang, { guild: meta.guildName, count: totalMembers })
+          : t('dialogue.scan.guild', lang, { guild: meta.guildName }),
         color: COLORS.info,
         progress: { ...progress, totalMembers, startedAt: startedAtRef.value },
+        lang,
       })],
       components: [buttonRow],
     }).then(() => {
@@ -81,24 +83,24 @@ export function makeRosterScanProgressCallback({ interaction, replyEditor, name,
  * @param {object} altResult - the detectAltsViaStronghold return
  * @returns {string} the formatted stats line for the result embed
  */
-export function formatDeepScanStats(altResult) {
+export function formatDeepScanStats(altResult, lang = 'en') {
   if (!altResult) return '';
 
   const checked = altResult.checkedCandidates ?? altResult.scannedCandidates ?? 0;
   const attempted = altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0;
-  const parts = [`checked ${checked}`];
+  const parts = [t('dialogue.scan.stats.checked', lang, { count: checked })];
   if (attempted > checked) {
-    parts.push(`attempted ${attempted}`);
+    parts.push(t('dialogue.scan.stats.attempted', lang, { count: attempted }));
   }
   if ((altResult.skippedCandidates ?? 0) > 0) {
-    parts.push(`skipped ${altResult.skippedCandidates} by limit`);
+    parts.push(t('dialogue.scan.stats.skipped', lang, { count: altResult.skippedCandidates }));
   }
   if ((altResult.failedCandidates ?? 0) > 0) {
-    parts.push(`failed ${altResult.failedCandidates}`);
+    parts.push(t('dialogue.scan.stats.failed', lang, { count: altResult.failedCandidates }));
   }
   if (altResult.concurrency) {
-    parts.push(`concurrency ${altResult.concurrency}`);
+    parts.push(t('dialogue.scan.stats.concurrency', lang, { count: altResult.concurrency }));
   }
-  parts.push(`ScraperAPI ${altResult.usedScraperApiForCandidates ? 'on' : 'off'}`);
+  parts.push(t('dialogue.scan.stats.scraper', lang, { state: t(`dialogue.scan.stats.${altResult.usedScraperApiForCandidates ? 'on' : 'off'}`, lang) }));
   return parts.join(' · ');
 }

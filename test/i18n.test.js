@@ -6,6 +6,9 @@ import {
   SUPPORTED_LANGUAGES,
   TRANSLATIONS,
 } from '../bot/locales/index.js';
+import rawEn from '../bot/locales/en.js';
+import rawVi from '../bot/locales/vi.js';
+import rawJp from '../bot/locales/jp.js';
 import {
   clearGuildLanguageCache,
   clearUserLanguageCache,
@@ -82,6 +85,15 @@ test('locale packs keep the same concrete leaf-key shape', () => {
     const missing = [...expected].filter((key) => !actual.has(key));
     assert.deepEqual(missing, [], `${code} is missing locale keys`);
     assert.equal([...actual].some((key) => key.includes('undefined')), false);
+  }
+});
+
+test('raw locale packs are complete without relying on English fallback', () => {
+  const expected = new Set(leafKeys(rawEn));
+  for (const [code, tree] of Object.entries({ vi: rawVi, jp: rawJp })) {
+    const actual = new Set(leafKeys(tree));
+    const missing = [...expected].filter((key) => !actual.has(key));
+    assert.deepEqual(missing, [], `${code} is relying on English fallback`);
   }
 });
 

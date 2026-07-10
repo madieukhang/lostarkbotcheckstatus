@@ -13,6 +13,7 @@ import {
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
+import { t } from '../../../services/i18n/index.js';
 import {
   getListContext,
   buildListEditSuccessEmbed,
@@ -53,13 +54,14 @@ export async function applyListEditNow({
   additionalNamesParsed,
   changes,
   isOwner,
+  lang = 'en',
 }) {
   // Apply edit immediately
   try {
     if (isTypeChange) {
       // Move to different list: preflight duplicate check, then delete old + create new
       const { model: oldModel } = getListContext(currentType);
-      const { model: newModel, label: newLabel } = getListContext(targetType);
+      const { model: newModel } = getListContext(targetType);
 
       // Preflight: scope-aware duplicate check on target list
       const nameMatch = { $or: [{ name: existing.name }, { allCharacters: existing.name }] };
@@ -79,9 +81,8 @@ export async function applyListEditNow({
       if (targetDupe) {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
-          title: 'Move Blocked',
-          description: `**${existing.name}** already exists in ${newLabel}.`,
-          footer: 'Remove the conflicting target entry first, then retry the move.',
+          ...t('dialogue.listEdit.moveBlocked', lang, { name: existing.name }),
+          lang,
         });
         return;
       }
@@ -147,6 +148,7 @@ export async function applyListEditNow({
           freshDisplayUrl: moveFreshUrl,
           requesterDisplayName: getInteractionDisplayName(interaction),
           isMove: true,
+          lang,
         }),
         { content: null }
       );
@@ -195,9 +197,8 @@ export async function applyListEditNow({
         if (err.code === 11000 && isScopeChange) {
           await editAlert(interaction, {
             severity: AlertSeverity.WARNING,
-            title: 'Scope Change Raced',
-            description: 'Another entry with this name claimed the target scope between the preflight check and the persist step.',
-            footer: 'Retry the command, or remove the conflicting entry first.',
+            ...t('dialogue.listEdit.scopeRaced', lang),
+            lang,
           });
           return;
         }
@@ -225,6 +226,7 @@ export async function applyListEditNow({
           freshDisplayUrl: editFreshUrl,
           requesterDisplayName: getInteractionDisplayName(interaction),
           isMove: false,
+          lang,
         }),
         { content: null }
       );
@@ -246,9 +248,9 @@ export async function applyListEditNow({
   } catch (err) {
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,
-      title: 'Edit Failed',
-      description: 'Could not apply the edit.',
-      fields: [{ name: 'Error', value: `\`${err.message}\``, inline: false }],
+      ...t('dialogue.listEdit.applyFailed', lang),
+      fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+      lang,
     });
   }
 }

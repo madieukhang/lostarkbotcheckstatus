@@ -294,10 +294,12 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false, 
     names: entry.allCharacters,
     primaryName: entry.name,
     emptySentinel: t('listView.evidence.onlyThisCharacter', lang),
+    label: `🧬 ${t('dialogue.broadcast.fields.trackedAlts', lang)}`,
+    overflowTemplate: t('dialogue.broadcast.more', lang),
   });
   if (altsField) fields.push(altsField);
 
-  const embed = createArtistEmbed()
+  const embed = createArtistEmbed(lang)
     .setTitle(`${entry._icon} ${entry.name}`)
     .setURL(link)
     .addFields(fields)

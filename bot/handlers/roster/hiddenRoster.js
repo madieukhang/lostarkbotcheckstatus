@@ -19,7 +19,7 @@ import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import UserPreference from '../../models/UserPreference.js';
-import { getUserLanguage } from '../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../services/i18n/index.js';
 import {
   detectAltsViaStronghold,
   fetchCharacterMeta,
@@ -116,9 +116,10 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
           await replyEditor.edit({
             content: '',
             embeds: [buildScanProgressEmbed({
-              title: `Stronghold scan in progress · ${name}`,
-              subtitle: `Guild **${meta.guildName}** (${guildMembers.length} members) · hidden roster`,
+              title: t('dialogue.scan.progress', lang, { name }),
+              subtitle: `${t('dialogue.scan.guildMembers', lang, { guild: meta.guildName, count: guildMembers.length })} · ${t('dialogue.scan.hiddenRoster', lang)}`,
               color: COLORS.info,
+              lang,
               progress: {
                 scannedCandidates: 0,
                 totalCandidates: Math.min(filteredCount, cap || filteredCount),
@@ -155,9 +156,9 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
           } catch (err) {
             scanErrorEmbed = buildAlertEmbed({
               severity: AlertSeverity.ERROR,
-              title: `Deep scan stopped · ${name}`,
-              description: `Reason: **${err.message || 'unexpected detector error'}**`,
-              footer: 'The roster card is still shown; deep scan was not completed.',
+              ...t('dialogue.scan.stopped', lang, { name, reason: err.message || t('dialogue.scan.unexpectedError', lang) }),
+              footer: t('dialogue.scan.stopped.rosterStillShown', lang),
+              lang,
             });
           } finally {
             unregisterScan(sessionId);
@@ -168,23 +169,23 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         // resume can re-render it without touching the primary card.
         const descriptionParts = [];
         descriptionParts.push(
-          `Roster is hidden. Guild: **${meta.guildName}** (${guildMembers.length} members)`,
-          `Stronghold: **${meta.strongholdName}** Lv.${meta.strongholdLevel} · Roster Lv.${meta.rosterLevel}`,
+          t('dialogue.roster.hiddenStatus', lang, { guild: meta.guildName, count: guildMembers.length }),
+          t('dialogue.roster.stronghold', lang, { stronghold: meta.strongholdName, strongholdLevel: meta.strongholdLevel, rosterLevel: meta.rosterLevel }),
         );
 
         if (!deep) {
           descriptionParts.push(
             '',
-            'Stronghold deep scan was not run. Use `deep:true` to scan same-account alts.',
+            t('dialogue.roster.noDeep', lang),
           );
         }
 
         if (guildBlackHits.length > 0) {
           descriptionParts.push(
             '',
-            `**⛔ Blacklisted guild members (${guildBlackHits.length}):**`,
+            `**⛔ ${t('dialogue.roster.blackGuild', lang, { count: guildBlackHits.length })}**`,
             ...guildBlackHits.map(
-              (e) => `⛔ **${e.name}** · ${e.reason || 'no reason'}${e.raid ? ' [' + e.raid + ']' : ''}`
+              (e) => `⛔ **${e.name}** · ${e.reason || t('dialogue.roster.noReason', lang)}${e.raid ? ' [' + e.raid + ']' : ''}`
             ),
           );
         }
@@ -192,9 +193,9 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         if (guildWhiteHits.length > 0) {
           descriptionParts.push(
             '',
-            `**✅ Whitelisted guild members (${guildWhiteHits.length}):**`,
+            `**✅ ${t('dialogue.roster.whiteGuild', lang, { count: guildWhiteHits.length })}**`,
             ...guildWhiteHits.map(
-              (e) => `✅ **${e.name}** · ${e.reason || 'no reason'}${e.raid ? ' [' + e.raid + ']' : ''}`
+              (e) => `✅ **${e.name}** · ${e.reason || t('dialogue.roster.noReason', lang)}${e.raid ? ' [' + e.raid + ']' : ''}`
             ),
           );
         }
@@ -203,15 +204,19 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         const hasBlack = guildBlackHits.length > 0;
         const hasWhite = guildWhiteHits.length > 0;
         const color = hasBlack ? COLORS.danger : hasWhite ? COLORS.success : COLORS.warning;
-        const deepStats = formatDeepScanStats(altResult);
+        const deepStats = formatDeepScanStats(altResult, lang);
 
-        const primaryEmbed = createArtistEmbed()
-          .setTitle(`🔒 Hidden Roster · ${name}`)
+        const primaryEmbed = createArtistEmbed(lang)
+          .setTitle(`🔒 ${t('dialogue.roster.hiddenTitle', lang, { name })}`)
           .setURL(bibleProfileUrl(name))
           .setDescription(description.length > 4000 ? description.slice(0, 4000) + '\n…' : description)
           .setColor(color)
           .setFooter({
-            text: `${guildMembers.length} guild member${guildMembers.length === 1 ? '' : 's'}${deepStats ? ` · ${deepStats}` : ''} · Source: lostark.bible`,
+            text: t('dialogue.roster.guildFooter', lang, {
+              count: guildMembers.length,
+              word: t(`dialogue.roster.${guildMembers.length === 1 ? 'memberOne' : 'memberMany'}`, lang),
+              stats: deepStats ? ` · ${deepStats}` : '',
+            }),
           })
           .setTimestamp();
 
@@ -231,7 +236,8 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
             target: { name, isHidden: true, guildName: meta.guildName, profileUrl },
             result: altResult,
             kind: 'roster-hidden',
-            summaryLine: `I scanned **${meta.guildName}** for stronghold matches with **${name}**.`,
+            summaryLine: t('dialogue.enrich.summary', lang, { guild: meta.guildName, name, resumed: '' }),
+            lang,
           });
           scanState = state;
           replyEmbeds.push(scanEmbed);
@@ -300,19 +306,21 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         await replyEditor.edit({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.ERROR,
-            title: 'No Roster Found',
-            description: `No character named **${name}** was found on lostark.bible. Similar names:`,
-            fields: [{ name: 'Suggestions', value: formatSuggestionLines(filtered).slice(0, 1024), inline: false }],
-            footer: 'Pick one of the suggested names and re-run the command.',
+            title: t('dialogue.listAdd.noRoster.title', lang),
+            description: t('dialogue.listAdd.noRoster.withSuggestions', lang, { name }),
+            fields: [{ name: t('dialogue.listAdd.noRoster.suggestions', lang), value: formatSuggestionLines(filtered).slice(0, 1024), inline: false }],
+            footer: t('dialogue.listAdd.noRoster.suggestionFooter', lang),
+            lang,
           })],
         });
       } else {
         await replyEditor.edit({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.ERROR,
-            title: 'No Roster Found',
-            description: `No character named **${name}** was found on lostark.bible.`,
-            footer: 'Check the spelling (LA names are case-sensitive and may include diacritics).',
+            title: t('dialogue.listAdd.noRoster.title', lang),
+            description: t('dialogue.listAdd.noRoster.withoutSuggestions', lang, { name }),
+            footer: t('dialogue.listAdd.noRoster.spellingFooter', lang),
+            lang,
           })],
         });
       }

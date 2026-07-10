@@ -13,6 +13,7 @@ import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
 import { upsertRosterSnapshots } from '../../../services/roster/rosterSnapshots.js';
+import { getGuildLanguage, t } from '../../../services/i18n/index.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
@@ -133,11 +134,12 @@ function getBroadcastClassName(record) {
 
 export const formatBroadcastCharacterLine = formatAltLine;
 
-export function buildTrackedAltsField(entry, statMap = new Map()) {
+export function buildTrackedAltsField(entry, statMap = new Map(), options = {}) {
   return renderTrackedAltsField({
     names: entry?.allCharacters,
     primaryName: entry?.name,
     statMap,
+    ...options,
   });
 }
 
@@ -146,6 +148,7 @@ export async function sendEmbedToChannels({
   channelIds,
   embed,
   components = [],
+  buildPayload,
   logLabel = '[list broadcast]',
   logger = console,
 }) {
@@ -154,10 +157,13 @@ export async function sendEmbedToChannels({
       try {
         const channel = await client.channels.fetch(channelId);
         if (channel?.isTextBased()) {
-          await channel.send({
-            embeds: [embed],
-            ...(components.length > 0 ? { components } : {}),
-          });
+          const messagePayload = typeof buildPayload === 'function'
+            ? await buildPayload({ channel, channelId })
+            : {
+                embeds: [embed],
+                ...(components.length > 0 ? { components } : {}),
+              };
+          await channel.send(messagePayload);
         }
       } catch (err) {
         logger.warn?.(`${logLabel} channel ${channelId} failed: ${err.message}`);
@@ -191,12 +197,8 @@ export function createBroadcastServices({
       newAltNames = [],
     } = options;
     const isEnrich = action === 'enriched';
-    const { label, color, icon } = getListContext(payload.type);
+    const { color, icon } = getListContext(payload.type);
     const rosterLink = rosterUrl(entry.name);
-
-    const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
-    const verb = ACTION_VERB[action] || action;
-    const scopeTag = entry.scope === 'server' ? ' `[Local]`' : '';
 
     // RosterSnapshot enrichment for class icon + ilvl + CP. Best-effort:
     // if /la-roster has queried this name before, the broadcast carries
@@ -233,82 +235,65 @@ export function createBroadcastServices({
     const newAlts = (Array.isArray(newAltNames) ? newAltNames : []).filter(Boolean);
     const newCount = newAlts.length;
     const totalTracked = Math.max(0, allChars.filter((n) => normalizeNameKey(n) !== normalizeNameKey(entry.name)).length);
-    const headline = isEnrich
-      ? `${icon} I found **${newCount}** new tracked alt${newCount === 1 ? '' : 's'} for ${classPrefix}**[${entry.name}](${rosterLink})** in **${labelCap}**${scopeTag}. There are **${totalTracked}** tracked now.`
-      : `${icon} I noted that ${classPrefix}**[${entry.name}](${rosterLink})** was ${verb} **${labelCap}**${scopeTag}. The useful context is gathered below.`;
-
-    const fields = [
-      { name: '📝 Reason', value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
-    ];
-    if (entry.raid) fields.push({ name: '🗡️ Raid', value: `\`${entry.raid}\``, inline: true });
-    if (entry.addedAt) {
-      // enrich shows the original add time (how long they've been listed) under
-      // the same "Added" label as the add card; only manual edits say "Edited".
-      fields.push({
-        name: action === 'edited' ? '🕐 Edited' : '🕐 Added',
-        value: relativeTime(entry.addedAt),
-        inline: true,
+    function buildPayloadForLanguage(lang) {
+      const listLabel = t(`dialogue.broadcast.list.${payload.type}`, lang);
+      const scopeTag = entry.scope === 'server'
+        ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
+        : '';
+      const linkedName = `${classPrefix}**[${entry.name}](${rosterLink})**`;
+      const headlineKey = `dialogue.broadcast.headlines.${isEnrich ? 'enriched' : action}`;
+      const headline = t(headlineKey, lang, {
+        icon,
+        name: linkedName,
+        list: listLabel,
+        scope: scopeTag,
+        newCount,
+        total: totalTracked,
+        altWord: t(`dialogue.broadcast.${newCount === 1 ? 'altOne' : 'altMany'}`, lang),
       });
-    }
-    // Roster stats from the snapshot lookup above. Both fields share
-    // the same `if snap` gate because RosterSnapshot writes ilvl + CP
-    // together; one without the other is unexpected. Inline with the
-    // existing meta so the card stays compact.
-    if (snap?.itemLevel > 0) {
-      fields.push({
-        name: '📊 ilvl',
-        value: `\`${snap.itemLevel.toFixed(2)}\``,
-        inline: true,
-      });
-    }
-    if (snap?.combatScore) {
-      fields.push({
-        name: '⚔️ CP',
-        value: snap.combatScore,
-        inline: true,
-      });
-    }
 
-    // Roster (allCharacters) field. Cross-server recipients of this
-    // broadcast haven't run /la-list view themselves, so seeing the
-    // full alt list inline saves them a lookup when deciding whether
-    // someone in their guild is the same account. Capped at 12 visible
-    // names with a `+N more` overflow line; rich rows are trimmed
-    // dynamically so the field stays under Discord's 1024-char limit.
-    // Non-enrich: full tracked-alts roster. Enrich: only the alts THIS scan
-    // just appended (label swapped to "🆕 New alts"), rendered through the same
-    // renderer so class icon + ilvl match the add card exactly. The new alts'
-    // class/ilvl ride in via options.rosterCharacters (the enrich session
-    // carries {name, classId, itemLevel}); RosterSnapshot may not have them yet.
-    if (isEnrich) {
-      const newAltsField = renderTrackedAltsField({
-        names: newAlts,
-        primaryName: entry.name,
-        statMap,
-        label: '🆕 New alts',
+      const fields = [{
+        name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
+        value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
+        inline: false,
+      }];
+      if (entry.raid) fields.push({ name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`, value: `\`${entry.raid}\``, inline: true });
+      if (entry.addedAt) {
+        fields.push({
+          name: `🕐 ${t(`dialogue.broadcast.fields.${action === 'edited' ? 'edited' : 'added'}`, lang)}`,
+          value: relativeTime(entry.addedAt),
+          inline: true,
+        });
+      }
+      if (snap?.itemLevel > 0) {
+        fields.push({ name: `📊 ${t('dialogue.broadcast.fields.itemLevel', lang)}`, value: `\`${snap.itemLevel.toFixed(2)}\``, inline: true });
+      }
+      if (snap?.combatScore) {
+        fields.push({ name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`, value: snap.combatScore, inline: true });
+      }
+
+      const rosterFieldOptions = {
+        label: `${isEnrich ? '🆕' : '🧬'} ${t(`dialogue.broadcast.fields.${isEnrich ? 'newAlts' : 'trackedAlts'}`, lang)}`,
+        overflowTemplate: t('dialogue.broadcast.more', lang),
+      };
+      const altsField = isEnrich
+        ? renderTrackedAltsField({ names: newAlts, primaryName: entry.name, statMap, ...rosterFieldOptions })
+        : buildTrackedAltsField(entry, statMap, rosterFieldOptions);
+      if (altsField) fields.push(altsField);
+
+      const titleKey = action in ACTION_VERB ? action : 'fallback';
+      const embed = createArtistEmbed(lang)
+        .setTitle(`🎨 ${t(`dialogue.broadcast.titles.${titleKey}`, lang, { list: listLabel })}`)
+        .setDescription(headline)
+        .addFields(fields)
+        .setColor(color)
+        .setTimestamp(new Date());
+      const components = buildBroadcastEvidenceComponents(entry, {
+        legacyUrl: preResolvedUrl !== undefined ? preResolvedUrl : entry.imageUrl,
+        lang,
       });
-      if (newAltsField) fields.push(newAltsField);
-    } else {
-      const trackedAltsField = buildTrackedAltsField(entry, statMap);
-      if (trackedAltsField) fields.push(trackedAltsField);
+      return { embeds: [embed], ...(components.length > 0 ? { components } : {}) };
     }
-
-    const titleByAction = {
-      added: `A new note · ${labelCap}`,
-      removed: `A name leaves · ${labelCap}`,
-      edited: `A note was revised · ${labelCap}`,
-      enriched: `The roster trail grew · ${labelCap}`,
-    };
-    const embed = createArtistEmbed()
-      .setTitle(`🎨 ${titleByAction[action] || `List update · ${labelCap}`}`)
-      .setDescription(headline)
-      .addFields(fields)
-      .setColor(color)
-      .setTimestamp(new Date());
-
-    const components = buildBroadcastEvidenceComponents(entry, {
-      legacyUrl: preResolvedUrl !== undefined ? preResolvedUrl : entry.imageUrl,
-    });
 
     const channelIds = await resolveBroadcastChannels(payload.guildId || '', { onlyOwner });
     if (channelIds.size === 0) return;
@@ -316,8 +301,10 @@ export function createBroadcastServices({
     await sendEmbedToChannels({
       client,
       channelIds,
-      embed,
-      components,
+      buildPayload: async ({ channel }) => {
+        const lang = await getGuildLanguage(channel.guild?.id, { GuildConfigModel: GuildConfig });
+        return buildPayloadForLanguage(lang);
+      },
       logLabel: '[list] Broadcast',
     });
   }
@@ -418,28 +405,33 @@ export function createBroadcastServices({
       return `${i + 1}. ${listTypeIcon(t)} ${classPrefix}**${name}** · ${reasonShort}`;
     };
 
-    const buildBulkEmbed = (entries, isLocal) => {
+    const buildBulkEmbed = (entries, isLocal, lang) => {
       const grouped = { black: [], white: [], watch: [] };
       for (const r of entries) {
         const t = r.type || r.entry?.type || 'black';
         if (grouped[t]) grouped[t].push(r);
       }
 
-      const embed = createArtistEmbed()
-        .setTitle(`📢 Bulk Add${isLocal ? ' (Local)' : ''} · ${entries.length} entries`)
+      const embed = createArtistEmbed(lang)
+        .setTitle(`📢 ${t('dialogue.broadcast.bulkTitle', lang, {
+          local: isLocal ? t('dialogue.broadcast.localSuffix', lang) : '',
+          count: entries.length,
+          entryWord: t(`dialogue.broadcast.${entries.length === 1 ? 'entryOne' : 'entryMany'}`, lang),
+        })}`)
         .setColor(COLORS.info)
         .setTimestamp(new Date());
 
-      const typeLabels = { black: 'Blacklist', white: 'Whitelist', watch: 'Watchlist' };
-      for (const t of ['black', 'white', 'watch']) {
-        if (grouped[t].length === 0) continue;
-        const lines = grouped[t]
+      for (const listType of ['black', 'white', 'watch']) {
+        if (grouped[listType].length === 0) continue;
+        const lines = grouped[listType]
           .slice(0, 15)
-          .map((r, i) => renderBulkLine(i, t, r))
+          .map((r, i) => renderBulkLine(i, listType, r))
           .join('\n');
-        const suffix = grouped[t].length > 15 ? `\n*... and ${grouped[t].length - 15} more*` : '';
+        const suffix = grouped[listType].length > 15
+          ? `\n*${t('dialogue.broadcast.more', lang, { count: grouped[listType].length - 15 })}*`
+          : '';
         embed.addFields({
-          name: `${typeLabels[t]} (${grouped[t].length})`,
+          name: `${t(`dialogue.broadcast.list.${listType}`, lang)} (${grouped[listType].length})`,
           value: (lines + suffix).slice(0, 1024),
         });
       }
@@ -452,11 +444,13 @@ export function createBroadcastServices({
     if (globalEntries.length > 0) {
       const channelIds = await resolveBroadcastChannels(originGuildId, { onlyOwner: false });
       if (channelIds.size > 0) {
-        const embed = buildBulkEmbed(globalEntries, false);
         await sendEmbedToChannels({
           client,
           channelIds,
-          embed,
+          buildPayload: async ({ channel }) => {
+            const lang = await getGuildLanguage(channel.guild?.id, { GuildConfigModel: GuildConfig });
+            return { embeds: [buildBulkEmbed(globalEntries, false, lang)] };
+          },
           logLabel: '[multiadd] Bulk broadcast',
         });
       }
@@ -465,11 +459,13 @@ export function createBroadcastServices({
     if (serverEntries.length > 0) {
       const channelIds = await resolveBroadcastChannels(originGuildId, { onlyOwner: true });
       if (channelIds.size > 0) {
-        const embed = buildBulkEmbed(serverEntries, true);
         await sendEmbedToChannels({
           client,
           channelIds,
-          embed,
+          buildPayload: async ({ channel }) => {
+            const lang = await getGuildLanguage(channel.guild?.id, { GuildConfigModel: GuildConfig });
+            return { embeds: [buildBulkEmbed(serverEntries, true, lang)] };
+          },
           logLabel: '[multiadd] Bulk local broadcast',
         });
       }
