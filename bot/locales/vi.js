@@ -49,26 +49,27 @@ const vi = {
   commands,
 
   autoCheckWelcome: {
-    title: '🎨 Artist chỉ đi ngang qua thôi~',
+    title: '🎨 Chào các cậu~ Artist ngồi trông channel này nhé',
     description: [
-      'Artist tình cờ đi ngang channel này rồi để lại một tấm bảng nhỏ. LoaLogs mới là người ở lại trông các lượt check nhé.',
-      'Cứ thả screenshot hoặc gõ `check abcxyz`; bot sẽ đối chiếu các tên character với list của server.',
+      'Cứ thả screenshot vào đây, hoặc gõ `check abcxyz`. Tớ sẽ đọc tên character rồi đối chiếu với các list của server nha~',
+      '',
+      'Mới vào? Mấy field bên dưới nói rõ tớ làm gì với một lượt check và cách đọc kết quả.',
     ],
     howName: '🔍 Sau khi cậu gửi yêu cầu check',
     howValue: [
-      '1. LoaLogs thả reaction 🔍 và đọc tối đa 8 tên character từ ảnh hoặc text.',
-      '2. Các tên được kiểm tra với blacklist, whitelist, watchlist và trusted.',
-      '3. Tên chưa nằm trong list có thể hiện Quick Add cho officer xử lý ngay.',
+      '1. Tớ thả reaction 🔍 và đọc tối đa 8 tên character từ ảnh hoặc text.',
+      '2. Từng tên được đối chiếu với blacklist, whitelist, watchlist và trusted.',
+      '3. Tên chưa nằm trong list nào mà đủ điều kiện sẽ hiện nút Quick Add cho officer.',
     ],
     listsName: '📚 Đọc kết quả thế nào',
     listsValue: [
-      'Kết quả black và watch cần chú ý; white và trusted cung cấp ngữ cảnh đối chiếu.',
-      'Gõ `check abcxyz` để kiểm tra list trực tiếp; /la-search dành cho tìm gần đúng trên Bible và filter.',
+      'Kết quả black và watch cần chú ý; white và trusted cho cậu ngữ cảnh khớp.',
+      'Gõ `check abcxyz` ngay đây để check list trực tiếp, hoặc dùng /la-search để tìm mờ trên Bible kèm bộ lọc.',
     ],
-    cleanupName: '🧹 Channel được dọn mỗi ngày',
+    cleanupName: '🧹 Mỗi ngày tớ dọn channel này một lần',
     cleanupValue: [
-      'Đúng **00:00 Asia/Ho_Chi_Minh (17:00 UTC)**, LoaLogs sẽ xóa toàn bộ tin nhắn không ghim trong channel này.',
-      'Tin đã ghim được giữ lại. Nội dung quan trọng thì cậu chuyển sang nơi khác trước giờ dọn nhé.',
+      'Đúng **00:00 Asia/Ho_Chi_Minh (17:00 UTC)**, tớ xoá mọi tin nhắn không ghim ở đây.',
+      'Tin đã ghim thì tớ để yên. Có gì quan trọng thì chuyển đi chỗ khác trước giờ dọn nha.',
     ],
     commandsName: '🧭 Các lệnh hữu ích',
     commandsValue: [
@@ -78,7 +79,7 @@ const vi = {
       '/la-search name:<character> - tìm và đối chiếu list',
       '/la-help - mở hướng dẫn đầy đủ',
     ],
-    footer: 'Artist đi tiếp đây~ Tấm bảng này cứ để lại nhé.',
+    footer: 'Muốn xem hướng dẫn đầy đủ tất cả lệnh? Gõ /la-help nhé~',
   },
 
   help: {

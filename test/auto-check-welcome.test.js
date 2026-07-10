@@ -50,11 +50,13 @@ function createGuildConfig({ stored = null, persistError = null } = {}) {
   };
 }
 
-test('auto-check welcome carries Artist as a passerby and explains daily cleanup', () => {
+test('auto-check welcome presents Artist as the channel host and explains daily cleanup', () => {
   const embed = buildAutoCheckWelcomeEmbed('vi').toJSON();
 
   assert.match(embed.title, /Artist/i);
-  assert.match(embed.description, /đi ngang/i);
+  // The host speaks in first person and never narrates itself in the third person.
+  assert.match(embed.description, /tớ/i);
+  assert.doesNotMatch(embed.description, /LoaLogs/i);
   assert.match(embed.fields.map((field) => field.value).join('\n'), /00:00/);
   assert.match(embed.fields.map((field) => field.value).join('\n'), /\/la-help/);
   assert.match(embed.fields.map((field) => field.value).join('\n'), /check abcxyz/i);
@@ -76,6 +78,7 @@ test('auto-check welcome stays within Discord embed limits in every language', (
       ...embed.fields.flatMap((field) => [field.name, field.value]),
     ].join('');
     assert.ok(totalText.length <= 6000, lang + ' embed exceeds 6000');
+    assert.doesNotMatch(totalText, /LoaLogs/i, lang + ' welcome still names the bot in third person');
   }
 });
 

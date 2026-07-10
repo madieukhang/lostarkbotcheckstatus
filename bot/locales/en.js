@@ -238,26 +238,27 @@ const en = {
   },
 
   autoCheckWelcome: {
-    title: '🎨 Artist was only passing by...',
+    title: '🎨 Hi everyone~ Artist is keeping an eye on this channel',
     description: [
-      'Artist happened to walk past this channel and left a small sign behind. LoaLogs is the one staying here to watch the checks.',
-      'Drop a screenshot, or type `check abcxyz`; the bot will compare those character names against the server lists.',
+      'Drop a screenshot in here, or type `check abcxyz`. I will read the character names out of it and compare them against this server\'s lists.',
+      '',
+      'New here? The fields below explain what I do with a check request and how to read the result.',
     ],
     howName: '🔍 What happens after a check request',
     howValue: [
-      '1. LoaLogs reacts with 🔍 and reads up to 8 character names from the image or text.',
-      '2. The names are checked against blacklist, whitelist, watchlist, and trusted records.',
-      '3. Eligible unlisted names may expose a Quick Add control for officers.',
+      '1. I react with 🔍 and read up to 8 character names from the image or the text.',
+      '2. Each name is checked against the blacklist, whitelist, watchlist, and trusted records.',
+      '3. Eligible unlisted names get a Quick Add control for officers.',
     ],
     listsName: '📚 Reading the result',
     listsValue: [
-      'Black and watch results deserve attention; white and trusted results provide the matching context.',
-      'Type `check abcxyz` here for a direct list check; use /la-search for fuzzy Bible search and filters.',
+      'Black and watch results deserve attention; white and trusted results give you the matching context.',
+      'Type `check abcxyz` here for a direct list check, or use /la-search for fuzzy Bible search and filters.',
     ],
-    cleanupName: '🧹 This channel resets once a day',
+    cleanupName: '🧹 I tidy this channel once a day',
     cleanupValue: [
-      'At **00:00 Asia/Ho_Chi_Minh (17:00 UTC)**, LoaLogs deletes every non-pinned message in this channel.',
-      'Pinned messages stay. Move anything important elsewhere before the daily sweep.',
+      'At **00:00 Asia/Ho_Chi_Minh (17:00 UTC)** I delete every non-pinned message here.',
+      'Pinned messages stay. Move anything important elsewhere before the sweep.',
     ],
     commandsName: '🧭 Useful commands',
     commandsValue: [
@@ -267,7 +268,7 @@ const en = {
       '/la-search name:<character> - search and cross-check lists',
       '/la-help - open the full command guide',
     ],
-    footer: 'Artist is moving on now~ The sign can stay.',
+    footer: 'Want the full command guide? Type /la-help~',
   },
 
   help: {
