@@ -1,4 +1,5 @@
 import GuildConfig from '../../models/GuildConfig.js';
+import { autoCheckChannelGuard } from './autoCheckChannelGuard.js';
 
 export const AUTO_CHECK_CLEANUP_TICK_MS = 15 * 60 * 1000;
 export const AUTO_CHECK_CLEANUP_TIME_ZONE = 'Asia/Ho_Chi_Minh';
@@ -20,7 +21,13 @@ export function getVietnamDayKey(date = new Date()) {
   return parts.year + '-' + parts.month + '-' + parts.day;
 }
 
-export async function cleanupAutoCheckChannelMessages(channel, { maxPages = 20 } = {}) {
+export async function cleanupAutoCheckChannelMessages(
+  channel,
+  { maxPages = 20, protectedMessageIds = [] } = {}
+) {
+  const protectedIds = new Set(
+    [...protectedMessageIds].filter(Boolean).map(String)
+  );
   let before;
   let deleted = 0;
   let failed = 0;
@@ -36,7 +43,7 @@ export async function cleanupAutoCheckChannelMessages(channel, { maxPages = 20 }
     scanned += fetched.size;
     before = fetched.last?.()?.id;
     for (const message of fetched.values()) {
-      if (message.pinned) continue;
+      if (message.pinned || protectedIds.has(String(message.id))) continue;
       try {
         await message.delete();
         deleted += 1;
@@ -72,6 +79,7 @@ export function createAutoCheckCleanupService({
   cleanupMessages = cleanupAutoCheckChannelMessages,
   nowDate = () => new Date(),
   resolveChannel = resolveConfiguredChannel,
+  channelGuard = autoCheckChannelGuard,
   logger = console,
 } = {}) {
   async function releaseClaim(guildId, dayKey) {
@@ -105,36 +113,46 @@ export function createAutoCheckCleanupService({
         continue;
       }
 
-      let claimed = false;
       try {
-        const claim = await GuildConfigModel.findOneAndUpdate(
-          {
-            guildId: config.guildId,
-            autoCheckChannelId: config.autoCheckChannelId,
-            lastAutoCheckCleanupKey: { $ne: dayKey },
-          },
-          { $set: { lastAutoCheckCleanupKey: dayKey } },
-          { new: true }
-        );
-        if (!claim) continue;
-        claimed = true;
+        await channelGuard.runExclusive(channel.id, async () => {
+          let claimed = false;
+          try {
+            const claim = await GuildConfigModel.findOneAndUpdate(
+              {
+                guildId: config.guildId,
+                autoCheckChannelId: config.autoCheckChannelId,
+                lastAutoCheckCleanupKey: { $ne: dayKey },
+              },
+              { $set: { lastAutoCheckCleanupKey: dayKey } },
+              { new: true }
+            );
+            if (!claim) return;
+            claimed = true;
 
-        const outcome = await cleanupMessages(channel);
-        if (outcome.failed > 0 || outcome.truncated) {
-          throw new Error(
-            'incomplete cleanup deleted=' + outcome.deleted +
-            ' failed=' + outcome.failed +
-            ' truncated=' + Boolean(outcome.truncated)
-          );
-        }
-        logger.info?.(
-          '[auto-check cleanup] guild=' + config.guildId +
-          ' day=' + dayKey +
-          ' deleted=' + outcome.deleted
-        );
+            const protectedMessageIds = [
+              config.autoCheckWelcomeMessageId,
+              ...channelGuard.getProtectedMessageIds(channel.id),
+            ].filter(Boolean);
+            const outcome = await cleanupMessages(channel, { protectedMessageIds });
+            if (outcome.failed > 0 || outcome.truncated) {
+              throw new Error(
+                'incomplete cleanup deleted=' + outcome.deleted +
+                ' failed=' + outcome.failed +
+                ' truncated=' + Boolean(outcome.truncated)
+              );
+            }
+            logger.info?.(
+              '[auto-check cleanup] guild=' + config.guildId +
+              ' day=' + dayKey +
+              ' deleted=' + outcome.deleted
+            );
+          } catch (err) {
+            logger.error?.('[auto-check cleanup] failed guild=' + config.guildId + ':', err?.message || err);
+            if (claimed) await releaseClaim(config.guildId, dayKey);
+          }
+        });
       } catch (err) {
-        logger.error?.('[auto-check cleanup] failed guild=' + config.guildId + ':', err?.message || err);
-        if (claimed) await releaseClaim(config.guildId, dayKey);
+        logger.error?.('[auto-check cleanup] guard failed guild=' + config.guildId + ':', err?.message || err);
       }
     }
   }

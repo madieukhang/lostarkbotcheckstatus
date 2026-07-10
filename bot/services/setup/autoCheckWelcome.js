@@ -10,6 +10,7 @@ import {
   cleanupAutoCheckChannelMessages,
   getVietnamDayKey,
 } from './autoCheckCleanup.js';
+import { autoCheckChannelGuard } from './autoCheckChannelGuard.js';
 import { COLORS } from '../../utils/ui.js';
 
 function asText(value) {
@@ -59,6 +60,7 @@ export function createAutoCheckWelcomeService({
   getGuildLanguageFn = getGuildLanguage,
   cleanupMessages = cleanupAutoCheckChannelMessages,
   getCleanupDayKey = getVietnamDayKey,
+  channelGuard = autoCheckChannelGuard,
   supportedLanguageCodes = getSupportedLanguages().map((entry) => entry.code),
   logger = console,
 } = {}) {
@@ -94,6 +96,7 @@ export function createAutoCheckWelcomeService({
     const refs = new Map();
     let pinScanSucceeded = false;
     let hadOwnedWelcomePin = false;
+    const pinnedMessageIds = new Set();
     const add = (channelId, messageId, message = null) => {
       if (!channelId || !messageId) return;
       refs.set(channelId + ':' + messageId, { channelId, messageId, message });
@@ -108,6 +111,7 @@ export function createAutoCheckWelcomeService({
       const response = await channel.messages.fetchPins();
       pinScanSucceeded = true;
       for (const message of pinnedMessages(response)) {
+        if (message.id) pinnedMessageIds.add(String(message.id));
         if (isOwnedWelcome(message, botUserId)) {
           hadOwnedWelcomePin = true;
           add(channel.id, message.id, message);
@@ -116,7 +120,7 @@ export function createAutoCheckWelcomeService({
     } catch (err) {
       logger.warn?.('[auto-check welcome] pin scan failed:', err?.message || err);
     }
-    return { refs, pinScanSucceeded, hadOwnedWelcomePin };
+    return { refs, pinScanSucceeded, hadOwnedWelcomePin, pinnedMessageIds };
   }
 
   async function rollbackFresh(sent) {
@@ -157,7 +161,7 @@ export function createAutoCheckWelcomeService({
     }
   }
 
-  async function postWelcome({ botUserId, channel, client, guildId }) {
+  async function postWelcomeLocked({ botUserId, channel, client, guildId }) {
     const outcome = {
       posted: false,
       pinned: false,
@@ -188,7 +192,9 @@ export function createAutoCheckWelcomeService({
     if (outcome.pinScanSucceeded && !outcome.hadOwnedWelcomePin) {
       outcome.cleanupAttempted = true;
       try {
-        const cleanup = await cleanupMessages(channel);
+        const cleanup = await cleanupMessages(channel, {
+          protectedMessageIds: pinState.pinnedMessageIds,
+        });
         outcome.cleanupDeleted = Number(cleanup?.deleted) || 0;
         outcome.cleanupFailed = Number(cleanup?.failed) || 0;
         outcome.cleanupTruncated = Boolean(cleanup?.truncated);
@@ -235,6 +241,16 @@ export function createAutoCheckWelcomeService({
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
       outcome.persisted = true;
+      channelGuard.rememberWelcome(channel.id, sent.id);
+      if (
+        stored?.autoCheckWelcomeChannelId &&
+        stored.autoCheckWelcomeChannelId !== channel.id
+      ) {
+        channelGuard.forgetWelcome(
+          stored.autoCheckWelcomeChannelId,
+          stored.autoCheckWelcomeMessageId
+        );
+      }
     } catch (err) {
       logger.warn?.('[auto-check welcome] pin persistence failed:', err?.message || err);
       await rollbackFresh(sent);
@@ -244,6 +260,13 @@ export function createAutoCheckWelcomeService({
 
     await deleteStaleRefs(staleRefs, channel, client, outcome);
     return outcome;
+  }
+
+  async function postWelcome(options) {
+    return channelGuard.runExclusive(
+      options?.channel?.id,
+      () => postWelcomeLocked(options)
+    );
   }
 
   return {
