@@ -37,10 +37,25 @@ test('welcome setup requires Discord Pin Messages separately from Manage Message
   assert.deepEqual(result.missing, ['Pin Messages']);
 });
 
-test('welcome setup passes only when cleanup and pin permissions are both present', () => {
+test('cleanup-enabled welcome setup passes only when cleanup and pin permissions are both present', () => {
   const allowed = new Set([
     ...basePermissions,
     PermissionFlagsBits.ManageMessages,
+    PermissionFlagsBits.PinMessages,
+  ]);
+
+  const result = checkBotPermissions(
+    channelWithPermissions(allowed),
+    guild,
+    { cleanup: true, welcomePin: true }
+  );
+
+  assert.deepEqual(result, { ok: true, missing: [] });
+});
+
+test('server-local welcome pin does not require Manage Messages when cleanup is off', () => {
+  const allowed = new Set([
+    ...basePermissions,
     PermissionFlagsBits.PinMessages,
   ]);
 

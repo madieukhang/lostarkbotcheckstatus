@@ -1,6 +1,10 @@
 import GuildConfig from '../../models/GuildConfig.js';
 import { autoCheckChannelGuard } from './autoCheckChannelGuard.js';
 import { checkBotPermissions } from './channelPermissions.js';
+import {
+  buildAutoCheckCleanupEligibility,
+  resolveAutoCheckCleanupEnabled,
+} from './autoCheckCleanupPolicy.js';
 
 export const AUTO_CHECK_CLEANUP_TICK_MS = 15 * 60 * 1000;
 export const AUTO_CHECK_CLEANUP_TIME_ZONE = 'Asia/Ho_Chi_Minh';
@@ -102,8 +106,11 @@ export function createAutoCheckCleanupService({
   resolveChannel = resolveConfiguredChannel,
   channelGuard = autoCheckChannelGuard,
   checkPermissions = checkBotPermissions,
+  ownerGuildId = (process.env.OWNER_GUILD_ID || '').trim(),
   logger = console,
 } = {}) {
+  const cleanupEligibility = buildAutoCheckCleanupEligibility(ownerGuildId);
+
   async function releaseClaim(guildId, dayKey) {
     try {
       await GuildConfigModel.findOneAndUpdate(
@@ -120,6 +127,7 @@ export function createAutoCheckCleanupService({
     let configs;
     try {
       configs = await GuildConfigModel.find({
+        ...cleanupEligibility,
         autoCheckChannelId: { $nin: ['', null] },
         lastAutoCheckCleanupKey: { $ne: dayKey },
       }).lean();
@@ -129,6 +137,10 @@ export function createAutoCheckCleanupService({
     }
 
     for (const config of configs) {
+      if (!resolveAutoCheckCleanupEnabled(config, config.guildId, ownerGuildId)) {
+        continue;
+      }
+
       const channel = await resolveChannel(client, config);
       if (!channel) {
         logger.warn?.('[auto-check cleanup] channel unavailable guild=' + config.guildId + ' channel=' + config.autoCheckChannelId);
@@ -155,6 +167,7 @@ export function createAutoCheckCleanupService({
           try {
             const claim = await GuildConfigModel.findOneAndUpdate(
               {
+                ...cleanupEligibility,
                 guildId: config.guildId,
                 autoCheckChannelId: config.autoCheckChannelId,
                 lastAutoCheckCleanupKey: { $ne: dayKey },

@@ -23,7 +23,7 @@ export function checkBotPermissions(
   { cleanup = false, welcomePin = false } = {}
 ) {
   const required = [...BASE_CHANNEL_PERMISSIONS];
-  if (cleanup || welcomePin) required.push(CLEANUP_PERMISSION);
+  if (cleanup) required.push(CLEANUP_PERMISSION);
   if (welcomePin) required.push(PIN_PERMISSION);
 
   const botMember = guild?.members?.me;

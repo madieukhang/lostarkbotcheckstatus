@@ -48,11 +48,17 @@ export default {
     welcomeCleanupIncomplete: '最初の掃除は **{count}** 件削除したところで未完了でしたの。毎日の cleaner が再試行しますわ。',
     sameChannelWarning: 'ここは {other} チャンネルと同じですの。分けた方が読みやすいですわ。',
     autoChannelNotSet: '<#{channel}> に welcome pin を作成して保存できなかったため、auto-check チャンネルは変更していませんの。\n{welcome}',
-    autoChannelSet: 'Auto-check チャンネルを <#{channel}> に設定しました。\nLoaLogs が投稿された screenshot を自動確認しますの。{warning}\n{welcome}\n毎日 00:00 Asia/Ho_Chi_Minh に、ピン留め以外のメッセージを片づけますわ。',
+    autoChannelSet: 'Auto-check チャンネルを <#{channel}> に設定しました。\nLoaLogs が投稿された screenshot を自動確認しますの。{warning}\n{welcome}\n{cleanup}',
     notifyChannelSet: '通知チャンネルを <#{channel}> に設定しました。\nリスト変更をここへ送りますの。{warning}\n\nテストメッセージは30秒後に消えますわ。',
     notifyChannelSetTestFailed: '通知チャンネルを <#{channel}> に設定しました。{warning}\nテストメッセージを送れなかったため、LoaLogs の権限をご確認くださいませ。',
     notificationsEnabled: 'このサーバーのグローバル通知を **有効** にしました。\n他サーバーのリスト変更をここへ届けますわ。',
     notificationsDisabled: 'このサーバーのグローバル通知を **無効** にしました。\n他サーバーの変更は静かにしておきますの。\n\n`/la-setup off` をもう一度実行するか、通知チャンネルを設定すると再び有効になりますわ。',
+    autoCleanup: {
+      enabled: 'Auto-cleanup は **この server だけで有効** ですの。00:00 Asia/Ho_Chi_Minh に auto-check channel の pinned 以外を削除しますわ。`/la-setup cleanup state:off` で停止できますの。',
+      disabled: 'Auto-cleanup は **この server では無効** ですの。Auto-check は動きますが、通常の message は削除いたしませんわ。必要なら `/la-setup cleanup state:on` で個別に有効化できますの。',
+      noChannel: 'Cleanup を有効にする前に `/la-setup autochannel` で auto-check channel を設定してくださいませ。',
+      guideNotRefreshed: 'Cleanup 設定は安全に変更しましたが、pinned guide を更新できませんでしたの。足りない権限: {missing}。',
+    },
     view: {
       author: '{guild} · Bot 設定', description: 'このサーバーの LoaLogs 設定を集めましたわ。変更するときは対応する `/la-setup` subcommand をお使いくださいませ。',
       autoChannel: 'Auto-check チャンネル', notifyChannel: '通知チャンネル', defaultScope: 'Blacklist の既定 scope', globalNotifications: 'グローバル通知',
@@ -60,7 +66,7 @@ export default {
       setViaSetup: '/la-setup で設定', fromEnv: '環境変数の fallback', notConfigured: '未設定', scopeHint: '`/la-list add type:black` で scope を省略すると {scope} を使います',
       notificationsOn: '**有効**\n他サーバーの broadcast を受信', notificationsOff: '**無効**\n他サーバーの broadcast を受信しません',
       pinMissing: 'まだ追跡していません · /la-setup repin を実行', cleanupActive: '**毎日 00:00 Asia/Ho_Chi_Minh**\n最終完了: {last}',
-      cleanupInactive: '/la-setup で autochannel を保存するまで無効', notYet: 'まだですの', lastUpdated: '最終更新 {user} · {time}',
+      cleanupDisabled: '**この server では無効**\nAuto-check は動作し、通常の message は残りますの', cleanupNoChannel: '掃除する保存済み auto-check channel がありませんの', notYet: 'まだですの', lastUpdated: '最終更新 {user} · {time}',
       noPersisted: '保存済み設定なし · 環境変数と既定値を表示中',
     },
     repin: {
@@ -91,7 +97,7 @@ export default {
     dashboardTitle: 'Remote control · ダッシュボード', noServers: 'LoaLogs はまだどのサーバーにも接続していませんの。', ownerServer: 'Owner server', noConfig: '設定なし',
     notSet: '未設定', evidenceLegacy: '未設定 · 画像は期限付き legacy URL を使用中',
     fields: {
-      globalNotify: 'グローバル通知', defaultScope: '既定 scope', autoCheck: 'Auto-check', notifyChannel: '通知チャンネル', lastUpdated: '最終更新', updatedBy: '更新者',
+      globalNotify: 'グローバル通知', defaultScope: '既定 scope', autoCheck: 'Auto-check', autoCleanup: 'Auto-cleanup', notifyChannel: '通知チャンネル', lastUpdated: '最終更新', updatedBy: '更新者',
       evidenceChannel: 'Evidence channel · bot 全体', channel: 'チャンネル', channelId: 'Channel ID', server: 'サーバー', status: '状態',
     },
     state: { enabled: '有効', disabled: '無効', local: 'Server · Local', global: 'Global', receiving: 'Broadcast 受信中', silent: '停止中 · broadcast なし' },

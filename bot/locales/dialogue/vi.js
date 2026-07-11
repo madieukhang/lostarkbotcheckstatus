@@ -69,11 +69,17 @@ export default {
     welcomeCleanupIncomplete: 'Lần dọn đầu chưa hoàn tất sau khi xóa **{count}** tin; bộ dọn hằng ngày sẽ thử lại.',
     sameChannelWarning: 'Đây cũng là channel {other}. Tách riêng hai channel sẽ dễ đọc hơn.',
     autoChannelNotSet: 'Auto-check channel chưa được thay đổi vì tớ không thể tạo và lưu welcome pin trong <#{channel}>.\n{welcome}',
-    autoChannelSet: 'Đã đặt auto-check channel thành <#{channel}>.\nLoaLogs sẽ tự kiểm tra screenshot gửi tại đó.{warning}\n{welcome}\nMỗi ngày lúc 00:00 Asia/Ho_Chi_Minh, mọi tin nhắn không ghim sẽ được dọn.',
+    autoChannelSet: 'Đã đặt auto-check channel thành <#{channel}>.\nLoaLogs sẽ tự kiểm tra screenshot gửi tại đó.{warning}\n{welcome}\n{cleanup}',
     notifyChannelSet: 'Đã đặt notification channel thành <#{channel}>.\nCác thay đổi danh sách sẽ được gửi tại đó.{warning}\n\nTớ đã gửi tin nhắn thử; nó sẽ tự biến mất sau 30 giây.',
     notifyChannelSetTestFailed: 'Đã đặt notification channel thành <#{channel}>.{warning}\nTớ chưa gửi được tin nhắn thử, cậu kiểm tra lại quyền của LoaLogs nhé.',
     notificationsEnabled: 'Đã **bật** thông báo danh sách toàn cục cho server này.\nTớ sẽ mang các thay đổi từ server khác về đây.',
     notificationsDisabled: 'Đã **tắt** thông báo danh sách toàn cục cho server này.\nTớ sẽ giữ yên các thay đổi từ server khác.\n\nChạy lại `/la-setup off` hoặc đặt notify channel để bật lại.',
+    autoCleanup: {
+      enabled: 'Auto-cleanup đang **bật riêng cho server này**. Lúc 00:00 Asia/Ho_Chi_Minh, tin không ghim trong auto-check channel có thể bị xoá. Dùng `/la-setup cleanup state:off` để tắt.',
+      disabled: 'Auto-cleanup đang **tắt cho server này**. Auto-check vẫn chạy nhưng LoaLogs sẽ không xoá tin nhắn thông thường. Dùng `/la-setup cleanup state:on` nếu muốn bật riêng.',
+      noChannel: 'Hãy đặt auto-check channel bằng `/la-setup autochannel` trước khi bật cleanup.',
+      guideNotRefreshed: 'Cleanup đã đổi an toàn, nhưng tớ chưa làm mới được bảng ghim. Còn thiếu: {missing}.',
+    },
     view: {
       author: '{guild} · Cấu hình bot',
       description: 'Tớ đã gom cấu hình LoaLogs của server này ở dưới. Dùng subcommand `/la-setup` tương ứng để thay đổi nhé.',
@@ -83,7 +89,7 @@ export default {
       scopeHint: '`/la-list add type:black` sẽ dùng {scope} khi bỏ trống scope',
       notificationsOn: '**Đang bật**\nNhận broadcast từ server khác', notificationsOff: '**Đang tắt**\nKhông nhận broadcast từ server khác',
       pinMissing: 'Chưa theo dõi ghim · chạy /la-setup repin', cleanupActive: '**00:00 Asia/Ho_Chi_Minh mỗi ngày**\nLần gần nhất: {last}',
-      cleanupInactive: 'Chưa hoạt động cho tới khi lưu autochannel bằng /la-setup', notYet: 'chưa chạy',
+      cleanupDisabled: '**Đang tắt cho server này**\nAuto-check vẫn chạy; tin nhắn thông thường được giữ lại', cleanupNoChannel: 'Chưa có auto-check channel đã lưu để dọn', notYet: 'chưa chạy',
       lastUpdated: 'Cập nhật gần nhất bởi {user} · {time}', noPersisted: 'Chưa có cấu hình đã lưu · đang hiện giá trị môi trường và mặc định',
     },
     repin: {
@@ -115,7 +121,7 @@ export default {
     dashboardTitle: 'Điều khiển từ xa · Tổng quan', noServers: 'LoaLogs chưa kết nối với server nào.', ownerServer: 'Owner server', noConfig: 'Chưa có cấu hình',
     notSet: 'Chưa đặt', evidenceLegacy: 'Chưa đặt · ảnh vẫn dùng URL cũ có thể hết hạn',
     fields: {
-      globalNotify: 'Thông báo toàn cục', defaultScope: 'Scope mặc định', autoCheck: 'Auto-check', notifyChannel: 'Notify channel', lastUpdated: 'Cập nhật gần nhất',
+      globalNotify: 'Thông báo toàn cục', defaultScope: 'Scope mặc định', autoCheck: 'Auto-check', autoCleanup: 'Auto-cleanup', notifyChannel: 'Notify channel', lastUpdated: 'Cập nhật gần nhất',
       updatedBy: 'Cập nhật bởi', evidenceChannel: 'Evidence channel · toàn bot', channel: 'Channel', channelId: 'Channel ID', server: 'Server', status: 'Trạng thái',
     },
     state: { enabled: 'Đang bật', disabled: 'Đang tắt', local: 'Server · Local', global: 'Global', receiving: 'Đang nhận broadcast', silent: 'Im lặng · không broadcast' },

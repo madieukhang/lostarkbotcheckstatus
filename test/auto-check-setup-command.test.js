@@ -13,6 +13,15 @@ test('/la-setup exposes repin and guild-language controls', () => {
   const byName = new Map(setup.options.map((option) => [option.name, option]));
   assert.ok(byName.has('repin'));
   assert.ok(byName.has('language'));
+  assert.ok(byName.has('cleanup'));
+
+  const cleanupState = byName.get('cleanup').options.find(
+    (option) => option.name === 'state'
+  );
+  assert.deepEqual(
+    cleanupState.choices.map((choice) => choice.value),
+    ['on', 'off']
+  );
 
   const languageOption = byName.get('language').options.find(
     (option) => option.name === 'language'
@@ -26,6 +35,7 @@ test('/la-setup exposes repin and guild-language controls', () => {
 test('GuildConfig tracks the welcome pin and daily cleanup cursor', () => {
   assert.ok(GuildConfig.schema.path('autoCheckWelcomeMessageId'));
   assert.ok(GuildConfig.schema.path('autoCheckWelcomeChannelId'));
+  assert.equal(GuildConfig.schema.path('autoCheckCleanupEnabled').options.default, false);
   assert.ok(GuildConfig.schema.path('lastAutoCheckCleanupKey'));
 });
 
@@ -59,6 +69,8 @@ test('/la-setup autochannel does not claim the cleanup day before cleanup runs',
   assert.doesNotMatch(handlerSource, /lastAutoCheckCleanupKey|getVietnamDayKey/);
   assert.doesNotMatch(handlerSource, /GuildConfig\.findOneAndUpdate/);
   assert.match(handlerSource, /configSet:\s*\{/);
+  assert.match(handlerSource, /autoCheckCleanupEnabled:\s*cleanupEnabled/);
+  assert.match(handlerSource, /cleanupEnabled,/);
   assert.match(handlerSource, /!welcome\.pinned\s*\|\|\s*!welcome\.persisted/);
 });
 

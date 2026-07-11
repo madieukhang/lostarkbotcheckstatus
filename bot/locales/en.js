@@ -171,6 +171,12 @@ const en = {
             channel: 'Channel where list notifications will be sent',
           },
         },
+        cleanup: {
+          description: 'Enable or disable daily message cleanup for this server',
+          options: {
+            state: 'Whether LoaLogs may delete non-pinned messages here',
+          },
+        },
         view: {
           description: 'View current bot channel configuration',
         },
@@ -260,6 +266,11 @@ const en = {
       'At **00:00 Asia/Ho_Chi_Minh (17:00 UTC)** I delete every non-pinned message here.',
       'Pinned messages stay. Move anything important elsewhere before the sweep.',
     ],
+    cleanupDisabledName: '🛡️ This server keeps its own messages',
+    cleanupDisabledValue: [
+      'Auto-cleanup is off here. I only process check requests and do not delete ordinary messages.',
+      'A Manage Server admin can opt in with `/la-setup cleanup state:on`.',
+    ],
     commandsName: '🧭 Useful commands',
     commandsValue: [
       '/la-check image:<screenshot> - run the same check manually',
@@ -321,6 +332,7 @@ const en = {
           lines: [
             '`/la-setup autochannel #channel` - Set the screenshot + `check <name>` channel for this server',
             '`/la-setup notifychannel #channel` - Set notification channel for this server',
+            '`/la-setup cleanup state:on/off` - Control daily cleanup for this server only',
             '`/la-setup view` - View current channel configuration',
             '`/la-setup repin` - Refresh the pinned Artist guide',
             '`/la-setup language` - Set public guild and pinned-guide language',

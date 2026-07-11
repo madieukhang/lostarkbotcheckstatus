@@ -22,6 +22,7 @@ import {
 } from '../../services/i18n/index.js';
 import { postAutoCheckWelcome } from '../../services/setup/autoCheckWelcome.js';
 import { checkBotPermissions } from '../../services/setup/channelPermissions.js';
+import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
 import {
   deferEphemeralReply,
   editAlert,
@@ -99,8 +100,17 @@ async function handleSetupAutoChannel(interaction, lang) {
     return;
   }
 
+  await connectDB();
+  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+  const cleanupEnabled = resolveAutoCheckCleanupEnabled(
+    existing,
+    interaction.guild.id,
+    config.ownerGuildId
+  );
+
   // Check bot permissions before saving
   const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
+    cleanup: cleanupEnabled,
     welcomePin: true,
   });
   if (!ok) {
@@ -117,18 +127,17 @@ async function handleSetupAutoChannel(interaction, lang) {
     return;
   }
 
-  await connectDB();
-
   // Warn if same channel as notify (allow but warn)
-  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
   const sameAsNotify = existing?.listNotifyChannelId === channel.id;
 
   const welcome = await postAutoCheckWelcome({
     botUserId: interaction.client.user.id,
     channel,
     client: interaction.client,
+    cleanupEnabled,
     configSet: {
       autoCheckChannelId: channel.id,
+      autoCheckCleanupEnabled: cleanupEnabled,
       updatedByUserId: interaction.user.id,
       updatedByTag: interaction.user.tag,
     },
@@ -155,6 +164,10 @@ async function handleSetupAutoChannel(interaction, lang) {
     interaction,
     `✅ ${t('dialogue.setup.autoChannelSet', lang, {
       channel: channel.id,
+      cleanup: t(
+        `dialogue.setup.autoCleanup.${cleanupEnabled ? 'enabled' : 'disabled'}`,
+        lang
+      ),
       warning,
       welcome: welcomeOutcomeText(welcome, lang),
     })}`,
@@ -281,6 +294,100 @@ async function handleSetupOff(interaction, lang) {
 }
 
 /**
+ * Handle /la-setup cleanup state:on|off · destructive cleanup is per guild.
+ */
+async function handleSetupCleanup(interaction, lang) {
+  const enabled = interaction.options.getString('state', true) === 'on';
+  await connectDB();
+
+  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+  const channel = await resolveGuildTextChannel(
+    interaction,
+    existing?.autoCheckChannelId
+  );
+
+  if (enabled && !channel) {
+    await editNotice(
+      interaction,
+      `⚠️ ${t('dialogue.setup.autoCleanup.noChannel', lang)}`,
+      { severity: AlertSeverity.WARNING, lang }
+    );
+    return;
+  }
+
+  if (enabled) {
+    const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
+      cleanup: true,
+      welcomePin: true,
+    });
+    if (!ok) {
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.common.missingPermissions', lang, { channel: channel.id }),
+        fields: [{
+          name: t('dialogue.common.missingField', lang),
+          value: missing.map((entry) => `• ${entry}`).join('\n'),
+          inline: false,
+        }],
+        lang,
+      });
+      return;
+    }
+  }
+
+  await GuildConfig.findOneAndUpdate(
+    { guildId: interaction.guild.id },
+    {
+      $set: {
+        autoCheckCleanupEnabled: enabled,
+        updatedByUserId: interaction.user.id,
+        updatedByTag: interaction.user.tag,
+      },
+    },
+    { upsert: true, returnDocument: 'after' }
+  );
+  invalidateGuildConfig(interaction.guild.id);
+
+  let guideLine = '';
+  if (channel) {
+    const pinPermissions = checkBotPermissions(channel, interaction.guild, {
+      cleanup: enabled,
+      welcomePin: true,
+    });
+    if (pinPermissions.ok) {
+      const welcome = await postAutoCheckWelcome({
+        botUserId: interaction.client.user.id,
+        channel,
+        client: interaction.client,
+        cleanupEnabled: enabled,
+        guildId: interaction.guild.id,
+      });
+      guideLine = `\n${welcomeOutcomeText(welcome, lang)}`;
+    } else {
+      guideLine = `\n⚠️ ${t('dialogue.setup.autoCleanup.guideNotRefreshed', lang, {
+        missing: pinPermissions.missing.join(', '),
+      })}`;
+    }
+  }
+
+  await editNotice(
+    interaction,
+    `${enabled ? '🧹' : '🛡️'} ${t(
+      `dialogue.setup.autoCleanup.${enabled ? 'enabled' : 'disabled'}`,
+      lang
+    )}${guideLine}`,
+    {
+      severity: enabled ? AlertSeverity.SUCCESS : AlertSeverity.INFO,
+      lang,
+    }
+  );
+
+  console.log(
+    `[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) autoCheckCleanup → ${enabled ? 'ON' : 'OFF'} by ${interaction.user.tag}`
+  );
+}
+
+/**
  * Handle /la-setup view
  */
 async function handleSetupView(interaction, lang) {
@@ -293,6 +400,11 @@ async function handleSetupView(interaction, lang) {
   const autoCheckEnv = config.autoCheckChannelIds;
   const notifyEnv = config.listNotifyChannelIds;
   const notifyEnabled = guildConfig?.globalNotifyEnabled ?? true;
+  const cleanupEnabled = resolveAutoCheckCleanupEnabled(
+    guildConfig,
+    interaction.guild.id,
+    config.ownerGuildId
+  );
   const defaultScope = guildConfig?.defaultBlacklistScope || 'global';
   const scopeEmoji = defaultScope === 'server' ? '🔒' : '🌐';
   const languageEntry =
@@ -307,11 +419,13 @@ async function handleSetupView(interaction, lang) {
         guildConfig.autoCheckWelcomeChannelId + '/' +
         guildConfig.autoCheckWelcomeMessageId + ')'
       : `*${t('dialogue.setup.view.pinMissing', lang)}*`;
-  const cleanupValue = autoCheckDb
-    ? t('dialogue.setup.view.cleanupActive', lang, {
+  const cleanupValue = !autoCheckDb
+    ? `*${t('dialogue.setup.view.cleanupNoChannel', lang)}*`
+    : cleanupEnabled
+      ? t('dialogue.setup.view.cleanupActive', lang, {
         last: guildConfig?.lastAutoCheckCleanupKey || `*${t('dialogue.setup.view.notYet', lang)}*`,
       })
-    : `*${t('dialogue.setup.view.cleanupInactive', lang)}*`;
+      : t('dialogue.setup.view.cleanupDisabled', lang);
 
   // Each setting renders as its own field so the dashboard reads as a
   // compact grid of "what's configured here?" cards instead of a wall of
@@ -403,6 +517,11 @@ async function handleSetupRepin(interaction, lang) {
   const guildConfig = await GuildConfig.findOne({
     guildId: interaction.guild.id,
   }).lean();
+  const cleanupEnabled = resolveAutoCheckCleanupEnabled(
+    guildConfig,
+    interaction.guild.id,
+    config.ownerGuildId
+  );
   const channel = await resolveGuildTextChannel(
     interaction,
     guildConfig?.autoCheckChannelId
@@ -417,6 +536,7 @@ async function handleSetupRepin(interaction, lang) {
   }
 
   const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
+    cleanup: cleanupEnabled,
     welcomePin: true,
   });
   if (!ok) {
@@ -435,6 +555,7 @@ async function handleSetupRepin(interaction, lang) {
     botUserId: interaction.client.user.id,
     channel,
     client: interaction.client,
+    cleanupEnabled,
     guildId: interaction.guild.id,
   });
   await editNotice(
@@ -473,6 +594,11 @@ async function handleSetupLanguage(interaction) {
     flag: languageEntry.flag,
     label: languageEntry.label,
   })}`;
+  const cleanupEnabled = resolveAutoCheckCleanupEnabled(
+    guildConfig,
+    interaction.guild.id,
+    config.ownerGuildId
+  );
   const channel = await resolveGuildTextChannel(
     interaction,
     guildConfig?.autoCheckChannelId
@@ -487,6 +613,7 @@ async function handleSetupLanguage(interaction) {
   }
 
   const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
+    cleanup: cleanupEnabled,
     welcomePin: true,
   });
   if (!ok) {
@@ -505,6 +632,7 @@ async function handleSetupLanguage(interaction) {
     botUserId: interaction.client.user.id,
     channel,
     client: interaction.client,
+    cleanupEnabled,
     guildId: interaction.guild.id,
   });
   await editNotice(
@@ -550,6 +678,8 @@ export async function handleSetupCommand(interaction) {
     await handleSetupNotifyChannel(interaction, lang);
   } else if (subcommand === 'off') {
     await handleSetupOff(interaction, lang);
+  } else if (subcommand === 'cleanup') {
+    await handleSetupCleanup(interaction, lang);
   } else if (subcommand === 'defaultscope') {
     await handleSetupDefaultScope(interaction, lang);
   } else if (subcommand === 'view') {
