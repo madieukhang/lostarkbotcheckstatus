@@ -34,8 +34,18 @@ export function buildAutoCheckWelcomeEmbed(lang, { cleanupEnabled = false } = {}
         value: asText(t('autoCheckWelcome.listsValue', lang)),
       },
       {
+        name: t('autoCheckWelcome.scopeName', lang),
+        value: asText(t('autoCheckWelcome.scopeValue', lang)),
+      },
+      // cleanupKey toggles the on/off variant; keep it at index 3 so the
+      // channel's cleanup posture stays the middle beat of the guide.
+      {
         name: t(`autoCheckWelcome.${cleanupKey}Name`, lang),
         value: asText(t(`autoCheckWelcome.${cleanupKey}Value`, lang)),
+      },
+      {
+        name: t('autoCheckWelcome.quickAddName', lang),
+        value: asText(t('autoCheckWelcome.quickAddValue', lang)),
       },
       {
         name: t('autoCheckWelcome.commandsName', lang),

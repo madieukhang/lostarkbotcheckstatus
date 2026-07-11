@@ -59,7 +59,7 @@ test('auto-check welcome presents Artist as the channel host and explains daily 
   assert.doesNotMatch(embed.description, /LoaLogs/i);
   assert.match(embed.fields.map((field) => field.value).join('\n'), /00:00/);
   assert.match(embed.fields.map((field) => field.value).join('\n'), /\/la-help/);
-  assert.match(embed.fields.map((field) => field.value).join('\n'), /check abcxyz/i);
+  assert.match(embed.fields.map((field) => field.value).join('\n'), /check <name>/i);
 });
 
 test('server-local welcome says cleanup is off and does not promise deletion', () => {
@@ -67,7 +67,8 @@ test('server-local welcome says cleanup is off and does not promise deletion', (
   const text = embed.fields.map((field) => field.value).join('\n');
 
   assert.match(text, /không xoá|không xóa/i);
-  assert.match(text, /cleanup state:on/i);
+  // Guard against regressing to the pre-consolidation dead command syntax.
+  assert.match(text, /config action:cleanup-on/i);
   assert.doesNotMatch(text, /17:00 UTC/i);
 });
 
