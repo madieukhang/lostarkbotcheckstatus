@@ -404,80 +404,30 @@ function setupCommand(name) {
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((sub) =>
       sub
-        .setName('autochannel')
-        .setDescription(commandText('setup.subcommands.autochannel.description'))
-        .addChannelOption((opt) =>
-          opt
-            .setName('channel')
-            .setDescription(commandText('setup.subcommands.autochannel.options.channel'))
-            .setRequired(true)
-        )
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('notifychannel')
-        .setDescription(commandText('setup.subcommands.notifychannel.description'))
-        .addChannelOption((opt) =>
-          opt
-            .setName('channel')
-            .setDescription(commandText('setup.subcommands.notifychannel.options.channel'))
-            .setRequired(true)
-        )
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('cleanup')
-        .setDescription(commandText('setup.subcommands.cleanup.description'))
+        .setName('config')
+        .setDescription(commandText('setup.subcommands.config.description'))
         .addStringOption((opt) =>
           opt
-            .setName('state')
-            .setDescription(commandText('setup.subcommands.cleanup.options.state'))
+            .setName('action')
+            .setDescription(commandText('setup.subcommands.config.options.action'))
             .setRequired(true)
-            .addChoices(
-              { name: 'on', value: 'on' },
-              { name: 'off', value: 'off' }
-            )
+            .setAutocomplete(true)
         )
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('view')
-        .setDescription(commandText('setup.subcommands.view.description'))
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('repin')
-        .setDescription(commandText('setup.subcommands.repin.description'))
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('language')
-        .setDescription(commandText('setup.subcommands.language.description'))
+        .addChannelOption((opt) =>
+          opt
+            .setName('channel')
+            .setDescription(commandText('setup.subcommands.config.options.channel'))
+        )
         .addStringOption((opt) =>
           opt
             .setName('language')
-            .setDescription(commandText('setup.subcommands.language.options.language'))
-            .setRequired(true)
-            .addChoices(...getSupportedLanguages().map((language) => ({
-              name: language.flag + ' ' + language.label,
-              value: language.code,
-            })))
+            .setDescription(commandText('setup.subcommands.config.options.language'))
+            .setAutocomplete(true)
         )
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('off')
-        .setDescription(commandText('setup.subcommands.off.description'))
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('defaultscope')
-        .setDescription(commandText('setup.subcommands.defaultscope.description'))
         .addStringOption((opt) =>
           opt
             .setName('scope')
-            .setDescription(commandText('setup.subcommands.defaultscope.options.scope'))
-            .setRequired(true)
+            .setDescription(commandText('setup.subcommands.config.options.scope'))
             .addChoices(
               { name: 'global', value: 'global' },
               { name: 'server', value: 'server' }

@@ -159,43 +159,13 @@ const en = {
     setup: {
       description: 'Configure bot channels for this server',
       subcommands: {
-        autochannel: {
-          description: 'Set the channel for auto-checking screenshots',
+        config: {
+          description: 'Configure this server (pick an action)',
           options: {
-            channel: 'Channel where screenshots will be auto-checked',
-          },
-        },
-        notifychannel: {
-          description: 'Set the channel for list add/remove notifications',
-          options: {
-            channel: 'Channel where list notifications will be sent',
-          },
-        },
-        cleanup: {
-          description: 'Enable or disable daily message cleanup for this server',
-          options: {
-            state: 'Whether LoaLogs may delete non-pinned messages here',
-          },
-        },
-        view: {
-          description: 'View current bot channel configuration',
-        },
-        repin: {
-          description: 'Refresh the pinned Artist guide in the auto-check channel',
-        },
-        language: {
-          description: 'Set the language for public guild messages and the pinned guide',
-          options: {
-            language: 'Language used by public guild messages',
-          },
-        },
-        off: {
-          description: 'Toggle global list notifications on/off for this server',
-        },
-        defaultscope: {
-          description: 'Set default blacklist scope for /la-list add (global or server)',
-          options: {
-            scope: 'Default scope when /la-list add does not specify scope',
+            action: 'Which setting to view or change',
+            channel: 'Target channel for set-auto-channel / set-notify-channel',
+            language: 'Language for set-language',
+            scope: 'Default blacklist scope for set-default-scope',
           },
         },
       },
