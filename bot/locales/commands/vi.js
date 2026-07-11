@@ -25,14 +25,15 @@ export default {
   setup: {
     description: 'Cấu hình LoaLogs cho server này',
     subcommands: {
-      autochannel: { description: 'Đặt channel tự kiểm tra screenshot', options: { channel: 'Channel nhận screenshot để tự kiểm tra' } },
-      notifychannel: { description: 'Đặt channel nhận thông báo thay đổi list', options: { channel: 'Channel nhận thông báo list' } },
-      cleanup: { description: 'Bật hoặc tắt dọn tin hằng ngày cho server này', options: { state: 'Cho phép LoaLogs xoá tin không ghim hay không' } },
-      view: { description: 'Xem cấu hình LoaLogs hiện tại' },
-      repin: { description: 'Làm mới bảng hướng dẫn được ghim trong auto-check channel' },
-      language: { description: 'Đặt ngôn ngữ global cho thông báo và bảng ghim', options: { language: 'Ngôn ngữ dùng cho message public của server' } },
-      off: { description: 'Bật hoặc tắt thông báo list toàn cục của server' },
-      defaultscope: { description: 'Đặt scope blacklist mặc định cho /la-list add', options: { scope: 'Scope dùng khi /la-list add không chỉ định' } },
+      config: {
+        description: 'Cấu hình server này (chọn action)',
+        options: {
+          action: 'Xem hoặc đổi setting nào',
+          channel: 'Channel đích (cho set-auto-channel / set-notify-channel)',
+          language: 'Ngôn ngữ (cho set-language)',
+          scope: 'Scope blacklist mặc định (cho set-default-scope)',
+        },
+      },
     },
   },
   stats: { description: 'Xem thống kê sử dụng bot' },

@@ -6,30 +6,22 @@ import { buildCommands } from '../bot/commands/index.js';
 import GuildConfig from '../bot/models/GuildConfig.js';
 import { startReadyBackgroundServices } from '../bot/app/lifecycle.js';
 
-test('/la-setup exposes repin and guild-language controls', () => {
+test('/la-setup collapses into a single config subcommand with the action option', () => {
   const setup = buildCommands().find((command) => command.name === 'la-setup');
   assert.ok(setup);
 
-  const byName = new Map(setup.options.map((option) => [option.name, option]));
-  assert.ok(byName.has('repin'));
-  assert.ok(byName.has('language'));
-  assert.ok(byName.has('cleanup'));
+  const subs = setup.options.filter((option) => option.type === 1); // SUB_COMMAND
+  assert.equal(subs.length, 1);
+  assert.equal(subs[0].name, 'config');
 
-  const cleanupState = byName.get('cleanup').options.find(
-    (option) => option.name === 'state'
-  );
-  assert.deepEqual(
-    cleanupState.choices.map((choice) => choice.value),
-    ['on', 'off']
-  );
-
-  const languageOption = byName.get('language').options.find(
-    (option) => option.name === 'language'
-  );
-  assert.deepEqual(
-    languageOption.choices.map((choice) => choice.value),
-    ['en', 'vi', 'jp']
-  );
+  const opts = Object.fromEntries(subs[0].options.map((option) => [option.name, option]));
+  assert.ok(opts.action, 'action option present');
+  assert.equal(opts.action.autocomplete, true);
+  assert.equal(opts.action.required, true);
+  assert.ok(opts.channel, 'channel option present');
+  assert.ok(opts.language, 'language option present');
+  assert.ok(opts.scope, 'scope option present');
+  assert.deepEqual(opts.scope.choices.map((choice) => choice.value), ['global', 'server']);
 });
 
 test('GuildConfig tracks the welcome pin and daily cleanup cursor', () => {

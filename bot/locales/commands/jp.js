@@ -25,14 +25,15 @@ export default {
   setup: {
     description: 'この server の LoaLogs を設定します',
     subcommands: {
-      autochannel: { description: 'Screenshot auto-check channel を設定します', options: { channel: 'Screenshot を自動 check する channel' } },
-      notifychannel: { description: 'List change notification channel を設定します', options: { channel: 'List notification を送る channel' } },
-      cleanup: { description: 'この server の毎日 message cleanup を切り替えます', options: { state: 'Pinned 以外を LoaLogs が削除してよいか' } },
-      view: { description: '現在の LoaLogs 設定を表示します' },
-      repin: { description: 'Auto-check channel の pinned guide を更新します' },
-      language: { description: 'Public notification と pinned guide の global 言語を設定します', options: { language: 'Server public message の言語' } },
-      off: { description: 'この server の global list notification を切り替えます' },
-      defaultscope: { description: '/la-list add の既定 blacklist scope を設定します', options: { scope: 'Scope 未指定時の既定値' } },
+      config: {
+        description: 'この server を設定します (action を選択)',
+        options: {
+          action: '表示または変更する設定',
+          channel: '対象 channel (set-auto-channel / set-notify-channel 用)',
+          language: '言語 (set-language 用)',
+          scope: '既定の blacklist scope (set-default-scope 用)',
+        },
+      },
     },
   },
   stats: { description: 'Bot usage statistics を表示します' },
