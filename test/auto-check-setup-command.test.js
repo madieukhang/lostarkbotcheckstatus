@@ -24,6 +24,14 @@ test('/la-setup collapses into a single config subcommand with the action option
   assert.deepEqual(opts.scope.choices.map((choice) => choice.value), ['global', 'server']);
 });
 
+test('/la-setup dispatch maps every action to a handler', async () => {
+  const { SETUP_ACTION_HANDLERS } = await import('../bot/handlers/setup/guildSetup.js');
+  assert.deepEqual(Object.keys(SETUP_ACTION_HANDLERS).sort(), [
+    'cleanup-off', 'cleanup-on', 'notify-off', 'notify-on', 'repin',
+    'set-auto-channel', 'set-default-scope', 'set-language', 'set-notify-channel', 'show',
+  ]);
+});
+
 test('GuildConfig tracks the welcome pin and daily cleanup cursor', () => {
   assert.ok(GuildConfig.schema.path('autoCheckWelcomeMessageId'));
   assert.ok(GuildConfig.schema.path('autoCheckWelcomeChannelId'));

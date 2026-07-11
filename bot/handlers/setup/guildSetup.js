@@ -250,14 +250,10 @@ async function handleSetupNotifyChannel(interaction, lang) {
 /**
  * Handle /la-setup off · toggle global notifications on/off
  */
-async function handleSetupOff(interaction, lang) {
+async function handleSetupOff(interaction, lang, targetEnabled) {
   await connectDB();
 
-  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id });
-
-  // Current state (default true if no config exists)
-  const currentlyEnabled = existing?.globalNotifyEnabled ?? true;
-  const newState = !currentlyEnabled;
+  const newState = targetEnabled;
 
   await GuildConfig.findOneAndUpdate(
     { guildId: interaction.guild.id },
@@ -272,13 +268,13 @@ async function handleSetupOff(interaction, lang) {
   );
 
   if (newState) {
-    await editNotice(interaction, `🔔 ${t('dialogue.setup.notificationsEnabled', lang)}`, {
+    await editNotice(interaction, `🔔 ${t('dialogue.setup.notificationsEnabled', lang)}\n${t('dialogue.setup.showHint', lang)}`, {
       severity: AlertSeverity.SUCCESS,
       titleIcon: '🔔',
       lang,
     });
   } else {
-    await editNotice(interaction, `🔕 ${t('dialogue.setup.notificationsDisabled', lang)}`, {
+    await editNotice(interaction, `🔕 ${t('dialogue.setup.notificationsDisabled', lang)}\n${t('dialogue.setup.showHint', lang)}`, {
       severity: AlertSeverity.INFO,
       titleIcon: '🔕',
       lang,
@@ -292,8 +288,7 @@ async function handleSetupOff(interaction, lang) {
 /**
  * Handle /la-setup cleanup state:on|off · destructive cleanup is per guild.
  */
-async function handleSetupCleanup(interaction, lang) {
-  const enabled = interaction.options.getString('state', true) === 'on';
+async function handleSetupCleanup(interaction, lang, enabled) {
   await connectDB();
 
   const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
@@ -371,7 +366,7 @@ async function handleSetupCleanup(interaction, lang) {
     `${enabled ? '🧹' : '🛡️'} ${t(
       `dialogue.setup.autoCleanup.${enabled ? 'enabled' : 'disabled'}`,
       lang
-    )}${guideLine}`,
+    )}${guideLine}\n${t('dialogue.setup.showHint', lang)}`,
     {
       severity: enabled ? AlertSeverity.SUCCESS : AlertSeverity.INFO,
       lang,
@@ -629,6 +624,22 @@ async function handleSetupLanguage(interaction) {
   );
 }
 
+// Maps the `action` option of /la-setup config to the handler that runs it.
+// The two toggles pass an explicit target state so the action name is the
+// source of truth (autocomplete only offers the toggle that changes state).
+export const SETUP_ACTION_HANDLERS = {
+  'show': (interaction, lang) => handleSetupView(interaction, lang),
+  'set-auto-channel': (interaction, lang) => handleSetupAutoChannel(interaction, lang),
+  'set-notify-channel': (interaction, lang) => handleSetupNotifyChannel(interaction, lang),
+  'set-language': (interaction) => handleSetupLanguage(interaction),
+  'set-default-scope': (interaction, lang) => handleSetupDefaultScope(interaction, lang),
+  'cleanup-on': (interaction, lang) => handleSetupCleanup(interaction, lang, true),
+  'cleanup-off': (interaction, lang) => handleSetupCleanup(interaction, lang, false),
+  'notify-on': (interaction, lang) => handleSetupOff(interaction, lang, true),
+  'notify-off': (interaction, lang) => handleSetupOff(interaction, lang, false),
+  'repin': (interaction, lang) => handleSetupRepin(interaction, lang),
+};
+
 export async function handleSetupCommand(interaction) {
   await deferEphemeralReply(interaction);
   const lang = await getUserLanguage(interaction.user?.id, { UserPreferenceModel: UserPreference });
@@ -641,38 +652,19 @@ export async function handleSetupCommand(interaction) {
     return;
   }
 
-  const subcommand = interaction.options.getSubcommand();
-
-  // Remote is senior-only (checked inside handler). All others need ManageGuild.
-  if (subcommand !== 'remote') {
-    const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
-    if (!hasManageGuild) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.setup.manageGuildRequired', lang),
-        lang,
-      });
-      return;
-    }
+  const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+  if (!hasManageGuild) {
+    await editAlert(interaction, {
+      severity: AlertSeverity.ERROR,
+      ...t('dialogue.setup.manageGuildRequired', lang),
+      lang,
+    });
+    return;
   }
 
-  if (subcommand === 'autochannel') {
-    await handleSetupAutoChannel(interaction, lang);
-  } else if (subcommand === 'notifychannel') {
-    await handleSetupNotifyChannel(interaction, lang);
-  } else if (subcommand === 'off') {
-    await handleSetupOff(interaction, lang);
-  } else if (subcommand === 'cleanup') {
-    await handleSetupCleanup(interaction, lang);
-  } else if (subcommand === 'defaultscope') {
-    await handleSetupDefaultScope(interaction, lang);
-  } else if (subcommand === 'view') {
-    await handleSetupView(interaction, lang);
-  } else if (subcommand === 'repin') {
-    await handleSetupRepin(interaction, lang);
-  } else if (subcommand === 'language') {
-    await handleSetupLanguage(interaction);
-  }
+  const action = interaction.options.getString('action', true);
+  const handler = SETUP_ACTION_HANDLERS[action];
+  if (handler) await handler(interaction, lang);
 }
 
 /**

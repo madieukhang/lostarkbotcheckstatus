@@ -72,6 +72,7 @@ export default {
     autoChannelSet: 'Đã đặt auto-check channel thành <#{channel}>.\nLoaLogs sẽ tự kiểm tra screenshot gửi tại đó.{warning}\n{welcome}\n{cleanup}',
     notifyChannelSet: 'Đã đặt notification channel thành <#{channel}>.\nCác thay đổi danh sách sẽ được gửi tại đó.{warning}\n\nTớ đã gửi tin nhắn thử; nó sẽ tự biến mất sau 30 giây.',
     notifyChannelSetTestFailed: 'Đã đặt notification channel thành <#{channel}>.{warning}\nTớ chưa gửi được tin nhắn thử, cậu kiểm tra lại quyền của LoaLogs nhé.',
+    showHint: 'Chạy `/la-setup config action:show` để xem lại mọi setting nha~',
     notificationsEnabled: 'Đã **bật** thông báo danh sách toàn cục cho server này.\nTớ sẽ mang các thay đổi từ server khác về đây.',
     notificationsDisabled: 'Đã **tắt** thông báo danh sách toàn cục cho server này.\nTớ sẽ giữ yên các thay đổi từ server khác.\n\nChạy lại `/la-setup off` hoặc đặt notify channel để bật lại.',
     autoCleanup: {

@@ -105,6 +105,7 @@ export default {
     autoChannelSet: 'Auto-check channel set to <#{channel}>.\nLoaLogs will check screenshots posted there automatically.{warning}\n{welcome}\n{cleanup}',
     notifyChannelSet: 'Notification channel set to <#{channel}>.\nList changes will be broadcast there.{warning}\n\nI sent a test message; it will disappear in 30 seconds.',
     notifyChannelSetTestFailed: 'Notification channel set to <#{channel}>.{warning}\nI could not send the test message, so please check LoaLogs permissions.',
+    showHint: 'Run `/la-setup config action:show` to review every setting.',
     notificationsEnabled: 'Global list notifications are **enabled** for this server.\nI will bring list changes from other servers here.',
     notificationsDisabled: 'Global list notifications are **disabled** for this server.\nI will keep cross-server list changes quiet.\n\nRun `/la-setup off` again or set a notify channel to enable them.',
     autoCleanup: {
