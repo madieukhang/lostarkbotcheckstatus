@@ -9,7 +9,10 @@ import { InteractionType, MessageFlags } from 'discord.js';
 
 import { checkStatus, resetState } from '../monitor/monitor.js';
 import { AlertSeverity, buildAlertEmbed } from '../utils/alertEmbed.js';
-import { getCachedUserLanguage, t } from '../services/i18n/index.js';
+import { getCachedUserLanguage, t, getSupportedLanguages } from '../services/i18n/index.js';
+import GuildConfig from '../models/GuildConfig.js';
+import { buildSetupActionChoices } from '../handlers/setup/setupActions.js';
+import { resolveAutoCheckCleanupEnabled } from '../services/setup/autoCheckCleanupPolicy.js';
 import { createSystemHandlers } from '../handlers/system/index.js';
 import { handleRosterCommand, handleRosterDeepContinueButton } from '../handlers/roster/index.js';
 import {
@@ -81,6 +84,36 @@ function createAutocompleteRoutes() {
       await interaction.respond(choices);
     },
     'la-evidence': handleListEvidenceAutocomplete,
+    'la-setup': async (interaction) => {
+      const focused = interaction.options.getFocused(true);
+      if (focused.name === 'language') {
+        const needle = String(focused.value || '').toLowerCase();
+        await interaction.respond(
+          getSupportedLanguages()
+            .filter((l) => `${l.label} ${l.code}`.toLowerCase().includes(needle))
+            .slice(0, 25)
+            .map((l) => ({ name: `${l.flag} ${l.label}`, value: l.code }))
+        );
+        return;
+      }
+      // action field: read the guild's current state so toggles hide correctly.
+      let cfg = null;
+      try {
+        cfg = interaction.guild
+          ? await GuildConfig.findOne({ guildId: interaction.guild.id }).lean()
+          : null;
+      } catch {
+        cfg = null;
+      }
+      const state = {
+        cleanupEnabled: resolveAutoCheckCleanupEnabled(cfg),
+        notifyEnabled: cfg?.globalNotifyEnabled ?? true,
+        autoChannelSet: Boolean(cfg?.autoCheckChannelId),
+      };
+      await interaction.respond(
+        buildSetupActionChoices({ needle: focused.value, state, t, lang: 'en' })
+      );
+    },
   };
 }
 
