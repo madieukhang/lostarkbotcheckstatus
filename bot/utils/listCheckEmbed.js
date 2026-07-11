@@ -24,6 +24,7 @@
 
 import { createArtistEmbed } from './artistVoice.js';
 import { t } from '../services/i18n/index.js';
+import { COLORS } from './ui.js';
 
 /**
  * @typedef ListCheckRender
@@ -72,10 +73,10 @@ export function buildListCheckEmbed({
 
   let color;
   let titleIcon;
-  if (counts.black > 0) { color = 0xed4245; titleIcon = '⛔'; }
-  else if (counts.watch > 0) { color = 0xfee75c; titleIcon = '⚠️'; }
-  else if (counts.white > 0 || counts.trusted > 0) { color = 0x57f287; titleIcon = '✅'; }
-  else { color = 0x5865f2; titleIcon = '🔍'; }
+  if (counts.black > 0) { color = COLORS.danger; titleIcon = '⛔'; }
+  else if (counts.watch > 0) { color = COLORS.warning; titleIcon = '⚠️'; }
+  else if (counts.white > 0 || counts.trusted > 0) { color = COLORS.success; titleIcon = '✅'; }
+  else { color = COLORS.info; titleIcon = '🔍'; }
 
   // HUD-merged header. The mode + total name count live on the author kicker
   // line; the title IS the breakdown, ordered by severity (black -> watch ->
