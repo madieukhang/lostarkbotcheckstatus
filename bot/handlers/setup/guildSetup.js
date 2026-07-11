@@ -102,11 +102,7 @@ async function handleSetupAutoChannel(interaction, lang) {
 
   await connectDB();
   const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
-  const cleanupEnabled = resolveAutoCheckCleanupEnabled(
-    existing,
-    interaction.guild.id,
-    config.ownerGuildId
-  );
+  const cleanupEnabled = resolveAutoCheckCleanupEnabled(existing);
 
   // Check bot permissions before saving
   const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
@@ -400,11 +396,7 @@ async function handleSetupView(interaction, lang) {
   const autoCheckEnv = config.autoCheckChannelIds;
   const notifyEnv = config.listNotifyChannelIds;
   const notifyEnabled = guildConfig?.globalNotifyEnabled ?? true;
-  const cleanupEnabled = resolveAutoCheckCleanupEnabled(
-    guildConfig,
-    interaction.guild.id,
-    config.ownerGuildId
-  );
+  const cleanupEnabled = resolveAutoCheckCleanupEnabled(guildConfig);
   const defaultScope = guildConfig?.defaultBlacklistScope || 'global';
   const scopeEmoji = defaultScope === 'server' ? '🔒' : '🌐';
   const languageEntry =
@@ -517,11 +509,7 @@ async function handleSetupRepin(interaction, lang) {
   const guildConfig = await GuildConfig.findOne({
     guildId: interaction.guild.id,
   }).lean();
-  const cleanupEnabled = resolveAutoCheckCleanupEnabled(
-    guildConfig,
-    interaction.guild.id,
-    config.ownerGuildId
-  );
+  const cleanupEnabled = resolveAutoCheckCleanupEnabled(guildConfig);
   const channel = await resolveGuildTextChannel(
     interaction,
     guildConfig?.autoCheckChannelId
@@ -594,11 +582,7 @@ async function handleSetupLanguage(interaction) {
     flag: languageEntry.flag,
     label: languageEntry.label,
   })}`;
-  const cleanupEnabled = resolveAutoCheckCleanupEnabled(
-    guildConfig,
-    interaction.guild.id,
-    config.ownerGuildId
-  );
+  const cleanupEnabled = resolveAutoCheckCleanupEnabled(guildConfig);
   const channel = await resolveGuildTextChannel(
     interaction,
     guildConfig?.autoCheckChannelId

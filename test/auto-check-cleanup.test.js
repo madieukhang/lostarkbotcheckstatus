@@ -305,7 +305,6 @@ test('daily cleanup skips a server-local auto-check config that did not opt in',
         }],
       }),
     },
-    ownerGuildId: 'owner-guild',
     resolveChannel: async () => {
       channelResolutions += 1;
       return { id: 'channel-1', guildId: 'private-guild' };
@@ -323,7 +322,7 @@ test('daily cleanup skips a server-local auto-check config that did not opt in',
   assert.equal(cleanupCalls, 0);
 });
 
-test('daily cleanup query preserves the legacy owner while excluding local defaults', async () => {
+test('daily cleanup query requires explicit opt-in from every guild', async () => {
   let findQuery;
   const service = createAutoCheckCleanupService({
     GuildConfigModel: {
@@ -332,19 +331,13 @@ test('daily cleanup query preserves the legacy owner while excluding local defau
         return { lean: async () => [] };
       },
     },
-    ownerGuildId: 'owner-guild',
     logger: { info() {}, warn() {}, error() {} },
   });
 
   await service.runDailyCleanupTick({});
 
-  assert.deepEqual(findQuery.$or, [
-    { autoCheckCleanupEnabled: true },
-    {
-      guildId: 'owner-guild',
-      autoCheckCleanupEnabled: { $exists: false },
-    },
-  ]);
+  assert.equal(findQuery.autoCheckCleanupEnabled, true);
+  assert.equal(findQuery.$or, undefined);
 });
 
 test('cleanup scheduler starts immediately, prevents overlap, and reuses one timer', async () => {

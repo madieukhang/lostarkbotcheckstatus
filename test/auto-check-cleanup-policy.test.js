@@ -8,39 +8,21 @@ import {
 
 test('cleanup policy keeps explicit per-server choices authoritative', () => {
   assert.equal(
-    resolveAutoCheckCleanupEnabled(
-      { autoCheckCleanupEnabled: false },
-      'owner',
-      'owner'
-    ),
+    resolveAutoCheckCleanupEnabled({ autoCheckCleanupEnabled: false }),
     false
   );
   assert.equal(
-    resolveAutoCheckCleanupEnabled(
-      { autoCheckCleanupEnabled: true },
-      'private',
-      'owner'
-    ),
+    resolveAutoCheckCleanupEnabled({ autoCheckCleanupEnabled: true }),
     true
   );
 });
 
-test('legacy cleanup defaults on only for the global owner guild', () => {
-  assert.equal(resolveAutoCheckCleanupEnabled({}, 'owner', 'owner'), true);
-  assert.equal(resolveAutoCheckCleanupEnabled({}, 'private', 'owner'), false);
-  assert.equal(resolveAutoCheckCleanupEnabled({}, 'private', ''), false);
+test('cleanup defaults off for every guild including the global owner', () => {
+  assert.equal(resolveAutoCheckCleanupEnabled({}), false);
+  assert.equal(resolveAutoCheckCleanupEnabled(null), false);
 });
 
-test('cleanup eligibility includes explicit opt-ins plus the legacy owner fallback', () => {
-  assert.deepEqual(buildAutoCheckCleanupEligibility('owner'), {
-    $or: [
-      { autoCheckCleanupEnabled: true },
-      {
-        guildId: 'owner',
-        autoCheckCleanupEnabled: { $exists: false },
-      },
-    ],
-  });
+test('cleanup eligibility includes explicit opt-ins only', () => {
   assert.deepEqual(buildAutoCheckCleanupEligibility(), {
     autoCheckCleanupEnabled: true,
   });

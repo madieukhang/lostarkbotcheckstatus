@@ -75,7 +75,7 @@ export async function handleSetupRemoteCommand(interaction) {
         ? `🔒 ${t('dialogue.remote.state.local', lang)}`
         : `🌐 ${t('dialogue.remote.state.global', lang)}`;
       const autoCheck = gc?.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : `*${t('dialogue.remote.notSet', lang)}*`;
-      const cleanupEnabled = resolveAutoCheckCleanupEnabled(gc, guild.id, config.ownerGuildId);
+      const cleanupEnabled = resolveAutoCheckCleanupEnabled(gc);
       const cleanup = cleanupEnabled
         ? `🧹 ${t('dialogue.remote.state.enabled', lang)}`
         : `🛡️ ${t('dialogue.remote.state.disabled', lang)}`;

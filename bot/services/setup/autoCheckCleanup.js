@@ -106,10 +106,9 @@ export function createAutoCheckCleanupService({
   resolveChannel = resolveConfiguredChannel,
   channelGuard = autoCheckChannelGuard,
   checkPermissions = checkBotPermissions,
-  ownerGuildId = (process.env.OWNER_GUILD_ID || '').trim(),
   logger = console,
 } = {}) {
-  const cleanupEligibility = buildAutoCheckCleanupEligibility(ownerGuildId);
+  const cleanupEligibility = buildAutoCheckCleanupEligibility();
 
   async function releaseClaim(guildId, dayKey) {
     try {
@@ -137,7 +136,7 @@ export function createAutoCheckCleanupService({
     }
 
     for (const config of configs) {
-      if (!resolveAutoCheckCleanupEnabled(config, config.guildId, ownerGuildId)) {
+      if (!resolveAutoCheckCleanupEnabled(config)) {
         continue;
       }
 
