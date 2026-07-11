@@ -151,14 +151,11 @@ const jp = {
         {
           name: '⚙️ サーバー設定',
           lines: [
-            '`/la-setup autochannel #channel` - screenshot と `check <name>` 用 channel を設定',
-            '`/la-setup notifychannel #channel` - list notification channel を設定',
-            '`/la-setup cleanup state:on/off` - この server だけの毎日 cleanup を切り替え',
-            '`/la-setup view` - 現在の config を表示',
-            '`/la-setup repin` - pinned Artist guide を更新',
-            '`/la-setup language` - public message と pin の言語を変更',
-            '`/la-setup off` - global list notifications の on/off',
-            '`/la-setup defaultscope global/server` - /la-list add の default blacklist scope を設定',
+            '`/la-setup config action:<action>` で全 setup を実行 (Manage Server 必要):',
+            '• `show` - 全 config を表示 · `repin` - pinned Artist guide を更新',
+            '• `set-auto-channel channel:#x` - screenshot + `check <name>` 用 channel · `set-notify-channel channel:#x`',
+            '• `cleanup-on` / `cleanup-off` - この server の毎日 cleanup · `notify-on` / `notify-off` - server 間 list 通知',
+            '• `set-language` - public + pin の言語 · `set-default-scope scope:global/server` - /la-list add の既定 scope',
           ],
         },
         {

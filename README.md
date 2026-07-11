@@ -35,11 +35,14 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 | `/la-list multiadd action [file]` | Bulk add via Excel template (≤ 30 rows). `action:template` downloads, `action:file` uploads |
 | `/la-check image` | OCR a screenshot → cross-check names against all lists |
 | `/la-help` | Show all commands |
-| `/la-setup autochannel #channel` | Set auto-check channel (Manage Server) |
-| `/la-setup notifychannel #channel` | Set notification channel (Manage Server) |
-| `/la-setup view` | View current channel config |
-| `/la-setup off` | Toggle global-list notifications on/off for this server |
-| `/la-setup defaultscope global/server` | Set default scope for `/la-list add` |
+| `/la-setup config action:<action>` | All setup runs through one command (Manage Server). Actions below |
+| `action:show` | View the current server config |
+| `action:set-auto-channel channel:#x` | Set the auto-check channel |
+| `action:set-notify-channel channel:#x` | Set the notification channel |
+| `action:cleanup-on` / `cleanup-off` | Toggle daily cleanup for this server |
+| `action:notify-on` / `notify-off` | Toggle global-list notifications |
+| `action:set-default-scope scope:global/server` | Default scope for `/la-list add` |
+| `action:set-language` / `action:repin` | Set public language / refresh the pinned guide |
 
 ### Status Icons
 

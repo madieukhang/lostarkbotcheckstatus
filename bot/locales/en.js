@@ -316,14 +316,11 @@ const en = {
         {
           name: '⚙️ Server Setup',
           lines: [
-            '`/la-setup autochannel #channel` - Set the screenshot + `check <name>` channel for this server',
-            '`/la-setup notifychannel #channel` - Set notification channel for this server',
-            '`/la-setup cleanup state:on/off` - Control daily cleanup for this server only',
-            '`/la-setup view` - View current channel configuration',
-            '`/la-setup repin` - Refresh the pinned Artist guide',
-            '`/la-setup language` - Set public guild and pinned-guide language',
-            '`/la-setup off` - Toggle global list notifications on/off',
-            '`/la-setup defaultscope global/server` - Set default blacklist scope for /la-list add',
+            '`/la-setup config action:<action>` runs every setup step (Manage Server only):',
+            '• `show` - full config · `repin` - refresh the pinned Artist guide',
+            '• `set-auto-channel channel:#x` - screenshot + `check <name>` channel · `set-notify-channel channel:#x`',
+            '• `cleanup-on` / `cleanup-off` - daily cleanup for this server · `notify-on` / `notify-off` - cross-server list notifications',
+            '• `set-language` - public + pinned-guide language · `set-default-scope scope:global/server` - default `/la-list add` scope',
           ],
         },
         {
