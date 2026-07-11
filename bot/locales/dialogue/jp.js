@@ -51,6 +51,7 @@ export default {
     autoChannelSet: 'Auto-check チャンネルを <#{channel}> に設定しました。\nLoaLogs が投稿された screenshot を自動確認しますの。{warning}\n{welcome}\n{cleanup}',
     notifyChannelSet: '通知チャンネルを <#{channel}> に設定しました。\nリスト変更をここへ送りますの。{warning}\n\nテストメッセージは30秒後に消えますわ。',
     notifyChannelSetTestFailed: '通知チャンネルを <#{channel}> に設定しました。{warning}\nテストメッセージを送れなかったため、LoaLogs の権限をご確認くださいませ。',
+    showHint: '`/la-setup config action:show` ですべての設定を確認できますわ。',
     notificationsEnabled: 'このサーバーのグローバル通知を **有効** にしました。\n他サーバーのリスト変更をここへ届けますわ。',
     notificationsDisabled: 'このサーバーのグローバル通知を **無効** にしました。\n他サーバーの変更は静かにしておきますの。\n\n`/la-setup off` をもう一度実行するか、通知チャンネルを設定すると再び有効になりますわ。',
     autoCleanup: {
