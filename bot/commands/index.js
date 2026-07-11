@@ -426,6 +426,21 @@ function setupCommand(name) {
     )
     .addSubcommand((sub) =>
       sub
+        .setName('cleanup')
+        .setDescription(commandText('setup.subcommands.cleanup.description'))
+        .addStringOption((opt) =>
+          opt
+            .setName('state')
+            .setDescription(commandText('setup.subcommands.cleanup.options.state'))
+            .setRequired(true)
+            .addChoices(
+              { name: 'on', value: 'on' },
+              { name: 'off', value: 'off' }
+            )
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName('view')
         .setDescription(commandText('setup.subcommands.view.description'))
     )

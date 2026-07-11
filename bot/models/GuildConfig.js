@@ -21,6 +21,9 @@ const guildConfigSchema = new mongoose.Schema({
   autoCheckWelcomeMessageId: { type: String, default: '' },
   autoCheckWelcomeChannelId: { type: String, default: '' },
 
+  /** Destructive daily cleanup is opt-in per guild; auto-check stays independent */
+  autoCheckCleanupEnabled: { type: Boolean, default: false },
+
   /** YYYY-MM-DD in Asia/Ho_Chi_Minh for the last completed daily cleanup */
   lastAutoCheckCleanupKey: { type: String, default: '' },
 

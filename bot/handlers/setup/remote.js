@@ -17,6 +17,7 @@ import {
   updatePayload,
 } from '../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
+import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
 import { handleSyncImagesAction } from './syncImages.js';
 /**
  * Handle /la-remote · Senior-only remote config management
@@ -74,6 +75,10 @@ export async function handleSetupRemoteCommand(interaction) {
         ? `🔒 ${t('dialogue.remote.state.local', lang)}`
         : `🌐 ${t('dialogue.remote.state.global', lang)}`;
       const autoCheck = gc?.autoCheckChannelId ? `<#${gc.autoCheckChannelId}>` : `*${t('dialogue.remote.notSet', lang)}*`;
+      const cleanupEnabled = resolveAutoCheckCleanupEnabled(gc, guild.id, config.ownerGuildId);
+      const cleanup = cleanupEnabled
+        ? `🧹 ${t('dialogue.remote.state.enabled', lang)}`
+        : `🛡️ ${t('dialogue.remote.state.disabled', lang)}`;
       const notifyCh = gc?.listNotifyChannelId ? `<#${gc.listNotifyChannelId}>` : `*${t('dialogue.remote.notSet', lang)}*`;
       const updated = gc?.updatedAt ? `<t:${Math.floor(new Date(gc.updatedAt).getTime() / 1000)}:R>` : '-';
       const configured = gc ? '✅' : '⚪';
@@ -85,6 +90,7 @@ export async function handleSetupRemoteCommand(interaction) {
           { name: `📡 ${t('dialogue.remote.fields.globalNotify', lang)}`, value: notify, inline: true },
           { name: `🎯 ${t('dialogue.remote.fields.defaultScope', lang)}`, value: scopeDisplay, inline: true },
           { name: `📸 ${t('dialogue.remote.fields.autoCheck', lang)}`, value: autoCheck, inline: true },
+          { name: `🧹 ${t('dialogue.remote.fields.autoCleanup', lang)}`, value: cleanup, inline: true },
           { name: `🔔 ${t('dialogue.remote.fields.notifyChannel', lang)}`, value: notifyCh, inline: true },
           { name: `🕐 ${t('dialogue.remote.fields.lastUpdated', lang)}`, value: updated, inline: true },
           { name: `👤 ${t('dialogue.remote.fields.updatedBy', lang)}`, value: gc?.updatedByTag || '-', inline: true },

@@ -71,6 +71,11 @@ const vi = {
       'Đúng **00:00 Asia/Ho_Chi_Minh (17:00 UTC)**, tớ xoá mọi tin nhắn không ghim ở đây.',
       'Tin đã ghim thì tớ để yên. Có gì quan trọng thì chuyển đi chỗ khác trước giờ dọn nha.',
     ],
+    cleanupDisabledName: '🛡️ Server này tự giữ tin nhắn của mình',
+    cleanupDisabledValue: [
+      'Auto-cleanup đang tắt. Tớ chỉ xử lý lượt check và không xoá các tin nhắn thông thường.',
+      'Admin có quyền Manage Server có thể bật riêng bằng `/la-setup cleanup state:on`.',
+    ],
     commandsName: '🧭 Các lệnh hữu ích',
     commandsValue: [
       '/la-check image:<screenshot> - kiểm tra ảnh thủ công',
@@ -132,6 +137,7 @@ const vi = {
           lines: [
             '`/la-setup autochannel #channel` - Set channel nhận screenshot và `check <tên>` cho server',
             '`/la-setup notifychannel #channel` - Set channel nhận thông báo list',
+            '`/la-setup cleanup state:on/off` - Bật/tắt dọn hằng ngày chỉ cho server này',
             '`/la-setup view` - Xem config hiện tại',
             '`/la-setup repin` - Làm mới bảng hướng dẫn Artist đã ghim',
             '`/la-setup language` - Đổi ngôn ngữ public và tin ghim của server',

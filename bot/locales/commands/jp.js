@@ -27,6 +27,7 @@ export default {
     subcommands: {
       autochannel: { description: 'Screenshot auto-check channel を設定します', options: { channel: 'Screenshot を自動 check する channel' } },
       notifychannel: { description: 'List change notification channel を設定します', options: { channel: 'List notification を送る channel' } },
+      cleanup: { description: 'この server の毎日 message cleanup を切り替えます', options: { state: 'Pinned 以外を LoaLogs が削除してよいか' } },
       view: { description: '現在の LoaLogs 設定を表示します' },
       repin: { description: 'Auto-check channel の pinned guide を更新します' },
       language: { description: 'Public notification と pinned guide の global 言語を設定します', options: { language: 'Server public message の言語' } },

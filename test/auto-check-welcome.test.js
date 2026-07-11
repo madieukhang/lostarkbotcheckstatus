@@ -51,7 +51,7 @@ function createGuildConfig({ stored = null, persistError = null } = {}) {
 }
 
 test('auto-check welcome presents Artist as the channel host and explains daily cleanup', () => {
-  const embed = buildAutoCheckWelcomeEmbed('vi').toJSON();
+  const embed = buildAutoCheckWelcomeEmbed('vi', { cleanupEnabled: true }).toJSON();
 
   assert.match(embed.title, /Artist/i);
   // The host speaks in first person and never narrates itself in the third person.
@@ -62,23 +62,35 @@ test('auto-check welcome presents Artist as the channel host and explains daily 
   assert.match(embed.fields.map((field) => field.value).join('\n'), /check abcxyz/i);
 });
 
+test('server-local welcome says cleanup is off and does not promise deletion', () => {
+  const embed = buildAutoCheckWelcomeEmbed('vi').toJSON();
+  const text = embed.fields.map((field) => field.value).join('\n');
+
+  assert.match(text, /không xoá|không xóa/i);
+  assert.match(text, /cleanup state:on/i);
+  assert.doesNotMatch(text, /17:00 UTC/i);
+});
+
 test('auto-check welcome stays within Discord embed limits in every language', () => {
   for (const lang of ['en', 'vi', 'jp']) {
-    const embed = buildAutoCheckWelcomeEmbed(lang).toJSON();
-    assert.ok(embed.title.length <= 256, lang + ' title exceeds 256');
-    assert.ok(embed.description.length <= 4096, lang + ' description exceeds 4096');
-    for (const field of embed.fields) {
-      assert.ok(field.name.length <= 256, lang + ' field name exceeds 256');
-      assert.ok(field.value.length <= 1024, lang + ' field value exceeds 1024');
+    for (const cleanupEnabled of [false, true]) {
+      const label = lang + (cleanupEnabled ? ' cleanup-on' : ' cleanup-off');
+      const embed = buildAutoCheckWelcomeEmbed(lang, { cleanupEnabled }).toJSON();
+      assert.ok(embed.title.length <= 256, label + ' title exceeds 256');
+      assert.ok(embed.description.length <= 4096, label + ' description exceeds 4096');
+      for (const field of embed.fields) {
+        assert.ok(field.name.length <= 256, label + ' field name exceeds 256');
+        assert.ok(field.value.length <= 1024, label + ' field value exceeds 1024');
+      }
+      const totalText = [
+        embed.title,
+        embed.description,
+        embed.footer?.text || '',
+        ...embed.fields.flatMap((field) => [field.name, field.value]),
+      ].join('');
+      assert.ok(totalText.length <= 6000, label + ' embed exceeds 6000');
+      assert.doesNotMatch(totalText, /LoaLogs/i, label + ' welcome still names the bot in third person');
     }
-    const totalText = [
-      embed.title,
-      embed.description,
-      embed.footer?.text || '',
-      ...embed.fields.flatMap((field) => [field.name, field.value]),
-    ].join('');
-    assert.ok(totalText.length <= 6000, lang + ' embed exceeds 6000');
-    assert.doesNotMatch(totalText, /LoaLogs/i, lang + ' welcome still names the bot in third person');
   }
 });
 
@@ -176,6 +188,44 @@ test('welcome replacement persists the fresh pin before deleting tracked and orp
   });
 });
 
+test('first server-local welcome does not run destructive cleanup when cleanup is off', async () => {
+  const fresh = createMessage('fresh', 'Welcome vi');
+  let cleanupCalls = 0;
+  const channel = {
+    id: 'channel-1',
+    messages: { fetchPins: async () => ({ items: [] }) },
+    send: async () => fresh,
+  };
+  const GuildConfigModel = createGuildConfig();
+  const service = createAutoCheckWelcomeService({
+    GuildConfigModel,
+    buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
+    getGuildLanguageFn: async () => 'vi',
+    cleanupMessages: async () => {
+      cleanupCalls += 1;
+      return { deleted: 99, failed: 0, truncated: false };
+    },
+    supportedLanguageCodes: ['en', 'vi', 'jp'],
+    logger: { warn() {} },
+  });
+
+  const outcome = await service.postWelcome({
+    botUserId: 'bot',
+    channel,
+    client: { channels: { fetch: async () => channel } },
+    cleanupEnabled: false,
+    guildId: 'guild-1',
+  });
+
+  assert.equal(cleanupCalls, 0);
+  assert.equal(outcome.cleanupAttempted, false);
+  assert.equal(outcome.pinned, true);
+  assert.equal(
+    GuildConfigModel.updates[0].update.$set.lastAutoCheckCleanupKey,
+    undefined
+  );
+});
+
 test('first welcome cleans non-pinned messages before posting and records the cleanup day', async () => {
   const fresh = createMessage('fresh', 'Welcome vi');
   const events = [];
@@ -217,8 +267,10 @@ test('first welcome cleans non-pinned messages before posting and records the cl
     botUserId: 'bot',
     channel,
     client: { channels: { fetch: async () => channel } },
+    cleanupEnabled: true,
     configSet: {
       autoCheckChannelId: channel.id,
+      autoCheckCleanupEnabled: true,
       updatedByUserId: 'officer-1',
     },
     guildId: 'guild-1',
@@ -236,6 +288,7 @@ test('first welcome cleans non-pinned messages before posting and records the cl
   assert.equal(outcome.cleanupDeleted, 12);
   assert.deepEqual(GuildConfigModel.updates[0].update.$set, {
     autoCheckChannelId: 'channel-1',
+    autoCheckCleanupEnabled: true,
     updatedByUserId: 'officer-1',
     autoCheckWelcomeMessageId: 'fresh',
     autoCheckWelcomeChannelId: 'channel-1',
@@ -248,6 +301,7 @@ test('welcome setup and daily cleanup cannot race across the send-to-pin window'
   const state = {
     guildId: 'guild-1',
     autoCheckChannelId: 'channel-1',
+    autoCheckCleanupEnabled: true,
   };
   const GuildConfigModel = {
     find() {
@@ -322,6 +376,7 @@ test('welcome setup and daily cleanup cannot race across the send-to-pin window'
     botUserId: 'bot',
     channel,
     client: { channels: { fetch: async () => channel } },
+    cleanupEnabled: true,
     guildId: 'guild-1',
   });
   await initialCleanupReady;
@@ -405,6 +460,7 @@ test('first welcome skips destructive cleanup when pin discovery fails', async (
     botUserId: 'bot',
     channel,
     client: { channels: { fetch: async () => channel } },
+    cleanupEnabled: true,
     guildId: 'guild-1',
   });
 
@@ -436,6 +492,7 @@ test('incomplete first cleanup leaves the day unclaimed so the scheduler can ret
     botUserId: 'bot',
     channel,
     client: { channels: { fetch: async () => channel } },
+    cleanupEnabled: true,
     guildId: 'guild-1',
   });
 

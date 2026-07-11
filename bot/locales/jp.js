@@ -71,6 +71,11 @@ const jp = {
       '毎日 **00:00 Asia/Ho_Chi_Minh (日本時間 02:00)** に、pinned 以外の全 message をわたくしが削除しますわ。',
       'Pinned message は残りますの。大切な内容は cleanup 前に別の場所へ移してね♪',
     ],
+    cleanupDisabledName: '🛡️ この server の message はそのまま残しますわ',
+    cleanupDisabledValue: [
+      'Auto-cleanup は無効ですの。Check request だけを処理し、通常の message は削除いたしませんわ。',
+      'Manage Server 権限を持つ admin は `/la-setup cleanup state:on` で個別に有効化できますの。',
+    ],
     commandsName: '🧭 便利なコマンド',
     commandsValue: [
       '/la-check image:<screenshot> - 手動で画像を check',
@@ -132,6 +137,7 @@ const jp = {
           lines: [
             '`/la-setup autochannel #channel` - screenshot と `check <name>` 用 channel を設定',
             '`/la-setup notifychannel #channel` - list notification channel を設定',
+            '`/la-setup cleanup state:on/off` - この server だけの毎日 cleanup を切り替え',
             '`/la-setup view` - 現在の config を表示',
             '`/la-setup repin` - pinned Artist guide を更新',
             '`/la-setup language` - public message と pin の言語を変更',

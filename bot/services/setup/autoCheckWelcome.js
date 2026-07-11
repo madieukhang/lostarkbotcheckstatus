@@ -18,7 +18,8 @@ function asText(value) {
   return Array.isArray(value) ? value.join('\n') : String(value || '');
 }
 
-export function buildAutoCheckWelcomeEmbed(lang) {
+export function buildAutoCheckWelcomeEmbed(lang, { cleanupEnabled = false } = {}) {
+  const cleanupKey = cleanupEnabled ? 'cleanup' : 'cleanupDisabled';
   return new EmbedBuilder()
     .setColor(COLORS.info)
     .setTitle(t('autoCheckWelcome.title', lang))
@@ -33,8 +34,8 @@ export function buildAutoCheckWelcomeEmbed(lang) {
         value: asText(t('autoCheckWelcome.listsValue', lang)),
       },
       {
-        name: t('autoCheckWelcome.cleanupName', lang),
-        value: asText(t('autoCheckWelcome.cleanupValue', lang)),
+        name: t(`autoCheckWelcome.${cleanupKey}Name`, lang),
+        value: asText(t(`autoCheckWelcome.${cleanupKey}Value`, lang)),
       },
       {
         name: t('autoCheckWelcome.commandsName', lang),
@@ -166,6 +167,7 @@ export function createAutoCheckWelcomeService({
     botUserId,
     channel,
     client,
+    cleanupEnabled = false,
     configSet = {},
     guildId,
   }) {
@@ -197,7 +199,7 @@ export function createAutoCheckWelcomeService({
     // guide becomes the stable top-level anchor instead of landing below an
     // inherited wall of messages. If pin discovery itself failed, skip this
     // destructive step and let the daily scheduler retry safely later.
-    if (outcome.pinScanSucceeded && !outcome.hadOwnedWelcomePin) {
+    if (cleanupEnabled && outcome.pinScanSucceeded && !outcome.hadOwnedWelcomePin) {
       outcome.cleanupAttempted = true;
       try {
         const cleanup = await cleanupMessages(channel, {
@@ -225,7 +227,9 @@ export function createAutoCheckWelcomeService({
 
     let sent;
     try {
-      sent = await channel.send({ embeds: [buildWelcomeEmbed(lang)] });
+      sent = await channel.send({
+        embeds: [buildWelcomeEmbed(lang, { cleanupEnabled })],
+      });
       outcome.posted = true;
       await sent.pin();
       outcome.pinned = true;

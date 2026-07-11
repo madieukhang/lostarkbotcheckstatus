@@ -140,7 +140,11 @@ test('per-channel guard serializes cleanup work and releases after completion', 
 });
 
 test('daily cleanup claims one VN day once even when the scheduler ticks again', async () => {
-  const config = { guildId: 'guild-1', autoCheckChannelId: 'channel-1' };
+  const config = {
+    guildId: 'guild-1',
+    autoCheckChannelId: 'channel-1',
+    autoCheckCleanupEnabled: true,
+  };
   let claimed = false;
   const updates = [];
   const GuildConfigModel = {
@@ -171,6 +175,7 @@ test('daily cleanup claims one VN day once even when the scheduler ticks again',
   await service.runDailyCleanupTick({});
 
   assert.equal(cleanupCalls, 1);
+  assert.equal(updates[0].query.autoCheckCleanupEnabled, true);
   assert.equal(updates[0].query.lastAutoCheckCleanupKey.$ne, '2026-07-10');
   assert.deepEqual(updates[0].update, {
     $set: { lastAutoCheckCleanupKey: '2026-07-10' },
@@ -181,6 +186,7 @@ test('daily scheduler forwards stored and in-process welcome IDs as protected', 
   const config = {
     guildId: 'guild-1',
     autoCheckChannelId: 'channel-1',
+    autoCheckCleanupEnabled: true,
     autoCheckWelcomeMessageId: 'stored-welcome',
   };
   const GuildConfigModel = {
@@ -215,7 +221,11 @@ test('daily scheduler forwards stored and in-process welcome IDs as protected', 
 });
 
 test('daily cleanup releases the day claim when any deletion fails', async () => {
-  const config = { guildId: 'guild-1', autoCheckChannelId: 'channel-1' };
+  const config = {
+    guildId: 'guild-1',
+    autoCheckChannelId: 'channel-1',
+    autoCheckCleanupEnabled: true,
+  };
   const updates = [];
   const GuildConfigModel = {
     find() {
@@ -250,7 +260,11 @@ test('daily cleanup releases the day claim when any deletion fails', async () =>
 });
 
 test('daily cleanup leaves the day unclaimed when channel permissions were revoked', async () => {
-  const config = { guildId: 'guild-1', autoCheckChannelId: 'channel-1' };
+  const config = {
+    guildId: 'guild-1',
+    autoCheckChannelId: 'channel-1',
+    autoCheckCleanupEnabled: true,
+  };
   let updates = 0;
   let cleanupCalls = 0;
   const warnings = [];
@@ -276,6 +290,61 @@ test('daily cleanup leaves the day unclaimed when channel permissions were revok
   assert.equal(updates, 0);
   assert.equal(cleanupCalls, 0);
   assert.match(warnings[0], /Manage Messages/);
+});
+
+test('daily cleanup skips a server-local auto-check config that did not opt in', async () => {
+  let channelResolutions = 0;
+  let cleanupCalls = 0;
+  const service = createAutoCheckCleanupService({
+    GuildConfigModel: {
+      find: () => ({
+        lean: async () => [{
+          guildId: 'private-guild',
+          autoCheckChannelId: 'channel-1',
+          autoCheckCleanupEnabled: false,
+        }],
+      }),
+    },
+    ownerGuildId: 'owner-guild',
+    resolveChannel: async () => {
+      channelResolutions += 1;
+      return { id: 'channel-1', guildId: 'private-guild' };
+    },
+    cleanupMessages: async () => {
+      cleanupCalls += 1;
+      return { deleted: 0, failed: 0, truncated: false };
+    },
+    logger: { info() {}, warn() {}, error() {} },
+  });
+
+  await service.runDailyCleanupTick({});
+
+  assert.equal(channelResolutions, 0);
+  assert.equal(cleanupCalls, 0);
+});
+
+test('daily cleanup query preserves the legacy owner while excluding local defaults', async () => {
+  let findQuery;
+  const service = createAutoCheckCleanupService({
+    GuildConfigModel: {
+      find(query) {
+        findQuery = query;
+        return { lean: async () => [] };
+      },
+    },
+    ownerGuildId: 'owner-guild',
+    logger: { info() {}, warn() {}, error() {} },
+  });
+
+  await service.runDailyCleanupTick({});
+
+  assert.deepEqual(findQuery.$or, [
+    { autoCheckCleanupEnabled: true },
+    {
+      guildId: 'owner-guild',
+      autoCheckCleanupEnabled: { $exists: false },
+    },
+  ]);
 });
 
 test('cleanup scheduler starts immediately, prevents overlap, and reuses one timer', async () => {

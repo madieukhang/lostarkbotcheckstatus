@@ -27,6 +27,7 @@ export default {
     subcommands: {
       autochannel: { description: 'Đặt channel tự kiểm tra screenshot', options: { channel: 'Channel nhận screenshot để tự kiểm tra' } },
       notifychannel: { description: 'Đặt channel nhận thông báo thay đổi list', options: { channel: 'Channel nhận thông báo list' } },
+      cleanup: { description: 'Bật hoặc tắt dọn tin hằng ngày cho server này', options: { state: 'Cho phép LoaLogs xoá tin không ghim hay không' } },
       view: { description: 'Xem cấu hình LoaLogs hiện tại' },
       repin: { description: 'Làm mới bảng hướng dẫn được ghim trong auto-check channel' },
       language: { description: 'Đặt ngôn ngữ global cho thông báo và bảng ghim', options: { language: 'Ngôn ngữ dùng cho message public của server' } },
