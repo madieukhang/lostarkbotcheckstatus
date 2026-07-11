@@ -151,14 +151,11 @@ const vi = {
         {
           name: '⚙️ Cài đặt server',
           lines: [
-            '`/la-setup autochannel #channel` - Set channel nhận screenshot và `check <tên>` cho server',
-            '`/la-setup notifychannel #channel` - Set channel nhận thông báo list',
-            '`/la-setup cleanup state:on/off` - Bật/tắt dọn hằng ngày chỉ cho server này',
-            '`/la-setup view` - Xem config hiện tại',
-            '`/la-setup repin` - Làm mới bảng hướng dẫn Artist đã ghim',
-            '`/la-setup language` - Đổi ngôn ngữ public và tin ghim của server',
-            '`/la-setup off` - Bật/tắt global list notifications',
-            '`/la-setup defaultscope global/server` - Set default blacklist scope cho /la-list add',
+            '`/la-setup config action:<action>` chạy mọi bước setup (cần Manage Server):',
+            '• `show` - xem toàn bộ config · `repin` - làm mới bảng hướng dẫn Artist đã ghim',
+            '• `set-auto-channel channel:#x` - channel nhận screenshot + `check <tên>` · `set-notify-channel channel:#x`',
+            '• `cleanup-on` / `cleanup-off` - dọn hằng ngày cho server này · `notify-on` / `notify-off` - thông báo list xuyên server',
+            '• `set-language` - ngôn ngữ public + tin ghim · `set-default-scope scope:global/server` - scope mặc định cho /la-list add',
           ],
         },
         {

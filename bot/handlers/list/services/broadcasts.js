@@ -1,7 +1,7 @@
 /**
  * handlers/list/services/broadcasts.js
  * Cross-guild broadcast helpers · posts list-change notifications to
- * the per-guild notify channel (configured via /la-setup notifychannel
+ * the per-guild notify channel (configured via /la-setup config action:set-notify-channel
  * or LIST_NOTIFY_CHANNEL_IDS env fallback). Also exports the tracked-
  * alts field builder and roster stat-record merge helpers reused by
  * the multiadd reject/summary embeds.

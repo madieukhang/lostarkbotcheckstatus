@@ -86,7 +86,7 @@ export function welcomeOutcomeText(outcome, lang) {
 }
 
 /**
- * Handle /la-setup autochannel #channel
+ * Handle the set-auto-channel action
  */
 async function handleSetupAutoChannel(interaction, lang) {
   const channel = interaction.options.getChannel('channel', true);
@@ -175,7 +175,7 @@ async function handleSetupAutoChannel(interaction, lang) {
 }
 
 /**
- * Handle /la-setup notifychannel #channel
+ * Handle the set-notify-channel action
  */
 async function handleSetupNotifyChannel(interaction, lang) {
   const channel = interaction.options.getChannel('channel', true);
@@ -248,7 +248,7 @@ async function handleSetupNotifyChannel(interaction, lang) {
 }
 
 /**
- * Handle /la-setup off · toggle global notifications on/off
+ * Handle the notify-on / notify-off action · toggle global notifications
  */
 async function handleSetupOff(interaction, lang, targetEnabled) {
   await connectDB();
@@ -286,7 +286,7 @@ async function handleSetupOff(interaction, lang, targetEnabled) {
 }
 
 /**
- * Handle /la-setup cleanup state:on|off · destructive cleanup is per guild.
+ * Handle the cleanup-on / cleanup-off action · destructive cleanup is per guild.
  */
 async function handleSetupCleanup(interaction, lang, enabled) {
   await connectDB();
@@ -379,7 +379,7 @@ async function handleSetupCleanup(interaction, lang, enabled) {
 }
 
 /**
- * Handle /la-setup view
+ * Handle the show action (status hub)
  */
 async function handleSetupView(interaction, lang) {
   await connectDB();
@@ -668,7 +668,7 @@ export async function handleSetupCommand(interaction) {
 }
 
 /**
- * Handle /la-setup defaultscope global|server
+ * Handle the set-default-scope action
  */
 async function handleSetupDefaultScope(interaction, lang) {
   const scope = interaction.options.getString('scope', true);
