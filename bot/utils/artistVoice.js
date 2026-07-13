@@ -1,9 +1,9 @@
 import { EmbedBuilder } from 'discord.js';
 
 /**
- * Shared entry point for user-facing LoaLogs cards. Artist is expressed by
- * the localized copy itself; embeds intentionally carry no repeated author
- * badge or signature footer.
+ * Shared entry point for user-facing LoaLogs cards. Public voice is defined by
+ * localized copy; embeds intentionally carry no repeated author badge or
+ * signature footer.
  */
 
 export function createArtistEmbed() {

@@ -101,8 +101,8 @@ export function createListAddCommandHandler({
       const requestId = randomUUID();
 
       // Rehost the image NOW (while the Discord CDN URL is still valid).
-      // If rehost fails or no evidence channel is configured, we fall back to
-      // storing the original URL as legacy (which will eventually expire).
+      // Rehost failure or a missing evidence channel falls back to the legacy
+      // original URL, which eventually expires.
       let rehostResult = null;
       if (image?.url) {
         rehostResult = await rehostImage(image.url, client, {

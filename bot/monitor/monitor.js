@@ -37,8 +37,8 @@ async function loadState() {
 }
 
 /**
- * Persist the state object to disk atomically (write-then-rename isn't
- * available cross-platform in pure Node, so we just overwrite).
+ * Persist the state object to disk. This path overwrites the target directly
+ * because cross-platform write-then-rename is not used here.
  * @param {object} state
  */
 async function saveState(state) {

@@ -34,7 +34,7 @@ test('ICONS exposes severity, status, action, and persona buckets', () => {
   // action
   assert.equal(typeof ICONS.search, 'string');
   assert.equal(typeof ICONS.evidence, 'string');
-  // persona
+  // bot expression
   assert.equal(ICONS.fox, '🦊');
 });
 

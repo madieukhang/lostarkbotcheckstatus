@@ -17,7 +17,7 @@ const guildConfigSchema = new mongoose.Schema({
   /** Channel ID where screenshots are auto-checked (OCR → list check) */
   autoCheckChannelId: { type: String, default: '' },
 
-  /** Tracked Artist welcome pin for the auto-check channel */
+  /** Tracked welcome-guide pin for the auto-check channel */
   autoCheckWelcomeMessageId: { type: String, default: '' },
   autoCheckWelcomeChannelId: { type: String, default: '' },
 

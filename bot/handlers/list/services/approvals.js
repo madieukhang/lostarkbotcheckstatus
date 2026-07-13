@@ -127,10 +127,9 @@ export function createApprovalServices({
           .setEmoji('✖️')
       );
 
-    // Per-type breakdown gives the senior a quick "what am I about to
-    // approve?" read before they parse the line list. A bulk batch of
-    // 30 rows skewed heavily blacklist deserves visible warning vs an
-    // all-whitelist batch which is mostly mechanical.
+    // Per-type breakdown summarizes the pending batch before the detailed
+    // rows. Blacklist-heavy batches receive a stronger visual warning than
+    // all-whitelist batches.
     const typeCounts = { black: 0, white: 0, watch: 0 };
     let serverScopedCount = 0;
     for (const r of pending.rows) {

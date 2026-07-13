@@ -12,15 +12,14 @@
  *     in production with the gentle cap-300 scan profile.
  *   - Most adds do not need a deep scan: visible-roster characters
  *     return their full alt list directly via the roster scrape.
- *   - The blacklist edge case (target griefed under one alt, has more)
- *     is exactly when an officer wants the option to opt in to a
- *     thorough discovery on demand.
+ *   - Blacklist entries may identify only one alt while the account has
+ *     others, so officers can opt into thorough discovery on demand.
  *
  * Access: everyone can run this, but regular users are limited to one
  * active Stronghold scan at a time. Officers/seniors can run parallel
  * operational scans when needed.
  *
- * Cooldown: 30 seconds per entry (in-memory). Deep scans burn bible
+ * Cooldown: 30 seconds per entry (in-memory). Deep scans consume Bible
  * quota; the cooldown prevents an accidental double-click from
  * doubling the request count.
  *
@@ -93,8 +92,7 @@ import { rosterUrl } from '../../../utils/rosterLink.js';
 
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
 // ~40-60 updates over a 10-15 minute gentle-mode scan; well under the
-// rate-limit ceiling and tight enough that progress feels live rather
-// than batched.
+// rate-limit ceiling while keeping progress updates timely.
 const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
 const PROGRESS_EDIT_FAILURE_LIMIT = 3;
 
@@ -148,7 +146,7 @@ export function createEnrichHandlers({ client, services }) {
     // in the result card so officers know whether the alt list came
     // from a fingerprint match (stronger constraint) or a direct
     // roster scan. Skip the probe on Continue passes since the answer
-    // is cached on the session and a re-probe would burn an extra
+    // is cached on the session and a re-probe would consume an extra
     // bible request per Continue click.
     let targetIsHidden;
     if (existingSession?.targetIsHidden !== undefined) {
@@ -169,10 +167,9 @@ export function createEnrichHandlers({ client, services }) {
       targetIsHidden = probe.rosterVisibility === 'hidden';
     }
 
-    // Up-front bible probe so we can fail fast on no-guild / no-stronghold
-    // before paying the multi-minute candidate fan-out. ScraperAPI is
-    // allowed for this single-request probe because bible direct can flap
-    // 429/503 and a one-off fallback is cheap quota-wise.
+    // Probe Bible before the multi-minute candidate fan-out to reject targets
+    // without guild or stronghold data. ScraperAPI is allowed for this one
+    // request because direct Bible access may return transient 429/503 errors.
     const meta = existingSession?.meta || await fetchCharacterMeta(name, {
       timeoutMs: config.strongholdDeepCandidateTimeoutMs,
       viaWorker: true,
@@ -200,9 +197,8 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
 
-    // Guild member fetch is one request, so ScraperAPI fallback is on
-    // (cheap) when bible direct flaps. Per-candidate scan below stays
-    // direct-only.
+    // Guild-member lookup uses one ScraperAPI fallback request when direct
+    // Bible access fails. The per-candidate scan below remains direct-only.
     const guildMembers = await fetchGuildMembers(name, {
       timeoutMs: config.strongholdDeepCandidateTimeoutMs,
       cacheKey: meta.guildName,
@@ -229,9 +225,8 @@ export function createEnrichHandlers({ client, services }) {
       label: `${name} (enrich${existingSession ? ' · resume' : ''})`,
     });
 
-    // Pre-compute the per-pass candidate count for the initial 0%
-    // progress embed. We subtract the already-scanned set so the
-    // progress bar reads correctly on a Continue resume.
+    // Pre-compute the per-pass candidate count for the initial 0% progress
+    // embed. Already-scanned names are excluded from resumed-pass totals.
     const excludeSet = new Set(
       (existingSession?.scannedNames ?? []).map((n) => String(n).toLowerCase())
     );
@@ -329,10 +324,9 @@ export function createEnrichHandlers({ client, services }) {
       return;
     }
 
-    // Defensive: detectAltsViaStronghold can return null on early-exit
-    // failure modes (no meta / no guild / no stronghold). At this point
-    // we already validated meta + guild upstream so null is unexpected,
-    // but render a clean error rather than crashing the editReply.
+    // detectAltsViaStronghold may return null on early exits such as missing
+    // meta, guild, or stronghold data. Upstream validation makes this branch
+    // unexpected, but it still renders an error instead of failing editReply.
     if (!result) {
       await replyEditor.edit({
         embeds: [buildAlertEmbed({
@@ -363,9 +357,8 @@ export function createEnrichHandlers({ client, services }) {
     const cumulativeRateLimitRetries =
       (existingSession?.scanStats?.rateLimitRetries ?? 0) + (result.rateLimitRetries || 0);
 
-    // Diff against entry.allCharacters to surface only NEW alts. Names
-    // are stored case-sensitive in the DB so we lowercase both sides
-    // for the membership check.
+    // Diff against entry.allCharacters to surface only new alts. Database
+    // names retain case, so both sides are lowercased for membership checks.
     const existingChars = new Set(
       (found.entry.allCharacters || []).map((n) => String(n).toLowerCase())
     );

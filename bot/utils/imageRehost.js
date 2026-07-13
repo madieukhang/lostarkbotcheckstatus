@@ -5,8 +5,8 @@
  *
  * Background: as of 2024, Discord CDN attachment URLs include signed expiry
  * tokens (`?ex=...&hm=...`) that invalidate after ~24 hours. Storing the URL
- * directly means the image silently 404s after a day or two · which is bad
- * for evidence data that's supposed to live as long as the entry does.
+ * directly can produce a 404 after a day or two, violating the evidence
+ * retention requirement for the lifetime of the entry.
  *
  * Solution: when a user attaches an image to /la-list add (or similar), the bot
  * immediately re-uploads it to a dedicated "evidence channel" in the owner

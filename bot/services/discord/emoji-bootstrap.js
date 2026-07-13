@@ -10,9 +10,8 @@
  * roster card.
  *
  * Ported from sister bot RaidManage (`bot/services/emoji-bootstrap.js`)
- * to ESM. LoaLogs only needs class icons today; the artist-persona
- * branch from RaidManage is dropped here since LoaLogs does not have
- * a persona surface yet.
+ * to ESM. This service bootstraps class icons only; RaidManage's separate
+ * bot-expression branch is outside its scope.
  *
  * **Content-addressed naming.** Each emoji is uploaded with the name
  * `{fileBaseName}_{md5short}` where md5short is the first 6 chars of
@@ -28,13 +27,12 @@
  *
  * Result: any time a PNG file content changes (new art, color invert,
  * source upgrade) the bot detects it on the next deploy and refreshes
- * Discord's copy automatically. No env var dance, no manual script run.
+ * Discord's copy automatically without environment changes or a manual script.
  *
  * Failure mode: any error (REST blocked, app emoji slot exhausted, etc.)
  * is logged and swallowed. Bot keeps running with whatever subset of the
  * CLASS_EMOJI_MAP got populated; getClassEmoji falls back to empty
- * string for the unmapped ones - render paths degrade gracefully without
- * icons.
+ * string for unmapped classes, so render paths omit unavailable icons.
  */
 
 import fs from 'node:fs';
@@ -50,13 +48,12 @@ const __dirname = path.dirname(__filename);
 // 3 levels up from bot/services/discord/ → repo root, then assets/.
 // Pre-refactor file lived at bot/services/ so 2 levels was correct;
 // the cef2187 refactor pushed this file one level deeper without
-// updating the path, which silently broke icon discovery (file walk
+// updating the path, which caused icon discovery to return no files (file walk
 // returned empty → bootstrap reused stale Discord emoji slots only).
 const CLASS_ICONS_DIR = path.resolve(__dirname, '..', '..', '..', 'assets', 'class-icons');
 
-// Class IDs that share art with another class - upload ONE emoji and
-// point both display names at the same emoji ID. Saves application
-// emoji slots (2000 cap, plenty of room, but the dedup is still cleaner).
+// Class IDs that share art use one uploaded emoji and map both display names
+// to the same ID, reducing application emoji slot usage.
 const CLASS_ALIAS_GROUPS = [
   ['soulmaster', 'force_master'], // both = Soulfist
   ['hawkeye', 'hawk_eye'], // both = Sharpshooter
@@ -157,8 +154,7 @@ export async function bootstrapClassEmoji(client) {
   if (!existingByName) return ZERO;
 
   // Pre-compute alias bookkeeping. Aliases share art with the canonical
-  // (e.g. soulmaster <-> force_master) so we upload one PNG and point
-  // both at the same emoji ID.
+  // (e.g. soulmaster <-> force_master), so one PNG supplies both emoji IDs.
   const aliasCanonicalByAlias = new Map();
   const aliasFileBases = new Set();
   for (const group of CLASS_ALIAS_GROUPS) {
@@ -284,7 +280,7 @@ export async function bootstrapClassEmoji(client) {
       if (existing) refreshed += 1;
       else uploaded += 1;
       // Application emoji rate limit: ~50 / 30s. Sleep 250ms between
-      // mutations to stay well under without making startup feel slow.
+      // mutations to remain below the limit without excessive startup delay.
       await new Promise((r) => setTimeout(r, 250));
     } catch (err) {
       failed += 1;
@@ -292,9 +288,9 @@ export async function bootstrapClassEmoji(client) {
     }
   }
 
-  // Orphan detection: app emoji whose name parses as a known displayKey
-  // but didn't match any current PNG. Don't auto-delete - could be
-  // intentional (different concern), surface for human cleanup.
+  // Orphan detection: application emoji whose name parses as a known
+  // displayKey but does not match a current PNG. Preserve these entries and
+  // report them for manual cleanup because deletion is a separate concern.
   const orphanNames = [];
   for (const [name, emoji] of existingByName) {
     if (matchedEmojiIds.has(emoji.id)) continue;

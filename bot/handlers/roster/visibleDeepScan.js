@@ -64,8 +64,8 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
 
     // Deep scan: Stronghold alt detection even when roster is visible
       try {
-        // Pre-fetch meta + guild members so we can render an initial
-        // progress embed with guild context (member count, name) before
+        // Pre-fetch meta + guild members to render an initial progress embed
+        // with guild context (member count, name) before
         // the candidate fan-out starts. The detector skips its own
         // internal target/guild fetches when both are pre-supplied.
         const visMeta = await fetchCharacterMeta(name, {
@@ -153,10 +153,9 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
         visibleDeepMeta = visMeta;
         visibleDeepGuildMembers = visGuildMembers;
 
-        // Render the deep-scan result as a separate embed so a Continue
-        // resume can re-edit it without rebuilding the visible roster
-        // card. The visible-roster deep path is opt-in (deep:true) so
-        // we know the officer wants the alt list visible.
+        // Render the deep-scan result as a separate embed so a Continue resume
+        // can re-edit it without rebuilding the visible roster card. The
+        // deep:true option explicitly requests a visible alt list.
         if (altResult && visMeta?.guildName) {
           const profileUrl = rosterUrl(name);
           const { embed: scanEmbed, state } = buildScanResultEmbed({
@@ -184,10 +183,9 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
                 failed: altResult.failedCandidates || 0,
                 rateLimitRetries: altResult.rateLimitRetries || 0,
               },
-              // primaryEmbedJSON captured AFTER editReply below; we
-              // overwrite it here with the working embed snapshot so
-              // a Continue click can re-render the same card without
-              // re-scraping the visible roster page.
+              // primaryEmbedJSON is captured after editReply below. Store the
+              // working embed snapshot here so Continue can re-render the same
+              // card without re-scraping the visible roster page.
               primaryEmbedJSON: embed.toJSON(),
             });
             const buttonRow = buildScanResultButtons({
@@ -200,10 +198,9 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
             if (buttonRow) deepScanComponents.push(buttonRow);
           }
         } else if (altResult) {
-          // No guild context (visible roster but no guild on bible).
-          // Render scan result anyway with whatever we have so officer
-          // sees outcome. No Continue button (nothing to resume against
-          // without a guild member list).
+          // No guild context (visible roster but no guild on Bible). Render
+          // the available scan result without a Continue button because no
+          // guild-member list exists for a resumed pass.
           const { embed: scanEmbed } = buildScanResultEmbed({
             target: { name, isHidden: false, guildName: visMeta?.guildName, profileUrl: rosterUrl(name) },
             result: altResult,

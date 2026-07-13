@@ -10,8 +10,8 @@
  * needs to render the alt list with Continue / Save / Discard buttons
  * goes through that module.
  *
- * Voice is English-first Artist Kitsune (warm first-person, no em-dash,
- * no stage directions).
+ * Public wording is localization-owned and uses first-person copy without
+ * stage directions. English is the fallback locale.
  */
 
 import { LIST_LABELS } from './data.js';
@@ -44,18 +44,15 @@ export function buildEnrichProgressEmbed({ entry, foundType, meta, progress, lan
 
 /**
  * Post-confirm success card. Replaces the older one-line "Appended N
- * alt(s) to the entry's `allCharacters`" with a richer layout that
- * surfaces the per-alt class + ilvl (data we already had on the
- * session but threw away), the scan source (guild + hidden-roster
- * indicator), and a next-step hint pointing at /la-list view. The
- * Mongoose-ese footer (`matched=1 · modified=1`) is replaced with a
- * user-friendly footer; the technical numbers go into a debug log
- * server-side instead of polluting the end-user view.
+ * alt(s) to the entry's `allCharacters`" with a layout containing per-alt
+ * class and item level, scan source, hidden-roster state, and a next-step
+ * hint. Database counters such as `matched=1 · modified=1` are written to
+ * debug logs rather than the public footer.
  *
  * Layout:
  *   ${list-icon} Saved · ${entry.name}        (color: list-type tint)
  *
- *   ✨ I appended **5 new alt(s)** to the blacklist entry.
+ *   ✨ Localized confirmation with the appended-alt count.
  *   📍 Source: Stronghold scan in **<guild>**
  *   🔒 Roster was hidden, matched via stronghold fingerprint  [optional]
  *
@@ -69,9 +66,8 @@ export function buildEnrichProgressEmbed({ entry, foundType, meta, progress, lan
 export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en') {
   const ctx = LIST_LABELS[session.type];
 
-  // Per-alt rendering: bring back class + ilvl that the success card
-  // dropped before. Names link out to bible roster page so an officer
-  // skimming the card can audit a specific match in one click.
+  // Per-alt rendering restores class and item level omitted by the prior
+  // success card. Names link to Bible roster pages for per-match verification.
   const altLines = session.newAlts
     .map((alt, index) => {
       // alt.classId may already be a resolved className (e.g. from
@@ -89,9 +85,8 @@ export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en') {
     })
     .join('\n');
 
-  // Sections joined by blank lines. Each section is one visual block;
-  // the blank line between them gives Discord enough breathing room
-  // to render distinct units instead of a wall of text.
+  // Sections are joined by blank lines so Discord renders each as a distinct
+  // visual block.
   const sections = [];
 
   sections.push(
@@ -113,9 +108,9 @@ export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en') {
 
   sections.push(`💡 ${t('dialogue.enrich.success.tip', lang, { type: session.type })}`);
 
-  // Server-side trace for the Mongoose write outcome. Useful when
-  // diagnosing "I clicked Confirm but nothing seemed to save"; surfacing
-  // matched/modified to end users was confusing more than informative.
+  // Server-side trace for cases where confirmation appears not to persist.
+  // matched/modified counters remain in logs because they are operational
+  // details rather than public status information.
   if (updateResult && (updateResult.matchedCount === 0 || updateResult.modifiedCount === 0)) {
     console.warn(
       `[enrich] Confirm wrote unexpectedly empty result for ${session.entryName}: ` +

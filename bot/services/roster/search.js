@@ -3,7 +3,7 @@
  * Wrappers around the lostark.bible name-search API. The API speaks a
  * compact reference-payload JSON (numeric indices into a `data` array)
  * so the decoding here is invariant-critical · break it and search
- * autocomplete + hidden-roster inference both quietly return null.
+ * autocomplete and hidden-roster inference both return null.
  * Reminder: this API is NFC-only and prefix-based with single-edit
  * tolerance · see [[reference-bible-api]] for the full behaviour notes.
  */
@@ -60,8 +60,8 @@ export async function fetchNameSuggestions(name, options = {}) {
 
 /**
  * Hidden-roster fallback · when a character's full roster page is
- * private but the name still appears in search results, we can still
- * recover their item-level. Used by buildRosterCharacters'
+ * private but the name still appears in search results, the result can
+ * provide the item level. Used by buildRosterCharacters'
  * hiddenRosterFallback path.
  * @param {string} name - exact character name (case-insensitive match)
  * @param {object} [options] - forwarded to fetchNameSuggestions

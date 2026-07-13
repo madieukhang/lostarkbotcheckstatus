@@ -7,9 +7,8 @@
  *
  * Exports: buildTrustedListEmbed, buildListPageEmbed,
  * buildListViewComponents, buildEvidenceEmbed, buildExpiredComponents.
- * Per-helper JSDoc is light here · most are pure embed builders with
- * obvious inputs · the buildEvidenceEmbed signature is the only one
- * worth a fuller block (see its declaration).
+ * Most helpers are pure embed builders with shared input conventions, so
+ * buildEvidenceEmbed is the only function with expanded parameter docs.
  */
 
 import {
@@ -57,16 +56,14 @@ function buildEntryMetaLine({ entry, freshUrl, lang = 'en' }) {
 
 /**
  * Render the roster (allCharacters) line that sits below the meta
- * line. Goal: tell the reader "who else is on this account" at a
- * glance without blowing up the description budget. The entry's own
- * name is always present in allCharacters and is filtered out (we
- * already showed it on line 1). Capped at 3 visible alts with a
+ * line. It summarizes the other characters on the account within the
+ * description budget. The entry name is always present in allCharacters
+ * and is filtered out because line 1 already displays it. Capped at 3 visible alts with a
  * `+N more` suffix; entries with no alts skip this line entirely.
  *
  * Why compact: /la-list view renders 10 entries per page and Discord's
- * description hard cap is 4096 chars. Showing every alt inline would
- * blow that budget on guilds with deep rosters; the detail view + DM
- * surface the full list when an officer wants the whole picture.
+ * description hard cap is 4096 chars. Showing every alt inline can exceed
+ * that budget on deep rosters; the detail view and DM expose the full list.
  */
 function buildEntryRosterLine(entry, lang = 'en') {
   const others = (entry.allCharacters || [])
@@ -97,7 +94,7 @@ export function buildTrustedListEmbed(entries, lang = 'en') {
     block.push('');
     return block;
   });
-  // Drop trailing blank line for cleaner footer-adjacent rendering.
+  // Drop the trailing blank line before footer-adjacent content.
   if (lines[lines.length - 1] === '') lines.pop();
 
   // Count rides the title (matches the list-page card); the footer keeps
@@ -146,9 +143,8 @@ export async function buildListPageEmbed(options) {
 
   // Two-line entry layout. Line 1 is name + list-type icon + scope tag;
   // line 2 (prefixed `└ `) carries reason / raid / time / evidence link.
-  // Empty line between entries gives breathing room. Description has a
-  // 4096-char hard cap from Discord; truncate at the entry boundary if
-  // we go over (10 entries * ~200 chars each is well under, but be safe).
+  // Empty lines separate entries. Discord applies a 4096-character
+  // description cap, so rendering truncates at an entry boundary.
   const lines = [];
   pageEntries.forEach((entry, index) => {
     let scopeTag = '';

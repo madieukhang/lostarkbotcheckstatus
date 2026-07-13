@@ -14,7 +14,7 @@
 
 /**
  * Severity colors. The `success`/`warning`/`info`/`danger`/`muted` set
- * matches Discord's brand palette so the embeds feel native; `trusted`
+ * matches Discord's brand palette to align embeds with the host UI; `trusted`
  * is a distinct shade used for the trusted-user block card.
  */
 export const COLORS = Object.freeze({
@@ -37,8 +37,7 @@ export const COLORS = Object.freeze({
  *                icons so users moving between bots see the same
  *                visual language).
  *   - action   : verb glyphs used in titles/buttons.
- *   - persona  : fox icon for Artist signature moments (use sparingly
- *                per memory `feedback_bot_persona.md`).
+ *   - expression: fox icon for selected public bot messages.
  */
 export const ICONS = Object.freeze({
   // severity
@@ -64,7 +63,7 @@ export const ICONS = Object.freeze({
   remove: '➖',
   prev: '◀',
   next: '▶',
-  // persona signature (use sparingly)
+  // bot expression
   fox: '🦊',
 });
 

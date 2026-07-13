@@ -28,10 +28,9 @@ export async function enrichListCheckResults(results) {
     //     (class + ilvl + stronghold + guild) on a residential IP that
     //     bible accepts. Result persisted to RosterSnapshot.
     //   - Worker OFFLINE → fetchNameSuggestions direct from Railway.
-    //     bible's search endpoint is lighter and tends to slip past CF
-    //     where the per-character HTML page does not. Returns just
-    //     {name, cls, itemLevel} for matches; we pick the exact-name
-    //     row and persist class+ilvl.
+    //     Bible's search endpoint is lighter and can complete when CF blocks
+    //     the per-character HTML page. It returns {name, cls, itemLevel}; the
+    //     exact-name row supplies the persisted class and item level.
     // Both paths upsert the snapshot so the next OCR run hits cache.
     const health = await getWorkerHealth().catch(() => ({ online: false, reason: 'health-check-threw' }));
 

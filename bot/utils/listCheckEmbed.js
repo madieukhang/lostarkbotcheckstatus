@@ -113,17 +113,16 @@ export function buildListCheckEmbed({
   // Stats grid (Checked / Flagged / Cleared) was a 3-up inline field
   // panel pre-v0.5.73. The Outcome breakdown line at the top of the
   // description carries the same per-status info (with finer
-  // granularity), so the panel was strictly redundant and made the
-  // card feel busy. Dropped intentionally; reintroduce only if
-  // someone needs the aggregate counts in a separate visual block.
+  // granularity), so the panel duplicated information and increased visual
+  // density. Reintroduce it only when separate aggregate counts are required.
   // (clearedCount kept above as a value reference for future copy
   // tweaks but not surfaced in fields.)
   void clearedCount;
 
   // Footer hint differs between modes:
   //   slash:  Tip toward /la-roster on a flagged hit OR retry hint when unflagged.
-  //   auto:   Note that the dropdown below lets you Quick Add unflagged
-  //           names (the auto-check pipeline ships a select menu for that).
+  //   auto:   Note that the dropdown below provides Quick Add for unflagged
+  //           names (the auto-check pipeline supplies the select menu).
   // Footer is a HUD status line: a // FLAGGED n (or // CLEAR) tag, the
   // mode-specific tip, then the source citation.
   const footerParts = [`// ${t(`dialogue.check.embed.${flaggedCount > 0 ? 'flagged' : 'clear'}`, lang, { count: flaggedCount })}`];

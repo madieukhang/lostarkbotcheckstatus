@@ -165,8 +165,8 @@ export function createRemoveHandlers({ client, services }) {
           sections.push(`🚫 **${t('dialogue.remove.failedSection', lang)}**\n${failLines.join('\n')}`);
         }
 
-        // Roster preview helps verify "did I remove the right entry?"
-        // Scan all entries (oks + fails) for allCharacters; first one
+        // Roster preview identifies the removal target. Scan all entries
+        // (successes and failures) for allCharacters; the first one
         // with > 1 char wins (entries usually share the same roster).
         const sourceEntry = (outcomes.find((o) => Array.isArray(o.entry.allCharacters) && o.entry.allCharacters.length > 1))?.entry;
         if (sourceEntry) {

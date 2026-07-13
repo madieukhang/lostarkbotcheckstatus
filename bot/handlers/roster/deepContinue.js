@@ -45,8 +45,8 @@ import { makeRosterScanProgressCallback } from './progress.js';
 /**
  * Continue button for /la-roster deep:true. Resumes the prior scan
  * with scanned-names fed back as excludeNames so the next pass walks
- * only fresh candidates. Reuses cached meta + guildMembers from the
- * session so we don't pay another roster-page fetch for the resume.
+ * only fresh candidates. Cached meta + guildMembers from the session avoid
+ * another roster-page fetch during resume.
  * Officer/senior-only.
  *
  * customId shape: `roster-deep:continue:<sessionId>`
@@ -108,8 +108,8 @@ export async function handleRosterDeepContinueButton(interaction) {
     label: `${session.targetName} (roster deep · resume)`,
   });
 
-  // Show progress embed during the resume pass. We replace the result
-  // card temporarily; on completion the result card is rebuilt and
+  // Show the progress embed during the resume pass. It temporarily replaces
+  // the result card; on completion the result card is rebuilt and
   // posted alongside the cached primary embed snapshot.
   const excludeSet = new Set((session.scannedNames || []).map((n) => String(n).toLowerCase()));
   const passEligible = (session.guildMembers || [])

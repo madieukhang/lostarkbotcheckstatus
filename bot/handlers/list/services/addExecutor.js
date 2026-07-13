@@ -389,9 +389,8 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     if (altsField) fields.push(altsField);
     fields.push({ name: `🔗 ${t('dialogue.listAdd.success.fields.links', lang)}`, value: linkParts.join(' · '), inline: false });
 
-    // titleIcon prefixes done + list-type. For whitelist (✅) we drop
-    // the done prefix to avoid a doubled tick (✅ ✅) and let the list
-    // icon carry the success cue on its own.
+    // titleIcon normally prefixes done + list-type. Whitelist omits the done
+    // prefix to avoid a doubled tick (✅ ✅); its list icon carries the cue.
     const titleIcon = payload.type === 'white' ? icon : `${ICONS.done} ${icon}`;
 
     const embed = buildAlertEmbed({

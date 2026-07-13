@@ -21,18 +21,18 @@
  *   - **Cache only non-null**: a `null` from fetchCharacterMeta means
  *     a transient 429, 5xx, or HTML parse failure. Caching nulls would
  *     pin a transient outage into the cache for the full TTL window
- *     and starve later scans of a chance to retry. Successful meta is
+ *     and prevent later scans from retrying. Successful meta is
  *     stable enough to cache; failure is not.
  *   - **LRU on access + insert**: re-inserting on read keeps recently-
  *     used keys away from the eviction edge. Eviction picks the oldest
  *     key (Map iteration order is insertion order in V8).
- *   - **Lazy expiry on read**: no separate sweep, no setInterval. Each
- *     `get` checks the entry's `expiresAt` and removes if stale. Drop-
- *     simple and good enough for the observed scan cadence.
- *   - **In-memory only**: bot restart drops the cache, which is fine -
- *     the next /la-roster deep simply pays the cold-cache cost once and
- *     repopulates. Persisting to Mongo is a Phase 2.5+ concern that
- *     would need invalidation hooks; not justified by current load.
+ *   - **Lazy expiry on read**: no separate sweep or setInterval. Each
+ *     `get` checks the entry's `expiresAt` and removes stale entries. This
+ *     matches the observed scan cadence without a background timer.
+ *   - **In-memory only**: bot restart drops the cache. The next
+ *     /la-roster deep incurs one cold-cache fetch and repopulates it.
+ *     Mongo persistence would require invalidation hooks and is not
+ *     justified by current load.
  */
 
 let metaCacheTtlMs = 30 * 60 * 1000;
