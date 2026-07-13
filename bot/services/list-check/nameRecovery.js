@@ -190,8 +190,8 @@ function levenshteinDistance(a, b) {
 export function chooseCanonicalSuggestion(name, suggestions) {
   if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
 
-  // First pass: case-insensitive exact match. Covers the happy path
-  // where Gemini preserved every character but casing drifted.
+  // First pass: case-insensitive exact match for cases where Gemini preserved
+  // every character but changed casing.
   const target = String(name).toLowerCase();
   let chosen = suggestions.find((s) => String(s.name).toLowerCase() === target);
   if (chosen) return { chosen, reason: 'exact' };

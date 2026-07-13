@@ -183,8 +183,8 @@ export async function checkNamesAgainstLists(names, options = {}) {
   //       Clauseduk's roster and Clauseduk is trusted, so Morrahduk
   //       inherits trust via the alts the roster scrape just returned.
   //
-  // OCR checks still avoid an extra roster fetch here · we reuse the
-  // alts the gather phase already paid for.
+  // OCR checks avoid another roster fetch by reusing alts from the gather
+  // phase.
   const altNamesForTrustedCheck = new Set();
   for (const item of results) {
     if (item.trustedEntry) continue;

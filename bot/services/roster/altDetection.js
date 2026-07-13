@@ -4,9 +4,9 @@
  * members + bible meta lookups to find characters that share the same
  * stronghold name (= same player account). Two modes: 'gentle'
  * (sequential, 1.5s throttle, transient retry, current default) and
- * 'fast' (concurrency 3, no retry). Gentle is the default since the
- * 2026-05-03 peak-hour incident · fast mode should only be used
- * off-peak when bible is cool.
+ * 'fast' (concurrency 3, no retry). Gentle remains the default after a
+ * 2026-05-03 peak-hour rate-limit incident; fast mode is intended for
+ * off-peak use.
  */
 
 import config from '../../config.js';
@@ -48,16 +48,13 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   // probes so the whole chain bypasses Railway's CF-blocked IP.
   const viaWorker = options.viaWorker === true;
 
-  // Mode selection. The Phase 1 verification scan that found Ainslinn's
-  // 5 alts ran in 'gentle' mode (sequential, 1.5s throttle, transient retry).
-  // 'fast' mode (concurrency 3, no retry, 300ms backoff floor) was the
-  // original production default; Bao's 2026-05-03 peak-hour run on
-  // Ainslinn hit 100% failure with fast mode because bible was
-  // blanket-rejecting requests. Default switched to 'gentle' so Bao's
-  // case recovers.
+  // Mode selection. A Phase 1 verification scan found all five expected alts
+  // in 'gentle' mode (sequential, 1.5s throttle, transient retry). The original
+  // 'fast' production default (concurrency 3, no retry, 300ms backoff floor)
+  // reached 100% failure during a 2026-05-03 peak-hour run because Bible
+  // rejected the burst. The default therefore remains 'gentle'.
   //
-  // Power users can opt back into fast mode via `mode: 'fast'`. They
-  // should only do that off-peak, when bible is cool.
+  // Callers can opt into fast mode with `mode: 'fast'` for off-peak runs.
   const mode = options.mode === 'fast' ? 'fast' : 'gentle';
   const isGentle = mode === 'gentle';
   const concurrency = isGentle
@@ -258,7 +255,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
       }
 
       // Console log stays per-25 (operator-facing). UI progress emits
-      // per-5 so the embed can pulse faster between throttled edits;
+      // per-5 so the embed can update more frequently between throttled edits;
       // the caller decides how often to actually push to Discord.
       if (attemptedCandidates % 25 === 0 || attemptedCandidates === limitedCandidates.length) {
         console.log(
@@ -274,11 +271,9 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
         || alts.length > 0 && attemptedCandidates % 1 === 0
       ) {
         if (typeof options.onProgress === 'function') {
-          // Pass a snapshot of the alts array (shallow copy of the
-          // current matches) so the UI can render names live as the
-          // scan finds them. Truncate to top-N inside the UI if the
-          // embed gets too long; we don't truncate here so the caller
-          // has full freedom.
+          // Pass a shallow snapshot of the current matches so the UI can
+          // render names during the scan. Any display truncation belongs in
+          // the UI; the callback receives the complete match set.
           Promise.resolve(options.onProgress({
             scannedCandidates: attemptedCandidates,
             checkedCandidates,

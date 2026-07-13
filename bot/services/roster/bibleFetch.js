@@ -95,8 +95,8 @@ async function fetchViaScraperApi(url) {
 /**
  * Main bible fetch path. Tries direct first (unless preferScraperApi),
  * falls back to ScraperAPI on 403/503/network-error. 429 only falls
- * back when `fallbackOnRateLimit` is on (most callers don't want to
- * burn quota on a transient rate-limit). When ScraperAPI fallback also
+ * back when `fallbackOnRateLimit` is on (most callers avoid consuming quota
+ * for a transient rate limit). When ScraperAPI fallback also
  * fails, returns the original direct response so the caller can read
  * its status code.
  * @param {string} url

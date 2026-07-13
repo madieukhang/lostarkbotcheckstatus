@@ -120,9 +120,9 @@ function buildAltList(alts, { newAltsSet, lang = 'en' } = {}) {
  * @param {Array<object>} [options.alts] - Override which alts to display (e.g. only the new-on-entry subset)
  * @param {Set<string>} [options.newAltsSet] - Lowercased names tagged as "new" in the alt list
  * @param {string} options.kind - 'enrich' | 'roster-hidden' | 'roster-visible'
- * @param {object} [options.contextStyle] - { icon, color, label } - list-type flavour for enrich
+ * @param {object} [options.contextStyle] - { icon, color, label } - list-type styling for enrich
  * @param {number} [options.startedAt] - epoch ms; renders elapsed time line when present
- * @param {string} [options.summaryLine] - Optional one-line lead (e.g. "I scanned X members in guild Y")
+ * @param {string} [options.summaryLine] - Optional localized one-line summary
  * @param {string} [options.actionHint] - Optional trailing line guiding next action
  * @returns {{embed: EmbedBuilder, state: {stopReason: string, hasRemaining: boolean, remaining: number}}}
  */
@@ -150,9 +150,8 @@ export function buildScanResultEmbed({
   const finalColor = contextStyle?.color ?? style.color;
   const finalIcon = contextStyle?.icon ?? style.icon;
 
-  // Title carries kind + state in a single line. The state icon prefix
-  // is enough state signal that we no longer need a separate bolded
-  // banner line in the description — saves one paragraph break.
+  // Title carries kind + state in a single line. The state icon makes a
+  // separate bold banner in the description redundant.
   let kindLabel;
   if (kind === 'enrich') kindLabel = t('dialogue.scan.result.kinds.enrich', lang);
   else if (kind === 'roster-hidden') kindLabel = t('dialogue.scan.result.kinds.hidden', lang);
@@ -161,9 +160,8 @@ export function buildScanResultEmbed({
 
   const sections = [];
 
-  // 1. Summary lead. Combines summaryLine (caller-supplied "I scanned X
-  // for Y") with state label so the reader knows in one paragraph what
-  // happened and how it ended.
+  // 1. Summary lead. Combines the caller-supplied summary with the state label
+  // so the outcome and terminal state appear in one paragraph.
   if (summaryLine) {
     sections.push(`${summaryLine}\n*${stateLabel}.*`);
   } else {
@@ -171,18 +169,16 @@ export function buildScanResultEmbed({
   }
 
   // 2. Hidden roster notice. Single-line italic, less verbose than the
-  // prior 2-line blockquote. The "explains how stronghold fingerprint
-  // works" copy still appears once in the help docs and in DM, so
-  // this card doesn't need to repeat the whole spiel.
+  // prior two-line blockquote. The detailed stronghold-fingerprint explanation
+  // remains in the help docs and completion DM, so this card omits it.
   if (target.isHidden) {
     sections.push(
       `${ICONS.locked} *${t('dialogue.scan.result.hiddenNotice', lang)}*`
     );
   }
 
-  // 3. Stop-reason hint. The state's title icon already says WHAT
-  // happened; this paragraph explains WHY and what to do next. We
-  // tighten the copy here vs the older multi-sentence version.
+  // 3. Stop-reason hint. The title icon carries the outcome; this paragraph
+  // carries the cause and next action in a shorter form than the prior copy.
   let stopHint = '';
   if (state.stopReason === 'stopped') {
     stopHint = t('dialogue.scan.result.stoppedHint', lang, { remaining: state.remaining });
@@ -210,8 +206,8 @@ export function buildScanResultEmbed({
   }
   if (stopHint) sections.push(stopHint);
 
-  // 4. Alt list block. Header doubles as a count so a reader scrolling
-  // through history can see at a glance how many came back.
+  // 4. Alt list block. The header also exposes the result count when scanning
+  // message history.
   if (altList) {
     sections.push(`**🎯 ${t('dialogue.scan.result.altsFound', lang, { count: alts.length })}**\n${altList}`);
   }
@@ -238,11 +234,9 @@ export function buildScanResultEmbed({
     embed.setURL(target.profileUrl);
   }
 
-  // Stats grid as inline fields. Discord renders 3 inline fields side-
-  // by-side which gives the card a clear "stats panel" affordance,
-  // visually separated from the narrative description above. Older
-  // version inlined these as a `·`-joined prose line which read
-  // cluttered when 5-6 metrics were active simultaneously.
+  // Stats grid as inline fields. Discord renders three inline fields per row,
+  // separating metrics from the narrative description. The prior `·`-joined
+  // prose line became difficult to scan with five or six active metrics.
   const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
   const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
   const fields = [

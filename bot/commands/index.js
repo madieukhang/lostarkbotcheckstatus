@@ -9,7 +9,7 @@ import { getSupportedLanguages, t } from '../services/i18n/index.js';
 /**
  * Phase 4 (2026-05-03) put every bot command under the `la-` prefix so
  * Discord autocomplete groups all of them under `/la`. Each command
- * builder takes the slash command name; we call it once per command
+ * builder accepts the slash command name and is invoked once per command
  * with the `la-` name (e.g. `la-status`, `la-list`, `la-help`).
  *
  * Phase 4a registered both legacy + `la-` names as aliases; Phase 4c

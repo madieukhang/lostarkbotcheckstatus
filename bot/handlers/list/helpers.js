@@ -232,20 +232,17 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     });
   }
 
-  // Request ID stays at the bottom · approvers shouldn't scan past it
-  // to read business context. Code-formatted so it's visually distinct
-  // and copy-paste-friendly when an approver wants to look the row
-  // up server-side.
+  // Request ID stays below the business context and uses code formatting to
+  // remain visually distinct and support server-side row lookup.
   fields.push({
     name: `🆔 ${t('dialogue.approval.fields.requestId', lang)}`,
     value: `\`${payload.requestId}\``,
     inline: false,
   });
 
-  // No titleIcon override · the title already leads with the list icon
-  // (⛔/✅/⚠️). Stacking the shield prefix on top reads cluttered ("🛡️ ⛔
-  // Add approval"). The shield emoji is reintroduced subtly via the
-  // approver-flow footer instead.
+  // No titleIcon override: the list icon (⛔/✅/⚠️) already provides the title
+  // cue. A second shield prefix would duplicate it; the footer carries the
+  // shield instead.
   const embed = buildAlertEmbed({
     severity: AlertSeverity.INFO,
     titleIcon: '',

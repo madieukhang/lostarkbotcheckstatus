@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 
 import { TRANSLATIONS } from '../bot/locales/index.js';
 
-// Setup notices must (1) speak in Artist's first person, never narrating the
-// tool as "LoaLogs" in the third person, and (2) reference the post-A
-// consolidated command surface, not the dead `/la-setup <subcommand>` forms.
+// Setup notices use first-person localized copy without narrating the tool as
+// "LoaLogs" in the third person. They also reference the consolidated command
+// surface rather than the removed `/la-setup <subcommand>` forms.
 const LANGS = ['en', 'vi', 'jp'];
 const DEAD_SUBCOMMAND = /\/la-setup (autochannel|notifychannel|cleanup state|defaultscope|off|repin|view|language)\b/;
 

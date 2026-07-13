@@ -14,7 +14,7 @@
  * To reconstruct the original page state, recursively walk indexes
  * starting at `data[0]`.
  *
- * Why we use this:
+ * Decoder rationale:
  *   - The raw HTML page embeds the same data under a `<script>` blob,
  *     and the legacy regex extractors against that blob are fragile.
  *     The `__data.json` endpoint is shorter, structured, and trivially
@@ -29,7 +29,7 @@
  *     hard.
  *   - The decoder must guard against cycles even though current
  *     payloads do not contain them, because a future bible build could
- *     introduce them and we do not want a crashed worker.
+ *     introduce them and crash a worker without this guard.
  */
 
 /**
@@ -65,7 +65,7 @@ export function decodeBibleData(data, idx, seen = new Set()) {
  * Walk a parsed `__data.json` response and decode the first node whose
  * decoded payload contains `predicateKey` at the top level. Bible's
  * routes split nodes per layout layer (root / page / sub-page); the
- * caller picks which layer they want by passing the key that appears
+ * caller selects a layer by passing the key that appears
  * there.
  *
  * Returns `null` when no node matches so callers can fall back without

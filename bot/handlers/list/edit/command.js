@@ -87,8 +87,8 @@ export function createListEditCommandHandler({
     await connectDB();
 
     // Rehost the new image NOW (while CDN URL is still valid). Result is used
-    // later in updateFields. If rehost fails or no evidence channel configured,
-    // we fall back to storing the legacy URL (which will eventually expire).
+    // later in updateFields. Rehost failure or a missing evidence channel
+    // falls back to the legacy URL, which eventually expires.
     let newImageRehost = null;
     if (newImageUrl) {
       newImageRehost = await rehostImage(newImageUrl, client, {

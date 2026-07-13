@@ -1,7 +1,7 @@
 /**
  * handlers/meta/stats.js
  * /la-stats command · shows bot usage statistics. Counts are
- * Promise.all-batched for one round-trip; the 7-day "growth pulse"
+ * Promise.all-batched for one round-trip; the seven-day growth metric
  * uses a $gte timestamp filter so a missing index would still work
  * (just slower). Embed is ephemeral · stats are for operators not
  * channel chat.
@@ -49,7 +49,7 @@ export async function handleStatsCommand(interaction) {
     Watchlist.countDocuments(),
     RosterCache.countDocuments(),
     GuildConfig.countDocuments(),
-    // Last-7-days addition rate gives a "list growth" pulse without
+    // Last-seven-days addition rate provides a list-growth metric without
     // needing a full time-series chart.
     Blacklist.countDocuments({
       addedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
