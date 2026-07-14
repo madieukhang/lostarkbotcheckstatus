@@ -5,10 +5,16 @@ process.env.DISCORD_TOKEN ||= 'test';
 process.env.CHANNEL_ID ||= 'test';
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
-const [{ default: Blacklist }, { default: Whitelist }, { default: Watchlist }] = await Promise.all([
+const [
+  { default: Blacklist },
+  { default: Whitelist },
+  { default: Watchlist },
+  { default: TrustedUser },
+] = await Promise.all([
   import('../bot/models/Blacklist.js'),
   import('../bot/models/Whitelist.js'),
   import('../bot/models/Watchlist.js'),
+  import('../bot/models/TrustedUser.js'),
 ]);
 
 const COMMON_PATHS = [
@@ -78,7 +84,10 @@ test('list entry indexes keep current uniqueness and roster lookup contracts', (
 
   for (const model of [Blacklist, Whitelist, Watchlist]) {
     assert.deepEqual(findIndex(model, { allCharacters: 1 })?.[1], {});
+    assert.deepEqual(findIndex(model, { addedAt: -1 })?.[1], {});
   }
+
+  assert.deepEqual(findIndex(TrustedUser, { addedAt: -1 })?.[1], {});
 });
 
 test('list entry model and collection names remain stable', () => {

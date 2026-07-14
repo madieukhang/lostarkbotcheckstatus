@@ -20,7 +20,11 @@ import {
   replyEmbed,
   replyNotice,
 } from '../../../utils/interactionReplies.js';
-import { getUserLanguage, t } from '../../../services/i18n/index.js';
+import {
+  getCachedUserLanguage,
+  getUserLanguage,
+  t,
+} from '../../../services/i18n/index.js';
 import { getListContext } from '../helpers.js';
 import {
   buildEvidenceEmbed,
@@ -56,21 +60,28 @@ function buildBlacklistViewQuery({ isOwnerGuild, scopeFilter, viewGuildId }) {
   };
 }
 
-async function loadListEntries({ isOwnerGuild, scopeFilter, type, viewGuildId }) {
-  const allEntries = [];
+export async function loadListEntries(
+  { isOwnerGuild, scopeFilter, type, viewGuildId },
+  { resolveListContext = getListContext } = {}
+) {
   const types = resolveTypes(type, scopeFilter);
 
-  for (const listType of types) {
-    const { model, label, color, icon } = getListContext(listType);
+  const entryGroups = await Promise.all(types.map(async (listType) => {
+    const { model, label, color, icon } = resolveListContext(listType);
     const query = listType === 'black' && viewGuildId
       ? buildBlacklistViewQuery({ isOwnerGuild, scopeFilter, viewGuildId })
       : {};
     const entries = await model.find(query).sort({ addedAt: -1 }).lean();
-    for (const entry of entries) {
-      allEntries.push({ ...entry, _listType: listType, _label: label, _color: color, _icon: icon });
-    }
-  }
+    return entries.map((entry) => ({
+      ...entry,
+      _listType: listType,
+      _label: label,
+      _color: color,
+      _icon: icon,
+    }));
+  }));
 
+  const allEntries = entryGroups.flat();
   allEntries.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0));
   return allEntries;
 }
@@ -107,9 +118,10 @@ async function buildGuildNameCache({ allEntries, client, isOwnerGuild }) {
  */
 export function createViewHandlers({ client }) {
   async function handleListViewCommand(interaction) {
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     if (!interaction.guild) {
-      await replyAlert(interaction, {
+      await deferReply(interaction, { ephemeral: true });
+      const lang = getCachedUserLanguage(interaction.user.id);
+      await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.common.serverOnly', lang),
         lang,
@@ -118,6 +130,7 @@ export function createViewHandlers({ client }) {
     }
 
     await deferReply(interaction);
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     const type = interaction.options.getString('type', true);
     const scopeFilter = interaction.options.getString('scope') || '';

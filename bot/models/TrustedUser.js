@@ -44,5 +44,6 @@ trustedUserSchema.index(
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
 trustedUserSchema.index({ allCharacters: 1 });
+trustedUserSchema.index({ addedAt: -1 });
 
 export default mongoose.model('TrustedUser', trustedUserSchema);
