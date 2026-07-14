@@ -54,6 +54,6 @@ export function createListEntrySchema({ scoped = false } = {}) {
     { unique: true, collation: CASE_INSENSITIVE_COLLATION }
   );
   schema.index({ allCharacters: 1 });
+  schema.index({ addedAt: -1 });
   return schema;
 }
-
