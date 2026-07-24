@@ -7,9 +7,13 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 process.env.DISCORD_TOKEN = 'test';
 process.env.CHANNEL_ID = 'test';
 process.env.BIBLE_WORKER_ENABLED = 'false';
+process.env.SCRAPERAPI_KEY = '';
+process.env.SCRAPERAPI_KEY_2 = '';
+process.env.SCRAPERAPI_KEY_3 = '';
 
 let mongod;
 let checkNamesAgainstLists;
+let enrichListCheckResults;
 let formatCheckResults;
 let connectDB;
 let RosterSnapshot;
@@ -23,6 +27,7 @@ test.before(async () => {
 
   ({ connectDB } = await import('../bot/db.js'));
   ({ checkNamesAgainstLists, formatCheckResults } = await import('../bot/services/list-check/service.js'));
+  ({ enrichListCheckResults } = await import('../bot/services/list-check/enrichment.js'));
   ({ default: RosterSnapshot } = await import('../bot/models/RosterSnapshot.js'));
   ({ default: WorkerHeartbeat } = await import('../bot/models/WorkerHeartbeat.js'));
   ({ default: Blacklist } = await import('../bot/models/Blacklist.js'));
@@ -301,6 +306,46 @@ test('search enrichment still resolves exact Crüelfighter and Qiylyn metadata',
     assert.match(lines[1], /1753\.33/);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('search enrichment persists all successful names with one bulk write', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalBulkWrite = RosterSnapshot.bulkWrite;
+  const bulkCalls = [];
+
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (!requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      throw new Error(`unexpected URL: ${requestedUrl}`);
+    }
+
+    const payload = new URL(requestedUrl).searchParams.get('payload');
+    const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+    const name = decoded[1];
+    const data = [[1], [2, 3, 4], name, 'bard', 1740];
+    return Response.json({ type: 'result', result: JSON.stringify(data) });
+  };
+  RosterSnapshot.bulkWrite = async (operations, options) => {
+    bulkCalls.push({ operations, options });
+    return { acknowledged: true };
+  };
+
+  try {
+    const results = [
+      { name: 'Batchone', snapClassId: '', snapClassName: '', snapItemLevel: 0, snapCombatScore: '', discoveredAlts: [] },
+      { name: 'Batchtwo', snapClassId: '', snapClassName: '', snapItemLevel: 0, snapCombatScore: '', discoveredAlts: [] },
+    ];
+
+    await enrichListCheckResults(results);
+
+    assert.equal(bulkCalls.length, 1);
+    assert.equal(bulkCalls[0].operations.length, 2);
+    assert.equal(results[0].snapItemLevel, 1740);
+    assert.equal(results[1].snapItemLevel, 1740);
+  } finally {
+    globalThis.fetch = originalFetch;
+    RosterSnapshot.bulkWrite = originalBulkWrite;
   }
 });
 
@@ -840,6 +885,34 @@ test('search retries with ASCII fold when the first query returns empty', async 
     assert.match(lines[0], /1760/);
     assert.equal(counts.searchCalls, 2, 'expected first search + ASCII-fold retry');
     assert.equal(counts.foldedHit, true, 'ASCII-fold retry should resolve the canonical row');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('unsupported search envelopes stop before prefix recovery fans out', async () => {
+  const originalFetch = globalThis.fetch;
+  let searchCalls = 0;
+
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      searchCalls += 1;
+      return Response.json({
+        type: 'result',
+        data: { unsupported: true },
+      });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Ainslinn'], { guildId: 'guild-1' });
+
+    assert.equal(searchCalls, 1);
+    assert.equal(results[0].name, 'Ainslinn');
+    assert.equal(results[0].snapClassId, '');
+    assert.equal(results[0].snapItemLevel, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -44,12 +44,13 @@ import { enrichListCheckResults } from './enrichment.js';
  * @param {string[]} names
  * @param {object} [options]
  * @param {string} [options.guildId] - Guild ID for including server-scoped blacklist entries
+ * @param {Map} [options.suggestionCache] - request-local Bible search cache
  * @returns {Promise<Array<object>>} Results with list entries and stored snapshot metadata
  */
 export async function checkNamesAgainstLists(names, options = {}) {
   const startedAt = Date.now();
   await connectDB();
-  const { guildId } = options;
+  const { guildId, suggestionCache } = options;
 
   // Phase 1: Batch list check · 3 queries for ALL names instead of 3 × N
   const nameQuery = buildNameRosterQuery(names);
@@ -113,7 +114,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
 
   // Phase 1.5: Targeted class/ilvl enrichment lives in its own module so
   // the list-check service stays focused on DB orchestration.
-  await enrichListCheckResults(results);
+  await enrichListCheckResults(results, { suggestionCache });
 
   // Phase 1.6: Enrichment can canonicalize OCR'd names (for example
   // "Auroraforymluv" -> "Auroraformyluv") or discover visible roster

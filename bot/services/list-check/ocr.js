@@ -1,5 +1,6 @@
 import config from '../../config.js';
 import { normalizeCharacterName } from '../../utils/names.js';
+import { mapWithConcurrency } from '../../utils/async.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 import { hasAnyDiacritic, stripDiacritics } from './nameRecovery.js';
 
@@ -102,28 +103,30 @@ function filterAndDeduplicateNames(parsed) {
   return unique;
 }
 
-async function findAmbiguousOcrChoices(names) {
-  const choices = [];
-
-  for (const name of names) {
+async function findAmbiguousOcrChoices(names, { suggestionCache } = {}) {
+  const concurrency = config.listcheckRosterLookupConcurrency || 3;
+  const choices = await mapWithConcurrency(names, concurrency, async (name) => {
     // This refinement is only for the dangerous case where Gemini
     // dropped a visible mark entirely (e.g. Crüelfighter -> Cruelfighter)
     // and Bible also has a real unmarked character. If the OCR already
     // contains a mark, the normal canonical matcher can rank it safely.
-    if (hasAnyDiacritic(name)) continue;
+    if (hasAnyDiacritic(name)) return null;
 
     let suggestions = null;
     try {
-      suggestions = await fetchNameSuggestions(name, { timeoutMs: 5000 });
+      suggestions = await fetchNameSuggestions(name, {
+        timeoutMs: 5000,
+        suggestionCache,
+      });
     } catch (err) {
       console.warn(`[listcheck] OCR refine search skipped for ${name}: ${err.message}`);
-      continue;
+      return null;
     }
-    if (!Array.isArray(suggestions) || suggestions.length === 0) continue;
+    if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
 
     const lower = name.toLowerCase();
     const exact = suggestions.find((s) => String(s.name).toLowerCase() === lower);
-    if (!exact) continue;
+    if (!exact) return null;
 
     const base = stripDiacritics(name);
     const markedSiblings = suggestions
@@ -135,14 +138,14 @@ async function findAmbiguousOcrChoices(names) {
       })
       .map((s) => String(s.name));
 
-    if (markedSiblings.length === 0) continue;
-    choices.push({
+    if (markedSiblings.length === 0) return null;
+    return {
       original: name,
       candidates: [String(exact.name), ...markedSiblings],
-    });
-  }
+    };
+  });
 
-  return choices;
+  return choices.filter(Boolean);
 }
 
 async function requestGeminiObject(prompt, imageBase64, mimeType) {
@@ -204,8 +207,17 @@ async function requestGeminiObject(prompt, imageBase64, mimeType) {
   return null;
 }
 
-async function refineAmbiguousOcrNames(names, { imageBase64, mimeType } = {}) {
-  const choices = await findAmbiguousOcrChoices(names);
+async function refineAmbiguousOcrNames(
+  names,
+  { imageBase64, mimeType, suggestionCache } = {},
+) {
+  // Keep overflow names for the ignored-count UI, but avoid spending HTTP
+  // calls on rows that cannot enter the bounded list-check pipeline.
+  const refineLimit = config.listcheckMaxNames || names.length;
+  const choices = await findAmbiguousOcrChoices(
+    names.slice(0, refineLimit),
+    { suggestionCache },
+  );
   if (choices.length === 0) return names;
 
   const choiceLines = choices
@@ -244,6 +256,7 @@ async function refineAmbiguousOcrNames(names, { imageBase64, mimeType } = {}) {
  * @param {object} image - Discord attachment or { url, contentType }
  * @param {object} [options]
  * @param {boolean} [options.refineAmbiguousDiacritics=false] - second-pass OCR for exact unmarked names with marked Bible siblings
+ * @param {Map} [options.suggestionCache] - request-local Bible search cache
  * @returns {Promise<string[]>} Array of normalized character names
  */
 export async function extractNamesFromImage(image, options = {}) {
@@ -365,7 +378,11 @@ export async function extractNamesFromImage(image, options = {}) {
 
     let names = filterAndDeduplicateNames(parsed);
     if (refineAmbiguousDiacritics) {
-      names = await refineAmbiguousOcrNames(names, { imageBase64, mimeType });
+      names = await refineAmbiguousOcrNames(names, {
+        imageBase64,
+        mimeType,
+        suggestionCache: options.suggestionCache,
+      });
     }
     setCachedOcrNames(cacheKey, names);
     return names;

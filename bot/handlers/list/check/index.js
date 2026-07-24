@@ -168,12 +168,16 @@ export function createCheckHandlers({ client }) {
   async function handleListCheckCommand(interaction) {
     const image = interaction.options.getAttachment('image', true);
     let names = [];
+    const suggestionCache = new Map();
 
     await deferReply(interaction);
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     try {
-      names = await extractNamesFromImage(image, { refineAmbiguousDiacritics: true });
+      names = await extractNamesFromImage(image, {
+        refineAmbiguousDiacritics: true,
+        suggestionCache,
+      });
     } catch (err) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
@@ -205,7 +209,10 @@ export function createCheckHandlers({ client }) {
     });
 
     try {
-      const results = await checkNamesAgainstLists(limitedNames, { guildId: interaction.guild?.id });
+      const results = await checkNamesAgainstLists(limitedNames, {
+        guildId: interaction.guild?.id,
+        suggestionCache,
+      });
       const formattedLines = formatCheckResults(results, lang);
 
       const { embed } = buildListCheckEmbed({

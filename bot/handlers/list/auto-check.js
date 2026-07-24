@@ -221,9 +221,13 @@ export function createAutoCheckMessageHandler({
         return;
       }
 
+      const suggestionCache = new Map();
       let names = textRequest?.names || [];
       if (image) {
-        names = await extractNamesFromImageFn(image, { refineAmbiguousDiacritics: true });
+        names = await extractNamesFromImageFn(image, {
+          refineAmbiguousDiacritics: true,
+          suggestionCache,
+        });
       }
 
       if (names.length === 0) {
@@ -251,7 +255,10 @@ export function createAutoCheckMessageHandler({
         )],
       });
 
-      const results = await checkNamesAgainstListsFn(limitedNames, { guildId: message.guild.id });
+      const results = await checkNamesAgainstListsFn(limitedNames, {
+        guildId: message.guild.id,
+        suggestionCache,
+      });
       const formattedLines = formatCheckResultsFn(results, lang);
 
       // Same embed builder as /la-list check; mode: 'auto' tweaks the
