@@ -146,6 +146,7 @@ async function recoverViaPrefixCandidates(name, predicate, options = {}) {
   const matches = new Map();
   for (const prefix of buildRecoveryPrefixes(folded)) {
     const suggestions = await fetchNameSuggestions(prefix, options);
+    if (suggestions === null) return null;
     if (!Array.isArray(suggestions) || suggestions.length === 0) continue;
     const before = matches.size;
     for (const s of suggestions) {
@@ -312,6 +313,7 @@ export async function recoverViaVisualSubstitution(name, options = {}) {
   const matches = new Map();
   for (const variant of buildSingleVisualSubstitutionVariants(name)) {
     const suggestions = await fetchNameSuggestions(variant, options);
+    if (suggestions === null) return null;
     const match = chooseCanonicalSuggestion(variant, suggestions);
     if (!match || !['exact', 'diacritic'].includes(match.reason)) continue;
 

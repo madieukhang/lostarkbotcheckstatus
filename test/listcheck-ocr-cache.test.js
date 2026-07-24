@@ -330,6 +330,80 @@ test('extractNamesFromImage can refine dropped umlauts with a targeted candidate
   }
 });
 
+test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  const originalMaxNames = config.listcheckMaxNames;
+  const originalConcurrency = config.listcheckRosterLookupConcurrency;
+  const names = Array.from({ length: 10 }, (_, index) => `Benchname${index}`);
+  let searchCalls = 0;
+  let activeSearches = 0;
+  let maxActiveSearches = 0;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels = ['fake-model'];
+  config.listcheckMaxNames = 8;
+  config.listcheckRosterLookupConcurrency = 3;
+
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/refine-concurrency.png') {
+      return new Response(new Uint8Array([19, 20, 21]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      return Response.json({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text: JSON.stringify(names) }] },
+        }],
+      });
+    }
+
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      searchCalls += 1;
+      activeSearches += 1;
+      maxActiveSearches = Math.max(maxActiveSearches, activeSearches);
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      activeSearches -= 1;
+
+      const payload = new URL(requestedUrl).searchParams.get('payload');
+      const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+      const query = decoded[1];
+      const table = [{ _: 1 }, [2], [3, 4, 5], query, 'blade', 1700];
+      return Response.json({ type: 'result', data: JSON.stringify(table) });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const result = await extractNamesFromImage({
+      id: 'refine-concurrency',
+      url: 'https://cdn.discordapp.com/refine-concurrency.png',
+      contentType: 'image/png',
+    }, { refineAmbiguousDiacritics: true });
+
+    assert.deepEqual(result, names, 'names beyond the check limit should remain available for ignored-count UI');
+    assert.equal(searchCalls, 8, 'refinement should stop at the configured list-check limit');
+    assert.ok(maxActiveSearches > 1, 'refinement searches should overlap');
+    assert.ok(maxActiveSearches <= 3, 'refinement must respect configured concurrency');
+  } finally {
+    globalThis.fetch = originalFetch;
+    config.geminiApiKey = originalKey;
+    config.geminiModels = originalModels;
+    config.listcheckMaxNames = originalMaxNames;
+    config.listcheckRosterLookupConcurrency = originalConcurrency;
+    clearOcrCache();
+  }
+});
+
 test('extractNamesFromImage rejects oversized downloads even when content-length is missing', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;

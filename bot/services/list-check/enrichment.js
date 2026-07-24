@@ -16,7 +16,7 @@ import {
   recoverViaVisualSubstitution,
 } from './nameRecovery.js';
 
-export async function enrichListCheckResults(results) {
+export async function enrichListCheckResults(results, { suggestionCache } = {}) {
   const itemsNeedingEnrichment = results.filter(
     (item) => !item.snapClassId || !item.snapItemLevel
   );
@@ -38,8 +38,9 @@ export async function enrichListCheckResults(results) {
     const lookupTimeoutMs = config.listcheckRosterLookupTimeoutMs || 6000;
     const enrichStartedAt = Date.now();
     const mode = health.online ? 'worker-meta' : 'search-direct';
+    const pendingSnapshots = new Map();
 
-    async function applyEnrichment(item, { classId, itemLevel, combatScore }) {
+    function applyEnrichment(item, { classId, itemLevel, combatScore }) {
       if (classId) {
         item.snapClassId = classId;
         item.snapClassName = getClassName(classId);
@@ -50,23 +51,19 @@ export async function enrichListCheckResults(results) {
       if (combatScore && combatScore !== '?') {
         item.snapCombatScore = String(combatScore);
       }
-      try {
-        await upsertRosterSnapshots([{
-          name: item.name,
-          itemLevel,
-          classId,
-          combatScore,
-        }], item.name);
-      } catch (saveErr) {
-        // Snapshot upsert failure is non-fatal · in-memory enrichment
-        // still renders for THIS call; next call just re-fetches.
-        console.warn(`[listcheck] Snapshot upsert failed for ${item.name}: ${saveErr.message}`);
-      }
+      pendingSnapshots.set(String(item.name).toLowerCase(), {
+        name: item.name,
+        itemLevel,
+        classId,
+        combatScore,
+      });
     }
 
     async function applySearchSuggestionEnrichment(item, searchOptions = {}) {
       const originalName = item.name;
       let suggestions = await fetchNameSuggestions(originalName, searchOptions);
+      if (suggestions === null) return false;
+
       // Bible search returns empty `[[]]` when the query bytes do not
       // match its index (observed for NFD-form input and visually-
       // confusable Unicode like Cyrillic look-alikes that survive
@@ -82,12 +79,14 @@ export async function enrichListCheckResults(results) {
             `[listcheck] Search empty for "${originalName}", retrying with ASCII fold "${folded}"`
           );
           suggestions = await fetchNameSuggestions(folded, searchOptions);
+          if (suggestions === null) return false;
         }
       }
       let match = chooseCanonicalSuggestion(originalName, suggestions);
       if (!match) {
         for (const variant of buildDiaeresisDigraphVariants(originalName)) {
           const variantSuggestions = await fetchNameSuggestions(variant, searchOptions);
+          if (variantSuggestions === null) return false;
           const variantMatch = chooseCanonicalSuggestion(variant, variantSuggestions);
           if (variantMatch) {
             console.log(
@@ -107,7 +106,7 @@ export async function enrichListCheckResults(results) {
             `[listcheck] Visual-substitution recovery: OCR'd "${originalName}" -> canonical "${recoveredName}"`
           );
           if (recoveredName !== originalName) item.name = recoveredName;
-          await applyEnrichment(item, {
+          applyEnrichment(item, {
             classId: substituted.cls || '',
             itemLevel: Number(substituted.itemLevel) || 0,
           });
@@ -122,7 +121,7 @@ export async function enrichListCheckResults(results) {
             `[listcheck] Prefix-transposition recovery: OCR'd "${originalName}" -> canonical "${recoveredName}"`
           );
           if (recoveredName !== originalName) item.name = recoveredName;
-          await applyEnrichment(item, {
+          applyEnrichment(item, {
             classId: transposed.cls || '',
             itemLevel: Number(transposed.itemLevel) || 0,
           });
@@ -143,7 +142,7 @@ export async function enrichListCheckResults(results) {
             `[listcheck] Prefix-indel recovery: OCR'd "${originalName}" -> canonical "${recoveredName}"`
           );
           if (recoveredName !== originalName) item.name = recoveredName;
-          await applyEnrichment(item, {
+          applyEnrichment(item, {
             classId: recovered.cls || '',
             itemLevel: Number(recovered.itemLevel) || 0,
           });
@@ -177,7 +176,7 @@ export async function enrichListCheckResults(results) {
         item.name = chosenName;
       }
 
-      await applyEnrichment(item, {
+      applyEnrichment(item, {
         classId: chosen.cls || '',
         itemLevel: Number(chosen.itemLevel) || 0,
       });
@@ -186,7 +185,7 @@ export async function enrichListCheckResults(results) {
 
     await mapWithConcurrency(itemsNeedingEnrichment, concurrency, async (item) => {
       try {
-        const searchOptions = { timeoutMs: lookupTimeoutMs };
+        const searchOptions = { timeoutMs: lookupTimeoutMs, suggestionCache };
         if (health.online) {
           // Case 1 · worker online: scrape the roster page via worker.
           // Returns class + ilvl + CP for the target AND the full alt
@@ -243,7 +242,7 @@ export async function enrichListCheckResults(results) {
             await applySearchSuggestionEnrichment(item, { ...searchOptions, viaWorker: true });
             return;
           }
-          await applyEnrichment(item, {
+          applyEnrichment(item, {
             classId,
             itemLevel: rosterItemLevel,
             combatScore: roster.targetCombatScore || targetRecord?.combatScore || '',
@@ -267,6 +266,16 @@ export async function enrichListCheckResults(results) {
         console.warn(`[listcheck] Enrichment (${mode}) skipped for ${item.name}: ${err.message}`);
       }
     });
+
+    if (pendingSnapshots.size > 0) {
+      try {
+        await upsertRosterSnapshots([...pendingSnapshots.values()], '');
+      } catch (saveErr) {
+        // Persistence is best-effort. In-memory enrichment still renders
+        // for this response; a later request can retry the snapshot write.
+        console.warn(`[listcheck] Snapshot batch upsert failed: ${saveErr.message}`);
+      }
+    }
 
     console.log(
       `[listcheck] Enriched ${itemsNeedingEnrichment.length} name(s) via ${mode} in ${Date.now() - enrichStartedAt}ms`
