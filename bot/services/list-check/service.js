@@ -45,12 +45,15 @@ import { enrichListCheckResults } from './enrichment.js';
  * @param {object} [options]
  * @param {string} [options.guildId] - Guild ID for including server-scoped blacklist entries
  * @param {Map} [options.suggestionCache] - request-local Bible search cache
+ * @param {object} [options.suggestionContext] - request-wide Bible lookup budget and metrics
  * @returns {Promise<Array<object>>} Results with list entries and stored snapshot metadata
  */
 export async function checkNamesAgainstLists(names, options = {}) {
   const startedAt = Date.now();
+  const connectStartedAt = Date.now();
   await connectDB();
-  const { guildId, suggestionCache } = options;
+  const connectMs = Date.now() - connectStartedAt;
+  const { guildId, suggestionCache, suggestionContext } = options;
 
   // Phase 1: Batch list check · 3 queries for ALL names instead of 3 × N
   const nameQuery = buildNameRosterQuery(names);
@@ -63,6 +66,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   // Best-effort enrichment: names previously queried have rich data
   // surfaced inline; brand-new names render without (graceful fallback).
   // One query for all input names, joined into the results below.
+  const initialDbStartedAt = Date.now();
   const [allBlack, allWhite, allWatch, allTrusted, allSnapshots] = await Promise.all([
     Blacklist.find(blackQuery).collation(collation).lean(),
     Whitelist.find(nameQuery).collation(collation).lean(),
@@ -70,6 +74,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     TrustedUser.find(nameQuery).collation(collation).lean(),
     RosterSnapshot.find({ name: { $in: names } }).collation(collation).lean(),
   ]);
+  const initialDbMs = Date.now() - initialDbStartedAt;
   const snapshotMap = new Map(allSnapshots.map((s) => [s.name.toLowerCase(), s]));
 
   // Build O(1) lookup maps from list entries (once per list, not per name)
@@ -109,12 +114,16 @@ export async function checkNamesAgainstLists(names, options = {}) {
     };
   });
 
+  const correctionStartedAt = Date.now();
   await applyMarkedSiblingLevelCorrections(results);
+  const correctionMs = Date.now() - correctionStartedAt;
 
 
   // Phase 1.5: Targeted class/ilvl enrichment lives in its own module so
   // the list-check service stays focused on DB orchestration.
-  await enrichListCheckResults(results, { suggestionCache });
+  const enrichmentStartedAt = Date.now();
+  await enrichListCheckResults(results, { suggestionCache, suggestionContext });
+  const enrichmentMs = Date.now() - enrichmentStartedAt;
 
   // Phase 1.6: Enrichment can canonicalize OCR'd names (for example
   // "Auroraforymluv" -> "Auroraformyluv") or discover visible roster
@@ -134,16 +143,19 @@ export async function checkNamesAgainstLists(names, options = {}) {
     }
   }
 
+  let refreshDbMs = 0;
   if (refreshNames.size > 0) {
     const refreshList = [...refreshNames];
     const refreshNameQuery = buildNameRosterQuery(refreshList);
     const refreshBlackQuery = buildBlacklistQuery(refreshNameQuery, guildId);
+    const refreshDbStartedAt = Date.now();
     const [refreshBlack, refreshWhite, refreshWatch, refreshTrusted] = await Promise.all([
       Blacklist.find(refreshBlackQuery).collation(collation).lean(),
       Whitelist.find(refreshNameQuery).collation(collation).lean(),
       Watchlist.find(refreshNameQuery).collation(collation).lean(),
       TrustedUser.find(refreshNameQuery).collation(collation).lean(),
     ]);
+    refreshDbMs = Date.now() - refreshDbStartedAt;
     sortBlacklistForScopePriority(refreshBlack);
     const refreshBlackMap = buildEntryMap(refreshBlack);
     const refreshWhiteMap = buildEntryMap(refreshWhite);
@@ -198,10 +210,13 @@ export async function checkNamesAgainstLists(names, options = {}) {
     }
   }
 
+  let trustedDbMs = 0;
   if (altNamesForTrustedCheck.size > 0) {
     const trustedNames = [...altNamesForTrustedCheck];
+    const trustedDbStartedAt = Date.now();
     const altTrusted = await TrustedUser.find(buildNameRosterQuery(trustedNames))
       .collation(collation).lean();
+    trustedDbMs = Date.now() - trustedDbStartedAt;
 
     if (altTrusted.length > 0) {
       const altTrustedSet = buildEntryMap(altTrusted);
@@ -226,8 +241,15 @@ export async function checkNamesAgainstLists(names, options = {}) {
     }
   }
 
-  console.log(
-    `[listcheck] Checked ${names.length} name(s) in ${Date.now() - startedAt}ms (db-only)`
-  );
+  console.log([
+    `[listcheck] Timing total=${Date.now() - startedAt}ms`,
+    `names=${names.length}`,
+    `connect=${connectMs}ms`,
+    `initialDb=${initialDbMs}ms`,
+    `correction=${correctionMs}ms`,
+    `enrichment=${enrichmentMs}ms`,
+    `refreshDb=${refreshDbMs}ms`,
+    `trustedDb=${trustedDbMs}ms`,
+  ].join(' '));
   return results;
 }
