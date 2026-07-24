@@ -9,7 +9,10 @@ import TrustedUser from '../../models/TrustedUser.js';
 import UserPreference from '../../models/UserPreference.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import { getClassName, resolveClassId } from '../../models/Class.js';
-import { fetchNameSuggestions } from '../../services/roster/index.js';
+import {
+  createNameSuggestionContext,
+  fetchNameSuggestions,
+} from '../../services/roster/index.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
@@ -22,6 +25,12 @@ import { buildEntryMap, sortBlacklistForScopePriority } from './matches.js';
 import { buildSearchResultEmbed } from './ui.js';
 
 export async function handleSearchCommand(interaction) {
+  const startedAt = Date.now();
+  const suggestionContext = createNameSuggestionContext({ maxNetworkLookups: 1 });
+  let status = 'error';
+  let bibleMs = 0;
+  let dbMs = 0;
+  let resultCount = 0;
   const raw = interaction.options.getString('name', true);
   const name = normalizeCharacterName(raw);
   const minIlvl = interaction.options.getInteger('min_ilvl') ?? 1700;
@@ -32,9 +41,12 @@ export async function handleSearchCommand(interaction) {
   const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   try {
-    let suggestions = await fetchNameSuggestions(name);
+    const bibleStartedAt = Date.now();
+    let suggestions = await fetchNameSuggestions(name, { suggestionContext });
+    bibleMs = Date.now() - bibleStartedAt;
 
     if (suggestions === null) {
+      status = 'bible-unavailable';
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.search.bibleUnavailable', lang),
@@ -44,6 +56,7 @@ export async function handleSearchCommand(interaction) {
     }
 
     if (suggestions.length === 0) {
+      status = 'no-results';
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.search.noResults', lang, { name }),
@@ -61,6 +74,7 @@ export async function handleSearchCommand(interaction) {
     });
 
     if (suggestions.length === 0) {
+      status = 'filtered-empty';
       const filterDesc = [`ilvl ≥ ${minIlvl}`];
       if (maxIlvl !== null) filterDesc.push(`ilvl ≤ ${maxIlvl}`);
       if (classFilter) filterDesc.push(`class: ${getClassName(classFilter)}`);
@@ -73,6 +87,7 @@ export async function handleSearchCommand(interaction) {
       return;
     }
 
+    const dbStartedAt = Date.now();
     await connectDB();
 
     const searchGuildId = interaction.guild?.id || '';
@@ -89,6 +104,7 @@ export async function handleSearchCommand(interaction) {
       TrustedUser.find(nameQuery).collation(collation).lean(),
       RosterSnapshot.find({ name: { $in: allNames } }).collation(collation).lean(),
     ]);
+    dbMs = Date.now() - dbStartedAt;
 
     const blackMap = buildEntryMap(sortBlacklistForScopePriority(allBlack));
     const whiteMap = buildEntryMap(allWhite);
@@ -113,6 +129,7 @@ export async function handleSearchCommand(interaction) {
         combatScore: snap?.combatScore || '',
       };
     });
+    resultCount = results.length;
 
     const embed = buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang });
 
@@ -122,6 +139,7 @@ export async function handleSearchCommand(interaction) {
 
     await editEmbed(interaction, embed, { components });
     await attachSearchEvidenceCollector({ interaction, results, flaggedWithImages, lang });
+    status = 'ok';
   } catch (err) {
     console.error('[search] ❌ Search failed:', err.message);
     await editAlert(interaction, {
@@ -130,5 +148,16 @@ export async function handleSearchCommand(interaction) {
       fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
       lang,
     });
+  } finally {
+    const stats = suggestionContext.stats;
+    console.log([
+      `[search] Timing total=${Date.now() - startedAt}ms`,
+      `status=${status}`,
+      `bible=${bibleMs}ms`,
+      `db=${dbMs}ms`,
+      `results=${resultCount}`,
+      `network=${stats.networkLookups}`,
+      `sharedCache=${stats.sharedCacheHits}`,
+    ].join(' '));
   }
 }

@@ -252,7 +252,11 @@ Copy `.env.example` to `.env` and fill in values.
 | `LISTCHECK_ROSTER_LOOKUP_CONCURRENCY` | `3` | Parallel direct roster lookups during `/la-check` |
 | `LISTCHECK_ROSTER_LOOKUP_START_SPACING_MS` | `150` | Start spacing between `/la-check` roster lookups |
 | `LISTCHECK_ROSTER_LOOKUP_TIMEOUT_MS` | `6000` | Timeout for each direct `/la-check` roster/suggestion lookup |
-| `LISTCHECK_SIMILAR_LOOKUP_LIMIT` | `3` | Max no-roster names that trigger similar-name suggestions |
+| `LISTCHECK_SIMILAR_LOOKUP_LIMIT` | `3` | Max unresolved names that enter deep typo recovery; also caps visual-substitution candidates per name |
+| `LISTCHECK_SUGGESTION_LOOKUP_BUDGET` | `32` | Hard cap on new Bible search HTTP calls shared by OCR refinement and enrichment in one check |
+| `NAME_SUGGESTION_CACHE_TTL_MS` | `300000` | Cross-request TTL for successful Bible name-search results |
+| `NAME_SUGGESTION_EMPTY_CACHE_TTL_MS` | `30000` | Shorter cross-request TTL for empty Bible name-search results |
+| `NAME_SUGGESTION_CACHE_MAX_SIZE` | `1000` | LRU size cap for cross-request Bible name-search results |
 | `OCR_CACHE_TTL_MS` | `300000` | Short-lived cache for repeated OCR of the same attachment URL |
 | `OCR_CACHE_MAX_SIZE` | `100` | Max cached OCR attachment results |
 | `GUILD_MEMBERS_CACHE_TTL_MS` | `900000` | Cache guild member lists for Stronghold deep/enrich scans |

@@ -12,6 +12,8 @@ export {
 } from './parsers.js';
 
 export {
+  clearNameSuggestionCache,
+  createNameSuggestionContext,
   fetchNameSuggestions,
   formatSuggestionLines,
 } from './search.js';

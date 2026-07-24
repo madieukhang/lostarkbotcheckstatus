@@ -1,3 +1,4 @@
+import config from '../../config.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 
 /**
@@ -310,9 +311,15 @@ export async function recoverViaVisualSubstitution(name, options = {}) {
   const source = stripDiacritics(name);
   if (source.length < 5) return null;
 
+  const {
+    recoveryCandidateLimit = config.listcheckSimilarLookupLimit || 3,
+    ...searchOptions
+  } = options;
+  const candidateLimit = Math.max(1, Number(recoveryCandidateLimit) || 1);
   const matches = new Map();
-  for (const variant of buildSingleVisualSubstitutionVariants(name)) {
-    const suggestions = await fetchNameSuggestions(variant, options);
+  const variants = buildSingleVisualSubstitutionVariants(name).slice(0, candidateLimit);
+  for (const variant of variants) {
+    const suggestions = await fetchNameSuggestions(variant, searchOptions);
     if (suggestions === null) return null;
     const match = chooseCanonicalSuggestion(variant, suggestions);
     if (!match || !['exact', 'diacritic'].includes(match.reason)) continue;

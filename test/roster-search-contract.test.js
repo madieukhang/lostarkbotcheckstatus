@@ -9,15 +9,29 @@ process.env.SCRAPERAPI_KEY_2 = '';
 process.env.SCRAPERAPI_KEY_3 = '';
 
 let fetchNameSuggestions;
+let clearNameSuggestionCache;
+let createNameSuggestionContext;
+let config;
 let recoverViaPrefixIndel;
 let recoverViaPrefixTransposition;
+let recoverViaVisualSubstitution;
 
 test.before(async () => {
-  ({ fetchNameSuggestions } = await import('../bot/services/roster/search.js'));
+  ({
+    clearNameSuggestionCache,
+    createNameSuggestionContext,
+    fetchNameSuggestions,
+  } = await import('../bot/services/roster/search.js'));
+  ({ default: config } = await import('../bot/config.js'));
   ({
     recoverViaPrefixIndel,
     recoverViaPrefixTransposition,
+    recoverViaVisualSubstitution,
   } = await import('../bot/services/list-check/nameRecovery.js'));
+});
+
+test.beforeEach(() => {
+  clearNameSuggestionCache();
 });
 
 async function withSearchResponse(responseBody, run) {
@@ -105,6 +119,92 @@ test('fetchNameSuggestions deduplicates concurrent lookups in one request cache'
   }
 });
 
+test('fetchNameSuggestions reuses successful lookups across request-local caches', async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    const table = [{ _: 1 }, [2], [3, 4, 5], 'Sharedname', 'bard', 1710];
+    return Response.json({ type: 'result', data: JSON.stringify(table) });
+  };
+
+  try {
+    const first = await fetchNameSuggestions('Sharedname', {
+      allowScraperApi: false,
+      suggestionCache: new Map(),
+    });
+    const second = await fetchNameSuggestions('sharedname', {
+      allowScraperApi: false,
+      suggestionCache: new Map(),
+    });
+
+    assert.equal(fetchCalls, 1);
+    assert.deepEqual(second, first);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('fetchNameSuggestions does not share-cache transport failures', async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    if (fetchCalls === 1) return new Response('', { status: 503 });
+    const table = [{ _: 1 }, [2], [3, 4, 5], 'Recoveredname', 'bard', 1710];
+    return Response.json({ type: 'result', data: JSON.stringify(table) });
+  };
+
+  try {
+    const first = await fetchNameSuggestions('Recoveredname', {
+      allowScraperApi: false,
+      suggestionCache: new Map(),
+    });
+    const second = await fetchNameSuggestions('Recoveredname', {
+      allowScraperApi: false,
+      suggestionCache: new Map(),
+    });
+
+    assert.equal(first, null);
+    assert.equal(second?.[0]?.name, 'Recoveredname');
+    assert.equal(fetchCalls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('fetchNameSuggestions stops new network calls when the request budget is exhausted', async () => {
+  const originalFetch = globalThis.fetch;
+  const suggestionContext = createNameSuggestionContext({ maxNetworkLookups: 2 });
+  let fetchCalls = 0;
+
+  globalThis.fetch = async (url) => {
+    fetchCalls += 1;
+    const payload = new URL(String(url)).searchParams.get('payload');
+    const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+    const query = decoded[1];
+    const table = [{ _: 1 }, [2], [3, 4, 5], query, 'bard', 1710];
+    return Response.json({ type: 'result', data: JSON.stringify(table) });
+  };
+
+  try {
+    assert.ok(await fetchNameSuggestions('Budgetone', { suggestionContext }));
+    assert.ok(await fetchNameSuggestions('Budgettwo', { suggestionContext }));
+    assert.equal(
+      await fetchNameSuggestions('Budgetthree', { suggestionContext }),
+      null,
+    );
+
+    assert.equal(fetchCalls, 2);
+    assert.equal(suggestionContext.stats.networkLookups, 2);
+    assert.equal(suggestionContext.stats.budgetExhaustions, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('prefix recovery reuses the same prefix searches across recovery strategies', async () => {
   const originalFetch = globalThis.fetch;
   const suggestionCache = new Map();
@@ -124,6 +224,33 @@ test('prefix recovery reuses the same prefix searches across recovery strategies
 
     assert.equal(fetchCalls, 7, '10-to-4 character prefixes should be fetched once, not twice');
   } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('visual-substitution recovery caps candidate fan-out', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalLimit = config.listcheckSimilarLookupLimit;
+  let fetchCalls = 0;
+
+  config.listcheckSimilarLookupLimit = 2;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return Response.json({
+      type: 'result',
+      data: JSON.stringify([{ _: 1 }, []]),
+    });
+  };
+
+  try {
+    await recoverViaVisualSubstitution('Aqqqqq', {
+      allowScraperApi: false,
+      suggestionCache: new Map(),
+    });
+
+    assert.equal(fetchCalls, 2);
+  } finally {
+    config.listcheckSimilarLookupLimit = originalLimit;
     globalThis.fetch = originalFetch;
   }
 });

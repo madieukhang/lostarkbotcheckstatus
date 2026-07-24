@@ -20,6 +20,8 @@ let RosterSnapshot;
 let WorkerHeartbeat;
 let Blacklist;
 let TrustedUser;
+let config;
+let clearNameSuggestionCache;
 
 test.before(async () => {
   mongod = await MongoMemoryServer.create();
@@ -32,6 +34,8 @@ test.before(async () => {
   ({ default: WorkerHeartbeat } = await import('../bot/models/WorkerHeartbeat.js'));
   ({ default: Blacklist } = await import('../bot/models/Blacklist.js'));
   ({ default: TrustedUser } = await import('../bot/models/TrustedUser.js'));
+  ({ default: config } = await import('../bot/config.js'));
+  ({ clearNameSuggestionCache } = await import('../bot/services/roster/search.js'));
 
   await connectDB();
 });
@@ -42,12 +46,69 @@ test.after(async () => {
 });
 
 test.beforeEach(async () => {
+  clearNameSuggestionCache();
   await Promise.all([
     RosterSnapshot.deleteMany({}),
     WorkerHeartbeat.deleteMany({}),
     Blacklist.deleteMany({}),
     TrustedUser.deleteMany({}),
   ]);
+});
+
+test('enrichment completes every primary lookup before bounded deep recovery', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalLimit = config.listcheckSimilarLookupLimit;
+  const originalBudget = config.listcheckSuggestionLookupBudget;
+  const queries = [];
+  const originalNames = ['Aqqqqq', 'Bqqqqq', 'Cqqqqq', 'Dqqqqq'];
+
+  config.listcheckSimilarLookupLimit = 2;
+  config.listcheckSuggestionLookupBudget = 100;
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (!requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      throw new Error(`unexpected URL: ${requestedUrl}`);
+    }
+    const payload = new URL(requestedUrl).searchParams.get('payload');
+    const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+    queries.push(String(decoded[1]).toLowerCase());
+    return Response.json({
+      type: 'result',
+      data: JSON.stringify([{ _: 1 }, []]),
+    });
+  };
+
+  const results = originalNames.map((name) => ({
+    name,
+    snapClassId: '',
+    snapClassName: '',
+    snapItemLevel: 0,
+    snapCombatScore: '',
+  }));
+
+  try {
+    await enrichListCheckResults(results, { suggestionCache: new Map() });
+
+    const normalizedOriginals = originalNames.map((name) => name.toLowerCase());
+    const firstDeepIndex = queries.findIndex((query) => !normalizedOriginals.includes(query));
+    assert.ok(firstDeepIndex >= normalizedOriginals.length);
+    for (const name of normalizedOriginals) {
+      assert.ok(
+        queries.slice(0, firstDeepIndex).includes(name),
+        `primary lookup should run before deep recovery for ${name}`,
+      );
+    }
+    assert.deepEqual(
+      queries.filter((query) => query.startsWith('c') || query.startsWith('d')),
+      ['cqqqqq', 'dqqqqq'],
+      'names beyond the deep-recovery limit must not fan out',
+    );
+  } finally {
+    config.listcheckSimilarLookupLimit = originalLimit;
+    config.listcheckSuggestionLookupBudget = originalBudget;
+    globalThis.fetch = originalFetch;
+    clearNameSuggestionCache();
+  }
 });
 
 async function markWorkerOnline() {

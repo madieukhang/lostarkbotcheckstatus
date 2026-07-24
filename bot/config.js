@@ -147,6 +147,12 @@ const config = {
   listcheckRosterLookupStartSpacingMs: parsePositiveIntEnv('LISTCHECK_ROSTER_LOOKUP_START_SPACING_MS', 150),
   listcheckRosterLookupTimeoutMs: parsePositiveIntEnv('LISTCHECK_ROSTER_LOOKUP_TIMEOUT_MS', 6000),
   listcheckSimilarLookupLimit: parsePositiveIntEnv('LISTCHECK_SIMILAR_LOOKUP_LIMIT', 3),
+  listcheckSuggestionLookupBudget: parsePositiveIntEnv('LISTCHECK_SUGGESTION_LOOKUP_BUDGET', 32),
+
+  /** Cross-request lostark.bible search cache. Empty results expire sooner. */
+  nameSuggestionCacheTtlMs: parsePositiveIntEnv('NAME_SUGGESTION_CACHE_TTL_MS', 5 * 60 * 1000),
+  nameSuggestionEmptyCacheTtlMs: parsePositiveIntEnv('NAME_SUGGESTION_EMPTY_CACHE_TTL_MS', 30 * 1000),
+  nameSuggestionCacheMaxSize: parsePositiveIntEnv('NAME_SUGGESTION_CACHE_MAX_SIZE', 1000),
 
   /** Short-lived Gemini OCR result cache for repeated checks of the same attachment URL. */
   ocrCacheTtlMs: parsePositiveIntEnv('OCR_CACHE_TTL_MS', 5 * 60 * 1000),

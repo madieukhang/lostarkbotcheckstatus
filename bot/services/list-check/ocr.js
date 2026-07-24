@@ -1,5 +1,5 @@
 import config from '../../config.js';
-import { normalizeCharacterName } from '../../utils/names.js';
+import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 import { hasAnyDiacritic, stripDiacritics } from './nameRecovery.js';
@@ -89,7 +89,9 @@ function shouldFailoverGeminiModel(status, bodyText) {
 function filterAndDeduplicateNames(parsed) {
   const names = parsed
     .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
-    .filter((name) => name && !SERVER_NAMES.has(name.toLowerCase()));
+    .filter(
+      (name) => isValidCharacterName(name) && !SERVER_NAMES.has(name.toLowerCase())
+    );
 
   const seen = new Set();
   const unique = [];
@@ -103,7 +105,10 @@ function filterAndDeduplicateNames(parsed) {
   return unique;
 }
 
-async function findAmbiguousOcrChoices(names, { suggestionCache } = {}) {
+async function findAmbiguousOcrChoices(
+  names,
+  { suggestionCache, suggestionContext } = {},
+) {
   const concurrency = config.listcheckRosterLookupConcurrency || 3;
   const choices = await mapWithConcurrency(names, concurrency, async (name) => {
     // This refinement is only for the dangerous case where Gemini
@@ -117,6 +122,7 @@ async function findAmbiguousOcrChoices(names, { suggestionCache } = {}) {
       suggestions = await fetchNameSuggestions(name, {
         timeoutMs: 5000,
         suggestionCache,
+        suggestionContext,
       });
     } catch (err) {
       console.warn(`[listcheck] OCR refine search skipped for ${name}: ${err.message}`);
@@ -209,14 +215,14 @@ async function requestGeminiObject(prompt, imageBase64, mimeType) {
 
 async function refineAmbiguousOcrNames(
   names,
-  { imageBase64, mimeType, suggestionCache } = {},
+  { imageBase64, mimeType, suggestionCache, suggestionContext } = {},
 ) {
   // Keep overflow names for the ignored-count UI, but avoid spending HTTP
   // calls on rows that cannot enter the bounded list-check pipeline.
   const refineLimit = config.listcheckMaxNames || names.length;
   const choices = await findAmbiguousOcrChoices(
     names.slice(0, refineLimit),
-    { suggestionCache },
+    { suggestionCache, suggestionContext },
   );
   if (choices.length === 0) return names;
 
@@ -257,9 +263,22 @@ async function refineAmbiguousOcrNames(
  * @param {object} [options]
  * @param {boolean} [options.refineAmbiguousDiacritics=false] - second-pass OCR for exact unmarked names with marked Bible siblings
  * @param {Map} [options.suggestionCache] - request-local Bible search cache
+ * @param {object} [options.suggestionContext] - request-wide Bible lookup budget and metrics
  * @returns {Promise<string[]>} Array of normalized character names
  */
 export async function extractNamesFromImage(image, options = {}) {
+  const startedAt = Date.now();
+  const timing = {
+    cache: 'miss',
+    status: 'error',
+    model: 'none',
+    names: 0,
+    downloadMs: 0,
+    geminiMs: 0,
+    refineMs: 0,
+  };
+
+  try {
   if (!config.geminiApiKey) {
     throw new Error('GEMINI_API_KEY is not configured.');
   }
@@ -272,11 +291,15 @@ export async function extractNamesFromImage(image, options = {}) {
   const cacheKey = image.url ? `${image.url}|refine:${refineAmbiguousDiacritics ? '1' : '0'}` : '';
   const cachedNames = getCachedOcrNames(cacheKey);
   if (cachedNames !== undefined) {
-    console.log(`[listcheck] OCR cache hit for attachment ${image.id || cacheKey.slice(0, 32)}`);
+    timing.cache = 'hit';
+    timing.status = 'ok';
+    timing.names = cachedNames.length;
     return cachedNames;
   }
 
+  const downloadStartedAt = Date.now();
   const imageRes = await fetch(image.url, { signal: AbortSignal.timeout(15000) });
+  timing.downloadMs = Date.now() - downloadStartedAt;
   if (!imageRes.ok) {
     throw new Error(`Failed to download attachment (HTTP ${imageRes.status})`);
   }
@@ -288,6 +311,7 @@ export async function extractNamesFromImage(image, options = {}) {
 
   const mimeType = image.contentType || imageRes.headers.get('content-type') || 'image/png';
   const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+  timing.downloadMs = Date.now() - downloadStartedAt;
   if (imageBuffer.byteLength > MAX_OCR_IMAGE_BYTES) {
     throw new Error('Image file too large (max 20MB).');
   }
@@ -305,9 +329,11 @@ export async function extractNamesFromImage(image, options = {}) {
 
   for (let i = 0; i < models.length; i += 1) {
     const model = models[i];
+    timing.model = model;
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
 
     let aiRes;
+    const modelStartedAt = Date.now();
     try {
       aiRes = await fetch(endpoint, {
         method: 'POST',
@@ -315,7 +341,9 @@ export async function extractNamesFromImage(image, options = {}) {
         body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(30000),
       });
+      timing.geminiMs += Date.now() - modelStartedAt;
     } catch (fetchErr) {
+      timing.geminiMs += Date.now() - modelStartedAt;
       failures.push(`${model}: ${fetchErr.name || fetchErr.message}`);
       if (i < models.length - 1) {
         console.warn(`[listcheck] Gemini timeout/network error on ${model}, trying fallback model.`);
@@ -353,7 +381,10 @@ export async function extractNamesFromImage(image, options = {}) {
       console.warn(`[listcheck] Gemini (${model}) finishReason: ${finishReason}, text: ${text.slice(0, 100)}`);
     }
 
-    if (!text) return [];
+    if (!text) {
+      timing.status = 'ok';
+      return [];
+    }
 
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
@@ -378,15 +409,40 @@ export async function extractNamesFromImage(image, options = {}) {
 
     let names = filterAndDeduplicateNames(parsed);
     if (refineAmbiguousDiacritics) {
-      names = await refineAmbiguousOcrNames(names, {
-        imageBase64,
-        mimeType,
-        suggestionCache: options.suggestionCache,
-      });
+      const refineStartedAt = Date.now();
+      try {
+        names = await refineAmbiguousOcrNames(names, {
+          imageBase64,
+          mimeType,
+          suggestionCache: options.suggestionCache,
+          suggestionContext: options.suggestionContext,
+        });
+      } finally {
+        timing.refineMs = Date.now() - refineStartedAt;
+      }
     }
     setCachedOcrNames(cacheKey, names);
+    timing.status = 'ok';
+    timing.names = names.length;
     return names;
   }
 
   throw new Error(`All Gemini models failed: ${failures.join(' | ')}`);
+  } finally {
+    const lookupStats = options.suggestionContext?.stats || {};
+    console.log([
+      `[listcheck] OCR timing total=${Date.now() - startedAt}ms`,
+      `status=${timing.status}`,
+      `cache=${timing.cache}`,
+      `download=${timing.downloadMs}ms`,
+      `gemini=${timing.geminiMs}ms`,
+      `refine=${timing.refineMs}ms`,
+      `model=${timing.model}`,
+      `names=${timing.names}`,
+      `searchNetwork=${lookupStats.networkLookups || 0}`,
+      `searchRequestCache=${lookupStats.requestCacheHits || 0}`,
+      `searchSharedCache=${lookupStats.sharedCacheHits || 0}`,
+      `searchBudgetExhausted=${lookupStats.budgetExhaustions || 0}`,
+    ].join(' '));
+  }
 }

@@ -23,6 +23,7 @@ import {
   checkNamesAgainstLists,
   formatCheckResults,
 } from '../../../services/list-check/service.js';
+import { createNameSuggestionContext } from '../../../services/roster/search.js';
 import {
   normalizeCharacterName,
   getAddedByDisplay,
@@ -168,7 +169,10 @@ export function createCheckHandlers({ client }) {
   async function handleListCheckCommand(interaction) {
     const image = interaction.options.getAttachment('image', true);
     let names = [];
-    const suggestionCache = new Map();
+    const suggestionContext = createNameSuggestionContext({
+      maxNetworkLookups: config.listcheckSuggestionLookupBudget,
+    });
+    const suggestionCache = suggestionContext.cache;
 
     await deferReply(interaction);
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
@@ -177,6 +181,7 @@ export function createCheckHandlers({ client }) {
       names = await extractNamesFromImage(image, {
         refineAmbiguousDiacritics: true,
         suggestionCache,
+        suggestionContext,
       });
     } catch (err) {
       await editAlert(interaction, {
@@ -212,6 +217,7 @@ export function createCheckHandlers({ client }) {
       const results = await checkNamesAgainstLists(limitedNames, {
         guildId: interaction.guild?.id,
         suggestionCache,
+        suggestionContext,
       });
       const formattedLines = formatCheckResults(results, lang);
 

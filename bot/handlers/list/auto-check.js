@@ -16,10 +16,11 @@ import {
   checkNamesAgainstLists,
   formatCheckResults,
 } from '../../services/list-check/service.js';
+import { createNameSuggestionContext } from '../../services/roster/search.js';
 import { getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
-import { normalizeCharacterName } from '../../utils/names.js';
+import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
 import { getGuildLanguage, t } from '../../services/i18n/index.js';
 import { buildAutoCheckEvidenceRow } from './check/index.js';
 
@@ -33,7 +34,6 @@ const processedMessages = new Map(); // messageId -> timestamp
 const inFlightMessages = new Set();
 const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
 export const AUTO_CHECK_MAX_NAMES = 8;
-const TEXT_NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}\p{N}]{1,19}$/u;
 
 /**
  * Parse an explicit auto-check text request. Bare names and words such as
@@ -55,7 +55,7 @@ export function parseAutoCheckText(content) {
   const seen = new Set();
 
   for (const token of tokens) {
-    if (!TEXT_NAME_RE.test(token)) {
+    if (!isValidCharacterName(token)) {
       invalidTokens.push(token);
       continue;
     }
@@ -221,12 +221,16 @@ export function createAutoCheckMessageHandler({
         return;
       }
 
-      const suggestionCache = new Map();
+      const suggestionContext = createNameSuggestionContext({
+        maxNetworkLookups: config.listcheckSuggestionLookupBudget,
+      });
+      const suggestionCache = suggestionContext.cache;
       let names = textRequest?.names || [];
       if (image) {
         names = await extractNamesFromImageFn(image, {
           refineAmbiguousDiacritics: true,
           suggestionCache,
+          suggestionContext,
         });
       }
 
@@ -258,6 +262,7 @@ export function createAutoCheckMessageHandler({
       const results = await checkNamesAgainstListsFn(limitedNames, {
         guildId: message.guild.id,
         suggestionCache,
+        suggestionContext,
       });
       const formattedLines = formatCheckResultsFn(results, lang);
 

@@ -20,6 +20,12 @@ function normalizeNameGlyphs(raw) {
     .normalize('NFC');
 }
 
+export const CHARACTER_NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}\p{N}]{1,19}$/u;
+
+export function isValidCharacterName(value) {
+  return CHARACTER_NAME_RE.test(String(value || '').normalize('NFC'));
+}
+
 export function normalizeCharacterName(raw) {
   const value = normalizeNameGlyphs(raw);
   if (!value) return '';

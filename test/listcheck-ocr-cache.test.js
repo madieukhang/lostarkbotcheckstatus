@@ -207,6 +207,60 @@ test('extractNamesFromImage removes OCR-inserted spaces inside names', async () 
   }
 });
 
+test('extractNamesFromImage drops invalid and out-of-range OCR tokens', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/invalid-name-image.png') {
+      return new Response(new Uint8Array([31, 32, 33]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      return Response.json({
+        candidates: [{
+          finishReason: 'STOP',
+          content: {
+            parts: [{
+              text: JSON.stringify([
+                'Validname',
+                'Name2',
+                'A',
+                '9start',
+                'Bad-name',
+                'ABCDEFGHIJKLMNOPQRSTU',
+              ]),
+            }],
+          },
+        }],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'image-invalid-names',
+      url: 'https://cdn.discordapp.com/invalid-name-image.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(names, ['Validname', 'Name2']);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
+});
+
 test('extractNamesFromImage repairs observed Banhcanhcua umlaut collapses', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;
