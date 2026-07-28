@@ -14,8 +14,8 @@ ENV NODE_ENV=production
 # Copy package files first so Docker can cache the npm install layer
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm install --omit=dev
+# Install the exact production dependency tree recorded in package-lock.json
+RUN npm ci --omit=dev
 
 # Copy the rest of the source code
 COPY . .
