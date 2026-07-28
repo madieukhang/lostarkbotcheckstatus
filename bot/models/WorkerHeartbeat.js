@@ -4,8 +4,9 @@ import mongoose from 'mongoose';
 // `lastSeenAt: now()` every ~15s. Bot reads it via getWorkerHealth() to
 // decide whether the residential-IP worker is online.
 //
-// Distinct workerId values let multiple workers run side-by-side
-// later (HA), but Phase 2 ships with a single 'default' worker.
+// The default deployment uses one `default` worker. Distinct workerId
+// values keep the schema compatible with multiple workers if HA is
+// introduced later.
 const workerHeartbeatSchema = new mongoose.Schema({
   workerId: {
     type: String,

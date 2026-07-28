@@ -4,9 +4,9 @@
  * members + bible meta lookups to find characters that share the same
  * stronghold name (= same player account). Two modes: 'gentle'
  * (sequential, 1.5s throttle, transient retry, current default) and
- * 'fast' (concurrency 3, no retry). Gentle remains the default after a
- * 2026-05-03 peak-hour rate-limit incident; fast mode is intended for
- * off-peak use.
+ * 'fast' (concurrency 3, no retry). Gentle is the production-safe
+ * default because the upstream rejects burst traffic; fast mode is an
+ * explicit off-peak opt-in.
  */
 
 import config from '../../config.js';
@@ -48,11 +48,9 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   // probes so the whole chain bypasses Railway's CF-blocked IP.
   const viaWorker = options.viaWorker === true;
 
-  // Mode selection. A Phase 1 verification scan found all five expected alts
-  // in 'gentle' mode (sequential, 1.5s throttle, transient retry). The original
-  // 'fast' production default (concurrency 3, no retry, 300ms backoff floor)
-  // reached 100% failure during a 2026-05-03 peak-hour run because Bible
-  // rejected the burst. The default therefore remains 'gentle'.
+  // Gentle mode is deliberately sequential and retries transient failures:
+  // Bible rate-limits short concurrent bursts aggressively. Fast mode keeps
+  // the original bounded concurrency for explicit off-peak runs.
   //
   // Callers can opt into fast mode with `mode: 'fast'` for off-peak runs.
   const mode = options.mode === 'fast' ? 'fast' : 'gentle';

@@ -7,14 +7,10 @@ import { getRaidChoices } from '../models/Raid.js';
 import { getSupportedLanguages, t } from '../services/i18n/index.js';
 
 /**
- * Phase 4 (2026-05-03) put every bot command under the `la-` prefix so
- * Discord autocomplete groups all of them under `/la`. Each command
- * builder accepts the slash command name and is invoked once per command
- * with the `la-` name (e.g. `la-status`, `la-list`, `la-help`).
- *
- * Phase 4a registered both legacy + `la-` names as aliases; Phase 4c
- * (this commit) removed the legacy halves once the soft-deprecation
- * banner had been live long enough.
+ * Public commands use the stable `la-` prefix so Discord autocomplete
+ * groups them together. Builders accept the command name to keep the
+ * registry table-driven; legacy unprefixed aliases are intentionally not
+ * registered.
  */
 
 function commandText(key) {
