@@ -47,17 +47,6 @@ function diacriticDistance(a, b) {
   return score;
 }
 
-export function medianNumber(values) {
-  const sorted = values
-    .filter((value) => Number.isFinite(value))
-    .sort((a, b) => a - b);
-  if (sorted.length === 0) return null;
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1
-    ? sorted[mid]
-    : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
 // Aggressive ASCII fallback for bible search retries. Strips combining
 // marks AND any remaining non-ASCII codepoint (catches Cyrillic
 // look-alikes and other Unicode confusables that survive Gemini's OCR
