@@ -55,7 +55,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const connectMs = Date.now() - connectStartedAt;
   const { guildId, suggestionCache, suggestionContext } = options;
 
-  // Phase 1: Batch list check · 3 queries for ALL names instead of 3 × N
+  // Fetch every input name once per collection. The query count stays
+  // constant as the OCR/name batch grows; lookup maps below make the
+  // per-name join O(1).
   const nameQuery = buildNameRosterQuery(names);
   const collation = { locale: 'en', strength: 2 };
 
@@ -119,13 +121,13 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const correctionMs = Date.now() - correctionStartedAt;
 
 
-  // Phase 1.5: Targeted class/ilvl enrichment lives in its own module so
-  // the list-check service stays focused on DB orchestration.
+  // Targeted class/ilvl enrichment lives in its own module so this
+  // service stays focused on DB orchestration.
   const enrichmentStartedAt = Date.now();
   await enrichListCheckResults(results, { suggestionCache, suggestionContext });
   const enrichmentMs = Date.now() - enrichmentStartedAt;
 
-  // Phase 1.6: Enrichment can canonicalize OCR'd names (for example
+  // Enrichment can canonicalize OCR'd names (for example
   // "Auroraforymluv" -> "Auroraformyluv") or discover visible roster
   // siblings. The initial DB list query ran before that data existed,
   // so refresh missing hits against the canonical name + discovered
@@ -182,7 +184,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     }
   }
 
-  // Phase 2: Resolve trusted status via roster relationships.
+  // Resolve trusted status through already-known roster relationships.
   //
   // Two alt sources cross-reference into TrustedUser here:
   //   (a) `allCharacters` already stored on a blacklist / whitelist /
