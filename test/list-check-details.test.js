@@ -5,8 +5,11 @@ process.env.DISCORD_TOKEN ||= 'test';
 process.env.CHANNEL_ID ||= 'test';
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
-const { buildAutoCheckEvidenceRow } = await import('../bot/handlers/list/check/index.js');
-const { buildEvidenceEmbed } = await import('../bot/handlers/list/view/ui.js');
+const {
+  buildAutoCheckEvidenceRow,
+  loadCheckDetailStatMap,
+} = await import('../bot/handlers/list/check/index.js');
+const { buildCheckEntryDetailsEmbed } = await import('../bot/handlers/list/check/ui.js');
 
 test('check details dropdown includes a blacklist entry without an evidence image', () => {
   const blackId = 'a'.repeat(24);
@@ -51,8 +54,56 @@ test('check details dropdown de-duplicates multiple checked alts from one entry'
   assert.equal(select.options[0].value, `black:${blackId}`);
 });
 
-test('list-entry detail still renders raid and added-by metadata without an image', () => {
-  const embed = buildEvidenceEmbed({
+test('check detail snapshot loader stays DB-only and includes primary plus tracked alts', async () => {
+  let receivedQuery;
+  let receivedCollation;
+  const RosterSnapshotModel = {
+    find(query) {
+      receivedQuery = query;
+      return {
+        collation(value) {
+          receivedCollation = value;
+          return this;
+        },
+        async lean() {
+          return [
+            { name: 'Rosterprimary', classId: 'bard', itemLevel: 1725.5, combatScore: '≈3136.08' },
+            { name: 'Checkedalt', classId: 'blade', itemLevel: 1711.67, combatScore: '≈2981.11' },
+          ];
+        },
+      };
+    },
+  };
+
+  const statMap = await loadCheckDetailStatMap({
+    name: 'Rosterprimary',
+    allCharacters: ['Rosterprimary', 'Checkedalt', 'Checkedalt'],
+  }, { RosterSnapshotModel });
+
+  assert.deepEqual(receivedQuery, {
+    name: { $in: ['Rosterprimary', 'Checkedalt'] },
+  });
+  assert.deepEqual(receivedCollation, { locale: 'en', strength: 2 });
+  assert.equal(statMap.get('rosterprimary').combatScore, '≈3136.08');
+  assert.equal(statMap.get('checkedalt').itemLevel, 1711.67);
+});
+
+test('dropdown detail uses broadcast layout with added-by beside CP and evidence below', () => {
+  const statMap = new Map([
+    ['rosterprimary', {
+      name: 'Rosterprimary',
+      className: 'Bard',
+      itemLevel: 1725.5,
+      combatScore: '≈3136.08',
+    }],
+    ['checkedalt', {
+      name: 'Checkedalt',
+      className: 'Blade',
+      itemLevel: 1711.67,
+      combatScore: '≈2981.11',
+    }],
+  ]);
+  const embed = buildCheckEntryDetailsEmbed({
     name: 'Rosterprimary',
     reason: 'Blacklist report',
     raid: 'Kazeros Hard',
@@ -63,10 +114,29 @@ test('list-entry detail still renders raid and added-by metadata without an imag
     _label: 'blacklist',
     _icon: '⛔',
     _color: 0xed4245,
-  }, null, { includeAddedBy: true, lang: 'vi' }).toJSON();
+  }, {
+    displayUrl: 'https://cdn.example.test/evidence.png',
+    includeAddedBy: true,
+    lang: 'vi',
+    statMap,
+  }).toJSON();
 
-  const fields = new Map(embed.fields.map((field) => [field.name, field.value]));
-  assert.equal(fields.get('🗡️ Raid'), '`Kazeros Hard`');
-  assert.equal(fields.get('👤 Người thêm'), 'Legacy Officer');
-  assert.equal(fields.get('⚠️ Evidence'), 'Entry này chưa có ảnh evidence.');
+  assert.equal(embed.title, '🎨 Một ghi chú mới · Blacklist');
+  assert.match(embed.description, /Rosterprimary/u);
+  assert.deepEqual(embed.fields.map((field) => field.name), [
+    '📝 Lý do',
+    '🗡️ Raid',
+    '🕐 Đã thêm',
+    '📊 ilvl',
+    '⚔️ CP',
+    '👤 Người thêm',
+    '🧬 Alt đang track (1)',
+  ]);
+  assert.equal(embed.fields[3].value, '`1725.50`');
+  assert.equal(embed.fields[4].value, '≈3136.08');
+  assert.equal(embed.fields[4].inline, true);
+  assert.equal(embed.fields[5].value, 'Legacy Officer');
+  assert.equal(embed.fields[5].inline, true);
+  assert.match(embed.fields[6].value, /`1711\.67` · CP `≈2981\.11`/u);
+  assert.equal(embed.image.url, 'https://cdn.example.test/evidence.png');
 });

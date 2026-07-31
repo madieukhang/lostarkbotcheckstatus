@@ -15,6 +15,7 @@ import { connectDB } from '../../../db.js';
 import config from '../../../config.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getClassName } from '../../../models/Class.js';
@@ -24,11 +25,6 @@ import {
   formatCheckResults,
 } from '../../../services/list-check/service.js';
 import { createNameSuggestionContext } from '../../../services/roster/search.js';
-import {
-  normalizeCharacterName,
-  getAddedByDisplay,
-  getInteractionDisplayName,
-} from '../../../utils/names.js';
 import { truncateDiscordContent } from '../../../utils/discordText.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
@@ -37,15 +33,11 @@ import {
   editAlert,
   editEmbed,
   editNotice,
-  replyAlert,
-  replyEmbed,
-  replyNotice,
 } from '../../../utils/interactionReplies.js';
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import { ICONS } from '../../../utils/ui.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
-import { buildEvidenceEmbed } from '../view/ui.js';
 import {
   buildMultiaddTemplate,
   parseMultiaddFile,
@@ -65,6 +57,8 @@ import {
   buildApprovalResultRow,
   buildApprovalProcessingRow,
 } from '../helpers.js';
+import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
+import { buildCheckEntryDetailsEmbed } from './ui.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
@@ -125,14 +119,40 @@ export function buildAutoCheckEvidenceRow(results, lang = 'en') {
   );
 }
 
+/**
+ * Load cached character stats for the dropdown detail card. This path is
+ * deliberately DB-only: the original check already owns enrichment, so a
+ * component click must not trigger another Bible/worker request.
+ */
+export async function loadCheckDetailStatMap(entry, {
+  RosterSnapshotModel = RosterSnapshot,
+} = {}) {
+  const names = [...new Set([
+    entry?.name,
+    ...(Array.isArray(entry?.allCharacters) ? entry.allCharacters : []),
+  ].filter(Boolean))];
+  if (names.length === 0) return new Map();
+
+  try {
+    const snapshots = await RosterSnapshotModel.find({ name: { $in: names } })
+      .collation({ locale: 'en', strength: 2 })
+      .lean();
+    return statMapFromRosterCharacters(snapshots);
+  } catch (err) {
+    console.warn('[listcheck] Snapshot lookup for detail card failed (non-fatal):', err.message);
+    return new Map();
+  }
+}
+
 export function createAutoCheckEvidenceHandler({ client }) {
   return async function handleAutoCheckEvidenceSelect(interaction) {
     const raw = interaction.values?.[0] || '';
     const parsed = parseListEntryRef(raw);
+    await deferReply(interaction, { ephemeral: true });
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     if (!parsed) {
-      await replyNotice(interaction, t('dialogue.check.malformed', lang), {
+      await editNotice(interaction, t('dialogue.check.malformed', lang), {
         severity: AlertSeverity.WARNING,
         lang,
       });
@@ -144,7 +164,7 @@ export function createAutoCheckEvidenceHandler({ client }) {
     const entry = await ctx.model.findOne({ _id: parsed.id }).lean();
 
     if (!entry) {
-      await replyAlert(interaction, {
+      await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.entryRemoved', lang),
         lang,
@@ -153,12 +173,20 @@ export function createAutoCheckEvidenceHandler({ client }) {
     }
 
     const decorated = decorateListEntry(entry, parsed.listType);
-    const displayUrl = await resolveDisplayImageUrl(entry, client);
+    const [displayUrl, statMap] = await Promise.all([
+      resolveDisplayImageUrl(entry, client),
+      loadCheckDetailStatMap(entry),
+    ]);
     const isOfficer =
       config.officerApproverIds.includes(interaction.user.id)
       || config.seniorApproverIds.includes(interaction.user.id);
 
-    await replyEmbed(interaction, buildEvidenceEmbed(decorated, displayUrl, { includeAddedBy: isOfficer, lang }));
+    await editEmbed(interaction, buildCheckEntryDetailsEmbed(decorated, {
+      displayUrl,
+      includeAddedBy: isOfficer,
+      lang,
+      statMap,
+    }));
   };
 }
 
