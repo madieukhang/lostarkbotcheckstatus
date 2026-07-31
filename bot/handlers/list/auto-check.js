@@ -302,10 +302,9 @@ export function createAutoCheckMessageHandler({
         components.push(selectRow);
       }
 
-      // Evidence dropdown · second row when any flagged result has an
-      // attached image. Mirrors /la-list view's design so officers can
-      // audit evidence right from the auto-check card instead of
-      // re-running /la-list view.
+      // Details dropdown · second row when any checked name resolves to a
+      // list entry. It exposes reason / raid / added-by metadata even when
+      // that entry has no screenshot evidence.
       const evidenceRow = buildAutoCheckEvidenceRowFn(results, lang);
       if (evidenceRow) components.push(evidenceRow);
 

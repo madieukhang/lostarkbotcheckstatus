@@ -25,6 +25,14 @@ test('auto-check text parser accepts check/check: with one or many names', () =>
     names: ['Abcxyz'],
     invalidTokens: [],
   });
+  assert.deepEqual(parseAutoCheckText('check abcxyz defuvw'), {
+    names: ['Abcxyz', 'Defuvw'],
+    invalidTokens: [],
+  });
+  assert.deepEqual(parseAutoCheckText('check abcxyz, defuvw'), {
+    names: ['Abcxyz', 'Defuvw'],
+    invalidTokens: [],
+  });
   assert.deepEqual(parseAutoCheckText('CHECK: abcxyz, DÉFüvw\nabcxyz'), {
     names: ['Abcxyz', 'Défüvw'],
     invalidTokens: [],

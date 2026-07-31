@@ -22,6 +22,7 @@ import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import {
   refreshImageUrl,
 } from '../../../utils/imageRehost.js';
+import { getAddedByDisplay } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
@@ -251,7 +252,7 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  *   4. Roster field - "Tracked alts" with linked names; falls back
  *                     to "(only this character)" if allCharacters is
  *                     just the entry name
- *   5. Evidence     - image OR warning placeholder when expired
+ *   5. Evidence     - image, expired warning, or an explicit not-attached note
  *   6. Logs / Added by (optional) - kept from prior version
  *
  * The Roster field is the headline change vs the older detail card:
@@ -305,9 +306,12 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false, 
   if (displayUrl) {
     embed.setImage(displayUrl);
   } else {
+    const evidenceMessage = entry.imageMessageId || entry.imageUrl
+      ? t('listView.evidence.unavailable', lang)
+      : t('listView.evidence.noImage', lang);
     embed.addFields({
       name: `${ICONS.warn} ${t('listView.evidence.evidence', lang)}`,
-      value: t('listView.evidence.unavailable', lang),
+      value: evidenceMessage,
       inline: false,
     });
   }
@@ -320,8 +324,9 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false, 
     });
   }
 
-  if (includeAddedBy && entry.addedByDisplayName) {
-    embed.addFields({ name: t('listView.evidence.addedBy', lang), value: entry.addedByDisplayName, inline: true });
+  const addedByDisplay = getAddedByDisplay(entry);
+  if (includeAddedBy && addedByDisplay) {
+    embed.addFields({ name: t('listView.evidence.addedBy', lang), value: addedByDisplay, inline: true });
   }
 
   return embed;

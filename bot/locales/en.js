@@ -216,7 +216,7 @@ const en = {
   autoCheckWelcome: {
     title: '🎨 Hi everyone~ Artist is keeping an eye on this channel',
     description: [
-      'Drop a screenshot in here, or type `check <name>` - I read the character names out of it and cross-check them against this server\'s lists.',
+      'Drop a screenshot in here, or type `check NameOne NameTwo` / `check NameOne, NameTwo` - I read up to 8 character names and cross-check them against this server\'s lists.',
       '',
       'New here? The fields below walk through exactly what I do with a check and how to read the result.',
     ],
@@ -500,6 +500,7 @@ const en = {
     },
     navigation: {
       evidencePlaceholder: 'View evidence for...',
+      detailsPlaceholder: 'View listed-name details...',
       expired: 'Session expired · re-run /la-list view',
       noReason: 'No reason',
     },

@@ -69,13 +69,13 @@ import {
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
 
-function pickListEntryWithEvidence(result) {
+function pickListEntryForDetails(result) {
   for (const [listType, entry] of [
     ['black', result.blackEntry],
-    ['white', result.whiteEntry],
     ['watch', result.watchEntry],
+    ['white', result.whiteEntry],
   ]) {
-    if (entry && (entry.imageMessageId || entry.imageUrl)) {
+    if (entry) {
       return { entry, listType };
     }
   }
@@ -83,17 +83,22 @@ function pickListEntryWithEvidence(result) {
 }
 
 /**
- * Build the auto-check / /la-check evidence dropdown. Lists every result
- * row whose flagged list entry carries an evidence image (rehosted or
- * legacy URL). Each option's value encodes `<listType>:<_id>` so the
- * select handler resolves unambiguously across types and scopes (mirrors
- * /la-evidence's encoding).
+ * Build the auto-check / /la-check details dropdown. Every result backed by
+ * a blacklist, watchlist, or whitelist entry is selectable even when the
+ * entry has no evidence image. Blacklist wins when one checked name happens
+ * to match multiple lists, because it is the highest-severity result shown on
+ * the check card. The legacy custom id is kept so already-rendered evidence
+ * menus continue to work after deploy.
  */
 export function buildAutoCheckEvidenceRow(results, lang = 'en') {
   const candidates = [];
+  const seenEntryRefs = new Set();
   for (const result of results) {
-    const picked = pickListEntryWithEvidence(result);
+    const picked = pickListEntryForDetails(result);
     if (!picked) continue;
+    const entryRef = `${picked.listType}:${picked.entry._id}`;
+    if (seenEntryRefs.has(entryRef)) continue;
+    seenEntryRefs.add(entryRef);
     candidates.push({
       result,
       entry: picked.entry,
@@ -105,7 +110,7 @@ export function buildAutoCheckEvidenceRow(results, lang = 'en') {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('autocheck_evidence')
-      .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.evidencePlaceholder', lang)}`)
+      .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.detailsPlaceholder', lang)}`)
       .addOptions(
         candidates.slice(0, 25).map(({ result, entry, listType }) => {
           const ctx = getListContext(listType);
@@ -142,14 +147,6 @@ export function createAutoCheckEvidenceHandler({ client }) {
       await replyAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.entryRemoved', lang),
-        lang,
-      });
-      return;
-    }
-
-    if (!entry.imageMessageId && !entry.imageUrl) {
-      await replyNotice(interaction, t('listView.evidence.noImage', lang), {
-        severity: AlertSeverity.WARNING,
         lang,
       });
       return;
@@ -231,9 +228,9 @@ export function createCheckHandlers({ client }) {
         lang,
       });
 
-      // Evidence dropdown · mirror of /la-list view's evidence row.
-      // Surfaces every flagged row whose list entry has an evidence
-      // image so officers can audit without re-running /la-list view.
+      // Details dropdown · unlike /la-list view's image-only evidence row,
+      // this surfaces every list hit so raid / reason / added-by metadata is
+      // still reachable when no screenshot was attached to the entry.
       const components = [];
       const evidenceRow = buildAutoCheckEvidenceRow(results, lang);
       if (evidenceRow) components.push(evidenceRow);
