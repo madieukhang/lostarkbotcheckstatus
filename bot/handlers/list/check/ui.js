@@ -1,7 +1,7 @@
 /**
- * Broadcast-style detail card shown after selecting a listed name from a
- * /la-check or auto-check result. The check summary stays compact; this card
- * carries the richer context without changing /la-evidence or /la-list view.
+ * Check-specific detail card shown after selecting a listed name from a
+ * /la-check or auto-check result. It borrows the broadcast metadata grid, but
+ * uses copy that describes a lookup result instead of announcing a new entry.
  */
 
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
@@ -101,8 +101,8 @@ export function buildCheckEntryDetailsEmbed(entry, {
   if (altsField) fields.push(altsField);
 
   const embed = createArtistEmbed(lang)
-    .setTitle(`🎨 ${t('dialogue.broadcast.titles.added', lang, { list: listLabel })}`)
-    .setDescription(t('dialogue.broadcast.headlines.added', lang, {
+    .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
+    .setDescription(t('dialogue.check.details.headline', lang, {
       icon,
       name: linkedName,
       list: listLabel,

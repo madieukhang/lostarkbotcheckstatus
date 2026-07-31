@@ -121,8 +121,10 @@ test('dropdown detail uses broadcast layout with added-by beside CP and evidence
     statMap,
   }).toJSON();
 
-  assert.equal(embed.title, '🎨 Một ghi chú mới · Blacklist');
+  assert.equal(embed.title, '🔎 Kết quả kiểm tra · Blacklist');
   assert.match(embed.description, /Rosterprimary/u);
+  assert.match(embed.description, /hiện nằm trong \*\*Blacklist\*\*/u);
+  assert.doesNotMatch(embed.description, /vừa được thêm/u);
   assert.deepEqual(embed.fields.map((field) => field.name), [
     '📝 Lý do',
     '🗡️ Raid',
