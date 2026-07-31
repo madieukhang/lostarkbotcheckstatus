@@ -376,6 +376,7 @@ export default {
     entryRemoved: { title: 'The entry was removed', description: 'The list entry behind this evidence row no longer exists.' },
     ocrFailed: { title: 'OCR could not read the image', description: 'I could not extract character names from this screenshot.', footer: 'Try a clearer raid waiting-room screenshot.' },
     noNames: { title: 'No names detected', description: 'OCR completed but found no valid character names.', footer: 'Try a clearer screenshot of the raid waiting room.' },
+    details: { title: 'Check result · {list}', headline: '{icon} {name} is currently listed in **{list}**{scope}. The saved entry details are gathered below for a quick review.' },
     text: {
       empty: { title: 'No character name provided', description: 'Type `check <character>` or `check: <character>` in this channel.', footer: 'Separate multiple names with spaces, commas, or new lines.' },
       invalid: { title: 'That text is not a character name', description: 'These values are not valid Lost Ark character names: {tokens}', footer: 'Use only character names after `check`; links and mentions are ignored.' },
