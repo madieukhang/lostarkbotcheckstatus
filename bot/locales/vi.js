@@ -51,7 +51,7 @@ const vi = {
   autoCheckWelcome: {
     title: '🎨 Chào các cậu~ Artist ngồi trông channel này nhé',
     description: [
-      'Cứ thả screenshot vào đây, hoặc gõ `check <name>` - tớ sẽ đọc tên character rồi đối chiếu với các list của server này nha~',
+      'Cứ thả screenshot vào đây, hoặc gõ `check TênMột TênHai` / `check TênMột, TênHai` - tớ sẽ đọc tối đa 8 tên character rồi đối chiếu với các list của server này nha~',
       '',
       'Mới vào? Mấy field bên dưới nói rõ tớ làm gì với một lượt check và cách đọc kết quả.',
     ],
@@ -335,6 +335,7 @@ const vi = {
     },
     navigation: {
       evidencePlaceholder: 'Xem evidence của...',
+      detailsPlaceholder: 'Xem chi tiết tên trong list...',
       expired: 'Hết hạn · chạy lại /la-list view',
       noReason: 'Chưa có lý do',
     },

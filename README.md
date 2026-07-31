@@ -9,6 +9,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 - **List management** — blacklist / whitelist / watchlist (`⛔` / `✅` / `⚠️`), global or server-scoped, trusted users protected from any list
 - **Bulk add** — `/la-list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast
 - **Screenshot OCR** — `/la-check` or drop in an auto-check channel, Gemini extracts ≤ 8 names and cross-checks; auto-failover across Gemini models on quota
+- **Text checks** — in an auto-check channel, `check NameOne NameTwo` and `check NameOne, NameTwo` both cross-check up to 8 names in one request
 - **Quick Add** — after auto-check, dropdown adds unflagged names straight to blacklist/watchlist via modal
 - **Approval flow** — members submit, officers instant-approve; senior approver always receives the DM
 - **Evidence rehosting** — images uploaded with an entry are rehosted into a pinned evidence channel so Discord's 24h CDN expiry doesn't rot the reference
@@ -34,6 +35,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 | `/la-list enrich name [deep_limit]` | Stronghold deep-scan an existing entry and append discovered alts. **Restricted to officers/seniors** (depends on the bot owner's residential-IP worker; ~10-15 min wall clock) |
 | `/la-list multiadd action [file]` | Bulk add via Excel template (≤ 30 rows). `action:template` downloads, `action:file` uploads |
 | `/la-check image` | OCR a screenshot → cross-check names against all lists |
+| `check NameOne NameTwo` / `check NameOne, NameTwo` | In the configured auto-check channel, cross-check multiple typed names (space, comma, semicolon, or newline separated; max 8) |
 | `/la-help` | Show all commands |
 | `/la-setup config action:<action>` | All setup runs through one command (Manage Server). Actions below |
 | `action:show` | View the current server config |

@@ -51,7 +51,7 @@ const jp = {
   autoCheckWelcome: {
     title: '🎨 皆さん、こんにちは～ この channel は Artist が見ておりますわ',
     description: [
-      'Screenshot をこちらに投げるか、`check <name>` と入力してくださいませ - わたくしが character 名を読み取り、この server の list と照らし合わせますわ。',
+      'Screenshot をこちらに投げるか、`check NameOne NameTwo` / `check NameOne, NameTwo` と入力してくださいませ - 最大8名の character 名を読み取り、この server の list と照らし合わせますわ。',
       '',
       '初めての方は、下の field で check の流れと結果の読み方をご確認くださいませ。',
     ],
@@ -335,6 +335,7 @@ const jp = {
     },
     navigation: {
       evidencePlaceholder: 'evidence を見る...',
+      detailsPlaceholder: 'List 登録名の詳細を見る...',
       expired: '期限切れ · /la-list view を再実行',
       noReason: 'No reason',
     },

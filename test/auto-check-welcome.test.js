@@ -56,6 +56,8 @@ test('auto-check welcome presents Artist as the channel host and explains daily 
   assert.match(embed.title, /Artist/i);
   // The host speaks in first person and never narrates itself in the third person.
   assert.match(embed.description, /tớ/i);
+  assert.match(embed.description, /check TênMột TênHai/u);
+  assert.match(embed.description, /check TênMột, TênHai/u);
   assert.doesNotMatch(embed.description, /LoaLogs/i);
   assert.match(embed.fields.map((field) => field.value).join('\n'), /00:00/);
   assert.match(embed.fields.map((field) => field.value).join('\n'), /\/la-help/);
