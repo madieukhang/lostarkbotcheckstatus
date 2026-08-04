@@ -403,8 +403,8 @@ export default {
   check: {
     malformed: 'I could not make sense of that evidence pick. Run the check again and I will start fresh.',
     entryRemoved: { title: 'That one is gone now', description: 'Someone removed the list entry this evidence belonged to, so there is nothing left for me to show you.' },
-    ocrFailed: { title: 'I could not read that image', description: 'I stared at this screenshot and could not pull a single character name out of it.', footer: 'A clearer shot of the raid waiting room usually does the trick~' },
-    noNames: { title: 'Nothing in there looked like a name', description: 'I read the image fine, but none of it looked like a character name.', footer: 'The raid waiting-room screen is the easiest one for me to read~' },
+    ocrFailed: { title: 'I could not read that image', description: 'I stared at this screenshot and could not pull a single character name out of it.', footer: 'A clearer shot of the raid waiting room usually does the trick.' },
+    noNames: { title: 'Nothing in there looked like a name', description: 'I read the image fine, but none of it looked like a character name.', footer: 'The raid waiting-room screen is the easiest one for me to read.' },
     details: { title: 'Check result · {list}', headline: '{icon} {name} is on the **{list}**{scope}. Here is everything I have saved about them.' },
     text: {
       empty: { title: 'You forgot the name~', description: 'Type `check <character>` or `check: <character>` here and I will look them up for you.', footer: 'Several at once is fine - separate them with spaces, commas, or new lines.' },
