@@ -88,6 +88,35 @@ export default {
     scraperIdle: 'Idle in this process.',
     footer: 'Officer-only · private view · re-run /la-stats to refresh',
   },
+  // Posted after the daily sweep so an emptied channel reads as tidying rather
+  // than as messages going missing. Tone scales with how much was cleared.
+  cleanupNotice: {
+    trivial: {
+      variants: [
+        "Tidied up **{n}** message(s) here overnight. Pinned messages stayed put~",
+        "Just **{n}** message(s) to clear this time - barely any work at all~",
+        "Swept **{n}** message(s) while you were away. Nothing pinned was touched.",
+        "A light night: **{n}** message(s) cleared, pins untouched~",
+      ],
+    },
+    normal: {
+      variants: [
+        "Cleared **{n}** messages here overnight. Pinned messages stayed put~",
+        "The nightly sweep took **{n}** messages. Anything pinned is still here.",
+        "**{n}** messages tidied away while you were asleep~",
+        "Done for the night: **{n}** messages cleared, pins left alone.",
+      ],
+    },
+    heavy: {
+      variants: [
+        "Busy night - **{n}** messages cleared. Pinned messages stayed put~",
+        "That was a lot: **{n}** messages swept away. Nothing pinned was touched.",
+        "**{n}** messages tidied overnight. You lot were talkative~",
+        "Worked overtime on this one - **{n}** messages cleared, pins left alone.",
+      ],
+    },
+  },
+
   setup: {
     testMessage: 'Artist checked in~ This is now the **{purpose}** channel configured through `/la-setup`.',
     purpose: {

@@ -59,6 +59,35 @@ export default {
     keyLine: 'Key #{key}: **{requests}** ({ok} thành công / {failed} lỗi)', scraperIdle: 'Tiến trình này chưa dùng.',
     footer: 'Chỉ officer · xem riêng · chạy lại /la-stats để làm mới',
   },
+  // Posted after the daily sweep so an emptied channel reads as tidying rather
+  // than as messages going missing. Tone scales with how much was cleared.
+  cleanupNotice: {
+    trivial: {
+      variants: [
+        "Đêm qua tớ dọn **{n}** tin ở đây. Tin đã ghim vẫn nguyên nha~",
+        "Có mỗi **{n}** tin thôi, nhẹ tay lắm~",
+        "Tớ quét **{n}** tin lúc mọi người ngủ. Tin ghim tớ không đụng.",
+        "Một đêm nhẹ nhàng: **{n}** tin đã dọn, ghim vẫn còn nguyên~",
+      ],
+    },
+    normal: {
+      variants: [
+        "Đêm qua tớ dọn **{n}** tin ở đây. Tin đã ghim vẫn nguyên nha~",
+        "Ca dọn đêm lấy đi **{n}** tin. Mấy tin ghim thì vẫn còn đủ.",
+        "**{n}** tin đã được dọn gọn lúc mọi người ngủ~",
+        "Xong ca đêm: **{n}** tin đã dọn, ghim tớ để yên.",
+      ],
+    },
+    heavy: {
+      variants: [
+        "Đêm bận thật - **{n}** tin đã dọn. Tin ghim vẫn nguyên nha~",
+        "Nhiều ghê: **{n}** tin bị quét sạch. Tin ghim tớ không đụng đâu.",
+        "**{n}** tin dọn trong một đêm. Mọi người nói chuyện sôi nổi ghê~",
+        "Tớ tăng ca vụ này - **{n}** tin đã dọn, ghim để nguyên.",
+      ],
+    },
+  },
+
   setup: {
     testMessage: 'Artist ghé qua kiểm tra~ Đây đã là channel **{purpose}** được đặt bằng `/la-setup`.',
     purpose: { autoCheck: 'tự kiểm tra', notification: 'thông báo' },

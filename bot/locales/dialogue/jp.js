@@ -38,6 +38,35 @@ export default {
     keyLine: 'Key #{key}: **{requests}** (成功 {ok} / 失敗 {failed})', scraperIdle: 'このプロセスでは未使用ですの。',
     footer: 'Officer 限定 · 非公開表示 · /la-stats でもう一度確認',
   },
+  // Posted after the daily sweep so an emptied channel reads as tidying rather
+  // than as messages going missing. Tone scales with how much was cleared.
+  cleanupNotice: {
+    trivial: {
+      variants: [
+        "夜のうちに **{n}** 件を片付けましたわ。ピン留めはそのままですの～",
+        "今回は **{n}** 件だけ、ほんの少しでしたわ～",
+        "皆さんがお休みの間に **{n}** 件お掃除しましたの。ピン留めには触れていませんわ。",
+        "軽い夜でしたわ: **{n}** 件を片付け、ピン留めはそのままですの～",
+      ],
+    },
+    normal: {
+      variants: [
+        "夜のうちに **{n}** 件を片付けましたわ。ピン留めはそのままですの～",
+        "夜のお掃除で **{n}** 件を回収しましたわ。ピン留めは残っていますの。",
+        "皆さんがお休みの間に **{n}** 件を整理しましたわ～",
+        "夜の分は完了ですの: **{n}** 件を片付け、ピン留めはそのままですわ。",
+      ],
+    },
+    heavy: {
+      variants: [
+        "忙しい夜でしたわ - **{n}** 件を片付けましたの。ピン留めはそのままですわ～",
+        "かなりの量でしたわ: **{n}** 件をお掃除いたしましたの。ピン留めには触れていませんわ。",
+        "一晩で **{n}** 件を整理しましたわ。皆さん、よくお話しになりますのね～",
+        "残業でしたわ - **{n}** 件を片付け、ピン留めはそのままですの。",
+      ],
+    },
+  },
+
   setup: {
     testMessage: 'Artist が確認に来ましたわ〜 ここは `/la-setup` で設定した **{purpose}** チャンネルですの。',
     purpose: { autoCheck: 'auto-check', notification: '通知' },

@@ -1,4 +1,6 @@
 import GuildConfig from '../../models/GuildConfig.js';
+import { getGuildLanguage } from '../i18n/index.js';
+import { postCleanupNotice } from './cleanupNotice.js';
 import { autoCheckChannelGuard } from './autoCheckChannelGuard.js';
 import { checkBotPermissions } from './channelPermissions.js';
 import {
@@ -106,6 +108,8 @@ export function createAutoCheckCleanupService({
   resolveChannel = resolveConfiguredChannel,
   channelGuard = autoCheckChannelGuard,
   checkPermissions = checkBotPermissions,
+  postNotice = postCleanupNotice,
+  getGuildLanguageFn = getGuildLanguage,
   logger = console,
 } = {}) {
   const cleanupEligibility = buildAutoCheckCleanupEligibility();
@@ -196,6 +200,14 @@ export function createAutoCheckCleanupService({
               ' day=' + dayKey +
               ' deleted=' + outcome.deleted
             );
+
+            // Leave a sign, otherwise the channel just looks emptied and
+            // nobody can tell tidying apart from messages going missing.
+            // Posted after the sweep so this run cannot delete its own notice,
+            // and left standing until tomorrow's sweep: at 00:00 local time a
+            // self-deleting notice would be seen by nobody.
+            const lang = await getGuildLanguageFn(config.guildId, { GuildConfigModel });
+            await postNotice(channel, outcome.deleted, lang, { logger });
           } catch (err) {
             logger.error?.('[auto-check cleanup] failed guild=' + config.guildId + ':', err?.message || err);
             if (claimed) await releaseClaim(config.guildId, dayKey);
