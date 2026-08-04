@@ -199,13 +199,13 @@ export default {
   evidence: {
     missing: {
       title: 'Evidence slipped away',
-      description: 'I could not reopen this archived screenshot. It may have been deleted, or LoaLogs may no longer have access to its storage channel.',
-      footer: 'Ask an officer to attach fresh evidence to the entry.',
+      description: 'I could not reopen this archived screenshot. It may have been deleted, or I may have lost access to the channel it lives in.',
+      footer: 'An officer can attach a fresh screenshot to that entry.',
     },
     archive: {
       title: 'Evidence archive',
       description: 'I kept this screenshot separate so the broadcast stays easy to read. Open the image to inspect it at its natural size.',
-      footer: 'Private view · refreshed from the LoaLogs evidence archive',
+      footer: 'Only you can see this · pulled fresh from my evidence archive',
     },
   },
   remote: {
@@ -328,7 +328,7 @@ export default {
     },
     change: { reason: 'Reason: "{old}" → "{next}"', list: 'List: {old} → {next}', raid: 'Raid: "{old}" → "{next}"', logs: 'Logs: updated', evidence: 'Evidence: updated', scope: 'Scope: {old} → {next}', append: 'Append alts: {names}', appendWithDuplicates: 'Append alts: {names} (skipped duplicates: {duplicates})' },
     applyFailed: { title: 'Edit failed', description: 'I could not apply the edit.' },
-    approval: { requiredTitle: 'List edit · Approval required', deliveryFailed: { title: 'Approval delivery failed', footer: 'No edit was applied. Try again, or contact an officer directly.' }, sent: { title: 'Edit request sent', description: 'An approver has been notified. The edit will apply after approval.', pending: 'Pending changes ({count})' } },
+    approval: { requiredTitle: 'List edit · Approval required', deliveryFailed: { title: 'I could not pass that edit on', footer: 'Nothing was changed. Try again, or go straight to an officer.' }, sent: { title: 'Edit request sent', description: 'An approver has been notified. The edit will apply after approval.', pending: 'Pending changes ({count})' } },
   },
   listAdd: {
     command: {
@@ -386,9 +386,9 @@ export default {
     failed: { title: 'Evidence lookup failed', description: 'I could not load the evidence record.' },
   },
   quickAdd: {
-    deliveryFailed: { title: 'Approval delivery failed', fallback: 'I could not deliver the approval request.' },
-    sent: { title: 'Approval request sent', description: 'The request to add **{name}** to **{list}** is waiting for approval.' },
-    failed: { title: 'Quick add failed', description: 'I could not process this quick-add request.' },
+    deliveryFailed: { title: 'I could not pass that on', fallback: 'The approval request did not reach anyone. Try again in a moment.' },
+    sent: { title: 'Sent it off for approval', description: '**{name}** is queued for the **{list}** - just waiting on someone to approve it.' },
+    failed: { title: 'That quick add did not go through', description: 'Something went wrong while I was filing that one. Give it another try.' },
   },
   remove: {
     notFound: { title: 'Nothing to remove', description: '**{name}** is not in any visible list.', footer: 'Use `/la-list view` to browse existing entries.' },
@@ -401,14 +401,14 @@ export default {
     failed: { title: 'Removal failed', description: 'I could not remove the entry.' }, unknown: 'unknown',
   },
   check: {
-    malformed: 'That evidence selection is malformed. Run the check again.',
-    entryRemoved: { title: 'The entry was removed', description: 'The list entry behind this evidence row no longer exists.' },
-    ocrFailed: { title: 'OCR could not read the image', description: 'I could not extract character names from this screenshot.', footer: 'Try a clearer raid waiting-room screenshot.' },
-    noNames: { title: 'No names detected', description: 'OCR completed but found no valid character names.', footer: 'Try a clearer screenshot of the raid waiting room.' },
-    details: { title: 'Check result · {list}', headline: '{icon} {name} is currently listed in **{list}**{scope}. The saved entry details are gathered below for a quick review.' },
+    malformed: 'I could not make sense of that evidence pick. Run the check again and I will start fresh.',
+    entryRemoved: { title: 'That one is gone now', description: 'Someone removed the list entry this evidence belonged to, so there is nothing left for me to show you.' },
+    ocrFailed: { title: 'I could not read that image', description: 'I stared at this screenshot and could not pull a single character name out of it.', footer: 'A clearer shot of the raid waiting room usually does the trick~' },
+    noNames: { title: 'Nothing in there looked like a name', description: 'I read the image fine, but none of it looked like a character name.', footer: 'The raid waiting-room screen is the easiest one for me to read~' },
+    details: { title: 'Check result · {list}', headline: '{icon} {name} is on the **{list}**{scope}. Here is everything I have saved about them.' },
     text: {
-      empty: { title: 'No character name provided', description: 'Type `check <character>` or `check: <character>` in this channel.', footer: 'Separate multiple names with spaces, commas, or new lines.' },
-      invalid: { title: 'That text is not a character name', description: 'These values are not valid Lost Ark character names: {tokens}', footer: 'Use only character names after `check`; links and mentions are ignored.' },
+      empty: { title: 'You forgot the name~', description: 'Type `check <character>` or `check: <character>` here and I will look them up for you.', footer: 'Several at once is fine - separate them with spaces, commas, or new lines.' },
+      invalid: { title: 'Those do not look like names', description: 'I could not read these as Lost Ark character names: {tokens}', footer: 'Character names only after `check`, please - I skip links and mentions.' },
       progress: {
       variants: [
           'Received **{count}** {word} · checking the database lists…',
@@ -425,9 +425,9 @@ export default {
           'Read **{count}** {word} · cross-checking the lists now…',
           '**{count}** {word} out of the screenshot · checking…',
         ],
-    }, ignored: 'Ignored **{count}** extra {word} (limit: {limit}).', nameOne: 'name', nameMany: 'names',
-    failed: { title: 'List check failed', description: 'OCR succeeded, but I could not complete the database check.' },
-    autoFailed: { title: 'Auto-check failed', description: 'I could not complete this automatic list-check request.' },
+    }, ignored: 'I skipped **{count}** extra {word} - I can only take {limit} at a time.', nameOne: 'name', nameMany: 'names',
+    failed: { title: 'The check did not finish', description: 'I got the names off the image, but I could not finish checking them against the lists.' },
+    autoFailed: { title: 'I could not finish that check', description: 'Something went wrong partway through this one. Post it again and I will have another go.' },
     embed: {
       autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: 'not listed', configured: 'configured', ignored: 'Ignored {count} extra {word} (cap: {limit}).',
       flagged: 'FLAGGED {count}', clear: 'CLEAR', quickFlagged: 'Quick Add unflagged via the dropdown · /la-roster <name> for details', quickClean: 'Quick Add unflagged names with the dropdown below', rosterTip: '/la-roster <name> for the full roster of a flagged hit', rerunTip: 'Run again with a fresh image to re-check', source: 'SRC db blacklist + whitelist + watchlist + trusted',
@@ -533,7 +533,7 @@ export default {
       cancelled: { title: 'Bulk add cancelled', description: 'No entries were added.' },
       processing: 'Processing {count} rows… this may take up to {seconds}s.', progress: 'Processing… {current}/{total} rows complete',
       routing: { title: 'Approval routing is not configured', description: 'No Senior approver IDs are configured.', footer: 'Set `SENIOR_APPROVER_IDS`, restart LoaLogs, then upload the file again.' },
-      delivery: { title: 'Approval delivery failed', description: 'I could not deliver the bulk approval request.', footer: 'No entries were added. Try again, or contact a Senior directly.' },
+      delivery: { title: 'The bulk request did not get through', description: 'I could not hand that batch to anyone for approval.', footer: 'Nothing was added. Try again, or go straight to a Senior.' },
       awaiting: { title: 'Bulk add · Waiting for Senior approval', description: 'Your **{count}-row** bulk add is with a Senior now.\n\nI will post the decision in this channel.', footer: 'Request ID: {id}' },
       requestFailed: { title: 'Approval request failed', description: 'I could not create the bulk approval request.', footer: 'No entries were added. Upload it again; if this repeats, contact a Senior.' },
     },
