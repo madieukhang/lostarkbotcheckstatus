@@ -148,14 +148,14 @@ export default {
   },
   evidence: {
     missing: {
-      title: 'Bằng chứng đã nằm ngoài tầm với',
-      description: 'Tớ chưa mở lại được screenshot đã lưu. Có thể ảnh đã bị xóa, hoặc LoaLogs không còn quyền vào channel lưu trữ.',
-      footer: 'Nhờ officer gắn evidence mới vào entry nhé.',
+      title: 'Ảnh bằng chứng vừa trôi mất rồi',
+      description: 'Tớ mở lại tấm ảnh đã cất mà không được. Có thể ảnh bị xóa rồi, hoặc tớ đã mất quyền vào channel đang giữ nó.',
+      footer: 'Nhờ officer gắn một tấm ảnh mới vào chỗ đó nhé.',
     },
     archive: {
-      title: 'Kho bằng chứng',
-      description: 'Tớ để screenshot riêng để broadcast vẫn gọn và dễ đọc. Mở ảnh để xem ở kích thước tự nhiên nhé.',
-      footer: 'Xem riêng · vừa làm mới từ kho evidence của LoaLogs',
+      title: 'Kho ảnh bằng chứng',
+      description: 'Tớ để tấm ảnh này ra riêng cho phần thông báo kia đỡ rối mắt. Cậu mở ảnh lên là xem được cỡ gốc nhé.',
+      footer: 'Chỉ mình cậu thấy · tớ vừa lấy nó ra từ trong kho ảnh',
     },
   },
   remote: {
@@ -184,10 +184,10 @@ export default {
     localTag: 'Nội bộ server',
     titles: { added: 'Một ghi chú mới · {list}', removed: 'Một cái tên rời list · {list}', edited: 'Ghi chú vừa được sửa · {list}', enriched: 'Dấu vết roster vừa dài thêm · {list}', fallback: 'Cập nhật list · {list}' },
     headlines: {
-      added: '{icon} Tớ ghi nhận {name} vừa được thêm vào **{list}**{scope}. Phần ngữ cảnh hữu ích nằm ngay bên dưới nhé.',
-      removed: '{icon} Tớ ghi nhận {name} vừa được gỡ khỏi **{list}**{scope}. Phần ngữ cảnh hữu ích nằm ngay bên dưới nhé.',
-      edited: '{icon} Tớ ghi nhận entry của {name} trong **{list}**{scope} vừa được chỉnh sửa. Phần ngữ cảnh hữu ích nằm ngay bên dưới nhé.',
-      enriched: '{icon} Tớ tìm thấy **{newCount}** alt mới của {name} trong **{list}**{scope}. Hiện đã track **{total}** alt.',
+      added: '{icon} {name} vừa vào **{list}**{scope} rồi. Mọi thứ đáng biết tớ để ngay bên dưới.',
+      removed: '{icon} {name} vừa rời khỏi **{list}**{scope}. Đây là những gì entry đó từng có.',
+      edited: '{icon} Có người vừa sửa lại {name} trong **{list}**{scope}. Nội dung mới nằm bên dưới.',
+      enriched: '{icon} Tớ lần ra thêm **{newCount}** alt của {name} trong **{list}**{scope} - vị chi là **{total}** alt đang theo dõi.',
     },
     altOne: 'alt', altMany: 'alt',
     fields: { reason: 'Lý do', raid: 'Raid', edited: 'Đã sửa', added: 'Đã thêm', itemLevel: 'ilvl', combatPower: 'CP', trackedAlts: 'Alt đang track', newAlts: 'Alt mới' },
@@ -236,7 +236,7 @@ export default {
       scopeNotApplicable: { title: 'Scope không áp dụng ở đây', description: 'Option `scope` chỉ dùng cho blacklist. Entry {list} luôn là global.', footer: 'Bỏ `scope`, hoặc đổi sang `type:black` nếu muốn entry nội bộ server.' }, scopeBlockedGlobal: 'Đã có blacklist entry global cùng tên.', scopeBlockedServer: 'Đã có blacklist entry nội bộ cùng tên trong server này.', scopeBlocked: { title: 'Không thể đổi scope', footer: 'Xóa entry bị trùng trước hoặc tự gộp chúng nhé.' }, noEffective: { title: 'Không có gì thực sự thay đổi', description: 'Các giá trị cậu đưa đã giống entry hiện tại.' },
     },
     change: { reason: 'Lý do: "{old}" → "{next}"', list: 'List: {old} → {next}', raid: 'Raid: "{old}" → "{next}"', logs: 'Logs: đã cập nhật', evidence: 'Evidence: đã cập nhật', scope: 'Scope: {old} → {next}', append: 'Thêm alt: {names}', appendWithDuplicates: 'Thêm alt: {names} (bỏ qua tên trùng: {duplicates})' },
-    applyFailed: { title: 'Chỉnh sửa thất bại', description: 'Tớ chưa áp dụng được thay đổi.' }, approval: { requiredTitle: 'Chỉnh sửa list · Cần duyệt', deliveryFailed: { title: 'Gửi lượt duyệt thất bại', footer: 'Chưa có thay đổi nào được áp dụng. Thử lại hoặc liên hệ officer nhé.' }, sent: { title: 'Đã gửi yêu cầu chỉnh sửa', description: 'Approver đã được thông báo. Thay đổi sẽ áp dụng sau khi duyệt.', pending: 'Thay đổi đang chờ ({count})' } },
+    applyFailed: { title: 'Chỉnh sửa thất bại', description: 'Tớ chưa áp dụng được thay đổi.' }, approval: { requiredTitle: 'Chỉnh sửa list · Cần duyệt', deliveryFailed: { title: 'Tớ chưa chuyển được chỉnh sửa đó đi', footer: 'Chưa có gì bị đổi cả. Cậu thử lại, hoặc tìm thẳng officer nhé.' }, sent: { title: 'Đã gửi yêu cầu chỉnh sửa', description: 'Approver đã được thông báo. Thay đổi sẽ áp dụng sau khi duyệt.', pending: 'Thay đổi đang chờ ({count})' } },
   },
   listAdd: {
     command: {
@@ -270,7 +270,7 @@ export default {
     publicRestricted: { title: 'Evidence public được giới hạn', description: 'Chỉ officer và senior mới đăng evidence công khai được, nên tớ giữ view này ở chế độ riêng.' }, failed: { title: 'Tra evidence thất bại', description: 'Tớ chưa tải được record evidence.' },
   },
   quickAdd: {
-    deliveryFailed: { title: 'Gửi yêu cầu duyệt thất bại', fallback: 'Tớ chưa gửi được yêu cầu duyệt.' }, sent: { title: 'Đã gửi yêu cầu duyệt', description: 'Yêu cầu thêm **{name}** vào **{list}** đang chờ duyệt.' }, failed: { title: 'Quick add thất bại', description: 'Tớ chưa xử lý được yêu cầu quick-add này.' },
+    deliveryFailed: { title: 'Tớ chưa chuyển đi được', fallback: 'Yêu cầu duyệt chưa tới được tay ai cả. Lát nữa cậu thử lại nhé.' }, sent: { title: 'Tớ gửi đi duyệt rồi', description: '**{name}** đang xếp hàng vào **{list}**, chỉ chờ có người duyệt nữa thôi.' }, failed: { title: 'Lượt quick add đó chưa trót lọt', description: 'Đang ghi lại giúp cậu thì có gì đó trục trặc. Cậu thử lại lần nữa nhé.' },
   },
   remove: {
     notFound: { title: 'Không có gì để xóa', description: '**{name}** không nằm trong list nào cậu nhìn thấy.', footer: 'Dùng `/la-list view` để xem các entry hiện có nhé.' }, titles: { blocked: 'Không thể xóa · {name}', one: 'Đã xóa khỏi {list} · {name}', many: 'Đã xóa khỏi {count} list · {name}', mixed: 'Kết quả hỗn hợp · {name}' },
@@ -278,9 +278,9 @@ export default {
     footerSuccess: 'Dùng `/la-list view` để xác nhận entry đã được xóa.', footerBlocked: 'Kiểm tra bằng `/la-list view`; dùng `/la-list edit` cho entry legacy.', pickerTitle: 'Đã tìm thấy · {name}', pickerDescription: '**{name}** nằm trong {count} list. Chọn mục cần xóa:', pickerFooter: 'Hết hạn sau 30 giây · chỉ cậu dùng được picker này.', failed: { title: 'Xóa thất bại', description: 'Tớ chưa xóa được entry.' }, unknown: 'không xác định',
   },
   check: {
-    malformed: 'Lựa chọn evidence bị sai định dạng. Chạy lại lượt check nhé.', entryRemoved: { title: 'Entry đã bị xóa', description: 'Entry đứng sau dòng evidence này không còn tồn tại.' }, ocrFailed: { title: 'OCR chưa đọc được ảnh', description: 'Tớ chưa trích được tên character từ screenshot này.', footer: 'Thử screenshot phòng chờ raid rõ hơn nhé.' }, noNames: { title: 'Không phát hiện tên nào', description: 'OCR đã chạy nhưng không tìm thấy tên character hợp lệ.', footer: 'Thử screenshot phòng chờ raid rõ hơn nhé.' },
-    details: { title: 'Kết quả kiểm tra · {list}', headline: '{icon} {name} hiện nằm trong **{list}**{scope}. Tớ gom thông tin đang lưu của entry bên dưới để cậu đối chiếu nhanh.' },
-    text: { empty: { title: 'Cậu chưa nhập tên character', description: 'Gõ `check <character>` hoặc `check: <character>` trong channel này nhé.', footer: 'Nhiều tên có thể ngăn bằng dấu cách, dấu phẩy hoặc xuống dòng.' }, invalid: { title: 'Đoạn text này không phải tên character', description: 'Các giá trị sau không phải tên Lost Ark hợp lệ: {tokens}', footer: 'Sau `check` chỉ nhập tên character; link và mention sẽ không được nhận.' }, progress: {
+    malformed: 'Tớ không hiểu cậu vừa chọn tấm ảnh nào. Cậu chạy lại lượt check nhé, tớ làm lại từ đầu.', entryRemoved: { title: 'Cái đó không còn nữa rồi', description: 'Cái tên mà tấm ảnh này gắn vào đã bị gỡ khỏi list, nên tớ chẳng còn gì để đưa cậu xem.' }, ocrFailed: { title: 'Tớ không đọc nổi tấm ảnh này', description: 'Tớ nhìn kỹ tấm ảnh rồi mà không lấy ra được cái tên nào.', footer: 'Ảnh phòng chờ raid rõ nét hơn là tớ đọc được ngay.' }, noNames: { title: 'Trong ảnh không có gì giống tên cả', description: 'Ảnh thì tớ đọc được, nhưng không có chữ nào trông giống tên character.', footer: 'Màn hình phòng chờ raid là chỗ tớ đọc dễ nhất.' },
+    details: { title: 'Kết quả kiểm tra · {list}', headline: '{icon} {name} hiện nằm trong **{list}**{scope}. Tớ gom hết những gì đang lưu về người này ở ngay dưới đây.' },
+    text: { empty: { title: 'Cậu quên nhập tên rồi~', description: 'Cậu gõ `check <character>` hoặc `check: <character>` ngay ở đây, tớ tra giúp cho.', footer: 'Nhiều tên một lúc cũng được - cách nhau bằng dấu cách, dấu phẩy hoặc xuống dòng đều ổn.' }, invalid: { title: 'Mấy cái này không giống tên character', description: 'Tớ không đọc được mấy chữ này thành tên Lost Ark: {tokens}', footer: 'Sau `check` cậu chỉ nhập tên character thôi nhé - link với mention thì tớ bỏ qua.' }, progress: {
       variants: [
           'Đã nhận **{count}** {word} · đang kiểm tra database…',
           'Ghi nhận **{count}** {word} · đang đối chiếu list…',
@@ -295,7 +295,7 @@ export default {
           'Đọc ra **{count}** {word} · tớ tra list đây…',
           '**{count}** {word} từ screenshot · đang kiểm tra…',
         ],
-    }, ignored: 'Đã bỏ qua **{count}** {word} dư (giới hạn: {limit}).', nameOne: 'tên', nameMany: 'tên', failed: { title: 'Kiểm tra list thất bại', description: 'OCR đã thành công nhưng tớ chưa hoàn tất được lượt kiểm tra database.' }, autoFailed: { title: 'Auto-check thất bại', description: 'Tớ chưa hoàn tất được yêu cầu kiểm tra tự động này.' },
+    }, ignored: 'Tớ bỏ qua **{count}** {word} dư rồi - mỗi lượt tớ chỉ nhận được {limit} thôi.', nameOne: 'tên', nameMany: 'tên', failed: { title: 'Lượt check chưa xong được', description: 'Tớ lấy được tên ra khỏi ảnh rồi, nhưng đối chiếu với các list thì chưa xong.' }, autoFailed: { title: 'Tớ chưa check xong được cái này', description: 'Nửa chừng thì có gì đó trục trặc. Cậu đăng lại ảnh nhé, tớ thử lần nữa.' },
     embed: { autoKicker: 'AUTO-CHECK', slashKicker: 'KIỂM TRA LIST', names: 'TÊN', notListed: 'chưa vào list', configured: 'đã cấu hình', ignored: 'Đã bỏ qua {count} {word} dư (giới hạn: {limit}).', flagged: 'CẦN CHÚ Ý {count}', clear: 'AN TOÀN', quickFlagged: 'Quick Add tên chưa vào list bằng dropdown · /la-roster <name> để xem kỹ', quickClean: 'Quick Add tên chưa vào list bằng dropdown bên dưới', rosterTip: '/la-roster <name> để xem roster đầy đủ của hit cần chú ý', rerunTip: 'Chạy lại với ảnh mới để kiểm tra lại', source: 'NGUỒN db blacklist + whitelist + watchlist + trusted' },
     format: { via: 'qua **{name}**', alts: 'alt', more: '+{count} tên khác', local: 'Nội bộ', trusted: 'trusted' },
   },
@@ -360,7 +360,7 @@ export default {
       notYours: { title: 'Đây không phải file của cậu', description: 'Chỉ người đã tải bảng tính lên mới dùng được các nút này.' }, cancelled: { title: 'Đã hủy thêm hàng loạt', description: 'Chưa có entry nào được thêm.' },
       processing: 'Đang xử lý {count} dòng… có thể mất tối đa {seconds}s.', progress: 'Đang xử lý… xong {current}/{total} dòng',
       routing: { title: 'Chưa cấu hình đường duyệt', description: 'Chưa có ID Senior approver nào được cấu hình.', footer: 'Đặt `SENIOR_APPROVER_IDS`, khởi động lại LoaLogs rồi tải file lên lại nhé.' },
-      delivery: { title: 'Gửi yêu cầu duyệt thất bại', description: 'Tớ chưa gửi được yêu cầu duyệt hàng loạt.', footer: 'Chưa có entry nào được thêm. Thử lại hoặc liên hệ trực tiếp Senior nhé.' },
+      delivery: { title: 'Yêu cầu hàng loạt chưa đi tới nơi', description: 'Tớ chưa đưa được lô này cho ai duyệt cả.', footer: 'Chưa có tên nào được thêm. Cậu thử lại, hoặc tìm thẳng Senior nhé.' },
       awaiting: { title: 'Thêm hàng loạt · Đang chờ Senior duyệt', description: 'Batch **{count} dòng** của cậu đã được gửi cho Senior.\n\nTớ sẽ báo quyết định trong channel này.', footer: 'Request ID: {id}' },
       requestFailed: { title: 'Tạo yêu cầu duyệt thất bại', description: 'Tớ chưa tạo được yêu cầu duyệt hàng loạt.', footer: 'Chưa có entry nào được thêm. Tải lại file; nếu vẫn lỗi thì liên hệ Senior nhé.' },
     },
