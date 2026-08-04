@@ -241,7 +241,7 @@ export default {
   listAdd: {
     command: {
       reasonRequired: { title: 'Cậu còn thiếu lý do', description: 'Mỗi entry đều cần lý do. Chạy lại command và điền `reason` nhé.' }, invalidImage: { title: 'File đính kèm không phải ảnh', description: 'Option `image` chỉ nhận file ảnh; Discord báo loại `{type}`.' },
-      deliveryFailed: { title: 'Chưa gửi được yêu cầu duyệt', description: 'Tớ chưa liên hệ được approver nào được chỉ định.', footer: 'Chưa có entry nào được tạo. Thử lại hoặc liên hệ trực tiếp officer nhé.' }, submittedTitle: 'Thêm vào list · Đã gửi đề xuất',
+      deliveryFailed: { title: 'Tớ chưa đưa được cái này tới người duyệt', description: 'Không approver nào được chỉ định mà tớ liên hệ được.', footer: 'Chưa có gì được lưu cả. Cậu thử lại, hoặc tìm thẳng officer cũng được.' }, submittedTitle: 'Thêm vào list · Đã gửi đề xuất',
       proposalFailed: { title: 'Chưa tạo được đề xuất', description: 'Tớ chưa tạo được yêu cầu duyệt.', footer: 'Chưa có entry nào được tạo. Chạy lại command; nếu vẫn lỗi thì liên hệ officer nhé.' },
     },
     hidden: { title: 'Phát hiện roster đang ẩn', withGuild: 'Hiện mới track tên cậu nhập. Bible hiển thị guild **{guild}**, nên dùng `/la-list enrich name:{name}` hoặc bấm **Enrich ngay** để quét guildmate cùng stronghold.', withoutGuild: 'Hiện mới track tên cậu nhập. Bible không hiển thị danh sách guild, nên dùng `/la-list edit name:{name} additional_names:Alt1, Alt2` để thêm alt đã biết thủ công.' },

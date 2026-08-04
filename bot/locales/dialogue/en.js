@@ -334,7 +334,7 @@ export default {
     command: {
       reasonRequired: { title: 'A reason is still missing', description: 'Every list entry needs a reason. Run the command again and fill in `reason`.' },
       invalidImage: { title: 'That attachment is not an image', description: 'The `image` option only accepts image files; Discord reported `{type}`.' },
-      deliveryFailed: { title: 'The approval request could not be delivered', description: 'I could not reach any assigned approver.', footer: 'No entry was created. Try again, or contact an officer directly.' },
+      deliveryFailed: { title: 'I could not get that in front of an approver', description: 'None of the assigned approvers could be reached.', footer: 'Nothing was saved. Try again, or go straight to an officer.' },
       submittedTitle: 'List add · Proposal submitted',
       proposalFailed: { title: 'The proposal could not be created', description: 'I could not create the approval request.', footer: 'No entry was created. Try the command again; if this repeats, contact an officer.' },
     },

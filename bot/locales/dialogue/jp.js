@@ -124,14 +124,14 @@ export default {
   },
   evidence: {
     missing: {
-      title: '証拠画像に届きませんでしたの',
-      description: '保存済み screenshot を開き直せませんでした。画像が削除されたか、LoaLogs が保存チャンネルへ入れなくなった可能性がありますわ。',
-      footer: 'Officer に新しい evidence を entry へ添付してもらってくださいませ。',
+      title: '証拠の画像が見当たりませんの',
+      description: 'しまっておいた screenshot をもう一度開けませんでしたの。消されてしまったか、置いてあった場所へわたくしが入れなくなったのかもしれませんわ。',
+      footer: 'Officer に新しい screenshot をその entry へ付け直してもらえますわ。',
     },
     archive: {
       title: '証拠アーカイブ',
       description: 'Broadcast を読みやすくするため screenshot は別にしてありますの。画像を開いて元の大きさでご確認くださいませ。',
-      footer: '非公開表示 · LoaLogs evidence archive から更新済み',
+      footer: 'あなただけに見えていますわ · わたくしの証拠アーカイブから取り出したばかりですの',
     },
   },
   remote: {
@@ -160,10 +160,10 @@ export default {
     localTag: 'サーバー内',
     titles: { added: '新しい記録ですの · {list}', removed: 'List から外れましたわ · {list}', edited: '記録を更新しましたの · {list}', enriched: 'Roster の手がかりが増えましたわ · {list}', fallback: 'List 更新 · {list}' },
     headlines: {
-      added: '{icon} {name} が **{list}**{scope} に追加されたことを記録しましたわ。必要な context は下にまとめてありますの。',
-      removed: '{icon} {name} が **{list}**{scope} から削除されたことを記録しましたわ。必要な context は下にまとめてありますの。',
-      edited: '{icon} **{list}**{scope} にある {name} の entry が更新されましたわ。必要な context は下にまとめてありますの。',
-      enriched: '{icon} **{list}**{scope} の {name} に新しい alt を **{newCount}** 名見つけましたわ。現在 **{total}** 名を track 中ですの。',
+      added: '{icon} {name} が **{list}**{scope} に入りましたわ。知っておきたいことは下にまとめてありますの。',
+      removed: '{icon} {name} が **{list}**{scope} から外れましたわ。その entry にあった内容はこちらですの。',
+      edited: '{icon} どなたかが **{list}**{scope} の {name} を書き直されましたわ。新しい内容は下にございますの。',
+      enriched: '{icon} **{list}**{scope} の {name} から alt をさらに **{newCount}** 名たどりましたわ。これで **{total}** 名を追っておりますの。',
     },
     altOne: 'alt', altMany: 'alts',
     fields: { reason: '理由', raid: 'Raid', edited: '更新', added: '追加', itemLevel: 'ilvl', combatPower: 'CP', trackedAlts: '追跡中の alt', newAlts: '新しい alt' },
@@ -212,12 +212,12 @@ export default {
       scopeNotApplicable: { title: 'Scope はここでは使えませんの', description: '`scope` option は blacklist 専用です。{list} entry は常に global ですわ。', footer: '`scope` を外すか、server scope なら `type:black` にしてくださいませ。' }, scopeBlockedGlobal: '同名の global blacklist entry がすでにありますの。', scopeBlockedServer: 'この server に同名の server-scoped blacklist entry がありますわ。', scopeBlocked: { title: 'Scope を変更できませんの', footer: '競合 entry を削除するか、手動で merge してくださいませ。' }, noEffective: { title: '実際の変更はありませんの', description: '入力値は現在の entry と同じですわ。' },
     },
     change: { reason: '理由: "{old}" → "{next}"', list: 'List: {old} → {next}', raid: 'Raid: "{old}" → "{next}"', logs: 'Logs: 更新済み', evidence: 'Evidence: 更新済み', scope: 'Scope: {old} → {next}', append: 'Alt 追加: {names}', appendWithDuplicates: 'Alt 追加: {names} (重複 skip: {duplicates})' },
-    applyFailed: { title: '編集に失敗しましたの', description: '変更を適用できませんでしたわ。' }, approval: { requiredTitle: 'List 編集 · 承認が必要ですの', deliveryFailed: { title: '承認 request を届けられませんでしたの', footer: '変更は適用されていません。再試行するか officer にご連絡くださいませ。' }, sent: { title: '編集 request を送りましたわ', description: 'Approver に通知しました。承認後に変更が適用されますの。', pending: '承認待ち変更 ({count})' } },
+    applyFailed: { title: '編集に失敗しましたの', description: '変更を適用できませんでしたわ。' }, approval: { requiredTitle: 'List 編集 · 承認が必要ですの', deliveryFailed: { title: 'その編集をお渡しできませんでしたの', footer: '変更は適用されていません。再試行するか officer にご連絡くださいませ。' }, sent: { title: '編集 request を送りましたわ', description: 'Approver に通知しました。承認後に変更が適用されますの。', pending: '承認待ち変更 ({count})' } },
   },
   listAdd: {
     command: {
       reasonRequired: { title: '理由がまだありませんの', description: 'List entry には理由が必要ですわ。Command を再実行して `reason` を入力してくださいませ。' }, invalidImage: { title: '添付 file は画像ではありませんの', description: '`image` option は画像 file のみです。Discord は `{type}` と判定しましたわ。' },
-      deliveryFailed: { title: '承認 request を届けられませんでしたの', description: '指定 approver に連絡できませんでしたわ。', footer: 'Entry は作成されていません。再試行するか officer にご連絡くださいませ。' }, submittedTitle: 'List 追加 · 提案送信済み',
+      deliveryFailed: { title: '承認してくださる方までお届けできませんでしたわ', description: '指定された approver のどなたにも連絡がつきませんでしたの。', footer: '何も保存されておりませんわ。もう一度お試しになるか、officer に直接ご連絡くださいませ。' }, submittedTitle: 'List 追加 · 提案送信済み',
       proposalFailed: { title: '提案を作れませんでしたの', description: '承認 request の作成に失敗しましたわ。', footer: 'Entry は作成されていません。再実行し、続く場合は officer にご連絡くださいませ。' },
     },
     hidden: { title: 'Hidden roster を検出しましたわ', withGuild: '現在は入力した名前だけを track していますの。Bible に guild **{guild}** があるので、`/la-list enrich name:{name}` または **今すぐ enrich** で同じ stronghold の guildmate alt を探せますわ。', withoutGuild: '現在は入力した名前だけを track していますの。Bible は guild member list を公開していないため、`/la-list edit name:{name} additional_names:Alt1, Alt2` で既知 alt を手動追加してくださいませ。' },
@@ -246,7 +246,7 @@ export default {
     publicRestricted: { title: 'Public evidence は制限されていますの', description: 'Evidence を public 投稿できるのは officer / senior だけなので、この view は private にしましたわ。' }, failed: { title: 'Evidence 検索に失敗しましたの', description: 'Evidence record を読み込めませんでしたわ。' },
   },
   quickAdd: {
-    deliveryFailed: { title: '承認 request を届けられませんでしたの', fallback: '承認 request を送れませんでしたわ。' }, sent: { title: '承認 request を送りましたわ', description: '**{name}** を **{list}** へ追加する request は承認待ちですの。' }, failed: { title: 'Quick add に失敗しましたの', description: 'Quick-add request を処理できませんでしたわ。' },
+    deliveryFailed: { title: 'そちらをお渡しできませんでしたの', fallback: '承認のお願いがどなたにも届きませんでしたわ。少し経ってからもう一度お試しくださいませ。' }, sent: { title: '承認へ送っておきましたわ', description: '**{name}** を **{list}** へ、とお伝えしてありますの。あとはどなたかが頷いてくださるのを待つだけですわ〜' }, failed: { title: 'その quick add は通りませんでしたの', description: 'お預かりして書き留めている途中で、どこかに引っかかってしまいましたの。もう一度お試しくださいませ。' },
   },
   remove: {
     notFound: { title: '削除するものがありませんの', description: '**{name}** は表示可能な list にいませんわ。', footer: '`/la-list view` で既存 entry を確認できますの。' }, titles: { blocked: '削除できません · {name}', one: '{list} から削除 · {name}', many: '{count} lists から削除 · {name}', mixed: 'Mixed result · {name}' },
@@ -254,9 +254,9 @@ export default {
     footerSuccess: '`/la-list view` で削除結果をご確認くださいませ。', footerBlocked: '`/la-list view` で確認し、legacy entry は `/la-list edit` で変更してくださいませ。', pickerTitle: '発見 · {name}', pickerDescription: '**{name}** は {count} lists にいます。削除対象を選んでくださいませ:', pickerFooter: '30秒で期限切れ · この picker はあなた専用ですの。', failed: { title: '削除に失敗しましたの', description: 'Entry を削除できませんでしたわ。' }, unknown: '不明',
   },
   check: {
-    malformed: 'Evidence selection の形式が不正ですの。Check を再実行してくださいませ。', entryRemoved: { title: 'Entry は削除されていますの', description: 'この evidence row の list entry はもう存在しませんわ。' }, ocrFailed: { title: 'OCR が画像を読めませんでしたの', description: 'Screenshot から character 名を抽出できませんでしたわ。', footer: 'もっと鮮明な raid waiting-room screenshot をお試しくださいませ。' }, noNames: { title: '名前を検出できませんでしたの', description: 'OCR は完了しましたが有効な character 名がありませんでしたわ。', footer: '鮮明な raid waiting-room screenshot をお試しくださいませ。' },
-    details: { title: 'チェック結果 · {list}', headline: '{icon} {name} は現在 **{list}**{scope} に登録されていますわ。保存中の entry details を下にまとめましたの。' },
-    text: { empty: { title: 'Character 名がありませんの', description: 'この channel で `check <character>` または `check: <character>` と入力してね♪', footer: '複数名はスペース、カンマ、改行で区切れますわ。' }, invalid: { title: 'Character 名として読めない text ですの', description: '次の値は Lost Ark の character 名として無効ですわ: {tokens}', footer: '`check` の後は character 名だけを入力してね。Link と mention は受け付けませんの。' }, progress: {
+    malformed: 'どの証拠を選ばれたのか読み取れませんでしたの。もう一度 check を実行してくだされば、最初からやり直しますわ。', entryRemoved: { title: 'そちらはもう消えてしまいましたの', description: 'この証拠が結びついていた list entry は、どなたかが消してしまいましたの。もうお見せできるものが残っておりませんわ。' }, ocrFailed: { title: 'その画像を読めませんでしたの', description: 'この screenshot をじっと見つめてみましたけれど、character の名前をひとつも拾えませんでしたわ。', footer: 'raid の待機所を鮮明に写した screenshot なら、たいてい上手くいきますの〜' }, noNames: { title: '名前らしきものが見当たりませんの', description: '画像はきちんと読めましたけれど、character の名前らしきものはひとつもありませんでしたわ。', footer: 'raid の待機所の画面が、わたくしには一番読みやすいですの〜' },
+    details: { title: 'チェック結果 · {list}', headline: '{icon} {name} は **{list}**{scope} にいますわ。控えてあることを、すべて下にまとめましたの。' },
+    text: { empty: { title: '肝心のお名前が抜けておりますわ〜', description: 'ここで `check <character>` か `check: <character>` と入力してくだされば、お調べいたしますわ〜', footer: '何名でもかまいませんの。スペース、カンマ、改行で区切ってくださいませ。' }, invalid: { title: 'そちらは名前には見えませんの', description: 'こちらは Lost Ark の character 名として読み取れませんでしたわ: {tokens}', footer: '`check` のあとは character 名だけにしてくださいませ。link と mention は読み飛ばしますの。' }, progress: {
       variants: [
           '**{count}** {word}を受信 · database list を確認中ですの…',
           '**{count}** {word}を承りましたわ · list を照合中ですの…',
@@ -271,7 +271,7 @@ export default {
           '**{count}** {word}を読みましたわ · 今から list を確認いたしますの…',
           'screenshot から **{count}** {word} · 確認しておりますわ…',
         ],
-    }, ignored: '上限 {limit} のため **{count}** 件を除外しましたわ。', nameOne: 'name', nameMany: 'names', failed: { title: 'List check に失敗しましたの', description: 'OCR は成功しましたが database check を完了できませんでしたわ。' }, autoFailed: { title: 'Auto-check に失敗しましたの', description: 'この自動 list-check request を完了できませんでしたわ。' },
+    }, ignored: '一度にお預かりできるのは {limit} 名までですので、あふれた **{count}** 名は見送りましたわ。', nameOne: 'name', nameMany: 'names', failed: { title: '確認が最後まで終わりませんでしたの', description: '画像から名前は読み取れましたけれど、list との照合を最後まで終えられませんでしたわ。' }, autoFailed: { title: 'その確認を終えられませんでしたの', description: '途中でつまずいてしまいましたの。もう一度貼っていただければ、また見てみますわ。' },
     embed: { autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: '未登録', configured: 'configured', ignored: '上限 {limit} のため {count} {word}を除外しましたの。', flagged: 'FLAGGED {count}', clear: 'CLEAR', quickFlagged: 'Dropdown で未登録名を Quick Add · /la-roster <name> で詳細', quickClean: '下の dropdown で未登録名を Quick Add', rosterTip: '/la-roster <name> で flagged hit の full roster', rerunTip: 'Fresh image で再実行してくださいませ', source: 'SRC db blacklist + whitelist + watchlist + trusted' },
     format: { via: '**{name}** 経由', alts: 'alts', more: '+{count} 名', local: 'サーバー内', trusted: 'trusted' },
   },
@@ -332,7 +332,7 @@ export default {
       notYours: { title: 'あなたの upload ではありませんの', description: 'Spreadsheet を upload した本人だけが操作できますわ。' }, cancelled: { title: '一括追加を取り消しましたわ', description: 'Entry は追加されていませんの。' },
       processing: '{count} rows を処理中ですの… 最大 {seconds}s ほどかかります。', progress: '処理中… {current}/{total} rows 完了',
       routing: { title: '承認 route が未設定ですの', description: 'Senior approver ID が設定されていませんわ。', footer: '`SENIOR_APPROVER_IDS` を設定して LoaLogs を再起動後、再 upload してくださいませ。' },
-      delivery: { title: '承認申請を送れませんでしたの', description: '一括承認 request を届けられませんでしたわ。', footer: 'Entry は追加されていません。再試行するか Senior にご連絡くださいませ。' },
+      delivery: { title: 'その一括のお願いが届きませんでしたの', description: '一括承認 request を届けられませんでしたわ。', footer: 'Entry は追加されていません。再試行するか Senior にご連絡くださいませ。' },
       awaiting: { title: '一括追加 · Senior 承認待ち', description: '**{count} rows** の一括追加を Senior に送りましたわ。\n\n判断はこの channel でお知らせしますの。', footer: 'Request ID: {id}' },
       requestFailed: { title: '承認 request を作れませんでしたの', description: '一括承認 request の作成に失敗しましたわ。', footer: 'Entry は追加されていません。再 upload して、続く場合は Senior にご連絡くださいませ。' },
     },
