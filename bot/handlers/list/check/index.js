@@ -37,7 +37,7 @@ import {
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
 import { ICONS } from '../../../utils/ui.js';
-import { getUserLanguage, t } from '../../../services/i18n/index.js';
+import { getUserLanguage, t, tPick } from '../../../services/i18n/index.js';
 import {
   buildMultiaddTemplate,
   parseMultiaddFile,
@@ -230,7 +230,7 @@ export function createCheckHandlers({ client }) {
     const maxNames = config.listcheckMaxNames;
     const limitedNames = names.slice(0, maxNames);
     await editNotice(interaction, [
-      `🔍 ${t('dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
+      `🔍 ${tPick('dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
       limitedNames.length < names.length ? t('dialogue.check.ignored', lang, { count: names.length - limitedNames.length, word: t(`dialogue.check.${names.length - limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang), limit: maxNames }) : null,
     ].filter(Boolean).join('\n'), {
       severity: AlertSeverity.INFO,

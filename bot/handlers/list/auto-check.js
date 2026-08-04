@@ -21,7 +21,7 @@ import { getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
 import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
-import { getGuildLanguage, t } from '../../services/i18n/index.js';
+import { getGuildLanguage, t, tPick } from '../../services/i18n/index.js';
 import { buildAutoCheckEvidenceRow } from './check/index.js';
 
 /** Env-based channel set (global fallback) */
@@ -254,7 +254,7 @@ export function createAutoCheckMessageHandler({
       // surface as slash commands. It is replaced by the full result card.
       const progressMsg = await message.reply({
         embeds: [buildNoticeEmbed(
-          `🔍 ${t(textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
+          `🔍 ${tPick(textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
           { severity: AlertSeverity.INFO, titleIcon: '🔍', lang }
         )],
       });

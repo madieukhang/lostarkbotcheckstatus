@@ -280,8 +280,22 @@ export default {
   check: {
     malformed: 'Lựa chọn evidence bị sai định dạng. Chạy lại lượt check nhé.', entryRemoved: { title: 'Entry đã bị xóa', description: 'Entry đứng sau dòng evidence này không còn tồn tại.' }, ocrFailed: { title: 'OCR chưa đọc được ảnh', description: 'Tớ chưa trích được tên character từ screenshot này.', footer: 'Thử screenshot phòng chờ raid rõ hơn nhé.' }, noNames: { title: 'Không phát hiện tên nào', description: 'OCR đã chạy nhưng không tìm thấy tên character hợp lệ.', footer: 'Thử screenshot phòng chờ raid rõ hơn nhé.' },
     details: { title: 'Kết quả kiểm tra · {list}', headline: '{icon} {name} hiện nằm trong **{list}**{scope}. Tớ gom thông tin đang lưu của entry bên dưới để cậu đối chiếu nhanh.' },
-    text: { empty: { title: 'Cậu chưa nhập tên character', description: 'Gõ `check <character>` hoặc `check: <character>` trong channel này nhé.', footer: 'Nhiều tên có thể ngăn bằng dấu cách, dấu phẩy hoặc xuống dòng.' }, invalid: { title: 'Đoạn text này không phải tên character', description: 'Các giá trị sau không phải tên Lost Ark hợp lệ: {tokens}', footer: 'Sau `check` chỉ nhập tên character; link và mention sẽ không được nhận.' }, progress: 'Đã nhận **{count}** {word} · đang kiểm tra database…' },
-    progress: 'Đã trích **{count}** {word} · đang kiểm tra database…', ignored: 'Đã bỏ qua **{count}** {word} dư (giới hạn: {limit}).', nameOne: 'tên', nameMany: 'tên', failed: { title: 'Kiểm tra list thất bại', description: 'OCR đã thành công nhưng tớ chưa hoàn tất được lượt kiểm tra database.' }, autoFailed: { title: 'Auto-check thất bại', description: 'Tớ chưa hoàn tất được yêu cầu kiểm tra tự động này.' },
+    text: { empty: { title: 'Cậu chưa nhập tên character', description: 'Gõ `check <character>` hoặc `check: <character>` trong channel này nhé.', footer: 'Nhiều tên có thể ngăn bằng dấu cách, dấu phẩy hoặc xuống dòng.' }, invalid: { title: 'Đoạn text này không phải tên character', description: 'Các giá trị sau không phải tên Lost Ark hợp lệ: {tokens}', footer: 'Sau `check` chỉ nhập tên character; link và mention sẽ không được nhận.' }, progress: {
+      variants: [
+          'Đã nhận **{count}** {word} · đang kiểm tra database…',
+          'Ghi nhận **{count}** {word} · đang đối chiếu list…',
+          'Nhận **{count}** {word} rồi · tớ tra đây…',
+          'Đang tra **{count}** {word} với các list…',
+        ],
+    } },
+    progress: {
+      variants: [
+          'Đã trích **{count}** {word} · đang kiểm tra database…',
+          'Lấy được **{count}** {word} từ ảnh · đang đối chiếu list…',
+          'Đọc ra **{count}** {word} · tớ tra list đây…',
+          '**{count}** {word} từ screenshot · đang kiểm tra…',
+        ],
+    }, ignored: 'Đã bỏ qua **{count}** {word} dư (giới hạn: {limit}).', nameOne: 'tên', nameMany: 'tên', failed: { title: 'Kiểm tra list thất bại', description: 'OCR đã thành công nhưng tớ chưa hoàn tất được lượt kiểm tra database.' }, autoFailed: { title: 'Auto-check thất bại', description: 'Tớ chưa hoàn tất được yêu cầu kiểm tra tự động này.' },
     embed: { autoKicker: 'AUTO-CHECK', slashKicker: 'KIỂM TRA LIST', names: 'TÊN', notListed: 'chưa vào list', configured: 'đã cấu hình', ignored: 'Đã bỏ qua {count} {word} dư (giới hạn: {limit}).', flagged: 'CẦN CHÚ Ý {count}', clear: 'AN TOÀN', quickFlagged: 'Quick Add tên chưa vào list bằng dropdown · /la-roster <name> để xem kỹ', quickClean: 'Quick Add tên chưa vào list bằng dropdown bên dưới', rosterTip: '/la-roster <name> để xem roster đầy đủ của hit cần chú ý', rerunTip: 'Chạy lại với ảnh mới để kiểm tra lại', source: 'NGUỒN db blacklist + whitelist + watchlist + trusted' },
     format: { via: 'qua **{name}**', alts: 'alt', more: '+{count} tên khác', local: 'Nội bộ', trusted: 'trusted' },
   },

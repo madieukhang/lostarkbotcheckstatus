@@ -409,9 +409,23 @@ export default {
     text: {
       empty: { title: 'No character name provided', description: 'Type `check <character>` or `check: <character>` in this channel.', footer: 'Separate multiple names with spaces, commas, or new lines.' },
       invalid: { title: 'That text is not a character name', description: 'These values are not valid Lost Ark character names: {tokens}', footer: 'Use only character names after `check`; links and mentions are ignored.' },
-      progress: 'Received **{count}** {word} · checking the database lists…',
+      progress: {
+      variants: [
+          'Received **{count}** {word} · checking the database lists…',
+          '**{count}** {word} noted · cross-checking the lists now…',
+          'Got **{count}** {word} · looking them up…',
+          'Reading **{count}** {word} against the lists…',
+        ],
     },
-    progress: 'Extracted **{count}** {word} · checking the database lists…', ignored: 'Ignored **{count}** extra {word} (limit: {limit}).', nameOne: 'name', nameMany: 'names',
+    },
+    progress: {
+      variants: [
+          'Extracted **{count}** {word} · checking the database lists…',
+          'Got **{count}** {word} off the image · checking the lists…',
+          'Read **{count}** {word} · cross-checking the lists now…',
+          '**{count}** {word} out of the screenshot · checking…',
+        ],
+    }, ignored: 'Ignored **{count}** extra {word} (limit: {limit}).', nameOne: 'name', nameMany: 'names',
     failed: { title: 'List check failed', description: 'OCR succeeded, but I could not complete the database check.' },
     autoFailed: { title: 'Auto-check failed', description: 'I could not complete this automatic list-check request.' },
     embed: {
