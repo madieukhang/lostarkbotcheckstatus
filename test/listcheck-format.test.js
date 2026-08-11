@@ -40,3 +40,34 @@ test('formatCheckResults renders roster-match branch context', () => {
   assert.match(lines[0], /via \*\*Mainchar\*\*/);
   assert.match(lines[0], /CP `90000`/);
 });
+
+test('formatCheckResults shows OCR correction and the roster path used to confirm a list hit', () => {
+  const lines = formatCheckResults([{
+    inputName: 'Altchxr',
+    inputSource: 'ocr',
+    name: 'Altchar',
+    blackEntry: { name: 'Mainchar', reason: 'RMT', scope: 'global' },
+    matchDetails: {
+      black: { kind: 'roster', matchedName: 'Rosteralt' },
+    },
+    discoveredAlts: ['Rosteralt'],
+    snapClassName: 'Berserker',
+    snapItemLevel: 1720,
+  }]);
+
+  assert.match(lines[0], /OCR \*\*Altchxr\*\* → lostark\.bible \*\*Altchar\*\*/);
+  assert.match(lines[0], /roster alt \*\*Rosteralt\*\* → entry \*\*Mainchar\*\*/);
+});
+
+test('formatCheckResults does not label a typed-name correction as OCR', () => {
+  const [line] = formatCheckResults([{
+    inputName: 'Altchxr',
+    inputSource: 'text',
+    name: 'Altchar',
+    snapClassName: '',
+    snapItemLevel: 0,
+  }]);
+
+  assert.match(line, /typed \*\*Altchxr\*\* → lostark\.bible \*\*Altchar\*\*/);
+  assert.doesNotMatch(line, /OCR/);
+});

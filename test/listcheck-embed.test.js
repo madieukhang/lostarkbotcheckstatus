@@ -41,3 +41,35 @@ test('slash mode kicker + all-clear footer (0 flagged -> // CLEAR)', () => {
   assert.equal(j.title, '🛡️ 1 · ❓ 1 not listed');
   assert.match(j.footer.text, /^\/\/ CLEAR/u);
 });
+
+test('footer asks for image confirmation when OCR changed a character identity', () => {
+  const results = [{
+    inputName: 'Altchxr',
+    inputSource: 'ocr',
+    name: 'Altchar',
+    watchEntry: { name: 'Altchar' },
+  }];
+  const { embed } = buildListCheckEmbed({
+    results,
+    formattedLines: ['⚠️ **Altchar**'],
+    limitedNamesCount: 1,
+    mode: 'auto',
+    lang: 'vi',
+  });
+
+  assert.match(embed.toJSON().footer.text, /OCR đã hiệu chỉnh 1 tên · đối chiếu lại với ảnh/u);
+});
+
+test('footer uses typed-input confirmation copy outside the screenshot flow', () => {
+  const { embed } = buildListCheckEmbed({
+    results: [{ inputName: 'Altchxr', inputSource: 'text', name: 'Altchar' }],
+    formattedLines: ['❓ Altchar'],
+    limitedNamesCount: 1,
+    mode: 'auto',
+    lang: 'vi',
+  });
+
+  const footer = embed.toJSON().footer.text;
+  assert.match(footer, /Đã hiệu chỉnh 1 tên nhập · đối chiếu lại tên gốc/u);
+  assert.doesNotMatch(footer, /OCR/u);
+});

@@ -21,6 +21,11 @@ import {
 } from '../../utils/listEntryMap.js';
 import { applyMarkedSiblingLevelCorrections } from './partyCorrections.js';
 import { enrichListCheckResults } from './enrichment.js';
+import {
+  buildListMatchCandidates,
+  didListCheckNameChange,
+  resolveMappedListMatch,
+} from './matchResolution.js';
 
 // ─── Name checking ──────────────────────────────────────────────────────────
 
@@ -44,6 +49,7 @@ import { enrichListCheckResults } from './enrichment.js';
  * @param {string[]} names
  * @param {object} [options]
  * @param {string} [options.guildId] - Guild ID for including server-scoped blacklist entries
+ * @param {'ocr'|'text'} [options.inputSource='text'] - How the checked name was supplied
  * @param {Map} [options.suggestionCache] - request-local Bible search cache
  * @param {object} [options.suggestionContext] - request-wide Bible lookup budget and metrics
  * @returns {Promise<Array<object>>} Results with list entries and stored snapshot metadata
@@ -53,7 +59,12 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const connectStartedAt = Date.now();
   await connectDB();
   const connectMs = Date.now() - connectStartedAt;
-  const { guildId, suggestionCache, suggestionContext } = options;
+  const {
+    guildId,
+    inputSource = 'text',
+    suggestionCache,
+    suggestionContext,
+  } = options;
 
   // Fetch every input name once per collection. The query count stays
   // constant as the OCR/name batch grows; lookup maps below make the
@@ -86,16 +97,28 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const whiteMap = buildEntryMap(allWhite);
   const watchMap = buildEntryMap(allWatch);
   const trustedMap = buildEntryMap(allTrusted);
-  const originalNameSet = new Set(names.map((n) => String(n || '').toLowerCase()));
 
   const results = names.map((name) => {
     const snap = snapshotMap.get(name.toLowerCase()) || null;
+    const candidates = [{ name, origin: 'checked' }];
+    const blackMatch = resolveMappedListMatch(blackMap, candidates);
+    const whiteMatch = resolveMappedListMatch(whiteMap, candidates);
+    const watchMatch = resolveMappedListMatch(watchMap, candidates);
+    const trustedMatch = resolveMappedListMatch(trustedMap, candidates);
     return {
+      inputName: name,
+      inputSource,
       name,
-      blackEntry: blackMap.get(name.toLowerCase()) || null,
-      whiteEntry: whiteMap.get(name.toLowerCase()) || null,
-      watchEntry: watchMap.get(name.toLowerCase()) || null,
-      trustedEntry: trustedMap.get(name.toLowerCase()) || null,
+      blackEntry: blackMatch.entry,
+      whiteEntry: whiteMatch.entry,
+      watchEntry: watchMatch.entry,
+      trustedEntry: trustedMatch.entry,
+      matchDetails: {
+        black: blackMatch.detail,
+        white: whiteMatch.detail,
+        watch: watchMatch.detail,
+        trusted: trustedMatch.detail,
+      },
       hasRoster: false,
       failReason: null,
       similarNames: null,
@@ -130,18 +153,18 @@ export async function checkNamesAgainstLists(names, options = {}) {
   // Enrichment can canonicalize OCR'd names (for example
   // "Auroraforymluv" -> "Auroraformyluv") or discover visible roster
   // siblings. The initial DB list query ran before that data existed,
-  // so refresh missing hits against the canonical name + discovered
-  // alts before rendering / Quick Add decisions. Without this pass a
-  // row can show the right character name but still say "not listed".
+  // so reconcile every affected item against its FINAL identity set.
+  // Replacement (including null) is intentional: merely filling missing
+  // hits would retain a stale match from the pre-correction OCR spelling and
+  // could flag a different person.
+  const itemsToReconcile = results.filter((item) => (
+    didListCheckNameChange(item)
+    || (Array.isArray(item.discoveredAlts) && item.discoveredAlts.length > 0)
+  ));
   const refreshNames = new Set();
-  for (const item of results) {
-    const canonical = String(item.name || '').trim();
-    if (canonical && !originalNameSet.has(canonical.toLowerCase())) {
-      refreshNames.add(canonical);
-    }
-    for (const alt of (Array.isArray(item.discoveredAlts) ? item.discoveredAlts : [])) {
-      const clean = String(alt || '').trim();
-      if (clean) refreshNames.add(clean);
+  for (const item of itemsToReconcile) {
+    for (const candidate of buildListMatchCandidates(item)) {
+      refreshNames.add(candidate.name);
     }
   }
 
@@ -164,23 +187,21 @@ export async function checkNamesAgainstLists(names, options = {}) {
     const refreshWatchMap = buildEntryMap(refreshWatch);
     const refreshTrustedMap = buildEntryMap(refreshTrusted);
 
-    function firstMapped(map, candidates) {
-      for (const candidate of candidates) {
-        const hit = map.get(String(candidate || '').toLowerCase());
-        if (hit) return hit;
-      }
-      return null;
-    }
+    for (const item of itemsToReconcile) {
+      const candidates = buildListMatchCandidates(item);
+      const blackMatch = resolveMappedListMatch(refreshBlackMap, candidates);
+      const whiteMatch = resolveMappedListMatch(refreshWhiteMap, candidates);
+      const watchMatch = resolveMappedListMatch(refreshWatchMap, candidates);
+      const trustedMatch = resolveMappedListMatch(refreshTrustedMap, candidates);
 
-    for (const item of results) {
-      const candidates = [
-        item.name,
-        ...(Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []),
-      ].filter(Boolean);
-      if (!item.blackEntry) item.blackEntry = firstMapped(refreshBlackMap, candidates);
-      if (!item.whiteEntry) item.whiteEntry = firstMapped(refreshWhiteMap, candidates);
-      if (!item.watchEntry) item.watchEntry = firstMapped(refreshWatchMap, candidates);
-      if (!item.trustedEntry) item.trustedEntry = firstMapped(refreshTrustedMap, candidates);
+      item.blackEntry = blackMatch.entry;
+      item.whiteEntry = whiteMatch.entry;
+      item.watchEntry = watchMatch.entry;
+      item.trustedEntry = trustedMatch.entry;
+      item.matchDetails.black = blackMatch.detail;
+      item.matchDetails.white = whiteMatch.detail;
+      item.matchDetails.watch = watchMatch.detail;
+      item.matchDetails.trusted = trustedMatch.detail;
     }
   }
 
@@ -229,14 +250,22 @@ export async function checkNamesAgainstLists(names, options = {}) {
           if (!entry?.allCharacters) continue;
           for (const c of entry.allCharacters) {
             const match = altTrustedSet.get(c.toLowerCase());
-            if (match) { item.trustedEntry = match; break; }
+            if (match) {
+              item.trustedEntry = match;
+              item.matchDetails.trusted = { kind: 'roster', matchedName: c };
+              break;
+            }
           }
           if (item.trustedEntry) break;
         }
         if (!item.trustedEntry && Array.isArray(item.discoveredAlts)) {
           for (const c of item.discoveredAlts) {
             const match = altTrustedSet.get(c.toLowerCase());
-            if (match) { item.trustedEntry = match; break; }
+            if (match) {
+              item.trustedEntry = match;
+              item.matchDetails.trusted = { kind: 'roster', matchedName: c };
+              break;
+            }
           }
         }
       }

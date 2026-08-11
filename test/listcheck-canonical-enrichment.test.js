@@ -19,6 +19,8 @@ let connectDB;
 let RosterSnapshot;
 let WorkerHeartbeat;
 let Blacklist;
+let Whitelist;
+let Watchlist;
 let TrustedUser;
 let config;
 let clearNameSuggestionCache;
@@ -33,6 +35,8 @@ test.before(async () => {
   ({ default: RosterSnapshot } = await import('../bot/models/RosterSnapshot.js'));
   ({ default: WorkerHeartbeat } = await import('../bot/models/WorkerHeartbeat.js'));
   ({ default: Blacklist } = await import('../bot/models/Blacklist.js'));
+  ({ default: Whitelist } = await import('../bot/models/Whitelist.js'));
+  ({ default: Watchlist } = await import('../bot/models/Watchlist.js'));
   ({ default: TrustedUser } = await import('../bot/models/TrustedUser.js'));
   ({ default: config } = await import('../bot/config.js'));
   ({ clearNameSuggestionCache } = await import('../bot/services/roster/search.js'));
@@ -51,6 +55,8 @@ test.beforeEach(async () => {
     RosterSnapshot.deleteMany({}),
     WorkerHeartbeat.deleteMany({}),
     Blacklist.deleteMany({}),
+    Whitelist.deleteMany({}),
+    Watchlist.deleteMany({}),
     TrustedUser.deleteMany({}),
   ]);
 });
@@ -421,6 +427,12 @@ test('party-level context corrects unmarked exact OCR when marked sibling fits t
     { name: 'Leign', classId: 'berserker', itemLevel: 1732.5, rosterName: 'Leign' },
     { name: 'Auroraformyluv', classId: 'bard', itemLevel: 1754.1666, rosterName: 'Auroraformyluv' },
   ]);
+  await Promise.all([Blacklist, Whitelist, Watchlist].map((Model) => Model.create({
+    name: 'Cruelfighter',
+    reason: 'belongs to the unmarked character only',
+    addedByUserId: 'tester',
+    addedByTag: 'tester#0001',
+  })));
 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
@@ -436,14 +448,22 @@ test('party-level context corrects unmarked exact OCR when marked sibling fits t
       'Misoon',
       'Leign',
       'Auroraformyluv',
-    ], { guildId: 'guild-1' });
+    ], { guildId: 'guild-1', inputSource: 'ocr' });
     const corrected = results[0];
     const lines = formatCheckResults(results);
 
+    assert.equal(corrected.inputName, 'Cruelfighter');
     assert.equal(corrected.name, 'Cr\u00fcelfighter');
     assert.equal(corrected.snapClassName, 'Breaker');
     assert.equal(corrected.snapItemLevel, 1768.3334);
+    assert.equal(corrected.blackEntry, null, 'stale hit for the pre-correction OCR identity must be removed');
+    assert.equal(corrected.whiteEntry, null);
+    assert.equal(corrected.watchEntry, null);
+    assert.equal(corrected.matchDetails.black, null);
+    assert.equal(corrected.matchDetails.white, null);
+    assert.equal(corrected.matchDetails.watch, null);
     assert.match(lines.join('\n'), /Cr\u00fcelfighter/);
+    assert.match(lines.join('\n'), /OCR \*\*Cruelfighter\*\*.*Cr\u00fcelfighter/);
     assert.doesNotMatch(lines.join('\n'), /Cruelfighter · `1640\.00`/);
   } finally {
     globalThis.fetch = originalFetch;
@@ -623,7 +643,7 @@ test('visual-substitution recovery resolves y read as q (Qiqlyn -> Qiylyn)', asy
     qiylyn: [[1], [2, 3, 4], 'Qiylyn', 'weather_artist', 1753.3334],
   });
   try {
-    const results = await checkNamesAgainstLists(['Qiqlyn'], { guildId: 'guild-1' });
+    const results = await checkNamesAgainstLists(['Qiqlyn'], { guildId: 'guild-1', inputSource: 'ocr' });
     const lines = formatCheckResults(results);
 
     assert.equal(results.length, 1);
@@ -632,7 +652,8 @@ test('visual-substitution recovery resolves y read as q (Qiqlyn -> Qiylyn)', asy
     assert.equal(results[0].snapItemLevel, 1753.3334);
     assert.equal(results[0].trustedEntry?.name, 'Qiylyn');
     assert.match(lines.join('\n'), /Qiylyn/);
-    assert.doesNotMatch(lines.join('\n'), /Qiqlyn/);
+    assert.doesNotMatch(lines[0].split('\n')[0], /Qiqlyn/);
+    assert.match(lines[0], /OCR \*\*Qiqlyn\*\*.*Qiylyn/);
   } finally {
     stub.restore();
   }
@@ -693,12 +714,12 @@ test('prefix-transposition recovery resolves adjacent swapped letters (Aurorafor
 
 test('canonical recovery refreshes list hits before rendering not-listed', async () => {
   await markWorkerOnline();
-  await Blacklist.create({
+  await Promise.all([Blacklist, Whitelist, Watchlist].map((Model) => Model.create({
     name: 'Auroraformyluv',
     reason: 'prior evidence',
     addedByUserId: 'tester',
     addedByTag: 'tester#0001',
-  });
+  })));
   const stub = installPrefixIndelStub({
     auro: [[1], [2, 3, 4], 'Auroraformyluv', 'bard', 1754.17],
   });
@@ -706,9 +727,18 @@ test('canonical recovery refreshes list hits before rendering not-listed', async
     const results = await checkNamesAgainstLists(['Auroraforymluv'], { guildId: 'guild-1' });
 
     assert.equal(results.length, 1);
+    assert.equal(results[0].inputName, 'Auroraforymluv');
     assert.equal(results[0].name, 'Auroraformyluv');
     assert.equal(results[0].blackEntry?.name, 'Auroraformyluv');
+    assert.equal(results[0].whiteEntry?.name, 'Auroraformyluv');
+    assert.equal(results[0].watchEntry?.name, 'Auroraformyluv');
     assert.equal(results[0].blackEntry?.reason, 'prior evidence');
+    assert.deepEqual(results[0].matchDetails.black, {
+      kind: 'direct',
+      matchedName: 'Auroraformyluv',
+    });
+    assert.deepEqual(results[0].matchDetails.white, results[0].matchDetails.black);
+    assert.deepEqual(results[0].matchDetails.watch, results[0].matchDetails.black);
   } finally {
     stub.restore();
   }
@@ -751,6 +781,10 @@ test('worker-online discovered alts refresh list hits before Quick Add', async (
     assert.equal(results[0].name, 'Auroraformyluv');
     assert.equal(results[0].blackEntry?.name, 'Auroraforyou');
     assert.ok(results[0].discoveredAlts.includes('Auroraforyou'));
+    assert.deepEqual(results[0].matchDetails.black, {
+      kind: 'roster',
+      matchedName: 'Auroraforyou',
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -822,7 +856,7 @@ test('worker-online enrichment falls back to bible search canonical names', asyn
   const stub = installBibleSearchStub();
 
   try {
-    const results = await checkNamesAgainstLists(['Qy\u00F6ir'], { guildId: 'guild-1' });
+    const results = await checkNamesAgainstLists(['Qy\u00F6ir'], { guildId: 'guild-1', inputSource: 'ocr' });
     const lines = formatCheckResults(results);
 
     assert.equal(results.length, 1);
@@ -830,7 +864,8 @@ test('worker-online enrichment falls back to bible search canonical names', asyn
     assert.equal(results[0].snapClassName, 'Bard');
     assert.equal(results[0].snapItemLevel, 1741.67);
     assert.match(lines[0], /Qyoir/);
-    assert.doesNotMatch(lines[0], /Qy\u00F6ir/);
+    assert.doesNotMatch(lines[0].split('\n')[0], /Qy\u00F6ir/);
+    assert.match(lines[0], /OCR \*\*Qy\u00F6ir\*\*.*Qyoir/);
     assert.equal(stub.counts.rosterCalls, 1);
     assert.equal(stub.counts.searchCalls, 1);
 
@@ -984,7 +1019,7 @@ test('worker-online canonicalization repairs short i/l look-alike names', async 
   const stub = installBibleSearchStub();
 
   try {
-    const results = await checkNamesAgainstLists(['Qyolr'], { guildId: 'guild-1' });
+    const results = await checkNamesAgainstLists(['Qyolr'], { guildId: 'guild-1', inputSource: 'ocr' });
     const lines = formatCheckResults(results);
 
     assert.equal(results.length, 1);
@@ -992,7 +1027,8 @@ test('worker-online canonicalization repairs short i/l look-alike names', async 
     assert.equal(results[0].snapClassName, 'Bard');
     assert.equal(results[0].snapItemLevel, 1741.67);
     assert.match(lines[0], /Qyoir/);
-    assert.doesNotMatch(lines[0], /Qyolr/);
+    assert.doesNotMatch(lines[0].split('\n')[0], /Qyolr/);
+    assert.match(lines[0], /OCR \*\*Qyolr\*\*.*Qyoir/);
     assert.equal(stub.counts.rosterCalls, 1);
     assert.equal(stub.counts.searchCalls, 1);
   } finally {

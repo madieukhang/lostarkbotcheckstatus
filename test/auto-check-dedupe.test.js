@@ -104,6 +104,7 @@ test('auto-check message handler sends prefixed text through the shared list-che
   const reactions = [];
   const languageGuilds = [];
   const renderedLangs = [];
+  const inputSources = [];
   const handler = createAutoCheckMessageHandler({
     client: { user: { id: 'bot-user' } },
     imageChecksEnabled: false,
@@ -112,8 +113,9 @@ test('auto-check message handler sends prefixed text through the shared list-che
       languageGuilds.push(guildId);
       return 'vi';
     },
-    checkNamesAgainstListsFn: async (names) => {
+    checkNamesAgainstListsFn: async (names, options) => {
       checked.push(names);
+      inputSources.push(options.inputSource);
       return names.map((name) => ({ name, blackEntry: { name } }));
     },
     formatCheckResultsFn: () => ['formatted'],
@@ -148,11 +150,13 @@ test('auto-check message handler sends prefixed text through the shared list-che
   assert.equal(reactions.length, 2);
   assert.deepEqual(languageGuilds, ['guild-1']);
   assert.deepEqual(renderedLangs, ['vi']);
+  assert.deepEqual(inputSources, ['text']);
 });
 
 test('auto-check message handler keeps image OCR as the priority over a text caption', async () => {
   resetAutoCheckDedupeForTest();
   const checked = [];
+  const inputSources = [];
   let extracted = 0;
   const image = { id: 'image-1', contentType: 'image/png' };
   const handler = createAutoCheckMessageHandler({
@@ -165,8 +169,9 @@ test('auto-check message handler keeps image OCR as the priority over a text cap
       assert.equal(input, image);
       return ['FromImage'];
     },
-    checkNamesAgainstListsFn: async (names) => {
+    checkNamesAgainstListsFn: async (names, options) => {
       checked.push(names);
+      inputSources.push(options.inputSource);
       return names.map((name) => ({ name, blackEntry: { name } }));
     },
     formatCheckResultsFn: () => ['formatted'],
@@ -192,4 +197,5 @@ test('auto-check message handler keeps image OCR as the priority over a text cap
 
   assert.equal(extracted, 1);
   assert.deepEqual(checked, [['FromImage']]);
+  assert.deepEqual(inputSources, ['ocr']);
 });

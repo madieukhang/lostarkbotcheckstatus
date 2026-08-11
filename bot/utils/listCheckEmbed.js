@@ -24,6 +24,7 @@
 
 import { createArtistEmbed } from './artistVoice.js';
 import { t } from '../services/i18n/index.js';
+import { didListCheckNameChange } from '../services/list-check/matchResolution.js';
 import { COLORS } from './ui.js';
 
 /**
@@ -70,6 +71,8 @@ export function buildListCheckEmbed({
 
   const flaggedCount = counts.black + counts.watch;
   const clearedCount = counts.white + counts.trusted + counts.notListed;
+  const correctedResults = results.filter(didListCheckNameChange);
+  const correctedCount = correctedResults.length;
 
   let color;
   let titleIcon;
@@ -126,6 +129,12 @@ export function buildListCheckEmbed({
   // Footer is a HUD status line: a // FLAGGED n (or // CLEAR) tag, the
   // mode-specific tip, then the source citation.
   const footerParts = [`// ${t(`dialogue.check.embed.${flaggedCount > 0 ? 'flagged' : 'clear'}`, lang, { count: flaggedCount })}`];
+  if (correctedCount > 0) {
+    const correctionKey = correctedResults.some((result) => result.inputSource === 'ocr')
+      ? 'correctedOcr'
+      : 'correctedText';
+    footerParts.push(t(`dialogue.check.embed.${correctionKey}`, lang, { count: correctedCount }));
+  }
   if (mode === 'auto') {
     if (flaggedCount > 0) {
       footerParts.push(t('dialogue.check.embed.quickFlagged', lang));
