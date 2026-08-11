@@ -5,12 +5,6 @@ import { fetchNameSuggestions } from '../roster/search.js';
 import { hasAnyDiacritic, stripDiacritics } from './nameRecovery.js';
 
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
-const DEFAULT_GEMINI_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3-flash-preview',
-];
 const GEMINI_GENERATION_CONFIG = {
   temperature: 0,
   topP: 0.1,
@@ -97,12 +91,6 @@ function shouldFailoverGeminiModel(status, bodyText) {
   );
 }
 
-function getGeminiModels() {
-  return config.geminiModels.length > 0
-    ? config.geminiModels
-    : DEFAULT_GEMINI_MODELS;
-}
-
 function createGeminiRequestBody(prompt, imageBase64, mimeType) {
   return {
     contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType, data: imageBase64 } }] }],
@@ -134,7 +122,7 @@ async function requestGeminiWithFallback({
   onRetry = () => {},
 }) {
   const requestBody = createGeminiRequestBody(prompt, imageBase64, mimeType);
-  const models = getGeminiModels();
+  const models = config.geminiModels;
   const failures = [];
 
   for (let i = 0; i < models.length; i += 1) {
