@@ -24,6 +24,7 @@ import {
   checkNamesAgainstLists,
   formatCheckResults,
 } from '../../../services/list-check/service.js';
+import { didListCheckNameChange } from '../../../services/list-check/matchResolution.js';
 import { createNameSuggestionContext } from '../../../services/roster/search.js';
 import { truncateDiscordContent } from '../../../utils/discordText.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
@@ -108,8 +109,11 @@ export function buildAutoCheckEvidenceRow(results, lang = 'en') {
       .addOptions(
         candidates.slice(0, 25).map(({ result, entry, listType }) => {
           const ctx = getListContext(listType);
+          const label = didListCheckNameChange(result)
+            ? `${result.inputName} → ${result.name}`
+            : String(result.name || result.inputName || 'Unknown');
           return {
-            label: result.name,
+            label: label.slice(0, 100),
             description: (entry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),
             value: `${listType}:${entry._id}`.slice(0, 100),
             emoji: ctx.icon,
@@ -241,6 +245,7 @@ export function createCheckHandlers({ client }) {
     try {
       const results = await checkNamesAgainstLists(limitedNames, {
         guildId: interaction.guild?.id,
+        inputSource: 'ocr',
         suggestionCache,
         suggestionContext,
       });

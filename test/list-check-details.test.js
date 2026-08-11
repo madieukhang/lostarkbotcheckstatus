@@ -54,6 +54,22 @@ test('check details dropdown de-duplicates multiple checked alts from one entry'
   assert.equal(select.options[0].value, `black:${blackId}`);
 });
 
+test('check details dropdown keeps the screenshot name visible after canonical correction', () => {
+  const blackId = 'd'.repeat(24);
+  const row = buildAutoCheckEvidenceRow([{
+    inputName: 'Altchxr',
+    name: 'Altchar',
+    blackEntry: {
+      _id: blackId,
+      name: 'Altchar',
+      reason: 'Confirmed report',
+    },
+  }], 'en');
+
+  const select = row.toJSON().components[0];
+  assert.equal(select.options[0].label, 'Altchxr → Altchar');
+});
+
 test('check detail snapshot loader stays DB-only and includes primary plus tracked alts', async () => {
   let receivedQuery;
   let receivedCollation;

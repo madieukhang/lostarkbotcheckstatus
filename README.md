@@ -8,7 +8,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 - **Roster lookup** — `/la-roster` scrapes `lostark.bible`, tracks iLvl progression, cross-checks every list; `deep:true` runs Stronghold alt detection
 - **List management** — blacklist / whitelist / watchlist (`⛔` / `✅` / `⚠️`), global or server-scoped, trusted users protected from any list
 - **Bulk add** — `/la-list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast
-- **Screenshot OCR** — `/la-check` or drop in an auto-check channel, Gemini extracts ≤ 8 names and cross-checks; auto-failover across Gemini models on quota
+- **Screenshot OCR** — `/la-check` or drop in an auto-check channel, Gemini extracts ≤ 8 names and cross-checks; corrected names are re-matched against their final canonical/roster identities and the card shows the `OCR → resolved name → list entry` path
 - **Text checks** — in an auto-check channel, `check NameOne NameTwo` and `check NameOne, NameTwo` both cross-check up to 8 names in one request; listed hits open a broadcast-style detail card with cached ilvl/CP, attribution, tracked alts, and inline evidence
 - **Quick Add** — after auto-check, dropdown adds unflagged names straight to blacklist/watchlist via modal
 - **Approval flow** — members submit, officers instant-approve; senior approver always receives the DM
@@ -308,7 +308,7 @@ Slash commands register through Discord's global endpoint on boot (`ClientReady`
 
 - `/la-roster` and `/la-search` scrape `lostark.bible` HTML/SvelteKit payloads. Layout changes upstream will break parsers under `services/roster/`.
 - Discord CDN URLs on `imageUrl` (legacy entries) expire around 24h after upload. New entries use the `imageMessageId` + `imageChannelId` rehosting path; old entries may show a broken image.
-- Gemini OCR quality on diacritic names depends heavily on screenshot resolution. Similar-name suggestion is the fallback when OCR misreads (`Lùnaria` vs `Lunaria`).
+- Gemini OCR quality on diacritic names depends heavily on screenshot resolution. Similar-name recovery is the fallback when OCR misreads (`Lùnaria` vs `Lunaria`); corrected names are labeled on the result card so a reviewer can compare them with the screenshot.
 - ScraperAPI falls back on 403/503 but not on soft blocks that return 200 with empty HTML. If upstream silently cloaks, `/la-roster` returns "no roster found".
 - ScraperAPI usage stats are in-memory process counters. They reset on bot restart/redeploy and estimate bot-side requests, not ScraperAPI billing-plan credits.
 - One Mongo cluster, no sharding. List entries are small (≤ a few KB each) so this scales comfortably for a single-guild deployment.

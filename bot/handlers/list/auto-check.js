@@ -261,6 +261,7 @@ export function createAutoCheckMessageHandler({
 
       const results = await checkNamesAgainstListsFn(limitedNames, {
         guildId: message.guild.id,
+        inputSource: image ? 'ocr' : 'text',
         suggestionCache,
         suggestionContext,
       });

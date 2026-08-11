@@ -1,5 +1,28 @@
 import { getClassEmoji, isSupportClass } from '../../models/Class.js';
 import { t } from '../i18n/index.js';
+import { didListCheckNameChange } from './matchResolution.js';
+
+function normalizeName(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function formatMatchContext(item, entry, listType, lang) {
+  const detail = item.matchDetails?.[listType];
+  if (detail?.kind === 'roster') {
+    const matchedName = String(detail.matchedName || entry.name || '').trim();
+    if (normalizeName(matchedName) === normalizeName(entry.name)) {
+      return t('dialogue.check.format.rosterVia', lang, { name: matchedName });
+    }
+    return t('dialogue.check.format.rosterEntry', lang, {
+      name: matchedName,
+      entry: entry.name,
+    });
+  }
+  if (normalizeName(entry.name) !== normalizeName(item.name)) {
+    return t('dialogue.check.format.via', lang, { name: entry.name });
+  }
+  return '';
+}
 
 /**
  * Pick the alt list to display for an item, in this priority order:
@@ -56,11 +79,22 @@ function formatResultLine(item, lang = 'en') {
   const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 🛡️' : '';
 
   const branches = [];
-  for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
+  if (didListCheckNameChange(item)) {
+    const correctionKey = item.inputSource === 'ocr' ? 'correctedOcr' : 'correctedText';
+    branches.push(`   ↳ ${t(`dialogue.check.format.${correctionKey}`, lang, {
+      input: item.inputName,
+      name: item.name,
+    })}`);
+  }
+  for (const [listType, entry] of [
+    ['black', item.blackEntry],
+    ['white', item.whiteEntry],
+    ['watch', item.watchEntry],
+  ]) {
     if (!entry) continue;
-    const isRosterMatch = entry.name.toLowerCase() !== item.name.toLowerCase();
     const parts = [];
-    if (isRosterMatch) parts.push(t('dialogue.check.format.via', lang, { name: entry.name }));
+    const matchContext = formatMatchContext(item, entry, listType, lang);
+    if (matchContext) parts.push(matchContext);
     if (entry.reason?.trim()) parts.push(`*${entry.reason.trim()}*`);
     if (entry.raid?.trim()) parts.push(`[${entry.raid.trim()}]`);
     if (parts.length > 0) branches.push(`   ↳ ${parts.join(' · ')}`);
@@ -99,13 +133,13 @@ function formatResultLine(item, lang = 'en') {
     };
   }
   if (item.trustedEntry) {
-    const isVia = item.trustedEntry.name.toLowerCase() !== item.name.toLowerCase();
-    const directTag = isVia ? '' : ` · ${t('dialogue.check.format.trusted', lang)}`;
+    const trustedContext = formatMatchContext(item, item.trustedEntry, 'trusted', lang);
+    const directTag = trustedContext ? '' : ` · ${t('dialogue.check.format.trusted', lang)}`;
     // Trusted-only branch reuses the same `branches` block built above
     // so the alts line (if any) renders. Prepend the via-trusted note
     // so it shows above alts in the same sub-list.
     const trustedBranches = [];
-    if (isVia) trustedBranches.push(`   ↳ ${t('dialogue.check.format.via', lang, { name: item.trustedEntry.name })} · ${t('dialogue.check.format.trusted', lang)}`);
+    if (trustedContext) trustedBranches.push(`   ↳ ${trustedContext} · ${t('dialogue.check.format.trusted', lang)}`);
     for (const b of branches) trustedBranches.push(b);
     const trustedBlock = trustedBranches.length > 0 ? `\n${trustedBranches.join('\n')}` : '';
     return {
