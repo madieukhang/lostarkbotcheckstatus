@@ -22,6 +22,45 @@ function formatStatus(status, lang) {
   }
 }
 
+export function resolveSystemHealth({
+  onlineCount,
+  offlineCount,
+  maintenanceCount,
+  unknownCount,
+  totalCount,
+}) {
+  if (offlineCount > 0) {
+    return {
+      state: 'offline',
+      titleIcon: STATUS_GLYPH[STATUS.OFFLINE],
+      color: COLORS.danger,
+      count: offlineCount,
+    };
+  }
+  if (maintenanceCount > 0) {
+    return {
+      state: 'maintenance',
+      titleIcon: STATUS_GLYPH[STATUS.MAINTENANCE],
+      color: COLORS.warning,
+      count: maintenanceCount,
+    };
+  }
+  if (onlineCount === totalCount && totalCount > 0) {
+    return {
+      state: 'online',
+      titleIcon: STATUS_GLYPH[STATUS.ONLINE],
+      color: COLORS.success,
+      count: totalCount,
+    };
+  }
+  return {
+    state: 'unknown',
+    titleIcon: '❓',
+    color: COLORS.warning,
+    count: unknownCount,
+  };
+}
+
 export function createSystemHandlers({ checkStatus, resetState, client }) {
   async function handleStatusCommand(interaction) {
     await deferReply(interaction);
@@ -35,30 +74,19 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
       const offlineCount = allStatuses.filter((s) => s === STATUS.OFFLINE).length;
       const maintenanceCount = allStatuses.filter((s) => s === STATUS.MAINTENANCE).length;
       const unknownCount = allStatuses.length - onlineCount - offlineCount - maintenanceCount;
-      const allOnline = onlineCount === allStatuses.length && allStatuses.length > 0;
+      const health = resolveSystemHealth({
+        onlineCount,
+        offlineCount,
+        maintenanceCount,
+        unknownCount,
+        totalCount: allStatuses.length,
+      });
 
-      // Title icon doubles as the at-a-glance health indicator: red dot
-      // when anything is offline, yellow when maintenance is active,
-      // green when all clear, question mark when servers haven't reported.
-      let titleIcon;
-      let color;
-      if (offlineCount > 0) { titleIcon = '🔴'; color = COLORS.danger; }
-      else if (maintenanceCount > 0) { titleIcon = '🟡'; color = COLORS.warning; }
-      else if (allOnline) { titleIcon = '🟢'; color = COLORS.success; }
-      else { titleIcon = '❓'; color = COLORS.warning; }
-
-      // Headline summary at the top of the description gives the
-      // reader the punchline before the per-server breakdown.
-      let headline;
-      if (offlineCount > 0) {
-        headline = t('dialogue.system.status.headline.offline', lang, { count: offlineCount });
-      } else if (maintenanceCount > 0) {
-        headline = t('dialogue.system.status.headline.maintenance', lang, { count: maintenanceCount });
-      } else if (allOnline) {
-        headline = t('dialogue.system.status.headline.online', lang, { count: allStatuses.length });
-      } else {
-        headline = t('dialogue.system.status.headline.unknown', lang, { count: unknownCount });
-      }
+      // The shared classification keeps icon/color and headline priority
+      // aligned: offline > maintenance > all-online > unknown.
+      const headline = t(`dialogue.system.status.headline.${health.state}`, lang, {
+        count: health.count,
+      });
 
       const fields = [];
 
@@ -86,10 +114,10 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
       }
 
       const embed = createArtistEmbed(lang)
-        .setTitle(`${titleIcon} ${t('dialogue.system.status.title', lang)}`)
+        .setTitle(`${health.titleIcon} ${t('dialogue.system.status.title', lang)}`)
         .setDescription(`${headline}\n\n${t('dialogue.system.status.checked', lang, { time: relativeTime(Date.now()) })}`)
         .addFields(fields)
-        .setColor(color)
+        .setColor(health.color)
         .setFooter({ text: t('dialogue.system.status.footer', lang, { refresh: ICONS.refresh }) })
         .setTimestamp();
 

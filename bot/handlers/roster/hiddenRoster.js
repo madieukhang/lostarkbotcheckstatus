@@ -39,7 +39,7 @@ import {
   unregisterScan,
 } from '../../utils/scanSession.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
-import { createRosterDeepSession } from '../../utils/rosterDeepSession.js';
+import { createRosterContinuationSession } from '../../utils/rosterDeepSession.js';
 import { rosterUrl, profileUrl as bibleProfileUrl } from '../../utils/rosterLink.js';
 import { makeRosterScanProgressCallback, formatDeepScanStats } from './progress.js';
 
@@ -243,21 +243,14 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
           replyEmbeds.push(scanEmbed);
 
           if (state.hasRemaining) {
-            const session = createRosterDeepSession({
+            const session = createRosterContinuationSession({
               callerId: interaction.user.id,
               targetName: name,
               isHidden: true,
               meta,
               guildMembers,
-              scannedNames: altResult.scannedNames || [],
-              allDiscoveredAlts: altResult.alts || [],
+              altResult,
               cap: deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit,
-              scanStats: {
-                scanned: altResult.scannedCandidates || 0,
-                attempted: altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0,
-                failed: altResult.failedCandidates || 0,
-                rateLimitRetries: altResult.rateLimitRetries || 0,
-              },
               primaryEmbedJSON: primaryEmbed.toJSON(),
             });
             const buttonRow = buildScanResultButtons({

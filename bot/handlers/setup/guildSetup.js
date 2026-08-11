@@ -5,7 +5,7 @@
  * without needing to modify environment variables.
  */
 
-import { ChannelType, PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits } from 'discord.js';
 import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
@@ -20,7 +20,6 @@ import {
   t,
   setGuildLanguage,
 } from '../../services/i18n/index.js';
-import { postAutoCheckWelcome } from '../../services/setup/autoCheckWelcome.js';
 import { checkBotPermissions } from '../../services/setup/channelPermissions.js';
 import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
 import {
@@ -29,6 +28,13 @@ import {
   editEmbed,
   editNotice,
 } from '../../utils/interactionReplies.js';
+import {
+  postSetupWelcome,
+  reportMissingChannelPermissions,
+  requireSetupGuildTextChannel,
+  resolveGuildTextChannel,
+  resolveWelcomePinContext,
+} from './setupGuards.js';
 
 /**
  * Send a test message to verify the channel is working.
@@ -51,19 +57,6 @@ async function sendTestMessage(channel, purpose, lang) {
   } catch {
     return false;
   }
-}
-
-async function resolveGuildTextChannel(interaction, channelId) {
-  if (!channelId) return null;
-  let channel = interaction.guild?.channels?.cache?.get(channelId) || null;
-  if (!channel && interaction.guild?.channels?.fetch) {
-    try {
-      channel = await interaction.guild.channels.fetch(channelId);
-    } catch {
-      channel = null;
-    }
-  }
-  return channel?.type === ChannelType.GuildText ? channel : null;
 }
 
 export function welcomeOutcomeText(outcome, lang) {
@@ -89,16 +82,8 @@ export function welcomeOutcomeText(outcome, lang) {
  * Handle the set-auto-channel action
  */
 async function handleSetupAutoChannel(interaction, lang) {
-  const channel = interaction.options.getChannel('channel', true);
-
-  if (channel.type !== ChannelType.GuildText) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.common.wrongTextChannel', lang),
-      lang,
-    });
-    return;
-  }
+  const channel = await requireSetupGuildTextChannel(interaction, lang);
+  if (!channel) return;
 
   await connectDB();
   const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
@@ -110,26 +95,15 @@ async function handleSetupAutoChannel(interaction, lang) {
     welcomePin: true,
   });
   if (!ok) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.common.missingPermissions', lang, { channel: channel.id }),
-      fields: [{
-        name: t('dialogue.common.missingField', lang),
-        value: missing.map((m) => `• ${m}`).join('\n'),
-        inline: false,
-      }],
-      lang,
-    });
+    await reportMissingChannelPermissions(interaction, lang, channel.id, missing);
     return;
   }
 
   // Warn if same channel as notify (allow but warn)
   const sameAsNotify = existing?.listNotifyChannelId === channel.id;
 
-  const welcome = await postAutoCheckWelcome({
-    botUserId: interaction.client.user.id,
+  const welcome = await postSetupWelcome(interaction, {
     channel,
-    client: interaction.client,
     cleanupEnabled,
     configSet: {
       autoCheckChannelId: channel.id,
@@ -137,7 +111,6 @@ async function handleSetupAutoChannel(interaction, lang) {
       updatedByUserId: interaction.user.id,
       updatedByTag: interaction.user.tag,
     },
-    guildId: interaction.guild.id,
   });
 
   if (!welcome.pinned || !welcome.persisted) {
@@ -178,30 +151,13 @@ async function handleSetupAutoChannel(interaction, lang) {
  * Handle the set-notify-channel action
  */
 async function handleSetupNotifyChannel(interaction, lang) {
-  const channel = interaction.options.getChannel('channel', true);
-
-  if (channel.type !== ChannelType.GuildText) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.common.wrongTextChannel', lang),
-      lang,
-    });
-    return;
-  }
+  const channel = await requireSetupGuildTextChannel(interaction, lang);
+  if (!channel) return;
 
   // Check bot permissions before saving
   const { ok, missing } = checkBotPermissions(channel, interaction.guild);
   if (!ok) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.common.missingPermissions', lang, { channel: channel.id }),
-      fields: [{
-        name: t('dialogue.common.missingField', lang),
-        value: missing.map((m) => `• ${m}`).join('\n'),
-        inline: false,
-      }],
-      lang,
-    });
+    await reportMissingChannelPermissions(interaction, lang, channel.id, missing);
     return;
   }
 
@@ -312,16 +268,7 @@ async function handleSetupCleanup(interaction, lang, enabled) {
       welcomePin: true,
     });
     if (!ok) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.common.missingPermissions', lang, { channel: channel.id }),
-        fields: [{
-          name: t('dialogue.common.missingField', lang),
-          value: missing.map((entry) => `• ${entry}`).join('\n'),
-          inline: false,
-        }],
-        lang,
-      });
+      await reportMissingChannelPermissions(interaction, lang, channel.id, missing);
       return;
     }
   }
@@ -346,12 +293,9 @@ async function handleSetupCleanup(interaction, lang, enabled) {
       welcomePin: true,
     });
     if (pinPermissions.ok) {
-      const welcome = await postAutoCheckWelcome({
-        botUserId: interaction.client.user.id,
+      const welcome = await postSetupWelcome(interaction, {
         channel,
-        client: interaction.client,
         cleanupEnabled: enabled,
-        guildId: interaction.guild.id,
       });
       guideLine = `\n${welcomeOutcomeText(welcome, lang)}`;
     } else {
@@ -504,10 +448,9 @@ async function handleSetupRepin(interaction, lang) {
   const guildConfig = await GuildConfig.findOne({
     guildId: interaction.guild.id,
   }).lean();
-  const cleanupEnabled = resolveAutoCheckCleanupEnabled(guildConfig);
-  const channel = await resolveGuildTextChannel(
+  const { cleanupEnabled, channel, permissions } = await resolveWelcomePinContext(
     interaction,
-    guildConfig?.autoCheckChannelId
+    guildConfig,
   );
   if (!channel) {
     await editNotice(
@@ -518,10 +461,7 @@ async function handleSetupRepin(interaction, lang) {
     return;
   }
 
-  const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
-    cleanup: cleanupEnabled,
-    welcomePin: true,
-  });
+  const { ok, missing } = permissions;
   if (!ok) {
     await editNotice(
       interaction,
@@ -534,12 +474,9 @@ async function handleSetupRepin(interaction, lang) {
     return;
   }
 
-  const welcome = await postAutoCheckWelcome({
-    botUserId: interaction.client.user.id,
+  const welcome = await postSetupWelcome(interaction, {
     channel,
-    client: interaction.client,
     cleanupEnabled,
-    guildId: interaction.guild.id,
   });
   await editNotice(
     interaction,
@@ -577,10 +514,9 @@ async function handleSetupLanguage(interaction) {
     flag: languageEntry.flag,
     label: languageEntry.label,
   })}`;
-  const cleanupEnabled = resolveAutoCheckCleanupEnabled(guildConfig);
-  const channel = await resolveGuildTextChannel(
+  const { cleanupEnabled, channel, permissions } = await resolveWelcomePinContext(
     interaction,
-    guildConfig?.autoCheckChannelId
+    guildConfig,
   );
   if (!channel) {
     await editNotice(
@@ -591,10 +527,7 @@ async function handleSetupLanguage(interaction) {
     return;
   }
 
-  const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
-    cleanup: cleanupEnabled,
-    welcomePin: true,
-  });
+  const { ok, missing } = permissions;
   if (!ok) {
     await editNotice(
       interaction,
@@ -607,12 +540,9 @@ async function handleSetupLanguage(interaction) {
     return;
   }
 
-  const welcome = await postAutoCheckWelcome({
-    botUserId: interaction.client.user.id,
+  const welcome = await postSetupWelcome(interaction, {
     channel,
-    client: interaction.client,
     cleanupEnabled,
-    guildId: interaction.guild.id,
   });
   await editNotice(
     interaction,

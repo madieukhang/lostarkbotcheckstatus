@@ -42,11 +42,46 @@ export function createApprovalServices({
   client,
   getUserLanguageFn = getUserLanguage,
   getGuildLanguageFn = getGuildLanguage,
+  getApproverRecipientIdsFn = getApproverRecipientIds,
+  getSeniorApproverIdsFn = getSeniorApproverIds,
   UserPreferenceModel = UserPreference,
   GuildConfigModel = GuildConfig,
 }) {
+  async function deliverApprovalDms({ approverIds, buildMessage, logPrefix }) {
+    const deliveredApproverIds = [];
+    const deliveredDmMessages = [];
+
+    await Promise.all(
+      approverIds.map(async (approverId) => {
+        try {
+          const user = await client.users.fetch(approverId);
+          if (!user || user.bot) return;
+          const lang = await getUserLanguageFn(user.id, { UserPreferenceModel });
+          const sentMessage = await user.send(await buildMessage(lang, user));
+          deliveredApproverIds.push(user.id);
+          deliveredDmMessages.push({
+            approverId: user.id,
+            channelId: sentMessage.channelId,
+            messageId: sentMessage.id,
+          });
+        } catch (err) {
+          console.warn(`${logPrefix} Failed to DM approver ${approverId}:`, err.message);
+        }
+      })
+    );
+
+    if (deliveredApproverIds.length === 0) {
+      return {
+        success: false,
+        reason: 'Unable to DM configured approvers. Check user IDs/privacy settings.',
+      };
+    }
+
+    return { success: true, deliveredApproverIds, deliveredDmMessages };
+  }
+
   async function sendListAddApprovalToApprovers(guild, payload, options = {}) {
-    const approverIds = getApproverRecipientIds();
+    const approverIds = getApproverRecipientIdsFn();
     if (approverIds.length === 0) {
       return { success: false, reason: 'No approver user IDs configured. Set SENIOR_APPROVER_IDS or OFFICER_APPROVER_IDS in env.' };
     }
@@ -74,39 +109,18 @@ export function createApprovalServices({
       return new ActionRowBuilder().addComponents(buttons);
     };
 
-    const deliveredApproverIds = [];
-    const deliveredDmMessages = [];
-
-    await Promise.all(
-      approverIds.map(async (approverId) => {
-        try {
-          const user = await client.users.fetch(approverId);
-          if (!user || user.bot) return;
-          const lang = await getUserLanguageFn(user.id, { UserPreferenceModel });
-          const embed = buildListAddApprovalEmbed(guild, payload, { ...options, lang });
-
-          const sentMessage = await user.send({ embeds: [embed], components: [buildRow(lang)] });
-          deliveredApproverIds.push(user.id);
-          deliveredDmMessages.push({
-            approverId: user.id,
-            channelId: sentMessage.channelId,
-            messageId: sentMessage.id,
-          });
-        } catch (err) {
-          console.warn(`[list] Failed to DM approver ${approverId}:`, err.message);
-        }
-      })
-    );
-
-    if (deliveredApproverIds.length === 0) {
-      return { success: false, reason: 'Unable to DM configured approvers. Check user IDs/privacy settings.' };
-    }
-
-    return { success: true, deliveredApproverIds, deliveredDmMessages };
+    return deliverApprovalDms({
+      approverIds,
+      logPrefix: '[list]',
+      buildMessage: (lang) => ({
+        embeds: [buildListAddApprovalEmbed(guild, payload, { ...options, lang })],
+        components: [buildRow(lang)],
+      }),
+    });
   }
 
   async function sendBulkApprovalToApprovers(guild, pending) {
-    const approverIds = getSeniorApproverIds();
+    const approverIds = getSeniorApproverIdsFn();
     if (approverIds.length === 0) {
       return {
         success: false,
@@ -179,38 +193,14 @@ export function createApprovalServices({
         .setTimestamp(new Date());
     };
 
-    const deliveredApproverIds = [];
-    const deliveredDmMessages = [];
-
-    await Promise.all(
-      approverIds.map(async (approverId) => {
-        try {
-          const user = await client.users.fetch(approverId);
-          if (!user || user.bot) return;
-          const lang = await getUserLanguageFn(user.id, { UserPreferenceModel });
-          const embed = buildBulkEmbed(lang);
-
-          const sentMessage = await user.send({ embeds: [embed], components: [buildRow(lang)] });
-          deliveredApproverIds.push(user.id);
-          deliveredDmMessages.push({
-            approverId: user.id,
-            channelId: sentMessage.channelId,
-            messageId: sentMessage.id,
-          });
-        } catch (err) {
-          console.warn(`[multiadd] Failed to DM approver ${approverId}:`, err.message);
-        }
-      })
-    );
-
-    if (deliveredApproverIds.length === 0) {
-      return {
-        success: false,
-        reason: 'Unable to DM configured approvers. Check user IDs/privacy settings.',
-      };
-    }
-
-    return { success: true, deliveredApproverIds, deliveredDmMessages };
+    return deliverApprovalDms({
+      approverIds,
+      logPrefix: '[multiadd]',
+      buildMessage: (lang) => ({
+        embeds: [buildBulkEmbed(lang)],
+        components: [buildRow(lang)],
+      }),
+    });
   }
 
   async function syncApproverDmMessages(payload, messageOptionsOrBuilder, options = {}) {

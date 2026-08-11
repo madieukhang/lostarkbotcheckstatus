@@ -7,7 +7,6 @@
  * and renders the rich summary card.
  */
 
-import { randomUUID } from 'node:crypto';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { connectDB } from '../../../db.js';
@@ -16,6 +15,7 @@ import { rehostImage } from '../../../utils/imageRehost.js';
 import { COLORS } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { listTypeIcon } from '../helpers.js';
+import { buildListMutationPayload } from './mutationFlow.js';
 
 /**
  * Build the bulk service bag.
@@ -71,10 +71,15 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         }
       }
 
-      const payload = {
-        requestId: randomUUID(),
+      const payload = buildListMutationPayload({
         guildId: meta.guildId,
         channelId: meta.channelId,
+        requester: {
+          id: meta.requesterId,
+          tag: meta.requesterTag || '',
+          username: meta.requesterName || '',
+        },
+        requestedByDisplayName: meta.requesterDisplayName || '',
         type: row.type,
         name: row.name,
         reason: row.reason,
@@ -84,13 +89,8 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
         imageMessageId: rowRehost?.messageId || '',
         imageChannelId: rowRehost?.channelId || '',
         scope: effectiveScope,
-        requestedByUserId: meta.requesterId,
-        requestedByTag: meta.requesterTag || '',
-        requestedByName: meta.requesterName || '',
-        requestedByDisplayName: meta.requesterDisplayName || '',
-        createdAt: Date.now(),
         skipBroadcast: true,
-      };
+      });
 
       try {
         const result = await executeListAddToDatabase(payload);

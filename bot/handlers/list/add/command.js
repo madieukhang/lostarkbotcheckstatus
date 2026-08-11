@@ -24,12 +24,16 @@ import {
   deferReply,
   editAlert,
   editEmbed,
-  editNotice,
 } from '../../../utils/interactionReplies.js';
 import {
   buildListAddApprovalEmbed,
   isRequesterAutoApprover,
 } from '../helpers.js';
+import {
+  buildListMutationPayload,
+  persistDeliveredApproval,
+  renderListAddExecutionResult,
+} from '../services/mutationFlow.js';
 
 /**
  * Build the /la-list add slash-command handler.
@@ -112,10 +116,11 @@ export function createListAddCommandHandler({
         });
       }
 
-      const payload = {
+      const payload = buildListMutationPayload({
         requestId,
-        guildId: interaction.guild.id,
-        channelId: interaction.channelId,
+        interaction,
+        requestedByDisplayName: getInteractionDisplayName(interaction),
+        lang,
         type,
         name,
         reason,
@@ -130,34 +135,12 @@ export function createListAddCommandHandler({
         imageMessageId: rehostResult?.messageId || '',
         imageChannelId: rehostResult?.channelId || '',
         scope: type === 'black' ? scope : 'global', // scope only applies to blacklist
-        requestedByUserId: interaction.user.id,
-        requestedByTag: interaction.user.tag,
-        requestedByName: interaction.user.username,
-        requestedByDisplayName: getInteractionDisplayName(interaction),
-        lang,
-        createdAt: Date.now(),
-      };
+      });
 
       // Auto-approve: officers always, OR server-scoped entries (local = no approval needed)
       if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
         const result = await executeListAddToDatabase(payload);
-        // Prefer the domain-rich embed; unexpected content-only executor
-        // results still render through the shared notice embed.
-        // Components carry the optional "Enrich now" button on hidden-
-        // roster success cards (see addExecutor.js).
-        const hasEmbed = (result.embeds?.length ?? 0) > 0;
-        if (hasEmbed) {
-          await editEmbed(interaction, result.embeds ?? [], {
-            content: null,
-            components: result.components ?? [],
-          });
-        } else {
-          await editNotice(interaction, result.content, {
-            severity: result.ok ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
-            lang,
-            components: result.components ?? [],
-          });
-        }
+        await renderListAddExecutionResult(interaction, result, lang);
         return;
       }
 
@@ -173,11 +156,7 @@ export function createListAddCommandHandler({
       }
 
       await connectDB();
-      await PendingApproval.create({
-        ...payload,
-        approverIds: sent.deliveredApproverIds,
-        approverDmMessages: sent.deliveredDmMessages,
-      });
+      await persistDeliveredApproval(PendingApproval, payload, sent);
 
       await editEmbed(
         interaction,
