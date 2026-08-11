@@ -9,6 +9,7 @@
 // - On Railway: .env doesn't exist in the container, so this is a no-op.
 //   Railway-injected vars in process.env are NEVER overridden by dotenv.
 import dotenv from 'dotenv';
+import { resolveGeminiModels } from './config/geminiModels.js';
 dotenv.config();
 
 /**
@@ -72,6 +73,15 @@ function parseRatioEnv(key, defaultValue) {
   return raw <= 1 ? raw : defaultValue;
 }
 
+const geminiModelResolution = resolveGeminiModels(
+  process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || '',
+);
+if (geminiModelResolution.rejected.length > 0) {
+  console.warn(
+    `[config] Ignoring non-3.x Gemini models: ${geminiModelResolution.rejected.join(', ')}`,
+  );
+}
+
 const config = {
   /** Discord bot token */
   token: requireEnv('DISCORD_TOKEN'),
@@ -127,10 +137,7 @@ const config = {
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
 
   /** Gemini model priority list for image parsing with auto-failover on quota limits */
-  geminiModels: (process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || 'gemini-2.5-flash,gemini-2.5-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview')
-    .split(',')
-    .map((m) => m.trim())
-    .filter(Boolean),
+  geminiModels: geminiModelResolution.models,
 
   /**
    * Optional post-check Stronghold scan for flagged OCR names.
