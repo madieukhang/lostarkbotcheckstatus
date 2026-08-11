@@ -6,12 +6,14 @@
  * (so the approver UX stays consistent across add + edit).
  */
 
-import { randomUUID } from 'node:crypto';
-
 import PendingApproval from '../../../models/PendingApproval.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert } from '../../../utils/interactionReplies.js';
 import { t } from '../../../services/i18n/index.js';
+import {
+  buildListMutationPayload,
+  persistDeliveredApproval,
+} from '../services/mutationFlow.js';
 
 /**
  * Persist a /la-list edit request as a PendingApproval and fan out the
@@ -55,13 +57,13 @@ export async function sendListEditApprovalRequest({
         : { imageUrl: newImageUrl, imageMessageId: '', imageChannelId: '' })
     : { imageUrl: existing.imageUrl || '', imageMessageId: existing.imageMessageId || '', imageChannelId: existing.imageChannelId || '' };
 
-  const payload = {
-    requestId: randomUUID(),
+  const payload = buildListMutationPayload({
+    interaction,
+    requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+    lang,
     action: 'edit',
     existingEntryId: String(existingObj._id),
     currentType,
-    guildId: interaction.guild.id,
-    channelId: interaction.channelId,
     type: targetType,
     name: existing.name,
     reason: newReason || existing.reason,
@@ -72,13 +74,7 @@ export async function sendListEditApprovalRequest({
     // The approval handler at line ~1206 (cross-list move) and ~1230 (in-place)
     // both honor payload.scope when persisting the edit.
     scope: newScope || existingObj.scope || editGuildDefaultScope,
-    requestedByUserId: interaction.user.id,
-    requestedByTag: interaction.user.tag,
-    requestedByName: interaction.user.username,
-    requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
-    lang,
-    createdAt: Date.now(),
-  };
+  });
 
   const sent = await sendListAddApprovalToApprovers(interaction.guild, payload, {
     title: t('dialogue.listEdit.approval.requiredTitle', lang),
@@ -96,11 +92,7 @@ export async function sendListEditApprovalRequest({
     return;
   }
 
-  await PendingApproval.create({
-    ...payload,
-    approverIds: sent.deliveredApproverIds,
-    approverDmMessages: sent.deliveredDmMessages,
-  });
+  await persistDeliveredApproval(PendingApproval, payload, sent);
 
   await editAlert(interaction, {
     severity: AlertSeverity.INFO,

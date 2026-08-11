@@ -5,6 +5,17 @@ import { fetchNameSuggestions } from '../roster/search.js';
 import { hasAnyDiacritic, stripDiacritics } from './nameRecovery.js';
 
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
+const DEFAULT_GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
+];
+const GEMINI_GENERATION_CONFIG = {
+  temperature: 0,
+  topP: 0.1,
+  maxOutputTokens: 512,
+};
 
 /** Known Lost Ark server/world names to filter from OCR results */
 const SERVER_NAMES = new Set([
@@ -86,6 +97,113 @@ function shouldFailoverGeminiModel(status, bodyText) {
   );
 }
 
+function getGeminiModels() {
+  return config.geminiModels.length > 0
+    ? config.geminiModels
+    : DEFAULT_GEMINI_MODELS;
+}
+
+function createGeminiRequestBody(prompt, imageBase64, mimeType) {
+  return {
+    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType, data: imageBase64 } }] }],
+    generationConfig: GEMINI_GENERATION_CONFIG,
+  };
+}
+
+function extractGeminiResponse(payload) {
+  const candidate = payload?.candidates?.[0];
+  const text = (candidate?.content?.parts || [])
+    .filter((part) => !part.thought)
+    .map((part) => part?.text ?? '')
+    .join('')
+    .trim();
+
+  return {
+    finishReason: candidate?.finishReason,
+    text,
+  };
+}
+
+async function requestGeminiWithFallback({
+  prompt,
+  imageBase64,
+  mimeType,
+  parseResponse,
+  onModelStart = () => {},
+  onModelElapsed = () => {},
+  onRetry = () => {},
+}) {
+  const requestBody = createGeminiRequestBody(prompt, imageBase64, mimeType);
+  const models = getGeminiModels();
+  const failures = [];
+
+  for (let i = 0; i < models.length; i += 1) {
+    const model = models[i];
+    const hasFallback = i < models.length - 1;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
+    const modelStartedAt = Date.now();
+    onModelStart(model);
+
+    let aiRes;
+    try {
+      aiRes = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch (error) {
+      onModelElapsed(Date.now() - modelStartedAt);
+      failures.push(`${model}: ${error.name || error.message}`);
+      if (hasFallback) {
+        onRetry({ type: 'network', model, error });
+        continue;
+      }
+      return { ok: false, type: 'network', model, error, failures };
+    }
+    onModelElapsed(Date.now() - modelStartedAt);
+
+    if (!aiRes.ok) {
+      const bodyText = await aiRes.text().catch(() => '');
+      failures.push(`${model}: HTTP ${aiRes.status}`);
+      if (hasFallback && shouldFailoverGeminiModel(aiRes.status, bodyText)) {
+        onRetry({ type: 'http', model, status: aiRes.status, bodyText });
+        continue;
+      }
+      return {
+        ok: false,
+        type: 'http',
+        model,
+        status: aiRes.status,
+        bodyText,
+        failures,
+      };
+    }
+
+    const payload = await aiRes.json();
+    const parsed = await parseResponse({
+      ...extractGeminiResponse(payload),
+      model,
+      hasFallback,
+    });
+    if (parsed?.retry === true) {
+      failures.push(`${model}: ${parsed.reason}`);
+      if (hasFallback) continue;
+      return {
+        ok: false,
+        type: 'response',
+        model,
+        reason: parsed.reason,
+        failures,
+      };
+    }
+
+    return { ok: true, value: parsed?.value, model, failures };
+  }
+
+  return { ok: false, type: 'exhausted', failures };
+}
+
 function filterAndDeduplicateNames(parsed) {
   const names = parsed
     .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
@@ -155,62 +273,31 @@ async function findAmbiguousOcrChoices(
 }
 
 async function requestGeminiObject(prompt, imageBase64, mimeType) {
-  const requestBody = {
-    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType, data: imageBase64 } }] }],
-    generationConfig: { temperature: 0, topP: 0.1, maxOutputTokens: 512 },
-  };
+  const result = await requestGeminiWithFallback({
+    prompt,
+    imageBase64,
+    mimeType,
+    parseResponse: ({ text }) => {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return { retry: true, reason: 'non-JSON object' };
 
-  const models = config.geminiModels.length > 0
-    ? config.geminiModels
-    : ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview'];
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          value: parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? parsed
+            : null,
+        };
+      } catch {
+        return { retry: true, reason: 'invalid JSON object' };
+      }
+    },
+  });
 
-  const failures = [];
-  for (let i = 0; i < models.length; i += 1) {
-    const model = models[i];
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
-
-    let aiRes;
-    try {
-      aiRes = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(30000),
-      });
-    } catch (err) {
-      failures.push(`${model}: ${err.name || err.message}`);
-      continue;
-    }
-
-    if (!aiRes.ok) {
-      const errBody = await aiRes.text().catch(() => '');
-      failures.push(`${model}: HTTP ${aiRes.status}`);
-      if (i < models.length - 1 && shouldFailoverGeminiModel(aiRes.status, errBody)) continue;
-      return null;
-    }
-
-    const payload = await aiRes.json();
-    const text = (payload?.candidates?.[0]?.content?.parts || [])
-      .filter((part) => !part.thought)
-      .map((part) => part?.text ?? '')
-      .join('')
-      .trim();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      failures.push(`${model}: non-JSON object`);
-      continue;
-    }
-
-    try {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
-    } catch {
-      failures.push(`${model}: invalid JSON object`);
-    }
+  if (!result.ok && result.type !== 'http') {
+    console.warn(`[listcheck] OCR ambiguity refinement failed: ${result.failures.join(' | ')}`);
   }
-
-  console.warn(`[listcheck] OCR ambiguity refinement failed: ${failures.join(' | ')}`);
-  return null;
+  return result.ok ? result.value : null;
 }
 
 async function refineAmbiguousOcrNames(
@@ -317,117 +404,84 @@ export async function extractNamesFromImage(image, options = {}) {
   }
   const imageBase64 = imageBuffer.toString('base64');
 
-  const requestBody = {
-    contents: [{ parts: [{ text: GEMINI_PROMPT }, { inlineData: { mimeType, data: imageBase64 } }] }],
-    generationConfig: { temperature: 0, topP: 0.1, maxOutputTokens: 512 },
-  };
-
-  const models = config.geminiModels.length > 0
-    ? config.geminiModels
-    : ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview'];
-  const failures = [];
-
-  for (let i = 0; i < models.length; i += 1) {
-    const model = models[i];
-    timing.model = model;
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
-
-    let aiRes;
-    const modelStartedAt = Date.now();
-    try {
-      aiRes = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(30000),
-      });
-      timing.geminiMs += Date.now() - modelStartedAt;
-    } catch (fetchErr) {
-      timing.geminiMs += Date.now() - modelStartedAt;
-      failures.push(`${model}: ${fetchErr.name || fetchErr.message}`);
-      if (i < models.length - 1) {
+  const geminiResult = await requestGeminiWithFallback({
+    prompt: GEMINI_PROMPT,
+    imageBase64,
+    mimeType,
+    onModelStart: (model) => {
+      timing.model = model;
+    },
+    onModelElapsed: (elapsedMs) => {
+      timing.geminiMs += elapsedMs;
+    },
+    onRetry: ({ type, model }) => {
+      if (type === 'network') {
         console.warn(`[listcheck] Gemini timeout/network error on ${model}, trying fallback model.`);
-        continue;
-      }
-      throw new Error(`Gemini request failed on ${model}: ${fetchErr.message}`);
-    }
-
-    if (!aiRes.ok) {
-      const errBody = await aiRes.text().catch(() => '');
-      failures.push(`${model}: HTTP ${aiRes.status}`);
-
-      const canFallback = i < models.length - 1;
-      if (canFallback && shouldFailoverGeminiModel(aiRes.status, errBody)) {
+      } else if (type === 'http') {
         console.warn(`[listcheck] Gemini quota/rate hit on ${model}, trying fallback model.`);
-        continue;
+      }
+    },
+    parseResponse: ({ finishReason, text, model }) => {
+      if (finishReason && finishReason !== 'STOP') {
+        console.warn(`[listcheck] Gemini (${model}) finishReason: ${finishReason}, text: ${text.slice(0, 100)}`);
       }
 
-      throw new Error(`Gemini request failed on ${model} (HTTP ${aiRes.status}) ${errBody}`.trim());
-    }
+      if (!text) return { value: { parsed: [], emptyResponse: true } };
 
-    const payload = await aiRes.json();
-    const candidate = payload?.candidates?.[0];
-    const finishReason = candidate?.finishReason;
-
-    // Filter out thinking parts (thought: true) · only keep actual response text
-    const parts = candidate?.content?.parts || [];
-    const text = parts
-      .filter((part) => !part.thought)
-      .map((part) => part?.text ?? '')
-      .join('')
-      .trim();
-
-    if (finishReason && finishReason !== 'STOP') {
-      console.warn(`[listcheck] Gemini (${model}) finishReason: ${finishReason}, text: ${text.slice(0, 100)}`);
-    }
-
-    if (!text) {
-      timing.status = 'ok';
-      return [];
-    }
-
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      // If this model returned non-JSON, try next model instead of throwing immediately
-      const canFallback = i < models.length - 1;
-      console.warn(`[listcheck] Gemini (${model}) returned non-JSON text: ${text.slice(0, 200)}`);
-      if (canFallback) {
-        failures.push(`${model}: non-JSON response`);
-        continue;
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        console.warn(`[listcheck] Gemini (${model}) returned non-JSON text: ${text.slice(0, 200)}`);
+        return { retry: true, reason: 'non-JSON response' };
       }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        console.warn(`[listcheck] Gemini (${model}) JSON parse failed: ${jsonMatch[0].slice(0, 200)}`);
+        throw new Error('Gemini returned invalid JSON.');
+      }
+      if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
+      return { value: { parsed, emptyResponse: false } };
+    },
+  });
+
+  if (!geminiResult.ok) {
+    if (geminiResult.type === 'network') {
+      throw new Error(`Gemini request failed on ${geminiResult.model}: ${geminiResult.error.message}`);
+    }
+    if (geminiResult.type === 'http') {
+      throw new Error(`Gemini request failed on ${geminiResult.model} (HTTP ${geminiResult.status}) ${geminiResult.bodyText}`.trim());
+    }
+    if (geminiResult.type === 'response' && geminiResult.reason === 'non-JSON response') {
       throw new Error('Gemini did not return a JSON array.');
     }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch (parseErr) {
-      console.warn(`[listcheck] Gemini (${model}) JSON parse failed: ${jsonMatch[0].slice(0, 200)}`);
-      throw new Error('Gemini returned invalid JSON.');
-    }
-    if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
-
-    let names = filterAndDeduplicateNames(parsed);
-    if (refineAmbiguousDiacritics) {
-      const refineStartedAt = Date.now();
-      try {
-        names = await refineAmbiguousOcrNames(names, {
-          imageBase64,
-          mimeType,
-          suggestionCache: options.suggestionCache,
-          suggestionContext: options.suggestionContext,
-        });
-      } finally {
-        timing.refineMs = Date.now() - refineStartedAt;
-      }
-    }
-    setCachedOcrNames(cacheKey, names);
-    timing.status = 'ok';
-    timing.names = names.length;
-    return names;
+    throw new Error(`All Gemini models failed: ${geminiResult.failures.join(' | ')}`);
   }
 
-  throw new Error(`All Gemini models failed: ${failures.join(' | ')}`);
+  if (geminiResult.value.emptyResponse) {
+    timing.status = 'ok';
+    return [];
+  }
+
+  let names = filterAndDeduplicateNames(geminiResult.value.parsed);
+  if (refineAmbiguousDiacritics) {
+    const refineStartedAt = Date.now();
+    try {
+      names = await refineAmbiguousOcrNames(names, {
+        imageBase64,
+        mimeType,
+        suggestionCache: options.suggestionCache,
+        suggestionContext: options.suggestionContext,
+      });
+    } finally {
+      timing.refineMs = Date.now() - refineStartedAt;
+    }
+  }
+  setCachedOcrNames(cacheKey, names);
+  timing.status = 'ok';
+  timing.names = names.length;
+  return names;
   } finally {
     const lookupStats = options.suggestionContext?.stats || {};
     console.log([

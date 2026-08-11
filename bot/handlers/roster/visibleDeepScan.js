@@ -30,7 +30,7 @@ import {
   registerScan,
   unregisterScan,
 } from '../../utils/scanSession.js';
-import { createRosterDeepSession } from '../../utils/rosterDeepSession.js';
+import { createRosterContinuationSession } from '../../utils/rosterDeepSession.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { makeRosterScanProgressCallback } from './progress.js';
 
@@ -168,21 +168,14 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
           deepScanResultEmbed = scanEmbed;
 
           if (state.hasRemaining && hasGuildContext) {
-            const session = createRosterDeepSession({
+            const session = createRosterContinuationSession({
               callerId: interaction.user.id,
               targetName: name,
               isHidden: false,
               meta: visMeta,
               guildMembers: visGuildMembers,
-              scannedNames: altResult.scannedNames || [],
-              allDiscoveredAlts: altResult.alts || [],
+              altResult,
               cap: deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit,
-              scanStats: {
-                scanned: altResult.scannedCandidates || 0,
-                attempted: altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0,
-                failed: altResult.failedCandidates || 0,
-                rateLimitRetries: altResult.rateLimitRetries || 0,
-              },
               // primaryEmbedJSON is captured after editReply below. Store the
               // working embed snapshot here so Continue can re-render the same
               // card without re-scraping the visible roster page.

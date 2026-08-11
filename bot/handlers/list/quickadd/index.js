@@ -7,7 +7,6 @@
  * approver DM fan-out for everyone else).
  */
 
-import { randomUUID } from 'node:crypto';
 import {
   ActionRowBuilder,
   ModalBuilder,
@@ -23,11 +22,14 @@ import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   deferEphemeralReply,
   editAlert,
-  editEmbed,
-  editNotice,
 } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { isRequesterAutoApprover } from '../helpers.js';
+import {
+  buildListMutationPayload,
+  persistDeliveredApproval,
+  renderListAddExecutionResult,
+} from '../services/mutationFlow.js';
 
 /**
  * Build the Quick-Add handler bag.
@@ -112,10 +114,10 @@ export function createQuickAddHandlers({ client, services }) {
         quickScope = gc?.defaultBlacklistScope || 'global';
       }
 
-      const payload = {
-        requestId: randomUUID(),
-        guildId: interaction.guild?.id || '',
-        channelId: interaction.channelId,
+      const payload = buildListMutationPayload({
+        interaction,
+        requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+        lang,
         type,
         name,
         reason,
@@ -123,30 +125,12 @@ export function createQuickAddHandlers({ client, services }) {
         logsUrl: '',
         imageUrl: '',
         scope: quickScope,
-        requestedByUserId: interaction.user.id,
-        requestedByTag: interaction.user.tag,
-        requestedByName: interaction.user.username,
-        requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
-        lang,
-        createdAt: Date.now(),
-      };
+      });
 
       // Auto-approve: officers always, OR server-scoped (local = free)
       if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
         const result = await executeListAddToDatabase(payload);
-        const hasEmbed = (result.embeds?.length ?? 0) > 0;
-        if (hasEmbed) {
-          await editEmbed(interaction, result.embeds ?? [], {
-            content: null,
-            components: result.components ?? [],
-          });
-        } else {
-          await editNotice(interaction, result.content, {
-            severity: result.ok ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
-            lang,
-            components: result.components ?? [],
-          });
-        }
+        await renderListAddExecutionResult(interaction, result, lang);
         return;
       }
 
@@ -163,11 +147,7 @@ export function createQuickAddHandlers({ client, services }) {
       }
 
       await connectDB();
-      await PendingApproval.create({
-        ...payload,
-        approverIds: sent.deliveredApproverIds,
-        approverDmMessages: sent.deliveredDmMessages,
-      });
+      await persistDeliveredApproval(PendingApproval, payload, sent);
 
       await editAlert(interaction, {
         severity: AlertSeverity.INFO,

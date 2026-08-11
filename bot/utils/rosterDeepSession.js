@@ -52,6 +52,39 @@ export function createRosterDeepSession(payload) {
   return session;
 }
 
+export function buildRosterContinuationSessionPayload({
+  callerId,
+  targetName,
+  isHidden,
+  meta,
+  guildMembers,
+  altResult,
+  cap,
+  primaryEmbedJSON,
+}) {
+  return {
+    callerId,
+    targetName,
+    isHidden,
+    meta,
+    guildMembers,
+    scannedNames: altResult.scannedNames || [],
+    allDiscoveredAlts: altResult.alts || [],
+    cap,
+    scanStats: {
+      scanned: altResult.scannedCandidates || 0,
+      attempted: altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0,
+      failed: altResult.failedCandidates || 0,
+      rateLimitRetries: altResult.rateLimitRetries || 0,
+    },
+    primaryEmbedJSON,
+  };
+}
+
+export function createRosterContinuationSession(options) {
+  return createRosterDeepSession(buildRosterContinuationSessionPayload(options));
+}
+
 export function getRosterDeepSession(sessionId) {
   return sessions.get(sessionId) || null;
 }

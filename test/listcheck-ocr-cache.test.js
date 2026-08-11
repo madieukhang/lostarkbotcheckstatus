@@ -458,6 +458,106 @@ test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', 
   }
 });
 
+test('extractNamesFromImage fails over across rate limits and non-JSON model responses', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  const requestedModels = [];
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels = ['rate-limited-model', 'non-json-model', 'working-model'];
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl === 'https://cdn.discordapp.com/model-failover.png') {
+      return new Response(new Uint8Array([22, 23, 24]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      const model = decodeURIComponent(requestedUrl.match(/models\/([^:]+):/)?.[1] || '');
+      requestedModels.push(model);
+      if (model === 'rate-limited-model') {
+        return new Response('RESOURCE_EXHAUSTED', { status: 429 });
+      }
+      if (model === 'non-json-model') {
+        return Response.json({
+          candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'not json' }] } }],
+        });
+      }
+      return Response.json({
+        candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '["Fallbackname"]' }] } }],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'model-failover',
+      url: 'https://cdn.discordapp.com/model-failover.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(names, ['Fallbackname']);
+    assert.deepEqual(requestedModels, config.geminiModels);
+  } finally {
+    globalThis.fetch = originalFetch;
+    config.geminiApiKey = originalKey;
+    config.geminiModels = originalModels;
+    clearOcrCache();
+  }
+});
+
+test('extractNamesFromImage keeps invalid JSON terminal instead of trying another model', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  let geminiCalls = 0;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels = ['invalid-json-model', 'unused-fallback-model'];
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl === 'https://cdn.discordapp.com/invalid-json.png') {
+      return new Response(new Uint8Array([25, 26, 27]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      geminiCalls += 1;
+      return Response.json({
+        candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '["Broken",]' }] } }],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    await assert.rejects(
+      () => extractNamesFromImage({
+        id: 'invalid-json',
+        url: 'https://cdn.discordapp.com/invalid-json.png',
+        contentType: 'image/png',
+      }),
+      /Gemini returned invalid JSON/,
+    );
+    assert.equal(geminiCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    config.geminiApiKey = originalKey;
+    config.geminiModels = originalModels;
+    clearOcrCache();
+  }
+});
+
 test('extractNamesFromImage rejects oversized downloads even when content-length is missing', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;
