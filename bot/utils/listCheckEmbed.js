@@ -86,9 +86,12 @@ export function buildListCheckEmbed({
   const titlePrefix = t(`dialogue.check.embed.${mode === 'auto' ? 'autoKicker' : 'slashKicker'}`, lang);
   const kicker = `// ${titlePrefix} · ${limitedNamesCount} ${t('dialogue.check.embed.names', lang)}`;
   const isImageCheck = results.some((result) => result.inputSource === 'ocr');
+  const usesCompactChrome = mode === 'auto' || isImageCheck;
   const authorName = isImageCheck
     ? `📸 ${t('dialogue.check.embed.imageAuthor', lang)}`
-    : kicker;
+    : mode === 'auto'
+      ? `🔎 ${t('dialogue.check.embed.textAuthor', lang)}`
+      : kicker;
 
   const breakdownParts = [];
   if (counts.black) breakdownParts.push(`⛔ ${counts.black}`);
@@ -154,10 +157,11 @@ export function buildListCheckEmbed({
     .setDescription(description)
     .setColor(color);
 
-  // Screenshot cards use the compact author line requested for image checks.
-  // Per-roster rows already carry status and counts, so repeating a title,
-  // source footer, and timestamp only adds visual noise.
-  if (!isImageCheck) {
+  // Auto-check cards use one compact source-aware author line. Per-roster rows
+  // already carry status and counts, so repeating a title, source footer, and
+  // timestamp only adds visual noise. Image-driven slash checks stay compact
+  // for the same reason; typed slash checks retain their command context.
+  if (!usesCompactChrome) {
     embed
       .setTitle(title)
       .setFooter({ text: footerParts.join(' · ') })
