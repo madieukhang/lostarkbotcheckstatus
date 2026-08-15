@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { formatCheckResults } from '../bot/services/list-check/format.js';
 import { buildListCheckEmbed } from '../bot/utils/listCheckEmbed.js';
 
 // Minimal result objects - buildListCheckEmbed only reads which *Entry is set.
@@ -42,22 +43,47 @@ test('slash mode kicker + all-clear footer (0 flagged -> // CLEAR)', () => {
   assert.match(j.footer.text, /^\/\/ CLEAR/u);
 });
 
-test('footer asks for image confirmation when OCR changed a character identity', () => {
-  const results = [{
-    inputName: 'Altchxr',
-    inputSource: 'ocr',
-    name: 'Altchar',
-    watchEntry: { name: 'Altchar' },
-  }];
-  const { embed } = buildListCheckEmbed({
+test('OCR image card uses the compact camera author and omits redundant chrome', () => {
+  const sharedEntry = {
+    _id: 'd'.repeat(24),
+    name: 'Rosterprimary',
+    reason: 'Shared report',
+    allCharacters: ['Altone', 'Alttwo'],
+  };
+  const results = [
+    {
+      inputName: 'Altone',
+      inputSource: 'ocr',
+      name: 'Altone',
+      blackEntry: sharedEntry,
+      snapClassName: '',
+      snapItemLevel: 1720,
+    },
+    {
+      inputName: 'Alttwo',
+      inputSource: 'ocr',
+      name: 'Alttwo',
+      blackEntry: sharedEntry,
+      snapClassName: '',
+      snapItemLevel: 1710,
+    },
+  ];
+  const formattedLines = formatCheckResults(results, 'vi');
+  const { embed, counts } = buildListCheckEmbed({
     results,
-    formattedLines: ['⚠️ **Altchar**'],
-    limitedNamesCount: 1,
+    formattedLines,
+    limitedNamesCount: 2,
     mode: 'auto',
     lang: 'vi',
   });
 
-  assert.match(embed.toJSON().footer.text, /OCR đã hiệu chỉnh 1 tên · đối chiếu lại với ảnh/u);
+  const rendered = embed.toJSON();
+  assert.equal(counts.black, 1);
+  assert.equal(rendered.author.name, '📸 Danh sách chụp dựa trên ảnh cậu gửi nè.');
+  assert.equal(rendered.title, undefined);
+  assert.equal(rendered.footer, undefined);
+  assert.equal(rendered.timestamp, undefined);
+  assert.match(rendered.description, /2 tên cùng roster/u);
 });
 
 test('footer uses typed-input confirmation copy outside the screenshot flow', () => {

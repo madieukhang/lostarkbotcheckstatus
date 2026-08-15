@@ -41,6 +41,72 @@ test('formatCheckResults renders roster-match branch context', () => {
   assert.match(lines[0], /CP `90000`/);
 });
 
+test('formatCheckResults groups photographed characters backed by one roster entry', () => {
+  const names = [
+    'Dbbpallylastone',
+    'Anotherpallydbb',
+    'Holypaladindbb',
+    'Pallydbbswift',
+    'Dbbpaladin',
+    'Paladindbb',
+  ];
+  const sharedEntry = {
+    _id: 'a'.repeat(24),
+    name: 'Holynightdbb',
+    reason: 'Same roster report',
+    raid: 'Act4 Nor',
+    scope: 'global',
+    allCharacters: [...names, 'Offscreenalt'],
+  };
+  const results = names.map((name, index) => ({
+    inputName: name,
+    inputSource: 'ocr',
+    name,
+    blackEntry: sharedEntry,
+    whiteEntry: null,
+    watchEntry: null,
+    trustedEntry: { _id: `${index + 1}`.repeat(24), name },
+    matchDetails: { black: { kind: 'tracked', matchedName: name } },
+    discoveredAlts: [],
+    snapClassName: '',
+    snapItemLevel: 1766.67 - index,
+  }));
+
+  const lines = formatCheckResults(results, 'vi');
+
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /6 tên cùng roster/u);
+  assert.match(lines[0], /🛡️/u);
+  assert.match(lines[0], /qua \*\*Holynightdbb\*\*/u);
+  assert.match(lines[0], /Trong ảnh:/u);
+  for (const name of names) {
+    assert.equal((lines[0].match(new RegExp(name, 'gu')) || []).length, 1);
+  }
+  assert.equal((lines[0].match(/Same roster report/gu) || []).length, 1);
+  assert.match(lines[0], /alt: Offscreenalt/u);
+});
+
+test('formatCheckResults does not merge distinct list entries with similar roster labels', () => {
+  const makeResult = (name, id) => ({
+    name,
+    blackEntry: {
+      _id: id,
+      name: 'Sharedlabel',
+      reason: 'Separate report',
+      allCharacters: ['Altone', 'Alttwo'],
+    },
+    snapClassName: '',
+    snapItemLevel: 1700,
+  });
+
+  const lines = formatCheckResults([
+    makeResult('Altone', 'b'.repeat(24)),
+    makeResult('Alttwo', 'c'.repeat(24)),
+  ]);
+
+  assert.equal(lines.length, 2);
+});
+
 test('formatCheckResults shows OCR correction and the roster path used to confirm a list hit', () => {
   const lines = formatCheckResults([{
     inputName: 'Altchxr',

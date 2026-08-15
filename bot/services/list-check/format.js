@@ -1,5 +1,6 @@
 import { getClassEmoji, isSupportClass } from '../../models/Class.js';
 import { t } from '../i18n/index.js';
+import { groupListCheckResults } from './displayGroups.js';
 import { didListCheckNameChange } from './matchResolution.js';
 
 function normalizeName(value) {
@@ -33,13 +34,13 @@ function formatMatchContext(item, entry, listType, lang) {
  *      publicly visible).
  * Filters out the item's own name and dedupes case-insensitively.
  */
-function pickAltsForDisplay(item) {
+function pickAltsForDisplay(item, excludedNames = [item.name]) {
   const sourceEntry = item.blackEntry || item.whiteEntry || item.watchEntry || item.trustedEntry;
   const raw = (sourceEntry?.allCharacters && sourceEntry.allCharacters.length > 0)
     ? sourceEntry.allCharacters
     : (Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []);
   if (raw.length === 0) return [];
-  const seen = new Set([item.name.toLowerCase()]);
+  const seen = new Set(excludedNames.map(normalizeName).filter(Boolean));
   const out = [];
   for (const n of raw) {
     const trimmed = String(n || '').trim();
@@ -50,6 +51,18 @@ function pickAltsForDisplay(item) {
     out.push(trimmed);
   }
   return out;
+}
+
+function getClassPrefix(item) {
+  return item.snapClassName
+    ? (getClassEmoji(item.snapClassName) || item.snapClassName) + ' '
+    : '';
+}
+
+function getStatSuffix(item) {
+  return item.snapItemLevel > 0
+    ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP \`${item.snapCombatScore}\`` : ''}`
+    : '';
 }
 
 /**
@@ -68,13 +81,8 @@ function formatResultLine(item, lang = 'en') {
   const isWhite = Boolean(item.whiteEntry);
   const isWatch = Boolean(item.watchEntry);
 
-  const classPrefix = item.snapClassName
-    ? (getClassEmoji(item.snapClassName) || item.snapClassName) + ' '
-    : '';
-
-  const statSuffix = item.snapItemLevel > 0
-    ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP \`${item.snapCombatScore}\`` : ''}`
-    : '';
+  const classPrefix = getClassPrefix(item);
+  const statSuffix = getStatSuffix(item);
 
   const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 🛡️' : '';
 
@@ -150,6 +158,73 @@ function formatResultLine(item, lang = 'en') {
   return { line: `❓ ${classPrefix}${item.name}${statSuffix}${branchBlock}`, priority: 3 };
 }
 
+function formatRosterGroupLine(group, lang = 'en') {
+  const item = group.items[0];
+  const isBlack = group.status === 'black';
+  const isWatch = group.status === 'watch';
+  const isWhite = group.status === 'white';
+  const isTrusted = group.status === 'trusted';
+  const icon = isBlack ? '⛔' : isWatch ? '⚠️' : isWhite ? '✅' : '🛡️';
+  const scopeTag = isBlack && item.blackEntry?.scope === 'server'
+    ? ` (${t('dialogue.check.format.local', lang)})`
+    : '';
+  const trustedTag = !isTrusted && item.trustedEntry ? ' 🛡️' : '';
+  const entryContext = group.entry?.name
+    ? ` · ${t('dialogue.check.format.via', lang, { name: group.entry.name })}`
+    : '';
+  const trustedContext = isTrusted ? ` · ${t('dialogue.check.format.trusted', lang)}` : '';
+  const heading = `${icon} **${t('dialogue.check.format.sameRoster', lang, { count: group.items.length })}**${scopeTag}${trustedTag}${entryContext}${trustedContext}`;
+  const branches = [];
+
+  const photographed = group.items.map((member) => (
+    `${getClassPrefix(member)}**${member.name}**${getStatSuffix(member)}`
+  ));
+  for (let index = 0; index < photographed.length; index += 2) {
+    const label = index === 0 ? `${t('dialogue.check.format.inImage', lang)}: ` : '';
+    branches.push(`   ↳ ${label}${photographed.slice(index, index + 2).join(' · ')}`);
+  }
+
+  for (const member of group.items) {
+    if (!didListCheckNameChange(member)) continue;
+    const correctionKey = member.inputSource === 'ocr' ? 'correctedOcr' : 'correctedText';
+    branches.push(`   ↳ ${t(`dialogue.check.format.${correctionKey}`, lang, {
+      input: member.inputName,
+      name: member.name,
+    })}`);
+  }
+
+  for (const [listType, entry] of [
+    ['black', item.blackEntry],
+    ['white', item.whiteEntry],
+    ['watch', item.watchEntry],
+  ]) {
+    if (!entry) continue;
+    const parts = [];
+    if (listType !== group.status) {
+      const matchContext = formatMatchContext(item, entry, listType, lang);
+      if (matchContext) parts.push(matchContext);
+    }
+    if (entry.reason?.trim()) parts.push(`*${entry.reason.trim()}*`);
+    if (entry.raid?.trim()) parts.push(`[${entry.raid.trim()}]`);
+    if (parts.length > 0) branches.push(`   ↳ ${parts.join(' · ')}`);
+  }
+
+  const alts = pickAltsForDisplay(item, group.items.map((member) => member.name));
+  if (alts.length > 0) {
+    const visible = alts.slice(0, 3);
+    const tail = alts.length > visible.length
+      ? ` *${t('dialogue.check.format.more', lang, { count: alts.length - visible.length })}*`
+      : '';
+    branches.push(`   ↳ ${t('dialogue.check.format.alts', lang)}: ${visible.join(', ')}${tail}`);
+  }
+
+  return {
+    line: `${heading}\n${branches.join('\n')}`,
+    priority: group.priority,
+    item,
+  };
+}
+
 /**
  * Format check results into Discord-ready text lines.
  * Sorted by priority: blacklist, watchlist, whitelist/trusted, not listed.
@@ -158,7 +233,11 @@ function formatResultLine(item, lang = 'en') {
  * @returns {string[]} Formatted lines sorted by display priority
  */
 export function formatCheckResults(results, lang = 'en') {
-  const formatted = results.map((item) => ({ ...formatResultLine(item, lang), item }));
+  const formatted = groupListCheckResults(results).map((group) => (
+    group.items.length > 1
+      ? formatRosterGroupLine(group, lang)
+      : { ...formatResultLine(group.items[0], lang), item: group.items[0] }
+  ));
 
   formatted.sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
