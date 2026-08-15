@@ -83,7 +83,9 @@ test('OCR image card uses the compact camera author and omits redundant chrome',
   assert.equal(rendered.title, undefined);
   assert.equal(rendered.footer, undefined);
   assert.equal(rendered.timestamp, undefined);
-  assert.match(rendered.description, /2 tên cùng roster/u);
+  assert.match(rendered.description, /^⛔ \*\*Altone\*\*/u);
+  assert.match(rendered.description, /alt: Alttwo/u);
+  assert.doesNotMatch(rendered.description, /2 tên cùng roster|Trong ảnh:/u);
 });
 
 test('footer uses typed-input confirmation copy outside the screenshot flow', () => {

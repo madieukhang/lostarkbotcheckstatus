@@ -75,15 +75,12 @@ test('formatCheckResults groups photographed characters backed by one roster ent
   const lines = formatCheckResults(results, 'vi');
 
   assert.equal(lines.length, 1);
-  assert.match(lines[0], /6 tên cùng roster/u);
+  assert.match(lines[0], /^⛔ \*\*Dbbpallylastone\*\*/u);
   assert.match(lines[0], /🛡️/u);
   assert.match(lines[0], /qua \*\*Holynightdbb\*\*/u);
-  assert.match(lines[0], /Trong ảnh:/u);
-  for (const name of names) {
-    assert.equal((lines[0].match(new RegExp(name, 'gu')) || []).length, 1);
-  }
   assert.equal((lines[0].match(/Same roster report/gu) || []).length, 1);
-  assert.match(lines[0], /alt: Offscreenalt/u);
+  assert.match(lines[0], /alt: Anotherpallydbb, Holypaladindbb, Pallydbbswift \*\+3 tên khác\*/u);
+  assert.doesNotMatch(lines[0], /6 tên cùng roster|Trong ảnh:/u);
 });
 
 test('formatCheckResults does not merge distinct list entries with similar roster labels', () => {

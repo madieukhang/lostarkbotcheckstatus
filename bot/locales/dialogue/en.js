@@ -432,7 +432,7 @@ export default {
       imageAuthor: 'Here is the list from the image you sent.', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: 'not listed', configured: 'configured', ignored: 'Ignored {count} extra {word} (cap: {limit}).',
       flagged: 'FLAGGED {count}', clear: 'CLEAR', correctedOcr: 'OCR corrected {count} · compare with the screenshot', correctedText: 'Typed name corrected {count} · compare with the original input', quickFlagged: 'Quick Add unflagged via the dropdown · /la-roster <name> for details', quickClean: 'Quick Add unflagged names with the dropdown below', rosterTip: '/la-roster <name> for the full roster of a flagged hit', rerunTip: 'Run again with a fresh image to re-check', source: 'SRC db blacklist + whitelist + watchlist + trusted',
     },
-    format: { via: 'via **{name}**', correctedOcr: 'OCR **{input}** → lostark.bible **{name}**', correctedText: 'typed **{input}** → lostark.bible **{name}**', rosterVia: 'roster alt **{name}**', rosterEntry: 'roster alt **{name}** → entry **{entry}**', sameRoster: '{count} names from the same roster', inImage: 'In the image', alts: 'alts', more: '+{count} more', local: 'Local', trusted: 'trusted' },
+    format: { via: 'via **{name}**', correctedOcr: 'OCR **{input}** → lostark.bible **{name}**', correctedText: 'typed **{input}** → lostark.bible **{name}**', rosterVia: 'roster alt **{name}**', rosterEntry: 'roster alt **{name}** → entry **{entry}**', alts: 'alts', more: '+{count} more', local: 'Local', trusted: 'trusted' },
   },
   scan: {
     limit: { title: 'A scan is already running', description: 'You already have a Stronghold scan running. Wait for it, or press **Stop scan** on its active card.', active: 'Active: {label}' },
