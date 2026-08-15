@@ -158,86 +158,21 @@ function formatResultLine(item, lang = 'en') {
   return { line: `❓ ${classPrefix}${item.name}${statSuffix}${branchBlock}`, priority: 3 };
 }
 
-function formatRosterGroupLine(group, lang = 'en') {
-  const item = group.items[0];
-  const isBlack = group.status === 'black';
-  const isWatch = group.status === 'watch';
-  const isWhite = group.status === 'white';
-  const isTrusted = group.status === 'trusted';
-  const icon = isBlack ? '⛔' : isWatch ? '⚠️' : isWhite ? '✅' : '🛡️';
-  const scopeTag = isBlack && item.blackEntry?.scope === 'server'
-    ? ` (${t('dialogue.check.format.local', lang)})`
-    : '';
-  const trustedTag = !isTrusted && item.trustedEntry ? ' 🛡️' : '';
-  const entryContext = group.entry?.name
-    ? ` · ${t('dialogue.check.format.via', lang, { name: group.entry.name })}`
-    : '';
-  const trustedContext = isTrusted ? ` · ${t('dialogue.check.format.trusted', lang)}` : '';
-  const heading = `${icon} **${t('dialogue.check.format.sameRoster', lang, { count: group.items.length })}**${scopeTag}${trustedTag}${entryContext}${trustedContext}`;
-  const branches = [];
-
-  const photographed = group.items.map((member) => (
-    `${getClassPrefix(member)}**${member.name}**${getStatSuffix(member)}`
-  ));
-  for (let index = 0; index < photographed.length; index += 2) {
-    const label = index === 0 ? `${t('dialogue.check.format.inImage', lang)}: ` : '';
-    branches.push(`   ↳ ${label}${photographed.slice(index, index + 2).join(' · ')}`);
-  }
-
-  for (const member of group.items) {
-    if (!didListCheckNameChange(member)) continue;
-    const correctionKey = member.inputSource === 'ocr' ? 'correctedOcr' : 'correctedText';
-    branches.push(`   ↳ ${t(`dialogue.check.format.${correctionKey}`, lang, {
-      input: member.inputName,
-      name: member.name,
-    })}`);
-  }
-
-  for (const [listType, entry] of [
-    ['black', item.blackEntry],
-    ['white', item.whiteEntry],
-    ['watch', item.watchEntry],
-  ]) {
-    if (!entry) continue;
-    const parts = [];
-    if (listType !== group.status) {
-      const matchContext = formatMatchContext(item, entry, listType, lang);
-      if (matchContext) parts.push(matchContext);
-    }
-    if (entry.reason?.trim()) parts.push(`*${entry.reason.trim()}*`);
-    if (entry.raid?.trim()) parts.push(`[${entry.raid.trim()}]`);
-    if (parts.length > 0) branches.push(`   ↳ ${parts.join(' · ')}`);
-  }
-
-  const alts = pickAltsForDisplay(item, group.items.map((member) => member.name));
-  if (alts.length > 0) {
-    const visible = alts.slice(0, 3);
-    const tail = alts.length > visible.length
-      ? ` *${t('dialogue.check.format.more', lang, { count: alts.length - visible.length })}*`
-      : '';
-    branches.push(`   ↳ ${t('dialogue.check.format.alts', lang)}: ${visible.join(', ')}${tail}`);
-  }
-
-  return {
-    line: `${heading}\n${branches.join('\n')}`,
-    priority: group.priority,
-    item,
-  };
-}
-
 /**
  * Format check results into Discord-ready text lines.
- * Sorted by priority: blacklist, watchlist, whitelist/trusted, not listed.
+ * Multiple photographed characters backed by the same list entry collapse to
+ * one representative row. That row deliberately keeps the original compact
+ * name → via/reason → alts layout instead of expanding every roster member.
+ * Rows are sorted by priority: blacklist, watchlist, whitelist/trusted, not listed.
  *
  * @param {Array<object>} results - Output from checkNamesAgainstLists
  * @returns {string[]} Formatted lines sorted by display priority
  */
 export function formatCheckResults(results, lang = 'en') {
-  const formatted = groupListCheckResults(results).map((group) => (
-    group.items.length > 1
-      ? formatRosterGroupLine(group, lang)
-      : { ...formatResultLine(group.items[0], lang), item: group.items[0] }
-  ));
+  const formatted = groupListCheckResults(results).map((group) => {
+    const item = group.items[0];
+    return { ...formatResultLine(item, lang), item };
+  });
 
   formatted.sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
