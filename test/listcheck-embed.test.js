@@ -9,7 +9,7 @@ const watch = () => ({ watchEntry: { name: 'A' } });
 const trusted = () => ({ trustedEntry: { name: 'B' } });
 const unlisted = () => ({});
 
-test('merged header: kicker carries mode + count, title IS the breakdown', () => {
+test('auto text card uses the compact search author and omits redundant chrome', () => {
   const results = [watch(), trusted(), trusted(), unlisted(), unlisted(), unlisted(), unlisted(), unlisted()];
   const { embed } = buildListCheckEmbed({
     results,
@@ -18,15 +18,12 @@ test('merged header: kicker carries mode + count, title IS the breakdown', () =>
     mode: 'auto',
   });
   const j = embed.toJSON();
-  assert.equal(j.author.name, '// AUTO-CHECK · 8 NAMES');
-  // title = the breakdown itself; leading emoji is the strongest outcome present
-  assert.equal(j.title, '⚠️ 1 · 🛡️ 2 · ❓ 5 not listed');
-  // the old "Outcome:" header line is gone - description leads with the name list
+  assert.equal(j.author.name, '🔎 Here is the check based on the name you sent.');
+  assert.equal(j.title, undefined);
+  assert.equal(j.footer, undefined);
+  assert.equal(j.timestamp, undefined);
   assert.ok(!j.description.includes('Outcome:'));
   assert.ok(j.description.includes('⚠️ **A**'));
-  // footer is a HUD status line + the source citation
-  assert.match(j.footer.text, /^\/\/ FLAGGED 1/u);
-  assert.match(j.footer.text, /blacklist \+ whitelist \+ watchlist \+ trusted/u);
 });
 
 test('slash mode kicker + all-clear footer (0 flagged -> // CLEAR)', () => {
@@ -88,7 +85,7 @@ test('OCR image card uses the compact camera author and omits redundant chrome',
   assert.doesNotMatch(rendered.description, /2 tên cùng roster|Trong ảnh:/u);
 });
 
-test('footer uses typed-input confirmation copy outside the screenshot flow', () => {
+test('Vietnamese auto text card uses the compact name-based author', () => {
   const { embed } = buildListCheckEmbed({
     results: [{ inputName: 'Altchxr', inputSource: 'text', name: 'Altchar' }],
     formattedLines: ['❓ Altchar'],
@@ -97,7 +94,9 @@ test('footer uses typed-input confirmation copy outside the screenshot flow', ()
     lang: 'vi',
   });
 
-  const footer = embed.toJSON().footer.text;
-  assert.match(footer, /Đã hiệu chỉnh 1 tên nhập · đối chiếu lại tên gốc/u);
-  assert.doesNotMatch(footer, /OCR/u);
+  const rendered = embed.toJSON();
+  assert.equal(rendered.author.name, '🔎 Danh sách kiểm tra dựa trên tên cậu gửi nè.');
+  assert.equal(rendered.title, undefined);
+  assert.equal(rendered.footer, undefined);
+  assert.equal(rendered.timestamp, undefined);
 });

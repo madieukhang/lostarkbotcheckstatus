@@ -80,8 +80,9 @@ test('unmatched OCR names render as not listed instead of roster lookup status',
   });
 
   const rendered = embed.toJSON();
-  // "not listed" now lives in the merged title (the breakdown), not the description.
-  assert.match(rendered.title, /not listed/);
-  assert.match(rendered.footer.text, /blacklist \+ whitelist \+ watchlist \+ trusted/);
+  assert.equal(rendered.author.name, '🔎 Here is the check based on the name you sent.');
+  assert.equal(rendered.title, undefined);
+  assert.equal(rendered.footer, undefined);
+  assert.equal(rendered.timestamp, undefined);
   assert.doesNotMatch(rendered.description, /lookup issue|no roster|unchecked|worker offline/i);
 });

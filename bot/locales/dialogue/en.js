@@ -429,7 +429,7 @@ export default {
     failed: { title: 'The check did not finish', description: 'I got the names off the image, but I could not finish checking them against the lists.' },
     autoFailed: { title: 'I could not finish that check', description: 'Something went wrong partway through this one. Post it again and I will have another go.' },
     embed: {
-      imageAuthor: 'Here is the list from the image you sent.', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: 'not listed', configured: 'configured', ignored: 'Ignored {count} extra {word} (cap: {limit}).',
+      imageAuthor: 'Here is the list from the image you sent.', textAuthor: 'Here is the check based on the name you sent.', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: 'not listed', configured: 'configured', ignored: 'Ignored {count} extra {word} (cap: {limit}).',
       flagged: 'FLAGGED {count}', clear: 'CLEAR', correctedOcr: 'OCR corrected {count} · compare with the screenshot', correctedText: 'Typed name corrected {count} · compare with the original input', quickFlagged: 'Quick Add unflagged via the dropdown · /la-roster <name> for details', quickClean: 'Quick Add unflagged names with the dropdown below', rosterTip: '/la-roster <name> for the full roster of a flagged hit', rerunTip: 'Run again with a fresh image to re-check', source: 'SRC db blacklist + whitelist + watchlist + trusted',
     },
     format: { via: 'via **{name}**', correctedOcr: 'OCR **{input}** → lostark.bible **{name}**', correctedText: 'typed **{input}** → lostark.bible **{name}**', rosterVia: 'roster alt **{name}**', rosterEntry: 'roster alt **{name}** → entry **{entry}**', alts: 'alts', more: '+{count} more', local: 'Local', trusted: 'trusted' },
