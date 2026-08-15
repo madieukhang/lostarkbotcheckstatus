@@ -24,6 +24,7 @@
 
 import { createArtistEmbed } from './artistVoice.js';
 import { t } from '../services/i18n/index.js';
+import { groupListCheckResults } from '../services/list-check/displayGroups.js';
 import { didListCheckNameChange } from '../services/list-check/matchResolution.js';
 import { COLORS } from './ui.js';
 
@@ -61,12 +62,8 @@ export function buildListCheckEmbed({
     trusted: 0,
     notListed: 0,
   };
-  for (const r of results) {
-    if (r.blackEntry) counts.black++;
-    else if (r.watchEntry) counts.watch++;
-    else if (r.whiteEntry) counts.white++;
-    else if (r.trustedEntry) counts.trusted++;
-    else counts.notListed++;
+  for (const group of groupListCheckResults(results)) {
+    counts[group.status] += 1;
   }
 
   const flaggedCount = counts.black + counts.watch;
@@ -88,6 +85,10 @@ export function buildListCheckEmbed({
   // no separate "Outcome:" line and no redundant count line needed.
   const titlePrefix = t(`dialogue.check.embed.${mode === 'auto' ? 'autoKicker' : 'slashKicker'}`, lang);
   const kicker = `// ${titlePrefix} · ${limitedNamesCount} ${t('dialogue.check.embed.names', lang)}`;
+  const isImageCheck = results.some((result) => result.inputSource === 'ocr');
+  const authorName = isImageCheck
+    ? `📸 ${t('dialogue.check.embed.imageAuthor', lang)}`
+    : kicker;
 
   const breakdownParts = [];
   if (counts.black) breakdownParts.push(`⛔ ${counts.black}`);
@@ -149,12 +150,19 @@ export function buildListCheckEmbed({
   footerParts.push(t('dialogue.check.embed.source', lang));
 
   const embed = createArtistEmbed(lang)
-    .setAuthor({ name: kicker })
-    .setTitle(title)
+    .setAuthor({ name: authorName })
     .setDescription(description)
-    .setColor(color)
-    .setFooter({ text: footerParts.join(' · ') })
-    .setTimestamp();
+    .setColor(color);
+
+  // Screenshot cards use the compact author line requested for image checks.
+  // Per-roster rows already carry status and counts, so repeating a title,
+  // source footer, and timestamp only adds visual noise.
+  if (!isImageCheck) {
+    embed
+      .setTitle(title)
+      .setFooter({ text: footerParts.join(' · ') })
+      .setTimestamp();
+  }
 
   return { embed, counts };
 }
