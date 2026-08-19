@@ -29,6 +29,7 @@ import {
   LANGUAGE_SWITCH_SELECT_CUSTOM_ID,
 } from '../handlers/meta/languageSwitch.js';
 import { getClassAutocompleteChoices } from '../models/Class.js';
+import { getRaidAutocompleteChoices } from '../models/Raid.js';
 
 function hasPrefix(value, prefixes) {
   return prefixes.some((prefix) => value.startsWith(prefix));
@@ -74,12 +75,21 @@ async function handleRoute(interaction, route) {
   }
 }
 
-function createAutocompleteRoutes() {
+export function createAutocompleteRoutes() {
   return {
     'la-search': async (interaction) => {
       const focused = interaction.options.getFocused(true);
       const choices = focused?.name === 'class'
         ? getClassAutocompleteChoices(focused.value)
+        : [];
+      await interaction.respond(choices);
+    },
+    'la-list': async (interaction) => {
+      const focused = interaction.options.getFocused(true);
+      const subcommand = interaction.options.getSubcommand(false);
+      const type = interaction.options.getString('type');
+      const choices = focused?.name === 'raid' && subcommand === 'add'
+        ? getRaidAutocompleteChoices(focused.value, { allowCustom: type === 'watch' })
         : [];
       await interaction.respond(choices);
     },

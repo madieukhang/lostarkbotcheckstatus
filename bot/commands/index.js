@@ -91,16 +91,12 @@ function listCommand(name) {
             .setRequired(true)
         )
         .addStringOption((opt) => {
-          opt
+          return opt
             .setName('raid')
             .setDescription(commandText('list.subcommands.add.options.raid'))
-            .setRequired(false);
-
-          for (const choice of getRaidChoices()) {
-            opt.addChoices(choice);
-          }
-
-          return opt;
+            .setRequired(false)
+            .setMaxLength(100)
+            .setAutocomplete(true);
         })
         .addStringOption((opt) =>
           opt

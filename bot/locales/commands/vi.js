@@ -8,7 +8,7 @@ export default {
   list: {
     description: 'Quản lý blacklist, whitelist và watchlist',
     subcommands: {
-      add: { description: 'Thêm character vào blacklist, whitelist hoặc watchlist', options: { type: 'List cần thêm vào', name: 'Tên character cần thêm', reason: 'Lý do tạo entry', raid: 'Nhãn raid tùy chọn', logs: 'URL logs lostark.bible tùy chọn', image: 'Screenshot evidence tùy chọn', scope: 'Global cho mọi server hoặc Server chỉ cho server này; chỉ blacklist' } },
+      add: { description: 'Thêm character vào blacklist, whitelist hoặc watchlist', options: { type: 'List cần thêm vào', name: 'Tên character cần thêm', reason: 'Lý do tạo entry', raid: 'Nhãn raid; watchlist cho phép nhập tùy ý', logs: 'URL logs lostark.bible tùy chọn', image: 'Screenshot evidence tùy chọn', scope: 'Global cho mọi server hoặc Server chỉ cho server này; chỉ blacklist' } },
       edit: { description: 'Chỉnh sửa entry đang có', options: { name: 'Tên character cần sửa', reason: 'Lý do mới; để trống để giữ nguyên', type: 'Chuyển sang list khác', raid: 'Nhãn raid mới', logs: 'URL logs mới', image: 'Screenshot evidence mới', scope: 'Đổi giữa global và server; chỉ blacklist', additionalNames: 'Danh sách alt phân cách bằng dấu phẩy; chỉ officer/chủ entry' } },
       remove: { description: 'Xóa character khỏi blacklist, whitelist hoặc watchlist', options: { name: 'Tên character cần xóa' } },
       view: { description: 'Xem các entry trong list', options: { type: 'List cần xem', scope: 'Lọc blacklist theo scope' } },
