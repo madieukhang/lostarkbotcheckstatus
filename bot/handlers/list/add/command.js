@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import { resolveListAddRaidLabel } from '../../../models/Raid.js';
 import UserPreference from '../../../models/UserPreference.js';
 import {
   normalizeCharacterName,
@@ -55,7 +56,8 @@ export function createListAddCommandHandler({
     const type = interaction.options.getString('type', true);
     const rawName = interaction.options.getString('name', true).trim();
     const reason = interaction.options.getString('reason', true).trim();
-    const raid = interaction.options.getString('raid') ?? '';
+    const raidInput = interaction.options.getString('raid') ?? '';
+    const raid = resolveListAddRaidLabel(type, raidInput);
     const logs = interaction.options.getString('logs') ?? '';
     const image = interaction.options.getAttachment('image');
     const inputScope = interaction.options.getString('scope') || '';
@@ -86,6 +88,18 @@ export function createListAddCommandHandler({
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.listAdd.command.reasonRequired', lang),
+        lang,
+      });
+      return;
+    }
+
+    if (raid === null) {
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.listAdd.command.invalidRaid', lang, {
+          raid: raidInput.trim(),
+          list: type === 'black' ? 'blacklist' : 'whitelist',
+        }),
         lang,
       });
       return;

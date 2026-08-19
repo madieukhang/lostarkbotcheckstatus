@@ -8,7 +8,7 @@ export default {
   list: {
     description: 'Blacklist / whitelist / watchlist を管理します',
     subcommands: {
-      add: { description: 'Character を blacklist / whitelist / watchlist に追加します', options: { type: '追加先 list', name: '追加する character 名', reason: 'Entry の理由', raid: '任意 raid tag', logs: '任意 lostark.bible logs URL', image: '任意 evidence screenshot', scope: 'Global またはこの Server のみ; blacklist 専用' } },
+      add: { description: 'Character を blacklist / whitelist / watchlist に追加します', options: { type: '追加先 list', name: '追加する character 名', reason: 'Entry の理由', raid: 'Raid tag; watchlist は自由入力可', logs: '任意 lostark.bible logs URL', image: '任意 evidence screenshot', scope: 'Global またはこの Server のみ; blacklist 専用' } },
       edit: { description: '既存 list entry を編集します', options: { name: '編集する character 名', reason: '新しい理由; 空欄なら維持', type: '別の list へ移動', raid: '新しい raid tag', logs: '新しい logs URL', image: '新しい evidence screenshot', scope: 'Global / server を切り替え; blacklist 専用', additionalNames: '追加 alt をカンマ区切りで入力; officer/owner のみ' } },
       remove: { description: 'Character を list から削除します', options: { name: '削除する character 名' } },
       view: { description: 'List entry を表示します', options: { type: '表示する list', scope: 'Blacklist を scope で filter' } },

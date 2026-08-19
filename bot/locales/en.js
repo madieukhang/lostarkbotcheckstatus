@@ -69,7 +69,7 @@ const en = {
             type: 'Which list to add to',
             name: 'Character name to add',
             reason: 'Reason for this entry',
-            raid: 'Optional raid tag',
+            raid: 'Raid tag; watchlist accepts custom text',
             logs: 'Optional lostark.bible logs URL',
             image: 'Optional evidence screenshot',
             scope: 'Global (all servers) or Server (this server only) - blacklist only',

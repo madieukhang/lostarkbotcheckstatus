@@ -333,6 +333,7 @@ export default {
   listAdd: {
     command: {
       reasonRequired: { title: 'A reason is still missing', description: 'Every list entry needs a reason. Run the command again and fill in `reason`.' },
+      invalidRaid: { title: 'That raid label is only available for watchlist', description: '`{raid}` is not a standard raid for {list}. Choose one of the raid suggestions, or use `type:watch` for a custom label.' },
       invalidImage: { title: 'That attachment is not an image', description: 'The `image` option only accepts image files; Discord reported `{type}`.' },
       deliveryFailed: { title: 'I could not get that in front of an approver', description: 'None of the assigned approvers could be reached.', footer: 'Nothing was saved. Try again, or go straight to an officer.' },
       submittedTitle: 'List add · Proposal submitted',

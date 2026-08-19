@@ -240,7 +240,7 @@ export default {
   },
   listAdd: {
     command: {
-      reasonRequired: { title: 'Cậu còn thiếu lý do', description: 'Mỗi entry đều cần lý do. Chạy lại command và điền `reason` nhé.' }, invalidImage: { title: 'File đính kèm không phải ảnh', description: 'Option `image` chỉ nhận file ảnh; Discord báo loại `{type}`.' },
+      reasonRequired: { title: 'Cậu còn thiếu lý do', description: 'Mỗi entry đều cần lý do. Chạy lại command và điền `reason` nhé.' }, invalidRaid: { title: 'Raid tùy ý chỉ dùng cho watchlist', description: '`{raid}` không phải raid chuẩn của {list}. Chọn một raid được gợi ý, hoặc dùng `type:watch` để nhập nhãn tùy ý.' }, invalidImage: { title: 'File đính kèm không phải ảnh', description: 'Option `image` chỉ nhận file ảnh; Discord báo loại `{type}`.' },
       deliveryFailed: { title: 'Tớ chưa đưa được cái này tới người duyệt', description: 'Không approver nào được chỉ định mà tớ liên hệ được.', footer: 'Chưa có gì được lưu cả. Cậu thử lại, hoặc tìm thẳng officer cũng được.' }, submittedTitle: 'Thêm vào list · Đã gửi đề xuất',
       proposalFailed: { title: 'Chưa tạo được đề xuất', description: 'Tớ chưa tạo được yêu cầu duyệt.', footer: 'Chưa có entry nào được tạo. Chạy lại command; nếu vẫn lỗi thì liên hệ officer nhé.' },
     },
