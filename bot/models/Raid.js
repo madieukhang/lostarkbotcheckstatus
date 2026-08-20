@@ -4,14 +4,17 @@
  * while a raid was selectable continue to render and normalize correctly.
  */
 const RAID_CATALOG = [
-  { value: 'Act4 Nor' },
+  // Normal raids are retired from new selections now that their solo modes
+  // cover the common use case. Keep the values for existing entries and old
+  // multiadd workbooks, just like other archived choices below.
+  { value: 'Act4 Nor', selectable: false },
   { value: 'Act4 Hard' },
-  { value: 'Kazeros Nor' },
+  { value: 'Kazeros Nor', selectable: false },
   { value: 'Kazeros Hard' },
   // Mordum is retired from new selections but remains a recognized stored
   // value for existing entries and older multiadd workbooks.
   { value: 'Mordum Hard', selectable: false },
-  { value: 'Secra Nor' },
+  { value: 'Secra Nor', selectable: false },
   { value: 'Secra Hard' },
   { value: 'Secra NM' },
   // Horizon ships with three level tiers (Lv1/Lv2/Lv3) instead of

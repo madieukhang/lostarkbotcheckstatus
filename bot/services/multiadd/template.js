@@ -205,7 +205,7 @@ export async function buildMultiaddTemplate({ now = new Date() } = {}) {
       name: 'ExamplePlayer2',
       type: 'white',
       reason: `${EXAMPLE_REASON_PREFIX} Trusted static mate · 6 months (delete this row)`,
-      raid: 'Kazeros Nor',
+      raid: 'Kazeros Hard',
       logs: '',
       image: '',
       scope: '',
