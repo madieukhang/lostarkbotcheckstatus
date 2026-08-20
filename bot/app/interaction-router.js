@@ -88,8 +88,11 @@ export function createAutocompleteRoutes() {
       const focused = interaction.options.getFocused(true);
       const subcommand = interaction.options.getSubcommand(false);
       const type = interaction.options.getString('type');
-      const choices = focused?.name === 'raid' && subcommand === 'add'
-        ? getRaidAutocompleteChoices(focused.value, { allowCustom: type === 'watch' })
+      const supportsRaidAutocomplete = subcommand === 'add' || subcommand === 'edit';
+      const choices = focused?.name === 'raid' && supportsRaidAutocomplete
+        ? getRaidAutocompleteChoices(focused.value, {
+          allowCustom: type === 'watch',
+        })
         : [];
       await interaction.respond(choices);
     },

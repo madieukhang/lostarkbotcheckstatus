@@ -2,8 +2,9 @@
  * services/multiadd/template.js
  * Standalone .xlsx template generator for /la-list multiadd.
  * Kept in its own module so it has zero dependencies on config/db/discord,
- * making it trivially importable and testable in isolation. The only
- * internal import is the RAIDS enum, which is a pure data module.
+ * making it trivially importable and testable in isolation. The raid selector
+ * is resolved from the pure catalog at request time so limited choices expire
+ * even when the bot process stays online across their cutoff.
  *
  * The template uses a layered visual layout:
  *   Row 1: gradient title banner (merged)
@@ -18,19 +19,11 @@
  *   Row 9-13: blank placeholder rows with subtle borders + zebra stripes
  */
 
-import { RAIDS } from '../../models/Raid.js';
+import { getSelectableRaidValues } from '../../models/Raid.js';
 import { buildInstructionsSheet } from './instructionsSheet.js';
 
 // Max rows allowed in /la-list multiadd Excel file (excluding header)
 export const MULTIADD_MAX_ROWS = 30;
-
-// Inline-formula form for ExcelJS dropdown data validation.
-// Auto-derived from the RAIDS enum in models/Raid.js · single source of truth.
-// Current raids: Act4 Nor/Hard, Kazeros Nor/Hard, Mordum Hard, Secra Nor/Hard/NM,
-// Horizon Lv1/Lv2/Lv3. Excel limits inline validation formulae to 255 chars.
-// The current formula leaves room for roughly 8-10 additional raids; beyond
-// that point, use a named range instead of inline quoted CSV.
-const RAID_DROPDOWN_FORMULA = `"${RAIDS.join(',')}"`;
 
 /**
  * Marker prefix for example rows. Parser recognizes this and silently
@@ -100,8 +93,12 @@ function gradientBlurple() {
  * Build an .xlsx template buffer for /la-list multiadd.
  * Returns a Buffer suitable for AttachmentBuilder.
  */
-export async function buildMultiaddTemplate() {
+export async function buildMultiaddTemplate({ now = new Date() } = {}) {
   const ExcelJS = (await import('exceljs')).default;
+  // Resolve at request time so a long-running bot drops limited raids from a
+  // freshly downloaded template as soon as their cutoff is reached.
+  const selectableRaids = getSelectableRaidValues({ now });
+  const raidDropdownFormula = `"${selectableRaids.join(',')}"`;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Lost Ark Bot';
   wb.created = new Date();
@@ -219,7 +216,7 @@ export async function buildMultiaddTemplate() {
       name: 'ExamplePlayer3',
       type: 'watch',
       reason: `${EXAMPLE_REASON_PREFIX} Inconsistent dps, investigating (delete this row)`,
-      raid: 'Mordum Hard',
+      raid: 'Secra Hard',
       logs: '',
       image: '',
       scope: '',
@@ -297,11 +294,11 @@ export async function buildMultiaddTemplate() {
     sheet.getCell(`D${r}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: [RAID_DROPDOWN_FORMULA],
+      formulae: [raidDropdownFormula],
       showErrorMessage: true,
       errorStyle: 'error',
       errorTitle: 'Invalid raid',
-      error: `raid must be one of: ${RAIDS.join(', ')}`,
+      error: `raid must be one of: ${selectableRaids.join(', ')}`,
     };
     // scope column (G) · global/server (blacklist only, optional)
     sheet.getCell(`G${r}`).dataValidation = {
@@ -338,7 +335,7 @@ export async function buildMultiaddTemplate() {
     },
     gradientBlurple,
     maxRows: MULTIADD_MAX_ROWS,
-    raids: RAIDS,
+    raids: selectableRaids,
   });
 
   const buffer = await wb.xlsx.writeBuffer();

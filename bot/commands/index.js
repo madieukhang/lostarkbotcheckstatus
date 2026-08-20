@@ -3,7 +3,6 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 
-import { getRaidChoices } from '../models/Raid.js';
 import { getSupportedLanguages, t } from '../services/i18n/index.js';
 
 /**
@@ -149,16 +148,12 @@ function listCommand(name) {
             )
         )
         .addStringOption((opt) => {
-          opt
+          return opt
             .setName('raid')
             .setDescription(commandText('list.subcommands.edit.options.raid'))
-            .setRequired(false);
-
-          for (const choice of getRaidChoices()) {
-            opt.addChoices(choice);
-          }
-
-          return opt;
+            .setRequired(false)
+            .setMaxLength(100)
+            .setAutocomplete(true);
         })
         .addStringOption((opt) =>
           opt

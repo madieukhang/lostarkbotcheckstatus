@@ -332,6 +332,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
             description: dupDescription,
             fields: dupFields,
             footer: t('dialogue.listAdd.duplicate.footer', lang, { type: payload.type }),
+            timestamp: false,
             lang,
           }),
         ],

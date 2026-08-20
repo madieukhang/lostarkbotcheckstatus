@@ -1,29 +1,69 @@
 /**
- * Allowed raid labels for /la-list add.
+ * Raid catalog separates the durable stored value from its temporary choice
+ * label/availability. Historical values stay here forever so entries created
+ * while a raid was selectable continue to render and normalize correctly.
  */
-export const RAIDS = [
-  'Act4 Nor',
-  'Act4 Hard',
-  'Kazeros Nor',
-  'Kazeros Hard',
-  'Mordum Hard',
-  'Secra Nor',
-  'Secra Hard',
-  'Secra NM',
+const RAID_CATALOG = [
+  { value: 'Act4 Nor' },
+  { value: 'Act4 Hard' },
+  { value: 'Kazeros Nor' },
+  { value: 'Kazeros Hard' },
+  // Mordum is retired from new selections but remains a recognized stored
+  // value for existing entries and older multiadd workbooks.
+  { value: 'Mordum Hard', selectable: false },
+  { value: 'Secra Nor' },
+  { value: 'Secra Hard' },
+  { value: 'Secra NM' },
   // Horizon ships with three level tiers (Lv1/Lv2/Lv3) instead of
   // Nor/Hard/NM difficulties · mirrors the RaidManage catalog's
-  // Horizon Level 1/2/3. Newest content, so it sorts last like in-game.
-  'Horizon Lv1',
-  'Horizon Lv2',
-  'Horizon Lv3',
+  // Horizon Level 1/2/3. Newest permanent content sorts last like in-game.
+  { value: 'Horizon Lv1' },
+  { value: 'Horizon Lv2' },
+  { value: 'Horizon Lv3' },
+  {
+    value: 'Brel Extreme (Limited)',
+    choiceName: 'Brel Extreme (Limited Time) Choose',
+    // Hide at 00:00 on 2 September 2026 in Vietnam (UTC+7).
+    selectableUntil: '2026-09-01T17:00:00.000Z',
+  },
 ];
 
 /**
+ * Every canonical value that may already exist in storage. This intentionally
+ * includes retired/expired raids; use getRaidChoices() for new selections.
+ */
+export const RAIDS = RAID_CATALOG.map(({ value }) => value);
+
+function isRaidSelectable(raid, now) {
+  if (raid.selectable === false) return false;
+  if (!raid.selectableUntil) return true;
+  return new Date(now).getTime() < Date.parse(raid.selectableUntil);
+}
+
+function getSelectableRaids({ now = new Date() } = {}) {
+  return RAID_CATALOG.filter((raid) => isRaidSelectable(raid, now));
+}
+
+/**
  * Build Discord string option choices from the raid list.
+ * @param {{now?: Date|string|number}} [options]
  * @returns {Array<{name: string, value: string}>}
  */
-export function getRaidChoices() {
-  return RAIDS.map((raid) => ({ name: raid, value: raid }));
+export function getRaidChoices(options = {}) {
+  return getSelectableRaids(options).map((raid) => ({
+    name: raid.choiceName || raid.value,
+    value: raid.value,
+  }));
+}
+
+/**
+ * Values suitable for selectors that cannot separate option name from value
+ * (for example Excel data validation dropdowns).
+ * @param {{now?: Date|string|number}} [options]
+ * @returns {string[]}
+ */
+export function getSelectableRaidValues(options = {}) {
+  return getSelectableRaids(options).map(({ value }) => value);
 }
 
 /**
@@ -32,14 +72,23 @@ export function getRaidChoices() {
  * still receives the canonical raid suggestions.
  *
  * @param {string} focusedValue
- * @param {{allowCustom?: boolean}} [options]
+ * @param {{allowCustom?: boolean, now?: Date|string|number}} [options]
  * @returns {Array<{name: string, value: string}>}
  */
-export function getRaidAutocompleteChoices(focusedValue = '', { allowCustom = false } = {}) {
+export function getRaidAutocompleteChoices(
+  focusedValue = '',
+  { allowCustom = false, now = new Date() } = {},
+) {
   const input = String(focusedValue ?? '').trim();
   const needle = input.toLocaleLowerCase();
-  const matchingRaids = RAIDS.filter((raid) => raid.toLocaleLowerCase().includes(needle));
-  const hasCanonicalMatch = RAIDS.some((raid) => raid.toLocaleLowerCase() === needle);
+  const matchingRaids = getSelectableRaids({ now }).filter((raid) => (
+    raid.value.toLocaleLowerCase().includes(needle)
+    || raid.choiceName?.toLocaleLowerCase().includes(needle)
+  ));
+  const hasCanonicalMatch = RAID_CATALOG.some((raid) => (
+    raid.value.toLocaleLowerCase() === needle
+    || raid.choiceName?.toLocaleLowerCase() === needle
+  ));
   const choices = [];
 
   if (allowCustom && input && !hasCanonicalMatch) {
@@ -51,7 +100,7 @@ export function getRaidAutocompleteChoices(focusedValue = '', { allowCustom = fa
 
   for (const raid of matchingRaids) {
     if (choices.length >= 25) break;
-    choices.push({ name: raid, value: raid });
+    choices.push({ name: raid.choiceName || raid.value, value: raid.value });
   }
 
   return choices;
@@ -71,8 +120,11 @@ export function resolveRaidLabel(value = '', { allowCustom = false } = {}) {
   const input = String(value ?? '').trim();
   if (!input) return '';
 
-  const canonical = RAIDS.find((raid) => raid.toLocaleLowerCase() === input.toLocaleLowerCase());
-  if (canonical) return canonical;
+  const canonical = RAID_CATALOG.find((raid) => (
+    raid.value.toLocaleLowerCase() === input.toLocaleLowerCase()
+    || raid.choiceName?.toLocaleLowerCase() === input.toLocaleLowerCase()
+  ));
+  if (canonical) return canonical.value;
 
   return allowCustom ? input : null;
 }
