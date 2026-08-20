@@ -12,6 +12,7 @@ import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
+import { resolveRaidLabel } from '../../../models/Raid.js';
 import {
   normalizeCharacterName,
   getInteractionDisplayName,
@@ -67,7 +68,7 @@ export function createListEditCommandHandler({
     const name = normalizeCharacterName(raw);
     const newReason = interaction.options.getString('reason')?.trim() || '';
     const newType = interaction.options.getString('type') || '';
-    const newRaid = interaction.options.getString('raid')?.trim() || '';
+    const newRaidInput = interaction.options.getString('raid')?.trim() || '';
     const newLogs = interaction.options.getString('logs')?.trim() || '';
     const imageAttachment = interaction.options.getAttachment('image');
     const newImageUrl = imageAttachment?.url || '';
@@ -123,6 +124,21 @@ export function createListEditCommandHandler({
 
     const currentType = blackEntry ? 'black' : whiteEntry ? 'white' : 'watch';
     const currentLabel = t(`dialogue.broadcast.list.${currentType}`, lang);
+    const targetType = newType || currentType;
+    const isTypeChange = targetType !== currentType;
+    const newRaid = resolveRaidLabel(newRaidInput, { allowCustom: targetType === 'watch' });
+
+    if (newRaidInput && newRaid === null) {
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.listAdd.command.invalidRaid', lang, {
+          raid: newRaidInput,
+          list: targetType === 'black' ? 'blacklist' : 'whitelist',
+        }),
+        lang,
+      });
+      return;
+    }
 
     // Permission gate for additional_names: officer/senior or entry
     // owner only. The approval flow used for member edits does not
@@ -156,9 +172,6 @@ export function createListEditCommandHandler({
       });
       return;
     }
-
-    const targetType = newType || currentType;
-    const isTypeChange = targetType !== currentType;
 
     // Scope option validation: only meaningful for blacklist entries.
     // White/watch lists are always global by design · reject scope on non-blacklist
