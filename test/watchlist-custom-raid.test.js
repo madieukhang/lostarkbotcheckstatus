@@ -67,6 +67,23 @@ test('Mordum is hidden from new choices while historical raid values still norma
   assert.equal(resolveRaidLabel('Brel Extreme (Limited)'), 'Brel Extreme (Limited)');
 });
 
+test('normal raids are hidden from selectors but remain valid historical values', () => {
+  const normalRaids = ['Act4 Nor', 'Kazeros Nor', 'Secra Nor'];
+  const selectableValues = getSelectableRaidValues();
+
+  for (const raid of normalRaids) {
+    assert.equal(selectableValues.includes(raid), false);
+    assert.equal(resolveRaidLabel(raid), raid);
+  }
+  assert.deepEqual(getRaidAutocompleteChoices('Nor'), []);
+  assert.equal(selectableValues.includes('Secra Hard'), true);
+  assert.equal(selectableValues.includes('Secra NM'), true);
+  assert.deepEqual(
+    selectableValues.filter((raid) => raid.startsWith('Horizon ')),
+    ['Horizon Lv1', 'Horizon Lv2', 'Horizon Lv3'],
+  );
+});
+
 test('Brel autocomplete hides at the cutoff but keeps the selected storage label', () => {
   assert.deepEqual(
     getRaidAutocompleteChoices('Brel', { now: '2026-09-01T16:59:59.999Z' }),
@@ -104,7 +121,6 @@ test('multiadd raid dropdown follows the same retired and limited choice policy'
 test('watchlist raid autocomplete offers the typed custom label plus canonical matches', () => {
   assert.deepEqual(getRaidAutocompleteChoices('Secra', { allowCustom: true }), [
     { name: 'Custom · Secra', value: 'Secra' },
-    { name: 'Secra Nor', value: 'Secra Nor' },
     { name: 'Secra Hard', value: 'Secra Hard' },
     { name: 'Secra NM', value: 'Secra NM' },
   ]);
