@@ -354,7 +354,7 @@ export default {
     },
     duplicate: {
       title: 'Already in {list}', direct: '**{name}** is already in {list}.', roster: '**{name}** is already in {list} through roster match **{matched}**.',
-      matchType: 'Match type', rosterAlt: 'Roster alt', exactName: 'Exact name', matchedName: 'Matched name', scope: 'Scope', addedBy: 'Added by', existingReason: 'Existing reason', raid: 'Raid',
+      matchType: 'Match type', rosterAlt: 'Roster alt', exactName: 'Exact name', matchedName: 'Matched name', scope: 'Scope', addedBy: 'Added by', timeAdded: 'Time added', existingReason: 'Existing reason', raid: 'Raid',
       footer: 'Use `/la-list view type:{type}` for the full entry, or `/la-list edit` to change it.', contentDirect: '{name} already exists in {list}.', contentRoster: '{name} already exists in {list} through roster match {matched}.',
     },
     success: {

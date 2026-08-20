@@ -25,7 +25,7 @@ import {
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { ICONS } from '../../../utils/ui.js';
+import { ICONS, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl, logsUrl } from '../../../utils/rosterLink.js';
@@ -60,6 +60,31 @@ export function buildHiddenRosterGuidance(entryName, guildName, lang = 'en') {
   }
 
   return { fields, components };
+}
+
+/**
+ * Build the adjacent audit pair for an "already exists" result. Legacy
+ * entries may lack one or both values, so both fields retain a localized
+ * fallback instead of disappearing and shifting the card layout.
+ *
+ * @param {object} existed
+ * @param {string} [lang='en']
+ * @returns {Array<{name: string, value: string, inline: true}>}
+ */
+export function buildDuplicateAuditFields(existed, lang = 'en') {
+  const fallback = t('dialogue.broadcast.notAvailable', lang);
+  return [
+    {
+      name: t('dialogue.listAdd.duplicate.addedBy', lang),
+      value: existed.addedByDisplayName || existed.addedByTag || fallback,
+      inline: true,
+    },
+    {
+      name: t('dialogue.listAdd.duplicate.timeAdded', lang),
+      value: relativeTime(existed.addedAt) || fallback,
+      inline: true,
+    },
+  ];
 }
 
 /**
@@ -235,7 +260,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     if (existed) {
       const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
 
-      // Build structured alert embed with all the duplicate's context
+      // Build structured alert embed with all the duplicate's context.
       const existedRosterLink = rosterUrl(existed.name);
       const dupFields = [];
       if (isRosterMatch) {
@@ -263,13 +288,15 @@ export function createListAddExecutor({ client, broadcastListChange }) {
           inline: true,
         });
       }
-      if (existed.addedByDisplayName || existed.addedByTag) {
-        dupFields.push({
-          name: t('dialogue.listAdd.duplicate.addedBy', lang),
-          value: existed.addedByDisplayName || existed.addedByTag,
-          inline: true,
-        });
+
+      // Discord lays out at most three inline fields per row. A zero-width
+      // spacer prevents Added by / Time added from splitting across rows when
+      // the preceding match metadata occupies exactly two columns.
+      if (dupFields.length % 3 === 2) {
+        dupFields.push({ name: '\u200b', value: '\u200b', inline: true });
       }
+      dupFields.push(...buildDuplicateAuditFields(existed, lang));
+
       if (existed.reason) {
         dupFields.push({
           name: t('dialogue.listAdd.duplicate.existingReason', lang),
