@@ -229,7 +229,7 @@ export default {
       title: '{list} に登録済みですの', direct: '**{name}** はすでに {list} にいますわ。', roster: '**{name}** は **{matched}** の roster 経由ですでに {list} にいますの。', matchType: '一致 type', rosterAlt: 'Roster alt', exactName: '完全一致', matchedName: '一致名', scope: 'Scope', addedBy: '追加者', timeAdded: '追加日時', existingReason: '既存理由', raid: 'Raid', footer: '`/la-list view type:{type}` で entry 全体を見るか、`/la-list edit` で変更してくださいませ。', contentDirect: '{name} は {list} に登録済み。', contentRoster: '{name} は roster {matched} 経由で {list} に登録済み。',
     },
     success: {
-      title: '{list} · 追加済み · {name}', hero: '**{user}** が **{name}** を **{list}**{scope} へ追加しましたわ。', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: '理由', links: 'Links', trackedAlts: '追跡中の alt' }, onlyCharacter: 'この entry は現在この character だけを track していますの。', roster: 'Roster', logs: 'Logs', evidenceLogs: 'Evidence logs', sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: '{user} が追加 · {source}', officerFallback: 'officer', content: '追加承認: **{name}** を {list} へ追加しましたわ。',
+      title: '{list} · 追加済み · {name}', hero: '**{user}** が {name} を **{list}**{scope} へ追加しましたわ。', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: '理由', links: 'Links', trackedAlts: '追跡中の alt' }, onlyCharacter: 'この entry は現在この character だけを track していますの。', roster: 'Roster', logs: 'Logs', evidenceLogs: 'Evidence logs', sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: '{user} が追加 · {source}', officerFallback: 'officer', content: '追加承認: **{name}** を {list} へ追加しましたわ。',
     },
   },
   listView: {

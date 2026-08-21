@@ -358,7 +358,7 @@ export default {
       footer: 'Use `/la-list view type:{type}` for the full entry, or `/la-list edit` to change it.', contentDirect: '{name} already exists in {list}.', contentRoster: '{name} already exists in {list} through roster match {matched}.',
     },
     success: {
-      title: '{list} · Added · {name}', hero: '**{user}** added **{name}** to **{list}**{scope}.',
+      title: '{list} · Added · {name}', hero: '**{user}** added {name} to **{list}**{scope}.',
       fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Reason', links: 'Links', trackedAlts: 'Tracked alts' },
       onlyCharacter: 'Only this character is tracked on this entry.', roster: 'Roster', logs: 'Logs', evidenceLogs: 'Evidence logs',
       sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: 'Added by {user} · {source}', officerFallback: 'an officer',

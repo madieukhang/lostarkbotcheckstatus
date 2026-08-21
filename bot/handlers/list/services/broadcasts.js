@@ -14,13 +14,13 @@ import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
 import { upsertRosterSnapshots } from '../../../services/roster/rosterSnapshots.js';
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
-import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { getListContext, listTypeIcon } from '../helpers.js';
 import { buildBroadcastEvidenceComponents } from '../evidence/broadcastButton.js';
 import {
   formatAltLine,
+  formatLinkedCharacter,
   renderTrackedAltsField,
 } from '../trackedAltsRender.js';
 
@@ -119,11 +119,6 @@ export async function hydrateBroadcastStatMap({
   return statMap;
 }
 
-function getBroadcastClassName(record) {
-  if (!record) return '';
-  return record.className || (record.classId ? getClassName(record.classId) : '');
-}
-
 // formatBroadcastCharacterLine + buildTrackedAltsField are kept as thin
 // wrappers around the shared renderer in handlers/list/trackedAltsRender.js
 // so the broadcast-specific public API (which tests import) stays stable
@@ -198,7 +193,6 @@ export function createBroadcastServices({
     } = options;
     const isEnrich = action === 'enriched';
     const { color, icon } = getListContext(payload.type);
-    const rosterLink = rosterUrl(entry.name);
 
     // RosterSnapshot enrichment for class icon + ilvl + CP. Best-effort:
     // if /la-roster has queried this name before, the broadcast carries
@@ -222,9 +216,6 @@ export function createBroadcastServices({
     });
 
     const snap = statMap.get(normalizeNameKey(entry.name)) || null;
-    const className = getBroadcastClassName(snap);
-    const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
-
     // Description leads with a one-line headline so the recipient
     // sees "What changed in which list" without parsing the fields.
     // Class icon (when known) sits between the list-status icon and
@@ -240,7 +231,7 @@ export function createBroadcastServices({
       const scopeTag = entry.scope === 'server'
         ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
         : '';
-      const linkedName = `${classPrefix}**[${entry.name}](${rosterLink})**`;
+      const linkedName = formatLinkedCharacter(entry.name, snap);
       const headlineKey = `dialogue.broadcast.headlines.${isEnrich ? 'enriched' : action}`;
       const headline = t(headlineKey, lang, {
         icon,
