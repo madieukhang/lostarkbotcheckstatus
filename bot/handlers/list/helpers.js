@@ -126,7 +126,7 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
     { name: t('dialogue.listEdit.success.reason', lang), value: entry.reason || t('dialogue.broadcast.notAvailable', lang), inline: true },
   ];
   if (entry.raid) {
-    fields.push({ name: t('dialogue.listEdit.success.raid', lang), value: entry.raid, inline: true });
+    fields.push({ name: t('dialogue.listEdit.success.raid', lang), value: `\`${entry.raid}\``, inline: true });
   }
   if (changes.length > 0) {
     const changesText = changes.map((c) => `• ${c}`).join('\n');

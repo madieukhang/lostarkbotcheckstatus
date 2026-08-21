@@ -78,7 +78,7 @@ export function buildCheckEntryDetailsEmbed(entry, {
     },
     {
       name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`,
-      value: combatScore && combatScore !== '?' ? combatScore : notAvailable,
+      value: combatScore && combatScore !== '?' ? `\`${combatScore}\`` : notAvailable,
       inline: true,
     },
   ];
