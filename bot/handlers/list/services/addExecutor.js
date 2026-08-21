@@ -305,29 +305,32 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
 
       // Build structured alert embed with all the duplicate's context.
+      // Field icons mirror the success card below (🌐 scope, 📝 reason,
+      // 🗡️ raid, 🧬 roster alt) so a name that lands in the list and a
+      // name that was already there read as the same kind of card.
       const existedRosterLink = rosterUrl(existed.name);
       const dupFields = [];
       if (isRosterMatch) {
         dupFields.push({
-          name: t('dialogue.listAdd.duplicate.matchType', lang),
+          name: `${ICONS.search} ${t('dialogue.listAdd.duplicate.matchType', lang)}`,
           value: t('dialogue.listAdd.duplicate.rosterAlt', lang),
           inline: true,
         });
         dupFields.push({
-          name: t('dialogue.listAdd.duplicate.matchedName', lang),
+          name: `🧬 ${t('dialogue.listAdd.duplicate.matchedName', lang)}`,
           value: `[${existed.name}](${existedRosterLink})`,
           inline: true,
         });
       } else {
         dupFields.push({
-          name: t('dialogue.listAdd.duplicate.matchType', lang),
+          name: `${ICONS.search} ${t('dialogue.listAdd.duplicate.matchType', lang)}`,
           value: t('dialogue.listAdd.duplicate.exactName', lang),
           inline: true,
         });
       }
       if (existed.scope) {
         dupFields.push({
-          name: t('dialogue.listAdd.duplicate.scope', lang),
+          name: `🌐 ${t('dialogue.listAdd.duplicate.scope', lang)}`,
           value: `\`[${t(`dialogue.approval.scopeTag.${existed.scope === 'server' ? 'local' : 'global'}`, lang)}]\``,
           inline: true,
         });
@@ -339,14 +342,14 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
       if (existed.reason) {
         dupFields.push({
-          name: t('dialogue.listAdd.duplicate.existingReason', lang),
+          name: `📝 ${t('dialogue.listAdd.duplicate.existingReason', lang)}`,
           value: existed.reason.slice(0, 1024),
           inline: false,
         });
       }
       if (existed.raid) {
         dupFields.push({
-          name: t('dialogue.listAdd.duplicate.raid', lang),
+          name: `🗡️ ${t('dialogue.listAdd.duplicate.raid', lang)}`,
           value: existed.raid,
           inline: true,
         });
