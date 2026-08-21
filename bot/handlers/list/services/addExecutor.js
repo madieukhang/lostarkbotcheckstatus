@@ -30,6 +30,7 @@ import { t } from '../../../services/i18n/index.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl, logsUrl } from '../../../utils/rosterLink.js';
 import {
+  formatLinkedCharacter,
   renderTrackedAltsField,
   statMapFromRosterCharacters,
 } from '../trackedAltsRender.js';
@@ -62,10 +63,14 @@ export function buildHiddenRosterGuidance(entryName, guildName, lang = 'en') {
   return { fields, components };
 }
 
+function buildInlineSpacer() {
+  return { name: '\u200b', value: '\u200b', inline: true };
+}
+
 /**
- * Build the adjacent audit pair for an "already exists" result. Legacy
- * entries may lack one or both values, so both fields retain a localized
- * fallback instead of disappearing and shifting the card layout.
+ * Build the three-slot audit row for an "already exists" result. Legacy
+ * entries may lack one or both values, so both visible fields retain a
+ * localized fallback instead of disappearing and shifting the card layout.
  *
  * @param {object} existed
  * @param {string} [lang='en']
@@ -75,16 +80,55 @@ export function buildDuplicateAuditFields(existed, lang = 'en') {
   const fallback = t('dialogue.broadcast.notAvailable', lang);
   return [
     {
-      name: t('dialogue.listAdd.duplicate.addedBy', lang),
+      name: `👤 ${t('dialogue.listAdd.duplicate.addedBy', lang)}`,
       value: existed.addedByDisplayName || existed.addedByTag || fallback,
       inline: true,
     },
     {
-      name: t('dialogue.listAdd.duplicate.timeAdded', lang),
+      name: `🕐 ${t('dialogue.listAdd.duplicate.timeAdded', lang)}`,
       value: relativeTime(existed.addedAt) || fallback,
       inline: true,
     },
+    // Keep the audit pair on the same three-column grid as Match type / Scope.
+    // Without this final slot Discord stretches two fields to 50/50 and makes
+    // Time added look shifted to the right.
+    buildInlineSpacer(),
   ];
+}
+
+/**
+ * Pad preceding inline metadata to a complete row, then append the stable
+ * Added by / Time added / spacer row.
+ */
+export function appendDuplicateAuditRow(fields, existed, lang = 'en') {
+  while (fields.length % 3 !== 0) fields.push(buildInlineSpacer());
+  fields.push(...buildDuplicateAuditFields(existed, lang));
+  return fields;
+}
+
+/**
+ * Build the title icon + hero line shared by direct and approval-completed
+ * adds. The list icon is the only title prefix; the linked primary character
+ * carries its class icon in the description.
+ */
+export function buildListAddSuccessHeader({
+  icon,
+  requesterName,
+  entryName,
+  listLabel,
+  scopeTag = '',
+  primaryRecord = null,
+  lang = 'en',
+}) {
+  return {
+    titleIcon: icon,
+    heroLine: t('dialogue.listAdd.success.hero', lang, {
+      user: requesterName,
+      name: formatLinkedCharacter(entryName, primaryRecord),
+      list: listLabel,
+      scope: scopeTag,
+    }),
+  };
 }
 
 /**
@@ -289,13 +333,9 @@ export function createListAddExecutor({ client, broadcastListChange }) {
         });
       }
 
-      // Discord lays out at most three inline fields per row. A zero-width
-      // spacer prevents Added by / Time added from splitting across rows when
-      // the preceding match metadata occupies exactly two columns.
-      if (dupFields.length % 3 === 2) {
-        dupFields.push({ name: '\u200b', value: '\u200b', inline: true });
-      }
-      dupFields.push(...buildDuplicateAuditFields(existed, lang));
+      // Start the three-slot audit row cleanly regardless of whether this is
+      // an exact, roster, scoped, or legacy entry.
+      appendDuplicateAuditRow(dupFields, existed, lang);
 
       if (existed.reason) {
         dupFields.push({
@@ -394,17 +434,27 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     // rosterCharacters parse buildRosterCharacters returned for this name.
     // Visible-roster path supplies the statMap; hidden-roster path (which
     // returns just [name]) naturally falls through to the empty sentinel.
+    const rosterStatMap = statMapFromRosterCharacters(rosterCharacters);
     const altsField = renderTrackedAltsField({
       names: allCharacters,
       primaryName: entry.name,
-      statMap: statMapFromRosterCharacters(rosterCharacters),
+      statMap: rosterStatMap,
       emptySentinel: `_${t('dialogue.listAdd.success.onlyCharacter', lang)}_`,
       label: `🧬 ${t('dialogue.listAdd.success.fields.trackedAlts', lang)}`,
       overflowTemplate: t('dialogue.broadcast.more', lang),
     });
 
     const requesterName = payload.requestedByDisplayName || payload.requestedByName || t('dialogue.listAdd.success.officerFallback', lang);
-    const heroLine = t('dialogue.listAdd.success.hero', lang, { user: requesterName, name: entry.name, list: labelCap, scope: scopeTag });
+    const primaryRecord = rosterStatMap.get(entry.name.toLowerCase()) || null;
+    const { titleIcon, heroLine } = buildListAddSuccessHeader({
+      icon,
+      requesterName,
+      entryName: entry.name,
+      listLabel: labelCap,
+      scopeTag,
+      primaryRecord,
+      lang,
+    });
 
     const fields = [
       { name: `📒 ${t('dialogue.listAdd.success.fields.list', lang)}`, value: `${icon} ${labelCap}`, inline: true },
@@ -416,10 +466,6 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     fields.push({ name: `📝 ${t('dialogue.listAdd.success.fields.reason', lang)}`, value: (payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false });
     if (altsField) fields.push(altsField);
     fields.push({ name: `🔗 ${t('dialogue.listAdd.success.fields.links', lang)}`, value: linkParts.join(' · '), inline: false });
-
-    // titleIcon normally prefixes done + list-type. Whitelist omits the done
-    // prefix to avoid a doubled tick (✅ ✅); its list icon carries the cue.
-    const titleIcon = payload.type === 'white' ? icon : `${ICONS.done} ${icon}`;
 
     const embed = buildAlertEmbed({
       severity: AlertSeverity.SUCCESS,

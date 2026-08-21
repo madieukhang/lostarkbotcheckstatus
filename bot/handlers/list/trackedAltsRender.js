@@ -42,20 +42,30 @@ function parsePositiveNumber(value) {
 }
 
 /**
+ * Render one character with the same class-icon + roster-link vocabulary used
+ * across list cards. The class name remains a readable fallback while custom
+ * application emoji are still bootstrapping.
+ */
+export function formatLinkedCharacter(name, record, { bold = true } = {}) {
+  const className = classNameFromRecord(record);
+  const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
+  const linkedName = `[${name}](${rosterUrl(name)})`;
+  return `${classPrefix}${bold ? `**${linkedName}**` : linkedName}`;
+}
+
+/**
  * Build a single numbered alt line. Class icon + ilvl + CP are
  * appended when a stat record is available; the bare `[name](link)`
  * survives when no record is supplied (legacy entries / approval-DM
  * preview surfaces that don't have a snapshot map).
  */
 export function formatAltLine(name, index, record) {
-  const className = classNameFromRecord(record);
-  const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
   const statParts = [];
   const itemLevel = parsePositiveNumber(record?.itemLevel);
   if (itemLevel > 0) statParts.push(`\`${itemLevel.toFixed(2)}\``);
   if (record?.combatScore && record.combatScore !== '?') statParts.push(`CP \`${record.combatScore}\``);
   const statSuffix = statParts.length > 0 ? ` · ${statParts.join(' · ')}` : '';
-  return `**${index + 1}.** ${classPrefix}[${name}](${rosterUrl(name)})${statSuffix}`;
+  return `**${index + 1}.** ${formatLinkedCharacter(name, record, { bold: false })}${statSuffix}`;
 }
 
 /**

@@ -6,9 +6,12 @@ process.env.CHANNEL_ID ||= 'test';
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const {
+  appendDuplicateAuditRow,
   buildDuplicateAuditFields,
   buildHiddenRosterGuidance,
+  buildListAddSuccessHeader,
 } = await import('../bot/handlers/list/services/addExecutor.js');
+const { CLASS_EMOJI_MAP } = await import('../bot/models/Class.js');
 
 test('hidden roster add guidance offers enrich when bible exposes a guild', () => {
   const guidance = buildHiddenRosterGuidance('Ainslinn', 'Bullet Shell');
@@ -28,7 +31,7 @@ test('hidden roster add guidance avoids enrich button without a guild', () => {
   assert.equal(guidance.components.length, 0);
 });
 
-test('duplicate roster card places Time added beside Added by', () => {
+test('duplicate roster card aligns its icon-labelled audit pair on a three-column row', () => {
   const addedAt = new Date('2026-05-17T10:30:00Z');
   const fields = buildDuplicateAuditFields({
     addedByDisplayName: 'meow',
@@ -36,20 +39,65 @@ test('duplicate roster card places Time added beside Added by', () => {
   }, 'en');
 
   assert.deepEqual(fields, [
-    { name: 'Added by', value: 'meow', inline: true },
+    { name: '👤 Added by', value: 'meow', inline: true },
     {
-      name: 'Time added',
+      name: '🕐 Time added',
       value: `<t:${Math.floor(addedAt.getTime() / 1000)}:R>`,
       inline: true,
     },
+    { name: '\u200b', value: '\u200b', inline: true },
   ]);
+});
+
+test('duplicate audit row starts after match metadata and keeps Time added in column two', () => {
+  const fields = [
+    { name: 'Match type', value: 'Exact name', inline: true },
+    { name: 'Scope', value: '[Global]', inline: true },
+  ];
+
+  appendDuplicateAuditRow(fields, {
+    addedByDisplayName: 'meow',
+    addedAt: new Date('2026-05-17T10:30:00Z'),
+  }, 'en');
+
+  assert.equal(fields.length, 6);
+  assert.equal(fields[2].name, '\u200b', 'metadata row is padded to three columns');
+  assert.equal(fields[3].name, '👤 Added by');
+  assert.equal(fields[4].name, '🕐 Time added');
+  assert.equal(fields[5].name, '\u200b', 'audit row keeps a fixed third column');
 });
 
 test('duplicate audit fields tolerate missing legacy metadata', () => {
   const fields = buildDuplicateAuditFields({}, 'vi');
 
   assert.deepEqual(fields, [
-    { name: 'Được thêm bởi', value: 'Chưa có', inline: true },
-    { name: 'Thời gian thêm', value: 'Chưa có', inline: true },
+    { name: '👤 Được thêm bởi', value: 'Chưa có', inline: true },
+    { name: '🕐 Thời gian thêm', value: 'Chưa có', inline: true },
+    { name: '\u200b', value: '\u200b', inline: true },
   ]);
+});
+
+test('list-add success keeps one list icon and links the primary name with its class icon', () => {
+  const oldPaladinEmoji = CLASS_EMOJI_MAP.Paladin;
+  CLASS_EMOJI_MAP.Paladin = '<:paladin:42>';
+
+  try {
+    const header = buildListAddSuccessHeader({
+      icon: '⛔',
+      requesterName: 'meow',
+      entryName: 'Beatadin',
+      listLabel: 'Blacklist',
+      scopeTag: ' `[Global]`',
+      primaryRecord: { className: 'Paladin' },
+      lang: 'en',
+    });
+
+    assert.equal(header.titleIcon, '⛔');
+    assert.equal(
+      header.heroLine,
+      '**meow** added <:paladin:42> **[Beatadin](https://lostark.bible/character/NA/Beatadin/roster)** to **Blacklist** `[Global]`.'
+    );
+  } finally {
+    CLASS_EMOJI_MAP.Paladin = oldPaladinEmoji;
+  }
 });
