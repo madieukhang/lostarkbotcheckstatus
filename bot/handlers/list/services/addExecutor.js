@@ -15,7 +15,7 @@ import {
 
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
-import { getClassName } from '../../../models/Class.js';
+import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import {
   buildRosterCharacters,
   fetchCharacterMeta,
@@ -189,12 +189,17 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     if (!hasValidRoster) {
       const suggestions = await fetchNameSuggestions(name) || [];
       if (suggestions.length > 0) {
+        // The name stays first · it is what the reader has to copy back
+        // into the command. The class renders through getClassEmoji so it
+        // becomes an icon on its own once CLASS_EMOJI_MAP is populated,
+        // and falls back to the class name while that map is empty.
         const suggestionLines = suggestions
           .slice(0, 10)
-          .map(
-            (s, idx) =>
-              `**${idx + 1}.** [${s.name}](${rosterUrl(s.name)}) · \`${Number(s.itemLevel || 0).toFixed(2)}\` · ${getClassName(s.cls)}`
-          )
+          .map((s, idx) => {
+            const className = getClassName(s.cls);
+            const classLabel = getClassEmoji(className) || className;
+            return `**${idx + 1}.** [${s.name}](${rosterUrl(s.name)}) · \`${Number(s.itemLevel || 0).toFixed(2)}\` · ${classLabel}`;
+          })
           .join('\n');
 
         return {
@@ -206,7 +211,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
               title: t('dialogue.listAdd.noRoster.title', lang),
               description: t('dialogue.listAdd.noRoster.withSuggestions', lang, { name }),
               fields: [
-                { name: t('dialogue.listAdd.noRoster.suggestions', lang), value: suggestionLines.slice(0, 1024), inline: false },
+                { name: `${ICONS.search} ${t('dialogue.listAdd.noRoster.suggestions', lang)}`, value: suggestionLines.slice(0, 1024), inline: false },
               ],
               footer: t('dialogue.listAdd.noRoster.suggestionFooter', lang),
               lang,
@@ -250,11 +255,16 @@ export function createListAddExecutor({ client, broadcastListChange }) {
             severity: AlertSeverity.ERROR,
             title: t('dialogue.listAdd.itemLevel.title', lang),
             description: t('dialogue.listAdd.itemLevel.description', lang, { name }),
+            // Four inline fields leave the fourth alone on its own row,
+            // where Discord stretches it to full width. The spacers keep
+            // both rows on the same three-column grid as the other cards.
             fields: [
-              { name: t('dialogue.listAdd.itemLevel.character', lang), value: `[${name}](${rosterUrl(name)})`, inline: true },
-              { name: t('dialogue.listAdd.itemLevel.itemLevel', lang), value: `\`${targetItemLevel.toFixed(2)}\``, inline: true },
-              { name: t('dialogue.listAdd.itemLevel.minimum', lang), value: '`1700.00`', inline: true },
-              { name: t('dialogue.listAdd.itemLevel.targetList', lang), value: labelCap, inline: true },
+              { name: `🎯 ${t('dialogue.listAdd.itemLevel.character', lang)}`, value: `[${name}](${rosterUrl(name)})`, inline: true },
+              { name: `📊 ${t('dialogue.listAdd.itemLevel.itemLevel', lang)}`, value: `\`${targetItemLevel.toFixed(2)}\``, inline: true },
+              { name: `📉 ${t('dialogue.listAdd.itemLevel.minimum', lang)}`, value: '`1700.00`', inline: true },
+              { name: `📒 ${t('dialogue.listAdd.itemLevel.targetList', lang)}`, value: labelCap, inline: true },
+              buildInlineSpacer(),
+              buildInlineSpacer(),
             ],
             footer: t('dialogue.listAdd.itemLevel.footer', lang),
             lang,
