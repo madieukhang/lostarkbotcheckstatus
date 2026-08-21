@@ -150,8 +150,9 @@ test('dropdown detail uses broadcast layout with added-by beside CP and evidence
     '👤 Người thêm',
     '🧬 Alt đang track (1)',
   ]);
+  // ilvl and CP sit side by side, so both read as code values.
   assert.equal(embed.fields[3].value, '`1725.50`');
-  assert.equal(embed.fields[4].value, '≈3136.08');
+  assert.equal(embed.fields[4].value, '`≈3136.08`');
   assert.equal(embed.fields[4].inline, true);
   assert.equal(embed.fields[5].value, 'Legacy Officer');
   assert.equal(embed.fields[5].inline, true);

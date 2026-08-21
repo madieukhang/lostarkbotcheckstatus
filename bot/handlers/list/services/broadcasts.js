@@ -248,6 +248,11 @@ export function createBroadcastServices({
         value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
         inline: false,
       }];
+      // Code-wrap rule for every card in the list surfaces: fixed tokens
+      // and numbers (raid, ilvl, CP) render as `code` so they read as
+      // values; prose (reason) and links stay plain, and the timestamp
+      // MUST stay plain because backticks would print the raw
+      // <t:UNIX:R> instead of letting Discord localize it.
       if (entry.raid) fields.push({ name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`, value: `\`${entry.raid}\``, inline: true });
       if (entry.addedAt) {
         fields.push({
@@ -260,7 +265,7 @@ export function createBroadcastServices({
         fields.push({ name: `📊 ${t('dialogue.broadcast.fields.itemLevel', lang)}`, value: `\`${snap.itemLevel.toFixed(2)}\``, inline: true });
       }
       if (snap?.combatScore) {
-        fields.push({ name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`, value: snap.combatScore, inline: true });
+        fields.push({ name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`, value: `\`${snap.combatScore}\``, inline: true });
       }
 
       const rosterFieldOptions = {

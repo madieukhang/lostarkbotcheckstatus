@@ -341,7 +341,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       if (existed.scope) {
         dupFields.push({
           name: `🌐 ${t('dialogue.listAdd.duplicate.scope', lang)}`,
-          value: `\`[${t(`dialogue.approval.scopeTag.${existed.scope === 'server' ? 'local' : 'global'}`, lang)}]\``,
+          value: `[${t(`dialogue.approval.scopeTag.${existed.scope === 'server' ? 'local' : 'global'}`, lang)}]`,
           inline: true,
         });
       }
@@ -360,7 +360,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       if (existed.raid) {
         dupFields.push({
           name: `🗡️ ${t('dialogue.listAdd.duplicate.raid', lang)}`,
-          value: existed.raid,
+          value: `\`${existed.raid}\``,
           inline: true,
         });
       }
