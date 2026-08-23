@@ -35,6 +35,19 @@ test('/la-list add and edit raid options use dynamic autocomplete', () => {
   assert.equal(editRaid.choices, undefined);
 });
 
+test('Guardian Raid is a canonical option for blacklist add and edit flows', () => {
+  const choice = { name: 'Guardian Raid', value: 'Guardian Raid' };
+
+  assert.deepEqual(
+    getRaidChoices().find(({ value }) => value === 'Guardian Raid'),
+    choice,
+  );
+  assert.deepEqual(getRaidAutocompleteChoices('guardian'), [choice]);
+  assert.equal(resolveListAddRaidLabel('black', 'guardian raid'), 'Guardian Raid');
+  assert.equal(resolveRaidLabel('guardian raid'), 'Guardian Raid');
+  assert.equal(getSelectableRaidValues().includes('Guardian Raid'), true);
+});
+
 test('limited Brel choice uses a durable value and expires at Vietnam midnight', () => {
   const beforeCutoff = { now: '2026-09-01T16:59:59.999Z' };
   const atCutoff = { now: '2026-09-01T17:00:00.000Z' };
@@ -110,10 +123,12 @@ test('multiadd raid dropdown follows the same retired and limited choice policy'
   };
 
   const beforeCutoff = await readRaidFormula('2026-09-01T16:59:59.999Z');
+  assert.match(beforeCutoff, /Guardian Raid/);
   assert.match(beforeCutoff, /Brel Extreme \(Limited\)/);
   assert.doesNotMatch(beforeCutoff, /Mordum Hard/);
 
   const atCutoff = await readRaidFormula('2026-09-01T17:00:00.000Z');
+  assert.match(atCutoff, /Guardian Raid/);
   assert.doesNotMatch(atCutoff, /Brel Extreme \(Limited\)/);
   assert.doesNotMatch(atCutoff, /Mordum Hard/);
 });

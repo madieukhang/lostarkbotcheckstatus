@@ -7,6 +7,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Added
+- `Guardian Raid` is now a canonical raid option for `/la-list add` and `/la-list edit`, including blacklist entries. The shared raid catalog also carries it into the multiadd spreadsheet dropdown and validation.
 - Artist now leaves a sign after the nightly auto-check sweep. The cleanup previously logged to console and posted nothing, so an emptied channel could not be told apart from messages going missing. The notice scales its tone with the volume cleared (1-5 / 6-20 / 21+), with four phrasings per bucket per language. Unlike the RaidManage notice it does not self-delete, because a five-minute sign posted at 00:00 would be seen by nobody, and an empty sweep posts nothing at all.
 - `tPick(key, lang, vars, opts)` alongside `t()`: a key whose value is `{ variants: [...] }` resolves to one member at random, everything else passes through unchanged. Pools are objects rather than bare arrays because bare arrays here already mean "multi-line block" (the welcome-pin fields, the help groups).
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.

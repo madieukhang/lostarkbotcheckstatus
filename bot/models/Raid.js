@@ -23,6 +23,7 @@ const RAID_CATALOG = [
   { value: 'Horizon Lv1' },
   { value: 'Horizon Lv2' },
   { value: 'Horizon Lv3' },
+  { value: 'Guardian Raid' },
   {
     value: 'Brel Extreme (Limited)',
     choiceName: 'Brel Extreme (Limited Time) Choose',
