@@ -26,6 +26,12 @@ import {
   didListCheckNameChange,
   resolveMappedListMatch,
 } from './matchResolution.js';
+import { hasDatabaseListMatch } from './verification.js';
+export {
+  hasDatabaseListMatch,
+  isCharacterIdentityVerified,
+  partitionListCheckResultsByVerification,
+} from './verification.js';
 
 // ─── Name checking ──────────────────────────────────────────────────────────
 
@@ -52,7 +58,8 @@ import {
  * @param {'ocr'|'text'} [options.inputSource='text'] - How the checked name was supplied
  * @param {Map} [options.suggestionCache] - request-local Bible search cache
  * @param {object} [options.suggestionContext] - request-wide Bible lookup budget and metrics
- * @returns {Promise<Array<object>>} Results with list entries and stored snapshot metadata
+ * @returns {Promise<Array<object>>} Results with list entries, identity proof,
+ *   and stored snapshot metadata
  */
 export async function checkNamesAgainstLists(names, options = {}) {
   const startedAt = Date.now();
@@ -105,6 +112,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
     const whiteMatch = resolveMappedListMatch(whiteMap, candidates);
     const watchMatch = resolveMappedListMatch(watchMap, candidates);
     const trustedMatch = resolveMappedListMatch(trustedMap, candidates);
+    const initialListMatch = Boolean(
+      blackMatch.entry || whiteMatch.entry || watchMatch.entry || trustedMatch.entry
+    );
     return {
       inputName: name,
       inputSource,
@@ -113,6 +123,12 @@ export async function checkNamesAgainstLists(names, options = {}) {
       whiteEntry: whiteMatch.entry,
       watchEntry: watchMatch.entry,
       trustedEntry: trustedMatch.entry,
+      identityVerified: Boolean(snap || initialListMatch),
+      identityVerificationSource: initialListMatch
+        ? 'list-database'
+        : snap
+          ? 'roster-snapshot'
+          : null,
       matchDetails: {
         black: blackMatch.detail,
         white: whiteMatch.detail,
@@ -269,6 +285,16 @@ export async function checkNamesAgainstLists(names, options = {}) {
           }
         }
       }
+    }
+  }
+
+  // Canonicalization can reveal a list hit that the original OCR spelling did
+  // not query. Treat that real Mongo record as identity proof even when Bible
+  // was unavailable, while leaving external-only unresolved names unverified.
+  for (const item of results) {
+    if (hasDatabaseListMatch(item)) {
+      item.identityVerified = true;
+      item.identityVerificationSource ||= 'list-database';
     }
   }
 

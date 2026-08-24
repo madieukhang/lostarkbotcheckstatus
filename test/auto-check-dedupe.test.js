@@ -81,8 +81,9 @@ test('auto-check releases inactive-channel claims without marking processed', ()
   completeAutoCheckMessage('message-3', { processed: true, now: 4003 });
 });
 
-test('auto-check Quick Add excludes trusted names', () => {
+test('auto-check Quick Add requires a verified identity with no list hit', () => {
   assert.equal(isQuickAddCandidate({
+    identityVerified: true,
     blackEntry: null,
     whiteEntry: null,
     watchEntry: null,
@@ -90,11 +91,69 @@ test('auto-check Quick Add excludes trusted names', () => {
   }), true);
 
   assert.equal(isQuickAddCandidate({
+    identityVerified: false,
+    blackEntry: null,
+    whiteEntry: null,
+    watchEntry: null,
+    trustedEntry: null,
+  }), false);
+
+  assert.equal(isQuickAddCandidate({
+    identityVerified: true,
     blackEntry: null,
     whiteEntry: null,
     watchEntry: null,
     trustedEntry: { name: 'Clauseduk' },
   }), false);
+});
+
+test('auto-check hides unresolved text candidates instead of rendering or Quick Adding them', async () => {
+  resetAutoCheckDedupeForTest();
+  const edits = [];
+  const reactions = [];
+  let formatterCalled = false;
+  let cardBuilderCalled = false;
+  const handler = createAutoCheckMessageHandler({
+    client: { user: { id: 'bot-user' } },
+    imageChecksEnabled: false,
+    isAutoCheckChannelFn: async () => true,
+    getGuildLanguageFn: async () => 'en',
+    checkNamesAgainstListsFn: async (names) => names.map((name) => ({ name })),
+    formatCheckResultsFn: () => {
+      formatterCalled = true;
+      return ['must-not-render'];
+    },
+    buildListCheckEmbedFn: () => {
+      cardBuilderCalled = true;
+      return { embed: { title: 'must-not-render' } };
+    },
+    buildAutoCheckEvidenceRowFn: () => null,
+  });
+  const message = {
+    id: 'unverified-text-message',
+    content: 'check ocrnoise',
+    channelId: 'channel-1',
+    guild: { id: 'guild-1' },
+    author: { id: 'unverified-user', bot: false, tag: 'User#0003' },
+    attachments: {
+      filter: () => ({ size: 0, first: () => null }),
+    },
+    channel: { name: 'loa-check' },
+    reactions: { cache: { get: () => null } },
+    react: async (emoji) => reactions.push(emoji),
+    reply: async () => ({
+      edit: async (payload) => edits.push(payload),
+    }),
+  };
+
+  await handler(message);
+
+  assert.equal(formatterCalled, false);
+  assert.equal(cardBuilderCalled, false);
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].embeds[0].toJSON().description, /none matched lostark\.bible/u);
+  assert.deepEqual(edits[0].components, []);
+  assert.deepEqual(reactions, ['🔍', '⚠️']);
 });
 
 test('auto-check message handler sends prefixed text through the shared list-check card', async () => {

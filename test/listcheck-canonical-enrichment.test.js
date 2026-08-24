@@ -846,8 +846,41 @@ test('prefix-indel recovery rejects a same-length substitution (Viatchu stays ba
     assert.equal(results[0].name, 'Viatchu', 'OCR name unchanged · no unsafe substitution match');
     assert.equal(results[0].snapItemLevel, 0, 'no item level · row stays bare');
     assert.equal(results[0].snapClassName, '', 'no class · row stays bare');
+    assert.equal(results[0].identityVerified, false, 'unresolved OCR text is not a verified identity');
   } finally {
     stub.restore();
+  }
+});
+
+test('Mongo list records remain verified when Bible cannot confirm the character', async () => {
+  await Blacklist.create({
+    name: 'Storedname',
+    reason: 'saved moderation evidence',
+    addedByUserId: 'tester',
+    addedByTag: 'tester#0001',
+  });
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      return Response.json({ type: 'result', result: JSON.stringify([[]]) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists(['Storedname'], {
+      guildId: 'guild-1',
+      inputSource: 'ocr',
+    });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].blackEntry?.name, 'Storedname');
+    assert.equal(results[0].identityVerified, true);
+    assert.equal(results[0].identityVerificationSource, 'list-database');
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 
@@ -863,6 +896,8 @@ test('worker-online enrichment falls back to bible search canonical names', asyn
     assert.equal(results[0].name, 'Qyoir');
     assert.equal(results[0].snapClassName, 'Bard');
     assert.equal(results[0].snapItemLevel, 1741.67);
+    assert.equal(results[0].identityVerified, true);
+    assert.equal(results[0].identityVerificationSource, 'bible-search');
     assert.match(lines[0], /Qyoir/);
     assert.doesNotMatch(lines[0].split('\n')[0], /Qy\u00F6ir/);
     assert.match(lines[0], /OCR \*\*Qy\u00F6ir\*\*.*Qyoir/);

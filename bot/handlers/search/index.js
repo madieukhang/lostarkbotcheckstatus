@@ -121,6 +121,8 @@ export async function handleSearchCommand(interaction) {
       const snapItemLevel = Number(snap?.itemLevel || 0);
       return {
         ...s,
+        identityVerified: true,
+        identityVerificationSource: 'bible-search',
         itemLevel: snapItemLevel > 0 ? snapItemLevel : s.itemLevel,
         black: blackMap.get(s.name.toLowerCase()) || null,
         white: whiteMap.get(s.name.toLowerCase()) || null,

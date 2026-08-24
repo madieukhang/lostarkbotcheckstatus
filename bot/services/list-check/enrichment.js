@@ -58,7 +58,13 @@ export async function enrichListCheckResults(
     };
   }
 
-  function applyEnrichment(item, { classId, itemLevel, combatScore }) {
+  function applyEnrichment(
+    item,
+    { classId, itemLevel, combatScore },
+    verificationSource,
+  ) {
+    item.identityVerified = true;
+    item.identityVerificationSource = verificationSource;
     if (classId) {
       item.snapClassId = classId;
       item.snapClassName = getClassName(classId);
@@ -106,7 +112,7 @@ export async function enrichListCheckResults(
     applyEnrichment(item, {
       classId: chosen.cls || '',
       itemLevel: Number(chosen.itemLevel) || 0,
-    });
+    }, 'bible-search');
     return LOOKUP_RESOLVED;
   }
 
@@ -120,7 +126,7 @@ export async function enrichListCheckResults(
     applyEnrichment(item, {
       classId: recovered.cls || '',
       itemLevel: Number(recovered.itemLevel) || 0,
-    });
+    }, 'bible-search');
     return LOOKUP_RESOLVED;
   }
 
@@ -252,7 +258,7 @@ export async function enrichListCheckResults(
           classId,
           itemLevel: rosterItemLevel,
           combatScore: roster.targetCombatScore || targetRecord?.combatScore || '',
-        });
+        }, 'bible-roster');
         if (roster.rosterVisibility === 'visible' && Array.isArray(roster.allCharacters)) {
           item.discoveredAlts = roster.allCharacters.filter(
             (name) => String(name).toLowerCase() !== item.name.toLowerCase()

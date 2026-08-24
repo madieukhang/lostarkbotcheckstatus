@@ -40,6 +40,8 @@ import { COLORS } from './ui.js';
  * @param {Array<string>} options.formattedLines - Output from formatCheckResults (display lines, sorted by priority)
  * @param {number} options.limitedNamesCount - Number of names actually checked
  * @param {number} [options.ignoredCount=0] - Names dropped by per-message cap
+ * @param {number} [options.unverifiedCount=0] - OCR/text candidates rejected
+ *   because neither Bible/snapshot nor a Mongo list record confirmed them
  * @param {number} [options.maxNames] - The cap value, used in the "ignored" note
  * @param {'slash'|'auto'} [options.mode='slash'] - Drives small copy differences (title verb, footer)
  * @returns {ListCheckRender}
@@ -49,6 +51,7 @@ export function buildListCheckEmbed({
   formattedLines,
   limitedNamesCount,
   ignoredCount = 0,
+  unverifiedCount = 0,
   maxNames,
   mode = 'slash',
   lang = 'en',
@@ -104,18 +107,25 @@ export function buildListCheckEmbed({
     ? breakdownParts.join(' · ')
     : `${titleIcon} ${limitedNamesCount} ${t(`dialogue.check.${limitedNamesCount === 1 ? 'nameOne' : 'nameMany'}`, lang)}`;
 
-  const ignoreNote = ignoredCount > 0
-    ? `\n\n*${t('dialogue.check.embed.ignored', lang, {
+  const notes = [];
+  if (ignoredCount > 0) {
+    notes.push(t('dialogue.check.embed.ignored', lang, {
         count: ignoredCount,
         word: t(`dialogue.check.${ignoredCount === 1 ? 'nameOne' : 'nameMany'}`, lang),
         limit: maxNames ?? t('dialogue.check.embed.configured', lang),
-      })}*`
+      }));
+  }
+  if (unverifiedCount > 0) {
+    notes.push(t('dialogue.check.embed.unverified', lang, { count: unverifiedCount }));
+  }
+  const resultNotes = notes.length > 0
+    ? `\n\n${notes.map((note) => `*${note}*`).join('\n')}`
     : '';
 
   // Description leads straight with the per-name list now (the breakdown moved
   // up into the title). Ceiling is 4096; the slice is a safety net for long
   // reasons / many similar-name suggestions.
-  const description = (`${formattedLines.join('\n')}${ignoreNote}`).slice(0, 4096);
+  const description = (`${formattedLines.join('\n')}${resultNotes}`).slice(0, 4096);
 
   // Stats grid (Checked / Flagged / Cleared) was a 3-up inline field
   // panel pre-v0.5.73. The Outcome breakdown line at the top of the

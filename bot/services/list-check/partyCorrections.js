@@ -158,5 +158,7 @@ export async function applyMarkedSiblingLevelCorrections(results) {
     item.snapClassName = best.classId ? getClassName(best.classId) : '';
     item.snapItemLevel = Number(best.itemLevel) || 0;
     item.snapCombatScore = best.combatScore || '';
+    item.identityVerified = true;
+    item.identityVerificationSource = 'roster-snapshot';
   }
 }

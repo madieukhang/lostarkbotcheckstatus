@@ -15,6 +15,8 @@ import {
   extractNamesFromImage,
   checkNamesAgainstLists,
   formatCheckResults,
+  isCharacterIdentityVerified,
+  partitionListCheckResultsByVerification,
 } from '../../services/list-check/service.js';
 import { createNameSuggestionContext } from '../../services/roster/search.js';
 import { getGuildConfig } from '../../utils/scope.js';
@@ -129,8 +131,18 @@ export function resetAutoCheckDedupeForTest() {
   userCooldowns.clear();
 }
 
+/**
+ * Keep Quick Add limited to verified characters that have no existing list
+ * record. This prevents raw OCR/text noise from becoming a moderation entry.
+ * @param {object} result - verified list-check result
+ * @returns {boolean} true when the character is eligible for Quick Add
+ */
 export function isQuickAddCandidate(result) {
-  return !result.blackEntry && !result.whiteEntry && !result.watchEntry && !result.trustedEntry;
+  return isCharacterIdentityVerified(result)
+    && !result.blackEntry
+    && !result.whiteEntry
+    && !result.watchEntry
+    && !result.trustedEntry;
 }
 
 /**
@@ -259,12 +271,29 @@ export function createAutoCheckMessageHandler({
         )],
       });
 
-      const results = await checkNamesAgainstListsFn(limitedNames, {
+      const checkedResults = await checkNamesAgainstListsFn(limitedNames, {
         guildId: message.guild.id,
         inputSource: image ? 'ocr' : 'text',
         suggestionCache,
         suggestionContext,
       });
+      const { verified: results, unverified } = partitionListCheckResultsByVerification(
+        checkedResults
+      );
+      if (results.length === 0) {
+        await progressMsg.edit({
+          content: null,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            ...t('dialogue.check.noVerifiedNames', lang, { count: unverified.length }),
+            lang,
+          })],
+          components: [],
+        });
+        await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
+        await message.react('⚠️').catch(() => {});
+        return;
+      }
       const formattedLines = formatCheckResultsFn(results, lang);
 
       // Same embed builder as /la-list check; mode: 'auto' tweaks the
@@ -275,6 +304,7 @@ export function createAutoCheckMessageHandler({
         formattedLines,
         limitedNamesCount: limitedNames.length,
         ignoredCount: names.length - limitedNames.length,
+        unverifiedCount: unverified.length,
         maxNames,
         mode: 'auto',
         lang,

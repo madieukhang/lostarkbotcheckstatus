@@ -374,9 +374,9 @@ export default {
     noResults: { title: 'No matching characters', description: 'I could not find a character matching **{name}**.' },
     noFilteredResults: { title: 'No results match those filters', description: 'I found no **{name}** matches after applying these filters.', filters: 'Filters' },
     failed: { title: 'Search failed', description: 'I could not complete the name search.' },
-    title: 'Search · "{name}"', via: 'via **{name}** · ', noReason: 'no reason', clean: 'clean',
+    title: 'Search · "{name}"', via: 'via **{name}** · ', noReason: 'no reason', notListed: 'not in list DB',
     summary: 'Found **{count}** {word}: {breakdown}', summaryPlain: 'Found **{count}** {word}', matchOne: 'match', matchMany: 'matches',
-    footer: 'Filters: {filters} · Source: lostark.bible',
+    footer: 'Filters: {filters} · Characters: lostark.bible · Lists: bot database',
     session: { title: 'This is not your search', description: 'Only the person who ran this search can open its evidence.' },
     evidenceUnavailable: { title: 'Evidence is unavailable', description: 'The image link expired or its archived message was removed.', footer: 'Upload it again with `/la-list edit name:<entry> image:<file>`.' },
   },
@@ -406,6 +406,7 @@ export default {
     entryRemoved: { title: 'That one is gone now', description: 'Someone removed the list entry this evidence belonged to, so there is nothing left for me to show you.' },
     ocrFailed: { title: 'I could not read that image', description: 'I stared at this screenshot and could not pull a single character name out of it.', footer: 'A clearer shot of the raid waiting room usually does the trick.' },
     noNames: { title: 'Nothing in there looked like a name', description: 'I read the image fine, but none of it looked like a character name.', footer: 'The raid waiting-room screen is the easiest one for me to read.' },
+    noVerifiedNames: { title: 'No verified characters', description: 'I read {count} candidate name(s), but none matched lostark.bible, a saved roster snapshot, or a visible list record.', footer: 'Unverified OCR/text is hidden and cannot be offered through Quick Add.' },
     details: { title: 'Check result · {list}', headline: '{icon} {name} is on the **{list}**{scope}. Here is everything I have saved about them.' },
     text: {
       empty: { title: 'You forgot the name~', description: 'Type `check <character>` or `check: <character>` here and I will look them up for you.', footer: 'Several at once is fine - separate them with spaces, commas, or new lines.' },
@@ -430,7 +431,7 @@ export default {
     failed: { title: 'The check did not finish', description: 'I got the names off the image, but I could not finish checking them against the lists.' },
     autoFailed: { title: 'I could not finish that check', description: 'Something went wrong partway through this one. Post it again and I will have another go.' },
     embed: {
-      imageAuthor: 'Here is the list from the image you sent.', textAuthor: 'Here is the check based on the name you sent.', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: 'not listed', configured: 'configured', ignored: 'Ignored {count} extra {word} (cap: {limit}).',
+      imageAuthor: 'Here is the list from the image you sent.', textAuthor: 'Here is the check based on the name you sent.', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: 'not listed', configured: 'configured', ignored: 'Ignored {count} extra {word} (cap: {limit}).', unverified: 'Skipped {count} unverified candidate(s); Quick Add was disabled for them.',
       flagged: 'FLAGGED {count}', clear: 'CLEAR', correctedOcr: 'OCR corrected {count} · compare with the screenshot', correctedText: 'Typed name corrected {count} · compare with the original input', quickFlagged: 'Quick Add unflagged via the dropdown · /la-roster <name> for details', quickClean: 'Quick Add unflagged names with the dropdown below', rosterTip: '/la-roster <name> for the full roster of a flagged hit', rerunTip: 'Run again with a fresh image to re-check', source: 'SRC db blacklist + whitelist + watchlist + trusted',
     },
     format: { via: 'via **{name}**', correctedOcr: 'OCR **{input}** → lostark.bible **{name}**', correctedText: 'typed **{input}** → lostark.bible **{name}**', rosterVia: 'roster alt **{name}**', rosterEntry: 'roster alt **{name}** → entry **{entry}**', alts: 'alts', more: '+{count} more', local: 'Local', trusted: 'trusted' },

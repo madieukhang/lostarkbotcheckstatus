@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { pickEvidenceEntry } from '../bot/handlers/search/evidence.js';
 import { buildSearchResultEmbed } from '../bot/handlers/search/ui.js';
 
-test('search summary counts clean results without double-subtracting multi-status hits', () => {
+test('search summary counts names absent from the list database without double subtraction', () => {
   const embed = buildSearchResultEmbed({
     name: 'Ains',
     minIlvl: 1700,
@@ -36,7 +36,8 @@ test('search summary counts clean results without double-subtracting multi-statu
   assert.match(description, /Found \*\*2\*\* matches:/);
   assert.match(description, /⛔ \*\*1\*\*/);
   assert.match(description, /🛡️ \*\*1\*\*/);
-  assert.match(description, /❓ \*\*1\*\* clean/);
+  assert.match(description, /❓ \*\*1\*\* not in list DB/);
+  assert.doesNotMatch(description, /\bclean\b/i);
 });
 
 test('search evidence picker skips earlier list entries without images', () => {

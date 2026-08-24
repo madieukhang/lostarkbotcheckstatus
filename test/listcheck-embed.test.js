@@ -100,3 +100,15 @@ test('Vietnamese auto text card uses the compact name-based author', () => {
   assert.equal(rendered.footer, undefined);
   assert.equal(rendered.timestamp, undefined);
 });
+
+test('list-check card reports candidates rejected by identity verification', () => {
+  const { embed } = buildListCheckEmbed({
+    results: [{ name: 'Realname', identityVerified: true }],
+    formattedLines: ['❓ Realname'],
+    limitedNamesCount: 2,
+    unverifiedCount: 1,
+    mode: 'slash',
+  });
+
+  assert.match(embed.toJSON().description, /Skipped 1 unverified candidate/u);
+});

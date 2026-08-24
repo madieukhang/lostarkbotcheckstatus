@@ -23,6 +23,7 @@ import {
   extractNamesFromImage,
   checkNamesAgainstLists,
   formatCheckResults,
+  partitionListCheckResultsByVerification,
 } from '../../../services/list-check/service.js';
 import { didListCheckNameChange } from '../../../services/list-check/matchResolution.js';
 import { createNameSuggestionContext } from '../../../services/roster/search.js';
@@ -243,12 +244,23 @@ export function createCheckHandlers({ client }) {
     });
 
     try {
-      const results = await checkNamesAgainstLists(limitedNames, {
+      const checkedResults = await checkNamesAgainstLists(limitedNames, {
         guildId: interaction.guild?.id,
         inputSource: 'ocr',
         suggestionCache,
         suggestionContext,
       });
+      const { verified: results, unverified } = partitionListCheckResultsByVerification(
+        checkedResults
+      );
+      if (results.length === 0) {
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          ...t('dialogue.check.noVerifiedNames', lang, { count: unverified.length }),
+          lang,
+        });
+        return;
+      }
       const formattedLines = formatCheckResults(results, lang);
 
       const { embed } = buildListCheckEmbed({
@@ -256,6 +268,7 @@ export function createCheckHandlers({ client }) {
         formattedLines,
         limitedNamesCount: limitedNames.length,
         ignoredCount: names.length - limitedNames.length,
+        unverifiedCount: unverified.length,
         maxNames,
         mode: 'slash',
         lang,

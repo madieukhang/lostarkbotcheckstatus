@@ -4,6 +4,7 @@ import { getClassName, getClassEmoji } from '../../models/Class.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { COLORS } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
+import { hasDatabaseListMatch } from '../../services/list-check/verification.js';
 import { pickEvidenceEntry } from './evidence.js';
 
 export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang = 'en' }) {
@@ -45,9 +46,7 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
   const watchCount = results.filter((result) => result.watch).length;
   const whiteCount = results.filter((result) => result.white).length;
   const trustedCount = results.filter((result) => result.trusted).length;
-  const cleanCount = results.filter((result) =>
-    !result.black && !result.watch && !result.white && !result.trusted
-  ).length;
+  const notListedCount = results.filter((result) => !hasDatabaseListMatch(result)).length;
   const hasBlack = blackCount > 0;
   const hasWatch = watchCount > 0;
   const hasWhite = whiteCount > 0;
@@ -62,7 +61,9 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
   if (hasWatch) breakdown.push(`⚠️ **${watchCount}**`);
   if (hasWhite) breakdown.push(`✅ **${whiteCount}**`);
   if (trustedCount > 0) breakdown.push(`🛡️ **${trustedCount}**`);
-  if (cleanCount > 0) breakdown.push(`❓ **${cleanCount}** ${t('dialogue.search.clean', lang)}`);
+  if (notListedCount > 0) {
+    breakdown.push(`❓ **${notListedCount}** ${t('dialogue.search.notListed', lang)}`);
+  }
   const matchWord = t(`dialogue.search.${results.length === 1 ? 'matchOne' : 'matchMany'}`, lang);
   const summaryLine = breakdown.length > 0
     ? t('dialogue.search.summary', lang, { count: results.length, word: matchWord, breakdown: breakdown.join(' · ') })

@@ -141,6 +141,8 @@ test('party correction selects a unique accented sibling near the party median',
     snapClassId: 'bard',
     snapClassName: 'Bard',
     snapCombatScore: '90000',
+    identityVerified: true,
+    identityVerificationSource: 'roster-snapshot',
   });
 });
 
