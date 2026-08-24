@@ -261,17 +261,27 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   return embed;
 }
 
+/**
+ * Build approval-DM recipients while preserving the configured senior order.
+ * At most one random officer is appended; the set prevents duplicate DMs when
+ * the configured roles overlap without repeatedly scanning the output array.
+ * @returns {string[]} unique Discord user IDs
+ */
 export function getApproverRecipientIds() {
   const officers = OFFICER_APPROVER_IDS.filter(Boolean);
   const recipientIds = [];
+  const seen = new Set();
 
   for (const id of SENIOR_APPROVER_IDS) {
-    if (id && !recipientIds.includes(id)) recipientIds.push(id);
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      recipientIds.push(id);
+    }
   }
 
   if (officers.length > 0) {
     const randomOfficerId = officers[Math.floor(Math.random() * officers.length)];
-    if (!recipientIds.includes(randomOfficerId)) {
+    if (!seen.has(randomOfficerId)) {
       recipientIds.push(randomOfficerId);
     }
   }

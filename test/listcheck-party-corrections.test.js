@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import RosterSnapshot from '../bot/models/RosterSnapshot.js';
 import {
   applyMarkedSiblingLevelCorrections,
+  findUniqueClosestSnapshot,
   medianExcludingSortedIndex,
 } from '../bot/services/list-check/partyCorrections.js';
 
@@ -25,6 +26,80 @@ test('medianExcludingSortedIndex rejects unusable input', () => {
   assert.equal(medianExcludingSortedIndex([10], 0), null);
   assert.equal(medianExcludingSortedIndex([10, 20], -1), null);
   assert.equal(medianExcludingSortedIndex([10, 20], 2), null);
+});
+
+test('findUniqueClosestSnapshot uses binary-search neighbours and rejects ties', () => {
+  const snapshots = [
+    { name: 'A', itemLevel: 1680 },
+    { name: 'B', itemLevel: 1710 },
+    { name: 'C', itemLevel: 1740 },
+  ];
+  assert.equal(findUniqueClosestSnapshot(snapshots, 1712)?.name, 'B');
+  assert.equal(findUniqueClosestSnapshot(snapshots, 1725), null);
+  assert.equal(findUniqueClosestSnapshot([], 1710), null);
+
+  const duplicateLevel = [
+    { name: 'A', itemLevel: 1700 },
+    { name: 'B', itemLevel: 1710 },
+    { name: 'C', itemLevel: 1710 },
+  ];
+  assert.equal(findUniqueClosestSnapshot(duplicateLevel, 1709), null);
+});
+
+test('findUniqueClosestSnapshot preserves the former linear selection rules', () => {
+  function findWithLinearReference(snapshots, targetLevel) {
+    let best = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    let bestIsTied = false;
+    for (const snapshot of snapshots) {
+      const distance = Math.abs(Number(snapshot.itemLevel) - targetLevel);
+      if (distance < bestDistance) {
+        best = snapshot;
+        bestDistance = distance;
+        bestIsTied = false;
+      } else if (distance === bestDistance) {
+        bestIsTied = true;
+      }
+    }
+    return best && !bestIsTied ? best : null;
+  }
+
+  // A deterministic generator covers duplicates, exact hits, midpoint ties,
+  // and uneven gaps without making the regression test timing-dependent.
+  let state = 0x5eed1234;
+  const random = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+
+  for (let sample = 0; sample < 500; sample += 1) {
+    const snapshots = Array.from({ length: 1 + Math.floor(random() * 40) }, (_, index) => ({
+      id: `${sample}:${index}`,
+      itemLevel: 1500 + Math.floor(random() * 80) * 5,
+    })).sort((a, b) => a.itemLevel - b.itemLevel);
+    const targetLevel = 1480 + Math.floor(random() * 100) * 5;
+    assert.equal(
+      findUniqueClosestSnapshot(snapshots, targetLevel)?.id ?? null,
+      findWithLinearReference(snapshots, targetLevel)?.id ?? null,
+      `selection drifted for sample ${sample} at target ${targetLevel}`,
+    );
+  }
+});
+
+test('findUniqueClosestSnapshot reads logarithmically many rows', () => {
+  let itemLevelReads = 0;
+  const snapshots = Array.from({ length: 65_536 }, (_, index) => ({
+    id: index,
+    get itemLevel() {
+      itemLevelReads += 1;
+      return index * 10;
+    },
+  }));
+
+  const match = findUniqueClosestSnapshot(snapshots, 327_681);
+
+  assert.equal(match?.id, 32_768);
+  assert.ok(itemLevelReads < 40, `expected logarithmic reads, received ${itemLevelReads}`);
 });
 
 test('party correction selects a unique accented sibling near the party median', async () => {

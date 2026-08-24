@@ -6,6 +6,9 @@ import { hasAnyDiacritic, stripDiacritics } from './nameRecovery.js';
  * Return the median after excluding one position from an already sorted
  * numeric array. The caller sorts once for the whole OCR batch, avoiding a
  * filter + sort for every candidate row.
+ * @param {number[]} sortedValues - ascending item levels for the OCR batch
+ * @param {number} excludedIndex - position to omit from the median
+ * @returns {number|null} median of the remaining values, or null for bad input
  */
 export function medianExcludingSortedIndex(sortedValues, excludedIndex) {
   if (
@@ -26,6 +29,60 @@ export function medianExcludingSortedIndex(sortedValues, excludedIndex) {
     : (valueAt(middle - 1) + valueAt(middle)) / 2;
 }
 
+/**
+ * Find the sole snapshot closest to `targetLevel` in an item-level-sorted
+ * list. Equal-distance neighbours and duplicate rows at the winning level
+ * are deliberately rejected because the correction would be ambiguous.
+ * @param {Array<{itemLevel: number|string}>} sortedSnapshots - ascending snapshots
+ * @param {number} targetLevel - party median used to rank candidates
+ * @returns {object|null} the unique nearest snapshot, or null when ambiguous
+ */
+export function findUniqueClosestSnapshot(sortedSnapshots, targetLevel) {
+  if (!Array.isArray(sortedSnapshots) || sortedSnapshots.length === 0) return null;
+  if (!Number.isFinite(targetLevel)) return null;
+
+  let low = 0;
+  let high = sortedSnapshots.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (Number(sortedSnapshots[middle]?.itemLevel) < targetLevel) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+
+  const leftIndex = low - 1;
+  const rightIndex = low;
+  const leftDistance = leftIndex >= 0
+    ? Math.abs(Number(sortedSnapshots[leftIndex].itemLevel) - targetLevel)
+    : Number.POSITIVE_INFINITY;
+  const rightDistance = rightIndex < sortedSnapshots.length
+    ? Math.abs(Number(sortedSnapshots[rightIndex].itemLevel) - targetLevel)
+    : Number.POSITIVE_INFINITY;
+
+  if (leftDistance === rightDistance) return null;
+  const bestIndex = leftDistance < rightDistance ? leftIndex : rightIndex;
+  if (bestIndex < 0 || bestIndex >= sortedSnapshots.length) return null;
+
+  const bestLevel = Number(sortedSnapshots[bestIndex].itemLevel);
+  const previousLevel = bestIndex > 0
+    ? Number(sortedSnapshots[bestIndex - 1].itemLevel)
+    : null;
+  const nextLevel = bestIndex + 1 < sortedSnapshots.length
+    ? Number(sortedSnapshots[bestIndex + 1].itemLevel)
+    : null;
+  if (previousLevel === bestLevel || nextLevel === bestLevel) return null;
+
+  return sortedSnapshots[bestIndex];
+}
+
+/**
+ * Correct low OCR item-level outliers when one marked-name sibling uniquely
+ * fits the immutable party median and all safety thresholds.
+ * @param {Array<object>} results - mutable list-check result rows
+ * @returns {Promise<void>}
+ */
 export async function applyMarkedSiblingLevelCorrections(results) {
   const exactUnmarked = results.filter(
     (item) => item?.name
@@ -57,9 +114,19 @@ export async function applyMarkedSiblingLevelCorrections(results) {
   const snapshotsByBase = new Map();
   for (const snap of siblingSnapshots) {
     const base = stripDiacritics(snap.name);
-    if (!snap.itemLevel || !snap.classId) continue;
+    if (
+      !snap.classId
+      || !hasAnyDiacritic(snap.name)
+      || !Number.isFinite(Number(snap.itemLevel))
+      || Number(snap.itemLevel) <= 0
+    ) continue;
     if (!snapshotsByBase.has(base)) snapshotsByBase.set(base, []);
     snapshotsByBase.get(base).push(snap);
+  }
+  // Sort each normalized-name group once so every candidate can use binary
+  // search while retaining the former duplicate-level and tie rejection rules.
+  for (const snapshots of snapshotsByBase.values()) {
+    snapshots.sort((a, b) => Number(a.itemLevel) - Number(b.itemLevel));
   }
 
   const corrections = [];
@@ -69,23 +136,9 @@ export async function applyMarkedSiblingLevelCorrections(results) {
     if (!Number.isFinite(partyMedian)) continue;
 
     const base = stripDiacritics(item.name);
-    let best = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    let bestIsTied = false;
-    for (const snap of snapshotsByBase.get(base) || []) {
-      const sameExact = String(snap.name).toLowerCase() === String(item.name).toLowerCase();
-      if (sameExact || !hasAnyDiacritic(snap.name) || Number(snap.itemLevel) <= 0) continue;
-
-      const distance = Math.abs(Number(snap.itemLevel) - partyMedian);
-      if (distance < bestDistance) {
-        best = snap;
-        bestDistance = distance;
-        bestIsTied = false;
-      } else if (distance === bestDistance) {
-        bestIsTied = true;
-      }
-    }
-    if (!best || bestIsTied) continue;
+    const best = findUniqueClosestSnapshot(snapshotsByBase.get(base), partyMedian);
+    if (!best) continue;
+    const bestDistance = Math.abs(Number(best.itemLevel) - partyMedian);
 
     const exactDistance = Math.abs(Number(item.snapItemLevel) - partyMedian);
     const exactIsLowOutlier = Number(item.snapItemLevel) <= partyMedian - 50;

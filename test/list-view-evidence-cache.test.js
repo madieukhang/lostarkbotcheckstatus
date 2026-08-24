@@ -79,3 +79,22 @@ test('/la-list view renders localized pagination and evidence controls', () => {
   assert.equal(expiredPager[2].label, '次へ');
   assert.match(expiredPager[1].label, /\/la-list view/);
 });
+
+test('/la-list view evidence values keep their absolute index without page scans', () => {
+  const allEntries = [
+    buildEntry({ name: 'No image', imageMessageId: null }),
+    buildEntry({ name: 'First image', imageUrl: 'https://cdn.example/first.png' }),
+    buildEntry({ name: 'No image 2', imageMessageId: null }),
+    buildEntry({ name: 'Second image', imageMessageId: 'message-2' }),
+  ];
+  const rows = buildListViewComponents({
+    allEntries,
+    itemsPerPage: 10,
+    lang: 'en',
+    page: 0,
+    totalPages: 1,
+  });
+
+  const options = rows[1].toJSON().components[0].options;
+  assert.deepEqual(options.map((option) => option.value), ['1', '3']);
+});
