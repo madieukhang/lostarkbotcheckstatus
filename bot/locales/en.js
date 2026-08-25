@@ -501,6 +501,7 @@ const en = {
     navigation: {
       evidencePlaceholder: 'View evidence for...',
       detailsPlaceholder: 'View listed-name details...',
+      refresh: 'Refresh',
       expired: 'Session expired · re-run /la-list view',
       noReason: 'No reason',
     },

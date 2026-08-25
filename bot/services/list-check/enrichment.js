@@ -30,7 +30,9 @@ export async function enrichListCheckResults(
   const itemsNeedingEnrichment = results.filter(
     (item) => !item.snapClassId || !item.snapItemLevel
   );
-  if (itemsNeedingEnrichment.length === 0) return;
+  if (itemsNeedingEnrichment.length === 0) {
+    return { correctionApplied: false, correctionMs: 0 };
+  }
 
   // Worker health is checked once for the whole batch. A healthy worker gets
   // the richer roster-page route; every worker miss falls back to the direct
@@ -321,5 +323,10 @@ export async function enrichListCheckResults(
     `budgetExhausted=${lookupStats.budgetExhaustions || 0}`,
   ].join(' '));
 
+  const correctionStartedAt = Date.now();
   await applyMarkedSiblingLevelCorrections(results);
+  return {
+    correctionApplied: true,
+    correctionMs: Date.now() - correctionStartedAt,
+  };
 }

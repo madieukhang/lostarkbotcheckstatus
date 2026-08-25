@@ -53,7 +53,17 @@ export function createListEntrySchema({ scoped = false } = {}) {
     scoped ? { name: 1, scope: 1, guildId: 1 } : { name: 1 },
     { unique: true, collation: CASE_INSENSITIVE_COLLATION }
   );
-  schema.index({ allCharacters: 1 });
+  if (scoped) {
+    // Blacklist checks combine roster aliases with global/server visibility.
+    // Matching the query collation and scope fields lets Mongo satisfy both
+    // halves without scanning every alias hit before applying guild scope.
+    schema.index(
+      { allCharacters: 1, scope: 1, guildId: 1 },
+      { collation: CASE_INSENSITIVE_COLLATION }
+    );
+  } else {
+    schema.index({ allCharacters: 1 });
+  }
   schema.index({ addedAt: -1 });
   return schema;
 }

@@ -223,7 +223,12 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
         .setLabel(t('common.pagination.next', lang))
         .setEmoji(ICONS.next)
         .setStyle(ButtonStyle.Secondary)
-        .setDisabled(page >= totalPages - 1)
+        .setDisabled(page >= totalPages - 1),
+      new ButtonBuilder()
+        .setCustomId('listview_refresh')
+        .setLabel(t('listView.navigation.refresh', lang))
+        .setEmoji(ICONS.refresh)
+        .setStyle(ButtonStyle.Secondary)
     )
   );
 

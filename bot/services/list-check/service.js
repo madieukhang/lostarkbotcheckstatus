@@ -155,16 +155,27 @@ export async function checkNamesAgainstLists(names, options = {}) {
     };
   });
 
-  const correctionStartedAt = Date.now();
-  await applyMarkedSiblingLevelCorrections(results);
-  const correctionMs = Date.now() - correctionStartedAt;
-
-
   // Targeted class/ilvl enrichment lives in its own module so this
   // service stays focused on DB orchestration.
   const enrichmentStartedAt = Date.now();
-  await enrichListCheckResults(results, { suggestionCache, suggestionContext });
-  const enrichmentMs = Date.now() - enrichmentStartedAt;
+  const enrichmentOutcome = await enrichListCheckResults(results, {
+    suggestionCache,
+    suggestionContext,
+  });
+  const enrichmentTotalMs = Date.now() - enrichmentStartedAt;
+
+  // Enrichment already performs the party-level correction after it has all
+  // newly resolved levels. Fully cached batches skip enrichment, so they run
+  // the same correction here. This keeps exactly one immutable correction
+  // query per request instead of repeating it for mixed cached/uncached input.
+  let correctionMs = Number(enrichmentOutcome?.correctionMs) || 0;
+  if (!enrichmentOutcome?.correctionApplied) {
+    const correctionStartedAt = Date.now();
+    await applyMarkedSiblingLevelCorrections(results);
+    correctionMs = Date.now() - correctionStartedAt;
+  }
+  const enrichmentCorrectionMs = Number(enrichmentOutcome?.correctionMs) || 0;
+  const enrichmentMs = Math.max(0, enrichmentTotalMs - enrichmentCorrectionMs);
 
   // Enrichment can canonicalize OCR'd names (for example
   // "Auroraforymluv" -> "Auroraformyluv") or discover visible roster

@@ -336,6 +336,7 @@ const vi = {
     navigation: {
       evidencePlaceholder: 'Xem evidence của...',
       detailsPlaceholder: 'Xem chi tiết tên trong list...',
+      refresh: 'Làm mới',
       expired: 'Hết hạn · chạy lại /la-list view',
       noReason: 'Chưa có lý do',
     },

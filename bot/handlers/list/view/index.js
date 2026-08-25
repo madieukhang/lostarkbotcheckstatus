@@ -35,6 +35,7 @@ import {
 } from './ui.js';
 
 const ITEMS_PER_PAGE = 10;
+const LIST_VIEW_REFRESH_TTL_MS = 5000;
 
 function resolveTypes(type, scopeFilter) {
   if (scopeFilter && type === 'all') return ['black'];
@@ -86,13 +87,17 @@ export async function loadListEntries(
   return allEntries;
 }
 
-async function buildGuildNameCache({ allEntries, client, isOwnerGuild }) {
-  const guildNameCache = new Map();
+async function buildGuildNameCache({
+  allEntries,
+  client,
+  isOwnerGuild,
+  guildNameCache = new Map(),
+}) {
   if (!isOwnerGuild) return guildNameCache;
 
   const serverGuildIds = [...new Set(
     allEntries.filter((entry) => entry.scope === 'server' && entry.guildId).map((entry) => entry.guildId)
-  )];
+  )].filter((guildId) => !guildNameCache.has(guildId));
   await Promise.all(serverGuildIds.map(async (guildId) => {
     try {
       const guild = await client.guilds.fetch(guildId);
@@ -116,7 +121,16 @@ async function buildGuildNameCache({ allEntries, client, isOwnerGuild }) {
  *   handleListViewEvidenceSelect: Function,
  * }}
  */
-export function createViewHandlers({ client }) {
+export function createViewHandlers({
+  client,
+  connectDatabase = connectDB,
+  loadEntries = loadListEntries,
+  getLanguage = getUserLanguage,
+  now = Date.now,
+  refreshTtlMs = LIST_VIEW_REFRESH_TTL_MS,
+} = {}) {
+  const normalizedRefreshTtlMs = Math.max(0, Number(refreshTtlMs) || 0);
+
   async function handleListViewCommand(interaction) {
     if (!interaction.guild) {
       await deferReply(interaction, { ephemeral: true });
@@ -130,13 +144,13 @@ export function createViewHandlers({ client }) {
     }
 
     await deferReply(interaction);
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+    const lang = await getLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     const type = interaction.options.getString('type', true);
     const scopeFilter = interaction.options.getString('scope') || '';
 
     try {
-      await connectDB();
+      await connectDatabase();
 
       if (type === 'trusted') {
         const trustedEntries = await TrustedUser.find({}).sort({ addedAt: -1 }).lean();
@@ -156,7 +170,7 @@ export function createViewHandlers({ client }) {
 
       const viewGuildId = interaction.guild.id;
       const isOwnerGuild = viewGuildId === config.ownerGuildId;
-      const allEntries = await loadListEntries({ isOwnerGuild, scopeFilter, type, viewGuildId });
+      let allEntries = await loadEntries({ isOwnerGuild, scopeFilter, type, viewGuildId });
 
       if (allEntries.length === 0) {
         const ctx = type === 'all' ? null : getListContext(type);
@@ -174,9 +188,43 @@ export function createViewHandlers({ client }) {
       }
 
       const guildNameCache = await buildGuildNameCache({ allEntries, client, isOwnerGuild });
-      const totalPages = Math.ceil(allEntries.length / ITEMS_PER_PAGE);
+      let totalPages = Math.max(1, Math.ceil(allEntries.length / ITEMS_PER_PAGE));
       let currentPage = 0;
+      let snapshotLoadedAtMs = Number(now());
+      let refreshPromise = null;
       const evidenceUrlCache = new Map();
+
+      const refreshEntries = ({ force = false } = {}) => {
+        const snapshotAgeMs = Math.max(0, Number(now()) - snapshotLoadedAtMs);
+        if (!force && snapshotAgeMs < normalizedRefreshTtlMs) {
+          return Promise.resolve(false);
+        }
+        if (refreshPromise) return refreshPromise;
+
+        refreshPromise = (async () => {
+          const nextEntries = await loadEntries({
+            isOwnerGuild,
+            scopeFilter,
+            type,
+            viewGuildId,
+          });
+          await buildGuildNameCache({
+            allEntries: nextEntries,
+            client,
+            isOwnerGuild,
+            guildNameCache,
+          });
+          allEntries = nextEntries;
+          totalPages = Math.max(1, Math.ceil(allEntries.length / ITEMS_PER_PAGE));
+          currentPage = Math.min(currentPage, totalPages - 1);
+          evidenceUrlCache.clear();
+          snapshotLoadedAtMs = Number(now());
+          return true;
+        })().finally(() => {
+          refreshPromise = null;
+        });
+        return refreshPromise;
+      };
 
       const pageOptions = () => ({
         allEntries,
@@ -199,16 +247,18 @@ export function createViewHandlers({ client }) {
         totalPages,
       });
 
-      await editEmbed(interaction, await buildListPageEmbed(pageOptions()), {
+      const messageFromEdit = await editEmbed(interaction, await buildListPageEmbed(pageOptions()), {
         components: buildListViewComponents(componentOptions()),
       });
 
-      const reply = await interaction.fetchReply();
+      const reply = messageFromEdit?.createMessageComponentCollector
+        ? messageFromEdit
+        : await interaction.fetchReply();
       const collector = reply.createMessageComponentCollector({ time: 300000 });
 
       collector.on('collect', async (componentInteraction) => {
         if (componentInteraction.user.id !== interaction.user.id) {
-          const clickerLang = await getUserLanguage(componentInteraction.user.id, { UserPreferenceModel: UserPreference });
+          const clickerLang = await getLanguage(componentInteraction.user.id, { UserPreferenceModel: UserPreference });
           await replyAlert(componentInteraction, {
             severity: AlertSeverity.ERROR,
             ...t('dialogue.listView.session', clickerLang),
@@ -217,11 +267,16 @@ export function createViewHandlers({ client }) {
           return;
         }
 
-        if (componentInteraction.customId === 'listview_prev' || componentInteraction.customId === 'listview_next') {
-          currentPage = componentInteraction.customId === 'listview_prev'
-            ? Math.max(0, currentPage - 1)
-            : Math.min(totalPages - 1, currentPage + 1);
+        const isPrevious = componentInteraction.customId === 'listview_prev';
+        const isNext = componentInteraction.customId === 'listview_next';
+        const isRefresh = componentInteraction.customId === 'listview_refresh';
+        if (isPrevious || isNext || isRefresh) {
           await componentInteraction.deferUpdate();
+          await refreshEntries({ force: isRefresh }).catch((err) => {
+            console.warn('[list] Live view refresh failed:', err.message);
+          });
+          if (isPrevious) currentPage = Math.max(0, currentPage - 1);
+          if (isNext) currentPage = Math.min(totalPages - 1, currentPage + 1);
           await editEmbed(componentInteraction, await buildListPageEmbed(pageOptions()), {
             components: buildListViewComponents(componentOptions()),
           });

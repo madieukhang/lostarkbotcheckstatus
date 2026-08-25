@@ -82,8 +82,19 @@ test('list entry indexes keep current uniqueness and roster lookup contracts', (
     });
   }
 
-  for (const model of [Blacklist, Whitelist, Watchlist]) {
+  const blackRosterScope = findIndex(Blacklist, {
+    allCharacters: 1,
+    scope: 1,
+    guildId: 1,
+  });
+  assert.deepEqual(blackRosterScope?.[1], {
+    collation: { locale: 'en', strength: 2 },
+  });
+
+  for (const model of [Whitelist, Watchlist]) {
     assert.deepEqual(findIndex(model, { allCharacters: 1 })?.[1], {});
+  }
+  for (const model of [Blacklist, Whitelist, Watchlist]) {
     assert.deepEqual(findIndex(model, { addedAt: -1 })?.[1], {});
   }
 

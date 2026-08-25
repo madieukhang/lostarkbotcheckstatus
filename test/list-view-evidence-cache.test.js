@@ -70,6 +70,8 @@ test('/la-list view renders localized pagination and evidence controls', () => {
   const pager = rows[0].toJSON().components;
   assert.equal(pager[0].label, 'Trước');
   assert.equal(pager[2].label, 'Tiếp');
+  assert.equal(pager[3].label, 'Làm mới');
+  assert.equal(pager[3].custom_id, 'listview_refresh');
 
   const evidenceSelect = rows[1].toJSON().components[0];
   assert.match(evidenceSelect.placeholder, /Xem evidence của/);
