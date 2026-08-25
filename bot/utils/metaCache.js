@@ -62,9 +62,13 @@ export function getCachedMeta(name) {
 export function setCachedMeta(name, meta) {
   const key = normalize(name);
   if (!key) return;
-  // Evict the oldest entry when at capacity. Map iteration order in
-  // V8 is insertion order, so the first key is the LRU candidate.
-  if (cache.size >= metaCacheMaxSize) {
+
+  // Updating an existing key is an LRU touch, not a new allocation. Delete it
+  // first so Map insertion order moves it to the MRU edge, and only evict when
+  // this write truly grows the cache. The old order could evict an unrelated
+  // entry when the newest key was refreshed at capacity.
+  const isExisting = cache.delete(key);
+  if (!isExisting && cache.size >= metaCacheMaxSize) {
     const firstKey = cache.keys().next().value;
     cache.delete(firstKey);
   }
@@ -73,10 +77,6 @@ export function setCachedMeta(name, meta) {
 
 export function clearMetaCache() {
   cache.clear();
-}
-
-export function getMetaCacheStats() {
-  return { size: cache.size, ttlMs: metaCacheTtlMs, maxSize: metaCacheMaxSize };
 }
 
 function normalize(name) {

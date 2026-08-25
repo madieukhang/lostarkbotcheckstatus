@@ -37,15 +37,6 @@ export function buildBlacklistQuery(nameQuery, guildId) {
   return { $and: [nameQuery, scopeFilter] };
 }
 
-/**
- * Check if a guild is the owner guild.
- * @param {string} guildId
- * @returns {boolean}
- */
-export function isOwnerGuild(guildId) {
-  return Boolean(guildId && guildId === config.ownerGuildId);
-}
-
 // ─── GuildConfig cache ─────────────────────────────────────────────────────
 
 const guildConfigCache = new Map();

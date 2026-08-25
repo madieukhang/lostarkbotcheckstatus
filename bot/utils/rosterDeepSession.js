@@ -89,14 +89,6 @@ export function getRosterDeepSession(sessionId) {
   return sessions.get(sessionId) || null;
 }
 
-export function touchRosterDeepSession(sessionId) {
-  const session = sessions.get(sessionId);
-  if (!session) return null;
-  if (session.expireTimer) clearTimeout(session.expireTimer);
-  session.expireTimer = setTimeout(() => sessions.delete(sessionId), SESSION_TTL_MS);
-  return session;
-}
-
 export function refreshRosterDeepSession(session) {
   if (!session?.sessionId) return null;
   if (session.expireTimer) clearTimeout(session.expireTimer);

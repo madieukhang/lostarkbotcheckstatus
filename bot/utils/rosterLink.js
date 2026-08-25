@@ -7,7 +7,7 @@
  * of these helpers instead of building the URL inline.
  *
  * Why a helper layer:
- *   1. Config-driven base. `config.bibleBaseUrl` controls all four
+ *   1. Config-driven base. `config.bibleBaseUrl` controls all three
  *      shapes from one env var; swapping the upstream roster site no
  *      longer means grepping 25+ files for `lostark.bible`.
  *   2. Single encoding rule. Character names occasionally carry chars
@@ -45,9 +45,4 @@ export function logsUrl(name) {
 /** Bare profile link · `<base>/<name>`. Used by hidden-roster embeds. */
 export function profileUrl(name) {
   return joinBase(encodeURIComponent(name));
-}
-
-/** Guild page link · `<base>/<name>/guild`. Used by guild-members card. */
-export function guildPageUrl(name) {
-  return joinBase(`${encodeURIComponent(name)}/guild`);
 }

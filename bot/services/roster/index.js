@@ -40,7 +40,6 @@ export {
 } from './altDetection.js';
 
 export {
-  buildRosterStatusContent,
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
 } from './listChecks.js';

@@ -223,16 +223,6 @@ export function startMonitor(client) {
   return handle;
 }
 
-// ─── State management helpers (used by slash commands) ───────────────────────
-
-/**
- * Return a snapshot of the current persisted state (read-only).
- * @returns {Promise<object>}
- */
-export async function getState() {
-  return loadState();
-}
-
 /**
  * Reset the state file back to its default empty values.
  * @returns {Promise<void>}

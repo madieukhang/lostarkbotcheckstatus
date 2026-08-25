@@ -94,9 +94,3 @@ export async function handleRosterWhiteListCheck(names) {
     return null;
   }
 }
-
-export function buildRosterStatusContent(name, result, label) {
-  const reason = result.reason ? ` - *${result.reason}*` : '';
-  const raid = result.raid ? ` [${result.raid}]` : '';
-  return `${label} **${name}**${label === '⛔' ? ' is on the blacklist.' : ' is on the whitelist.'}${raid}${reason}`;
-}
