@@ -1,7 +1,7 @@
 /**
  * serverStatus.js
  * Fetches and parses the Lost Ark server status page to determine
- * the current status of a target server (e.g. "Brelshaza").
+ * the current status of a target server (e.g. "Thaemine").
  *
  * Real DOM structure (per live page inspection):
  *
@@ -12,9 +12,9 @@
  *        <svg …/>
  *      </div>
  *    </div>
- *    <div aria-label="Brelshaza is online"
+ *    <div aria-label="Thaemine is online"
  *         class="ags-ServerStatus-content-responses-response-server-name">
- *      Brelshaza
+ *      Thaemine
  *    </div>
  *  </div>
  *
@@ -73,7 +73,7 @@ function resolveStatusFromClass(className) {
 
 /**
  * Determine status from the aria-label attribute on the server name element.
- * The live page uses labels like "Brelshaza is online" / "Brelshaza is offline".
+ * The live page uses labels like "Thaemine is online" / "Thaemine is offline".
  * This is the most reliable signal because it is human-readable plain text.
  *
  * @param {string} ariaLabel
@@ -94,7 +94,7 @@ function resolveStatusFromAriaLabel(ariaLabel) {
  * the configured target server.
  *
  * Parsing uses three strategies in order of reliability:
- *   1. aria-label on the server name element   e.g. "Brelshaza is online"
+ *   1. aria-label on the server name element   e.g. "Thaemine is online"
  *   2. CSS modifier class on the inner status div  e.g. "…--good"
  *   3. Page-wide aria-label attribute search (fallback if outer DOM shifts)
  *

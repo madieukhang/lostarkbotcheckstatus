@@ -238,7 +238,7 @@ const config = {
   statusUrl: 'https://www.playlostark.com/en-gb/support/server-status',
 
   /** The server name(s) to monitor (comma-separated, must match names on the status page exactly) */
-  targetServers: (process.env.TARGET_SERVERS || process.env.TARGET_SERVER || 'Brelshaza')
+  targetServers: (process.env.TARGET_SERVERS || process.env.TARGET_SERVER || 'Thaemine')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
