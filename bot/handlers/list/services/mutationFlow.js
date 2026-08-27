@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
+import { connectDB } from '../../../db.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editEmbed, editNotice } from '../../../utils/interactionReplies.js';
+import { isRequesterAutoApprover } from '../helpers.js';
 
 export function buildListMutationPayload({
   requestId = randomUUID(),
@@ -57,4 +59,47 @@ export async function renderListAddExecutionResult(
     lang,
     components: result.components ?? [],
   });
+}
+
+/**
+ * Execute the shared decision boundary for a list-add mutation.
+ *
+ * Officers and server-scoped blacklist writes execute immediately. Every other
+ * request must be delivered to at least one approver before it is persisted.
+ * Surface-specific copy remains in callbacks so slash-add and Quick Add can
+ * keep their own UI without duplicating the approval contract.
+ */
+export async function submitListMutation({
+  interaction,
+  payload,
+  lang,
+  PendingApprovalModel,
+  sendListAddApprovalToApprovers,
+  executeListAddToDatabase,
+  onDeliveryFailed = null,
+  onQueued = null,
+  connectDBFn = connectDB,
+  isRequesterAutoApproverFn = isRequesterAutoApprover,
+  renderExecutionResultFn = renderListAddExecutionResult,
+}) {
+  const autoApproved =
+    isRequesterAutoApproverFn(payload.requestedByUserId)
+    || payload.scope === 'server';
+
+  if (autoApproved) {
+    const result = await executeListAddToDatabase(payload);
+    await renderExecutionResultFn(interaction, result, lang);
+    return { status: 'executed', result };
+  }
+
+  const delivery = await sendListAddApprovalToApprovers(interaction.guild, payload);
+  if (!delivery.success) {
+    await onDeliveryFailed?.(delivery);
+    return { status: 'delivery-failed', delivery };
+  }
+
+  await connectDBFn();
+  await persistDeliveredApproval(PendingApprovalModel, payload, delivery);
+  await onQueued?.(delivery);
+  return { status: 'queued', delivery };
 }

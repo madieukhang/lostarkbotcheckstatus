@@ -28,12 +28,10 @@ import {
 } from '../../../utils/interactionReplies.js';
 import {
   buildListAddApprovalEmbed,
-  isRequesterAutoApprover,
 } from '../helpers.js';
 import {
   buildListMutationPayload,
-  persistDeliveredApproval,
-  renderListAddExecutionResult,
+  submitListMutation,
 } from '../services/mutationFlow.js';
 
 /**
@@ -151,40 +149,34 @@ export function createListAddCommandHandler({
         scope: type === 'black' ? scope : 'global', // scope only applies to blacklist
       });
 
-      // Auto-approve: officers always, OR server-scoped entries (local = no approval needed)
-      if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
-        const result = await executeListAddToDatabase(payload);
-        await renderListAddExecutionResult(interaction, result, lang);
-        return;
-      }
-
-      const sent = await sendListAddApprovalToApprovers(interaction.guild, payload);
-      if (!sent.success) {
-        await editAlert(interaction, {
+      const submission = await submitListMutation({
+        interaction,
+        payload,
+        lang,
+        PendingApprovalModel: PendingApproval,
+        sendListAddApprovalToApprovers,
+        executeListAddToDatabase,
+        onDeliveryFailed: (delivery) => editAlert(interaction, {
           severity: AlertSeverity.WARNING,
           ...t('dialogue.listAdd.command.deliveryFailed', lang),
-          fields: [{ name: t('dialogue.broadcast.fields.reason', lang), value: sent.reason || t('dialogue.common.unknown', lang), inline: false }],
+          fields: [{ name: t('dialogue.broadcast.fields.reason', lang), value: delivery.reason || t('dialogue.common.unknown', lang), inline: false }],
           lang,
-        });
-        return;
-      }
-
-      await connectDB();
-      await persistDeliveredApproval(PendingApproval, payload, sent);
-
-      await editEmbed(
-        interaction,
-        buildListAddApprovalEmbed(interaction.guild, payload, {
-          title: t('dialogue.listAdd.command.submittedTitle', lang),
-          includeRequestedBy: false,
-          lang,
-        })
-      );
+        }),
+        onQueued: () => editEmbed(
+          interaction,
+          buildListAddApprovalEmbed(interaction.guild, payload, {
+            title: t('dialogue.listAdd.command.submittedTitle', lang),
+            includeRequestedBy: false,
+            lang,
+          })
+        ),
+      });
+      if (submission.status !== 'queued') return;
 
       try {
         const requestReply = await interaction.fetchReply();
         await PendingApproval.updateOne(
-          { requestId },
+          { requestId: payload.requestId },
           { $set: { requestMessageId: requestReply.id } }
         );
       } catch (err) {

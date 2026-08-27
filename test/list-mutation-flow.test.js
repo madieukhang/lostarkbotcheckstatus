@@ -6,6 +6,7 @@ import {
   buildListMutationPayload,
   persistDeliveredApproval,
   renderListAddExecutionResult,
+  submitListMutation,
 } from '../bot/handlers/list/services/mutationFlow.js';
 
 test('buildListMutationPayload keeps canonical request and requester metadata', () => {
@@ -141,4 +142,66 @@ test('renderListAddExecutionResult preserves rich-embed and notice projections',
       },
     ],
   });
+});
+
+function buildSubmissionDeps(overrides = {}) {
+  const calls = [];
+  return {
+    calls,
+    options: {
+      interaction: { guild: { id: 'guild-1' } },
+      payload: {
+        requestedByUserId: 'requester-1',
+        requestId: 'request-1',
+        scope: 'global',
+      },
+      lang: 'vi',
+      PendingApprovalModel: {
+        create: async (payload) => calls.push(['persist', payload]),
+      },
+      sendListAddApprovalToApprovers: async () => ({
+        success: true,
+        deliveredApproverIds: ['approver-1'],
+        deliveredDmMessages: [],
+      }),
+      executeListAddToDatabase: async () => ({ ok: true }),
+      connectDBFn: async () => calls.push(['connect']),
+      isRequesterAutoApproverFn: () => false,
+      renderExecutionResultFn: async (...args) => calls.push(['render', ...args]),
+      onDeliveryFailed: async (delivery) => calls.push(['delivery-failed', delivery]),
+      onQueued: async (delivery) => calls.push(['queued', delivery]),
+      ...overrides,
+    },
+  };
+}
+
+test('submitListMutation executes officers and server-scoped requests immediately', async () => {
+  for (const overrides of [
+    { isRequesterAutoApproverFn: () => true },
+    { payload: { requestedByUserId: 'requester-1', requestId: 'request-1', scope: 'server' } },
+  ]) {
+    const { calls, options } = buildSubmissionDeps(overrides);
+    const result = await submitListMutation(options);
+    assert.equal(result.status, 'executed');
+    assert.deepEqual(calls.map(([kind]) => kind), ['render']);
+  }
+});
+
+test('submitListMutation persists only after a successful approval delivery', async () => {
+  const { calls, options } = buildSubmissionDeps();
+  const result = await submitListMutation(options);
+
+  assert.equal(result.status, 'queued');
+  assert.deepEqual(calls.map(([kind]) => kind), ['connect', 'persist', 'queued']);
+});
+
+test('submitListMutation stops before persistence when approval delivery fails', async () => {
+  const delivery = { success: false, reason: 'no approver accepted the DM' };
+  const { calls, options } = buildSubmissionDeps({
+    sendListAddApprovalToApprovers: async () => delivery,
+  });
+  const result = await submitListMutation(options);
+
+  assert.equal(result.status, 'delivery-failed');
+  assert.deepEqual(calls, [['delivery-failed', delivery]]);
 });

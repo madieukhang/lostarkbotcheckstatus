@@ -16,17 +16,10 @@ import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { deferUpdate, replyAlert, replyEmbed } from '../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { detectAltsViaStronghold } from '../../services/roster/index.js';
-import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import {
   buildScanResultEmbed,
   buildScanResultButtons,
 } from '../../utils/scanResultEmbed.js';
-import {
-  buildStopButtonRow,
-  newScanSessionId,
-  registerScan,
-  unregisterScan,
-} from '../../utils/scanSession.js';
 import {
   buildStrongholdScanLimitEmbed,
   reserveStrongholdScanForInteraction,
@@ -40,7 +33,7 @@ import {
   clearRosterDeepSession,
 } from '../../utils/rosterDeepSession.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
-import { makeRosterScanProgressCallback } from './progress.js';
+import { createRosterScanRuntime } from './progress.js';
 
 /**
  * Continue button for /la-roster deep:true. Resumes the prior scan
@@ -97,15 +90,14 @@ export async function handleRosterDeepContinueButton(interaction) {
   session.inProgress = true;
   refreshRosterDeepSession(session);
 
-  const startedAtRef = { value: Date.now() };
-  const lastEditRef = { value: startedAtRef.value };
-  const scanSessionId = newScanSessionId();
-  const cancelFlag = { cancelled: false };
-  registerScan(scanSessionId, {
-    cancelFlag,
-    callerId: interaction.user.id,
-    startedAt: startedAtRef.value,
+  const activeScan = createRosterScanRuntime({
+    interaction,
+    replyEditor,
+    name: session.targetName,
+    meta: session.meta,
+    totalMembers: session.guildMembers.length,
     label: `${session.targetName} (roster deep · resume)`,
+    lang,
   });
 
   // Show the progress embed during the resume pass. It temporarily replaces
@@ -117,28 +109,16 @@ export async function handleRosterDeepContinueButton(interaction) {
     .length;
   const passLimit = session.cap || passEligible;
 
-  const progressEmbed = buildScanProgressEmbed({
-    title: t('dialogue.scan.resuming', lang, { name: session.targetName }),
-    subtitle: `${t('dialogue.scan.guildMembers', lang, { guild: session.meta.guildName, count: session.guildMembers.length })} · ${t('dialogue.scan.continuePass', lang)}`,
-    color: COLORS.info,
-    lang,
-    progress: {
-      scannedCandidates: 0,
-      totalCandidates: Math.min(passEligible, passLimit),
-      altsFound: 0,
-      failedCandidates: 0,
-      currentBackoffMs: 1500,
-      totalMembers: session.guildMembers.length,
-      startedAt: startedAtRef.value,
-    },
-  });
-
   const primaryEmbed = EmbedBuilder.from(session.primaryEmbedJSON);
-  await replyEditor.edit({
-    content: null,
-    embeds: [primaryEmbed, progressEmbed],
-    components: [buildStopButtonRow(scanSessionId, { lang })],
-  }).catch(() => {});
+  await replyEditor.edit(
+    activeScan.buildInitialPayload({
+      title: t('dialogue.scan.resuming', lang, { name: session.targetName }),
+      subtitle: `${t('dialogue.scan.guildMembers', lang, { guild: session.meta.guildName, count: session.guildMembers.length })} · ${t('dialogue.scan.continuePass', lang)}`,
+      totalCandidates: Math.min(passEligible, passLimit),
+      content: null,
+      leadingEmbeds: [primaryEmbed],
+    })
+  ).catch(() => {});
 
   let altResult;
   let scanThrownError = null;
@@ -149,27 +129,16 @@ export async function handleRosterDeepContinueButton(interaction) {
       candidateLimit: session.cap,
       useScraperApiForCandidates: false,
       excludeNames: session.scannedNames || [],
-      cancelFlag,
+      cancelFlag: activeScan.cancelFlag,
       viaWorker: true,
-      onProgress: makeRosterScanProgressCallback({
-        interaction,
-        replyEditor,
-        name: session.targetName,
-        meta: session.meta,
-        totalMembers: session.guildMembers.length,
-        startedAtRef,
-        lastEditRef,
-        cancelFlag,
-        sessionId: scanSessionId,
-        lang,
-      }),
+      onProgress: activeScan.onProgress,
     });
   } catch (err) {
     scanThrownError = err;
   } finally {
     session.inProgress = false;
     refreshRosterDeepSession(session);
-    unregisterScan(scanSessionId);
+    activeScan.close();
     scanReservation.release();
   }
 

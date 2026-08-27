@@ -8,7 +8,12 @@
 
 import { COLORS } from '../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
-import { buildStopButtonRow } from '../../utils/scanSession.js';
+import {
+  buildStopButtonRow,
+  newScanSessionId,
+  registerScan,
+  unregisterScan,
+} from '../../utils/scanSession.js';
 import { t } from '../../services/i18n/index.js';
 
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
@@ -17,6 +22,92 @@ import { t } from '../../services/i18n/index.js';
 // users reported the embed felt frozen between ticks.
 const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
 const PROGRESS_EDIT_FAILURE_LIMIT = 3;
+
+/**
+ * Own one active roster scan's cancellation registry and progress UI context.
+ * Hidden, visible, and continuation scans differ in data selection, but their
+ * session registration, initial card, callback, and cleanup contract is the
+ * same and must not drift between entry points.
+ */
+export function createRosterScanRuntime({
+  interaction,
+  replyEditor,
+  name,
+  meta,
+  totalMembers,
+  label,
+  lang = 'en',
+}) {
+  const startedAtRef = { value: Date.now() };
+  const lastEditRef = { value: startedAtRef.value };
+  const sessionId = newScanSessionId();
+  const cancelFlag = { cancelled: false };
+  let closed = false;
+
+  registerScan(sessionId, {
+    cancelFlag,
+    callerId: interaction.user.id,
+    startedAt: startedAtRef.value,
+    label,
+  });
+
+  const onProgress = makeRosterScanProgressCallback({
+    interaction,
+    replyEditor,
+    name,
+    meta,
+    totalMembers,
+    startedAtRef,
+    lastEditRef,
+    cancelFlag,
+    sessionId,
+    lang,
+  });
+
+  function buildInitialPayload({
+    title,
+    subtitle,
+    totalCandidates,
+    content = '',
+    leadingEmbeds = [],
+  }) {
+    const progressEmbed = buildScanProgressEmbed({
+      title,
+      subtitle,
+      color: COLORS.info,
+      lang,
+      progress: {
+        scannedCandidates: 0,
+        totalCandidates,
+        altsFound: 0,
+        failedCandidates: 0,
+        currentBackoffMs: 1500,
+        totalMembers,
+        startedAt: startedAtRef.value,
+      },
+    });
+    return {
+      content,
+      embeds: [...leadingEmbeds, progressEmbed],
+      components: [buildStopButtonRow(sessionId, { lang })],
+    };
+  }
+
+  function close() {
+    if (closed) return;
+    closed = true;
+    unregisterScan(sessionId);
+  }
+
+  return {
+    buildInitialPayload,
+    cancelFlag,
+    close,
+    onProgress,
+    sessionId,
+    startedAtRef,
+  };
+}
 
 function abortForProgressEditFailures(cancelFlag) {
   if (!cancelFlag || cancelFlag.cancelled) return;

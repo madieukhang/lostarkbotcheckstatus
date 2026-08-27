@@ -16,13 +16,10 @@
  * the interaction tokens (Discord webhook reply window is 15 min).
  */
 
+import { createExpiringSessionStore } from './expiringSessionStore.js';
+
 const SESSION_TTL_MS = 5 * 60 * 1000;
-
-const sessions = new Map();
-
-function newSessionId() {
-  return Math.random().toString(36).slice(2, 12);
-}
+const sessionStore = createExpiringSessionStore({ ttlMs: SESSION_TTL_MS });
 
 /**
  * @typedef RosterDeepSession
@@ -40,16 +37,7 @@ function newSessionId() {
  */
 
 export function createRosterDeepSession(payload) {
-  const sessionId = newSessionId();
-  const expireTimer = setTimeout(() => sessions.delete(sessionId), SESSION_TTL_MS);
-  const session = {
-    ...payload,
-    sessionId,
-    createdAt: Date.now(),
-    expireTimer,
-  };
-  sessions.set(sessionId, session);
-  return session;
+  return sessionStore.create(payload);
 }
 
 export function buildRosterContinuationSessionPayload({
@@ -86,19 +74,13 @@ export function createRosterContinuationSession(options) {
 }
 
 export function getRosterDeepSession(sessionId) {
-  return sessions.get(sessionId) || null;
+  return sessionStore.get(sessionId);
 }
 
 export function refreshRosterDeepSession(session) {
-  if (!session?.sessionId) return null;
-  if (session.expireTimer) clearTimeout(session.expireTimer);
-  session.expireTimer = setTimeout(() => sessions.delete(session.sessionId), SESSION_TTL_MS);
-  sessions.set(session.sessionId, session);
-  return session;
+  return sessionStore.refresh(session);
 }
 
 export function clearRosterDeepSession(sessionId) {
-  const session = sessions.get(sessionId);
-  if (session?.expireTimer) clearTimeout(session.expireTimer);
-  sessions.delete(sessionId);
+  sessionStore.clear(sessionId);
 }

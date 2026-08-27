@@ -24,11 +24,9 @@ import {
   editAlert,
 } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
-import { isRequesterAutoApprover } from '../helpers.js';
 import {
   buildListMutationPayload,
-  persistDeliveredApproval,
-  renderListAddExecutionResult,
+  submitListMutation,
 } from '../services/mutationFlow.js';
 
 /**
@@ -127,33 +125,25 @@ export function createQuickAddHandlers({ client, services }) {
         scope: quickScope,
       });
 
-      // Auto-approve: officers always, OR server-scoped (local = free)
-      if (isRequesterAutoApprover(payload.requestedByUserId) || payload.scope === 'server') {
-        const result = await executeListAddToDatabase(payload);
-        await renderListAddExecutionResult(interaction, result, lang);
-        return;
-      }
-
-      // Non-approver → send approval request
-      const sent = await sendListAddApprovalToApprovers(interaction.guild, payload);
-      if (!sent.success) {
-        await editAlert(interaction, {
+      await submitListMutation({
+        interaction,
+        payload,
+        lang,
+        PendingApprovalModel: PendingApproval,
+        sendListAddApprovalToApprovers,
+        executeListAddToDatabase,
+        onDeliveryFailed: (delivery) => editAlert(interaction, {
           severity: AlertSeverity.WARNING,
           title: t('dialogue.quickAdd.deliveryFailed.title', lang),
-          description: sent.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
+          description: delivery.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
           lang,
-        });
-        return;
-      }
-
-      await connectDB();
-      await persistDeliveredApproval(PendingApproval, payload, sent);
-
-      await editAlert(interaction, {
-        severity: AlertSeverity.INFO,
-        titleIcon: '📨',
-        ...t('dialogue.quickAdd.sent', lang, { name, list: t(`dialogue.broadcast.list.${type}`, lang) }),
-        lang,
+        }),
+        onQueued: () => editAlert(interaction, {
+          severity: AlertSeverity.INFO,
+          titleIcon: '📨',
+          ...t('dialogue.quickAdd.sent', lang, { name, list: t(`dialogue.broadcast.list.${type}`, lang) }),
+          lang,
+        }),
       });
     } catch (err) {
       console.error('[quickadd] Failed:', err.message);

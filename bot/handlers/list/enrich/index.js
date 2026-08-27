@@ -369,21 +369,26 @@ export function createEnrichHandlers({ client, services }) {
     // Reuse or create the enrich session that backs the Confirm /
     // Continue / Discard buttons. Continue paths refresh the TTL so
     // the 5-minute expiry doesn't fire between pass 1 and pass 2.
+    const nextSessionProgress = {
+      allDiscoveredAlts: cumulativeAlts,
+      newAlts: newAlts.map((a) => ({
+        name: a.name,
+        classId: a.classId,
+        itemLevel: a.itemLevel,
+      })),
+      scannedNames: cumulativeScannedNames,
+      scanStats: {
+        scanned: cumulativeScanned,
+        attempted: cumulativeAttempted,
+        failed: cumulativeFailed,
+        rateLimitRetries: cumulativeRateLimitRetries,
+        totalAlts: cumulativeAlts.length,
+        guildName: meta.guildName,
+      },
+    };
     let session;
     if (existingSession) {
-      Object.assign(existingSession, {
-        allDiscoveredAlts: cumulativeAlts,
-        newAlts: newAlts.map((a) => ({ name: a.name, classId: a.classId, itemLevel: a.itemLevel })),
-        scannedNames: cumulativeScannedNames,
-        scanStats: {
-          scanned: cumulativeScanned,
-          attempted: cumulativeAttempted,
-          failed: cumulativeFailed,
-          rateLimitRetries: cumulativeRateLimitRetries,
-          totalAlts: cumulativeAlts.length,
-          guildName: meta.guildName,
-        },
-      });
+      Object.assign(existingSession, nextSessionProgress);
       session = touchEnrichSession(existingSession.sessionId) || existingSession;
     } else {
       session = createEnrichSession({
@@ -398,17 +403,7 @@ export function createEnrichHandlers({ client, services }) {
         },
         targetIsHidden,
         cap: resolvedCap,
-        allDiscoveredAlts: cumulativeAlts,
-        newAlts: newAlts.map((a) => ({ name: a.name, classId: a.classId, itemLevel: a.itemLevel })),
-        scannedNames: cumulativeScannedNames,
-        scanStats: {
-          scanned: cumulativeScanned,
-          attempted: cumulativeAttempted,
-          failed: cumulativeFailed,
-          rateLimitRetries: cumulativeRateLimitRetries,
-          totalAlts: cumulativeAlts.length,
-          guildName: meta.guildName,
-        },
+        ...nextSessionProgress,
       });
     }
 

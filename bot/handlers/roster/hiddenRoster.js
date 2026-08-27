@@ -27,21 +27,14 @@ import {
   fetchNameSuggestions,
   formatSuggestionLines,
 } from '../../services/roster/index.js';
-import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import {
   buildScanResultEmbed,
   buildScanResultButtons,
 } from '../../utils/scanResultEmbed.js';
-import {
-  buildStopButtonRow,
-  newScanSessionId,
-  registerScan,
-  unregisterScan,
-} from '../../utils/scanSession.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { createRosterContinuationSession } from '../../utils/rosterDeepSession.js';
 import { rosterUrl, profileUrl as bibleProfileUrl } from '../../utils/rosterLink.js';
-import { makeRosterScanProgressCallback, formatDeepScanStats } from './progress.js';
+import { createRosterScanRuntime, formatDeepScanStats } from './progress.js';
 
 /**
  * Render the hidden-roster card for /la-roster.
@@ -101,37 +94,24 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
           // Send a 0% progress embed + Stop button immediately so the
           // officer knows the scan started and has a way out if bible
           // is hot. onProgress edits the same message every 15s.
-          const startedAtRef = { value: Date.now() };
-          const lastEditRef = { value: startedAtRef.value };
           const filteredCount = guildMembers.filter((m) => m.name !== name && m.ilvl >= 1700).length;
           const cap = deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit;
-          const sessionId = newScanSessionId();
-          const cancelFlag = { cancelled: false };
-          registerScan(sessionId, {
-            cancelFlag,
-            callerId: interaction.user.id,
-            startedAt: startedAtRef.value,
+          const scan = createRosterScanRuntime({
+            interaction,
+            replyEditor,
+            name,
+            meta,
+            totalMembers: guildMembers.length,
             label: `${name} (roster deep · hidden)`,
+            lang,
           });
-          await replyEditor.edit({
-            content: '',
-            embeds: [buildScanProgressEmbed({
+          await replyEditor.edit(
+            scan.buildInitialPayload({
               title: t('dialogue.scan.progress', lang, { name }),
               subtitle: `${t('dialogue.scan.guildMembers', lang, { guild: meta.guildName, count: guildMembers.length })} · ${t('dialogue.scan.hiddenRoster', lang)}`,
-              color: COLORS.info,
-              lang,
-              progress: {
-                scannedCandidates: 0,
-                totalCandidates: Math.min(filteredCount, cap || filteredCount),
-                altsFound: 0,
-                failedCandidates: 0,
-                currentBackoffMs: 1500,
-                totalMembers: guildMembers.length,
-                startedAt: startedAtRef.value,
-              },
-            })],
-            components: [buildStopButtonRow(sessionId, { lang })],
-          }).catch(() => {});
+              totalCandidates: Math.min(filteredCount, cap || filteredCount),
+            })
+          ).catch(() => {});
 
           try {
             altResult = await detectAltsViaStronghold(name, {
@@ -139,19 +119,8 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
               viaWorker: true,
               targetMeta: meta,
               guildMembers,
-              cancelFlag,
-              onProgress: makeRosterScanProgressCallback({
-                interaction,
-                replyEditor,
-                name,
-                meta,
-                totalMembers: guildMembers.length,
-                startedAtRef,
-                lastEditRef,
-                cancelFlag,
-                sessionId,
-                lang,
-              }),
+              cancelFlag: scan.cancelFlag,
+              onProgress: scan.onProgress,
             });
           } catch (err) {
             scanErrorEmbed = buildAlertEmbed({
@@ -161,7 +130,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
               lang,
             });
           } finally {
-            unregisterScan(sessionId);
+            scan.close();
           }
         }
         // Primary card: hidden roster info + guild list-hits. The alt

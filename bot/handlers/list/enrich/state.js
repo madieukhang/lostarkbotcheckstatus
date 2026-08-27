@@ -1,12 +1,10 @@
+import { createExpiringSessionStore } from '../../../utils/expiringSessionStore.js';
+
 const ENRICH_COOLDOWN_MS = 30 * 1000;
 const SESSION_TTL_MS = 5 * 60 * 1000;
 
 const enrichCooldown = new Map();
-const sessions = new Map();
-
-function newSessionId() {
-  return Math.random().toString(36).slice(2, 12);
-}
+const sessionStore = createExpiringSessionStore({ ttlMs: SESSION_TTL_MS });
 
 export function getCooldownWaitSeconds(name) {
   const cooldownKey = name.toLowerCase();
@@ -21,16 +19,7 @@ export function markCooldown(name) {
 }
 
 export function createEnrichSession(payload) {
-  const sessionId = newSessionId();
-  const expireTimer = setTimeout(() => sessions.delete(sessionId), SESSION_TTL_MS);
-  const session = {
-    ...payload,
-    sessionId,
-    createdAt: Date.now(),
-    expireTimer,
-  };
-  sessions.set(sessionId, session);
-  return session;
+  return sessionStore.create(payload);
 }
 
 /**
@@ -39,11 +28,7 @@ export function createEnrichSession(payload) {
  * landed. Mutates the session in-place; returns the session for chain.
  */
 export function touchEnrichSession(sessionId) {
-  const session = sessions.get(sessionId);
-  if (!session) return null;
-  if (session.expireTimer) clearTimeout(session.expireTimer);
-  session.expireTimer = setTimeout(() => sessions.delete(sessionId), SESSION_TTL_MS);
-  return session;
+  return sessionStore.touch(sessionId);
 }
 
 /**
@@ -53,19 +38,13 @@ export function touchEnrichSession(sessionId) {
  * TTL and render fresh buttons backed by an expired session.
  */
 export function refreshEnrichSession(session) {
-  if (!session?.sessionId) return null;
-  if (session.expireTimer) clearTimeout(session.expireTimer);
-  session.expireTimer = setTimeout(() => sessions.delete(session.sessionId), SESSION_TTL_MS);
-  sessions.set(session.sessionId, session);
-  return session;
+  return sessionStore.refresh(session);
 }
 
 export function getEnrichSession(sessionId) {
-  return sessions.get(sessionId) || null;
+  return sessionStore.get(sessionId);
 }
 
 export function clearEnrichSession(sessionId) {
-  const session = sessions.get(sessionId);
-  if (session?.expireTimer) clearTimeout(session.expireTimer);
-  sessions.delete(sessionId);
+  sessionStore.clear(sessionId);
 }

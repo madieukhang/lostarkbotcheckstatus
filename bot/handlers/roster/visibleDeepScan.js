@@ -19,20 +19,13 @@ import {
   fetchCharacterMeta,
   fetchGuildMembers,
 } from '../../services/roster/index.js';
-import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
 import {
   buildScanResultEmbed,
   buildScanResultButtons,
 } from '../../utils/scanResultEmbed.js';
-import {
-  buildStopButtonRow,
-  newScanSessionId,
-  registerScan,
-  unregisterScan,
-} from '../../utils/scanSession.js';
 import { createRosterContinuationSession } from '../../utils/rosterDeepSession.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
-import { makeRosterScanProgressCallback } from './progress.js';
+import { createRosterScanRuntime } from './progress.js';
 
 /**
  * Run the Stronghold deep-scan branch on a visible /la-roster query.
@@ -80,8 +73,6 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
             })
           : [];
 
-        const startedAtRef = { value: Date.now() };
-        const lastEditRef = { value: startedAtRef.value };
         const visFilteredCount = visGuildMembers.filter((m) => m.name !== name && m.ilvl >= 1700).length;
         const visCap = deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit;
         // Single progress embed during the scan; the final editReply at
@@ -91,34 +82,25 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
         // of the main roster card, but it was never rendered before the
         // scan anyway so nothing is actually lost.
         const hasGuildContext = visMeta?.guildName && visGuildMembers.length > 0;
-        const sessionId = hasGuildContext ? newScanSessionId() : null;
-        const cancelFlag = hasGuildContext ? { cancelled: false } : null;
-        if (hasGuildContext) {
-          registerScan(sessionId, {
-            cancelFlag,
-            callerId: interaction.user.id,
-            startedAt: startedAtRef.value,
+        const scan = hasGuildContext
+          ? createRosterScanRuntime({
+            interaction,
+            replyEditor,
+            name,
+            meta: visMeta,
+            totalMembers: visGuildMembers.length,
             label: `${name} (roster deep · visible)`,
-          });
-          await replyEditor.edit({
-            content: '',
-            embeds: [buildScanProgressEmbed({
+            lang,
+          })
+          : null;
+        if (scan) {
+          await replyEditor.edit(
+            scan.buildInitialPayload({
               title: t('dialogue.scan.progress', lang, { name }),
               subtitle: `${t('dialogue.scan.guildMembers', lang, { guild: visMeta.guildName, count: visGuildMembers.length })} · ${t('dialogue.scan.visibleRoster', lang)}`,
-              color: COLORS.info,
-              lang,
-              progress: {
-                scannedCandidates: 0,
-                totalCandidates: Math.min(visFilteredCount, visCap || visFilteredCount),
-                altsFound: 0,
-                failedCandidates: 0,
-                currentBackoffMs: 1500,
-                totalMembers: visGuildMembers.length,
-                startedAt: startedAtRef.value,
-              },
-            })],
-            components: [buildStopButtonRow(sessionId, { lang })],
-          }).catch(() => {});
+              totalCandidates: Math.min(visFilteredCount, visCap || visFilteredCount),
+            })
+          ).catch(() => {});
         }
 
         let altResult;
@@ -128,24 +110,11 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
             viaWorker: true,
             ...(visMeta ? { targetMeta: visMeta } : {}),
             ...(visGuildMembers.length > 0 ? { guildMembers: visGuildMembers } : {}),
-            ...(cancelFlag ? { cancelFlag } : {}),
-            onProgress: hasGuildContext
-              ? makeRosterScanProgressCallback({
-                  interaction,
-                  replyEditor,
-                  name,
-                  meta: visMeta,
-                  totalMembers: visGuildMembers.length,
-                  startedAtRef,
-                  lastEditRef,
-                  cancelFlag,
-                  sessionId,
-                  lang,
-                })
-              : undefined,
+            ...(scan ? { cancelFlag: scan.cancelFlag } : {}),
+            onProgress: scan?.onProgress,
           });
         } finally {
-          if (sessionId) unregisterScan(sessionId);
+          scan?.close();
         }
         // Surface deep-scan result to the function scope for the
         // post-reply DM. visMeta gives the DM access to guildName.
