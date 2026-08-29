@@ -14,7 +14,7 @@ import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
 import { upsertRosterSnapshots } from '../../../services/roster/rosterSnapshots.js';
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
-import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
+import { COLORS, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { getListContext, listTypeIcon } from '../helpers.js';
 import { buildBroadcastEvidenceComponents } from '../evidence/broadcastButton.js';

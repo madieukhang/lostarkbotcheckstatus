@@ -9,9 +9,7 @@
 import { EmbedBuilder } from 'discord.js';
 
 import { connectDB } from '../../db.js';
-import config from '../../config.js';
 import UserPreference from '../../models/UserPreference.js';
-import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { deferUpdate, replyAlert, replyEmbed } from '../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';

@@ -90,26 +90,8 @@ function resolveStatusFromAriaLabel(ariaLabel) {
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
- * Fetch the Lost Ark server status page and return the normalised status for
- * the configured target server.
- *
- * Parsing uses three strategies in order of reliability:
- *   1. aria-label on the server name element   e.g. "Thaemine is online"
- *   2. CSS modifier class on the inner status div  e.g. "…--good"
- *   3. Page-wide aria-label attribute search (fallback if outer DOM shifts)
- *
- * @param {string} [targetServer] - Server name to check (defaults to first configured server)
- * @returns {Promise<string>} One of the STATUS constants
- * @throws  When the HTTP request itself fails
- */
-export async function getServerStatus(targetServer) {
-  const results = await getMultiServerStatus(targetServer ? [targetServer] : [config.targetServers[0]]);
-  return results.values().next().value ?? STATUS.UNKNOWN;
-}
-
-/**
  * Fetch the status page once and return statuses for multiple servers.
- * Much more efficient than calling getServerStatus() per server.
+ * A single request keeps the configured server checks consistent.
  *
  * @param {string[]} serverNames - Server names to check
  * @returns {Promise<Map<string, string>>} Map of server name → STATUS

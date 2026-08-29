@@ -32,7 +32,6 @@ import {
 /**
  * Build the Quick-Add handler bag.
  * @param {object} deps
- * @param {import('discord.js').Client} deps.client - Discord client
  * @param {object} deps.services - shared approval-flow services
  *   (sendListAddApprovalToApprovers, executeListAddToDatabase)
  * @returns {{
@@ -40,7 +39,7 @@ import {
  *   handleQuickAddModalSubmit: Function,
  * }}
  */
-export function createQuickAddHandlers({ client, services }) {
+export function createQuickAddHandlers({ services }) {
   const { sendListAddApprovalToApprovers, executeListAddToDatabase } = services;
 
   async function handleQuickAddSelect(interaction) {

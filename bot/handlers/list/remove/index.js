@@ -37,12 +37,11 @@ import { getListContext } from '../helpers.js';
 /**
  * Build the /la-list remove handler bag.
  * @param {object} deps
- * @param {import('discord.js').Client} deps.client - Discord client
  * @param {object} deps.services - shared services
  *   (broadcastListChange for the post-remove guild notification)
  * @returns {{handleListRemoveCommand: Function}}
  */
-export function createRemoveHandlers({ client, services }) {
+export function createRemoveHandlers({ services }) {
   const { broadcastListChange } = services;
 
   async function handleListRemoveCommand(interaction) {

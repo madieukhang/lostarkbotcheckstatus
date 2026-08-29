@@ -103,7 +103,7 @@ async function lookupAutocompleteCandidates(query, guildId) {
   await connectDB();
   const trimmed = (query || '').trim();
 
-  const buildBaseQuery = (type) => {
+  const buildBaseQuery = () => {
     if (!trimmed) return {};
     // Escape regex metacharacters and anchor with `^` so MongoDB can hit
     // the compound (name, scope, guildId) index for a prefix range scan.
@@ -113,7 +113,7 @@ async function lookupAutocompleteCandidates(query, guildId) {
 
   const results = await Promise.all(KNOWN_TYPES.map(async (type) => {
     const { model } = getListContext(type);
-    const baseQuery = buildBaseQuery(type);
+    const baseQuery = buildBaseQuery();
     const scoped = buildScopedListQuery(type, baseQuery, guildId);
     const docs = await model
       .find(scoped)

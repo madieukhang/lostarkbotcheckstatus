@@ -195,7 +195,6 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
         // slash command from scratch.
         const replyEmbeds = [primaryEmbed];
         const replyComponents = [];
-        let scanState = null;
 
         if (scanErrorEmbed) {
           replyEmbeds.push(scanErrorEmbed);
@@ -208,7 +207,6 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
             summaryLine: t('dialogue.enrich.summary', lang, { guild: meta.guildName, name, resumed: '' }),
             lang,
           });
-          scanState = state;
           replyEmbeds.push(scanEmbed);
 
           if (state.hasRemaining) {

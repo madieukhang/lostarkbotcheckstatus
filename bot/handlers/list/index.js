@@ -43,12 +43,12 @@ export function createListHandlers({ client }) {
   const add = createAddHandlers({ client, services });
   const check = createCheckHandlers({ client });
   const edit = createEditHandlers({ client, services });
-  const enrich = createEnrichHandlers({ client, services });
+  const enrich = createEnrichHandlers({ services });
   const evidence = createEvidenceHandlers({ client });
   const handleBroadcastEvidenceButton = createBroadcastEvidenceButtonHandler({ client });
   const multiadd = createMultiaddHandlers({ client, services });
-  const quickadd = createQuickAddHandlers({ client, services });
-  const remove = createRemoveHandlers({ client, services });
+  const quickadd = createQuickAddHandlers({ services });
+  const remove = createRemoveHandlers({ services });
   const trust = createTrustHandlers({ client });
   const view = createViewHandlers({ client });
 

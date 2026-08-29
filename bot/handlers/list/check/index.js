@@ -1,24 +1,12 @@
-import { randomUUID } from 'node:crypto';
 import {
   ActionRowBuilder,
-  AttachmentBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType,
-  ModalBuilder,
   StringSelectMenuBuilder,
-  TextInputBuilder,
-  TextInputStyle,
 } from 'discord.js';
 
 import { connectDB } from '../../../db.js';
 import config from '../../../config.js';
-import GuildConfig from '../../../models/GuildConfig.js';
-import PendingApproval from '../../../models/PendingApproval.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
-import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { getClassName } from '../../../models/Class.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
@@ -27,8 +15,6 @@ import {
 } from '../../../services/list-check/service.js';
 import { didListCheckNameChange } from '../../../services/list-check/matchResolution.js';
 import { createNameSuggestionContext } from '../../../services/roster/search.js';
-import { truncateDiscordContent } from '../../../utils/discordText.js';
-import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
@@ -37,33 +23,16 @@ import {
   editNotice,
 } from '../../../utils/interactionReplies.js';
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
-import { rehostImage, resolveDisplayImageUrl, refreshImageUrl } from '../../../utils/imageRehost.js';
+import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { ICONS } from '../../../utils/ui.js';
 import { getUserLanguage, t, tPick } from '../../../services/i18n/index.js';
-import {
-  buildMultiaddTemplate,
-  parseMultiaddFile,
-  MULTIADD_MAX_ROWS,
-} from '../../../services/multiadd/index.js';
 import {
   getListContext,
   decorateListEntry,
   parseListEntryRef,
-  buildTrustedBlockEmbed,
-  buildListEditSuccessEmbed,
-  buildListAddApprovalEmbed,
-  getApproverRecipientIds,
-  isRequesterAutoApprover,
-  isOfficerOrSenior,
-  getSeniorApproverIds,
-  buildApprovalResultRow,
-  buildApprovalProcessingRow,
 } from '../helpers.js';
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 import { buildCheckEntryDetailsEmbed } from './ui.js';
-
-const OFFICER_APPROVER_IDS = config.officerApproverIds;
-const SENIOR_APPROVER_IDS = config.seniorApproverIds;
 
 function pickListEntryForDetails(result) {
   for (const [listType, entry] of [

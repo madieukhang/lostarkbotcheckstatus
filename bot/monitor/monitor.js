@@ -12,7 +12,7 @@ import { COLORS } from '../utils/ui.js';
 import { createArtistEmbed } from '../utils/artistVoice.js';
 import GuildConfig from '../models/GuildConfig.js';
 import { getGuildLanguage, t } from '../services/i18n/index.js';
-import { getServerStatus, getMultiServerStatus, STATUS } from './serverStatus.js';
+import { getMultiServerStatus, STATUS } from './serverStatus.js';
 
 // ─── State helpers ────────────────────────────────────────────────────────────
 

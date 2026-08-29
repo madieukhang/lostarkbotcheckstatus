@@ -29,7 +29,6 @@ import {
   replyAlert,
 } from '../../../utils/interactionReplies.js';
 import {
-  getListContext,
   buildTrustedBlockEmbed,
   isRequesterAutoApprover,
   isOfficerOrSenior,

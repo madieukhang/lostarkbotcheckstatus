@@ -51,7 +51,6 @@ import {
   replyNotice,
   updateAlert,
   updateNotice,
-  updatePayload,
 } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
@@ -96,7 +95,7 @@ import { rosterUrl } from '../../../utils/rosterLink.js';
 const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
 const PROGRESS_EDIT_FAILURE_LIMIT = 3;
 
-export function createEnrichHandlers({ client, services }) {
+export function createEnrichHandlers({ services }) {
   // Guild-broadcast notifier shared with /la-list add/edit. Fired on Confirm
   // so the notify channels learn an entry just gained newly-discovered alts.
   const { broadcastListChange } = services || {};
