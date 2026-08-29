@@ -1,10 +1,15 @@
 import config from '../../config.js';
 import { findBibleNode } from '../../utils/bibleData.js';
+import { createLruTtlCache } from '../../utils/lruTtlCache.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
 import { parseGuildMembersFromHtml } from './parsers.js';
 
-const guildMembersCache = new Map();
+const guildMembersCache = createLruTtlCache({
+  ttlMs: () => config.guildMembersCacheTtlMs,
+  maxSize: () => config.guildMembersCacheMaxSize,
+  normalizeKey: normalizeGuildMembersCacheKey,
+});
 const inFlightGuildMemberFetches = new Map();
 
 function normalizeGuildMembersCacheKey(key) {
@@ -12,30 +17,12 @@ function normalizeGuildMembersCacheKey(key) {
 }
 
 function getCachedGuildMembers(cacheKey) {
-  const key = normalizeGuildMembersCacheKey(cacheKey);
-  if (!key) return undefined;
-  const entry = guildMembersCache.get(key);
-  if (!entry) return undefined;
-  if (Date.now() > entry.expiresAt) {
-    guildMembersCache.delete(key);
-    return undefined;
-  }
-  guildMembersCache.delete(key);
-  guildMembersCache.set(key, entry);
-  return entry.members;
+  return guildMembersCache.get(cacheKey);
 }
 
 function setCachedGuildMembers(cacheKey, members) {
-  const key = normalizeGuildMembersCacheKey(cacheKey);
-  if (!key || !Array.isArray(members) || members.length === 0) return;
-  if (guildMembersCache.size >= config.guildMembersCacheMaxSize) {
-    const firstKey = guildMembersCache.keys().next().value;
-    guildMembersCache.delete(firstKey);
-  }
-  guildMembersCache.set(key, {
-    members,
-    expiresAt: Date.now() + config.guildMembersCacheTtlMs,
-  });
+  if (!Array.isArray(members) || members.length === 0) return;
+  guildMembersCache.set(cacheKey, members);
 }
 
 export function clearGuildMembersCache() {

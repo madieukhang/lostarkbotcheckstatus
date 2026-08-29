@@ -15,6 +15,10 @@ import { deferEphemeralReply, editAlert, editEmbed } from '../../../utils/intera
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import { decorateListEntry } from '../helpers.js';
+import {
+  PENDING_APPROVAL_ACCESS,
+  resolvePendingApprovalAccess,
+} from '../services/pendingApprovalAccess.js';
 
 /**
  * Build the "View evidence" button handler attached to approval DM cards.
@@ -33,26 +37,24 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     // Restrict to assigned approvers only · same permission model as
     // Approve/Reject. Avoids leaking evidence images to non-approvers who
     // somehow get hold of the button (shouldn't happen, but defense in depth).
-    const payload = await PendingApproval.findOne({
+    const approvalAccess = await resolvePendingApprovalAccess({
+      PendingApprovalModel: PendingApproval,
       requestId,
-      approverIds: interaction.user.id,
-    }).lean();
+      approverId: interaction.user.id,
+    });
+    const { payload } = approvalAccess;
 
     if (!payload) {
-      const stillExists = await PendingApproval.exists({ requestId });
-      if (stillExists) {
-        await editAlert(interaction, {
-          severity: AlertSeverity.ERROR,
-          ...t('dialogue.approval.flow.evidenceNotAuthorized', lang),
-          lang,
-        });
-      } else {
-        await editAlert(interaction, {
-          severity: AlertSeverity.WARNING,
-          ...t('dialogue.approval.flow.expired', lang),
-          lang,
-        });
-      }
+      const notAuthorized =
+        approvalAccess.status === PENDING_APPROVAL_ACCESS.notAuthorized;
+      await editAlert(interaction, {
+        severity: notAuthorized ? AlertSeverity.ERROR : AlertSeverity.WARNING,
+        ...t(
+          `dialogue.approval.flow.${notAuthorized ? 'evidenceNotAuthorized' : 'expired'}`,
+          lang
+        ),
+        lang,
+      });
       return;
     }
 

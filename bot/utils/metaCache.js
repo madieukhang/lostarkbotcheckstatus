@@ -35,9 +35,15 @@
  *     justified by current load.
  */
 
+import { createLruTtlCache } from './lruTtlCache.js';
+
 let metaCacheTtlMs = 30 * 60 * 1000;
 let metaCacheMaxSize = 5000;
-const cache = new Map();
+const cache = createLruTtlCache({
+  ttlMs: () => metaCacheTtlMs,
+  maxSize: () => metaCacheMaxSize,
+  normalizeKey: normalize,
+});
 
 export function configureMetaCache({ ttlMs, maxSize } = {}) {
   if (typeof ttlMs === 'number' && ttlMs > 0) metaCacheTtlMs = ttlMs;
@@ -45,34 +51,11 @@ export function configureMetaCache({ ttlMs, maxSize } = {}) {
 }
 
 export function getCachedMeta(name) {
-  const key = normalize(name);
-  if (!key) return undefined;
-  const entry = cache.get(key);
-  if (!entry) return undefined;
-  if (Date.now() > entry.expiresAt) {
-    cache.delete(key);
-    return undefined;
-  }
-  // LRU touch: re-insert so this key moves to "most recently used".
-  cache.delete(key);
-  cache.set(key, entry);
-  return entry.meta;
+  return cache.get(name);
 }
 
 export function setCachedMeta(name, meta) {
-  const key = normalize(name);
-  if (!key) return;
-
-  // Updating an existing key is an LRU touch, not a new allocation. Delete it
-  // first so Map insertion order moves it to the MRU edge, and only evict when
-  // this write truly grows the cache. The old order could evict an unrelated
-  // entry when the newest key was refreshed at capacity.
-  const isExisting = cache.delete(key);
-  if (!isExisting && cache.size >= metaCacheMaxSize) {
-    const firstKey = cache.keys().next().value;
-    cache.delete(firstKey);
-  }
-  cache.set(key, { meta, expiresAt: Date.now() + metaCacheTtlMs });
+  cache.set(name, meta);
 }
 
 export function clearMetaCache() {

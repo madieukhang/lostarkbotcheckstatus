@@ -25,6 +25,10 @@ import {
   buildApprovalResultRow,
   buildApprovalProcessingRow,
 } from '../helpers.js';
+import {
+  PENDING_APPROVAL_ACCESS,
+  resolvePendingApprovalAccess,
+} from '../services/pendingApprovalAccess.js';
 import { handleApprovedEditRequest } from './editApproval.js';
 
 /**
@@ -54,26 +58,19 @@ export function createListAddApprovalButtonHandler({
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     // Find but don't delete yet · need to keep for duplicate overwrite flow
-    const payload = await PendingApproval.findOne({
+    const approvalAccess = await resolvePendingApprovalAccess({
+      PendingApprovalModel: PendingApproval,
       requestId,
-      approverIds: interaction.user.id,
-    }).lean();
+      approverId: interaction.user.id,
+    });
+    const { payload } = approvalAccess;
 
     if (!payload) {
-      const stillExists = await PendingApproval.exists({ requestId });
-
-      if (stillExists) {
-        await replyAlert(interaction, {
-          severity: AlertSeverity.ERROR,
-          ...t('dialogue.approval.flow.notAuthorized', lang),
-          lang,
-        });
-        return;
-      }
-
+      const notAuthorized =
+        approvalAccess.status === PENDING_APPROVAL_ACCESS.notAuthorized;
       await replyAlert(interaction, {
-        severity: AlertSeverity.WARNING,
-        ...t('dialogue.approval.flow.expired', lang),
+        severity: notAuthorized ? AlertSeverity.ERROR : AlertSeverity.WARNING,
+        ...t(`dialogue.approval.flow.${notAuthorized ? 'notAuthorized' : 'expired'}`, lang),
         lang,
       });
       return;

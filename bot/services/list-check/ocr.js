@@ -1,6 +1,7 @@
 import config from '../../config.js';
 import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
 import { mapWithConcurrency } from '../../utils/async.js';
+import { createLruTtlCache } from '../../utils/lruTtlCache.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 import { hasAnyDiacritic, stripDiacritics } from './nameRecovery.js';
 
@@ -19,31 +20,19 @@ const SERVER_NAMES = new Set([
   'akkan', 'vairgrys', 'bergstrom', 'danube', 'mokoko',
 ]);
 
-const ocrCache = new Map();
+const ocrCache = createLruTtlCache({
+  ttlMs: () => config.ocrCacheTtlMs,
+  maxSize: () => config.ocrCacheMaxSize,
+  cloneValue: (names) => [...names],
+});
 
 function getCachedOcrNames(cacheKey) {
-  if (!cacheKey) return undefined;
-  const entry = ocrCache.get(cacheKey);
-  if (!entry) return undefined;
-  if (Date.now() > entry.expiresAt) {
-    ocrCache.delete(cacheKey);
-    return undefined;
-  }
-  ocrCache.delete(cacheKey);
-  ocrCache.set(cacheKey, entry);
-  return [...entry.names];
+  return ocrCache.get(cacheKey);
 }
 
 function setCachedOcrNames(cacheKey, names) {
-  if (!cacheKey || !Array.isArray(names)) return;
-  if (ocrCache.size >= config.ocrCacheMaxSize) {
-    const firstKey = ocrCache.keys().next().value;
-    ocrCache.delete(firstKey);
-  }
-  ocrCache.set(cacheKey, {
-    names: [...names],
-    expiresAt: Date.now() + config.ocrCacheTtlMs,
-  });
+  if (!Array.isArray(names)) return;
+  ocrCache.set(cacheKey, names);
 }
 
 /**

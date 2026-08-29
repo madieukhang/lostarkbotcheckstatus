@@ -14,6 +14,10 @@ import {
   updateNotice,
 } from '../../../utils/interactionReplies.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
+import {
+  PENDING_APPROVAL_ACCESS,
+  resolvePendingApprovalAccess,
+} from '../services/pendingApprovalAccess.js';
 
 export function createMultiaddApprovalButtonHandler(deps) {
   const {
@@ -29,15 +33,17 @@ export function createMultiaddApprovalButtonHandler(deps) {
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     await connectDB();
 
-    const payload = await PendingApproval.findOneAndDelete({
+    const approvalAccess = await resolvePendingApprovalAccess({
+      PendingApprovalModel: PendingApproval,
       requestId,
-      action: 'bulk',
-      approverIds: interaction.user.id,
-    }).lean();
+      approverId: interaction.user.id,
+      filters: { action: 'bulk' },
+      consume: true,
+    });
+    const { payload } = approvalAccess;
 
     if (!payload) {
-      const stillExists = await PendingApproval.exists({ requestId, action: 'bulk' });
-      if (stillExists) {
+      if (approvalAccess.status === PENDING_APPROVAL_ACCESS.notAuthorized) {
         await replyAlert(interaction, {
           severity: AlertSeverity.ERROR,
           ...t('dialogue.approval.flow.notAuthorized', lang),

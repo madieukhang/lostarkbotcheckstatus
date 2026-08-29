@@ -12,6 +12,7 @@ import TrustedUser from '../../../models/TrustedUser.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
+import { buildScopedListQuery } from '../../../utils/scope.js';
 import { t } from '../../../services/i18n/index.js';
 import {
   getListContext,
@@ -69,16 +70,12 @@ export async function handleApprovedEditRequest({
   if (isTypeChange) {
     // Preflight: scope-aware duplicate check on target list
     const nameMatch = { $or: [{ name: existingEntry.name }, { allCharacters: existingEntry.name }] };
-    let preflightQuery;
-    if (payload.type === 'black') {
-      preflightQuery = { $and: [nameMatch, { $or: [
-        { scope: 'global' },
-        { scope: { $exists: false } },
-        { scope: 'server', guildId: payload.guildId || '' },
-      ] }] };
-    } else {
-      preflightQuery = nameMatch;
-    }
+    const preflightQuery = buildScopedListQuery(
+      payload.type,
+      nameMatch,
+      payload.guildId || '',
+      { ownerSeesAll: false, includeEmptyServerScope: true }
+    );
     const targetDupe = await newModel.findOne(preflightQuery)
       .collation({ locale: 'en', strength: 2 }).lean();
     if (targetDupe) {

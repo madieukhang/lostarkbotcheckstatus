@@ -24,6 +24,7 @@ import {
 } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
+import { buildScopedListQuery } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { ICONS, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
@@ -290,22 +291,13 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     const entryScope = payload.scope || 'global';
     const entryGuildId = entryScope === 'server' ? (payload.guildId || '') : '';
 
-    let dupeQuery;
-    if (payload.type === 'black') {
-      // For blacklist: check global + this server's entries (avoid redundant adds)
-      dupeQuery = {
-        $and: [
-          buildNameRosterQuery(name),
-          { $or: [
-            { scope: 'global' },
-            { scope: { $exists: false } }, // backward compat: old entries without scope
-            ...(entryGuildId ? [{ scope: 'server', guildId: entryGuildId }] : []),
-          ] },
-        ],
-      };
-    } else {
-      dupeQuery = buildNameRosterQuery(name);
-    }
+    // Blacklist checks global + the current server; other lists have no scope.
+    const dupeQuery = buildScopedListQuery(
+      payload.type,
+      buildNameRosterQuery(name),
+      entryGuildId,
+      { ownerSeesAll: false }
+    );
 
     const existed = await model.findOne(dupeQuery)
       .collation({ locale: 'en', strength: 2 })

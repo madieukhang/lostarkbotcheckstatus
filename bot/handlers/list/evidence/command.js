@@ -22,7 +22,7 @@ import { connectDB } from '../../../db.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
-import { buildBlacklistScopeFilter } from '../../../utils/scope.js';
+import { buildScopedListQuery } from '../../../utils/scope.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import GuildConfig from '../../../models/GuildConfig.js';
@@ -39,19 +39,6 @@ const KNOWN_TYPES = ['black', 'white', 'watch'];
 const COLLATION = { locale: 'en', strength: 2 };
 const AUTOCOMPLETE_MAX = 25;
 const PER_LIST_FETCH_CAP = 25;
-
-/**
- * Apply the blacklist scope filter on top of a base name query. Whitelist
- * and watchlist have no scope concept, so the base query passes through
- * unchanged for those types. Blacklist owner guild sees everything; other
- * guilds see global + own-server entries only.
- */
-function applyScopeForType(type, baseQuery, guildId) {
-  if (type !== 'black') return baseQuery;
-  const scopeFilter = buildBlacklistScopeFilter(guildId);
-  if (!scopeFilter) return baseQuery; // owner guild · no restriction
-  return { $and: [baseQuery, scopeFilter] };
-}
 
 /**
  * Parse the `name` option value. Delegates to the shared
@@ -79,7 +66,7 @@ export function buildListEvidenceNameQuery(name) {
  */
 async function findEntryById({ entryId, type, guildId }) {
   const { model } = getListContext(type);
-  const query = applyScopeForType(type, { _id: entryId }, guildId);
+  const query = buildScopedListQuery(type, { _id: entryId }, guildId);
   const entry = await model.findOne(query).collation(COLLATION).lean();
   if (entry) return { entry, type };
   return { entry: null, type: null };
@@ -99,7 +86,7 @@ async function findEntryByName({ name, preferredType, guildId }) {
 
   for (const type of types) {
     const { model } = getListContext(type);
-    const query = applyScopeForType(type, buildListEvidenceNameQuery(name), guildId);
+    const query = buildScopedListQuery(type, buildListEvidenceNameQuery(name), guildId);
     const entry = await model.findOne(query).collation(COLLATION).lean();
     if (entry) return { entry, type };
   }
@@ -127,7 +114,7 @@ async function lookupAutocompleteCandidates(query, guildId) {
   const results = await Promise.all(KNOWN_TYPES.map(async (type) => {
     const { model } = getListContext(type);
     const baseQuery = buildBaseQuery(type);
-    const scoped = applyScopeForType(type, baseQuery, guildId);
+    const scoped = buildScopedListQuery(type, baseQuery, guildId);
     const docs = await model
       .find(scoped)
       .collation(COLLATION)
