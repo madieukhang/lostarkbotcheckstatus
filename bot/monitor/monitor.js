@@ -113,15 +113,66 @@ async function sendOnlineNotification(client, serverName) {
  * Maintenance window is fixed to 24 hours:
  *   Wednesday 07:00 UTC → Thursday 07:00 UTC
  */
-function isInMaintenanceWindow() {
-  const now = new Date();
-
+export function isInMaintenanceWindow(now = new Date()) {
   const day = now.getUTCDay(); // 3 = Wednesday, 4 = Thursday
   const hour = now.getUTCHours();
 
   if (day === 3 && hour >= 7) return true;
   if (day === 4 && hour < 7) return true;
   return false;
+}
+
+/**
+ * Keep the last definitive server state when the upstream page is incomplete.
+ * UNKNOWN describes the observation, not a real server transition, so storing
+ * it would erase the OFFLINE/MAINTENANCE state needed for recovery alerts.
+ */
+export function resolvePersistedStatus(previousStatus, observedStatus) {
+  if (observedStatus == null || observedStatus === STATUS.UNKNOWN) {
+    return previousStatus ?? null;
+  }
+  return observedStatus;
+}
+
+/**
+ * Apply one observed status to persisted per-server state.
+ * Returns whether this observation is a confirmed down-to-online transition.
+ */
+export function recordServerStatus(state, server, observedStatus) {
+  if (!state.servers) state.servers = {};
+  if (!state.servers[server]) {
+    state.servers[server] = { initialStatus: null, lastStatus: null, lastAlertTime: null };
+  }
+
+  const serverState = state.servers[server];
+
+  if (observedStatus === STATUS.UNKNOWN) {
+    return { serverState, shouldNotify: false };
+  }
+
+  if (serverState.initialStatus === null) {
+    serverState.initialStatus = observedStatus;
+  }
+
+  const wasDown =
+    serverState.lastStatus === STATUS.OFFLINE || serverState.lastStatus === STATUS.MAINTENANCE;
+  const shouldNotify = wasDown && observedStatus === STATUS.ONLINE;
+
+  serverState.lastStatus = resolvePersistedStatus(serverState.lastStatus, observedStatus);
+  return { serverState, shouldNotify };
+}
+
+/**
+ * Continue checking beyond the normal maintenance window until every monitored
+ * server has a definitive ONLINE result. An empty result is unresolved too.
+ */
+export function needsRecoveryPolling(statusMap) {
+  if (statusMap.size === 0) return true;
+  return [...statusMap.values()].some((status) => status !== STATUS.ONLINE);
+}
+
+export function shouldRunScheduledCheck(now = new Date(), recoveryPending = false) {
+  return isInMaintenanceWindow(now) || recoveryPending;
 }
 
 // ─── Core check logic ─────────────────────────────────────────────────────────
@@ -160,31 +211,17 @@ export async function checkStatus(client) {
   const now = new Date().toISOString();
 
   for (const [server, currentStatus] of statusMap) {
-    if (!state.servers[server]) {
-      state.servers[server] = { initialStatus: null, lastStatus: null, lastAlertTime: null };
-    }
+    const { serverState, shouldNotify } = recordServerStatus(state, server, currentStatus);
 
-    const serverState = state.servers[server];
-
-    if (serverState.initialStatus === null) {
-      serverState.initialStatus = currentStatus;
-    }
-
-    const wasDown =
-      serverState.lastStatus === STATUS.OFFLINE || serverState.lastStatus === STATUS.MAINTENANCE;
-    const isNowOnline = currentStatus === STATUS.ONLINE;
-
-    if (wasDown && isNowOnline) {
+    if (shouldNotify) {
       console.log(`[monitor] ${server} came online – sending notification.`);
       await sendOnlineNotification(client, server);
       serverState.lastAlertTime = now;
     }
-
-    serverState.lastStatus = currentStatus;
   }
 
   // Backward compat: keep top-level lastStatus for /la-status command
-  state.lastStatus = statusMap.get(servers[0]) ?? null;
+  state.lastStatus = resolvePersistedStatus(state.lastStatus, statusMap.get(servers[0]));
   state.lastCheckTime = now;
   await saveState(state);
 
@@ -205,19 +242,35 @@ export function startMonitor(client) {
     `[monitor] Starting monitor. Checking every ${config.checkIntervalMs / 1000}s…`
   );
 
+  let recoveryPending = false;
+  let checkInFlight = false;
+
+  const runCheck = async (label) => {
+    if (checkInFlight) return;
+
+    checkInFlight = true;
+    try {
+      const statusMap = await checkStatus(client);
+      recoveryPending = needsRecoveryPolling(statusMap);
+    } catch (err) {
+      // A request failure during maintenance must not let the scheduler stop at
+      // the fixed window boundary. Preserve an existing recovery wait as well.
+      recoveryPending = recoveryPending || isInMaintenanceWindow();
+      console.error(`[monitor] ${label} check failed:`, err.message);
+    } finally {
+      checkInFlight = false;
+    }
+  };
+
   // Run immediately on startup, then on each interval tick
-  checkStatus(client).catch((err) =>
-    console.error('[monitor] Initial check failed:', err.message)
-  );
+  void runCheck('Initial');
 
   const handle = setInterval(() => {
-    if (!isInMaintenanceWindow()) {
+    if (!shouldRunScheduledCheck(new Date(), recoveryPending)) {
       return;
     }
 
-    checkStatus(client).catch((err) =>
-      console.error('[monitor] Scheduled check failed:', err.message)
-    );
+    void runCheck('Scheduled');
   }, config.checkIntervalMs);
 
   return handle;
