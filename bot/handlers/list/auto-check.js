@@ -181,19 +181,156 @@ export function createAutoCheckMessageHandler({
   maxNames = AUTO_CHECK_MAX_NAMES,
   imageChecksEnabled = Boolean(config.geminiApiKey),
 } = {}) {
-  return async function handleAutoCheckMessage(message) {
-    if (message.author.bot) return;
-    if (!message.guild) return;
-
+  function resolveRequest(message) {
     const images = message.attachments.filter(
-      (a) => a.contentType && a.contentType.startsWith('image/')
+      (attachment) => attachment.contentType?.startsWith('image/')
     );
     const image = images.first() || null;
     const textRequest = image ? null : parseAutoCheckText(message.content);
+    if (!image && !textRequest) return null;
+    if (image && !imageChecksEnabled) return null;
+    return { image, textRequest };
+  }
 
-    if (!image && !textRequest) return;
-    if (image && !imageChecksEnabled) return;
+  async function removeSearchReaction(message) {
+    await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
+  }
 
+  async function rejectInvalidTextRequest(message, textRequest, lang) {
+    if (!textRequest || textRequest.invalidTokens.length === 0) return false;
+    const tokens = textRequest.invalidTokens
+      .slice(0, 5)
+      .map((token) => `\`${String(token).slice(0, 40)}\``)
+      .join(', ');
+    await message.reply({
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.check.text.invalid', lang, { tokens }),
+        lang,
+      })],
+    });
+    await removeSearchReaction(message);
+    return true;
+  }
+
+  async function resolveRequestNames(request, suggestionCache, suggestionContext) {
+    if (!request.image) return request.textRequest?.names || [];
+    return extractNamesFromImageFn(request.image, {
+      refineAmbiguousDiacritics: true,
+      suggestionCache,
+      suggestionContext,
+    });
+  }
+
+  async function rejectEmptyNames(message, textRequest, lang) {
+    if (textRequest) {
+      await message.reply({
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          ...t('dialogue.check.text.empty', lang),
+          lang,
+        })],
+      });
+    }
+    await removeSearchReaction(message);
+  }
+
+  function buildAutoCheckComponents(results, lang) {
+    const components = [];
+    const unflaggedNames = results.filter(isQuickAddCandidate);
+    if (unflaggedNames.length > 0) {
+      components.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('quickadd_select')
+          .setPlaceholder(t('quickAdd.selectPlaceholder', lang))
+          .addOptions(unflaggedNames.slice(0, 25).map((result) => ({
+            label: result.name,
+            description: t('quickAdd.noListHit', lang),
+            value: result.name,
+            emoji: '❓',
+          })))
+      ));
+    }
+    const evidenceRow = buildAutoCheckEvidenceRowFn(results, lang);
+    if (evidenceRow) components.push(evidenceRow);
+    return components;
+  }
+
+  async function rejectUnverifiedBatch(message, progressMsg, unverifiedCount, lang) {
+    await progressMsg.edit({
+      content: null,
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.check.noVerifiedNames', lang, { count: unverifiedCount }),
+        lang,
+      })],
+      components: [],
+    });
+    await removeSearchReaction(message);
+    await message.react('⚠️').catch(() => {});
+  }
+
+  async function processAutoCheckRequest(message, request, lang) {
+    const inputKind = request.image ? 'image' : 'text';
+    console.log(`[auto-check] ${inputKind} request from ${message.author.tag} in #${message.channel.name}, processing...`);
+    await message.react('🔍').catch(() => {});
+    if (await rejectInvalidTextRequest(message, request.textRequest, lang)) return;
+
+    const suggestionContext = createNameSuggestionContext({
+      maxNetworkLookups: config.listcheckSuggestionLookupBudget,
+    });
+    const names = await resolveRequestNames(request, suggestionContext.cache, suggestionContext);
+    if (names.length === 0) {
+      await rejectEmptyNames(message, request.textRequest, lang);
+      return;
+    }
+
+    const limitedNames = names.slice(0, maxNames);
+    const progressMsg = await message.reply({
+      embeds: [buildNoticeEmbed(
+        `🔍 ${tPick(request.textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, {
+          count: limitedNames.length,
+          word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang),
+        })}`,
+        { severity: AlertSeverity.INFO, titleIcon: '🔍', lang }
+      )],
+    });
+    const checkedResults = await checkNamesAgainstListsFn(limitedNames, {
+      guildId: message.guild.id,
+      inputSource: request.image ? 'ocr' : 'text',
+      suggestionCache: suggestionContext.cache,
+      suggestionContext,
+    });
+    const { verified: results, unverified } = partitionListCheckResultsByVerification(checkedResults);
+    if (results.length === 0) {
+      await rejectUnverifiedBatch(message, progressMsg, unverified.length, lang);
+      return;
+    }
+
+    const { embed } = buildListCheckEmbedFn({
+      results,
+      formattedLines: formatCheckResultsFn(results, lang),
+      limitedNamesCount: limitedNames.length,
+      ignoredCount: names.length - limitedNames.length,
+      unverifiedCount: unverified.length,
+      maxNames,
+      mode: 'auto',
+      lang,
+    });
+    await progressMsg.edit({
+      content: null,
+      embeds: [embed],
+      components: buildAutoCheckComponents(results, lang),
+    });
+    await removeSearchReaction(message);
+    await message.react('✅').catch(() => {});
+  }
+
+  return async function handleAutoCheckMessage(message) {
+    if (message.author.bot) return;
+    if (!message.guild) return;
+    const request = resolveRequest(message);
+    if (!request) return;
     if (!claimAutoCheckMessage(message.id)) return;
     let shouldRememberMessage = false;
     let lang = 'en';
@@ -211,140 +348,10 @@ export function createAutoCheckMessageHandler({
       const lastCheck = userCooldowns.get(message.author.id) || 0;
       if (Date.now() - lastCheck < COOLDOWN_MS) return;
       userCooldowns.set(message.author.id, Date.now());
-
-      const inputKind = image ? 'image' : 'text';
-      console.log(`[auto-check] ${inputKind} request from ${message.author.tag} in #${message.channel.name}, processing...`);
-
-      await message.react('🔍').catch(() => {});
-
-      if (textRequest?.invalidTokens.length > 0) {
-        const tokens = textRequest.invalidTokens
-          .slice(0, 5)
-          .map((token) => `\`${String(token).slice(0, 40)}\``)
-          .join(', ');
-        await message.reply({
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            ...t('dialogue.check.text.invalid', lang, { tokens }),
-            lang,
-          })],
-        });
-        await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
-        return;
-      }
-
-      const suggestionContext = createNameSuggestionContext({
-        maxNetworkLookups: config.listcheckSuggestionLookupBudget,
-      });
-      const suggestionCache = suggestionContext.cache;
-      let names = textRequest?.names || [];
-      if (image) {
-        names = await extractNamesFromImageFn(image, {
-          refineAmbiguousDiacritics: true,
-          suggestionCache,
-          suggestionContext,
-        });
-      }
-
-      if (names.length === 0) {
-        if (textRequest) {
-          await message.reply({
-            embeds: [buildAlertEmbed({
-              severity: AlertSeverity.WARNING,
-              ...t('dialogue.check.text.empty', lang),
-              lang,
-            })],
-          });
-        }
-        await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
-        return;
-      }
-
-      const limitedNames = names.slice(0, maxNames);
-
-      // Send progress immediately after OCR using the same notice-card
-      // surface as slash commands. It is replaced by the full result card.
-      const progressMsg = await message.reply({
-        embeds: [buildNoticeEmbed(
-          `🔍 ${tPick(textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
-          { severity: AlertSeverity.INFO, titleIcon: '🔍', lang }
-        )],
-      });
-
-      const checkedResults = await checkNamesAgainstListsFn(limitedNames, {
-        guildId: message.guild.id,
-        inputSource: image ? 'ocr' : 'text',
-        suggestionCache,
-        suggestionContext,
-      });
-      const { verified: results, unverified } = partitionListCheckResultsByVerification(
-        checkedResults
-      );
-      if (results.length === 0) {
-        await progressMsg.edit({
-          content: null,
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            ...t('dialogue.check.noVerifiedNames', lang, { count: unverified.length }),
-            lang,
-          })],
-          components: [],
-        });
-        await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
-        await message.react('⚠️').catch(() => {});
-        return;
-      }
-      const formattedLines = formatCheckResultsFn(results, lang);
-
-      // Same embed builder as /la-list check; mode: 'auto' tweaks the
-      // title verb ("Auto-check" vs "List Check") and the footer copy
-      // (mentions the Quick-Add dropdown below).
-      const { embed } = buildListCheckEmbedFn({
-        results,
-        formattedLines,
-        limitedNamesCount: limitedNames.length,
-        ignoredCount: names.length - limitedNames.length,
-        unverifiedCount: unverified.length,
-        maxNames,
-        mode: 'auto',
-        lang,
-      });
-
-      // Quick-Add dropdown for names with no DB list hit. Sits below
-      // the embed so an officer can add a suspicious unlisted name
-      // without retyping it.
-      const unflaggedNames = results.filter(isQuickAddCandidate);
-      const components = [];
-
-      if (unflaggedNames.length > 0) {
-        const selectRow = new ActionRowBuilder().addComponents(
-          new StringSelectMenuBuilder()
-            .setCustomId('quickadd_select')
-            .setPlaceholder(t('quickAdd.selectPlaceholder', lang))
-            .addOptions(
-              unflaggedNames.slice(0, 25).map((r) => ({
-                label: r.name,
-                description: t('quickAdd.noListHit', lang),
-                value: r.name,
-                emoji: '❓',
-              }))
-            )
-        );
-        components.push(selectRow);
-      }
-
-      // Details dropdown · second row when any checked name resolves to a
-      // list entry. It exposes reason / raid / added-by metadata even when
-      // that entry has no screenshot evidence.
-      const evidenceRow = buildAutoCheckEvidenceRowFn(results, lang);
-      if (evidenceRow) components.push(evidenceRow);
-
-      await progressMsg.edit({ content: null, embeds: [embed], components });
-      await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
-      await message.react('✅').catch(() => {});
+      await processAutoCheckRequest(message, request, lang);
     } catch (err) {
       console.error('[auto-check] Error processing request:', err.message);
-      await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
+      await removeSearchReaction(message);
       await message.react('❌').catch(() => {});
       await message.reply({
         embeds: [buildAlertEmbed({

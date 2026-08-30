@@ -32,6 +32,157 @@ import {
 } from '../../utils/rosterDeepSession.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { createRosterScanRuntime } from './progress.js';
+import { resolveRosterScanOutcome } from './completion.js';
+
+function getSessionAccessAlert(session, userId, lang) {
+  if (!session) {
+    return { severity: AlertSeverity.WARNING, ...t('dialogue.scan.sessionExpired', lang), lang };
+  }
+  if (session.callerId !== userId) {
+    return { severity: AlertSeverity.ERROR, ...t('dialogue.scan.notYourSession', lang), lang };
+  }
+  if (session.inProgress) {
+    return { severity: AlertSeverity.INFO, ...t('dialogue.scan.continueRunning', lang), lang };
+  }
+  return null;
+}
+
+function countContinuationCandidates(session) {
+  const excluded = new Set(
+    (session.scannedNames || []).map((name) => String(name).toLowerCase())
+  );
+  return (session.guildMembers || []).filter((member) => (
+    member.name !== session.targetName
+    && member.ilvl >= 1700
+    && !excluded.has(String(member.name).toLowerCase())
+  )).length;
+}
+
+async function runContinuationPass({ interaction, replyEditor, session, reservation, primaryEmbed, lang }) {
+  const activeScan = createRosterScanRuntime({
+    interaction,
+    replyEditor,
+    name: session.targetName,
+    meta: session.meta,
+    totalMembers: session.guildMembers.length,
+    label: `${session.targetName} (roster deep · resume)`,
+    lang,
+  });
+  const eligible = countContinuationCandidates(session);
+  const passLimit = session.cap || eligible;
+  await replyEditor.edit(activeScan.buildInitialPayload({
+    title: t('dialogue.scan.resuming', lang, { name: session.targetName }),
+    subtitle: `${t('dialogue.scan.guildMembers', lang, {
+      guild: session.meta.guildName,
+      count: session.guildMembers.length,
+    })} · ${t('dialogue.scan.continuePass', lang)}`,
+    totalCandidates: Math.min(eligible, passLimit),
+    content: null,
+    leadingEmbeds: [primaryEmbed],
+  })).catch(() => {});
+
+  try {
+    const result = await detectAltsViaStronghold(session.targetName, {
+      targetMeta: session.meta,
+      guildMembers: session.guildMembers,
+      candidateLimit: session.cap,
+      useScraperApiForCandidates: false,
+      excludeNames: session.scannedNames || [],
+      cancelFlag: activeScan.cancelFlag,
+      viaWorker: true,
+      onProgress: activeScan.onProgress,
+    });
+    return { result, error: null };
+  } catch (error) {
+    return { result: null, error };
+  } finally {
+    session.inProgress = false;
+    refreshRosterDeepSession(session);
+    activeScan.close();
+    reservation.release();
+  }
+}
+
+export function mergeContinuationScanResult(session, result) {
+  const alts = mergeAltsByName(session.allDiscoveredAlts || [], result.alts || []);
+  const scannedNames = [
+    ...(session.scannedNames || []),
+    ...(result.scannedNames || []),
+  ];
+  session.allDiscoveredAlts = alts;
+  session.scannedNames = scannedNames;
+  session.scanStats = {
+    ...(session.scanStats || {}),
+    scanned: (session.scanStats?.scanned ?? 0) + (result.scannedCandidates || 0),
+    attempted: (session.scanStats?.attempted ?? 0)
+      + (result.attemptedCandidates ?? result.scannedCandidates ?? 0),
+    failed: (session.scanStats?.failed ?? 0) + (result.failedCandidates || 0),
+    rateLimitRetries: (session.scanStats?.rateLimitRetries ?? 0) + (result.rateLimitRetries || 0),
+  };
+
+  return {
+    ...result,
+    scannedCandidates: session.scanStats.scanned ?? scannedNames.length,
+    checkedCandidates: session.scanStats.scanned ?? scannedNames.length,
+    attemptedCandidates: session.scanStats.attempted ?? scannedNames.length,
+    failedCandidates: session.scanStats.failed,
+    rateLimitRetries: session.scanStats.rateLimitRetries,
+    alts,
+    scannedNames,
+  };
+}
+
+function buildContinuationPayload(session, cumulativeResult, primaryEmbed, lang) {
+  const { embed: resultEmbed, state } = buildScanResultEmbed({
+    target: {
+      name: session.targetName,
+      isHidden: session.isHidden,
+      guildName: session.meta.guildName,
+      profileUrl: rosterUrl(session.targetName),
+    },
+    result: cumulativeResult,
+    kind: session.isHidden ? 'roster-hidden' : 'roster-visible',
+    summaryLine: t('dialogue.enrich.summary', lang, {
+      guild: session.meta.guildName,
+      name: session.targetName,
+      resumed: t('dialogue.enrich.resumed', lang),
+    }),
+    lang,
+  });
+  const components = [];
+  if (state.hasRemaining) {
+    const row = buildScanResultButtons({
+      kind: 'roster',
+      sessionId: session.sessionId,
+      hasAlts: cumulativeResult.alts.length > 0,
+      hasRemaining: true,
+      lang,
+    });
+    if (row) components.push(row);
+  } else {
+    clearRosterDeepSession(session.sessionId);
+  }
+  return {
+    payload: { content: null, embeds: [primaryEmbed, resultEmbed], components },
+    hasRemaining: state.hasRemaining,
+  };
+}
+
+function notifyContinuationCompletion({ interaction, replyEditor, session, result, hasRemaining, lang }) {
+  const outcome = resolveRosterScanOutcome(result, { hasRemaining });
+  if (!outcome) return;
+  sendScanCompletionDm({
+    user: interaction.user,
+    commandLabel: '/la-roster deep · resume',
+    scanTargetName: session.targetName,
+    guildName: session.meta.guildName,
+    channelMention: interaction.channelId ? `<#${interaction.channelId}>` : undefined,
+    resultMessageUrl: buildResultMessageUrl(interaction, replyEditor.getMessage()),
+    outcome,
+    result,
+    lang,
+  }).catch(() => {});
+}
 
 /**
  * Continue button for /la-roster deep:true. Resumes the prior scan
@@ -49,28 +200,9 @@ export async function handleRosterDeepContinueButton(interaction) {
   const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
   const sessionId = interaction.customId.split(':')[2];
   const session = getRosterDeepSession(sessionId);
-  if (!session) {
-    await replyAlert(interaction, {
-      severity: AlertSeverity.WARNING,
-      ...t('dialogue.scan.sessionExpired', lang),
-      lang,
-    });
-    return;
-  }
-  if (session.callerId !== interaction.user.id) {
-    await replyAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.scan.notYourSession', lang),
-      lang,
-    });
-    return;
-  }
-  if (session.inProgress) {
-    await replyAlert(interaction, {
-      severity: AlertSeverity.INFO,
-      ...t('dialogue.scan.continueRunning', lang),
-      lang,
-    });
+  const accessAlert = getSessionAccessAlert(session, interaction.user.id, lang);
+  if (accessAlert) {
+    await replyAlert(interaction, accessAlert);
     return;
   }
 
@@ -87,67 +219,26 @@ export async function handleRosterDeepContinueButton(interaction) {
   const replyEditor = createLongRunningReplyEditor(interaction);
   session.inProgress = true;
   refreshRosterDeepSession(session);
-
-  const activeScan = createRosterScanRuntime({
+  const primaryEmbed = EmbedBuilder.from(session.primaryEmbedJSON);
+  const scan = await runContinuationPass({
     interaction,
     replyEditor,
-    name: session.targetName,
-    meta: session.meta,
-    totalMembers: session.guildMembers.length,
-    label: `${session.targetName} (roster deep · resume)`,
+    session,
+    reservation: scanReservation,
+    primaryEmbed,
     lang,
   });
-
-  // Show the progress embed during the resume pass. It temporarily replaces
-  // the result card; on completion the result card is rebuilt and
-  // posted alongside the cached primary embed snapshot.
-  const excludeSet = new Set((session.scannedNames || []).map((n) => String(n).toLowerCase()));
-  const passEligible = (session.guildMembers || [])
-    .filter((m) => m.name !== session.targetName && m.ilvl >= 1700 && !excludeSet.has(String(m.name).toLowerCase()))
-    .length;
-  const passLimit = session.cap || passEligible;
-
-  const primaryEmbed = EmbedBuilder.from(session.primaryEmbedJSON);
-  await replyEditor.edit(
-    activeScan.buildInitialPayload({
-      title: t('dialogue.scan.resuming', lang, { name: session.targetName }),
-      subtitle: `${t('dialogue.scan.guildMembers', lang, { guild: session.meta.guildName, count: session.guildMembers.length })} · ${t('dialogue.scan.continuePass', lang)}`,
-      totalCandidates: Math.min(passEligible, passLimit),
-      content: null,
-      leadingEmbeds: [primaryEmbed],
-    })
-  ).catch(() => {});
-
-  let altResult;
-  let scanThrownError = null;
-  try {
-    altResult = await detectAltsViaStronghold(session.targetName, {
-      targetMeta: session.meta,
-      guildMembers: session.guildMembers,
-      candidateLimit: session.cap,
-      useScraperApiForCandidates: false,
-      excludeNames: session.scannedNames || [],
-      cancelFlag: activeScan.cancelFlag,
-      viaWorker: true,
-      onProgress: activeScan.onProgress,
-    });
-  } catch (err) {
-    scanThrownError = err;
-  } finally {
-    session.inProgress = false;
-    refreshRosterDeepSession(session);
-    activeScan.close();
-    scanReservation.release();
-  }
-
-  if (scanThrownError) {
+  if (scan.error) {
     await replyEditor.edit({
       content: null,
       embeds: [
         primaryEmbed,
         buildAlertEmbed({
           severity: AlertSeverity.ERROR,
-          ...t('dialogue.scan.stopped', lang, { name: session.targetName, reason: scanThrownError.message || t('dialogue.scan.unexpectedError', lang) }),
+          ...t('dialogue.scan.stopped', lang, {
+            name: session.targetName,
+            reason: scan.error.message || t('dialogue.scan.unexpectedError', lang),
+          }),
           footer: t('dialogue.scan.stopped.retry', lang),
           lang,
         }),
@@ -156,8 +247,7 @@ export async function handleRosterDeepContinueButton(interaction) {
     }).catch(() => {});
     return;
   }
-
-  if (!altResult) {
+  if (!scan.result) {
     await replyEditor.edit({
       content: null,
       embeds: [primaryEmbed],
@@ -165,89 +255,15 @@ export async function handleRosterDeepContinueButton(interaction) {
     }).catch(() => {});
     return;
   }
-
-  // Merge cumulative scan state into the session for the next Continue.
-  const mergedAlts = mergeAltsByName(session.allDiscoveredAlts || [], altResult.alts || []);
-  const mergedScannedNames = [
-    ...(session.scannedNames || []),
-    ...(altResult.scannedNames || []),
-  ];
-  session.allDiscoveredAlts = mergedAlts;
-  session.scannedNames = mergedScannedNames;
-  session.scanStats = {
-    ...(session.scanStats || {}),
-    scanned: (session.scanStats?.scanned ?? 0) + (altResult.scannedCandidates || 0),
-    attempted:
-      (session.scanStats?.attempted ?? 0) +
-      (altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0),
-    failed: (session.scanStats?.failed ?? 0) + (altResult.failedCandidates || 0),
-    rateLimitRetries: (session.scanStats?.rateLimitRetries ?? 0) + (altResult.rateLimitRetries || 0),
-  };
-
-  // Cumulative result for display: invariants from the latest pass,
-  // counts grown across passes.
-  const cumulativeResult = {
-    ...altResult,
-    scannedCandidates: session.scanStats.scanned ?? mergedScannedNames.length,
-    checkedCandidates: session.scanStats.scanned ?? mergedScannedNames.length,
-    attemptedCandidates: session.scanStats.attempted ?? mergedScannedNames.length,
-    failedCandidates: session.scanStats.failed,
-    rateLimitRetries: session.scanStats.rateLimitRetries,
-    alts: mergedAlts,
-    scannedNames: mergedScannedNames,
-  };
-
-  const profileUrl = rosterUrl(session.targetName);
-  const { embed: resultEmbed, state } = buildScanResultEmbed({
-    target: { name: session.targetName, isHidden: session.isHidden, guildName: session.meta.guildName, profileUrl },
+  const cumulativeResult = mergeContinuationScanResult(session, scan.result);
+  const rendered = buildContinuationPayload(session, cumulativeResult, primaryEmbed, lang);
+  await replyEditor.edit(rendered.payload);
+  notifyContinuationCompletion({
+    interaction,
+    replyEditor,
+    session,
     result: cumulativeResult,
-    kind: session.isHidden ? 'roster-hidden' : 'roster-visible',
-    summaryLine: t('dialogue.enrich.summary', lang, { guild: session.meta.guildName, name: session.targetName, resumed: t('dialogue.enrich.resumed', lang) }),
+    hasRemaining: rendered.hasRemaining,
     lang,
   });
-
-  const components = [];
-  if (state.hasRemaining) {
-    const buttonRow = buildScanResultButtons({
-      kind: 'roster',
-      sessionId: session.sessionId,
-      hasAlts: mergedAlts.length > 0,
-      hasRemaining: true,
-      lang,
-    });
-    if (buttonRow) components.push(buttonRow);
-  } else {
-    // Fully scanned. Drop the session so memory does not leak the
-    // cached guildMembers array.
-    clearRosterDeepSession(session.sessionId);
-  }
-
-  await replyEditor.edit({
-    content: null,
-    embeds: [primaryEmbed, resultEmbed],
-    components,
-  });
-
-  // DM only on terminal states (fully scanned or cancelled). Mid-scan
-  // continues do not warrant a fresh DM ping.
-  let outcome = null;
-  if (altResult.cancelled || altResult.pausedForFailureStorm) {
-    outcome = mergedAlts.length > 0 ? 'stopped-with-alts' : 'stopped-no-alts';
-  } else if (!state.hasRemaining) {
-    outcome = mergedAlts.length > 0 ? 'completed' : 'no-alts';
-  }
-  if (outcome) {
-    const replyMsg = replyEditor.getMessage();
-    sendScanCompletionDm({
-      user: interaction.user,
-      commandLabel: '/la-roster deep · resume',
-      scanTargetName: session.targetName,
-      guildName: session.meta.guildName,
-      channelMention: interaction.channelId ? `<#${interaction.channelId}>` : undefined,
-      resultMessageUrl: buildResultMessageUrl(interaction, replyMsg),
-      outcome,
-      result: cumulativeResult,
-      lang,
-    }).catch(() => {});
-  }
 }

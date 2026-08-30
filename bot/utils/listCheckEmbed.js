@@ -87,18 +87,19 @@ function buildCheckChrome({ results, counts, limitedNamesCount, mode, lang, titl
 }
 
 function buildResultNotes({ ignoredCount, unverifiedCount, maxNames, lang }) {
-  const notes = [];
-  if (ignoredCount > 0) {
-    const countKey = ignoredCount === 1 ? 'nameOne' : 'nameMany';
-    notes.push(t('dialogue.check.embed.ignored', lang, {
-      count: ignoredCount,
-      word: t(`dialogue.check.${countKey}`, lang),
-      limit: maxNames ?? t('dialogue.check.embed.configured', lang),
-    }));
-  }
-  if (unverifiedCount > 0) {
-    notes.push(t('dialogue.check.embed.unverified', lang, { count: unverifiedCount }));
-  }
+  const countKey = ignoredCount === 1 ? 'nameOne' : 'nameMany';
+  const notes = [
+    ignoredCount > 0
+      ? t('dialogue.check.embed.ignored', lang, {
+          count: ignoredCount,
+          word: t(`dialogue.check.${countKey}`, lang),
+          limit: maxNames ?? t('dialogue.check.embed.configured', lang),
+        })
+      : '',
+    unverifiedCount > 0
+      ? t('dialogue.check.embed.unverified', lang, { count: unverifiedCount })
+      : '',
+  ].filter(Boolean);
   return notes.length > 0
     ? `\n\n${notes.map((note) => `*${note}*`).join('\n')}`
     : '';
@@ -116,23 +117,16 @@ function buildCorrectionFooterPart(correctedResults, lang) {
 
 function buildCheckFooter({ counts, flaggedCount, correctedResults, mode, lang }) {
   const statusKey = flaggedCount > 0 ? 'flagged' : 'clear';
-  const parts = [
-    `// ${t(`dialogue.check.embed.${statusKey}`, lang, { count: flaggedCount })}`,
-  ];
   const correction = buildCorrectionFooterPart(correctedResults, lang);
-  if (correction) parts.push(correction);
-
-  if (mode === 'auto' && flaggedCount > 0) {
-    parts.push(t('dialogue.check.embed.quickFlagged', lang));
-  } else if (mode === 'auto' && counts.notListed > 0) {
-    parts.push(t('dialogue.check.embed.quickClean', lang));
-  } else if (mode !== 'auto' && flaggedCount > 0) {
-    parts.push(t('dialogue.check.embed.rosterTip', lang));
-  } else if (mode !== 'auto') {
-    parts.push(t('dialogue.check.embed.rerunTip', lang));
-  }
-  parts.push(t('dialogue.check.embed.source', lang));
-  return parts;
+  const hintKey = mode === 'auto'
+    ? (flaggedCount > 0 ? 'quickFlagged' : counts.notListed > 0 ? 'quickClean' : '')
+    : (flaggedCount > 0 ? 'rosterTip' : 'rerunTip');
+  return [
+    `// ${t(`dialogue.check.embed.${statusKey}`, lang, { count: flaggedCount })}`,
+    correction,
+    hintKey ? t(`dialogue.check.embed.${hintKey}`, lang) : '',
+    t('dialogue.check.embed.source', lang),
+  ].filter(Boolean);
 }
 
 /**

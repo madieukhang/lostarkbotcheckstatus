@@ -22,9 +22,11 @@ export function checkBotPermissions(
   guild,
   { cleanup = false, welcomePin = false } = {}
 ) {
-  const required = [...BASE_CHANNEL_PERMISSIONS];
-  if (cleanup) required.push(CLEANUP_PERMISSION);
-  if (welcomePin) required.push(PIN_PERMISSION);
+  const required = [
+    ...BASE_CHANNEL_PERMISSIONS,
+    cleanup ? CLEANUP_PERMISSION : null,
+    welcomePin ? PIN_PERMISSION : null,
+  ].filter(Boolean);
 
   const botMember = guild?.members?.me;
   if (!botMember) return { ok: false, missing: ['Cannot resolve bot member'] };

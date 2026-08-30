@@ -75,9 +75,11 @@ export async function handleSearchCommand(interaction) {
 
     if (suggestions.length === 0) {
       status = 'filtered-empty';
-      const filterDesc = [`ilvl ≥ ${minIlvl}`];
-      if (maxIlvl !== null) filterDesc.push(`ilvl ≤ ${maxIlvl}`);
-      if (classFilter) filterDesc.push(`class: ${getClassName(classFilter)}`);
+      const filterDesc = [
+        `ilvl ≥ ${minIlvl}`,
+        maxIlvl !== null ? `ilvl ≤ ${maxIlvl}` : '',
+        classFilter ? `class: ${getClassName(classFilter)}` : '',
+      ].filter(Boolean);
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.search.noFilteredResults', lang, { name }),

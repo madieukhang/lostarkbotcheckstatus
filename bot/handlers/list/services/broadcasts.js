@@ -140,6 +140,41 @@ export function buildTrackedAltsField(entry, statMap = new Map(), options = {}) 
   });
 }
 
+export function buildBroadcastFields({ entry, action, changes = [], snap, altsField, lang = 'en' }) {
+  const changesText = changes.join('\n');
+  return [
+    {
+      name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
+      value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
+      inline: false,
+    },
+    entry.raid
+      ? { name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`, value: `\`${entry.raid}\``, inline: true }
+      : null,
+    entry.addedAt
+      ? {
+          name: `🕐 ${t(`dialogue.broadcast.fields.${action === 'edited' ? 'edited' : 'added'}`, lang)}`,
+          value: relativeTime(entry.addedAt),
+          inline: true,
+        }
+      : null,
+    snap?.itemLevel > 0
+      ? { name: `📊 ${t('dialogue.broadcast.fields.itemLevel', lang)}`, value: `\`${snap.itemLevel.toFixed(2)}\``, inline: true }
+      : null,
+    snap?.combatScore
+      ? { name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`, value: `\`${snap.combatScore}\``, inline: true }
+      : null,
+    action === 'edited' && changesText
+      ? {
+          name: `🔁 ${t('dialogue.listEdit.success.changes', lang, { count: changes.length })}`,
+          value: changesText.length > 1024 ? `${changesText.slice(0, 1020)}…` : changesText,
+          inline: false,
+        }
+      : null,
+    altsField,
+  ].filter(Boolean);
+}
+
 export async function sendEmbedToChannels({
   client,
   channelIds,
@@ -186,6 +221,71 @@ export function createBroadcastServices({
   buildRosterCharactersFn = buildRosterCharacters,
   upsertRosterSnapshotsFn = upsertRosterSnapshots,
 }) {
+  async function findOwnerEnvNotifyChannel(channelIds) {
+    for (const envId of config.listNotifyChannelIds) {
+      try {
+        const channel = await client.channels.fetch(envId);
+        if (channel?.guild?.id !== config.ownerGuildId) continue;
+        channelIds.add(envId);
+        return;
+      } catch { /* skip */ }
+    }
+  }
+
+  async function resolveOwnerBroadcastChannels() {
+    const channelIds = new Set();
+    if (!config.ownerGuildId) return channelIds;
+    try {
+      const ownerConfig = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
+      if (ownerConfig?.globalNotifyEnabled === false) return channelIds;
+      if (ownerConfig?.listNotifyChannelId) channelIds.add(ownerConfig.listNotifyChannelId);
+      else await findOwnerEnvNotifyChannel(channelIds);
+    } catch (err) {
+      console.warn('[list] Failed to query owner GuildConfig:', err.message);
+    }
+    return channelIds;
+  }
+
+  function indexConfiguredBroadcastChannels(guildConfigs, originGuildId, isOwnerOrigin) {
+    const channelIds = new Set();
+    const disabledGuildIds = new Set();
+    const dbNotifyGuildIds = new Set();
+    for (const guildConfig of guildConfigs) {
+      if (guildConfig.globalNotifyEnabled === false) disabledGuildIds.add(guildConfig.guildId);
+      if (guildConfig.listNotifyChannelId) dbNotifyGuildIds.add(guildConfig.guildId);
+      const excludedOrigin = guildConfig.guildId === originGuildId && !isOwnerOrigin;
+      if (excludedOrigin || guildConfig.globalNotifyEnabled === false || !guildConfig.listNotifyChannelId) {
+        continue;
+      }
+      channelIds.add(guildConfig.listNotifyChannelId);
+    }
+    return { channelIds, disabledGuildIds, dbNotifyGuildIds };
+  }
+
+  async function loadConfiguredBroadcastChannels(originGuildId, isOwnerOrigin) {
+    try {
+      const guildConfigs = await GuildConfig.find({}).lean();
+      return indexConfiguredBroadcastChannels(guildConfigs, originGuildId, isOwnerOrigin);
+    } catch (err) {
+      console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
+      return { channelIds: new Set(), disabledGuildIds: new Set(), dbNotifyGuildIds: new Set() };
+    }
+  }
+
+  async function appendEnvBroadcastChannels(state, originGuildId, isOwnerOrigin) {
+    for (const envId of config.listNotifyChannelIds) {
+      if (state.channelIds.has(envId)) continue;
+      try {
+        const channel = await client.channels.fetch(envId);
+        if (!channel?.isTextBased()) continue;
+        const guildId = channel.guild?.id || '';
+        if (guildId === originGuildId && !isOwnerOrigin) continue;
+        if (state.disabledGuildIds.has(guildId) || state.dbNotifyGuildIds.has(guildId)) continue;
+        state.channelIds.add(envId);
+      } catch { /* skip */ }
+    }
+  }
+
   async function broadcastListChange(action, entry, payload, options = {}) {
     const {
       onlyOwner = false,
@@ -246,43 +346,14 @@ export function createBroadcastServices({
         altWord: t(`dialogue.broadcast.${newCount === 1 ? 'altOne' : 'altMany'}`, lang),
       });
 
-      const fields = [{
-        name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
-        value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
-        inline: false,
-      }];
       // Code-wrap rule for every card in the list surfaces: fixed tokens
       // and numbers (raid, ilvl, CP) render as `code` so they read as
       // values; prose (reason) and links stay plain, and the timestamp
       // MUST stay plain because backticks would print the raw
       // <t:UNIX:R> instead of letting Discord localize it.
-      if (entry.raid) fields.push({ name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`, value: `\`${entry.raid}\``, inline: true });
-      if (entry.addedAt) {
-        fields.push({
-          name: `🕐 ${t(`dialogue.broadcast.fields.${action === 'edited' ? 'edited' : 'added'}`, lang)}`,
-          value: relativeTime(entry.addedAt),
-          inline: true,
-        });
-      }
-      if (snap?.itemLevel > 0) {
-        fields.push({ name: `📊 ${t('dialogue.broadcast.fields.itemLevel', lang)}`, value: `\`${snap.itemLevel.toFixed(2)}\``, inline: true });
-      }
-      if (snap?.combatScore) {
-        fields.push({ name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`, value: `\`${snap.combatScore}\``, inline: true });
-      }
-
       // An edit broadcast said only "someone edited this entry", which
       // left every reader to diff the card against a memory of the old
       // one. The same change lines the editor saw go here too.
-      if (action === 'edited' && changes.length > 0) {
-        const changesText = changes.join('\n');
-        fields.push({
-          name: `🔁 ${t('dialogue.listEdit.success.changes', lang, { count: changes.length })}`,
-          value: changesText.length > 1024 ? `${changesText.slice(0, 1020)}…` : changesText,
-          inline: false,
-        });
-      }
-
       const rosterFieldOptions = {
         label: `${isEnrich ? '🆕' : '🧬'} ${t(`dialogue.broadcast.fields.${isEnrich ? 'newAlts' : 'trackedRosters'}`, lang)}`,
         overflowTemplate: t('dialogue.broadcast.more', lang),
@@ -290,7 +361,7 @@ export function createBroadcastServices({
       const altsField = isEnrich
         ? renderTrackedAltsField({ names: newAlts, primaryName: entry.name, statMap, ...rosterFieldOptions })
         : buildTrackedAltsField(entry, statMap, rosterFieldOptions);
-      if (altsField) fields.push(altsField);
+      const fields = buildBroadcastFields({ entry, action, changes, snap, altsField, lang });
 
       const titleKey = action in ACTION_VERB ? action : 'fallback';
       const embed = createArtistEmbed(lang)
@@ -321,65 +392,11 @@ export function createBroadcastServices({
   }
 
   async function resolveBroadcastChannels(originGuildId, { onlyOwner = false } = {}) {
-    const channelIds = new Set();
+    if (onlyOwner) return resolveOwnerBroadcastChannels();
     const isOwnerOrigin = originGuildId === config.ownerGuildId;
-
-    if (onlyOwner) {
-      if (!config.ownerGuildId) return channelIds;
-      try {
-        const ownerConfig = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
-        if (ownerConfig?.globalNotifyEnabled === false) return channelIds;
-        if (ownerConfig?.listNotifyChannelId) {
-          channelIds.add(ownerConfig.listNotifyChannelId);
-        } else {
-          for (const envId of config.listNotifyChannelIds) {
-            try {
-              const ch = await client.channels.fetch(envId);
-              if (ch?.guild?.id === config.ownerGuildId) {
-                channelIds.add(envId);
-                break;
-              }
-            } catch { /* skip */ }
-          }
-        }
-      } catch (err) {
-        console.warn('[list] Failed to query owner GuildConfig:', err.message);
-      }
-      return channelIds;
-    }
-
-    const disabledGuildIds = new Set();
-    const dbNotifyGuildIds = new Set();
-    try {
-      const guildConfigs = await GuildConfig.find({}).lean();
-      for (const gc of guildConfigs) {
-        if (gc.globalNotifyEnabled === false) disabledGuildIds.add(gc.guildId);
-        if (gc.listNotifyChannelId) dbNotifyGuildIds.add(gc.guildId);
-        if (gc.guildId === originGuildId && !isOwnerOrigin) continue;
-        if (gc.globalNotifyEnabled === false) continue;
-        if (!gc.listNotifyChannelId) continue;
-        channelIds.add(gc.listNotifyChannelId);
-      }
-    } catch (err) {
-      console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
-    }
-
-    if (config.listNotifyChannelIds.length > 0) {
-      for (const envId of config.listNotifyChannelIds) {
-        if (channelIds.has(envId)) continue;
-        try {
-          const ch = await client.channels.fetch(envId);
-          if (!ch?.isTextBased()) continue;
-          const chGuildId = ch.guild?.id || '';
-          if (chGuildId === originGuildId && !isOwnerOrigin) continue;
-          if (disabledGuildIds.has(chGuildId)) continue;
-          if (dbNotifyGuildIds.has(chGuildId)) continue;
-          channelIds.add(envId);
-        } catch { /* skip */ }
-      }
-    }
-
-    return channelIds;
+    const state = await loadConfiguredBroadcastChannels(originGuildId, isOwnerOrigin);
+    await appendEnvBroadcastChannels(state, originGuildId, isOwnerOrigin);
+    return state.channelIds;
   }
 
   async function broadcastBulkAdd(addedResults, meta) {

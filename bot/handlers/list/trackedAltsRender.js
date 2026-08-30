@@ -60,12 +60,15 @@ export function formatLinkedCharacter(name, record, { bold = true } = {}) {
  * preview surfaces that don't have a snapshot map).
  */
 export function formatAltLine(name, index, record) {
-  const statParts = [];
   const itemLevel = parsePositiveNumber(record?.itemLevel);
-  if (itemLevel > 0) statParts.push(`\`${itemLevel.toFixed(2)}\``);
   // CP carries its unit inside the badge, the way /la-roster rows read
   // (`≈6180.57 CP`), so one badge is one value with its label.
-  if (record?.combatScore && record.combatScore !== '?') statParts.push(`\`${record.combatScore} CP\``);
+  const statParts = [
+    itemLevel > 0 ? `\`${itemLevel.toFixed(2)}\`` : '',
+    record?.combatScore && record.combatScore !== '?'
+      ? `\`${record.combatScore} CP\``
+      : '',
+  ].filter(Boolean);
   const statSuffix = statParts.length > 0 ? ` · ${statParts.join(' · ')}` : '';
   return `**${index + 1}.** ${formatLinkedCharacter(name, record, { bold: false })}${statSuffix}`;
 }

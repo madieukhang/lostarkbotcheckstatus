@@ -17,6 +17,18 @@ import { t } from '../../../services/i18n/index.js';
 import { listTypeIcon } from '../helpers.js';
 import { buildListMutationPayload } from './mutationFlow.js';
 
+function buildBulkDetailField({ items = [], limit, formatLine, name, lang, tail = '' }) {
+  if (items.length === 0) return null;
+  const lines = items.slice(0, limit).map(formatLine).join('\n');
+  const overflow = items.length > limit
+    ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: items.length - limit })}*`
+    : '';
+  return {
+    name,
+    value: `${lines}${overflow}${tail}`.slice(0, 1024),
+  };
+}
+
 /**
  * Build the bulk service bag.
  * @param {object} deps
@@ -30,107 +42,102 @@ import { buildListMutationPayload } from './mutationFlow.js';
  * }}
  */
 export function createBulkServices({ client, executeListAddToDatabase }) {
-  async function executeBulkMultiadd(rows, meta, onProgress = null) {
-    const results = { added: [], skipped: [], failed: [], rehostWarnings: [] };
-
-    let guildDefaultScope = 'global';
+  async function resolveGuildDefaultScope(guildId) {
     try {
       await connectDB();
-      const gc = await getGuildConfig(meta.guildId);
-      guildDefaultScope = gc?.defaultBlacklistScope || 'global';
+      const guildConfig = await getGuildConfig(guildId);
+      return guildConfig?.defaultBlacklistScope || 'global';
     } catch (err) {
       console.warn('[multiadd] Failed to resolve guild default scope:', err.message);
+      return 'global';
     }
+  }
+
+  async function resolveBulkRowImage(row, meta, results) {
+    if (row.imageMessageId && row.imageChannelId) {
+      return { messageId: row.imageMessageId, channelId: row.imageChannelId, freshUrl: '' };
+    }
+    if (!row.image) return null;
+    try {
+      return await rehostImage(row.image, client, {
+        entryName: row.name,
+        addedBy: meta.requesterDisplayName || meta.requesterTag,
+        listType: row.type,
+        throwOnError: true,
+      });
+    } catch (err) {
+      results.rehostWarnings.push({ name: row.name, error: err.message });
+      console.warn(`[multiadd] Row "${row.name}" image rehost failed:`, err.message);
+      return null;
+    }
+  }
+
+  function buildBulkRowPayload(row, meta, scope, rehost) {
+    return buildListMutationPayload({
+      guildId: meta.guildId,
+      channelId: meta.channelId,
+      requester: {
+        id: meta.requesterId,
+        tag: meta.requesterTag || '',
+        username: meta.requesterName || '',
+      },
+      requestedByDisplayName: meta.requesterDisplayName || '',
+      type: row.type,
+      name: row.name,
+      reason: row.reason,
+      raid: row.raid || '',
+      logsUrl: row.logs || '',
+      imageUrl: rehost?.freshUrl || row.image || '',
+      imageMessageId: rehost?.messageId || '',
+      imageChannelId: rehost?.channelId || '',
+      scope,
+      skipBroadcast: true,
+    });
+  }
+
+  function recordBulkRowResult(results, row, scope, result) {
+    if (result.ok) {
+      results.added.push({ name: row.name, type: row.type, scope, entry: result.entry });
+      return;
+    }
+    if (result.isDuplicate) {
+      results.skipped.push({ name: row.name, reason: 'duplicate (already in list)' });
+      return;
+    }
+    const firstLine = (result.content || 'unknown error').split('\n')[0];
+    const reason = firstLine.replace(/\*\*/g, '').replace(/[⚠️❌🛡️⛔✅]/g, '').trim();
+    results.skipped.push({ name: row.name, reason: reason.slice(0, 80) });
+  }
+
+  async function executeBulkRow(row, meta, defaultScope, results) {
+    const scope = row.type === 'black' ? (row.scope || defaultScope) : 'global';
+    const rehost = await resolveBulkRowImage(row, meta, results);
+    const payload = buildBulkRowPayload(row, meta, scope, rehost);
+    try {
+      const result = await executeListAddToDatabase(payload);
+      recordBulkRowResult(results, row, scope, result);
+    } catch (err) {
+      console.error(`[multiadd] Row ${row.rowNum} "${row.name}" failed:`, err);
+      results.failed.push({ name: row.name, error: err.message || 'unknown error' });
+    }
+  }
+
+  async function reportBulkProgress(onProgress, completed, total) {
+    if (!onProgress) return;
+    try {
+      await onProgress(completed, total);
+    } catch { /* progress errors should not stop the batch */ }
+  }
+
+  async function executeBulkMultiadd(rows, meta, onProgress = null) {
+    const results = { added: [], skipped: [], failed: [], rehostWarnings: [] };
+    const guildDefaultScope = await resolveGuildDefaultScope(meta.guildId);
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      const effectiveScope =
-        row.type === 'black' ? (row.scope || guildDefaultScope) : 'global';
-
-      let rowRehost = null;
-      if (row.imageMessageId && row.imageChannelId) {
-        rowRehost = {
-          messageId: row.imageMessageId,
-          channelId: row.imageChannelId,
-          freshUrl: '',
-        };
-      } else if (row.image) {
-        try {
-          rowRehost = await rehostImage(row.image, client, {
-            entryName: row.name,
-            addedBy: meta.requesterDisplayName || meta.requesterTag,
-            listType: row.type,
-            throwOnError: true,
-          });
-        } catch (rehostErr) {
-          results.rehostWarnings.push({
-            name: row.name,
-            error: rehostErr.message,
-          });
-          console.warn(`[multiadd] Row "${row.name}" image rehost failed:`, rehostErr.message);
-        }
-      }
-
-      const payload = buildListMutationPayload({
-        guildId: meta.guildId,
-        channelId: meta.channelId,
-        requester: {
-          id: meta.requesterId,
-          tag: meta.requesterTag || '',
-          username: meta.requesterName || '',
-        },
-        requestedByDisplayName: meta.requesterDisplayName || '',
-        type: row.type,
-        name: row.name,
-        reason: row.reason,
-        raid: row.raid || '',
-        logsUrl: row.logs || '',
-        imageUrl: rowRehost?.freshUrl || row.image || '',
-        imageMessageId: rowRehost?.messageId || '',
-        imageChannelId: rowRehost?.channelId || '',
-        scope: effectiveScope,
-        skipBroadcast: true,
-      });
-
-      try {
-        const result = await executeListAddToDatabase(payload);
-        if (result.ok) {
-          results.added.push({
-            name: row.name,
-            type: row.type,
-            scope: effectiveScope,
-            entry: result.entry,
-          });
-        } else if (result.isDuplicate) {
-          results.skipped.push({
-            name: row.name,
-            reason: 'duplicate (already in list)',
-          });
-        } else {
-          const firstLine = (result.content || 'unknown error').split('\n')[0];
-          const plain = firstLine.replace(/\*\*/g, '').replace(/[⚠️❌🛡️⛔✅]/g, '').trim();
-          results.skipped.push({
-            name: row.name,
-            reason: plain.slice(0, 80),
-          });
-        }
-      } catch (err) {
-        console.error(`[multiadd] Row ${row.rowNum} "${row.name}" failed:`, err);
-        results.failed.push({
-          name: row.name,
-          error: err.message || 'unknown error',
-        });
-      }
-
-      if (onProgress) {
-        try {
-          await onProgress(i + 1, rows.length);
-        } catch { /* progress errors should not stop the batch */ }
-      }
-
-      if (i < rows.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      }
+      await executeBulkRow(row, meta, guildDefaultScope, results);
+      await reportBulkProgress(onProgress, i + 1, rows.length);
+      if (i < rows.length - 1) await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
     return results;
@@ -163,58 +170,38 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
       .setFooter({ text: t('dialogue.multiadd.summary.footer', lang, { user: meta.requesterDisplayName || t('dialogue.common.unknown', lang) }) })
       .setTimestamp(new Date());
 
-    if (results.added.length > 0) {
-      const addedLines = results.added
-        .slice(0, 15)
-        .map((r, i) => `${i + 1}. ${listTypeIcon(r.type)} **${r.name}**`)
-        .join('\n');
-      const suffix = results.added.length > 15 ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: results.added.length - 15 })}*` : '';
-      embed.addFields({
+    const detailFields = [
+      buildBulkDetailField({
+        items: results.added,
+        limit: 15,
+        formatLine: (row, index) => `${index + 1}. ${listTypeIcon(row.type)} **${row.name}**`,
         name: `✅ ${t('dialogue.multiadd.summary.added', lang, { count: results.added.length })}`,
-        value: (addedLines + suffix).slice(0, 1024),
-      });
-    }
-
-    if (results.skipped.length > 0) {
-      const skippedLines = results.skipped
-        .slice(0, 10)
-        .map((r) => `• **${r.name}** · ${r.reason}`)
-        .join('\n');
-      const suffix = results.skipped.length > 10 ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: results.skipped.length - 10 })}*` : '';
-      embed.addFields({
+        lang,
+      }),
+      buildBulkDetailField({
+        items: results.skipped,
+        limit: 10,
+        formatLine: (row) => `• **${row.name}** · ${row.reason}`,
         name: `⚠️ ${t('dialogue.multiadd.summary.skipped', lang, { count: results.skipped.length })}`,
-        value: (skippedLines + suffix).slice(0, 1024),
-      });
-    }
-
-    if (results.failed.length > 0) {
-      const failedLines = results.failed
-        .slice(0, 10)
-        .map((r) => `• **${r.name}** · ${r.error}`)
-        .join('\n');
-      const suffix = results.failed.length > 10 ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: results.failed.length - 10 })}*` : '';
-      embed.addFields({
+        lang,
+      }),
+      buildBulkDetailField({
+        items: results.failed,
+        limit: 10,
+        formatLine: (row) => `• **${row.name}** · ${row.error}`,
         name: `❌ ${t('dialogue.multiadd.summary.failed', lang, { count: results.failed.length })}`,
-        value: (failedLines + suffix).slice(0, 1024),
-      });
-    }
-
-    if (results.rehostWarnings?.length > 0) {
-      const warnLines = results.rehostWarnings
-        .slice(0, 10)
-        .map((r) => `• **${r.name}** · ${r.error}`)
-        .join('\n');
-      const suffix = results.rehostWarnings.length > 10
-        ? `\n*${t('dialogue.multiadd.summary.more', lang, { count: results.rehostWarnings.length - 10 })}*`
-        : '';
-      embed.addFields({
-        name: `🖼️ ${t('dialogue.multiadd.summary.imageFailed', lang, { count: results.rehostWarnings.length })}`,
-        value: (
-          warnLines + suffix +
-          `\n*${t('dialogue.multiadd.summary.imageLegacy', lang)}*`
-        ).slice(0, 1024),
-      });
-    }
+        lang,
+      }),
+      buildBulkDetailField({
+        items: results.rehostWarnings,
+        limit: 10,
+        formatLine: (row) => `• **${row.name}** · ${row.error}`,
+        name: `🖼️ ${t('dialogue.multiadd.summary.imageFailed', lang, { count: results.rehostWarnings?.length || 0 })}`,
+        lang,
+        tail: `\n*${t('dialogue.multiadd.summary.imageLegacy', lang)}*`,
+      }),
+    ].filter(Boolean);
+    embed.addFields(detailFields);
 
     return embed;
   }

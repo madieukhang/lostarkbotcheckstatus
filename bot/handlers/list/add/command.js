@@ -50,63 +50,124 @@ export function createListAddCommandHandler({
   sendListAddApprovalToApprovers,
   executeListAddToDatabase,
 }) {
-  async function handleListAddCommand(interaction) {
+  function readListAddRequest(interaction) {
     const type = interaction.options.getString('type', true);
-    const rawName = interaction.options.getString('name', true).trim();
-    const reason = interaction.options.getString('reason', true).trim();
     const raidInput = interaction.options.getString('raid') ?? '';
-    const raid = resolveListAddRaidLabel(type, raidInput);
-    const logs = interaction.options.getString('logs') ?? '';
-    const image = interaction.options.getAttachment('image');
-    const inputScope = interaction.options.getString('scope') || '';
-    const name = normalizeCharacterName(rawName);
+    return {
+      type,
+      name: normalizeCharacterName(interaction.options.getString('name', true).trim()),
+      reason: interaction.options.getString('reason', true).trim(),
+      raidInput,
+      raid: resolveListAddRaidLabel(type, raidInput),
+      logsUrl: interaction.options.getString('logs') ?? '',
+      image: interaction.options.getAttachment('image'),
+      inputScope: interaction.options.getString('scope') || '',
+    };
+  }
 
+  function validateListAddRequest(interaction, request, lang) {
+    if (!interaction.guild) return t('dialogue.common.serverOnly', lang);
+    if (!request.reason) return t('dialogue.listAdd.command.reasonRequired', lang);
+    if (request.raid === null) {
+      return t('dialogue.listAdd.command.invalidRaid', lang, {
+        raid: request.raidInput.trim(),
+        list: request.type === 'black' ? 'blacklist' : 'whitelist',
+      });
+    }
+    if (request.image?.contentType && !request.image.contentType.startsWith('image/')) {
+      return t('dialogue.listAdd.command.invalidImage', lang, { type: request.image.contentType });
+    }
+    return null;
+  }
+
+  async function resolveListAddScope(request, guildId) {
+    if (request.inputScope) return request.inputScope;
+    if (request.type !== 'black') return 'global';
+    await connectDB();
+    const guildConfig = await getGuildConfig(guildId);
+    return guildConfig?.defaultBlacklistScope || 'global';
+  }
+
+  async function rehostListAddImage(request, interaction) {
+    if (!request.image?.url) return null;
+    return rehostImage(request.image.url, client, {
+      entryName: request.name,
+      addedBy: getInteractionDisplayName(interaction),
+      listType: request.type,
+    });
+  }
+
+  function createListAddPayload(interaction, request, scope, rehostResult, lang) {
+    return buildListMutationPayload({
+      requestId: randomUUID(),
+      interaction,
+      requestedByDisplayName: getInteractionDisplayName(interaction),
+      lang,
+      type: request.type,
+      name: request.name,
+      reason: request.reason,
+      raid: request.raid,
+      logsUrl: request.logsUrl,
+      imageUrl: rehostResult?.freshUrl || request.image?.url || '',
+      imageMessageId: rehostResult?.messageId || '',
+      imageChannelId: rehostResult?.channelId || '',
+      scope: request.type === 'black' ? scope : 'global',
+    });
+  }
+
+  async function captureRequestReplyId(interaction, requestId) {
+    try {
+      const requestReply = await interaction.fetchReply();
+      await PendingApproval.updateOne(
+        { requestId },
+        { $set: { requestMessageId: requestReply.id } }
+      );
+    } catch (err) {
+      console.warn('[list] Failed to capture request reply message ID:', err.message);
+    }
+  }
+
+  async function submitListAddRequest(interaction, payload, lang) {
+    const submission = await submitListMutation({
+      interaction,
+      payload,
+      lang,
+      PendingApprovalModel: PendingApproval,
+      sendListAddApprovalToApprovers,
+      executeListAddToDatabase,
+      onDeliveryFailed: (delivery) => editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.listAdd.command.deliveryFailed', lang),
+        fields: [{
+          name: t('dialogue.broadcast.fields.reason', lang),
+          value: delivery.reason || t('dialogue.common.unknown', lang),
+          inline: false,
+        }],
+        lang,
+      }),
+      onQueued: () => editEmbed(
+        interaction,
+        buildListAddApprovalEmbed(interaction.guild, payload, {
+          title: t('dialogue.listAdd.command.submittedTitle', lang),
+          includeRequestedBy: false,
+          lang,
+        })
+      ),
+    });
+    if (submission.status === 'queued') {
+      await captureRequestReplyId(interaction, payload.requestId);
+    }
+  }
+
+  async function handleListAddCommand(interaction) {
+    const request = readListAddRequest(interaction);
     await deferReply(interaction);
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-
-    if (!interaction.guild) {
+    const validation = validateListAddRequest(interaction, request, lang);
+    if (validation) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
-        ...t('dialogue.common.serverOnly', lang),
-        lang,
-      });
-      return;
-    }
-
-    // Resolve scope: explicit input > guild default setting > 'global'
-    let scope = inputScope;
-    if (!scope && type === 'black') {
-      await connectDB();
-      const guildConfig = await getGuildConfig(interaction.guild.id);
-      scope = guildConfig?.defaultBlacklistScope || 'global';
-    }
-    if (!scope) scope = 'global'; // non-blacklist types always global
-
-    if (!reason) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.listAdd.command.reasonRequired', lang),
-        lang,
-      });
-      return;
-    }
-
-    if (raid === null) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.listAdd.command.invalidRaid', lang, {
-          raid: raidInput.trim(),
-          list: type === 'black' ? 'blacklist' : 'whitelist',
-        }),
-        lang,
-      });
-      return;
-    }
-
-    if (image?.contentType && !image.contentType.startsWith('image/')) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.listAdd.command.invalidImage', lang, { type: image.contentType }),
+        ...validation,
         lang,
       });
       return;
@@ -114,74 +175,10 @@ export function createListAddCommandHandler({
 
     try {
       await connectDB();
-      const requestId = randomUUID();
-
-      // Rehost the image NOW (while the Discord CDN URL is still valid).
-      // Rehost failure or a missing evidence channel falls back to the legacy
-      // original URL, which eventually expires.
-      let rehostResult = null;
-      if (image?.url) {
-        rehostResult = await rehostImage(image.url, client, {
-          entryName: name,
-          addedBy: getInteractionDisplayName(interaction),
-          listType: type,
-        });
-      }
-
-      const payload = buildListMutationPayload({
-        requestId,
-        interaction,
-        requestedByDisplayName: getInteractionDisplayName(interaction),
-        lang,
-        type,
-        name,
-        reason,
-        raid,
-        logsUrl: logs,
-        // imageUrl carries the CURRENT display URL (fresh at this moment).
-        // If rehosted, use the freshly-signed evidence URL; otherwise the
-        // original attachment URL. Either way it's valid for immediate render.
-        // executeListAddToDatabase decides whether to PERSIST this URL based
-        // on whether imageMessageId is set (rehosted entries don't store URL).
-        imageUrl: rehostResult?.freshUrl || image?.url || '',
-        imageMessageId: rehostResult?.messageId || '',
-        imageChannelId: rehostResult?.channelId || '',
-        scope: type === 'black' ? scope : 'global', // scope only applies to blacklist
-      });
-
-      const submission = await submitListMutation({
-        interaction,
-        payload,
-        lang,
-        PendingApprovalModel: PendingApproval,
-        sendListAddApprovalToApprovers,
-        executeListAddToDatabase,
-        onDeliveryFailed: (delivery) => editAlert(interaction, {
-          severity: AlertSeverity.WARNING,
-          ...t('dialogue.listAdd.command.deliveryFailed', lang),
-          fields: [{ name: t('dialogue.broadcast.fields.reason', lang), value: delivery.reason || t('dialogue.common.unknown', lang), inline: false }],
-          lang,
-        }),
-        onQueued: () => editEmbed(
-          interaction,
-          buildListAddApprovalEmbed(interaction.guild, payload, {
-            title: t('dialogue.listAdd.command.submittedTitle', lang),
-            includeRequestedBy: false,
-            lang,
-          })
-        ),
-      });
-      if (submission.status !== 'queued') return;
-
-      try {
-        const requestReply = await interaction.fetchReply();
-        await PendingApproval.updateOne(
-          { requestId: payload.requestId },
-          { $set: { requestMessageId: requestReply.id } }
-        );
-      } catch (err) {
-        console.warn('[list] Failed to capture request reply message ID:', err.message);
-      }
+      const scope = await resolveListAddScope(request, interaction.guild.id);
+      const rehostResult = await rehostListAddImage(request, interaction);
+      const payload = createListAddPayload(interaction, request, scope, rehostResult, lang);
+      await submitListAddRequest(interaction, payload, lang);
     } catch (err) {
       console.error('[list] ❌ Proposal create/send failed:', err.message);
       await editAlert(interaction, {

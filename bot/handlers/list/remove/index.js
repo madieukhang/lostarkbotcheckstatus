@@ -70,10 +70,11 @@ export function createRemoveHandlers({ services }) {
       ]);
 
       // Collect all found entries
-      const found = [];
-      if (blackEntry) found.push({ entry: blackEntry, type: 'black' });
-      if (whiteEntry) found.push({ entry: whiteEntry, type: 'white' });
-      if (watchEntry) found.push({ entry: watchEntry, type: 'watch' });
+      const found = [
+        blackEntry ? { entry: blackEntry, type: 'black' } : null,
+        whiteEntry ? { entry: whiteEntry, type: 'white' } : null,
+        watchEntry ? { entry: watchEntry, type: 'watch' } : null,
+      ].filter(Boolean);
 
       if (found.length === 0) {
         await editAlert(interaction, {

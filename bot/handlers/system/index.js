@@ -101,11 +101,16 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
       // worth surfacing (more than one bucket non-zero). Discord renders
       // 3 inline fields on one line which gives a quick visual grid
       // before the per-server detail block kicks in.
-      const stats = [];
-      if (onlineCount > 0) stats.push({ name: `🟢 ${t('dialogue.system.status.labels.online', lang)}`, value: String(onlineCount), inline: true });
-      if (maintenanceCount > 0) stats.push({ name: `🟡 ${t('dialogue.system.status.labels.maintenance', lang)}`, value: String(maintenanceCount), inline: true });
-      if (offlineCount > 0) stats.push({ name: `🔴 ${t('dialogue.system.status.labels.offline', lang)}`, value: String(offlineCount), inline: true });
-      if (unknownCount > 0) stats.push({ name: `❓ ${t('dialogue.system.status.labels.unknown', lang)}`, value: String(unknownCount), inline: true });
+      const stats = [
+        [onlineCount, '🟢', 'online'],
+        [maintenanceCount, '🟡', 'maintenance'],
+        [offlineCount, '🔴', 'offline'],
+        [unknownCount, '❓', 'unknown'],
+      ].filter(([count]) => count > 0).map(([count, icon, key]) => ({
+        name: `${icon} ${t(`dialogue.system.status.labels.${key}`, lang)}`,
+        value: String(count),
+        inline: true,
+      }));
       fields.push(...stats);
 
       // Per-server status grid follows. Sorted by status priority so

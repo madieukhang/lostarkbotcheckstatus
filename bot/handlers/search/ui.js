@@ -20,12 +20,13 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
     const cpSuffix = result.combatScore ? ` · \`${result.combatScore} CP\`` : '';
     const hasImage = Boolean(pickEvidenceEntry(result));
 
-    let icon = '';
-    if (result.black) icon += '⛔';
-    if (result.white) icon += '✅';
-    if (result.watch) icon += '⚠️';
-    if (result.trusted) icon += '🛡️';
-    if (icon) icon += ' ';
+    const statusIcons = [
+      result.black ? '⛔' : '',
+      result.white ? '✅' : '',
+      result.watch ? '⚠️' : '',
+      result.trusted ? '🛡️' : '',
+    ].filter(Boolean).join('');
+    const icon = statusIcons ? `${statusIcons} ` : '';
 
     const link = `[${result.name}](${rosterUrl(result.name)})`;
     // Class icon (or text fallback) sits BEFORE the name, after the list-
@@ -43,8 +44,8 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
           name: formatLinkedCharacter(entry.name, snapshotMap.get(entry.name.toLowerCase())),
         })
         : '';
-      line += `\n    ↳ ${via}*${entry.reason || t('dialogue.search.noReason', lang)}*`;
-      if (entry.raid) line += ` \`${entry.raid}\``;
+      const raidSuffix = entry.raid ? ` \`${entry.raid}\`` : '';
+      line += `\n    ↳ ${via}*${entry.reason || t('dialogue.search.noReason', lang)}*${raidSuffix}`;
     }
 
     return line;
@@ -60,18 +61,21 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
   const hasWhite = whiteCount > 0;
   const color = hasBlack ? COLORS.danger : hasWatch ? COLORS.warning : hasWhite ? COLORS.success : COLORS.info;
 
-  const filterParts = [`ilvl ≥ ${minIlvl}`];
-  if (maxIlvl !== null) filterParts.push(`ilvl ≤ ${maxIlvl}`);
-  if (classFilter) filterParts.push(getClassName(classFilter));
+  const filterParts = [
+    `ilvl ≥ ${minIlvl}`,
+    maxIlvl !== null ? `ilvl ≤ ${maxIlvl}` : '',
+    classFilter ? getClassName(classFilter) : '',
+  ].filter(Boolean);
 
-  const breakdown = [];
-  if (hasBlack) breakdown.push(`⛔ **${blackCount}**`);
-  if (hasWatch) breakdown.push(`⚠️ **${watchCount}**`);
-  if (hasWhite) breakdown.push(`✅ **${whiteCount}**`);
-  if (trustedCount > 0) breakdown.push(`🛡️ **${trustedCount}**`);
-  if (notListedCount > 0) {
-    breakdown.push(`❓ **${notListedCount}** ${t('dialogue.search.notListed', lang)}`);
-  }
+  const breakdown = [
+    hasBlack ? `⛔ **${blackCount}**` : '',
+    hasWatch ? `⚠️ **${watchCount}**` : '',
+    hasWhite ? `✅ **${whiteCount}**` : '',
+    trustedCount > 0 ? `🛡️ **${trustedCount}**` : '',
+    notListedCount > 0
+      ? `❓ **${notListedCount}** ${t('dialogue.search.notListed', lang)}`
+      : '',
+  ].filter(Boolean);
   const matchWord = t(`dialogue.search.${results.length === 1 ? 'matchOne' : 'matchMany'}`, lang);
 
   // The count lives in the title, the way every other list card carries

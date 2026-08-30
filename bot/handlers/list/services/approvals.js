@@ -160,11 +160,14 @@ export function createApprovalServices({
     else color = COLORS.success;
 
     const buildBulkEmbed = (lang) => {
-      const breakdownParts = [];
-      if (typeCounts.black) breakdownParts.push(`⛔ **${typeCounts.black}**`);
-      if (typeCounts.watch) breakdownParts.push(`⚠️ **${typeCounts.watch}**`);
-      if (typeCounts.white) breakdownParts.push(`✅ **${typeCounts.white}**`);
-      if (serverScopedCount > 0) breakdownParts.push(`🏠 **${serverScopedCount}** ${t('dialogue.approval.bulk.local', lang)}`);
+      const breakdownParts = [
+        typeCounts.black ? `⛔ **${typeCounts.black}**` : '',
+        typeCounts.watch ? `⚠️ **${typeCounts.watch}**` : '',
+        typeCounts.white ? `✅ **${typeCounts.white}**` : '',
+        serverScopedCount > 0
+          ? `🏠 **${serverScopedCount}** ${t('dialogue.approval.bulk.local', lang)}`
+          : '',
+      ].filter(Boolean);
 
       const previewLines = pending.rows.slice(0, 20).map((row, index) => {
         const reasonShort = (row.reason || '').length > 40 ? `${(row.reason || '').slice(0, 37)}...` : (row.reason || '');

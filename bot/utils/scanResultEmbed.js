@@ -145,6 +145,63 @@ function buildAltList(alts, { newAltsSet, lang = 'en' } = {}) {
   return lines.join('\n') + extra;
 }
 
+function buildResultSections({ target, result, state, style, alts, altList, summaryLine, actionHint, lang }) {
+  const stateLabel = t(`dialogue.scan.result.states.${style.localeKey}`, lang);
+  const stopHint = buildStopHint(state, result, lang);
+  return [
+    summaryLine ? `${summaryLine}\n*${stateLabel}.*` : `*${stateLabel}.*`,
+    target.isHidden
+      ? `${ICONS.locked} *${t('dialogue.scan.result.hiddenNotice', lang)}*`
+      : '',
+    stopHint,
+    altList
+      ? `**🎯 ${t('dialogue.scan.result.altsFound', lang, { count: alts.length })}**\n${altList}`
+      : '',
+    actionHint,
+  ].filter(Boolean);
+}
+
+function buildResultFields(result, state, altCount, lang) {
+  const checked = result.checkedCandidates ?? result.scannedCandidates ?? 0;
+  const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
+  const fields = [
+    { name: `🔍 ${t('dialogue.scan.result.fields.checked', lang)}`, value: String(checked), inline: true },
+    { name: `🎯 ${t('dialogue.scan.result.fields.found', lang)}`, value: String(altCount), inline: true },
+    { name: `⚠️ ${t('dialogue.scan.result.fields.failed', lang)}`, value: String(result.failedCandidates ?? 0), inline: true },
+  ];
+  const optional = [
+    [state.remaining > 0, '📋', 'remaining', state.remaining],
+    [attempted > checked, '🔁', 'attempts', attempted],
+    [(result.rateLimitRetries ?? 0) > 0, '⏱️', 'retries', result.rateLimitRetries],
+    [(result.scraperApiRequests ?? 0) > 0, '🌐', 'scraper', result.scraperApiRequests],
+  ];
+  fields.push(...optional
+    .filter(([include]) => include)
+    .map(([, icon, key, value]) => ({
+      name: `${icon} ${t(`dialogue.scan.result.fields.${key}`, lang)}`,
+      value: String(value),
+      inline: true,
+    })));
+  return fields;
+}
+
+function buildResultFooter(target, result, lang) {
+  return [
+    target.guildName
+      ? t('dialogue.scan.result.footer.guild', lang, { guild: target.guildName })
+      : '',
+    Number.isFinite(result.totalMembers)
+      ? t('dialogue.scan.result.footer.members', lang, { count: result.totalMembers })
+      : '',
+    result.candidateLimit
+      ? t('dialogue.scan.result.footer.cap', lang, { count: result.candidateLimit })
+      : '',
+    Number.isFinite(result.excludedCandidates) && result.excludedCandidates > 0
+      ? t('dialogue.scan.result.footer.excluded', lang, { count: result.excludedCandidates })
+      : '',
+  ].filter(Boolean).join(' · ');
+}
+
 /**
  * Build the unified scan-result embed.
  *
@@ -188,48 +245,17 @@ export function buildScanResultEmbed({
   // separate bold banner in the description redundant.
   const kindLocaleKey = KIND_LOCALE_KEYS[kind] ?? 'deep';
   const kindLabel = t(`dialogue.scan.result.kinds.${kindLocaleKey}`, lang);
-  const stateLabel = t(`dialogue.scan.result.states.${style.localeKey}`, lang);
-
-  const sections = [];
-
-  // 1. Summary lead. Combines the caller-supplied summary with the state label
-  // so the outcome and terminal state appear in one paragraph.
-  if (summaryLine) {
-    sections.push(`${summaryLine}\n*${stateLabel}.*`);
-  } else {
-    sections.push(`*${stateLabel}.*`);
-  }
-
-  // 2. Hidden roster notice. Single-line italic, less verbose than the
-  // prior two-line blockquote. The detailed stronghold-fingerprint explanation
-  // remains in the help docs and completion DM, so this card omits it.
-  if (target.isHidden) {
-    sections.push(
-      `${ICONS.locked} *${t('dialogue.scan.result.hiddenNotice', lang)}*`
-    );
-  }
-
-  // 3. Stop-reason hint. The title icon carries the outcome; this paragraph
-  // carries the cause and next action in a shorter form than the prior copy.
-  const stopHint = buildStopHint(state, result, lang);
-  if (stopHint) sections.push(stopHint);
-
-  // 4. Alt list block. The header also exposes the result count when scanning
-  // message history.
-  if (altList) {
-    sections.push(`**🎯 ${t('dialogue.scan.result.altsFound', lang, { count: alts.length })}**\n${altList}`);
-  }
-
-  // 5. Action hint. Reserved for caller-specific next-step copy
-  // (e.g. enrich: "Confirm to append all N to allCharacters").
-  if (actionHint) {
-    sections.push(actionHint);
-  }
-
-  // Discord description ceiling is 4096; the alt-list cap of 25 plus
-  // notices typically lands around 1.5-2k chars. The `.slice(0, 4096)`
-  // is a safety net for unusually long class names or names with
-  // exotic encoding overhead.
+  const sections = buildResultSections({
+    target,
+    result,
+    state,
+    style,
+    alts,
+    altList,
+    summaryLine,
+    actionHint,
+    lang,
+  });
   const description = sections.join('\n\n').slice(0, 4096);
 
   const embed = createArtistEmbed(lang)
@@ -238,44 +264,10 @@ export function buildScanResultEmbed({
     .setColor(finalColor)
     .setTimestamp();
 
-  if (target.profileUrl) {
-    embed.setURL(target.profileUrl);
-  }
-
-  // Stats grid as inline fields. Discord renders three inline fields per row,
-  // separating metrics from the narrative description. The prior `·`-joined
-  // prose line became difficult to scan with five or six active metrics.
-  const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
-  const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
-  const fields = [
-    { name: `🔍 ${t('dialogue.scan.result.fields.checked', lang)}`, value: String(checkedCandidates), inline: true },
-    { name: `🎯 ${t('dialogue.scan.result.fields.found', lang)}`, value: String(alts.length), inline: true },
-    { name: `⚠️ ${t('dialogue.scan.result.fields.failed', lang)}`, value: String(result.failedCandidates ?? 0), inline: true },
-  ];
-  if (state.remaining > 0) {
-    fields.push({ name: `📋 ${t('dialogue.scan.result.fields.remaining', lang)}`, value: String(state.remaining), inline: true });
-  }
-  if (attemptedCandidates > checkedCandidates) {
-    fields.push({ name: `🔁 ${t('dialogue.scan.result.fields.attempts', lang)}`, value: String(attemptedCandidates), inline: true });
-  }
-  if ((result.rateLimitRetries ?? 0) > 0) {
-    fields.push({ name: `⏱️ ${t('dialogue.scan.result.fields.retries', lang)}`, value: String(result.rateLimitRetries), inline: true });
-  }
-  if ((result.scraperApiRequests ?? 0) > 0) {
-    fields.push({ name: `🌐 ${t('dialogue.scan.result.fields.scraper', lang)}`, value: String(result.scraperApiRequests), inline: true });
-  }
-  embed.addFields(...fields);
-
-  const footerParts = [];
-  if (target.guildName) footerParts.push(t('dialogue.scan.result.footer.guild', lang, { guild: target.guildName }));
-  if (Number.isFinite(result.totalMembers)) footerParts.push(t('dialogue.scan.result.footer.members', lang, { count: result.totalMembers }));
-  if (result.candidateLimit) footerParts.push(t('dialogue.scan.result.footer.cap', lang, { count: result.candidateLimit }));
-  if (Number.isFinite(result.excludedCandidates) && result.excludedCandidates > 0) {
-    footerParts.push(t('dialogue.scan.result.footer.excluded', lang, { count: result.excludedCandidates }));
-  }
-  if (footerParts.length > 0) {
-    embed.setFooter({ text: footerParts.join(' · ') });
-  }
+  if (target.profileUrl) embed.setURL(target.profileUrl);
+  embed.addFields(...buildResultFields(result, state, alts.length, lang));
+  const footer = buildResultFooter(target, result, lang);
+  if (footer) embed.setFooter({ text: footer });
 
   return { embed, state };
 }

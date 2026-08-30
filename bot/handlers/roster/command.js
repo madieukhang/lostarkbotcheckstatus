@@ -48,6 +48,7 @@ import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
+import { resolveRosterScanOutcome } from './completion.js';
 
 /**
  * Render one visible-roster row. Both numeric stats use Discord code badges;
@@ -59,6 +60,187 @@ export function formatVisibleRosterLine(character, index, {
   delta = '',
 } = {}) {
   return `**${index + 1}.** ${classPrefix} ${character.name} · \`${character.itemLevel}\`${delta} · \`${character.combatScore} CP\``;
+}
+
+function parseItemLevel(value) {
+  return Number.parseFloat(String(value ?? '0').replace(/,/g, ''));
+}
+
+export function formatItemLevelDelta(currentItemLevel, previousItemLevel) {
+  const previous = Number(previousItemLevel) || 0;
+  if (previous <= 0) return '';
+
+  const diff = parseItemLevel(currentItemLevel) - previous;
+  if (diff === 0) return '';
+  return ` *(${diff > 0 ? '+' : ''}${diff.toFixed(2)})*`;
+}
+
+export function buildVisibleRosterLines(characters, previousSnapshots, lang = 'en') {
+  return characters.map((character, index) => {
+    const previous = previousSnapshots.get(character.name.toLowerCase());
+    const className = character.className || t('dialogue.common.unknown', lang);
+    return formatVisibleRosterLine(character, index, {
+      classPrefix: getClassEmoji(className) || className,
+      delta: formatItemLevelDelta(character.itemLevel, previous?.itemLevel),
+    });
+  });
+}
+
+async function fetchRosterCharacters(name, deep) {
+  const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
+  const response = await bibleClient.fetch(targetUrl, deep ? { viaWorker: true } : {});
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+  const html = await response.text();
+  const { document } = new JSDOM(html, { virtualConsole }).window;
+  return parseRosterCharactersFromHtml(html, document);
+}
+
+async function loadPreviousSnapshotMap(characters) {
+  await connectDB();
+  const snapshots = await RosterSnapshot.find({
+    name: { $in: characters.map((character) => character.name) },
+  })
+    .collation({ locale: 'en', strength: 2 })
+    .lean();
+  return new Map(snapshots.map((snapshot) => [snapshot.name.toLowerCase(), snapshot]));
+}
+
+function buildRosterDescription(characters, previousSnapshots, lang) {
+  const lines = buildVisibleRosterLines(characters, previousSnapshots, lang);
+  const rosterLines = lines.join('\n');
+  const description = rosterLines.length > 4000
+    ? `${rosterLines.slice(0, 4000)}\n…`
+    : rosterLines;
+  const topCharacter = characters[0];
+  if (!topCharacter) return description;
+
+  const topClass = topCharacter.className || topCharacter.classId || '?';
+  const summary = t('dialogue.roster.topCharacter', lang, {
+    class: getClassEmoji(topClass) || topClass,
+    name: topCharacter.name,
+    ilvl: topCharacter.itemLevel || '?',
+  });
+  return `${summary}\n\n${description}`.slice(0, 4096);
+}
+
+async function loadVisibleRosterMatches(characters, guildId) {
+  const checkNames = characters
+    .filter((character) => parseItemLevel(character.itemLevel) >= 1700)
+    .map((character) => character.name);
+  const [blacklist, whitelist, trusted] = await Promise.all([
+    handleRosterBlackListCheck(checkNames, { guildId }),
+    handleRosterWhiteListCheck(checkNames),
+    TrustedUser.findOne(buildNameRosterQuery(checkNames))
+      .collation({ locale: 'en', strength: 2 })
+      .lean(),
+  ]);
+  return { blacklist, whitelist, trusted };
+}
+
+function rosterCardColor({ blacklist, whitelist, trusted }) {
+  if (blacklist) return COLORS.danger;
+  if (whitelist) return COLORS.success;
+  if (trusted) return COLORS.trustedSoft;
+  return COLORS.info;
+}
+
+function prependEvidenceCards({ embeds, rows, matches, statMap, name, lang }) {
+  for (const [listType, entry] of [['black', matches.blacklist], ['white', matches.whitelist]]) {
+    if (!entry) continue;
+    embeds.unshift(buildEvidenceEmbed(decorateListEntry(entry, listType), '', {
+      lang,
+      statMap,
+      headline: true,
+      attachImage: false,
+      viaName: name,
+    }));
+    rows.unshift(...buildBroadcastEvidenceComponents(entry, {
+      legacyUrl: entry.imageUrl,
+      lang,
+    }));
+  }
+}
+
+function buildVisibleRosterPresentation({ characters, previousSnapshots, matches, name, lang }) {
+  const fullDescription = buildRosterDescription(characters, previousSnapshots, lang);
+  const embed = createArtistEmbed(lang)
+    .setTitle(`🛡️ ${t('dialogue.roster.title', lang, {
+      name,
+      count: characters.length,
+      word: t(`dialogue.roster.${characters.length === 1 ? 'characterOne' : 'characterMany'}`, lang),
+    })}`)
+    .setURL(rosterUrl(name))
+    .setDescription(fullDescription)
+    .setColor(rosterCardColor(matches));
+
+  if (matches.trusted) {
+    const status = `🛡️ ${t('dialogue.roster.trusted', lang, { name: matches.trusted.name })}`
+      + (matches.trusted.reason ? ` · *${matches.trusted.reason}*` : '');
+    const remaining = Math.max(0, 4096 - status.length - 2);
+    embed.setDescription([status, fullDescription.slice(0, remaining)].join('\n\n'));
+  }
+
+  const embeds = [embed];
+  const evidenceRows = [];
+  prependEvidenceCards({
+    embeds,
+    rows: evidenceRows,
+    matches,
+    statMap: statMapFromRosterCharacters(characters),
+    name,
+    lang,
+  });
+  return { embed, embeds, evidenceRows };
+}
+
+function notifyVisibleDeepCompletion({ interaction, replyEditor, visibleDeep, name, lang }) {
+  const outcome = resolveRosterScanOutcome(visibleDeep.result);
+  if (!outcome) return;
+
+  sendScanCompletionDm({
+    user: interaction.user,
+    commandLabel: '/la-roster deep',
+    scanTargetName: name,
+    guildName: visibleDeep.meta?.guildName,
+    channelMention: interaction.channelId ? `<#${interaction.channelId}>` : undefined,
+    resultMessageUrl: buildResultMessageUrl(interaction, replyEditor.getMessage()),
+    outcome,
+    result: visibleDeep.result,
+    lang,
+  }).catch(() => {});
+}
+
+async function handleVisibleRosterResult({ interaction, replyEditor, name, deep, deepOptions, characters, lang }) {
+  const previousSnapshots = await loadPreviousSnapshotMap(characters);
+  upsertRosterSnapshots(characters, name)
+    .catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
+
+  const matches = await loadVisibleRosterMatches(characters, interaction.guild?.id);
+  const presentation = buildVisibleRosterPresentation({
+    characters,
+    previousSnapshots,
+    matches,
+    name,
+    lang,
+  });
+  const visibleDeep = deep
+    ? await runVisibleRosterDeepScan({
+      interaction,
+      replyEditor,
+      name,
+      deepOptions,
+      embed: presentation.embed,
+    })
+    : { resultEmbed: null, components: [], result: null, meta: null };
+
+  if (visibleDeep.resultEmbed) presentation.embeds.push(visibleDeep.resultEmbed);
+  await replyEditor.edit({
+    content: null,
+    embeds: presentation.embeds,
+    components: [...presentation.evidenceRows, ...(visibleDeep.components || [])].slice(0, 5),
+  });
+  notifyVisibleDeepCompletion({ interaction, replyEditor, visibleDeep, name, lang });
 }
 
 /**
@@ -113,185 +295,21 @@ export async function handleRosterCommand(interaction) {
   const replyEditor = createLongRunningReplyEditor(interaction);
 
   try {
-    const targetUrl = `https://lostark.bible/character/NA/${encodeURIComponent(name)}/roster`;
-    const response = await bibleClient.fetch(targetUrl, deep ? { viaWorker: true } : {});
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const html = await response.text();
-    const { document } = new JSDOM(html, { virtualConsole }).window;
-    const characters = await parseRosterCharactersFromHtml(html, document);
+    const characters = await fetchRosterCharacters(name, deep);
 
     if (characters.length === 0) {
       await handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions });
       return;
     }
-
-    // Load previous snapshots for progression delta
-    await connectDB();
-    const prevSnapshots = new Map();
-    const existingSnaps = await RosterSnapshot.find({
-      name: { $in: characters.map((c) => c.name) },
-    })
-      .collation({ locale: 'en', strength: 2 })
-      .lean();
-
-    for (const snap of existingSnaps) {
-      prevSnapshots.set(snap.name.toLowerCase(), snap);
-    }
-
-    const lines = characters.map((c, i) => {
-      const prevSnap = prevSnapshots.get(c.name.toLowerCase());
-      const currentIlvl = parseFloat((c.itemLevel ?? '0').replace(/,/g, ''));
-      let delta = '';
-      if (prevSnap && prevSnap.itemLevel > 0) {
-        const diff = currentIlvl - prevSnap.itemLevel;
-        if (diff > 0) delta = ` *(+${diff.toFixed(2)})*`;
-        else if (diff < 0) delta = ` *(${diff.toFixed(2)})*`;
-      }
-
-      const cls = c.className || t('dialogue.common.unknown', lang);
-      const classPrefix = getClassEmoji(cls) || cls;
-      return formatVisibleRosterLine(c, i, { classPrefix, delta });
+    await handleVisibleRosterResult({
+      interaction,
+      replyEditor,
+      name,
+      deep,
+      deepOptions,
+      characters,
+      lang,
     });
-
-    let description = lines.join('\n');
-    if (description.length > 4000) {
-      description = description.slice(0, 4000) + '\n…';
-    }
-
-    // Save/update snapshots in one shared bulk write. List broadcasts use the
-    // same cache, so class icons and stats stay consistent across surfaces.
-    upsertRosterSnapshots(characters, name)
-      .catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
-
-    const charNames = characters
-      .filter((c) => parseFloat((c.itemLevel ?? '0').replace(/,/g, '')) >= 1700)
-      .map((c) => c.name);
-
-    const [blacklistResult, whitelistResult, trustedResult] = await Promise.all([
-      handleRosterBlackListCheck(charNames, { guildId: interaction.guild?.id }),
-      handleRosterWhiteListCheck(charNames),
-      TrustedUser.findOne(buildNameRosterQuery(charNames))
-        .collation({ locale: 'en', strength: 2 })
-        .lean(),
-    ]);
-
-    const embedColor = blacklistResult ? COLORS.danger : whitelistResult ? COLORS.success : trustedResult ? COLORS.trustedSoft : COLORS.info;
-
-    // Top-of-description summary: highest ilvl + total CP if available.
-    // Gives the reader an at-a-glance read on the roster's max gear
-    // without parsing the full character list.
-    const topChar = characters[0];
-    const topIlvl = topChar?.itemLevel || '?';
-    const topClass = topChar?.className || topChar?.classId || '?';
-    const topClassPrefix = getClassEmoji(topClass) || topClass;
-    const summaryLine = topChar
-      ? t('dialogue.roster.topCharacter', lang, { class: topClassPrefix, name: topChar.name, ilvl: topIlvl })
-      : '';
-
-    const fullDescription = summaryLine
-      ? `${summaryLine}\n\n${description}`.slice(0, 4096)
-      : description;
-
-    const embed = createArtistEmbed(lang)
-      .setTitle(`🛡️ ${t('dialogue.roster.title', lang, { name, count: characters.length, word: t(`dialogue.roster.${characters.length === 1 ? 'characterOne' : 'characterMany'}`, lang) })}`)
-      // Display URL goes through the helper so BIBLE_BASE_URL swaps cascade
-      // here too. targetUrl above is intentionally still hardcoded · it's
-      // the actual fetch endpoint, controlled by the scraper/worker layer.
-      .setURL(rosterUrl(name))
-      .setDescription(fullDescription)
-      .setColor(embedColor);
-
-    const embeds = [embed];
-    // Evidence rows travel beside their card · both lists unshift, so the
-    // buttons unshift too and stay in the same order as the embeds.
-    const evidenceRows = [];
-    const statusLines = [];
-    // Stats for the evidence cards below · same roster this command just
-    // rendered, so no extra request and no snapshot-write race.
-    const rosterStatMap = statMapFromRosterCharacters(characters);
-
-    // Only trusted gets a status line. Blacklist and whitelist hits each
-    // open their own notice card above this one, which already names the
-    // list, the raid and the reason in full · repeating a truncated copy
-    // here pushed the roster's own summary line further down for nothing.
-    if (trustedResult) {
-      statusLines.push(`🛡️ ${t('dialogue.roster.trusted', lang, { name: trustedResult.name })}${trustedResult.reason ? ` · *${trustedResult.reason}*` : ''}`);
-    }
-
-    if (blacklistResult) {
-      // Notice shape: the same grammar as a list-change broadcast, with
-      // the screenshot behind a button. This card is a side note on a
-      // roster lookup, so it renders whether or not evidence exists ·
-      // the reason, stats and tracked alts are the point, and gating the
-      // whole card on an image used to hide all of it.
-      embeds.unshift(buildEvidenceEmbed(decorateListEntry(blacklistResult, 'black'), '', {
-        lang,
-        statMap: rosterStatMap,
-        headline: true,
-        attachImage: false,
-        viaName: name,
-      }));
-      evidenceRows.unshift(...buildBroadcastEvidenceComponents(blacklistResult, {
-        legacyUrl: blacklistResult.imageUrl,
-        lang,
-      }));
-    }
-
-    if (whitelistResult) {
-      embeds.unshift(buildEvidenceEmbed(decorateListEntry(whitelistResult, 'white'), '', {
-        lang,
-        statMap: rosterStatMap,
-        headline: true,
-        attachImage: false,
-        viaName: name,
-      }));
-      evidenceRows.unshift(...buildBroadcastEvidenceComponents(whitelistResult, {
-        legacyUrl: whitelistResult.imageUrl,
-        lang,
-      }));
-    }
-
-    if (statusLines.length > 0) {
-      const statusBlock = statusLines.join('\n');
-      const remaining = Math.max(0, 4096 - statusBlock.length - 2);
-      embed.setDescription([statusBlock, fullDescription.slice(0, remaining)].join('\n\n'));
-    }
-
-    const visibleDeep = deep
-      ? await runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed })
-      : { resultEmbed: null, components: [], result: null, meta: null };
-
-    if (visibleDeep.resultEmbed) embeds.push(visibleDeep.resultEmbed);
-    await replyEditor.edit({
-      content: null,
-      embeds,
-      components: [...evidenceRows, ...(visibleDeep.components || [])].slice(0, 5),
-    });
-
-    // DM the caller when a deep scan was actually run (skip plain
-    // /la-roster which finishes in seconds and doesn't warrant a
-    // notification ping).
-    if (deep && visibleDeep.result) {
-      const replyMsg = replyEditor.getMessage();
-      let outcome;
-      if (visibleDeep.result.cancelled || visibleDeep.result.pausedForFailureStorm) {
-        outcome = visibleDeep.result.alts.length > 0 ? 'stopped-with-alts' : 'stopped-no-alts';
-      } else {
-        outcome = visibleDeep.result.alts.length > 0 ? 'completed' : 'no-alts';
-      }
-      sendScanCompletionDm({
-        user: interaction.user,
-        commandLabel: '/la-roster deep',
-        scanTargetName: name,
-        guildName: visibleDeep.meta?.guildName,
-        channelMention: interaction.channelId ? `<#${interaction.channelId}>` : undefined,
-        resultMessageUrl: buildResultMessageUrl(interaction, replyMsg),
-        outcome,
-        result: visibleDeep.result,
-        lang,
-      }).catch(() => {});
-    }
   } catch (err) {
     await replyEditor.edit({
       embeds: [buildAlertEmbed({

@@ -25,11 +25,11 @@ function formatUptime(ms) {
   const days = Math.floor(ms / 86_400_000);
   const hours = Math.floor((ms % 86_400_000) / 3_600_000);
   const minutes = Math.floor((ms % 3_600_000) / 60_000);
-  const parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  parts.push(`${minutes}m`);
-  return parts.join(' ');
+  return [
+    days > 0 ? `${days}d` : '',
+    hours > 0 ? `${hours}h` : '',
+    `${minutes}m`,
+  ].filter(Boolean).join(' ');
 }
 
 /**

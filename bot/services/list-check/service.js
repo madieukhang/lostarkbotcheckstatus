@@ -120,6 +120,183 @@ async function attachRelatedClassNames(results) {
   }
 }
 
+const LIST_COLLATION = { locale: 'en', strength: 2 };
+
+function createListMaps({ black, white, watch, trusted }) {
+  sortBlacklistForScopePriority(black);
+  return {
+    black: buildEntryMap(black),
+    white: buildEntryMap(white),
+    watch: buildEntryMap(watch),
+    trusted: buildEntryMap(trusted),
+  };
+}
+
+async function loadInitialListData(names, guildId) {
+  const nameQuery = buildNameRosterQuery(names);
+  const [black, white, watch, trusted, snapshots] = await Promise.all([
+    Blacklist.find(buildBlacklistQuery(nameQuery, guildId)).collation(LIST_COLLATION).lean(),
+    Whitelist.find(nameQuery).collation(LIST_COLLATION).lean(),
+    Watchlist.find(nameQuery).collation(LIST_COLLATION).lean(),
+    TrustedUser.find(nameQuery).collation(LIST_COLLATION).lean(),
+    RosterSnapshot.find({ name: { $in: names } }).collation(LIST_COLLATION).lean(),
+  ]);
+  return {
+    maps: createListMaps({ black, white, watch, trusted }),
+    snapshots: new Map(snapshots.map((snapshot) => [snapshot.name.toLowerCase(), snapshot])),
+  };
+}
+
+function resolveAllMappedMatches(maps, candidates) {
+  return {
+    black: resolveMappedListMatch(maps.black, candidates),
+    white: resolveMappedListMatch(maps.white, candidates),
+    watch: resolveMappedListMatch(maps.watch, candidates),
+    trusted: resolveMappedListMatch(maps.trusted, candidates),
+  };
+}
+
+function createInitialListCheckResult(name, inputSource, maps, snapshots) {
+  const snapshot = snapshots.get(name.toLowerCase()) || null;
+  const matches = resolveAllMappedMatches(maps, [{ name, origin: 'checked' }]);
+  const initialListMatch = Object.values(matches).some((match) => Boolean(match.entry));
+  return {
+    inputName: name,
+    inputSource,
+    name,
+    blackEntry: matches.black.entry,
+    whiteEntry: matches.white.entry,
+    watchEntry: matches.watch.entry,
+    trustedEntry: matches.trusted.entry,
+    identityVerified: Boolean(snapshot || initialListMatch),
+    identityVerificationSource: initialListMatch
+      ? 'list-database'
+      : snapshot
+        ? 'roster-snapshot'
+        : null,
+    matchDetails: {
+      black: matches.black.detail,
+      white: matches.white.detail,
+      watch: matches.watch.detail,
+      trusted: matches.trusted.detail,
+    },
+    hasRoster: false,
+    failReason: null,
+    similarNames: null,
+    snapClassId: snapshot?.classId || '',
+    snapClassName: snapshot?.classId ? getClassName(snapshot.classId) : '',
+    snapItemLevel: snapshot?.itemLevel || 0,
+    snapCombatScore: snapshot?.combatScore || '',
+    discoveredAlts: [],
+  };
+}
+
+function replaceListMatches(item, maps) {
+  const matches = resolveAllMappedMatches(maps, buildListMatchCandidates(item));
+  for (const listType of ['black', 'white', 'watch', 'trusted']) {
+    item[`${listType}Entry`] = matches[listType].entry;
+    item.matchDetails[listType] = matches[listType].detail;
+  }
+}
+
+async function reconcileEnrichedListMatches(results, guildId) {
+  const items = results.filter((item) => (
+    didListCheckNameChange(item)
+    || (Array.isArray(item.discoveredAlts) && item.discoveredAlts.length > 0)
+  ));
+  const names = new Set();
+  for (const item of items) {
+    for (const candidate of buildListMatchCandidates(item)) names.add(candidate.name);
+  }
+  if (names.size === 0) return 0;
+
+  const nameQuery = buildNameRosterQuery([...names]);
+  const startedAt = Date.now();
+  const [black, white, watch, trusted] = await Promise.all([
+    Blacklist.find(buildBlacklistQuery(nameQuery, guildId)).collation(LIST_COLLATION).lean(),
+    Whitelist.find(nameQuery).collation(LIST_COLLATION).lean(),
+    Watchlist.find(nameQuery).collation(LIST_COLLATION).lean(),
+    TrustedUser.find(nameQuery).collation(LIST_COLLATION).lean(),
+  ]);
+  const elapsedMs = Date.now() - startedAt;
+  const maps = createListMaps({ black, white, watch, trusted });
+  for (const item of items) replaceListMatches(item, maps);
+  return elapsedMs;
+}
+
+function collectTrustedAltNames(results) {
+  const names = new Set();
+  for (const item of results) {
+    if (item.trustedEntry) continue;
+    for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
+      for (const name of entry?.allCharacters || []) names.add(name);
+    }
+    if (Array.isArray(item.discoveredAlts)) {
+      for (const name of item.discoveredAlts) names.add(name);
+    }
+  }
+  return names;
+}
+
+function findTrustedRosterMatch(item, trustedMap) {
+  for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
+    for (const name of entry?.allCharacters || []) {
+      const match = trustedMap.get(String(name).toLowerCase());
+      if (match) return { entry: match, matchedName: name };
+    }
+  }
+  if (Array.isArray(item.discoveredAlts)) {
+    for (const name of item.discoveredAlts) {
+      const match = trustedMap.get(String(name).toLowerCase());
+      if (match) return { entry: match, matchedName: name };
+    }
+  }
+  return null;
+}
+
+async function resolveTrustedRosterMatches(results) {
+  const names = collectTrustedAltNames(results);
+  if (names.size === 0) return 0;
+
+  const startedAt = Date.now();
+  const entries = await TrustedUser.find(buildNameRosterQuery([...names]))
+    .collation(LIST_COLLATION)
+    .lean();
+  const elapsedMs = Date.now() - startedAt;
+  if (entries.length === 0) return elapsedMs;
+
+  const trustedMap = buildEntryMap(entries);
+  for (const item of results) {
+    if (item.trustedEntry) continue;
+    const match = findTrustedRosterMatch(item, trustedMap);
+    if (!match) continue;
+    item.trustedEntry = match.entry;
+    item.matchDetails.trusted = { kind: 'roster', matchedName: match.matchedName };
+  }
+  return elapsedMs;
+}
+
+function markDatabaseVerifiedIdentities(results) {
+  for (const item of results) {
+    if (!hasDatabaseListMatch(item)) continue;
+    item.identityVerified = true;
+    item.identityVerificationSource ||= 'list-database';
+  }
+}
+
+function logListCheckTiming(startedAt, names, timings) {
+  console.log([
+    `[listcheck] Timing total=${Date.now() - startedAt}ms`,
+    `names=${names.length}`,
+    `connect=${timings.connect}ms`,
+    `initialDb=${timings.initialDb}ms`,
+    `correction=${timings.correction}ms`,
+    `enrichment=${timings.enrichment}ms`,
+    `refreshDb=${timings.refreshDb}ms`,
+    `trustedDb=${timings.trustedDb}ms`,
+  ].join(' '));
+}
+
 export async function checkNamesAgainstLists(names, options = {}) {
   const startedAt = Date.now();
   const connectStartedAt = Date.now();
@@ -132,88 +309,15 @@ export async function checkNamesAgainstLists(names, options = {}) {
     suggestionContext,
   } = options;
 
-  // Fetch every input name once per collection. The query count stays
-  // constant as the OCR/name batch grows; lookup maps below make the
-  // per-name join O(1).
-  const nameQuery = buildNameRosterQuery(names);
-  const collation = { locale: 'en', strength: 2 };
-
-  // Blacklist: scope-aware query (owner sees all, others see global + own server)
-  const blackQuery = buildBlacklistQuery(nameQuery, guildId);
-
-  // (see attachRelatedClassNames below for the entry/alt names)
-  // RosterSnapshot has class/ilvl/CP populated by /la-roster runs.
-  // Best-effort enrichment: names previously queried have rich data
-  // surfaced inline; brand-new names render without (graceful fallback).
-  // One query for all input names, joined into the results below.
   const initialDbStartedAt = Date.now();
-  const [allBlack, allWhite, allWatch, allTrusted, allSnapshots] = await Promise.all([
-    Blacklist.find(blackQuery).collation(collation).lean(),
-    Whitelist.find(nameQuery).collation(collation).lean(),
-    Watchlist.find(nameQuery).collation(collation).lean(),
-    TrustedUser.find(nameQuery).collation(collation).lean(),
-    RosterSnapshot.find({ name: { $in: names } }).collation(collation).lean(),
-  ]);
+  const initialData = await loadInitialListData(names, guildId);
   const initialDbMs = Date.now() - initialDbStartedAt;
-  const snapshotMap = new Map(allSnapshots.map((s) => [s.name.toLowerCase(), s]));
-
-  // Build O(1) lookup maps from list entries (once per list, not per name)
-  // Sort blacklist: global first, server last → server overwrites in map (higher priority)
-  sortBlacklistForScopePriority(allBlack);
-  const blackMap = buildEntryMap(allBlack);
-  const whiteMap = buildEntryMap(allWhite);
-  const watchMap = buildEntryMap(allWatch);
-  const trustedMap = buildEntryMap(allTrusted);
-
-  const results = names.map((name) => {
-    const snap = snapshotMap.get(name.toLowerCase()) || null;
-    const candidates = [{ name, origin: 'checked' }];
-    const blackMatch = resolveMappedListMatch(blackMap, candidates);
-    const whiteMatch = resolveMappedListMatch(whiteMap, candidates);
-    const watchMatch = resolveMappedListMatch(watchMap, candidates);
-    const trustedMatch = resolveMappedListMatch(trustedMap, candidates);
-    const initialListMatch = Boolean(
-      blackMatch.entry || whiteMatch.entry || watchMatch.entry || trustedMatch.entry
-    );
-    return {
-      inputName: name,
-      inputSource,
-      name,
-      blackEntry: blackMatch.entry,
-      whiteEntry: whiteMatch.entry,
-      watchEntry: watchMatch.entry,
-      trustedEntry: trustedMatch.entry,
-      identityVerified: Boolean(snap || initialListMatch),
-      identityVerificationSource: initialListMatch
-        ? 'list-database'
-        : snap
-          ? 'roster-snapshot'
-          : null,
-      matchDetails: {
-        black: blackMatch.detail,
-        white: whiteMatch.detail,
-        watch: watchMatch.detail,
-        trusted: trustedMatch.detail,
-      },
-      hasRoster: false,
-      failReason: null,
-      similarNames: null,
-      // Snapshot enrichment: present when /la-roster has previously
-      // queried this name. Empty/null when never seen before; render
-      // sites fall back gracefully.
-      snapClassId: snap?.classId || '',
-      snapClassName: snap?.classId ? getClassName(snap.classId) : '',
-      snapItemLevel: snap?.itemLevel || 0,
-      snapCombatScore: snap?.combatScore || '',
-      // Roster alts discovered during the online enrichment branch
-      // (worker-online + visible roster). DB list entries already carry
-      // their own allCharacters; this field surfaces alts for OCR'd
-      // names that have no DB hit yet, so format.js can render them
-      // inline. Empty when worker offline, hidden roster, or the name
-      // is not on bible.
-      discoveredAlts: [],
-    };
-  });
+  const results = names.map((name) => createInitialListCheckResult(
+    name,
+    inputSource,
+    initialData.maps,
+    initialData.snapshots
+  ));
 
   // Targeted class/ilvl enrichment lives in its own module so this
   // service stays focused on DB orchestration.
@@ -244,53 +348,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   // Replacement (including null) is intentional: merely filling missing
   // hits would retain a stale match from the pre-correction OCR spelling and
   // could flag a different person.
-  const itemsToReconcile = results.filter((item) => (
-    didListCheckNameChange(item)
-    || (Array.isArray(item.discoveredAlts) && item.discoveredAlts.length > 0)
-  ));
-  const refreshNames = new Set();
-  for (const item of itemsToReconcile) {
-    for (const candidate of buildListMatchCandidates(item)) {
-      refreshNames.add(candidate.name);
-    }
-  }
-
-  let refreshDbMs = 0;
-  if (refreshNames.size > 0) {
-    const refreshList = [...refreshNames];
-    const refreshNameQuery = buildNameRosterQuery(refreshList);
-    const refreshBlackQuery = buildBlacklistQuery(refreshNameQuery, guildId);
-    const refreshDbStartedAt = Date.now();
-    const [refreshBlack, refreshWhite, refreshWatch, refreshTrusted] = await Promise.all([
-      Blacklist.find(refreshBlackQuery).collation(collation).lean(),
-      Whitelist.find(refreshNameQuery).collation(collation).lean(),
-      Watchlist.find(refreshNameQuery).collation(collation).lean(),
-      TrustedUser.find(refreshNameQuery).collation(collation).lean(),
-    ]);
-    refreshDbMs = Date.now() - refreshDbStartedAt;
-    sortBlacklistForScopePriority(refreshBlack);
-    const refreshBlackMap = buildEntryMap(refreshBlack);
-    const refreshWhiteMap = buildEntryMap(refreshWhite);
-    const refreshWatchMap = buildEntryMap(refreshWatch);
-    const refreshTrustedMap = buildEntryMap(refreshTrusted);
-
-    for (const item of itemsToReconcile) {
-      const candidates = buildListMatchCandidates(item);
-      const blackMatch = resolveMappedListMatch(refreshBlackMap, candidates);
-      const whiteMatch = resolveMappedListMatch(refreshWhiteMap, candidates);
-      const watchMatch = resolveMappedListMatch(refreshWatchMap, candidates);
-      const trustedMatch = resolveMappedListMatch(refreshTrustedMap, candidates);
-
-      item.blackEntry = blackMatch.entry;
-      item.whiteEntry = whiteMatch.entry;
-      item.watchEntry = watchMatch.entry;
-      item.trustedEntry = trustedMatch.entry;
-      item.matchDetails.black = blackMatch.detail;
-      item.matchDetails.white = whiteMatch.detail;
-      item.matchDetails.watch = watchMatch.detail;
-      item.matchDetails.trusted = trustedMatch.detail;
-    }
-  }
+  const refreshDbMs = await reconcileEnrichedListMatches(results, guildId);
 
   // Resolve trusted status through already-known roster relationships.
   //
@@ -308,66 +366,12 @@ export async function checkNamesAgainstLists(names, options = {}) {
   //
   // OCR checks avoid another roster fetch by reusing alts from the gather
   // phase.
-  const altNamesForTrustedCheck = new Set();
-  for (const item of results) {
-    if (item.trustedEntry) continue;
-    for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
-      if (!entry?.allCharacters) continue;
-      for (const c of entry.allCharacters) altNamesForTrustedCheck.add(c);
-    }
-    if (Array.isArray(item.discoveredAlts)) {
-      for (const c of item.discoveredAlts) altNamesForTrustedCheck.add(c);
-    }
-  }
-
-  let trustedDbMs = 0;
-  if (altNamesForTrustedCheck.size > 0) {
-    const trustedNames = [...altNamesForTrustedCheck];
-    const trustedDbStartedAt = Date.now();
-    const altTrusted = await TrustedUser.find(buildNameRosterQuery(trustedNames))
-      .collation(collation).lean();
-    trustedDbMs = Date.now() - trustedDbStartedAt;
-
-    if (altTrusted.length > 0) {
-      const altTrustedSet = buildEntryMap(altTrusted);
-
-      for (const item of results) {
-        if (item.trustedEntry) continue;
-        for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
-          if (!entry?.allCharacters) continue;
-          for (const c of entry.allCharacters) {
-            const match = altTrustedSet.get(c.toLowerCase());
-            if (match) {
-              item.trustedEntry = match;
-              item.matchDetails.trusted = { kind: 'roster', matchedName: c };
-              break;
-            }
-          }
-          if (item.trustedEntry) break;
-        }
-        if (!item.trustedEntry && Array.isArray(item.discoveredAlts)) {
-          for (const c of item.discoveredAlts) {
-            const match = altTrustedSet.get(c.toLowerCase());
-            if (match) {
-              item.trustedEntry = match;
-              item.matchDetails.trusted = { kind: 'roster', matchedName: c };
-              break;
-            }
-          }
-        }
-      }
-    }
-  }
+  const trustedDbMs = await resolveTrustedRosterMatches(results);
 
   // Canonicalization can reveal a list hit that the original OCR spelling did
   // not query. Treat that real Mongo record as identity proof even when Bible
   // was unavailable, while leaving external-only unresolved names unverified.
-  for (const item of results) {
-    if (hasDatabaseListMatch(item)) {
-      item.identityVerified = true;
-      item.identityVerificationSource ||= 'list-database';
-    }
-  }
+  markDatabaseVerifiedIdentities(results);
 
   // Class icons for the OTHER names a row prints: the entry it matched
   // through and the alts under it. Those were the only bare names left on
@@ -377,15 +381,13 @@ export async function checkNamesAgainstLists(names, options = {}) {
   // no icon.
   await attachRelatedClassNames(results);
 
-  console.log([
-    `[listcheck] Timing total=${Date.now() - startedAt}ms`,
-    `names=${names.length}`,
-    `connect=${connectMs}ms`,
-    `initialDb=${initialDbMs}ms`,
-    `correction=${correctionMs}ms`,
-    `enrichment=${enrichmentMs}ms`,
-    `refreshDb=${refreshDbMs}ms`,
-    `trustedDb=${trustedDbMs}ms`,
-  ].join(' '));
+  logListCheckTiming(startedAt, names, {
+    connect: connectMs,
+    initialDb: initialDbMs,
+    correction: correctionMs,
+    enrichment: enrichmentMs,
+    refreshDb: refreshDbMs,
+    trustedDb: trustedDbMs,
+  });
   return results;
 }

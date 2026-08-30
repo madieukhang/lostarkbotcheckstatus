@@ -48,11 +48,14 @@ function getListTypeLabel(type, fallback, lang) {
 }
 
 function buildEntryMetaLine({ entry, freshUrl, lang = 'en' }) {
-  const parts = [];
-  if (entry.reason) parts.push(entry.reason.length > 80 ? entry.reason.slice(0, 77) + '...' : entry.reason);
-  if (entry.raid) parts.push(`\`${entry.raid}\``);
-  if (entry.addedAt) parts.push(relativeTime(entry.addedAt));
-  if (freshUrl) parts.push(`[${ICONS.evidence} ${t('listView.meta.evidence', lang)}](${freshUrl})`);
+  const parts = [
+    entry.reason
+      ? (entry.reason.length > 80 ? entry.reason.slice(0, 77) + '...' : entry.reason)
+      : '',
+    entry.raid ? `\`${entry.raid}\`` : '',
+    entry.addedAt ? relativeTime(entry.addedAt) : '',
+    freshUrl ? `[${ICONS.evidence} ${t('listView.meta.evidence', lang)}](${freshUrl})` : '',
+  ].filter(Boolean);
   return parts.length > 0 ? `└ ${parts.join(' · ')}` : '';
 }
 
@@ -90,11 +93,7 @@ export function buildTrustedListEmbed(entries, lang = 'en') {
     const head = `${ICONS.shield} **[${entry.name}](${link})**`;
     const meta = buildEntryMetaLine({ entry, freshUrl: '', lang });
     const rosterLine = buildEntryRosterLine(entry, lang);
-    const block = [head];
-    if (meta) block.push(meta);
-    if (rosterLine) block.push(rosterLine);
-    block.push('');
-    return block;
+    return [head, meta, rosterLine].filter(Boolean).concat('');
   });
   // Drop the trailing blank line before footer-adjacent content.
   if (lines[lines.length - 1] === '') lines.pop();
@@ -162,10 +161,7 @@ export async function buildListPageEmbed(options) {
     const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${entry._icon} **[${entry.name}](${link})**${scopeTag}`;
     const meta = buildEntryMetaLine({ entry, freshUrl: freshUrls[index], lang });
     const rosterLine = buildEntryRosterLine(entry, lang);
-    lines.push(head);
-    if (meta) lines.push(meta);
-    if (rosterLine) lines.push(rosterLine);
-    lines.push('');
+    lines.push(...[head, meta, rosterLine].filter(Boolean), '');
   });
   if (lines[lines.length - 1] === '') lines.pop();
 
@@ -289,58 +285,52 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  * why this reads as an upgrade on /la-roster and a no-op everywhere else
  * until those callers pass one too.
  */
-export function buildEvidenceEmbed(entry, displayUrl, {
-  includeAddedBy = false,
-  lang = 'en',
-  statMap = new Map(),
-  headline = false,
-  attachImage = true,
-  viaName = '',
-} = {}) {
-  const link = rosterUrl(entry.name);
-  const fields = [
-    { name: t('listView.evidence.reason', lang), value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
-  ];
-
-  const snapshot = statMap.get(String(entry.name || '').trim().toLowerCase()) || null;
+function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, lang }) {
   const itemLevel = Number(String(snapshot?.itemLevel ?? '').replace(/,/g, ''));
   const combatScore = String(snapshot?.combatScore || '').trim();
   const addedByDisplay = getAddedByDisplay(entry);
-
-  const inlineMeta = [];
-  if (entry.raid) inlineMeta.push({ name: t('listView.evidence.raid', lang), value: `\`${entry.raid}\``, inline: true });
-  if (!headline) {
+  const inlineMeta = [
+    entry.raid
+      ? { name: t('listView.evidence.raid', lang), value: `\`${entry.raid}\``, inline: true }
+      : null,
     // With a headline the list is already named in the sentence above.
-    inlineMeta.push({
+    !headline ? {
       name: t('listView.evidence.list', lang),
       value: getListTypeLabel(entry._listType, entry._label, lang),
       inline: true,
-    });
-  }
-  if (entry.addedAt) {
-    inlineMeta.push({ name: t('listView.evidence.added', lang), value: relativeTime(entry.addedAt), inline: true });
-  }
+    } : null,
+    entry.addedAt
+      ? { name: t('listView.evidence.added', lang), value: relativeTime(entry.addedAt), inline: true }
+      : null,
   // ilvl and CP only appear when the caller supplied a stat snapshot.
   // Rendering them as "N/A" would cost two slots on every surface that
   // has no roster data to give, which is most of them.
-  if (Number.isFinite(itemLevel) && itemLevel > 0) {
-    inlineMeta.push({ name: t('listView.evidence.itemLevel', lang), value: `\`${itemLevel.toFixed(2)}\``, inline: true });
-  }
-  if (combatScore && combatScore !== '?') {
-    inlineMeta.push({ name: t('listView.evidence.combatPower', lang), value: `\`${combatScore}\``, inline: true });
-  }
+    Number.isFinite(itemLevel) && itemLevel > 0
+      ? { name: t('listView.evidence.itemLevel', lang), value: `\`${itemLevel.toFixed(2)}\``, inline: true }
+      : null,
+    combatScore && combatScore !== '?'
+      ? { name: t('listView.evidence.combatPower', lang), value: `\`${combatScore}\``, inline: true }
+      : null,
   // Added by joins the grid instead of trailing the card, the way the
   // check-detail embed places it beside CP.
-  if (includeAddedBy && addedByDisplay) {
-    inlineMeta.push({ name: t('listView.evidence.addedBy', lang), value: addedByDisplay, inline: true });
-  }
+    includeAddedBy && addedByDisplay
+      ? { name: t('listView.evidence.addedBy', lang), value: addedByDisplay, inline: true }
+      : null,
+  ].filter(Boolean);
   // Discord packs three inline fields per row and stretches a lone
   // trailing field to full width · pad to a whole row so the grid keeps
   // its columns whatever combination of optional fields showed up.
   while (inlineMeta.length % 3 !== 0) {
     inlineMeta.push({ name: '\u200b', value: '\u200b', inline: true });
   }
-  fields.push(...inlineMeta);
+  return inlineMeta;
+}
+
+function buildEvidenceFields(entry, snapshot, { includeAddedBy, headline, lang, statMap }) {
+  const fields = [
+    { name: t('listView.evidence.reason', lang), value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
+    ...buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, lang }),
+  ];
 
   // Roster (allCharacters) field. Counts alts excluding the entry's own
   // name, then renders a numbered list with bible roster links so the
@@ -364,56 +354,75 @@ export function buildEvidenceEmbed(entry, displayUrl, {
     label: `🧬 ${t('dialogue.broadcast.fields.trackedRosters', lang)}`,
     overflowTemplate: t('dialogue.broadcast.more', lang),
   });
-  if (altsField) fields.push(altsField);
+  return [...fields, altsField].filter(Boolean);
+}
+
+function applyEvidenceHeader(embed, entry, snapshot, { headline, viaName, statMap, lang }) {
+  if (!headline) {
+    embed.setTitle(`${entry._icon} ${entry.name}`).setURL(rosterUrl(entry.name));
+    return;
+  }
+
+  const listLabel = getListTypeLabel(entry._listType, entry._label, lang);
+  const scopeTag = entry.scope === 'server'
+    ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
+    : '';
+  const searched = String(viaName || '').trim();
+  const isVia = searched && searched.toLowerCase() !== String(entry.name || '').toLowerCase();
+  embed
+    .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
+    .setDescription(t(`dialogue.check.details.${isVia ? 'headlineVia' : 'headline'}`, lang, {
+      icon: getListContext(entry._listType).icon,
+      name: formatLinkedCharacter(entry.name, snapshot),
+      searched: formatLinkedCharacter(searched, statMap.get(searched.toLowerCase())),
+      list: listLabel,
+      scope: scopeTag,
+    }));
+}
+
+function applyEvidenceMedia(embed, entry, displayUrl, { attachImage, lang }) {
+  if (attachImage && displayUrl) {
+    embed.setImage(displayUrl);
+    return;
+  }
+  if (!attachImage) return;
+
+  const evidenceMessage = entry.imageMessageId || entry.imageUrl
+    ? t('listView.evidence.unavailable', lang)
+    : t('listView.evidence.noImage', lang);
+  embed.addFields({
+    name: `${ICONS.warn} ${t('listView.evidence.evidence', lang)}`,
+    value: evidenceMessage,
+    inline: false,
+  });
+}
+
+export function buildEvidenceEmbed(entry, displayUrl, {
+  includeAddedBy = false,
+  lang = 'en',
+  statMap = new Map(),
+  headline = false,
+  attachImage = true,
+  viaName = '',
+} = {}) {
+  const snapshot = statMap.get(String(entry.name || '').trim().toLowerCase()) || null;
+  const fields = buildEvidenceFields(entry, snapshot, {
+    includeAddedBy,
+    headline,
+    lang,
+    statMap,
+  });
 
   const embed = createArtistEmbed(lang)
     .addFields(fields)
     .setColor(entry._color)
     .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : undefined);
-
-  if (headline) {
-    // Notice shape, borrowed from the list-change broadcast: a title that
-    // names the list, then one Artist line naming the character. The name
-    // is linked inside that line, so the title drops its own URL rather
-    // than offering the same link twice.
-    const listLabel = getListTypeLabel(entry._listType, entry._label, lang);
-    const scopeTag = entry.scope === 'server'
-      ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
-      : '';
-    // A roster lookup matches on every character in the roster, so the
-    // entry that hit is often not the name that was typed. Saying only
-    // "X is on the blacklist" then leaves the reader to guess how X
-    // relates to their search · the via wording names both sides.
-    const searched = String(viaName || '').trim();
-    const isVia = searched && searched.toLowerCase() !== String(entry.name || '').toLowerCase();
-    embed
-      .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
-      .setDescription(t(`dialogue.check.details.${isVia ? 'headlineVia' : 'headline'}`, lang, {
-        icon: getListContext(entry._listType).icon,
-        name: formatLinkedCharacter(entry.name, snapshot),
-        searched: formatLinkedCharacter(searched, statMap.get(searched.toLowerCase())),
-        list: listLabel,
-        scope: scopeTag,
-      }));
-  } else {
-    embed.setTitle(`${entry._icon} ${entry.name}`).setURL(link);
-  }
+  applyEvidenceHeader(embed, entry, snapshot, { headline, viaName, statMap, lang });
 
   // attachImage:false sends evidence to a button beside the card · a
   // full-width screenshot dwarfs the data when this card is a side note
   // rather than the thing the reader asked for.
-  if (attachImage && displayUrl) {
-    embed.setImage(displayUrl);
-  } else if (attachImage) {
-    const evidenceMessage = entry.imageMessageId || entry.imageUrl
-      ? t('listView.evidence.unavailable', lang)
-      : t('listView.evidence.noImage', lang);
-    embed.addFields({
-      name: `${ICONS.warn} ${t('listView.evidence.evidence', lang)}`,
-      value: evidenceMessage,
-      inline: false,
-    });
-  }
+  applyEvidenceMedia(embed, entry, displayUrl, { attachImage, lang });
 
   if (entry.logsUrl) {
     embed.addFields({

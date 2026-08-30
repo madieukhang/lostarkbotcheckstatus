@@ -27,35 +27,17 @@ function getSnapshotClassName(snapshot) {
   return snapshot.className || (snapshot.classId ? getClassName(snapshot.classId) : '');
 }
 
-/**
- * Build the detail embed opened by the check-result dropdown.
- *
- * Field order is intentional: Raid / Added / ilvl fill the first inline row;
- * CP / Added by fill the next row, matching the list-change broadcast card.
- * Evidence remains the embed image at the bottom instead of becoming another
- * component interaction.
- */
-export function buildCheckEntryDetailsEmbed(entry, {
-  displayUrl = '',
-  includeAddedBy = false,
-  lang = 'en',
-  statMap = new Map(),
-} = {}) {
-  const listType = entry?._listType || 'black';
-  const { color, icon } = getListContext(listType);
-  const listLabel = t(`dialogue.broadcast.list.${listType}`, lang);
-  const scopeTag = entry?.scope === 'server'
-    ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
-    : '';
-  const snapshot = statMap.get(normalizeNameKey(entry?.name)) || null;
+function formatLinkedCheckName(entry, snapshot) {
   const className = getSnapshotClassName(snapshot);
   const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
-  const linkedName = `${classPrefix}**[${entry.name}](${rosterUrl(entry.name)})**`;
+  return `${classPrefix}**[${entry.name}](${rosterUrl(entry.name)})**`;
+}
+
+function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang }) {
   const notAvailable = t('dialogue.broadcast.notAvailable', lang);
   const itemLevel = parsePositiveNumber(snapshot?.itemLevel);
   const combatScore = String(snapshot?.combatScore || '').trim();
-
-  const fields = [
+  return [
     {
       name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
       value: (entry.reason || notAvailable).slice(0, 1024),
@@ -81,30 +63,70 @@ export function buildCheckEntryDetailsEmbed(entry, {
       value: combatScore && combatScore !== '?' ? `\`${combatScore}\`` : notAvailable,
       inline: true,
     },
-  ];
+    includeAddedBy
+      ? {
+          name: t('listView.evidence.addedBy', lang),
+          value: getAddedByDisplay(entry) || notAvailable,
+          inline: true,
+        }
+      : null,
+  ].filter(Boolean);
+}
 
-  if (includeAddedBy) {
-    fields.push({
-      name: t('listView.evidence.addedBy', lang),
-      value: getAddedByDisplay(entry) || notAvailable,
-      inline: true,
-    });
-  }
-
-  const altsField = renderTrackedAltsField({
+function buildTrackedAltsField(entry, statMap, lang) {
+  return renderTrackedAltsField({
     names: entry.allCharacters,
     primaryName: entry.name,
     statMap,
     label: `🧬 ${t('dialogue.broadcast.fields.trackedAlts', lang)}`,
     overflowTemplate: t('dialogue.broadcast.more', lang),
   });
-  if (altsField) fields.push(altsField);
+}
+
+function applyCheckEvidence(embed, entry, displayUrl, lang) {
+  if (displayUrl) {
+    embed.setImage(displayUrl);
+    return;
+  }
+  if (!entry.imageMessageId && !entry.imageUrl) return;
+  embed.addFields({
+    name: `${ICONS.warn} ${t('listView.evidence.evidence', lang)}`,
+    value: t('listView.evidence.unavailable', lang),
+    inline: false,
+  });
+}
+
+/**
+ * Build the detail embed opened by the check-result dropdown.
+ *
+ * Field order is intentional: Raid / Added / ilvl fill the first inline row;
+ * CP / Added by fill the next row, matching the list-change broadcast card.
+ * Evidence remains the embed image at the bottom instead of becoming another
+ * component interaction.
+ */
+export function buildCheckEntryDetailsEmbed(entry, {
+  displayUrl = '',
+  includeAddedBy = false,
+  lang = 'en',
+  statMap = new Map(),
+} = {}) {
+  const listType = entry?._listType || 'black';
+  const { color, icon } = getListContext(listType);
+  const listLabel = t(`dialogue.broadcast.list.${listType}`, lang);
+  const scopeTag = entry?.scope === 'server'
+    ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
+    : '';
+  const snapshot = statMap.get(normalizeNameKey(entry?.name)) || null;
+  const fields = [
+    ...buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang }),
+    buildTrackedAltsField(entry, statMap, lang),
+  ].filter(Boolean);
 
   const embed = createArtistEmbed(lang)
     .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
     .setDescription(t('dialogue.check.details.headline', lang, {
       icon,
-      name: linkedName,
+      name: formatLinkedCheckName(entry, snapshot),
       list: listLabel,
       scope: scopeTag,
     }))
@@ -112,15 +134,7 @@ export function buildCheckEntryDetailsEmbed(entry, {
     .setColor(color)
     .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : new Date());
 
-  if (displayUrl) {
-    embed.setImage(displayUrl);
-  } else if (entry.imageMessageId || entry.imageUrl) {
-    embed.addFields({
-      name: `${ICONS.warn} ${t('listView.evidence.evidence', lang)}`,
-      value: t('listView.evidence.unavailable', lang),
-      inline: false,
-    });
-  }
+  applyCheckEvidence(embed, entry, displayUrl, lang);
 
   return embed;
 }

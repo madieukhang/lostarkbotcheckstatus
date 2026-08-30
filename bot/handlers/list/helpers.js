@@ -237,15 +237,16 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     label: `🧬 ${t('dialogue.approval.fields.trackedAlts', lang)}`,
     overflowTemplate: t('dialogue.broadcast.more', lang),
   });
-  if (altsField) fields.push(altsField);
-
-  if (includeRequestedBy) {
-    fields.push({
-      name: `👤 ${t('dialogue.approval.fields.requestedBy', lang)}`,
-      value: `${payload.requestedByDisplayName} (<@${payload.requestedByUserId}>)`,
-      inline: false,
-    });
-  }
+  fields.push(...[
+    altsField,
+    includeRequestedBy
+      ? {
+          name: `👤 ${t('dialogue.approval.fields.requestedBy', lang)}`,
+          value: `${payload.requestedByDisplayName} (<@${payload.requestedByUserId}>)`,
+          inline: false,
+        }
+      : null,
+  ].filter(Boolean));
 
   // Request ID stays below the business context and uses code formatting to
   // remain visually distinct and support server-side row lookup.
@@ -305,10 +306,11 @@ export function getApproverRecipientIds() {
 }
 
 export function isRequesterAutoApprover(userId) {
-  if (!userId) return false;
-  if (SENIOR_APPROVER_IDS.includes(userId)) return true;
-  if (OFFICER_APPROVER_IDS.includes(userId)) return true;
-  return MEMBER_APPROVER_IDS.includes(userId);
+  return Boolean(userId) && [
+    SENIOR_APPROVER_IDS,
+    OFFICER_APPROVER_IDS,
+    MEMBER_APPROVER_IDS,
+  ].some((ids) => ids.includes(userId));
 }
 
 /**
