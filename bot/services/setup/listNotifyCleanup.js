@@ -2,9 +2,14 @@ import GuildConfig from '../../models/GuildConfig.js';
 import { getGuildLanguage } from '../i18n/index.js';
 import {
   cleanupChannelMessages,
-  formatCleanupFailureReasons,
 } from './channelCleanup.js';
 import { checkBotPermissions } from './channelPermissions.js';
+import {
+  createCleanupScheduler,
+  createIncompleteCleanupError,
+  prepareCleanupChannel,
+  resolveGuildTextChannel,
+} from './cleanupRuntime.js';
 import { listNotifyChannelGuard } from './listNotifyChannelGuard.js';
 import { postListNotifyCleanupNotice } from './listNotifyCleanupNotice.js';
 import { postListNotifyWelcomeLocked } from './listNotifyWelcome.js';
@@ -20,28 +25,16 @@ export function getVietnamHalfHourKey(date = new Date()) {
 }
 
 async function resolveConfiguredChannel(client, config) {
-  try {
-    const channel = await client.channels.fetch(config.listNotifyChannelId);
-    const channelGuildId = channel?.guildId || channel?.guild?.id;
-    if (!channel || channelGuildId !== config.guildId) return null;
-    if (typeof channel.isTextBased === 'function' && !channel.isTextBased()) return null;
-    return channel.messages?.fetch ? channel : null;
-  } catch {
-    return null;
-  }
+  return resolveGuildTextChannel(client, {
+    channelId: config.listNotifyChannelId,
+    guildId: config.guildId,
+  });
 }
 
 function incompleteCleanupError(outcome) {
-  const failureSummary = formatCleanupFailureReasons(outcome?.failureReasons);
-  const err = new Error(
-    'incomplete cleanup deleted=' + (Number(outcome?.deleted) || 0) +
-    ' failed=' + (Number(outcome?.failed) || 0) +
-    ' truncated=' + Boolean(outcome?.truncated) +
-    (failureSummary ? ' errors=' + failureSummary : '')
-  );
-  err.code = 'LIST_NOTIFY_CLEANUP_INCOMPLETE';
-  err.cleanup = outcome;
-  return err;
+  return createIncompleteCleanupError(outcome, {
+    code: 'LIST_NOTIFY_CLEANUP_INCOMPLETE',
+  });
 }
 
 export function createListNotifyCleanupService({
@@ -135,28 +128,17 @@ export function createListNotifyCleanupService({
     }
 
     for (const config of configs) {
-      const channel = await resolveChannel(client, config);
-      if (!channel) {
-        logger.warn?.(
-          '[list-notify cleanup] channel unavailable guild=' + config.guildId +
-          ' channel=' + config.listNotifyChannelId
-        );
-        continue;
-      }
-
-      const permissionCheck = checkPermissions(
-        channel,
-        channel.guild || client.guilds?.cache?.get?.(config.guildId),
-        { cleanup: true, welcomePin: true }
-      );
-      if (!permissionCheck.ok) {
-        logger.warn?.(
-          '[list-notify cleanup] permissions missing guild=' + config.guildId +
-          ' channel=' + config.listNotifyChannelId +
-          ' missing=' + permissionCheck.missing.join(', ')
-        );
-        continue;
-      }
+      const channel = await prepareCleanupChannel({
+        client,
+        config,
+        channelId: config.listNotifyChannelId,
+        resolveChannel,
+        checkPermissions,
+        permissionOptions: { cleanup: true, welcomePin: true },
+        logPrefix: '[list-notify cleanup]',
+        logger,
+      });
+      if (!channel) continue;
 
       try {
         await channelGuard.runExclusive(channel.id, async () => {
@@ -216,33 +198,13 @@ export function createListNotifyCleanupScheduler({
   logger = console,
   setIntervalFn = setInterval,
 } = {}) {
-  let timer = null;
-  let running = false;
-
-  async function run(client) {
-    if (running) return;
-    running = true;
-    try {
-      await cleanupService.runScheduledCleanupTick(client);
-    } catch (err) {
-      logger.error?.(
-        '[list-notify cleanup] unexpected scheduler failure:',
-        err?.message || err
-      );
-    } finally {
-      running = false;
-    }
-  }
-
-  function start(client) {
-    if (timer) return timer;
-    void run(client);
-    timer = setIntervalFn(() => run(client), intervalMs);
-    timer.unref?.();
-    return timer;
-  }
-
-  return { start };
+  return createCleanupScheduler({
+    runCleanup: (client) => cleanupService.runScheduledCleanupTick(client),
+    intervalMs,
+    failureLabel: '[list-notify cleanup] unexpected scheduler failure:',
+    logger,
+    setIntervalFn,
+  });
 }
 
 const productionCleanupService = createListNotifyCleanupService();

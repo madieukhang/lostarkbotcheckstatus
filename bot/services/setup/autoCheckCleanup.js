@@ -11,6 +11,12 @@ import {
   cleanupChannelMessages,
   formatCleanupFailureReasons,
 } from './channelCleanup.js';
+import {
+  createCleanupScheduler,
+  createIncompleteCleanupError,
+  prepareCleanupChannel,
+  resolveGuildTextChannel,
+} from './cleanupRuntime.js';
 
 // Backward-compatible public name used by the existing auto-check tests and
 // welcome service. The implementation is channel-generic so notify cleanup can
@@ -39,14 +45,10 @@ export function getVietnamDayKey(date = new Date()) {
 }
 
 async function resolveConfiguredChannel(client, config) {
-  try {
-    const channel = await client.channels.fetch(config.autoCheckChannelId);
-    if (!channel || channel.guildId !== config.guildId) return null;
-    if (typeof channel.isTextBased === 'function' && !channel.isTextBased()) return null;
-    return channel.messages?.fetch ? channel : null;
-  } catch {
-    return null;
-  }
+  return resolveGuildTextChannel(client, {
+    channelId: config.autoCheckChannelId,
+    guildId: config.guildId,
+  });
 }
 
 export function createAutoCheckCleanupService({
@@ -92,25 +94,17 @@ export function createAutoCheckCleanupService({
         continue;
       }
 
-      const channel = await resolveChannel(client, config);
-      if (!channel) {
-        logger.warn?.('[auto-check cleanup] channel unavailable guild=' + config.guildId + ' channel=' + config.autoCheckChannelId);
-        continue;
-      }
-
-      const permissionCheck = checkPermissions(
-        channel,
-        channel.guild || client.guilds?.cache?.get?.(config.guildId),
-        { cleanup: true }
-      );
-      if (!permissionCheck.ok) {
-        logger.warn?.(
-          '[auto-check cleanup] permissions missing guild=' + config.guildId +
-          ' channel=' + config.autoCheckChannelId +
-          ' missing=' + permissionCheck.missing.join(', ')
-        );
-        continue;
-      }
+      const channel = await prepareCleanupChannel({
+        client,
+        config,
+        channelId: config.autoCheckChannelId,
+        resolveChannel,
+        checkPermissions,
+        permissionOptions: { cleanup: true },
+        logPrefix: '[auto-check cleanup]',
+        logger,
+      });
+      if (!channel) continue;
 
       try {
         await channelGuard.runExclusive(channel.id, async () => {
@@ -135,13 +129,7 @@ export function createAutoCheckCleanupService({
             ].filter(Boolean);
             const outcome = await cleanupMessages(channel, { protectedMessageIds });
             if (outcome.failed > 0 || outcome.truncated) {
-              const failureSummary = formatCleanupFailureReasons(outcome.failureReasons);
-              throw new Error(
-                'incomplete cleanup deleted=' + outcome.deleted +
-                ' failed=' + outcome.failed +
-                ' truncated=' + Boolean(outcome.truncated) +
-                (failureSummary ? ' errors=' + failureSummary : '')
-              );
+              throw createIncompleteCleanupError(outcome);
             }
             logger.info?.(
               '[auto-check cleanup] guild=' + config.guildId +
@@ -178,30 +166,13 @@ export function createAutoCheckCleanupScheduler({
   logger = console,
   setIntervalFn = setInterval,
 } = {}) {
-  let timer = null;
-  let running = false;
-
-  async function run(client) {
-    if (running) return;
-    running = true;
-    try {
-      await cleanupService.runDailyCleanupTick(client);
-    } catch (err) {
-      logger.error?.('[auto-check cleanup] unexpected scheduler failure:', err?.message || err);
-    } finally {
-      running = false;
-    }
-  }
-
-  function start(client) {
-    if (timer) return timer;
-    void run(client);
-    timer = setIntervalFn(() => run(client), intervalMs);
-    timer.unref?.();
-    return timer;
-  }
-
-  return { start };
+  return createCleanupScheduler({
+    runCleanup: (client) => cleanupService.runDailyCleanupTick(client),
+    intervalMs,
+    failureLabel: '[auto-check cleanup] unexpected scheduler failure:',
+    logger,
+    setIntervalFn,
+  });
 }
 
 const productionCleanupService = createAutoCheckCleanupService();

@@ -19,6 +19,61 @@ import {
   resolvePendingApprovalAccess,
 } from '../services/pendingApprovalAccess.js';
 
+export async function notifyMultiaddRequester({
+  client,
+  payload,
+  copyKey,
+  copyValues = {},
+  severity,
+  buildExtraEmbeds = () => [],
+  failureLabel,
+  GuildConfigModel = GuildConfig,
+  getGuildLanguageFn = getGuildLanguage,
+  translate = t,
+  buildNoticeEmbedFn = buildNoticeEmbed,
+  logger = console,
+}) {
+  try {
+    const guild = await client.guilds.fetch(payload.guildId);
+    const channel = await guild.channels.fetch(payload.channelId);
+    if (!channel?.isTextBased()) return false;
+
+    const lang = await getGuildLanguageFn(guild.id, { GuildConfigModel });
+    const mention = `<@${payload.requestedByUserId}>`;
+    const copy = translate(copyKey, lang, {
+      user: payload.requestedByUserId,
+      ...copyValues,
+    });
+    await channel.send({
+      content: mention,
+      allowedMentions: { users: [payload.requestedByUserId] },
+      embeds: [
+        buildNoticeEmbedFn(copy.replace(mention, '').trim(), { severity, lang }),
+        ...buildExtraEmbeds(lang),
+      ],
+    });
+    return true;
+  } catch (err) {
+    logger.warn?.(failureLabel, err.message);
+    return false;
+  }
+}
+
+function buildRejectBreakdown(rows = []) {
+  const counts = { black: 0, white: 0, watch: 0 };
+  for (const row of rows) {
+    if (row.type && counts[row.type] !== undefined) counts[row.type] += 1;
+  }
+
+  return [
+    ['black', '⛔'],
+    ['watch', '⚠️'],
+    ['white', '✅'],
+  ]
+    .filter(([type]) => counts[type] > 0)
+    .map(([type, icon]) => `${icon} **${counts[type]}**`);
+}
+
 export function createMultiaddApprovalButtonHandler(deps) {
   const {
     client,
@@ -76,14 +131,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
       // breakdown shape the approval card does. Gives the requester
       // (and any other approver scrolling DMs) one-glance context for
       // what was thrown out.
-      const rejectCounts = { black: 0, white: 0, watch: 0 };
-      for (const row of payload.bulkRows || []) {
-        if (row.type && rejectCounts[row.type] !== undefined) rejectCounts[row.type] += 1;
-      }
-      const breakdown = [];
-      if (rejectCounts.black > 0) breakdown.push(`⛔ **${rejectCounts.black}**`);
-      if (rejectCounts.watch > 0) breakdown.push(`⚠️ **${rejectCounts.watch}**`);
-      if (rejectCounts.white > 0) breakdown.push(`✅ **${rejectCounts.white}**`);
+      const breakdown = buildRejectBreakdown(payload.bulkRows);
 
       const buildRejectEmbed = (targetLang) => createArtistEmbed(targetLang)
         .setTitle(`✖️ ${t('dialogue.multiadd.approval.rejectedTitle', targetLang, { count: payload.bulkRows.length })}`)
@@ -108,28 +156,14 @@ export function createMultiaddApprovalButtonHandler(deps) {
         { excludeMessageId: interaction.message?.id || '' }
       ).catch((err) => console.warn('[multiadd] DM sync failed:', err.message));
 
-      try {
-        const guild = await client.guilds.fetch(payload.guildId);
-        const channel = await guild.channels.fetch(payload.channelId);
-        if (channel?.isTextBased()) {
-          const guildLang = await getGuildLanguage(guild.id, { GuildConfigModel: GuildConfig });
-          const mention = `<@${payload.requestedByUserId}>`;
-          const copy = t('dialogue.multiadd.approval.publicRejected', guildLang, {
-            user: payload.requestedByUserId,
-            count: payload.bulkRows.length,
-          });
-          await channel.send({
-            content: mention,
-            allowedMentions: { users: [payload.requestedByUserId] },
-            embeds: [buildNoticeEmbed(copy.replace(mention, '').trim(), {
-              severity: AlertSeverity.ERROR,
-              lang: guildLang,
-            })],
-          });
-        }
-      } catch (err) {
-        console.warn('[multiadd] Failed to notify requester of rejection:', err.message);
-      }
+      await notifyMultiaddRequester({
+        client,
+        payload,
+        copyKey: 'dialogue.multiadd.approval.publicRejected',
+        copyValues: { count: payload.bulkRows.length },
+        severity: AlertSeverity.ERROR,
+        failureLabel: '[multiadd] Failed to notify requester of rejection:',
+      });
       return;
     }
 
@@ -183,29 +217,13 @@ export function createMultiaddApprovalButtonHandler(deps) {
       { excludeMessageId: interaction.message?.id || '' }
     ).catch((err) => console.warn('[multiadd] DM sync failed:', err.message));
 
-    try {
-      const guild = await client.guilds.fetch(payload.guildId);
-      const channel = await guild.channels.fetch(payload.channelId);
-      if (channel?.isTextBased()) {
-        const guildLang = await getGuildLanguage(guild.id, { GuildConfigModel: GuildConfig });
-        const mention = `<@${payload.requestedByUserId}>`;
-        const copy = t('dialogue.multiadd.approval.publicApproved', guildLang, {
-          user: payload.requestedByUserId,
-        });
-        await channel.send({
-          content: mention,
-          allowedMentions: { users: [payload.requestedByUserId] },
-          embeds: [
-            buildNoticeEmbed(copy.replace(mention, '').trim(), {
-              severity: AlertSeverity.SUCCESS,
-              lang: guildLang,
-            }),
-            buildApprovedSummary(guildLang),
-          ],
-        });
-      }
-    } catch (err) {
-      console.warn('[multiadd] Failed to notify requester of approval:', err.message);
-    }
+    await notifyMultiaddRequester({
+      client,
+      payload,
+      copyKey: 'dialogue.multiadd.approval.publicApproved',
+      severity: AlertSeverity.SUCCESS,
+      buildExtraEmbeds: (guildLang) => [buildApprovedSummary(guildLang)],
+      failureLabel: '[multiadd] Failed to notify requester of approval:',
+    });
   };
 }

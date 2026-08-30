@@ -28,6 +28,113 @@ import { groupListCheckResults } from '../services/list-check/displayGroups.js';
 import { didListCheckNameChange } from '../services/list-check/matchResolution.js';
 import { COLORS } from './ui.js';
 
+function countListCheckStates(results) {
+  const counts = {
+    black: 0,
+    watch: 0,
+    white: 0,
+    trusted: 0,
+    notListed: 0,
+  };
+  for (const group of groupListCheckResults(results)) {
+    counts[group.status] += 1;
+  }
+  return counts;
+}
+
+function resolveListCheckOutcome(counts) {
+  if (counts.black > 0) return { color: COLORS.danger, titleIcon: '⛔' };
+  if (counts.watch > 0) return { color: COLORS.warning, titleIcon: '⚠️' };
+  if (counts.white > 0 || counts.trusted > 0) {
+    return { color: COLORS.success, titleIcon: '✅' };
+  }
+  return { color: COLORS.info, titleIcon: '🔍' };
+}
+
+function buildBreakdownTitle(counts, titleIcon, limitedNamesCount, lang) {
+  const parts = [
+    counts.black ? `⛔ ${counts.black}` : '',
+    counts.watch ? `⚠️ ${counts.watch}` : '',
+    counts.white ? `✅ ${counts.white}` : '',
+    counts.trusted ? `🛡️ ${counts.trusted}` : '',
+    counts.notListed
+      ? `❓ ${counts.notListed} ${t('dialogue.check.embed.notListed', lang)}`
+      : '',
+  ].filter(Boolean);
+  if (parts.length > 0) return parts.join(' · ');
+
+  const countKey = limitedNamesCount === 1 ? 'nameOne' : 'nameMany';
+  return `${titleIcon} ${limitedNamesCount} ${t(`dialogue.check.${countKey}`, lang)}`;
+}
+
+function buildCheckChrome({ results, counts, limitedNamesCount, mode, lang, titleIcon }) {
+  const modeKey = mode === 'auto' ? 'autoKicker' : 'slashKicker';
+  const titlePrefix = t(`dialogue.check.embed.${modeKey}`, lang);
+  const kicker = `// ${titlePrefix} · ${limitedNamesCount} ${t('dialogue.check.embed.names', lang)}`;
+  const isImageCheck = results.some((result) => result.inputSource === 'ocr');
+  let authorName = kicker;
+  if (isImageCheck) {
+    authorName = `📸 ${t('dialogue.check.embed.imageAuthor', lang)}`;
+  } else if (mode === 'auto') {
+    authorName = `🔎 ${t('dialogue.check.embed.textAuthor', lang)}`;
+  }
+
+  return {
+    authorName,
+    title: buildBreakdownTitle(counts, titleIcon, limitedNamesCount, lang),
+    usesCompactChrome: mode === 'auto' || isImageCheck,
+  };
+}
+
+function buildResultNotes({ ignoredCount, unverifiedCount, maxNames, lang }) {
+  const notes = [];
+  if (ignoredCount > 0) {
+    const countKey = ignoredCount === 1 ? 'nameOne' : 'nameMany';
+    notes.push(t('dialogue.check.embed.ignored', lang, {
+      count: ignoredCount,
+      word: t(`dialogue.check.${countKey}`, lang),
+      limit: maxNames ?? t('dialogue.check.embed.configured', lang),
+    }));
+  }
+  if (unverifiedCount > 0) {
+    notes.push(t('dialogue.check.embed.unverified', lang, { count: unverifiedCount }));
+  }
+  return notes.length > 0
+    ? `\n\n${notes.map((note) => `*${note}*`).join('\n')}`
+    : '';
+}
+
+function buildCorrectionFooterPart(correctedResults, lang) {
+  if (correctedResults.length === 0) return '';
+  const correctionKey = correctedResults.some((result) => result.inputSource === 'ocr')
+    ? 'correctedOcr'
+    : 'correctedText';
+  return t(`dialogue.check.embed.${correctionKey}`, lang, {
+    count: correctedResults.length,
+  });
+}
+
+function buildCheckFooter({ counts, flaggedCount, correctedResults, mode, lang }) {
+  const statusKey = flaggedCount > 0 ? 'flagged' : 'clear';
+  const parts = [
+    `// ${t(`dialogue.check.embed.${statusKey}`, lang, { count: flaggedCount })}`,
+  ];
+  const correction = buildCorrectionFooterPart(correctedResults, lang);
+  if (correction) parts.push(correction);
+
+  if (mode === 'auto' && flaggedCount > 0) {
+    parts.push(t('dialogue.check.embed.quickFlagged', lang));
+  } else if (mode === 'auto' && counts.notListed > 0) {
+    parts.push(t('dialogue.check.embed.quickClean', lang));
+  } else if (mode !== 'auto' && flaggedCount > 0) {
+    parts.push(t('dialogue.check.embed.rosterTip', lang));
+  } else if (mode !== 'auto') {
+    parts.push(t('dialogue.check.embed.rerunTip', lang));
+  }
+  parts.push(t('dialogue.check.embed.source', lang));
+  return parts;
+}
+
 /**
  * @typedef ListCheckRender
  * @property {EmbedBuilder} embed
@@ -58,69 +165,30 @@ export function buildListCheckEmbed({
 }) {
   // Per-category counts. Mirrors the priority logic in formatCheckResults
   // so the badge counts and the line-list categorisation never drift.
-  const counts = {
-    black: 0,
-    watch: 0,
-    white: 0,
-    trusted: 0,
-    notListed: 0,
-  };
-  for (const group of groupListCheckResults(results)) {
-    counts[group.status] += 1;
-  }
-
+  const counts = countListCheckStates(results);
   const flaggedCount = counts.black + counts.watch;
-  const clearedCount = counts.white + counts.trusted + counts.notListed;
   const correctedResults = results.filter(didListCheckNameChange);
-  const correctedCount = correctedResults.length;
-
-  let color;
-  let titleIcon;
-  if (counts.black > 0) { color = COLORS.danger; titleIcon = '⛔'; }
-  else if (counts.watch > 0) { color = COLORS.warning; titleIcon = '⚠️'; }
-  else if (counts.white > 0 || counts.trusted > 0) { color = COLORS.success; titleIcon = '✅'; }
-  else { color = COLORS.info; titleIcon = '🔍'; }
+  const { color, titleIcon } = resolveListCheckOutcome(counts);
 
   // HUD-merged header. The mode + total name count live on the author kicker
   // line; the title IS the breakdown, ordered by severity (black -> watch ->
   // white -> trusted -> notListed). Plain text (embed titles ignore markdown)
   // so the title's leading emoji is naturally the strongest outcome present -
   // no separate "Outcome:" line and no redundant count line needed.
-  const titlePrefix = t(`dialogue.check.embed.${mode === 'auto' ? 'autoKicker' : 'slashKicker'}`, lang);
-  const kicker = `// ${titlePrefix} · ${limitedNamesCount} ${t('dialogue.check.embed.names', lang)}`;
-  const isImageCheck = results.some((result) => result.inputSource === 'ocr');
-  const usesCompactChrome = mode === 'auto' || isImageCheck;
-  const authorName = isImageCheck
-    ? `📸 ${t('dialogue.check.embed.imageAuthor', lang)}`
-    : mode === 'auto'
-      ? `🔎 ${t('dialogue.check.embed.textAuthor', lang)}`
-      : kicker;
-
-  const breakdownParts = [];
-  if (counts.black) breakdownParts.push(`⛔ ${counts.black}`);
-  if (counts.watch) breakdownParts.push(`⚠️ ${counts.watch}`);
-  if (counts.white) breakdownParts.push(`✅ ${counts.white}`);
-  if (counts.trusted) breakdownParts.push(`🛡️ ${counts.trusted}`);
-  if (counts.notListed) breakdownParts.push(`❓ ${counts.notListed} ${t('dialogue.check.embed.notListed', lang)}`);
-  // breakdown is empty only with zero results -> fall back to a plain count.
-  const title = breakdownParts.length > 0
-    ? breakdownParts.join(' · ')
-    : `${titleIcon} ${limitedNamesCount} ${t(`dialogue.check.${limitedNamesCount === 1 ? 'nameOne' : 'nameMany'}`, lang)}`;
-
-  const notes = [];
-  if (ignoredCount > 0) {
-    notes.push(t('dialogue.check.embed.ignored', lang, {
-        count: ignoredCount,
-        word: t(`dialogue.check.${ignoredCount === 1 ? 'nameOne' : 'nameMany'}`, lang),
-        limit: maxNames ?? t('dialogue.check.embed.configured', lang),
-      }));
-  }
-  if (unverifiedCount > 0) {
-    notes.push(t('dialogue.check.embed.unverified', lang, { count: unverifiedCount }));
-  }
-  const resultNotes = notes.length > 0
-    ? `\n\n${notes.map((note) => `*${note}*`).join('\n')}`
-    : '';
+  const { authorName, title, usesCompactChrome } = buildCheckChrome({
+    results,
+    counts,
+    limitedNamesCount,
+    mode,
+    lang,
+    titleIcon,
+  });
+  const resultNotes = buildResultNotes({
+    ignoredCount,
+    unverifiedCount,
+    maxNames,
+    lang,
+  });
 
   // Description leads straight with the per-name list now (the breakdown moved
   // up into the title). Ceiling is 4096; the slice is a safety net for long
@@ -132,9 +200,7 @@ export function buildListCheckEmbed({
   // description carries the same per-status info (with finer
   // granularity), so the panel duplicated information and increased visual
   // density. Reintroduce it only when separate aggregate counts are required.
-  // (clearedCount kept above as a value reference for future copy
-  // tweaks but not surfaced in fields.)
-  void clearedCount;
+  // Aggregate cleared count is therefore intentionally not computed here.
 
   // Footer hint differs between modes:
   //   slash:  Tip toward /la-roster on a flagged hit OR retry hint when unflagged.
@@ -142,25 +208,13 @@ export function buildListCheckEmbed({
   //           names (the auto-check pipeline supplies the select menu).
   // Footer is a HUD status line: a // FLAGGED n (or // CLEAR) tag, the
   // mode-specific tip, then the source citation.
-  const footerParts = [`// ${t(`dialogue.check.embed.${flaggedCount > 0 ? 'flagged' : 'clear'}`, lang, { count: flaggedCount })}`];
-  if (correctedCount > 0) {
-    const correctionKey = correctedResults.some((result) => result.inputSource === 'ocr')
-      ? 'correctedOcr'
-      : 'correctedText';
-    footerParts.push(t(`dialogue.check.embed.${correctionKey}`, lang, { count: correctedCount }));
-  }
-  if (mode === 'auto') {
-    if (flaggedCount > 0) {
-      footerParts.push(t('dialogue.check.embed.quickFlagged', lang));
-    } else if (counts.notListed > 0) {
-      footerParts.push(t('dialogue.check.embed.quickClean', lang));
-    }
-  } else if (flaggedCount > 0) {
-    footerParts.push(t('dialogue.check.embed.rosterTip', lang));
-  } else {
-    footerParts.push(t('dialogue.check.embed.rerunTip', lang));
-  }
-  footerParts.push(t('dialogue.check.embed.source', lang));
+  const footerParts = buildCheckFooter({
+    counts,
+    flaggedCount,
+    correctedResults,
+    mode,
+    lang,
+  });
 
   const embed = createArtistEmbed(lang)
     .setAuthor({ name: authorName })
