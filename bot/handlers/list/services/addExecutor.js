@@ -153,6 +153,390 @@ export function buildListAddTrackedRostersField({
   });
 }
 
+function buildTrustedRejection(name, trustedEntry, lang, { viaRoster = false } = {}) {
+  const trustedName = trustedEntry.name;
+  const via = trustedName.toLowerCase() === name.toLowerCase()
+    ? {}
+    : { via: trustedName };
+  return {
+    ok: false,
+    content: viaRoster
+      ? t('dialogue.trustedBlock.via', lang, { name, via: trustedName })
+      : t('dialogue.trustedBlock.direct', lang, { name }),
+    embeds: [buildTrustedBlockEmbed(name, trustedEntry.reason, { ...via, lang })],
+  };
+}
+
+async function findTrustedEntry(names) {
+  return TrustedUser.findOne(buildNameRosterQuery(names))
+    .collation({ locale: 'en', strength: 2 })
+    .lean();
+}
+
+function formatNameSuggestionLines(suggestions) {
+  return suggestions.slice(0, 10).map((suggestion, index) => {
+    const className = getClassName(suggestion.cls);
+    const classLabel = getClassEmoji(className) || className;
+    const itemLevel = Number(suggestion.itemLevel || 0).toFixed(2);
+    return `**${index + 1}.** [${suggestion.name}](${rosterUrl(suggestion.name)}) · \`${itemLevel}\` · ${classLabel}`;
+  }).join('\n');
+}
+
+function buildMissingRosterResult(name, suggestions, lang) {
+  const hasSuggestions = suggestions.length > 0;
+  const fields = hasSuggestions
+    ? [{
+        name: `${ICONS.search} ${t('dialogue.listAdd.noRoster.suggestions', lang)}`,
+        value: formatNameSuggestionLines(suggestions).slice(0, 1024),
+        inline: false,
+      }]
+    : undefined;
+  return {
+    ok: false,
+    content: hasSuggestions
+      ? t('dialogue.listAdd.noRoster.contentSuggestions', lang, { name, count: suggestions.length })
+      : t('dialogue.listAdd.noRoster.contentNone', lang, { name }),
+    embeds: [buildAlertEmbed({
+      severity: AlertSeverity.ERROR,
+      title: t('dialogue.listAdd.noRoster.title', lang),
+      description: t(
+        `dialogue.listAdd.noRoster.${hasSuggestions ? 'withSuggestions' : 'withoutSuggestions'}`,
+        lang,
+        { name }
+      ),
+      fields,
+      footer: t(
+        `dialogue.listAdd.noRoster.${hasSuggestions ? 'suggestionFooter' : 'spellingFooter'}`,
+        lang
+      ),
+      lang,
+    })],
+  };
+}
+
+async function saveRosterSnapshotsBestEffort(rosterCharacters, name) {
+  try {
+    await upsertRosterSnapshots(rosterCharacters, name);
+  } catch (err) {
+    console.warn('[list] Snapshot save after roster fetch failed (non-fatal):', err.message);
+  }
+}
+
+function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang }) {
+  if (targetItemLevel === null || targetItemLevel >= 1700) return null;
+  const formattedLevel = targetItemLevel.toFixed(2);
+  return {
+    ok: false,
+    content: t('dialogue.listAdd.itemLevel.content', lang, { name, level: formattedLevel }),
+    embeds: [buildAlertEmbed({
+      severity: AlertSeverity.ERROR,
+      title: t('dialogue.listAdd.itemLevel.title', lang),
+      description: t('dialogue.listAdd.itemLevel.description', lang, { name }),
+      fields: [
+        { name: `🎯 ${t('dialogue.listAdd.itemLevel.character', lang)}`, value: `[${name}](${rosterUrl(name)})`, inline: true },
+        { name: `📊 ${t('dialogue.listAdd.itemLevel.itemLevel', lang)}`, value: `\`${formattedLevel}\``, inline: true },
+        { name: `📉 ${t('dialogue.listAdd.itemLevel.minimum', lang)}`, value: '`1700.00`', inline: true },
+        { name: `📒 ${t('dialogue.listAdd.itemLevel.targetList', lang)}`, value: labelCap, inline: true },
+        buildInlineSpacer(),
+        buildInlineSpacer(),
+      ],
+      footer: t('dialogue.listAdd.itemLevel.footer', lang),
+      lang,
+    })],
+  };
+}
+
+function buildDuplicateMetadataFields(existed, isRosterMatch, lang) {
+  const fields = [{
+    name: `${ICONS.search} ${t('dialogue.listAdd.duplicate.matchType', lang)}`,
+    value: t(
+      `dialogue.listAdd.duplicate.${isRosterMatch ? 'rosterAlt' : 'exactName'}`,
+      lang
+    ),
+    inline: true,
+  }];
+  if (isRosterMatch) {
+    fields.push({
+      name: `🧬 ${t('dialogue.listAdd.duplicate.matchedName', lang)}`,
+      value: `[${existed.name}](${rosterUrl(existed.name)})`,
+      inline: true,
+    });
+  }
+  if (existed.scope) {
+    const scopeKey = existed.scope === 'server' ? 'local' : 'global';
+    fields.push({
+      name: `🌐 ${t('dialogue.listAdd.duplicate.scope', lang)}`,
+      value: `[${t(`dialogue.approval.scopeTag.${scopeKey}`, lang)}]`,
+      inline: true,
+    });
+  }
+  appendDuplicateAuditRow(fields, existed, lang);
+  return fields;
+}
+
+function appendDuplicateDetailFields(fields, existed, lang) {
+  if (existed.reason) {
+    fields.push({
+      name: `📝 ${t('dialogue.listAdd.duplicate.existingReason', lang)}`,
+      value: existed.reason.slice(0, 1024),
+      inline: false,
+    });
+  }
+  if (existed.raid) {
+    fields.push({
+      name: `🗡️ ${t('dialogue.listAdd.duplicate.raid', lang)}`,
+      value: `\`${existed.raid}\``,
+      inline: true,
+    });
+  }
+  return fields;
+}
+
+export function buildDuplicateListAddResult({ existed, name, labelCap, type, lang }) {
+  const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
+  const variant = isRosterMatch ? 'roster' : 'direct';
+  const contentVariant = isRosterMatch ? 'contentRoster' : 'contentDirect';
+  const values = { name, list: labelCap, matched: existed.name };
+  const fields = appendDuplicateDetailFields(
+    buildDuplicateMetadataFields(existed, isRosterMatch, lang),
+    existed,
+    lang
+  );
+  return {
+    ok: false,
+    isDuplicate: true,
+    existingEntry: existed,
+    content: t(`dialogue.listAdd.duplicate.${contentVariant}`, lang, values),
+    embeds: [buildAlertEmbed({
+      severity: AlertSeverity.WARNING,
+      title: t('dialogue.listAdd.duplicate.title', lang, { list: labelCap }),
+      description: t(`dialogue.listAdd.duplicate.${variant}`, lang, values),
+      fields,
+      footer: t('dialogue.listAdd.duplicate.footer', lang, { type }),
+      timestamp: false,
+      lang,
+    })],
+  };
+}
+
+function resolveEntryScope(payload) {
+  const scope = payload.scope || 'global';
+  return { scope, guildId: scope === 'server' ? (payload.guildId || '') : '' };
+}
+
+export function buildListEntryCreateData({ payload, name, allCharacters, entryScope }) {
+  const data = {
+    name,
+    reason: payload.reason,
+    raid: payload.raid,
+    logsUrl: payload.logsUrl || '',
+    imageUrl: payload.imageMessageId ? '' : (payload.imageUrl || ''),
+    imageMessageId: payload.imageMessageId || '',
+    imageChannelId: payload.imageChannelId || '',
+    allCharacters,
+    enrichmentSource: 'bible',
+    enrichedAt: new Date(),
+    addedByUserId: payload.requestedByUserId,
+    addedByTag: payload.requestedByTag,
+    addedByName: payload.requestedByName,
+    addedByDisplayName: payload.requestedByDisplayName,
+  };
+  if (payload.type === 'black') {
+    data.scope = entryScope.scope;
+    data.guildId = entryScope.guildId;
+  }
+  return data;
+}
+
+function resolveSuccessScopeTag(payload, entryScope, lang) {
+  if (payload.type !== 'black') return '';
+  const scopeKey = entryScope.scope === 'server' ? 'local' : 'global';
+  return ` \`[${t(`dialogue.approval.scopeTag.${scopeKey}`, lang)}]\``;
+}
+
+function buildSuccessLinkParts(entryName, payload, lang) {
+  const links = [
+    `[${t('dialogue.listAdd.success.roster', lang)}](${rosterUrl(entryName)})`,
+    `[${t('dialogue.listAdd.success.logs', lang)}](${logsUrl(entryName)})`,
+  ];
+  if (payload.logsUrl) {
+    links.push(`[${t('dialogue.listAdd.success.evidenceLogs', lang)}](${payload.logsUrl})`);
+  }
+  return links;
+}
+
+function buildSuccessFields({
+  payload,
+  entry,
+  entryScope,
+  icon,
+  labelCap,
+  rostersField,
+  linkParts,
+  lang,
+}) {
+  const fields = [
+    { name: `📒 ${t('dialogue.listAdd.success.fields.list', lang)}`, value: `${icon} ${labelCap}`, inline: true },
+    { name: `🗡️ ${t('dialogue.listAdd.success.fields.raid', lang)}`, value: payload.raid ? `\`${payload.raid}\`` : t('dialogue.broadcast.notAvailable', lang), inline: true },
+  ];
+  if (payload.type === 'black') {
+    const scopeKey = entryScope.scope === 'server' ? 'local' : 'global';
+    fields.push({
+      name: `🌐 ${t('dialogue.listAdd.success.fields.scope', lang)}`,
+      value: t(`dialogue.approval.scopeTag.${scopeKey}`, lang),
+      inline: true,
+    });
+  }
+  fields.push({
+    name: `📝 ${t('dialogue.listAdd.success.fields.reason', lang)}`,
+    value: (payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
+    inline: false,
+  });
+  if (rostersField) fields.push(rostersField);
+  fields.push({
+    name: `🔗 ${t('dialogue.listAdd.success.fields.links', lang)}`,
+    value: linkParts.join(' · '),
+    inline: false,
+  });
+  return fields;
+}
+
+function buildListAddSuccessEmbed({
+  payload,
+  entry,
+  entryScope,
+  rosterVisibility,
+  rosterCharacters,
+  color,
+  icon,
+  labelCap,
+  lang,
+}) {
+  const rosterStatMap = statMapFromRosterCharacters(rosterCharacters);
+  const rostersField = buildListAddTrackedRostersField({
+    names: entry.allCharacters,
+    primaryName: entry.name,
+    statMap: rosterStatMap,
+    lang,
+  });
+  const requesterName = payload.requestedByDisplayName
+    || payload.requestedByName
+    || t('dialogue.listAdd.success.officerFallback', lang);
+  const { titleIcon, heroLine } = buildListAddSuccessHeader({
+    icon,
+    requesterName,
+    entryName: entry.name,
+    listLabel: labelCap,
+    scopeTag: resolveSuccessScopeTag(payload, entryScope, lang),
+    primaryRecord: rosterStatMap.get(entry.name.toLowerCase()) || null,
+    lang,
+  });
+  const fields = buildSuccessFields({
+    payload,
+    entry,
+    entryScope,
+    icon,
+    labelCap,
+    rostersField,
+    linkParts: buildSuccessLinkParts(entry.name, payload, lang),
+    lang,
+  });
+  const sourceKey = rosterVisibility === 'hidden' ? 'sourceHidden' : 'sourceVisible';
+  return buildAlertEmbed({
+    severity: AlertSeverity.SUCCESS,
+    titleIcon,
+    color,
+    title: t('dialogue.listAdd.success.title', lang, { list: labelCap, name: entry.name }),
+    description: heroLine,
+    fields,
+    footer: `${ICONS.shield} ${t('dialogue.listAdd.success.footer', lang, {
+      user: requesterName,
+      source: t(`dialogue.listAdd.success.${sourceKey}`, lang),
+    })}`,
+    lang,
+  });
+}
+
+function dispatchListAddBroadcast({
+  payload,
+  entry,
+  entryScope,
+  freshDisplayUrl,
+  rosterCharacters,
+  broadcastListChange,
+}) {
+  if (payload.skipBroadcast) return;
+  broadcastListChange('added', entry, payload, {
+    onlyOwner: entryScope.scope === 'server',
+    displayUrl: freshDisplayUrl,
+    rosterCharacters,
+  }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
+}
+
+function appendHiddenRosterGuidance({
+  embed,
+  entry,
+  rosterVisibility,
+  hiddenRosterMeta,
+  lang,
+}) {
+  if (rosterVisibility !== 'hidden') return [];
+  const guidance = buildHiddenRosterGuidance(entry.name, hiddenRosterMeta?.guildName, lang);
+  embed.addFields(...guidance.fields);
+  return guidance.components;
+}
+
+async function buildSuccessfulAddResult({
+  payload,
+  entry,
+  entryScope,
+  rosterVisibility,
+  rosterCharacters,
+  hiddenRosterMeta,
+  color,
+  icon,
+  labelCap,
+  lang,
+  client,
+  broadcastListChange,
+}) {
+  const embed = buildListAddSuccessEmbed({
+    payload,
+    entry,
+    entryScope,
+    rosterVisibility,
+    rosterCharacters,
+    color,
+    icon,
+    labelCap,
+    lang,
+  });
+  const freshDisplayUrl = await resolveDisplayImageUrl(entry, client);
+  if (freshDisplayUrl) embed.setImage(freshDisplayUrl);
+  dispatchListAddBroadcast({
+    payload,
+    entry,
+    entryScope,
+    freshDisplayUrl,
+    rosterCharacters,
+    broadcastListChange,
+  });
+  const components = appendHiddenRosterGuidance({
+    embed,
+    entry,
+    rosterVisibility,
+    hiddenRosterMeta,
+    lang,
+  });
+  return {
+    ok: true,
+    entry,
+    content: `✅ ${t('dialogue.listAdd.success.content', lang, { name: entry.name, list: labelCap })}`,
+    embeds: [embed],
+    components,
+  };
+}
+
 /**
  * Build the executeListAddToDatabase executor.
  * @param {object} deps
@@ -173,379 +557,76 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     const name = normalizeCharacterName(payload.name);
     await connectDB();
 
-    // Step 0: Trusted user guard (exact name check · fast, before roster fetch)
-    //
-    // Note on `content` strings in non-ok returns: the user-facing reply
-    // suppresses content when an embed is present (see add/command.js
-    // line ~110). The string is kept for log-style consumers · bulk
-    // results and approval-flow error fallbacks read result.content for
-    // a one-line description of why the executor refused.
-    {
-      const trustedExact = await TrustedUser.findOne(buildNameRosterQuery(name))
-        .collation({ locale: 'en', strength: 2 }).lean();
-      if (trustedExact) {
-        const via = trustedExact.name.toLowerCase() === name.toLowerCase()
-          ? {}
-          : { via: trustedExact.name };
-        return {
-          ok: false,
-          content: t('dialogue.trustedBlock.direct', lang, { name }),
-          embeds: [buildTrustedBlockEmbed(name, trustedExact.reason, { ...via, lang })],
-        };
-      }
+    const trustedExact = await findTrustedEntry(name);
+    if (trustedExact) {
+      return buildTrustedRejection(name, trustedExact, lang);
     }
 
-    // Step 1: Check if character exists
-    const {
-      hasValidRoster,
-      allCharacters,
-      targetItemLevel,
-      rosterVisibility,
-      rosterCharacters,
-    } = await buildRosterCharacters(name, {
-      hiddenRosterFallback: true,
-    });
-    const hiddenRosterMeta = rosterVisibility === 'hidden'
+    const roster = await buildRosterCharacters(name, { hiddenRosterFallback: true });
+    const hiddenRosterMeta = roster.rosterVisibility === 'hidden'
       ? await fetchCharacterMeta(name)
       : null;
-    if (!hasValidRoster) {
+    if (!roster.hasValidRoster) {
       const suggestions = await fetchNameSuggestions(name) || [];
-      if (suggestions.length > 0) {
-        // The name stays first · it is what the reader has to copy back
-        // into the command. The class renders through getClassEmoji so it
-        // becomes an icon on its own once CLASS_EMOJI_MAP is populated,
-        // and falls back to the class name while that map is empty.
-        const suggestionLines = suggestions
-          .slice(0, 10)
-          .map((s, idx) => {
-            const className = getClassName(s.cls);
-            const classLabel = getClassEmoji(className) || className;
-            return `**${idx + 1}.** [${s.name}](${rosterUrl(s.name)}) · \`${Number(s.itemLevel || 0).toFixed(2)}\` · ${classLabel}`;
-          })
-          .join('\n');
-
-        return {
-          ok: false,
-          content: t('dialogue.listAdd.noRoster.contentSuggestions', lang, { name, count: suggestions.length }),
-          embeds: [
-            buildAlertEmbed({
-              severity: AlertSeverity.ERROR,
-              title: t('dialogue.listAdd.noRoster.title', lang),
-              description: t('dialogue.listAdd.noRoster.withSuggestions', lang, { name }),
-              fields: [
-                { name: `${ICONS.search} ${t('dialogue.listAdd.noRoster.suggestions', lang)}`, value: suggestionLines.slice(0, 1024), inline: false },
-              ],
-              footer: t('dialogue.listAdd.noRoster.suggestionFooter', lang),
-              lang,
-            }),
-          ],
-        };
-      }
-
-      return {
-        ok: false,
-        content: t('dialogue.listAdd.noRoster.contentNone', lang, { name }),
-        embeds: [
-          buildAlertEmbed({
-            severity: AlertSeverity.ERROR,
-            title: t('dialogue.listAdd.noRoster.title', lang),
-            description: t('dialogue.listAdd.noRoster.withoutSuggestions', lang, { name }),
-            footer: t('dialogue.listAdd.noRoster.spellingFooter', lang),
-            lang,
-          }),
-        ],
-      };
+      return buildMissingRosterResult(name, suggestions, lang);
     }
 
-    // Preserve the rich roster data while it is already in hand. Future
-    // edit/remove broadcasts can then render real class icons, ilvl, and CP
-    // without another bible request. Snapshot failure must not block a list
-    // moderation action, so this remains best-effort.
-    try {
-      await upsertRosterSnapshots(rosterCharacters, name);
-    } catch (err) {
-      console.warn('[list] Snapshot save after roster fetch failed (non-fatal):', err.message);
+    await saveRosterSnapshotsBestEffort(roster.rosterCharacters, name);
+    const itemLevelRejection = buildItemLevelRejection({
+      name,
+      targetItemLevel: roster.targetItemLevel,
+      labelCap,
+      lang,
+    });
+    if (itemLevelRejection) return itemLevelRejection;
+
+    const trustedAlt = roster.allCharacters.length > 0
+      ? await findTrustedEntry(roster.allCharacters)
+      : null;
+    if (trustedAlt) {
+      return buildTrustedRejection(name, trustedAlt, lang, { viaRoster: true });
     }
 
-    // Step 2: Check ilvl >= 1700 (using exact ilvl from roster, not regex on HTML)
-    if (targetItemLevel !== null && targetItemLevel < 1700) {
-      return {
-        ok: false,
-        content: t('dialogue.listAdd.itemLevel.content', lang, { name, level: targetItemLevel.toFixed(2) }),
-        embeds: [
-          buildAlertEmbed({
-            severity: AlertSeverity.ERROR,
-            title: t('dialogue.listAdd.itemLevel.title', lang),
-            description: t('dialogue.listAdd.itemLevel.description', lang, { name }),
-            // Four inline fields leave the fourth alone on its own row,
-            // where Discord stretches it to full width. The spacers keep
-            // both rows on the same three-column grid as the other cards.
-            fields: [
-              { name: `🎯 ${t('dialogue.listAdd.itemLevel.character', lang)}`, value: `[${name}](${rosterUrl(name)})`, inline: true },
-              { name: `📊 ${t('dialogue.listAdd.itemLevel.itemLevel', lang)}`, value: `\`${targetItemLevel.toFixed(2)}\``, inline: true },
-              { name: `📉 ${t('dialogue.listAdd.itemLevel.minimum', lang)}`, value: '`1700.00`', inline: true },
-              { name: `📒 ${t('dialogue.listAdd.itemLevel.targetList', lang)}`, value: labelCap, inline: true },
-              buildInlineSpacer(),
-              buildInlineSpacer(),
-            ],
-            footer: t('dialogue.listAdd.itemLevel.footer', lang),
-            lang,
-          }),
-        ],
-      };
-    }
-
-    // Step 2b: Trusted user guard (alt check · after roster gives us allCharacters)
-    if (allCharacters.length > 0) {
-      const trustedAlt = await TrustedUser.findOne(buildNameRosterQuery(allCharacters))
-        .collation({ locale: 'en', strength: 2 }).lean();
-      if (trustedAlt) {
-        return {
-          ok: false,
-          content: t('dialogue.trustedBlock.via', lang, { name, via: trustedAlt.name }),
-          embeds: [buildTrustedBlockEmbed(name, trustedAlt.reason, { via: trustedAlt.name, lang })],
-        };
-      }
-    }
-
-    // Step 3: Check if already in list (scope-aware for blacklist)
-    const entryScope = payload.scope || 'global';
-    const entryGuildId = entryScope === 'server' ? (payload.guildId || '') : '';
-
-    // Blacklist checks global + the current server; other lists have no scope.
-    const dupeQuery = buildScopedListQuery(
+    const entryScope = resolveEntryScope(payload);
+    const duplicateQuery = buildScopedListQuery(
       payload.type,
       buildNameRosterQuery(name),
-      entryGuildId,
+      entryScope.guildId,
       { ownerSeesAll: false }
     );
-
-    const existed = await model.findOne(dupeQuery)
+    const existed = await model.findOne(duplicateQuery)
       .collation({ locale: 'en', strength: 2 })
       .lean();
-
     if (existed) {
-      const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
-
-      // Build structured alert embed with all the duplicate's context.
-      // Field icons mirror the success card below (🌐 scope, 📝 reason,
-      // 🗡️ raid, 🧬 roster alt) so a name that lands in the list and a
-      // name that was already there read as the same kind of card.
-      const existedRosterLink = rosterUrl(existed.name);
-      const dupFields = [];
-      if (isRosterMatch) {
-        dupFields.push({
-          name: `${ICONS.search} ${t('dialogue.listAdd.duplicate.matchType', lang)}`,
-          value: t('dialogue.listAdd.duplicate.rosterAlt', lang),
-          inline: true,
-        });
-        dupFields.push({
-          name: `🧬 ${t('dialogue.listAdd.duplicate.matchedName', lang)}`,
-          value: `[${existed.name}](${existedRosterLink})`,
-          inline: true,
-        });
-      } else {
-        dupFields.push({
-          name: `${ICONS.search} ${t('dialogue.listAdd.duplicate.matchType', lang)}`,
-          value: t('dialogue.listAdd.duplicate.exactName', lang),
-          inline: true,
-        });
-      }
-      if (existed.scope) {
-        dupFields.push({
-          name: `🌐 ${t('dialogue.listAdd.duplicate.scope', lang)}`,
-          value: `[${t(`dialogue.approval.scopeTag.${existed.scope === 'server' ? 'local' : 'global'}`, lang)}]`,
-          inline: true,
-        });
-      }
-
-      // Start the three-slot audit row cleanly regardless of whether this is
-      // an exact, roster, scoped, or legacy entry.
-      appendDuplicateAuditRow(dupFields, existed, lang);
-
-      if (existed.reason) {
-        dupFields.push({
-          name: `📝 ${t('dialogue.listAdd.duplicate.existingReason', lang)}`,
-          value: existed.reason.slice(0, 1024),
-          inline: false,
-        });
-      }
-      if (existed.raid) {
-        dupFields.push({
-          name: `🗡️ ${t('dialogue.listAdd.duplicate.raid', lang)}`,
-          value: `\`${existed.raid}\``,
-          inline: true,
-        });
-      }
-
-      const dupDescription = isRosterMatch
-        ? t('dialogue.listAdd.duplicate.roster', lang, { name, list: labelCap, matched: existed.name })
-        : t('dialogue.listAdd.duplicate.direct', lang, { name, list: labelCap });
-
-      const dupContent = isRosterMatch
-        ? t('dialogue.listAdd.duplicate.contentRoster', lang, { name, list: labelCap, matched: existed.name })
-        : t('dialogue.listAdd.duplicate.contentDirect', lang, { name, list: labelCap });
-
-      return {
-        ok: false,
-        isDuplicate: true,
-        existingEntry: existed,
-        content: dupContent,
-        embeds: [
-          buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            title: t('dialogue.listAdd.duplicate.title', lang, { list: labelCap }),
-            description: dupDescription,
-            fields: dupFields,
-            footer: t('dialogue.listAdd.duplicate.footer', lang, { type: payload.type }),
-            timestamp: false,
-            lang,
-          }),
-        ],
-      };
+      return buildDuplicateListAddResult({
+        existed,
+        name,
+        labelCap,
+        type: payload.type,
+        lang,
+      });
     }
 
-    // Step 4: Create entry
-    const createData = {
+    const entry = await model.create(buildListEntryCreateData({
+      payload,
       name,
-      reason: payload.reason,
-      raid: payload.raid,
-      logsUrl: payload.logsUrl || '',
-      // Image storage: prefer rehosted (permanent) over direct URL (legacy/expiring)
-      imageUrl: payload.imageMessageId ? '' : (payload.imageUrl || ''),
-      imageMessageId: payload.imageMessageId || '',
-      imageChannelId: payload.imageChannelId || '',
-      allCharacters,
-      // allCharacters here always came through buildRosterCharacters
-      // (visible OR hidden-roster fallback both consult bible), so the
-      // enrichment is bible-sourced. enrichedAt stamps the create time
-      // so future re-enrich loops can spot stale entries.
-      enrichmentSource: 'bible',
-      enrichedAt: new Date(),
-      addedByUserId: payload.requestedByUserId,
-      addedByTag: payload.requestedByTag,
-      addedByName: payload.requestedByName,
-      addedByDisplayName: payload.requestedByDisplayName,
-    };
-
-    // Add scope fields for blacklist entries
-    if (payload.type === 'black') {
-      createData.scope = entryScope;
-      createData.guildId = entryGuildId;
-    }
-
-    const entry = await model.create(createData);
-
-    // Build success embed using the same vocabulary as the approval
-    // card (buildListAddApprovalEmbed) so an officer reviewing both
-    // sees a consistent layout: list-type icon in the title bar, hero
-    // line describing the action in plain English, icon-prefixed
-    // fields (📒/🗡️/🌐/📝/🧬/🔗), numbered tracked-alts with class
-    // icon + ilvl when the roster scrape surfaced them, and a footer
-    // crediting the requester + roster source.
-    const rosterLink = rosterUrl(entry.name);
-    const autoLogsLink = logsUrl(entry.name);
-
-    const linkParts = [`[${t('dialogue.listAdd.success.roster', lang)}](${rosterLink})`, `[${t('dialogue.listAdd.success.logs', lang)}](${autoLogsLink})`];
-    if (payload.logsUrl) linkParts.push(`[${t('dialogue.listAdd.success.evidenceLogs', lang)}](${payload.logsUrl})`);
-
-    const scopeTag = (payload.type === 'black' && entryScope === 'server')
-      ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\``
-      : payload.type === 'black' ? ` \`[${t('dialogue.approval.scopeTag.global', lang)}]\`` : '';
-    const rosterSourceLabel = rosterVisibility === 'hidden'
-      ? t('dialogue.listAdd.success.sourceHidden', lang)
-      : t('dialogue.listAdd.success.sourceVisible', lang);
-
-    // Complete tracked roster via the shared renderer · the character being
-    // added is always first, followed by its deduplicated roster characters.
-    // Class icon + ilvl come from buildRosterCharacters when available.
-    const rosterStatMap = statMapFromRosterCharacters(rosterCharacters);
-    const rostersField = buildListAddTrackedRostersField({
-      names: allCharacters,
-      primaryName: entry.name,
-      statMap: rosterStatMap,
-      lang,
-    });
-
-    const requesterName = payload.requestedByDisplayName || payload.requestedByName || t('dialogue.listAdd.success.officerFallback', lang);
-    const primaryRecord = rosterStatMap.get(entry.name.toLowerCase()) || null;
-    const { titleIcon, heroLine } = buildListAddSuccessHeader({
-      icon,
-      requesterName,
-      entryName: entry.name,
-      listLabel: labelCap,
-      scopeTag,
-      primaryRecord,
-      lang,
-    });
-
-    const fields = [
-      { name: `📒 ${t('dialogue.listAdd.success.fields.list', lang)}`, value: `${icon} ${labelCap}`, inline: true },
-      { name: `🗡️ ${t('dialogue.listAdd.success.fields.raid', lang)}`, value: payload.raid ? `\`${payload.raid}\`` : t('dialogue.broadcast.notAvailable', lang), inline: true },
-    ];
-    if (payload.type === 'black') {
-      fields.push({ name: `🌐 ${t('dialogue.listAdd.success.fields.scope', lang)}`, value: t(`dialogue.approval.scopeTag.${entryScope === 'server' ? 'local' : 'global'}`, lang), inline: true });
-    }
-    fields.push({ name: `📝 ${t('dialogue.listAdd.success.fields.reason', lang)}`, value: (payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false });
-    if (rostersField) fields.push(rostersField);
-    fields.push({ name: `🔗 ${t('dialogue.listAdd.success.fields.links', lang)}`, value: linkParts.join(' · '), inline: false });
-
-    const embed = buildAlertEmbed({
-      severity: AlertSeverity.SUCCESS,
-      titleIcon,
+      allCharacters: roster.allCharacters,
+      entryScope,
+    }));
+    return buildSuccessfulAddResult({
+      payload,
+      entry,
+      entryScope,
+      rosterVisibility: roster.rosterVisibility,
+      rosterCharacters: roster.rosterCharacters,
+      hiddenRosterMeta,
       color,
-      title: t('dialogue.listAdd.success.title', lang, { list: labelCap, name: entry.name }),
-      description: heroLine,
-      fields,
-      footer: `${ICONS.shield} ${t('dialogue.listAdd.success.footer', lang, { user: requesterName, source: rosterSourceLabel })}`,
+      icon,
+      labelCap,
       lang,
+      client,
+      broadcastListChange,
     });
-
-    // Resolve the freshest possible image URL from the just-created entry.
-    // payload.imageUrl is unsafe here because for approval-delayed adds the
-    // payload was snapshotted >24h ago and its URL may be expired. Going
-    // through resolveDisplayImageUrl() guarantees a freshly-signed URL from
-    // the rehosted message at THIS moment, regardless of payload age.
-    const freshDisplayUrl = await resolveDisplayImageUrl(entry, client);
-    if (freshDisplayUrl) {
-      embed.setImage(freshDisplayUrl);
-    }
-
-    // Global: broadcast to all opted-in servers
-    // Server-scoped: broadcast only to owner guild (special privilege)
-    // skipBroadcast: used by /la-list multiadd bulk flow to gather one summary broadcast instead of N spam
-    if (!payload.skipBroadcast) {
-      // Pass the already-resolved fresh URL so broadcastListChange does not
-      // re-fetch the same evidence message a second time.
-      broadcastListChange('added', entry, payload, {
-        onlyOwner: entryScope === 'server',
-        displayUrl: freshDisplayUrl,
-        rosterCharacters,
-      }).catch((err) =>
-        console.warn('[list] Broadcast failed:', err.message)
-      );
-    }
-
-    // Hidden roster: surface next-step guidance. Enrich requires a guild
-    // member list, so only render the button when bible exposes guildName;
-    // otherwise direct officers to manual additional_names.
-    const components = [];
-    if (rosterVisibility === 'hidden') {
-      const guidance = buildHiddenRosterGuidance(entry.name, hiddenRosterMeta?.guildName, payload.lang);
-      embed.addFields(...guidance.fields);
-      components.push(...guidance.components);
-    }
-
-    return {
-      ok: true,
-      entry, // Mongoose doc for callers that need to re-use the created entry (e.g. bulk broadcast)
-      // content honors the executor contract documented above: every return
-      // path (ok or not) carries a one-line string so approval-flow notifiers
-      // can render `<@requester> ${content}` without a literal "undefined".
-      content: `✅ ${t('dialogue.listAdd.success.content', lang, { name: entry.name, list: labelCap })}`,
-      embeds: [embed],
-      components,
-    };
   }
 
   return executeListAddToDatabase;

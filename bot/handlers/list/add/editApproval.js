@@ -20,6 +20,235 @@ import {
   buildApprovalResultRow,
 } from '../helpers.js';
 
+function buildApprovalAlertPayload({ embed, status, lang }) {
+  return {
+    content: '',
+    embeds: [embed],
+    components: [buildApprovalResultRow(status, lang)],
+  };
+}
+
+async function closeApprovalWithAlert({
+  interaction,
+  requestId,
+  embed,
+  status = 'Failed',
+  lang,
+}) {
+  await PendingApproval.deleteOne({ requestId });
+  await editPayload(interaction, buildApprovalAlertPayload({ embed, status, lang }));
+}
+
+function buildLocalizedAlert(key, lang, values = {}) {
+  return buildAlertEmbed({
+    severity: AlertSeverity.WARNING,
+    ...t(key, lang, values),
+    lang,
+  });
+}
+
+export function resolveApprovalMoveImageFields(payload, existingEntry) {
+  const imageMessageId = payload.imageMessageId || existingEntry.imageMessageId || '';
+  return {
+    imageUrl: imageMessageId ? '' : (payload.imageUrl || existingEntry.imageUrl || ''),
+    imageMessageId,
+    imageChannelId: payload.imageChannelId || existingEntry.imageChannelId || '',
+  };
+}
+
+function resolveApprovalMoveScope(payload, existingEntry) {
+  if (payload.type !== 'black') return {};
+  const scope = payload.scope || existingEntry.scope || 'global';
+  return { scope, guildId: scope === 'server' ? (payload.guildId || '') : '' };
+}
+
+export function buildApprovalMoveData(payload, existingEntry) {
+  return {
+    name: existingEntry.name,
+    reason: payload.reason || existingEntry.reason,
+    raid: payload.raid || existingEntry.raid,
+    logsUrl: payload.logsUrl || existingEntry.logsUrl,
+    ...resolveApprovalMoveImageFields(payload, existingEntry),
+    allCharacters: existingEntry.allCharacters || [],
+    enrichmentSource: existingEntry.enrichmentSource ?? null,
+    enrichedAt: existingEntry.enrichedAt ?? null,
+    addedByUserId: existingEntry.addedByUserId,
+    addedByTag: existingEntry.addedByTag,
+    addedByDisplayName: existingEntry.addedByDisplayName,
+    addedAt: existingEntry.addedAt,
+    ...resolveApprovalMoveScope(payload, existingEntry),
+  };
+}
+
+async function rejectBlockedTypeChange({
+  interaction,
+  payload,
+  requestId,
+  existingEntry,
+  newModel,
+  lang,
+}) {
+  const nameMatch = {
+    $or: [{ name: existingEntry.name }, { allCharacters: existingEntry.name }],
+  };
+  const targetDupe = await newModel.findOne(buildScopedListQuery(
+    payload.type,
+    nameMatch,
+    payload.guildId || '',
+    { ownerSeesAll: false, includeEmptyServerScope: true }
+  )).collation({ locale: 'en', strength: 2 }).lean();
+
+  if (targetDupe) {
+    await closeApprovalWithAlert({
+      interaction,
+      requestId,
+      embed: buildLocalizedAlert(
+        'dialogue.listEdit.moveBlocked',
+        lang,
+        { name: existingEntry.name }
+      ),
+      lang,
+    });
+    return true;
+  }
+
+  const trustedNow = await TrustedUser.findOne(buildNameRosterQuery([
+    existingEntry.name,
+    ...(existingEntry.allCharacters || []),
+  ])).collation({ locale: 'en', strength: 2 }).lean();
+  if (!trustedNow) return false;
+
+  await closeApprovalWithAlert({
+    interaction,
+    requestId,
+    embed: buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason, { lang }),
+    status: 'Blocked',
+    lang,
+  });
+  return true;
+}
+
+async function applyApprovedTypeChange(args) {
+  if (await rejectBlockedTypeChange(args)) return false;
+  await args.newModel.create(buildApprovalMoveData(args.payload, args.existingEntry));
+  await args.oldModel.deleteOne({ _id: args.existingEntry._id });
+  return true;
+}
+
+function resolveApprovalTextUpdates(payload, existingEntry) {
+  return {
+    ...(payload.reason && payload.reason !== existingEntry.reason
+      ? { reason: payload.reason }
+      : {}),
+    ...(payload.raid && payload.raid !== existingEntry.raid
+      ? { raid: payload.raid }
+      : {}),
+    ...(payload.logsUrl && payload.logsUrl !== existingEntry.logsUrl
+      ? { logsUrl: payload.logsUrl }
+      : {}),
+  };
+}
+
+function resolveApprovalImageUpdates(payload, existingEntry) {
+  if (payload.imageMessageId && payload.imageMessageId !== existingEntry.imageMessageId) {
+    return {
+      imageUrl: '',
+      imageMessageId: payload.imageMessageId,
+      imageChannelId: payload.imageChannelId || '',
+    };
+  }
+  if (payload.imageUrl && !payload.imageMessageId && payload.imageUrl !== existingEntry.imageUrl) {
+    return {
+      imageUrl: payload.imageUrl,
+      imageMessageId: '',
+      imageChannelId: '',
+    };
+  }
+  return {};
+}
+
+function resolveApprovalScopeUpdates(payload, existingEntry) {
+  const currentScope = existingEntry.scope || 'global';
+  if (payload.type !== 'black' || !payload.scope || payload.scope === currentScope) return {};
+  return {
+    scope: payload.scope,
+    guildId: payload.scope === 'server' ? (payload.guildId || '') : '',
+  };
+}
+
+export function buildApprovalUpdateFields(payload, existingEntry) {
+  return {
+    ...resolveApprovalTextUpdates(payload, existingEntry),
+    ...resolveApprovalImageUpdates(payload, existingEntry),
+    ...resolveApprovalScopeUpdates(payload, existingEntry),
+  };
+}
+
+async function applyApprovedInPlaceUpdate(args) {
+  const updateFields = buildApprovalUpdateFields(args.payload, args.existingEntry);
+  if (Object.keys(updateFields).length === 0) return true;
+  try {
+    await args.oldModel.updateOne(
+      { _id: args.existingEntry._id },
+      { $set: updateFields }
+    );
+    return true;
+  } catch (err) {
+    if (err.code !== 11000 || !updateFields.scope) throw err;
+    await closeApprovalWithAlert({
+      interaction: args.interaction,
+      requestId: args.requestId,
+      embed: buildLocalizedAlert('dialogue.listEdit.scopeRaced', args.lang),
+      lang: args.lang,
+    });
+    return false;
+  }
+}
+
+function broadcastApprovedEdit({ payload, existingEntry, broadcastListChange }) {
+  const scope = payload.scope || existingEntry.scope || 'global';
+  broadcastListChange('edited', {
+    ...(existingEntry.toObject?.() || existingEntry),
+    reason: payload.reason || existingEntry.reason,
+    raid: payload.raid || existingEntry.raid,
+    scope,
+  }, {
+    type: payload.type,
+    guildId: payload.guildId,
+    requestedByDisplayName: payload.requestedByDisplayName,
+    requestedByTag: payload.requestedByTag,
+  }, { onlyOwner: scope === 'server' }).catch(() => {});
+}
+
+function buildApprovedPayload(interaction, targetLang) {
+  return {
+    content: null,
+    embeds: [buildNoticeEmbed(
+      t('dialogue.listEdit.approvedBy', targetLang, { user: interaction.user.tag }),
+      { severity: AlertSeverity.SUCCESS, lang: targetLang }
+    )],
+    components: [buildApprovalResultRow('Approved', targetLang)],
+  };
+}
+
+async function finishApprovedEdit({
+  interaction,
+  payload,
+  requestId,
+  syncApproverDmMessages,
+  notifyRequesterAboutDecision,
+  lang,
+}) {
+  await PendingApproval.deleteOne({ requestId });
+  await editPayload(interaction, buildApprovedPayload(interaction, lang));
+  await syncApproverDmMessages(
+    payload,
+    (targetLang) => buildApprovedPayload(interaction, targetLang),
+    { excludeMessageId: interaction.message.id }
+  );
+  await notifyRequesterAboutDecision(payload, { ok: true }, false);
+}
+
 /**
  * Process an approver's "edit then approve" submission for a pending
  * /la-list add request. Rewrites the PendingApproval payload, runs the
@@ -50,177 +279,31 @@ export async function handleApprovedEditRequest({
 }) {
   const { model: oldModel } = getListContext(payload.currentType || payload.type);
   const { model: newModel } = getListContext(payload.type);
-  const isTypeChange = payload.currentType && payload.currentType !== payload.type;
-
   const existingEntry = await oldModel.findById(payload.existingEntryId);
   if (!existingEntry) {
-    await PendingApproval.deleteOne({ requestId });
-    await editPayload(interaction, {
-      content: '',
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        ...t('dialogue.listEdit.originalMissing', lang),
-        lang,
-      })],
-      components: [buildApprovalResultRow('Failed', lang)],
+    await closeApprovalWithAlert({
+      interaction,
+      requestId,
+      embed: buildLocalizedAlert('dialogue.listEdit.originalMissing', lang),
+      lang,
     });
     return;
   }
 
-  if (isTypeChange) {
-    // Preflight: scope-aware duplicate check on target list
-    const nameMatch = { $or: [{ name: existingEntry.name }, { allCharacters: existingEntry.name }] };
-    const preflightQuery = buildScopedListQuery(
-      payload.type,
-      nameMatch,
-      payload.guildId || '',
-      { ownerSeesAll: false, includeEmptyServerScope: true }
-    );
-    const targetDupe = await newModel.findOne(preflightQuery)
-      .collation({ locale: 'en', strength: 2 }).lean();
-    if (targetDupe) {
-      await PendingApproval.deleteOne({ requestId });
-      await editPayload(interaction, {
-        content: '',
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          ...t('dialogue.listEdit.moveBlocked', lang, { name: existingEntry.name }),
-          lang,
-        })],
-        components: [buildApprovalResultRow('Failed', lang)],
-      });
-      return;
-    }
+  const args = { interaction, payload, requestId, existingEntry, oldModel, newModel, lang };
+  const isTypeChange = payload.currentType && payload.currentType !== payload.type;
+  const applied = isTypeChange
+    ? await applyApprovedTypeChange(args)
+    : await applyApprovedInPlaceUpdate(args);
+  if (!applied) return;
 
-    // Recheck trusted guard at approval time (status may have changed)
-    {
-      const trustedNow = await TrustedUser.findOne(buildNameRosterQuery([
-        existingEntry.name,
-        ...(existingEntry.allCharacters || []),
-      ])).collation({ locale: 'en', strength: 2 }).lean();
-      if (trustedNow) {
-        await PendingApproval.deleteOne({ requestId });
-        await editPayload(interaction, {
-          content: '',
-          embeds: [buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason, { lang })],
-          components: [buildApprovalResultRow('Blocked', lang)],
-        });
-        return;
-      }
-    }
-
-    // Image fields: prefer new rehost from payload, fall back to existing
-    // entry's rehost refs, then legacy URL. This preserves rehost
-    // permanence across cross-list moves and avoids regressing rehosted
-    // entries into expiring URLs.
-    const moveImageMessageId = payload.imageMessageId || existingEntry.imageMessageId || '';
-    const moveImageChannelId = payload.imageChannelId || existingEntry.imageChannelId || '';
-    const moveImageUrl = moveImageMessageId
-      ? '' // rehosted entries do not store legacy URL
-      : (payload.imageUrl || existingEntry.imageUrl || '');
-
-    // Create first, then delete old (safe order · if create fails, old preserved)
-    await newModel.create({
-      name: existingEntry.name,
-      reason: payload.reason || existingEntry.reason,
-      raid: payload.raid || existingEntry.raid,
-      logsUrl: payload.logsUrl || existingEntry.logsUrl,
-      imageUrl: moveImageUrl,
-      imageMessageId: moveImageMessageId,
-      imageChannelId: moveImageChannelId,
-      allCharacters: existingEntry.allCharacters || [],
-      // Cross-list move via approval just copies the alt list verbatim, so
-      // preserve the source/timestamp from the pre-move entry. Stale-loop
-      // logic would otherwise see this freshly-created doc as legacy null
-      // even though the alts haven't changed.
-      enrichmentSource: existingEntry.enrichmentSource ?? null,
-      enrichedAt: existingEntry.enrichedAt ?? null,
-      addedByUserId: existingEntry.addedByUserId,
-      addedByTag: existingEntry.addedByTag,
-      addedByDisplayName: existingEntry.addedByDisplayName,
-      addedAt: existingEntry.addedAt,
-      ...(payload.type === 'black' ? { scope: payload.scope || existingEntry.scope || 'global', guildId: (payload.scope || existingEntry.scope || 'global') === 'server' ? (payload.guildId || '') : '' } : {}),
-    });
-    await oldModel.deleteOne({ _id: existingEntry._id });
-  } else {
-    const updateFields = {};
-    if (payload.reason && payload.reason !== existingEntry.reason) updateFields.reason = payload.reason;
-    if (payload.raid && payload.raid !== existingEntry.raid) updateFields.raid = payload.raid;
-    if (payload.logsUrl && payload.logsUrl !== existingEntry.logsUrl) updateFields.logsUrl = payload.logsUrl;
-    // Image update is atomic across all 3 fields: if a new rehosted
-    // image was provided, replace all 3; if a new legacy URL only,
-    // replace all 3 to clear stale rehost refs; otherwise leave alone.
-    if (payload.imageMessageId && payload.imageMessageId !== existingEntry.imageMessageId) {
-      updateFields.imageUrl = '';
-      updateFields.imageMessageId = payload.imageMessageId;
-      updateFields.imageChannelId = payload.imageChannelId || '';
-    } else if (payload.imageUrl && !payload.imageMessageId && payload.imageUrl !== existingEntry.imageUrl) {
-      updateFields.imageUrl = payload.imageUrl;
-      updateFields.imageMessageId = '';
-      updateFields.imageChannelId = '';
-    }
-    // Scope change in place · only blacklist supports it. Approval flow
-    // only reaches this branch when payload.type === existingEntry's
-    // current type (no cross-list move), so checking type === 'black'
-    // is enough.
-    if (
-      payload.type === 'black'
-      && payload.scope
-      && payload.scope !== (existingEntry.scope || 'global')
-    ) {
-      updateFields.scope = payload.scope;
-      updateFields.guildId = payload.scope === 'server' ? (payload.guildId || '') : '';
-    }
-    if (Object.keys(updateFields).length > 0) {
-      try {
-        await oldModel.updateOne({ _id: existingEntry._id }, { $set: updateFields });
-      } catch (err) {
-        // Defense in depth for the unique index race on scope change
-        if (err.code === 11000 && updateFields.scope) {
-          await PendingApproval.deleteOne({ requestId });
-          await editPayload(interaction, {
-            content: '',
-            embeds: [buildAlertEmbed({
-              severity: AlertSeverity.WARNING,
-              ...t('dialogue.listEdit.scopeRaced', lang),
-              lang,
-            })],
-            components: [buildApprovalResultRow('Failed', lang)],
-          });
-          return;
-        }
-        throw err;
-      }
-    }
-  }
-
-  // Broadcast edit: routing decided by the FINAL scope (after any scope
-  // change applied above). Using payload.scope first ensures that a
-  // demote-to-local edit broadcasts only to owner, and a promote-to-global
-  // edit broadcasts to all opted-in servers.
-  const broadcastScope = payload.scope || existingEntry.scope || 'global';
-  broadcastListChange('edited', { ...existingEntry.toObject?.() || existingEntry, reason: payload.reason || existingEntry.reason, raid: payload.raid || existingEntry.raid, scope: broadcastScope }, {
-    type: payload.type,
-    guildId: payload.guildId,
-    requestedByDisplayName: payload.requestedByDisplayName,
-    requestedByTag: payload.requestedByTag,
-  }, { onlyOwner: broadcastScope === 'server' }).catch(() => {});
-
-  await PendingApproval.deleteOne({ requestId });
-
-  const buildApprovedPayload = (targetLang) => ({
-    content: null,
-    embeds: [buildNoticeEmbed(
-      t('dialogue.listEdit.approvedBy', targetLang, { user: interaction.user.tag }),
-      { severity: AlertSeverity.SUCCESS, lang: targetLang }
-    )],
-    components: [buildApprovalResultRow('Approved', lang)],
+  broadcastApprovedEdit({ payload, existingEntry, broadcastListChange });
+  await finishApprovedEdit({
+    interaction,
+    payload,
+    requestId,
+    syncApproverDmMessages,
+    notifyRequesterAboutDecision,
+    lang,
   });
-  await editPayload(interaction, buildApprovedPayload(lang));
-  await syncApproverDmMessages(payload, (targetLang) => ({
-    ...buildApprovedPayload(targetLang),
-    components: [buildApprovalResultRow('Approved', targetLang)],
-  }), { excludeMessageId: interaction.message.id });
-  await notifyRequesterAboutDecision(payload, { ok: true }, false);
-  return;
 }
