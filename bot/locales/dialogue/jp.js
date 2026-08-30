@@ -291,7 +291,7 @@ export default {
   },
   check: {
     malformed: 'どの証拠を選ばれたのか読み取れませんでしたの。もう一度 check を実行してくだされば、最初からやり直しますわ。', entryRemoved: { title: 'そちらはもう消えてしまいましたの', description: 'この証拠が結びついていた list entry は、どなたかが消してしまいましたの。もうお見せできるものが残っておりませんわ。' }, ocrFailed: { title: 'その画像を読めませんでしたの', description: 'この screenshot をじっと見つめてみましたけれど、character の名前をひとつも拾えませんでしたわ。', footer: 'raid の待機所を鮮明に写した screenshot なら、たいてい上手くいきますの〜' }, noNames: { title: '名前らしきものが見当たりませんの', description: '画像はきちんと読めましたけれど、character の名前らしきものはひとつもありませんでしたわ。', footer: 'raid の待機所の画面が、わたくしには一番読みやすいですの〜' }, noVerifiedNames: { title: '確認済み character がありませんの', description: '{count} 件の candidate を読み取りましたが、lostark.bible、保存済み roster snapshot、または表示可能な list record のどれにも一致しませんでしたわ。', footer: '未確認 OCR/text は表示せず、Quick Add にも出しませんの。' },
-    details: { title: 'チェック結果 · {list}', headline: '{icon} {name} は **{list}**{scope} にいますわ。控えてあることを、すべて下にまとめましたの。' },
+    details: { title: 'チェック結果 · {list}', headline: '{icon} {name} は **{list}**{scope} にいますわ。控えてあることを、すべて下にまとめましたの。', headlineVia: '{icon} {searched} は {name} と同じ roster ですの。その方が **{list}**{scope} にいますわ。分かっていることを全部まとめました。' },
     text: { empty: { title: '肝心のお名前が抜けておりますわ〜', description: 'ここで `check <character>` か `check: <character>` と入力してくだされば、お調べいたしますわ〜', footer: '何名でもかまいませんの。スペース、カンマ、改行で区切ってくださいませ。' }, invalid: { title: 'そちらは名前には見えませんの', description: 'こちらは Lost Ark の character 名として読み取れませんでしたわ: {tokens}', footer: '`check` のあとは character 名だけにしてくださいませ。link と mention は読み飛ばしますの。' }, progress: {
       variants: [
           '**{count}** {word}を受信 · database list を確認中ですの…',

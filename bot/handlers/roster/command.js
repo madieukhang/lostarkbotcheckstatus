@@ -230,6 +230,7 @@ export async function handleRosterCommand(interaction) {
         statMap: rosterStatMap,
         headline: true,
         attachImage: false,
+        viaName: name,
       }));
       evidenceRows.unshift(...buildBroadcastEvidenceComponents(blacklistResult, {
         legacyUrl: blacklistResult.imageUrl,
@@ -243,6 +244,7 @@ export async function handleRosterCommand(interaction) {
         statMap: rosterStatMap,
         headline: true,
         attachImage: false,
+        viaName: name,
       }));
       evidenceRows.unshift(...buildBroadcastEvidenceComponents(whitelistResult, {
         legacyUrl: whitelistResult.imageUrl,

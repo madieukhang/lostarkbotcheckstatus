@@ -14,6 +14,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Changed
+- When `/la-roster` finds a list entry through a roster alt rather than the name that was typed, the notice card now names both sides: "**Tenshi** chung roster với **Hanako**, và người này đang nằm trong **Blacklist**". Previously the card announced only the entry it matched, leaving the reader to work out how that character related to their search, and the old status line went the other way and claimed the searched name itself was listed.
 - Auto-check `repin` now clears every non-pinned message before posting the replacement guide, even when the daily cleanup schedule is disabled. Existing pins remain protected, the action requires `Manage Messages`, and `notify-repin` keeps its guide-only behavior so notification history is not erased accidentally.
 - A blacklist or whitelist hit on `/la-roster` no longer repeats itself inside the roster card. The notice card above it already names the list, the raid and the full reason, while the status line carried a truncated copy and pushed the roster's own summary line further down. Trusted keeps its line, because a trusted match has no card of its own.
 - Mongo monitor claims now use Mongoose 9's `returnDocument: 'before'` option instead of deprecated `new: false`, preserving the existing pre-update-document semantics without startup warnings.

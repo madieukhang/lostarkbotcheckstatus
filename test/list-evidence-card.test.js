@@ -123,3 +123,29 @@ test('notice mode keeps evidence off the card entirely', () => {
   const detail = buildEvidenceEmbed(makeEntry(), 'https://cdn.example.test/e.png', { lang: 'vi' }).toJSON();
   assert.equal(detail.image.url, 'https://cdn.example.test/e.png');
 });
+
+test('notice mode names both sides when the hit came through a roster alt', () => {
+  // /la-roster matches on every character in the roster, so the entry
+  // that hit is often not the name the officer typed.
+  const entry = decorateListEntry({
+    name: 'Hanako',
+    reason: 'Griefing report',
+    allCharacters: ['Hanako', 'Tenshi'],
+  }, 'black');
+  const statMap = statMapFromRosterCharacters(ROSTER);
+  const via = buildEvidenceEmbed(entry, '', {
+    lang: 'vi', statMap, headline: true, attachImage: false, viaName: 'Tenshi',
+  }).toJSON();
+
+  // Both sides are named: what was typed, and what actually hit.
+  assert.match(via.description, /\*\*Tenshi\*\* chung roster/u);
+  assert.match(via.description, /\[Hanako\]/u);
+
+  // Searching the blacklisted name itself keeps the direct wording, and
+  // never mentions a second character. Matching is case-insensitive.
+  const direct = buildEvidenceEmbed(entry, '', {
+    lang: 'vi', statMap, headline: true, attachImage: false, viaName: 'hanako',
+  }).toJSON();
+  assert.doesNotMatch(direct.description, /Tenshi/u);
+  assert.doesNotMatch(direct.description, /chung roster/u);
+});

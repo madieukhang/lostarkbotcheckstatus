@@ -295,6 +295,7 @@ export function buildEvidenceEmbed(entry, displayUrl, {
   statMap = new Map(),
   headline = false,
   attachImage = true,
+  viaName = '',
 } = {}) {
   const link = rosterUrl(entry.name);
   const fields = [
@@ -374,11 +375,18 @@ export function buildEvidenceEmbed(entry, displayUrl, {
     const scopeTag = entry.scope === 'server'
       ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
       : '';
+    // A roster lookup matches on every character in the roster, so the
+    // entry that hit is often not the name that was typed. Saying only
+    // "X is on the blacklist" then leaves the reader to guess how X
+    // relates to their search · the via wording names both sides.
+    const searched = String(viaName || '').trim();
+    const isVia = searched && searched.toLowerCase() !== String(entry.name || '').toLowerCase();
     embed
       .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
-      .setDescription(t('dialogue.check.details.headline', lang, {
+      .setDescription(t(`dialogue.check.details.${isVia ? 'headlineVia' : 'headline'}`, lang, {
         icon: getListContext(entry._listType).icon,
         name: formatLinkedCharacter(entry.name, snapshot),
+        searched: `**${searched}**`,
         list: listLabel,
         scope: scopeTag,
       }));

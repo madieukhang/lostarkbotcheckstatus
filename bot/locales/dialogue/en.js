@@ -447,7 +447,7 @@ export default {
     ocrFailed: { title: 'I could not read that image', description: 'I stared at this screenshot and could not pull a single character name out of it.', footer: 'A clearer shot of the raid waiting room usually does the trick.' },
     noNames: { title: 'Nothing in there looked like a name', description: 'I read the image fine, but none of it looked like a character name.', footer: 'The raid waiting-room screen is the easiest one for me to read.' },
     noVerifiedNames: { title: 'No verified characters', description: 'I read {count} candidate name(s), but none matched lostark.bible, a saved roster snapshot, or a visible list record.', footer: 'Unverified OCR/text is hidden and cannot be offered through Quick Add.' },
-    details: { title: 'Check result · {list}', headline: '{icon} {name} is on the **{list}**{scope}. Here is everything I have saved about them.' },
+    details: { title: 'Check result · {list}', headline: '{icon} {name} is on the **{list}**{scope}. Here is everything I have saved about them.', headlineVia: '{icon} {searched} shares a roster with {name}, who is on the **{list}**{scope}. Here is everything I have on that entry.' },
     text: {
       empty: { title: 'You forgot the name~', description: 'Type `check <character>` or `check: <character>` here and I will look them up for you.', footer: 'Several at once is fine - separate them with spaces, commas, or new lines.' },
       invalid: { title: 'Those do not look like names', description: 'I could not read these as Lost Ark character names: {tokens}', footer: 'Character names only after `check`, please - I skip links and mentions.' },
