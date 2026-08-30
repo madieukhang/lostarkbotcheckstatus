@@ -14,6 +14,9 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Changed
+- The trust result card gives its reason the full width too, and pads character + added-by into a whole row, so a sentence no longer wraps inside a third of the card.
+- The enrich result card renders its new-alt rows through the shared `formatAltLine` instead of a local copy of the same line. The copy is why that card never picked up later changes to the row, the CP badge among them.
+- The multiadd approval summary's 👤 approved-by label gains an icon, matching every other label in the card family.
 - The `/la-list edit` result card gives its reason the full width instead of squeezing prose into a third of the row, icon-labels every field (👤 name, 🗡️ raid, 📝 reason, 🔁 changes), and pads name + raid into a whole three-column row.
 - Change lines now read as values rather than quoted text: `🗡️ **Raid:** `N/A` → `Kazeros Hard`` with an icon per kind of change (reason, list, raid, logs, evidence, scope) and no leading bullet.
 - The list-change broadcast for an edit now carries those same change lines. It used to say only that someone had edited the entry, which left every reader to diff the card against their memory of the previous one. Edits routed through the approval or overwrite paths do not build a change list, so their broadcasts stay as they were.

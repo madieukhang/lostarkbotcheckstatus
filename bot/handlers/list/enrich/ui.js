@@ -19,7 +19,8 @@ import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { ICONS } from '../../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../../utils/scanProgressEmbed.js';
-import { getClassName, getClassEmoji } from '../../../models/Class.js';
+import { getClassName } from '../../../models/Class.js';
+import { formatAltLine } from '../trackedAltsRender.js';
 import { t } from '../../../services/i18n/index.js';
 
 /**
@@ -66,22 +67,16 @@ export function buildEnrichProgressEmbed({ entry, foundType, meta, progress, lan
 export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en') {
   const ctx = LIST_LABELS[session.type];
 
-  // Per-alt rendering restores class and item level omitted by the prior
-  // success card. Names link to Bible roster pages for per-match verification.
+  // Rendered through the shared alt-row formatter rather than a local
+  // copy · this card used to hand-roll the same line and so missed every
+  // later change to it (the CP badge, for one). alt.classId may already
+  // be a resolved className or a raw bible-side id ("deathblade"), so the
+  // record is normalised to the shape formatAltLine expects.
   const altLines = session.newAlts
     .map((alt, index) => {
-      // alt.classId may already be a resolved className (e.g. from
-      // older alt records) or a raw bible-side id ("deathblade",
-      // "warlord"). Try the known-id lookup first; fall back to
-      // string-stringify so non-string ids don't crash getClassName.
       const idStr = alt.classId == null ? '' : String(alt.classId);
-      const cls = alt.className || getClassName(idStr) || idStr || t('dialogue.enrich.success.unknown', lang);
-      const classPrefix = getClassEmoji(cls) || cls;
-      const ilvl = typeof alt.itemLevel === 'number'
-        ? alt.itemLevel.toFixed(2)
-        : (alt.itemLevel || '?');
-      const link = rosterUrl(alt.name);
-      return `**${index + 1}.** ${classPrefix} [${alt.name}](${link}) · \`${ilvl}\``;
+      const className = alt.className || getClassName(idStr) || idStr;
+      return formatAltLine(alt.name, index, { ...alt, className });
     })
     .join('\n');
 

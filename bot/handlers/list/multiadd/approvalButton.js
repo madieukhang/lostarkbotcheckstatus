@@ -166,7 +166,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
 
     const buildApprovedSummary = (targetLang) => {
       const embed = buildBulkSummaryEmbed(results, meta, targetLang);
-      embed.addFields({ name: t('dialogue.multiadd.approval.approvedBy', targetLang), value: `<@${interaction.user.id}>`, inline: false });
+      embed.addFields({ name: `👤 ${t('dialogue.multiadd.approval.approvedBy', targetLang)}`, value: `<@${interaction.user.id}>`, inline: false });
       return embed;
     };
     const summaryEmbed = buildApprovedSummary(lang);

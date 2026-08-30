@@ -173,9 +173,13 @@ export function createTrustHandlers() {
     });
     const fields = [
       { name: `🧬 ${t('dialogue.trust.success.character', lang)}`, value: `[${name}](${rosterLink})`, inline: true },
-      { name: `📝 ${t('dialogue.trust.success.reason', lang)}`, value: (displayReason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: true },
       { name: `👤 ${t(`dialogue.trust.success.${existing ? 'refreshedBy' : 'addedBy'}`, lang)}`, value: interaction.user.tag, inline: true },
     ];
+    // Reason is prose · inline it wrapped inside a third of the card.
+    if (fields.length > 1) {
+      while (fields.length % 3 !== 0) fields.push({ name: '\u200b', value: '\u200b', inline: true });
+    }
+    fields.push({ name: `📝 ${t('dialogue.trust.success.reason', lang)}`, value: (displayReason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false });
     if (altsField) fields.push(altsField);
 
     const embed = buildAlertEmbed({
