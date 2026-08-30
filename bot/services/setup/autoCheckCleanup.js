@@ -7,6 +7,16 @@ import {
   buildAutoCheckCleanupEligibility,
   resolveAutoCheckCleanupEnabled,
 } from './autoCheckCleanupPolicy.js';
+import {
+  cleanupChannelMessages,
+  formatCleanupFailureReasons,
+} from './channelCleanup.js';
+
+// Backward-compatible public name used by the existing auto-check tests and
+// welcome service. The implementation is channel-generic so notify cleanup can
+// share the same old-message and partial-failure behavior.
+export const cleanupAutoCheckChannelMessages = cleanupChannelMessages;
+export { formatCleanupFailureReasons };
 
 export const AUTO_CHECK_CLEANUP_TICK_MS = 15 * 60 * 1000;
 export const AUTO_CHECK_CLEANUP_TIME_ZONE = 'Asia/Ho_Chi_Minh';
@@ -26,68 +36,6 @@ export function getVietnamDayKey(date = new Date()) {
       .map((part) => [part.type, part.value])
   );
   return parts.year + '-' + parts.month + '-' + parts.day;
-}
-
-function cleanupFailureKey(err) {
-  const code = err?.code ?? err?.rawError?.code ?? 'unknown';
-  const message = String(
-    err?.message || err?.rawError?.message || err?.name || 'Unknown error'
-  )
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 120);
-  return String(code) + ':' + message;
-}
-
-export function formatCleanupFailureReasons(failureReasons = {}) {
-  return Object.entries(failureReasons)
-    .map(([reason, count]) => reason + ' x' + count)
-    .join(', ');
-}
-
-export async function cleanupAutoCheckChannelMessages(
-  channel,
-  { maxPages = 20, protectedMessageIds = [] } = {}
-) {
-  const protectedIds = new Set(
-    [...protectedMessageIds].filter(Boolean).map(String)
-  );
-  let before;
-  let deleted = 0;
-  let failed = 0;
-  let scanned = 0;
-  let truncated = false;
-  const failureReasons = {};
-
-  for (let page = 0; page < maxPages; page += 1) {
-    const fetchOptions = { limit: 100 };
-    if (before) fetchOptions.before = before;
-    const fetched = await channel.messages.fetch(fetchOptions);
-    if (!fetched || fetched.size === 0) break;
-
-    scanned += fetched.size;
-    before = fetched.last?.()?.id;
-    for (const message of fetched.values()) {
-      if (message.pinned || protectedIds.has(String(message.id))) continue;
-      try {
-        await message.delete();
-        deleted += 1;
-      } catch (err) {
-        failed += 1;
-        const reason = cleanupFailureKey(err);
-        failureReasons[reason] = (failureReasons[reason] || 0) + 1;
-      }
-    }
-
-    if (fetched.size < 100) break;
-    if (!before) {
-      truncated = true;
-      break;
-    }
-    if (page === maxPages - 1) truncated = true;
-  }
-
-  return { deleted, failed, scanned, truncated, failureReasons };
 }
 
 async function resolveConfiguredChannel(client, config) {

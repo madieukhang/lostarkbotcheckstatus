@@ -5,9 +5,11 @@ import { ChannelType } from 'discord.js';
 import { AlertSeverity } from '../bot/utils/alertEmbed.js';
 import { t } from '../bot/services/i18n/index.js';
 import {
+  postListNotifySetupWelcome,
   postSetupWelcome,
   reportMissingChannelPermissions,
   requireSetupGuildTextChannel,
+  resolveListNotifyWelcomePinContext,
   resolveWelcomePinContext,
 } from '../bot/handlers/setup/setupGuards.js';
 
@@ -122,6 +124,66 @@ test('postSetupWelcome forwards the shared Discord and guild context with option
     channel,
     client,
     cleanupEnabled: false,
+    configSet,
+    guildId: 'guild-1',
+  });
+  assert.deepEqual(outcome, { pinned: true, persisted: true });
+});
+
+test('notification welcome context uses its independent cleanup flag and channel', async () => {
+  const interaction = { guild: { id: 'guild-1' } };
+  const guildConfig = {
+    listNotifyChannelId: 'notify-1',
+    listNotifyCleanupEnabled: true,
+  };
+  const channel = { id: 'notify-1' };
+  const calls = [];
+
+  const context = await resolveListNotifyWelcomePinContext(interaction, guildConfig, {
+    resolveChannelFn: async (...args) => {
+      calls.push(['resolve', ...args]);
+      return channel;
+    },
+    checkPermissionsFn: (...args) => {
+      calls.push(['permissions', ...args]);
+      return { ok: true, missing: [] };
+    },
+  });
+
+  assert.deepEqual(context, {
+    cleanupEnabled: true,
+    channel,
+    permissions: { ok: true, missing: [] },
+  });
+  assert.deepEqual(calls, [
+    ['resolve', interaction, 'notify-1'],
+    ['permissions', channel, interaction.guild, { cleanup: true, welcomePin: true }],
+  ]);
+});
+
+test('notification setup welcome forwards config atomically with Discord context', async () => {
+  const client = { user: { id: 'bot-1' } };
+  const interaction = { client, guild: { id: 'guild-1' } };
+  const channel = { id: 'notify-1' };
+  const configSet = { listNotifyChannelId: channel.id, globalNotifyEnabled: true };
+  let forwarded;
+
+  const outcome = await postListNotifySetupWelcome(
+    interaction,
+    { channel, cleanupEnabled: true, configSet },
+    {
+      postWelcomeFn: async (payload) => {
+        forwarded = payload;
+        return { pinned: true, persisted: true };
+      },
+    },
+  );
+
+  assert.deepEqual(forwarded, {
+    botUserId: 'bot-1',
+    channel,
+    client,
+    cleanupEnabled: true,
     configSet,
     guildId: 'guild-1',
   });

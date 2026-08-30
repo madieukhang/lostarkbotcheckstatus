@@ -139,6 +139,19 @@ test('per-channel guard serializes cleanup work and releases after completion', 
   assert.deepEqual(events, ['first:start', 'first:end', 'second']);
 });
 
+test('shared channel guard protects more than one setup welcome in the same channel', () => {
+  const guard = createAutoCheckChannelGuard();
+  guard.rememberWelcome('shared-channel', 'auto-welcome');
+  guard.rememberWelcome('shared-channel', 'notify-welcome');
+
+  assert.deepEqual(
+    new Set(guard.getProtectedMessageIds('shared-channel')),
+    new Set(['auto-welcome', 'notify-welcome'])
+  );
+  guard.forgetWelcome('shared-channel', 'notify-welcome');
+  assert.deepEqual(guard.getProtectedMessageIds('shared-channel'), ['auto-welcome']);
+});
+
 test('daily cleanup claims one VN day once even when the scheduler ticks again', async () => {
   const config = {
     guildId: 'guild-1',

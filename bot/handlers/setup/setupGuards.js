@@ -1,6 +1,7 @@
 import { ChannelType } from 'discord.js';
 
 import { postAutoCheckWelcome } from '../../services/setup/autoCheckWelcome.js';
+import { postListNotifyWelcome } from '../../services/setup/listNotifyWelcome.js';
 import { checkBotPermissions } from '../../services/setup/channelPermissions.js';
 import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
@@ -76,10 +77,45 @@ export async function resolveWelcomePinContext(
   return { cleanupEnabled, channel, permissions };
 }
 
+export async function resolveListNotifyWelcomePinContext(
+  interaction,
+  guildConfig,
+  {
+    resolveChannelFn = resolveGuildTextChannel,
+    checkPermissionsFn = checkBotPermissions,
+  } = {},
+) {
+  const cleanupEnabled = guildConfig?.listNotifyCleanupEnabled === true;
+  const channel = await resolveChannelFn(interaction, guildConfig?.listNotifyChannelId);
+  const permissions = channel
+    ? checkPermissionsFn(channel, interaction.guild, {
+        cleanup: cleanupEnabled,
+        welcomePin: true,
+      })
+    : null;
+
+  return { cleanupEnabled, channel, permissions };
+}
+
 export async function postSetupWelcome(
   interaction,
   { channel, cleanupEnabled, configSet },
   { postWelcomeFn = postAutoCheckWelcome } = {},
+) {
+  return postWelcomeFn({
+    botUserId: interaction.client.user.id,
+    channel,
+    client: interaction.client,
+    cleanupEnabled,
+    ...(configSet ? { configSet } : {}),
+    guildId: interaction.guild.id,
+  });
+}
+
+export async function postListNotifySetupWelcome(
+  interaction,
+  { channel, cleanupEnabled, configSet },
+  { postWelcomeFn = postListNotifyWelcome } = {},
 ) {
   return postWelcomeFn({
     botUserId: interaction.client.user.id,

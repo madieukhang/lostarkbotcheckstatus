@@ -268,6 +268,43 @@ const en = {
     footer: 'Want the full command guide? Type /la-help~',
   },
 
+  listNotifyWelcome: {
+    title: '🔔 List notifications · Artist is watching this channel',
+    description: [
+      'Whenever the blacklist, whitelist, or watchlist changes, I leave a card here so everyone can see what happened.',
+      'This guide is the stable anchor; change cards appear below it and every pinned message is protected during cleanup.',
+    ],
+    activityName: '📣 What appears here',
+    activityValue: [
+      '• Entries being added, edited, removed, or enriched with more roster data.',
+      '• Cards keep the reason, raid, item level, CP, tracked rosters, and evidence link when available.',
+      '• A change is not echoed back to the same server that performed it.',
+    ],
+    scopeName: '🌐 Notification scope',
+    scopeValue: [
+      'When **global notifications** are enabled, this channel receives matching changes from other servers.',
+      'Server-local entries carry a `Server local` tag; use `notify-off` / `notify-on` through `/la-setup config` to stop or resume broadcasts.',
+    ],
+    cleanupName: '🧹 Tidied every 30 minutes',
+    cleanupValue: [
+      'This server enabled notify cleanup. Every half hour I remove unpinned messages, rebuild this guide, and leave a five-minute cleanup notice.',
+      'Pinned messages are untouched. Use `notify-cleanup-off` if you want to retain a longer history.',
+    ],
+    cleanupDisabledName: '🛡️ History is being retained',
+    cleanupDisabledValue: [
+      'Notify cleanup is off, so change cards remain until an admin runs a manual cleanup.',
+      'Enable `/la-setup config action:notify-cleanup-on` for the same cleanup rhythm used by RaidManage.',
+    ],
+    commandsName: '⚙️ Channel administration',
+    commandsValue: [
+      '`notify-cleanup` - clean now and rebuild the pinned guide',
+      '`notify-cleanup-on` / `notify-cleanup-off` - enable or disable the 30-minute schedule',
+      '`notify-repin` - refresh only the guide without deleting change cards',
+      'Use each value with `/la-setup config action:<action>`; Manage Server is required.',
+    ],
+    footer: 'LoaLogs · the welcome guide and every pinned message stay protected during cleanup',
+  },
+
   help: {
     overview: {
       title: 'Lost Ark Check - Help (EN)',
@@ -320,6 +357,7 @@ const en = {
             '• `show` - full config · `repin` - refresh the pinned Artist guide',
             '• `set-auto-channel channel:#x` - screenshot + `check <name>` channel · `set-notify-channel channel:#x`',
             '• `cleanup-on` / `cleanup-off` - daily cleanup for this server · `notify-on` / `notify-off` - cross-server list notifications',
+            '• `notify-cleanup` / `notify-repin` - clean or repin notifications · `notify-cleanup-on/off` - 30-minute schedule',
             '• `set-language` - public + pinned-guide language · `set-default-scope scope:global/server` - default `/la-list add` scope',
           ],
         },

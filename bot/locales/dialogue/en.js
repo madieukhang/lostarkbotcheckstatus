@@ -116,8 +116,26 @@ export default {
     },
   },
 
+  listNotifyCleanupNotice: {
+    empty: { variants: [
+      '🧹 This sweep found **{n}** messages to remove. The channel was already tidy~',
+      '🧹 **{n}** messages removed this time. I only rebuilt the pinned guide.',
+    ] },
+    trivial: { variants: [
+      '🧹 I cleared **{n}** notification message(s). Every pin stayed in place~',
+      '🧹 **{n}** message(s) tidied; the pinned guide is fresh again.',
+    ] },
+    normal: { variants: [
+      '🧹 **{n}** older notification messages were cleared. Pins remained safe.',
+      '🧹 A healthy sweep: **{n}** messages removed and the guide rebuilt.',
+    ] },
+    heavy: { variants: [
+      '🧹 Busy channel - I cleared **{n}** messages and preserved every pin.',
+      '🧹 A large sweep: **{n}** messages removed and the welcome guide restored.',
+    ] },
+  },
+
   setup: {
-    testMessage: 'Artist checked in~ This is now the **{purpose}** channel configured through `/la-setup`.',
     purpose: {
       autoCheck: 'auto-check',
       notification: 'notification',
@@ -131,8 +149,8 @@ export default {
     sameChannelWarning: 'This is also the {other} channel. Separate channels will be easier to read.',
     autoChannelNotSet: 'Auto-check channel was not changed because I could not create and save a welcome pin in <#{channel}>.\n{welcome}',
     autoChannelSet: 'Auto-check channel set to <#{channel}>.\nI will check screenshots posted there automatically.{warning}\n{welcome}\n{cleanup}',
-    notifyChannelSet: 'Notification channel set to <#{channel}>.\nList changes will be broadcast there.{warning}\n\nI sent a test message; it will disappear in 30 seconds.',
-    notifyChannelSetTestFailed: 'Notification channel set to <#{channel}>.{warning}\nI could not send the test message, so please check my permissions.',
+    notifyChannelNotSet: 'Notification channel was not changed because I could not create and save a welcome pin in <#{channel}>.\n{welcome}',
+    notifyChannelSet: 'Notification channel set to <#{channel}>.\nList changes will be broadcast there.{warning}\n{welcome}\n{cleanup}',
     actions: {
       show: 'Show status',
       setAutoChannel: 'Set auto-check channel',
@@ -141,6 +159,10 @@ export default {
       setDefaultScope: 'Set default blacklist scope',
       cleanupOn: 'Turn daily cleanup ON',
       cleanupOff: 'Turn daily cleanup OFF',
+      notifyCleanup: 'Clean notification channel now',
+      notifyCleanupOn: 'Turn 30-minute notification cleanup ON',
+      notifyCleanupOff: 'Turn 30-minute notification cleanup OFF',
+      notifyRepin: 'Repin the notification guide',
       notifyOn: 'Turn global notifications ON',
       notifyOff: 'Turn global notifications OFF',
       repin: 'Repin the welcome guide',
@@ -154,6 +176,19 @@ export default {
       noChannel: 'Set an auto-check channel with `/la-setup config action:set-auto-channel` before enabling cleanup.',
       guideNotRefreshed: 'Cleanup was changed safely, but I could not refresh the pinned guide. Missing: {missing}.',
     },
+    listNotifyCleanup: {
+      enabled: 'Notify cleanup is **enabled for this server only**. Every 30 minutes, unpinned messages in the notification channel are removed; the welcome guide is rebuilt and the cleanup notice disappears after five minutes.',
+      disabled: 'Notify cleanup is **off for this server**. Notification cards remain until an admin runs a manual cleanup.',
+      noChannel: 'Set a notification channel with `/la-setup config action:set-notify-channel` first.',
+      guideNotRefreshed: 'The setting changed safely, but I could not refresh the notification guide. Missing: {missing}.',
+      manualSuccess: 'Cleared **{count}** unpinned messages in <#{channel}> and rebuilt the welcome guide.',
+      manualFailed: 'Cleanup in <#{channel}> did not finish after removing **{count}** messages. I left the slot incomplete so it can be retried safely.',
+    },
+    listNotifyRepin: {
+      noChannel: 'I cannot find an accessible saved notification channel. Run `/la-setup config action:set-notify-channel` first.',
+      missingPermissions: 'I cannot refresh the notification guide in <#{channel}>. Missing: {missing}.',
+      result: '{outcome} in <#{channel}>.',
+    },
     view: {
       author: '{guild} · Bot configuration',
       description: 'I gathered this server\'s settings below. Change any of them with `/la-setup config`.',
@@ -161,8 +196,10 @@ export default {
       notifyChannel: 'Notification channel',
       defaultScope: 'Default blacklist scope',
       globalNotifications: 'Global notifications',
-      pinnedWelcome: 'Pinned Artist guide',
-      dailyCleanup: 'Daily cleanup',
+      autoPinnedWelcome: 'Pinned auto-check guide',
+      notifyPinnedWelcome: 'Pinned notification guide',
+      dailyCleanup: 'Daily auto-check cleanup',
+      notifyCleanup: 'Notification cleanup',
       publicLanguage: 'Public language',
       setViaSetup: 'set through /la-setup',
       fromEnv: 'from environment fallback',
@@ -170,10 +207,13 @@ export default {
       scopeHint: '`/la-list add type:black` defaults to {scope} when scope is omitted',
       notificationsOn: '**Enabled**\nReceives broadcasts from other servers',
       notificationsOff: '**Disabled**\nDoes not receive broadcasts from other servers',
-      pinMissing: 'Not tracked yet · run /la-setup config action:repin',
+      pinMissing: 'Not tracked yet · run /la-setup config action:{action}',
       cleanupActive: '**00:00 Asia/Ho_Chi_Minh daily**\nLast completed: {last}',
       cleanupDisabled: '**Off for this server**\nAuto-check stays active; ordinary messages remain',
       cleanupNoChannel: 'No saved auto-check channel to clean',
+      notifyCleanupActive: '**Every 30 minutes**\nLast completed: {last}',
+      notifyCleanupDisabled: '**Off for this server**\nNotification cards remain',
+      notifyCleanupNoChannel: 'No saved notification channel to clean',
       notYet: 'not yet',
       lastUpdated: 'Last updated by {user} · {time}',
       noPersisted: 'No saved config yet · showing environment values and defaults',
@@ -185,9 +225,10 @@ export default {
     },
     language: {
       set: 'Public guild language set to {flag} **{label}**.',
-      noChannel: 'No saved auto-check channel is configured, so there is no pin to refresh.',
-      pinFailed: 'I changed the language, but could not refresh the pin in <#{channel}>. Missing: {missing}.',
-      pinResult: '{outcome} in <#{channel}>.',
+      noChannel: 'No saved auto-check or notification channel is configured, so there is no pin to refresh.',
+      channelUnavailable: 'The language changed, but the saved {surface} channel is unavailable.',
+      pinFailed: 'The language changed, but I could not refresh the {surface} guide in <#{channel}>. Missing: {missing}.',
+      pinResult: '**{surface}:** {outcome} in <#{channel}>.',
     },
     manageGuildRequired: {
       title: 'Manage Server permission required',
@@ -216,7 +257,7 @@ export default {
     notSet: 'Not set',
     evidenceLegacy: 'Not set · images still use legacy URLs that expire',
     fields: {
-      globalNotify: 'Global notify', defaultScope: 'Default scope', autoCheck: 'Auto-check', autoCleanup: 'Auto-cleanup', notifyChannel: 'Notify channel',
+      globalNotify: 'Global notify', defaultScope: 'Default scope', autoCheck: 'Auto-check', autoCleanup: 'Auto-cleanup', notifyChannel: 'Notify channel', notifyCleanup: 'Notify cleanup',
       lastUpdated: 'Last updated', updatedBy: 'Updated by', evidenceChannel: 'Evidence channel · bot-wide',
       channel: 'Channel', channelId: 'Channel ID', server: 'Server', status: 'Status',
     },

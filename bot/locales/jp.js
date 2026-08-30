@@ -103,6 +103,43 @@ const jp = {
     footer: '全コマンドの案内が必要でしたら /la-help をどうぞ～',
   },
 
+  listNotifyWelcome: {
+    title: '🔔 List 通知 · この channel は Artist が見ておりますわ',
+    description: [
+      'Blacklist、whitelist、watchlist に変更があるたび、何が起きたか分かる card をこちらへ置きますの。',
+      'この guide が固定の目印ですわ。変更 card は下に並び、cleanup 中も pinned message はすべて保護されますの。',
+    ],
+    activityName: '📣 ここへ届く内容',
+    activityValue: [
+      '• Entry の追加、編集、削除、または roster enrich。',
+      '• Reason、raid、item level、CP、tracked rosters、利用可能な evidence link。',
+      '• 変更を実行した同じ server へ、その broadcast を送り返すことはありませんの。',
+    ],
+    scopeName: '🌐 通知 scope',
+    scopeValue: [
+      '**Global 通知** が有効なら、他 server から該当する変更を受け取りますわ。',
+      'Server 内部 entry には `Server local` tag が付きますの。`/la-setup config` の `notify-off` / `notify-on` で受信を切り替えられますわ。',
+    ],
+    cleanupName: '🧹 30分ごとに整理しますわ',
+    cleanupValue: [
+      'この server は notify cleanup が有効ですの。30分ごとに未 pin の message を削除し、この guide を作り直して5分だけ notice を残しますわ。',
+      'Pinned message には触れませんの。長く履歴を残すなら `notify-cleanup-off` をお使いくださいませ。',
+    ],
+    cleanupDisabledName: '🛡️ 履歴をそのまま残しますわ',
+    cleanupDisabledValue: [
+      'Notify cleanup は無効なので、admin が手動 cleanup するまで変更 card は残りますの。',
+      'RaidManage と同じ整理周期にするなら `/la-setup config action:notify-cleanup-on` で有効化できますわ。',
+    ],
+    commandsName: '⚙️ Channel 管理',
+    commandsValue: [
+      '`notify-cleanup` - 今すぐ整理して pinned guide を再作成',
+      '`notify-cleanup-on` / `notify-cleanup-off` - 30分 cleanup を有効または無効化',
+      '`notify-repin` - card を削除せず guide だけ更新',
+      '各 action は `/la-setup config action:<action>` で使い、Manage Server 権限が必要ですの。',
+    ],
+    footer: 'LoaLogs · welcome guide とすべての pinned message は cleanup 中も保護されますの',
+  },
+
   help: {
     overview: {
       title: 'Lost Ark Check - Help (JP)',
@@ -155,6 +192,7 @@ const jp = {
             '• `show` - 全 config を表示 · `repin` - pinned Artist guide を更新',
             '• `set-auto-channel channel:#x` - screenshot + `check <name>` 用 channel · `set-notify-channel channel:#x`',
             '• `cleanup-on` / `cleanup-off` - この server の毎日 cleanup · `notify-on` / `notify-off` - server 間 list 通知',
+            '• `notify-cleanup` / `notify-repin` - 通知を掃除または再 pin · `notify-cleanup-on/off` - 30分 schedule',
             '• `set-language` - public + pin の言語 · `set-default-scope scope:global/server` - /la-list add の既定 scope',
           ],
         },

@@ -103,6 +103,43 @@ const vi = {
     footer: 'Muốn xem hướng dẫn đầy đủ tất cả lệnh? Gõ /la-help nhé~',
   },
 
+  listNotifyWelcome: {
+    title: '🔔 Thông báo list · Artist trông channel này nhé',
+    description: [
+      'Mỗi khi blacklist, whitelist hoặc watchlist thay đổi, tớ sẽ để một card tại đây để mọi người biết chuyện gì vừa xảy ra.',
+      'Bảng này là mốc cố định; những card thay đổi nằm bên dưới và tin đã ghim luôn được bảo vệ khi dọn.',
+    ],
+    activityName: '📣 Những gì sẽ xuất hiện ở đây',
+    activityValue: [
+      '• Entry được thêm, sửa, xóa hoặc enrich thêm roster.',
+      '• Card giữ reason, raid, item level, CP, tracked rosters và link evidence khi có.',
+      '• Broadcast từ server đang thực hiện thay đổi sẽ không dội ngược lại chính server đó.',
+    ],
+    scopeName: '🌐 Phạm vi thông báo',
+    scopeValue: [
+      'Khi **thông báo toàn cục** bật, channel này nhận thay đổi phù hợp từ các server khác.',
+      'Entry nội bộ được đánh dấu `Nội bộ server`; có thể tắt hoặc bật nhận broadcast bằng `notify-off` / `notify-on` trong `/la-setup config`.',
+    ],
+    cleanupName: '🧹 Dọn gọn mỗi 30 phút',
+    cleanupValue: [
+      'Server này đã bật notify cleanup. Mỗi nửa giờ tớ xóa tin không ghim, dựng lại bảng hướng dẫn và để một notice ngắn trong 5 phút.',
+      'Tin đã ghim không bị đụng tới. Dùng `notify-cleanup-off` nếu muốn giữ lịch sử lâu hơn.',
+    ],
+    cleanupDisabledName: '🛡️ Lịch sử đang được giữ lại',
+    cleanupDisabledValue: [
+      'Notify cleanup đang tắt, nên các card sẽ ở nguyên cho tới khi admin dọn thủ công.',
+      'Bật bằng `/la-setup config action:notify-cleanup-on` nếu muốn dùng nhịp dọn giống RaidManage.',
+    ],
+    commandsName: '⚙️ Công cụ quản trị channel',
+    commandsValue: [
+      '`notify-cleanup` - dọn ngay và dựng lại bảng ghim',
+      '`notify-cleanup-on` / `notify-cleanup-off` - bật hoặc tắt lịch dọn 30 phút',
+      '`notify-repin` - chỉ làm mới bảng hướng dẫn, không xóa card',
+      'Tất cả dùng trong `/la-setup config action:<action>` và cần quyền Manage Server.',
+    ],
+    footer: 'LoaLogs · welcome pin và mọi tin đã ghim luôn được bảo vệ khi cleanup',
+  },
+
   help: {
     overview: {
       title: 'Lost Ark Check - Help (VI)',
@@ -155,6 +192,7 @@ const vi = {
             '• `show` - xem toàn bộ config · `repin` - làm mới bảng hướng dẫn Artist đã ghim',
             '• `set-auto-channel channel:#x` - channel nhận screenshot + `check <tên>` · `set-notify-channel channel:#x`',
             '• `cleanup-on` / `cleanup-off` - dọn hằng ngày cho server này · `notify-on` / `notify-off` - thông báo list xuyên server',
+            '• `notify-cleanup` / `notify-repin` - dọn hoặc ghim lại notification · `notify-cleanup-on/off` - lịch dọn 30 phút',
             '• `set-language` - ngôn ngữ public + tin ghim · `set-default-scope scope:global/server` - scope mặc định cho /la-list add',
           ],
         },

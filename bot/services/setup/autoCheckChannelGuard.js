@@ -1,4 +1,9 @@
-export function createAutoCheckChannelGuard() {
+/**
+ * Serialize destructive channel lifecycle work and remember the welcome that
+ * must survive a cleanup sweep. The implementation is shared by auto-check
+ * and list-notification channels; the legacy export stays for compatibility.
+ */
+export function createChannelLifecycleGuard() {
   const channelTails = new Map();
   const welcomeMessageIds = new Map();
 
@@ -25,19 +30,27 @@ export function createAutoCheckChannelGuard() {
 
   function rememberWelcome(channelId, messageId) {
     if (!channelId || !messageId) return;
-    welcomeMessageIds.set(String(channelId), String(messageId));
+    const key = String(channelId);
+    const ids = welcomeMessageIds.get(key) || new Set();
+    ids.add(String(messageId));
+    welcomeMessageIds.set(key, ids);
   }
 
   function forgetWelcome(channelId, messageId) {
     if (!channelId) return;
     const key = String(channelId);
-    if (messageId && welcomeMessageIds.get(key) !== String(messageId)) return;
-    welcomeMessageIds.delete(key);
+    if (!messageId) {
+      welcomeMessageIds.delete(key);
+      return;
+    }
+    const ids = welcomeMessageIds.get(key);
+    if (!ids) return;
+    ids.delete(String(messageId));
+    if (ids.size === 0) welcomeMessageIds.delete(key);
   }
 
   function getProtectedMessageIds(channelId) {
-    const messageId = welcomeMessageIds.get(String(channelId || ''));
-    return messageId ? [messageId] : [];
+    return [...(welcomeMessageIds.get(String(channelId || '')) || [])];
   }
 
   return {
@@ -48,4 +61,5 @@ export function createAutoCheckChannelGuard() {
   };
 }
 
-export const autoCheckChannelGuard = createAutoCheckChannelGuard();
+export const createAutoCheckChannelGuard = createChannelLifecycleGuard;
+export const autoCheckChannelGuard = createChannelLifecycleGuard();

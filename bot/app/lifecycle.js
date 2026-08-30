@@ -11,6 +11,7 @@ import { startMonitor } from '../monitor/monitor.js';
 import { setupAutoCheck } from '../handlers/list/auto-check.js';
 import { bootstrapClassEmoji } from '../services/discord/emoji-bootstrap.js';
 import { startAutoCheckCleanup } from '../services/setup/autoCheckCleanup.js';
+import { startListNotifyCleanup } from '../services/setup/listNotifyCleanup.js';
 import { connectDB } from '../db.js';
 import Blacklist from '../models/Blacklist.js';
 import RosterCache from '../models/RosterCache.js';
@@ -23,10 +24,12 @@ export function startReadyBackgroundServices(client, {
   startMonitorFn = startMonitor,
   setupAutoCheckFn = setupAutoCheck,
   startAutoCheckCleanupFn = startAutoCheckCleanup,
+  startListNotifyCleanupFn = startListNotifyCleanup,
 } = {}) {
   startMonitorFn(client);
   setupAutoCheckFn(client);
   startAutoCheckCleanupFn(client);
+  startListNotifyCleanupFn(client);
 }
 
 /**

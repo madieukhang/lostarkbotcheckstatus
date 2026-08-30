@@ -27,7 +27,8 @@ test('/la-setup collapses into a single config subcommand with the action option
 test('/la-setup dispatch maps every action to a handler', async () => {
   const { SETUP_ACTION_HANDLERS } = await import('../bot/handlers/setup/guildSetup.js');
   assert.deepEqual(Object.keys(SETUP_ACTION_HANDLERS).sort(), [
-    'cleanup-off', 'cleanup-on', 'notify-off', 'notify-on', 'repin',
+    'cleanup-off', 'cleanup-on', 'notify-cleanup', 'notify-cleanup-off',
+    'notify-cleanup-on', 'notify-off', 'notify-on', 'notify-repin', 'repin',
     'set-auto-channel', 'set-default-scope', 'set-language', 'set-notify-channel', 'show',
   ]);
 });
@@ -37,9 +38,13 @@ test('GuildConfig tracks the welcome pin and daily cleanup cursor', () => {
   assert.ok(GuildConfig.schema.path('autoCheckWelcomeChannelId'));
   assert.equal(GuildConfig.schema.path('autoCheckCleanupEnabled').options.default, false);
   assert.ok(GuildConfig.schema.path('lastAutoCheckCleanupKey'));
+  assert.ok(GuildConfig.schema.path('listNotifyWelcomeMessageId'));
+  assert.ok(GuildConfig.schema.path('listNotifyWelcomeChannelId'));
+  assert.equal(GuildConfig.schema.path('listNotifyCleanupEnabled').options.default, false);
+  assert.ok(GuildConfig.schema.path('lastListNotifyCleanupKey'));
 });
 
-test('ready background services include the daily auto-check cleanup scheduler', () => {
+test('ready background services include both channel cleanup schedulers', () => {
   const calls = [];
   const client = { id: 'client' };
 
@@ -47,12 +52,14 @@ test('ready background services include the daily auto-check cleanup scheduler',
     startMonitorFn: (value) => calls.push(['monitor', value]),
     setupAutoCheckFn: (value) => calls.push(['auto-check', value]),
     startAutoCheckCleanupFn: (value) => calls.push(['cleanup', value]),
+    startListNotifyCleanupFn: (value) => calls.push(['notify-cleanup', value]),
   });
 
   assert.deepEqual(calls, [
     ['monitor', client],
     ['auto-check', client],
     ['cleanup', client],
+    ['notify-cleanup', client],
   ]);
 });
 

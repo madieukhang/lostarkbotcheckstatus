@@ -13,7 +13,7 @@ import GuildConfig from '../../models/GuildConfig.js';
 import UserPreference from '../../models/UserPreference.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
 import { COLORS } from '../../utils/ui.js';
-import { AlertSeverity, buildNoticeEmbed } from '../../utils/alertEmbed.js';
+import { AlertSeverity } from '../../utils/alertEmbed.js';
 import {
   getSupportedLanguages,
   getUserLanguage,
@@ -23,6 +23,10 @@ import {
 import { checkBotPermissions } from '../../services/setup/channelPermissions.js';
 import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
 import {
+  cleanupAndRefreshListNotifyChannel,
+  getVietnamHalfHourKey,
+} from '../../services/setup/listNotifyCleanup.js';
+import {
   deferEphemeralReply,
   editAlert,
   editEmbed,
@@ -30,34 +34,13 @@ import {
 } from '../../utils/interactionReplies.js';
 import {
   postSetupWelcome,
+  postListNotifySetupWelcome,
   reportMissingChannelPermissions,
   requireSetupGuildTextChannel,
   resolveGuildTextChannel,
+  resolveListNotifyWelcomePinContext,
   resolveWelcomePinContext,
 } from './setupGuards.js';
-
-/**
- * Send a test message to verify the channel is working.
- * @param {import('discord.js').TextChannel} channel
- * @param {string} purpose - "auto-check" or "notification"
- * @returns {Promise<boolean>}
- */
-async function sendTestMessage(channel, purpose, lang) {
-  try {
-    const msg = await channel.send({
-      embeds: [buildNoticeEmbed(t('dialogue.setup.testMessage', lang, { purpose }), {
-        severity: AlertSeverity.INFO,
-        titleIcon: '🧪',
-        lang,
-      })],
-    });
-    // Auto-delete test message after 30 seconds to keep channel clean
-    setTimeout(() => msg.delete().catch(() => {}), 30_000);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export function welcomeOutcomeText(outcome, lang) {
   const cleanupLine = outcome?.cleanupAttempted
@@ -154,48 +137,69 @@ async function handleSetupNotifyChannel(interaction, lang) {
   const channel = await requireSetupGuildTextChannel(interaction, lang);
   if (!channel) return;
 
-  // Check bot permissions before saving
-  const { ok, missing } = checkBotPermissions(channel, interaction.guild);
+  await connectDB();
+
+  // Warn if same channel as auto-check (allow but warn), and preserve the
+  // notify cleanup opt-in when moving the configured channel.
+  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+  const cleanupEnabled = existing?.listNotifyCleanupEnabled === true;
+  const sameAsAutoCheck = existing?.autoCheckChannelId === channel.id;
+
+  // A persistent guide replaces the old transient test message, so pin access
+  // is part of a successful setup. Manage Messages is only required when this
+  // guild explicitly enabled notify cleanup.
+  const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
+    cleanup: cleanupEnabled,
+    welcomePin: true,
+  });
   if (!ok) {
     await reportMissingChannelPermissions(interaction, lang, channel.id, missing);
     return;
   }
 
-  await connectDB();
-
-  // Warn if same channel as auto-check (allow but warn)
-  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
-  const sameAsAutoCheck = existing?.autoCheckChannelId === channel.id;
-
-  await GuildConfig.findOneAndUpdate(
-    { guildId: interaction.guild.id },
-    {
-      $set: {
-        listNotifyChannelId: channel.id,
-        globalNotifyEnabled: true, // auto re-enable when setting a notify channel
-        updatedByUserId: interaction.user.id,
-        updatedByTag: interaction.user.tag,
-      },
-    },
-    { upsert: true, returnDocument: 'after' }
-  );
-
-  // Send test message to verify channel works
-  const testOk = await sendTestMessage(
+  const configSet = {
+    listNotifyChannelId: channel.id,
+    globalNotifyEnabled: true,
+    listNotifyCleanupEnabled: cleanupEnabled,
+    updatedByUserId: interaction.user.id,
+    updatedByTag: interaction.user.tag,
+  };
+  if (cleanupEnabled) {
+    // Moving an enabled cleaner must not immediately wipe the new channel in
+    // the remainder of the current slot.
+    configSet.lastListNotifyCleanupKey = getVietnamHalfHourKey();
+  }
+  const welcome = await postListNotifySetupWelcome(interaction, {
     channel,
-    t('dialogue.setup.purpose.notification', existing?.language || lang),
-    existing?.language || lang,
-  );
+    cleanupEnabled,
+    configSet,
+  });
+  if (!welcome.pinned || !welcome.persisted) {
+    await editNotice(
+      interaction,
+      `⚠️ ${t('dialogue.setup.notifyChannelNotSet', lang, {
+        channel: channel.id,
+        welcome: welcomeOutcomeText(welcome, lang),
+      })}`,
+      { severity: AlertSeverity.ERROR, lang }
+    );
+    return;
+  }
+
   const warning = sameAsAutoCheck
     ? `\n⚠️ ${t('dialogue.setup.sameChannelWarning', lang, { other: t('dialogue.setup.purpose.autoCheck', lang) })}`
     : '';
 
-  await editNotice(interaction, `✅ ${t(
-    testOk ? 'dialogue.setup.notifyChannelSet' : 'dialogue.setup.notifyChannelSetTestFailed',
-    lang,
-    { channel: channel.id, warning },
-  )}`, {
-    severity: testOk ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
+  await editNotice(interaction, `✅ ${t('dialogue.setup.notifyChannelSet', lang, {
+    channel: channel.id,
+    warning,
+    welcome: welcomeOutcomeText(welcome, lang),
+    cleanup: t(
+      `dialogue.setup.listNotifyCleanup.${cleanupEnabled ? 'enabled' : 'disabled'}`,
+      lang
+    ),
+  })}`, {
+    severity: AlertSeverity.SUCCESS,
     lang,
   });
 
@@ -323,6 +327,193 @@ async function handleSetupCleanup(interaction, lang, enabled) {
 }
 
 /**
+ * Toggle the independent RaidManage-style cleaner for list notifications.
+ * Existing guilds remain off until an admin explicitly opts in.
+ */
+async function handleSetupListNotifyCleanupToggle(interaction, lang, enabled) {
+  await connectDB();
+
+  const existing = await GuildConfig.findOne({ guildId: interaction.guild.id }).lean();
+  const channel = await resolveGuildTextChannel(
+    interaction,
+    existing?.listNotifyChannelId
+  );
+
+  if (enabled && !channel) {
+    await editNotice(
+      interaction,
+      `⚠️ ${t('dialogue.setup.listNotifyCleanup.noChannel', lang)}`,
+      { severity: AlertSeverity.WARNING, lang }
+    );
+    return;
+  }
+
+  const permissions = channel
+    ? checkBotPermissions(channel, interaction.guild, {
+        cleanup: enabled,
+        welcomePin: true,
+      })
+    : null;
+  if (enabled && !permissions?.ok) {
+    await reportMissingChannelPermissions(
+      interaction,
+      lang,
+      channel.id,
+      permissions?.missing || []
+    );
+    return;
+  }
+
+  const state = {
+    listNotifyCleanupEnabled: enabled,
+    updatedByUserId: interaction.user.id,
+    updatedByTag: interaction.user.tag,
+  };
+  if (enabled) {
+    // Match RaidManage: enabling arms future slots without deleting the
+    // channel immediately during the current half-hour.
+    state.lastListNotifyCleanupKey = getVietnamHalfHourKey();
+  }
+  await GuildConfig.findOneAndUpdate(
+    { guildId: interaction.guild.id },
+    { $set: state },
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+  );
+  invalidateGuildConfig(interaction.guild.id);
+
+  let guideLine = '';
+  if (channel && permissions?.ok) {
+    const welcome = await postListNotifySetupWelcome(interaction, {
+      channel,
+      cleanupEnabled: enabled,
+    });
+    guideLine = `\n${welcomeOutcomeText(welcome, lang)}`;
+  } else if (channel && permissions && !permissions.ok) {
+    guideLine = `\n⚠️ ${t('dialogue.setup.listNotifyCleanup.guideNotRefreshed', lang, {
+      missing: permissions.missing.join(', '),
+    })}`;
+  }
+
+  await editNotice(
+    interaction,
+    `${enabled ? '🧹' : '🛡️'} ${t(
+      `dialogue.setup.listNotifyCleanup.${enabled ? 'enabled' : 'disabled'}`,
+      lang
+    )}${guideLine}\n${t('dialogue.setup.showHint', lang)}`,
+    {
+      severity: enabled ? AlertSeverity.SUCCESS : AlertSeverity.INFO,
+      lang,
+    }
+  );
+
+  console.log(
+    `[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) listNotifyCleanup → ${enabled ? 'ON' : 'OFF'} by ${interaction.user.tag}`
+  );
+}
+
+async function handleSetupListNotifyCleanupNow(interaction, lang) {
+  await connectDB();
+  const guildConfig = await GuildConfig.findOne({
+    guildId: interaction.guild.id,
+  }).lean();
+  const channel = await resolveGuildTextChannel(
+    interaction,
+    guildConfig?.listNotifyChannelId
+  );
+  if (!channel) {
+    await editNotice(
+      interaction,
+      `⚠️ ${t('dialogue.setup.listNotifyCleanup.noChannel', lang)}`,
+      { severity: AlertSeverity.WARNING, lang }
+    );
+    return;
+  }
+
+  const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
+    cleanup: true,
+    welcomePin: true,
+  });
+  if (!ok) {
+    await reportMissingChannelPermissions(interaction, lang, channel.id, missing);
+    return;
+  }
+
+  try {
+    const outcome = await cleanupAndRefreshListNotifyChannel(channel, {
+      client: interaction.client,
+      guildId: interaction.guild.id,
+      cleanupEnabled: guildConfig?.listNotifyCleanupEnabled === true,
+      protectedMessageIds: [guildConfig?.listNotifyWelcomeMessageId].filter(Boolean),
+      postNoticeAfter: false,
+    });
+    await editNotice(
+      interaction,
+      `✅ ${t('dialogue.setup.listNotifyCleanup.manualSuccess', lang, {
+        channel: channel.id,
+        count: outcome.deleted,
+      })}`,
+      { severity: AlertSeverity.SUCCESS, lang }
+    );
+  } catch (err) {
+    console.error('[la-setup] list notify manual cleanup failed:', err?.message || err);
+    await editNotice(
+      interaction,
+      `⚠️ ${t('dialogue.setup.listNotifyCleanup.manualFailed', lang, {
+        channel: channel.id,
+        count: Number(err?.cleanup?.deleted) || 0,
+      })}`,
+      { severity: AlertSeverity.ERROR, lang }
+    );
+  }
+}
+
+async function handleSetupListNotifyRepin(interaction, lang) {
+  await connectDB();
+  const guildConfig = await GuildConfig.findOne({
+    guildId: interaction.guild.id,
+  }).lean();
+  const { cleanupEnabled, channel, permissions } =
+    await resolveListNotifyWelcomePinContext(interaction, guildConfig);
+  if (!channel) {
+    await editNotice(
+      interaction,
+      `⚠️ ${t('dialogue.setup.listNotifyRepin.noChannel', lang)}`,
+      { severity: AlertSeverity.WARNING, lang }
+    );
+    return;
+  }
+  if (!permissions.ok) {
+    await editNotice(
+      interaction,
+      `⚠️ ${t('dialogue.setup.listNotifyRepin.missingPermissions', lang, {
+        channel: channel.id,
+        missing: permissions.missing.join(', '),
+      })}`,
+      { severity: AlertSeverity.WARNING, lang }
+    );
+    return;
+  }
+
+  const welcome = await postListNotifySetupWelcome(interaction, {
+    channel,
+    cleanupEnabled,
+  });
+  await editNotice(
+    interaction,
+    t('dialogue.setup.listNotifyRepin.result', lang, {
+      outcome: welcomeOutcomeText(welcome, lang),
+      channel: channel.id,
+    }),
+    {
+      severity: welcome.pinned && welcome.persisted
+        ? AlertSeverity.SUCCESS
+        : AlertSeverity.WARNING,
+      lang,
+    }
+  );
+}
+
+/**
  * Handle the show action (status hub)
  */
 async function handleSetupView(interaction, lang) {
@@ -336,20 +527,29 @@ async function handleSetupView(interaction, lang) {
   const notifyEnv = config.listNotifyChannelIds;
   const notifyEnabled = guildConfig?.globalNotifyEnabled ?? true;
   const cleanupEnabled = resolveAutoCheckCleanupEnabled(guildConfig);
+  const notifyCleanupEnabled = guildConfig?.listNotifyCleanupEnabled === true;
   const defaultScope = guildConfig?.defaultBlacklistScope || 'global';
   const scopeEmoji = defaultScope === 'server' ? '🔒' : '🌐';
   const languageEntry =
     getSupportedLanguages().find((entry) => entry.code === guildConfig?.language) ||
     getSupportedLanguages()[0];
-  const welcomePinValue =
-    guildConfig?.autoCheckWelcomeMessageId &&
-    guildConfig?.autoCheckWelcomeChannelId
-      ? '<#' + guildConfig.autoCheckWelcomeChannelId + '> · ' +
+  function welcomePinValue(messageId, channelId, repinAction) {
+    return messageId && channelId
+      ? '<#' + channelId + '> · ' +
         '[Jump to message](https://discord.com/channels/' +
-        interaction.guild.id + '/' +
-        guildConfig.autoCheckWelcomeChannelId + '/' +
-        guildConfig.autoCheckWelcomeMessageId + ')'
-      : `*${t('dialogue.setup.view.pinMissing', lang)}*`;
+        interaction.guild.id + '/' + channelId + '/' + messageId + ')'
+      : `*${t('dialogue.setup.view.pinMissing', lang, { action: repinAction })}*`;
+  }
+  const autoWelcomePinValue = welcomePinValue(
+    guildConfig?.autoCheckWelcomeMessageId,
+    guildConfig?.autoCheckWelcomeChannelId,
+    'repin'
+  );
+  const notifyWelcomePinValue = welcomePinValue(
+    guildConfig?.listNotifyWelcomeMessageId,
+    guildConfig?.listNotifyWelcomeChannelId,
+    'notify-repin'
+  );
   const cleanupValue = !autoCheckDb
     ? `*${t('dialogue.setup.view.cleanupNoChannel', lang)}*`
     : cleanupEnabled
@@ -357,6 +557,13 @@ async function handleSetupView(interaction, lang) {
         last: guildConfig?.lastAutoCheckCleanupKey || `*${t('dialogue.setup.view.notYet', lang)}*`,
       })
       : t('dialogue.setup.view.cleanupDisabled', lang);
+  const notifyCleanupValue = !notifyDb
+    ? `*${t('dialogue.setup.view.notifyCleanupNoChannel', lang)}*`
+    : notifyCleanupEnabled
+      ? t('dialogue.setup.view.notifyCleanupActive', lang, {
+        last: guildConfig?.lastListNotifyCleanupKey || `*${t('dialogue.setup.view.notYet', lang)}*`,
+      })
+      : t('dialogue.setup.view.notifyCleanupDisabled', lang);
 
   // Each setting renders as its own field so the dashboard reads as a
   // compact grid of "what's configured here?" cards instead of a wall of
@@ -382,30 +589,13 @@ async function handleSetupView(interaction, lang) {
       inline: true,
     },
     {
-      name: '​',
-      value: '​',
+      name: `🌐 ${t('dialogue.setup.view.publicLanguage', lang)}`,
+      value: languageEntry.flag + ' **' + languageEntry.label + '**',
       inline: true,
     },
     {
-      name: `${scopeEmoji} ${t('dialogue.setup.view.defaultScope', lang)}`,
-      value: `**${defaultScope}**\n*${t('dialogue.setup.view.scopeHint', lang, { scope: defaultScope })}*`,
-      inline: true,
-    },
-    {
-      name: `📡 ${t('dialogue.setup.view.globalNotifications', lang)}`,
-      value: notifyEnabled
-        ? `🔔 ${t('dialogue.setup.view.notificationsOn', lang)}`
-        : `🔕 ${t('dialogue.setup.view.notificationsOff', lang)}`,
-      inline: true,
-    },
-    {
-      name: '​',
-      value: '​',
-      inline: true,
-    },
-    {
-      name: `🎨 ${t('dialogue.setup.view.pinnedWelcome', lang)}`,
-      value: welcomePinValue,
+      name: `🎨 ${t('dialogue.setup.view.autoPinnedWelcome', lang)}`,
+      value: autoWelcomePinValue,
       inline: true,
     },
     {
@@ -414,8 +604,25 @@ async function handleSetupView(interaction, lang) {
       inline: true,
     },
     {
-      name: `🌐 ${t('dialogue.setup.view.publicLanguage', lang)}`,
-      value: languageEntry.flag + ' **' + languageEntry.label + '**',
+      name: `${scopeEmoji} ${t('dialogue.setup.view.defaultScope', lang)}`,
+      value: `**${defaultScope}**\n*${t('dialogue.setup.view.scopeHint', lang, { scope: defaultScope })}*`,
+      inline: true,
+    },
+    {
+      name: `🔔 ${t('dialogue.setup.view.notifyPinnedWelcome', lang)}`,
+      value: notifyWelcomePinValue,
+      inline: true,
+    },
+    {
+      name: `🧹 ${t('dialogue.setup.view.notifyCleanup', lang)}`,
+      value: notifyCleanupValue,
+      inline: true,
+    },
+    {
+      name: `📡 ${t('dialogue.setup.view.globalNotifications', lang)}`,
+      value: notifyEnabled
+        ? `🔔 ${t('dialogue.setup.view.notificationsOn', lang)}`
+        : `🔕 ${t('dialogue.setup.view.notificationsOff', lang)}`,
       inline: true,
     },
   ];
@@ -514,11 +721,23 @@ async function handleSetupLanguage(interaction) {
     flag: languageEntry.flag,
     label: languageEntry.label,
   })}`;
-  const { cleanupEnabled, channel, permissions } = await resolveWelcomePinContext(
-    interaction,
-    guildConfig,
-  );
-  if (!channel) {
+  const refreshes = [];
+  if (guildConfig?.autoCheckChannelId) {
+    refreshes.push({
+      surface: t('dialogue.setup.purpose.autoCheck', language),
+      context: await resolveWelcomePinContext(interaction, guildConfig),
+      post: postSetupWelcome,
+    });
+  }
+  if (guildConfig?.listNotifyChannelId) {
+    refreshes.push({
+      surface: t('dialogue.setup.purpose.notification', language),
+      context: await resolveListNotifyWelcomePinContext(interaction, guildConfig),
+      post: postListNotifySetupWelcome,
+    });
+  }
+
+  if (refreshes.length === 0) {
     await editNotice(
       interaction,
       `${prefix}\n${t('dialogue.setup.language.noChannel', language)}`,
@@ -527,30 +746,47 @@ async function handleSetupLanguage(interaction) {
     return;
   }
 
-  const { ok, missing } = permissions;
-  if (!ok) {
-    await editNotice(
-      interaction,
-      `${prefix}\n⚠️ ${t('dialogue.setup.language.pinFailed', language, {
+  const lines = [];
+  let hasWarning = false;
+  for (const refresh of refreshes) {
+    const { cleanupEnabled, channel, permissions } = refresh.context;
+    if (!channel) {
+      hasWarning = true;
+      lines.push(`⚠️ ${t('dialogue.setup.language.channelUnavailable', language, {
+        surface: refresh.surface,
+      })}`);
+      continue;
+    }
+    if (!permissions.ok) {
+      hasWarning = true;
+      lines.push(`⚠️ ${t('dialogue.setup.language.pinFailed', language, {
         channel: channel.id,
-        missing: missing.join(', '),
-      })}`,
-      { severity: AlertSeverity.WARNING, titleIcon: '🌐', lang: language }
-    );
-    return;
-  }
+        missing: permissions.missing.join(', '),
+        surface: refresh.surface,
+      })}`);
+      continue;
+    }
 
-  const welcome = await postSetupWelcome(interaction, {
-    channel,
-    cleanupEnabled,
-  });
-  await editNotice(
-    interaction,
-    `${prefix}\n${t('dialogue.setup.language.pinResult', language, {
+    const welcome = await refresh.post(interaction, {
+      channel,
+      cleanupEnabled,
+    });
+    if (!welcome.pinned || !welcome.persisted) hasWarning = true;
+    lines.push(t('dialogue.setup.language.pinResult', language, {
       outcome: welcomeOutcomeText(welcome, language),
       channel: channel.id,
-    })}`,
-    { severity: AlertSeverity.SUCCESS, titleIcon: '🌐', lang: language }
+      surface: refresh.surface,
+    }));
+  }
+
+  await editNotice(
+    interaction,
+    `${prefix}\n${lines.join('\n')}`,
+    {
+      severity: hasWarning ? AlertSeverity.WARNING : AlertSeverity.SUCCESS,
+      titleIcon: '🌐',
+      lang: language,
+    }
   );
 }
 
@@ -565,6 +801,10 @@ export const SETUP_ACTION_HANDLERS = {
   'set-default-scope': (interaction, lang) => handleSetupDefaultScope(interaction, lang),
   'cleanup-on': (interaction, lang) => handleSetupCleanup(interaction, lang, true),
   'cleanup-off': (interaction, lang) => handleSetupCleanup(interaction, lang, false),
+  'notify-cleanup': (interaction, lang) => handleSetupListNotifyCleanupNow(interaction, lang),
+  'notify-cleanup-on': (interaction, lang) => handleSetupListNotifyCleanupToggle(interaction, lang, true),
+  'notify-cleanup-off': (interaction, lang) => handleSetupListNotifyCleanupToggle(interaction, lang, false),
+  'notify-repin': (interaction, lang) => handleSetupListNotifyRepin(interaction, lang),
   'notify-on': (interaction, lang) => handleSetupOff(interaction, lang, true),
   'notify-off': (interaction, lang) => handleSetupOff(interaction, lang, false),
   'repin': (interaction, lang) => handleSetupRepin(interaction, lang),

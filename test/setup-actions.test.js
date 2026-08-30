@@ -6,7 +6,13 @@ import {
 } from '../bot/handlers/setup/setupActions.js';
 
 const t = (key) => key.split('.').pop(); // labelKey passthrough for tests
-const base = { cleanupEnabled: false, notifyEnabled: true, autoChannelSet: true };
+const base = {
+  cleanupEnabled: false,
+  notifyCleanupEnabled: false,
+  notifyEnabled: true,
+  autoChannelSet: true,
+  notifyChannelSet: true,
+};
 
 test('cleanup toggle visibility follows state and needs an auto-channel', () => {
   assert.equal(isSetupActionVisible({ value: 'cleanup-on' }, base), true);
@@ -27,11 +33,35 @@ test('notify toggle visibility follows the notify flag', () => {
   assert.equal(isSetupActionVisible({ value: 'notify-off' }, off), false);
 });
 
+test('notification cleanup actions require a notify channel and follow their own opt-in', () => {
+  assert.equal(isSetupActionVisible({ value: 'notify-cleanup' }, base), true);
+  assert.equal(isSetupActionVisible({ value: 'notify-repin' }, base), true);
+  assert.equal(isSetupActionVisible({ value: 'notify-cleanup-on' }, base), true);
+  assert.equal(isSetupActionVisible({ value: 'notify-cleanup-off' }, base), false);
+
+  const enabled = { ...base, notifyCleanupEnabled: true };
+  assert.equal(isSetupActionVisible({ value: 'notify-cleanup-on' }, enabled), false);
+  assert.equal(isSetupActionVisible({ value: 'notify-cleanup-off' }, enabled), true);
+
+  const noChannel = { ...base, notifyChannelSet: false };
+  for (const value of [
+    'notify-cleanup',
+    'notify-cleanup-on',
+    'notify-cleanup-off',
+    'notify-repin',
+  ]) {
+    assert.equal(isSetupActionVisible({ value }, noChannel), false);
+  }
+});
+
 test('buildSetupActionChoices filters by state and needle, always keeps non-toggle actions', () => {
   const all = buildSetupActionChoices({ needle: '', state: base, t, lang: 'en' });
   const values = all.map((c) => c.value);
   assert.ok(values.includes('show'));
   assert.ok(values.includes('cleanup-on'));
+  assert.ok(values.includes('notify-cleanup'));
+  assert.ok(values.includes('notify-cleanup-on'));
+  assert.ok(!values.includes('notify-cleanup-off'));
   assert.ok(!values.includes('cleanup-off')); // cleanup disabled -> off hidden
   assert.ok(!values.includes('notify-on')); // notify on -> on hidden
 

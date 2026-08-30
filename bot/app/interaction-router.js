@@ -120,8 +120,10 @@ export function createAutocompleteRoutes() {
       }
       const state = {
         cleanupEnabled: resolveAutoCheckCleanupEnabled(cfg),
+        notifyCleanupEnabled: cfg?.listNotifyCleanupEnabled === true,
         notifyEnabled: cfg?.globalNotifyEnabled ?? true,
         autoChannelSet: Boolean(cfg?.autoCheckChannelId),
+        notifyChannelSet: Boolean(cfg?.listNotifyChannelId),
       };
       await interaction.respond(
         buildSetupActionChoices({ needle: focused.value, state, t, lang: 'en' })

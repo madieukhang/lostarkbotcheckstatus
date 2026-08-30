@@ -88,8 +88,26 @@ export default {
     },
   },
 
+  listNotifyCleanupNotice: {
+    empty: { variants: [
+      '🧹 Lượt dọn này có **{n}** tin cần xóa. Channel đang gọn sẵn rồi~',
+      '🧹 **{n}** tin bị dọn lần này. Tớ chỉ dựng lại bảng ghim cho ngay ngắn thôi.',
+    ] },
+    trivial: { variants: [
+      '🧹 Tớ vừa dọn **{n}** tin khỏi channel thông báo. Tin ghim vẫn nguyên nhé~',
+      '🧹 Có **{n}** tin được dọn gọn; bảng hướng dẫn đã được làm mới.',
+    ] },
+    normal: { variants: [
+      '🧹 **{n}** tin thông báo cũ đã được dọn. Tin ghim vẫn an toàn.',
+      '🧹 Xong một lượt khá đầy: **{n}** tin đã xóa, bảng hướng dẫn đã dựng lại.',
+    ] },
+    heavy: { variants: [
+      '🧹 Channel bận ghê - tớ vừa dọn **{n}** tin và giữ nguyên mọi tin ghim.',
+      '🧹 Một mẻ lớn: **{n}** tin đã được xóa, welcome pin đã trở lại đúng chỗ.',
+    ] },
+  },
+
   setup: {
-    testMessage: 'Artist ghé qua kiểm tra~ Đây đã là channel **{purpose}** được đặt bằng `/la-setup`.',
     purpose: { autoCheck: 'tự kiểm tra', notification: 'thông báo' },
     welcomePinned: 'Đã ghim bảng hướng dẫn Artist an toàn', welcomeReplaced: 'đã thay {count} ghim cũ',
     welcomeFailed: 'Tớ chưa thể thay bảng hướng dẫn an toàn, nên ghim cũ vẫn được giữ lại.',
@@ -99,8 +117,8 @@ export default {
     sameChannelWarning: 'Đây cũng là channel {other}. Tách riêng hai channel sẽ dễ đọc hơn.',
     autoChannelNotSet: 'Auto-check channel chưa được thay đổi vì tớ không thể tạo và lưu welcome pin trong <#{channel}>.\n{welcome}',
     autoChannelSet: 'Đã đặt auto-check channel thành <#{channel}>.\nTớ sẽ tự kiểm tra screenshot gửi tại đó.{warning}\n{welcome}\n{cleanup}',
-    notifyChannelSet: 'Đã đặt notification channel thành <#{channel}>.\nCác thay đổi danh sách sẽ được gửi tại đó.{warning}\n\nTớ đã gửi tin nhắn thử; nó sẽ tự biến mất sau 30 giây.',
-    notifyChannelSetTestFailed: 'Đã đặt notification channel thành <#{channel}>.{warning}\nTớ chưa gửi được tin nhắn thử, cậu kiểm tra lại quyền của tớ nhé.',
+    notifyChannelNotSet: 'Notification channel chưa được thay đổi vì tớ không thể tạo và lưu welcome pin trong <#{channel}>.\n{welcome}',
+    notifyChannelSet: 'Đã đặt notification channel thành <#{channel}>.\nCác thay đổi danh sách sẽ được gửi tại đó.{warning}\n{welcome}\n{cleanup}',
     actions: {
       show: 'Xem trạng thái',
       setAutoChannel: 'Đặt channel auto-check',
@@ -109,6 +127,10 @@ export default {
       setDefaultScope: 'Đặt scope blacklist mặc định',
       cleanupOn: 'BẬT dọn tin hằng ngày',
       cleanupOff: 'TẮT dọn tin hằng ngày',
+      notifyCleanup: 'Dọn notification channel ngay',
+      notifyCleanupOn: 'BẬT dọn notification mỗi 30 phút',
+      notifyCleanupOff: 'TẮT dọn notification mỗi 30 phút',
+      notifyRepin: 'Ghim lại bảng notification',
       notifyOn: 'BẬT thông báo toàn cục',
       notifyOff: 'TẮT thông báo toàn cục',
       repin: 'Ghim lại bảng hướng dẫn',
@@ -122,16 +144,30 @@ export default {
       noChannel: 'Hãy đặt auto-check channel bằng `/la-setup config action:set-auto-channel` trước khi bật cleanup.',
       guideNotRefreshed: 'Cleanup đã đổi an toàn, nhưng tớ chưa làm mới được bảng ghim. Còn thiếu: {missing}.',
     },
+    listNotifyCleanup: {
+      enabled: 'Notify cleanup đang **bật riêng cho server này**. Cứ mỗi 30 phút, tin không ghim trong notification channel sẽ bị xóa; welcome pin được dựng lại và notice tự biến mất sau 5 phút.',
+      disabled: 'Notify cleanup đang **tắt cho server này**. Các card thông báo sẽ được giữ lại cho tới khi admin dọn thủ công.',
+      noChannel: 'Hãy đặt notification channel bằng `/la-setup config action:set-notify-channel` trước nhé.',
+      guideNotRefreshed: 'Setting đã đổi an toàn, nhưng tớ chưa làm mới được bảng notification. Còn thiếu: {missing}.',
+      manualSuccess: 'Đã dọn **{count}** tin không ghim trong <#{channel}> và dựng lại welcome pin.',
+      manualFailed: 'Lượt dọn <#{channel}> chưa hoàn tất sau khi xóa **{count}** tin. Tớ giữ lịch dọn ở trạng thái chưa hoàn thành để có thể thử lại.',
+    },
+    listNotifyRepin: {
+      noChannel: 'Tớ không tìm thấy notification channel đã lưu và có thể truy cập. Chạy `/la-setup config action:set-notify-channel` trước nhé.',
+      missingPermissions: 'Tớ chưa thể làm mới bảng notification trong <#{channel}>. Còn thiếu: {missing}.',
+      result: '{outcome} trong <#{channel}>.',
+    },
     view: {
       author: '{guild} · Cấu hình bot',
       description: 'Tớ đã gom cấu hình của server này ở dưới. Đổi bằng `/la-setup config` nhé.',
       autoChannel: 'Auto-check channel', notifyChannel: 'Notification channel', defaultScope: 'Scope blacklist mặc định', globalNotifications: 'Thông báo toàn cục',
-      pinnedWelcome: 'Bảng Artist đã ghim', dailyCleanup: 'Dọn dẹp hằng ngày', publicLanguage: 'Ngôn ngữ công khai',
+      autoPinnedWelcome: 'Bảng auto-check đã ghim', notifyPinnedWelcome: 'Bảng notification đã ghim', dailyCleanup: 'Dọn auto-check hằng ngày', notifyCleanup: 'Dọn notification', publicLanguage: 'Ngôn ngữ công khai',
       setViaSetup: 'đặt bằng /la-setup', fromEnv: 'lấy từ biến môi trường', notConfigured: 'Chưa cấu hình',
       scopeHint: '`/la-list add type:black` sẽ dùng {scope} khi bỏ trống scope',
       notificationsOn: '**Đang bật**\nNhận broadcast từ server khác', notificationsOff: '**Đang tắt**\nKhông nhận broadcast từ server khác',
-      pinMissing: 'Chưa theo dõi ghim · chạy /la-setup config action:repin', cleanupActive: '**00:00 Asia/Ho_Chi_Minh mỗi ngày**\nLần gần nhất: {last}',
+      pinMissing: 'Chưa theo dõi ghim · chạy /la-setup config action:{action}', cleanupActive: '**00:00 Asia/Ho_Chi_Minh mỗi ngày**\nLần gần nhất: {last}',
       cleanupDisabled: '**Đang tắt cho server này**\nAuto-check vẫn chạy; tin nhắn thông thường được giữ lại', cleanupNoChannel: 'Chưa có auto-check channel đã lưu để dọn', notYet: 'chưa chạy',
+      notifyCleanupActive: '**Mỗi 30 phút**\nLần gần nhất: {last}', notifyCleanupDisabled: '**Đang tắt cho server này**\nCác card notification được giữ lại', notifyCleanupNoChannel: 'Chưa có notification channel đã lưu để dọn',
       lastUpdated: 'Cập nhật gần nhất bởi {user} · {time}', noPersisted: 'Chưa có cấu hình đã lưu · đang hiện giá trị môi trường và mặc định',
     },
     repin: {
@@ -140,8 +176,9 @@ export default {
     },
     language: {
       set: 'Đã đặt ngôn ngữ công khai của guild thành {flag} **{label}**.',
-      noChannel: 'Chưa có auto-check channel đã lưu, nên không có bảng ghim để làm mới.',
-      pinFailed: 'Tớ đã đổi ngôn ngữ nhưng chưa làm mới được ghim trong <#{channel}>. Còn thiếu: {missing}.', pinResult: '{outcome} trong <#{channel}>.',
+      noChannel: 'Chưa có auto-check hoặc notification channel đã lưu, nên không có bảng ghim để làm mới.',
+      channelUnavailable: 'Đã đổi ngôn ngữ nhưng không truy cập được channel {surface} đã lưu.',
+      pinFailed: 'Đã đổi ngôn ngữ nhưng chưa làm mới được bảng {surface} trong <#{channel}>. Còn thiếu: {missing}.', pinResult: '**{surface}:** {outcome} trong <#{channel}>.',
     },
     manageGuildRequired: { title: 'Cần quyền Manage Server', description: 'Cậu cần quyền **Manage Server** để đổi cấu hình của tớ ở đây.' },
     defaultScopeSet: 'Đã đặt scope blacklist mặc định thành **{scope}**.\nKhi `/la-list add type:black` bỏ trống scope, tớ sẽ dùng **{scope}**.',
@@ -163,7 +200,7 @@ export default {
     dashboardTitle: 'Điều khiển từ xa · Tổng quan', noServers: 'LoaLogs chưa kết nối với server nào.', ownerServer: 'Owner server', noConfig: 'Chưa có cấu hình',
     notSet: 'Chưa đặt', evidenceLegacy: 'Chưa đặt · ảnh vẫn dùng URL cũ có thể hết hạn',
     fields: {
-      globalNotify: 'Thông báo toàn cục', defaultScope: 'Scope mặc định', autoCheck: 'Auto-check', autoCleanup: 'Auto-cleanup', notifyChannel: 'Notify channel', lastUpdated: 'Cập nhật gần nhất',
+      globalNotify: 'Thông báo toàn cục', defaultScope: 'Scope mặc định', autoCheck: 'Auto-check', autoCleanup: 'Auto-cleanup', notifyChannel: 'Notify channel', notifyCleanup: 'Notify cleanup', lastUpdated: 'Cập nhật gần nhất',
       updatedBy: 'Cập nhật bởi', evidenceChannel: 'Evidence channel · toàn bot', channel: 'Channel', channelId: 'Channel ID', server: 'Server', status: 'Trạng thái',
     },
     state: { enabled: 'Đang bật', disabled: 'Đang tắt', local: 'Server · Local', global: 'Global', receiving: 'Đang nhận broadcast', silent: 'Im lặng · không broadcast' },

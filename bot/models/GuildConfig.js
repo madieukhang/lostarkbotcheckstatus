@@ -30,6 +30,16 @@ const guildConfigSchema = new mongoose.Schema({
   /** Channel ID where list add/remove notifications are broadcast */
   listNotifyChannelId: { type: String, default: '' },
 
+  /** Tracked welcome-guide pin for the list notification channel */
+  listNotifyWelcomeMessageId: { type: String, default: '' },
+  listNotifyWelcomeChannelId: { type: String, default: '' },
+
+  /** RaidManage-style 30-minute cleanup is opt-in and notify-channel only */
+  listNotifyCleanupEnabled: { type: Boolean, default: false },
+
+  /** Asia/Ho_Chi_Minh half-hour slot last completed by notify cleanup */
+  lastListNotifyCleanupKey: { type: String, default: '' },
+
   /** Whether this guild receives global list notifications from other servers */
   globalNotifyEnabled: { type: Boolean, default: true },
 

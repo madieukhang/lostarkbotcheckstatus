@@ -67,8 +67,26 @@ export default {
     },
   },
 
+  listNotifyCleanupNotice: {
+    empty: { variants: [
+      '🧹 今回削除する message は **{n}** 件でしたの。すでに綺麗ですわ～',
+      '🧹 今回片付けたのは **{n}** 件ですの。Pinned guide だけ作り直しましたわ。',
+    ] },
+    trivial: { variants: [
+      '🧹 通知 message を **{n}** 件片付けましたわ。Pin はすべてそのままですの～',
+      '🧹 **{n}** 件を整理し、pinned guide も新しくしましたわ。',
+    ] },
+    normal: { variants: [
+      '🧹 古い通知を **{n}** 件片付けましたわ。Pin は安全ですの。',
+      '🧹 しっかりお掃除しましたの: **{n}** 件を削除し、guide を作り直しましたわ。',
+    ] },
+    heavy: { variants: [
+      '🧹 賑やかな channel ですわ - **{n}** 件を片付け、すべての pin を守りましたの。',
+      '🧹 大掃除でしたの: **{n}** 件を削除し、welcome guide を戻しましたわ。',
+    ] },
+  },
+
   setup: {
-    testMessage: 'Artist が確認に来ましたわ〜 ここは `/la-setup` で設定した **{purpose}** チャンネルですの。',
     purpose: { autoCheck: 'auto-check', notification: '通知' },
     welcomePinned: 'Artist ガイドを安全にピン留めしましたわ', welcomeReplaced: '古いピン {count} 件を置き換えました',
     welcomeFailed: '安全にガイドを置き換えられなかったため、以前のピンを残しましたの。',
@@ -78,8 +96,8 @@ export default {
     sameChannelWarning: 'ここは {other} チャンネルと同じですの。分けた方が読みやすいですわ。',
     autoChannelNotSet: '<#{channel}> に welcome pin を作成して保存できなかったため、auto-check チャンネルは変更していませんの。\n{welcome}',
     autoChannelSet: 'Auto-check チャンネルを <#{channel}> に設定しました。\nわたくしが投稿された screenshot を自動確認しますの。{warning}\n{welcome}\n{cleanup}',
-    notifyChannelSet: '通知チャンネルを <#{channel}> に設定しました。\nリスト変更をここへ送りますの。{warning}\n\nテストメッセージは30秒後に消えますわ。',
-    notifyChannelSetTestFailed: '通知チャンネルを <#{channel}> に設定しました。{warning}\nテストメッセージを送れなかったため、わたくしの権限をご確認くださいませ。',
+    notifyChannelNotSet: '<#{channel}> に welcome pin を作成して保存できなかったため、通知チャンネルは変更していませんの。\n{welcome}',
+    notifyChannelSet: '通知チャンネルを <#{channel}> に設定しました。\nリスト変更をここへ送りますの。{warning}\n{welcome}\n{cleanup}',
     actions: {
       show: 'ステータスを表示',
       setAutoChannel: 'auto-check channel を設定',
@@ -88,6 +106,10 @@ export default {
       setDefaultScope: '既定 blacklist scope を設定',
       cleanupOn: '毎日 cleanup を ON',
       cleanupOff: '毎日 cleanup を OFF',
+      notifyCleanup: '通知 channel を今すぐ cleanup',
+      notifyCleanupOn: '30分ごとの通知 cleanup を ON',
+      notifyCleanupOff: '30分ごとの通知 cleanup を OFF',
+      notifyRepin: '通知 guide を再 pin',
       notifyOn: 'グローバル通知を ON',
       notifyOff: 'グローバル通知を OFF',
       repin: 'ガイドを再 pin',
@@ -101,14 +123,27 @@ export default {
       noChannel: 'Cleanup を有効にする前に `/la-setup config action:set-auto-channel` で auto-check channel を設定してくださいませ。',
       guideNotRefreshed: 'Cleanup 設定は安全に変更しましたが、pinned guide を更新できませんでしたの。足りない権限: {missing}。',
     },
+    listNotifyCleanup: {
+      enabled: 'Notify cleanup は **この server だけで有効** ですの。30分ごとに通知 channel の未 pin message を削除し、welcome guide を作り直しますわ。Cleanup notice は5分後に消えますの。',
+      disabled: 'Notify cleanup は **この server では無効** ですの。Admin が手動 cleanup するまで通知 card は残りますわ。',
+      noChannel: '先に `/la-setup config action:set-notify-channel` で通知 channel を設定してくださいませ。',
+      guideNotRefreshed: '設定は安全に変更しましたが、通知 guide を更新できませんでしたの。足りない権限: {missing}。',
+      manualSuccess: '<#{channel}> の未 pin message を **{count}** 件削除し、welcome guide を作り直しましたわ。',
+      manualFailed: '<#{channel}> の cleanup は **{count}** 件削除したところで完了できませんでしたの。安全に再試行できるよう slot は未完了のままですわ。',
+    },
+    listNotifyRepin: {
+      noChannel: 'アクセスできる保存済み通知 channel が見つかりません。先に `/la-setup config action:set-notify-channel` を実行してくださいませ。',
+      missingPermissions: '<#{channel}> の通知 guide を更新できません。足りない権限: {missing}。',
+      result: '<#{channel}> で {outcome}',
+    },
     view: {
       author: '{guild} · Bot 設定', description: 'このサーバーの設定を集めましたわ。変更は `/la-setup config` からどうぞ。',
       autoChannel: 'Auto-check チャンネル', notifyChannel: '通知チャンネル', defaultScope: 'Blacklist の既定 scope', globalNotifications: 'グローバル通知',
-      pinnedWelcome: 'ピン留め Artist ガイド', dailyCleanup: '毎日の掃除', publicLanguage: '公開言語',
+      autoPinnedWelcome: 'Auto-check の pinned guide', notifyPinnedWelcome: '通知の pinned guide', dailyCleanup: '毎日の auto-check 掃除', notifyCleanup: '通知 cleanup', publicLanguage: '公開言語',
       setViaSetup: '/la-setup で設定', fromEnv: '環境変数の fallback', notConfigured: '未設定', scopeHint: '`/la-list add type:black` で scope を省略すると {scope} を使います',
       notificationsOn: '**有効**\n他サーバーの broadcast を受信', notificationsOff: '**無効**\n他サーバーの broadcast を受信しません',
-      pinMissing: 'まだ追跡していません · /la-setup config action:repin を実行', cleanupActive: '**毎日 00:00 Asia/Ho_Chi_Minh**\n最終完了: {last}',
-      cleanupDisabled: '**この server では無効**\nAuto-check は動作し、通常の message は残りますの', cleanupNoChannel: '掃除する保存済み auto-check channel がありませんの', notYet: 'まだですの', lastUpdated: '最終更新 {user} · {time}',
+      pinMissing: 'まだ追跡していません · /la-setup config action:{action} を実行', cleanupActive: '**毎日 00:00 Asia/Ho_Chi_Minh**\n最終完了: {last}',
+      cleanupDisabled: '**この server では無効**\nAuto-check は動作し、通常の message は残りますの', cleanupNoChannel: '掃除する保存済み auto-check channel がありませんの', notifyCleanupActive: '**30分ごと**\n最終完了: {last}', notifyCleanupDisabled: '**この server では無効**\n通知 card は残りますの', notifyCleanupNoChannel: '掃除する保存済み通知 channel がありませんの', notYet: 'まだですの', lastUpdated: '最終更新 {user} · {time}',
       noPersisted: '保存済み設定なし · 環境変数と既定値を表示中',
     },
     repin: {
@@ -116,8 +151,9 @@ export default {
       missingPermissions: '<#{channel}> の Artist ガイドを更新できません。足りない権限: {missing}。', result: '<#{channel}> で {outcome}',
     },
     language: {
-      set: 'Guild の公開言語を {flag} **{label}** に設定しました。', noChannel: '保存済み auto-check チャンネルがないため、更新するピンもありませんの。',
-      pinFailed: '言語は変更しましたが、<#{channel}> のピンを更新できません。足りない権限: {missing}。', pinResult: '<#{channel}> で {outcome}',
+      set: 'Guild の公開言語を {flag} **{label}** に設定しました。', noChannel: '保存済み auto-check または通知 channel がないため、更新する pin もありませんの。',
+      channelUnavailable: '言語は変更しましたが、保存済み {surface} channel へアクセスできませんの。',
+      pinFailed: '言語は変更しましたが、<#{channel}> の {surface} guide を更新できません。足りない権限: {missing}。', pinResult: '**{surface}:** <#{channel}> で {outcome}',
     },
     manageGuildRequired: { title: 'Manage Server 権限が必要ですの', description: 'わたくしの設定を変えるには **Manage Server** 権限が必要ですわ。' },
     defaultScopeSet: 'Blacklist の既定 scope を **{scope}** に設定しました。\n`/la-list add type:black` で scope を省略した場合は **{scope}** を使いますの。',
@@ -139,7 +175,7 @@ export default {
     dashboardTitle: 'Remote control · ダッシュボード', noServers: 'LoaLogs はまだどのサーバーにも接続していませんの。', ownerServer: 'Owner server', noConfig: '設定なし',
     notSet: '未設定', evidenceLegacy: '未設定 · 画像は期限付き legacy URL を使用中',
     fields: {
-      globalNotify: 'グローバル通知', defaultScope: '既定 scope', autoCheck: 'Auto-check', autoCleanup: 'Auto-cleanup', notifyChannel: '通知チャンネル', lastUpdated: '最終更新', updatedBy: '更新者',
+      globalNotify: 'グローバル通知', defaultScope: '既定 scope', autoCheck: 'Auto-check', autoCleanup: 'Auto-cleanup', notifyChannel: '通知チャンネル', notifyCleanup: '通知 cleanup', lastUpdated: '最終更新', updatedBy: '更新者',
       evidenceChannel: 'Evidence channel · bot 全体', channel: 'チャンネル', channelId: 'Channel ID', server: 'サーバー', status: '状態',
     },
     state: { enabled: '有効', disabled: '無効', local: 'Server · Local', global: 'Global', receiving: 'Broadcast 受信中', silent: '停止中 · broadcast なし' },

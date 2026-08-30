@@ -11,19 +11,36 @@ export const SETUP_ACTION_CHOICES = Object.freeze([
   { value: 'set-default-scope', labelKey: 'setDefaultScope' },
   { value: 'cleanup-on', labelKey: 'cleanupOn' },
   { value: 'cleanup-off', labelKey: 'cleanupOff' },
+  { value: 'notify-cleanup', labelKey: 'notifyCleanup' },
+  { value: 'notify-cleanup-on', labelKey: 'notifyCleanupOn' },
+  { value: 'notify-cleanup-off', labelKey: 'notifyCleanupOff' },
+  { value: 'notify-repin', labelKey: 'notifyRepin' },
   { value: 'notify-on', labelKey: 'notifyOn' },
   { value: 'notify-off', labelKey: 'notifyOff' },
   { value: 'repin', labelKey: 'repin' },
 ]);
 
 export function isSetupActionVisible(choice, state) {
-  const { cleanupEnabled = false, notifyEnabled = true, autoChannelSet = false } = state || {};
+  const {
+    cleanupEnabled = false,
+    notifyCleanupEnabled = false,
+    notifyEnabled = true,
+    autoChannelSet = false,
+    notifyChannelSet = false,
+  } = state || {};
   switch (choice.value) {
     // Cleanup is meaningless without an auto-channel, so hide both toggles then.
     case 'cleanup-on':
       return autoChannelSet && !cleanupEnabled;
     case 'cleanup-off':
       return autoChannelSet && cleanupEnabled;
+    case 'notify-cleanup':
+    case 'notify-repin':
+      return notifyChannelSet;
+    case 'notify-cleanup-on':
+      return notifyChannelSet && !notifyCleanupEnabled;
+    case 'notify-cleanup-off':
+      return notifyChannelSet && notifyCleanupEnabled;
     case 'notify-on':
       return !notifyEnabled;
     case 'notify-off':
