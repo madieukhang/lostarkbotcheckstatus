@@ -1,3 +1,8 @@
+import {
+  channelBelongsToGuild,
+  getChannelGuildId,
+} from './guildBoundary.js';
+
 function pinnedMessages(response) {
   const items = response?.items || response;
   if (!items) return [];
@@ -101,21 +106,34 @@ export function createPinnedWelcomeService({
     }
   }
 
-  async function resolveStaleMessage(ref, channel, client) {
+  async function resolveStaleMessage(ref, channel, client, guildId) {
     if (ref.message) return ref.message;
     try {
       const sourceChannel = ref.channelId === channel.id
         ? channel
         : await client?.channels?.fetch?.(ref.channelId);
+      if (!channelBelongsToGuild(sourceChannel, guildId)) {
+        logger.warn?.(
+          `[${logLabel}] stale welcome guild boundary rejected: guild=${guildId || 'unknown'}` +
+          ` channel=${ref.channelId || 'unknown'}` +
+          ` channelGuild=${getChannelGuildId(sourceChannel) || 'unknown'}`
+        );
+        return null;
+      }
       return await sourceChannel?.messages?.fetch?.(ref.messageId);
     } catch {
       return null;
     }
   }
 
-  async function deleteStaleRefs(refs, channel, client, outcome) {
+  async function deleteStaleRefs(refs, channel, client, guildId, outcome) {
     for (const ref of refs.values()) {
-      const message = await resolveStaleMessage(ref, channel, client);
+      const message = await resolveStaleMessage(
+        ref,
+        channel,
+        client,
+        guildId
+      );
       if (!message) continue;
       try {
         await message.delete();
@@ -141,8 +159,18 @@ export function createPinnedWelcomeService({
       removedOldCount: 0,
       pinScanSucceeded: false,
       hadOwnedWelcomePin: false,
+      guildBoundaryRejected: false,
       ...createOutcome(options),
     };
+    if (!channelBelongsToGuild(channel, guildId)) {
+      outcome.guildBoundaryRejected = true;
+      logger.warn?.(
+        `[${logLabel}] target channel guild boundary rejected: guild=${guildId || 'unknown'}` +
+        ` channel=${channel?.id || 'unknown'}` +
+        ` channelGuild=${getChannelGuildId(channel) || 'unknown'}`
+      );
+      return outcome;
+    }
     const stored = await loadStoredConfig(guildId);
     const pinState = await collectStaleRefs(channel, botUserId, stored);
     outcome.pinScanSucceeded = pinState.pinScanSucceeded;
@@ -210,7 +238,13 @@ export function createPinnedWelcomeService({
       return outcome;
     }
 
-    await deleteStaleRefs(pinState.refs, channel, client, outcome);
+    await deleteStaleRefs(
+      pinState.refs,
+      channel,
+      client,
+      guildId,
+      outcome
+    );
     return outcome;
   }
 

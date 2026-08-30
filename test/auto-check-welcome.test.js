@@ -114,12 +114,14 @@ test('welcome replacement persists the fresh pin before deleting tracked and orp
 
   const oldChannel = {
     id: 'old-channel',
+    guildId: 'guild-1',
     messages: {
       fetch: async (id) => (id === trackedOld.id ? trackedOld : null),
     },
   };
   const targetChannel = {
     id: 'new-channel',
+    guildId: 'guild-1',
     messages: {
       fetchPins: async () => ({
         items: [
@@ -191,11 +193,67 @@ test('welcome replacement persists the fresh pin before deleting tracked and orp
   });
 });
 
+test('welcome replacement leaves a cross-guild stale reference untouched', async () => {
+  const stale = createMessage('stale', 'Welcome en');
+  const fresh = createMessage('fresh', 'Welcome vi');
+  const warnings = [];
+  const staleChannel = {
+    id: 'stale-channel',
+    guildId: 'guild-2',
+    messages: {
+      fetch: async () => stale,
+    },
+  };
+  const channel = {
+    id: 'channel-1',
+    guildId: 'guild-1',
+    messages: {
+      fetchPins: async () => ({ items: [] }),
+    },
+    send: async () => fresh,
+  };
+  const GuildConfigModel = createGuildConfig({
+    stored: {
+      guildId: 'guild-1',
+      autoCheckWelcomeMessageId: stale.id,
+      autoCheckWelcomeChannelId: staleChannel.id,
+    },
+  });
+  const service = createAutoCheckWelcomeService({
+    GuildConfigModel,
+    channelGuard: createAutoCheckChannelGuard(),
+    buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
+    getGuildLanguageFn: async () => 'vi',
+    supportedLanguageCodes: ['en', 'vi', 'jp'],
+    logger: { warn: (...args) => warnings.push(args.join(' ')) },
+  });
+
+  const outcome = await service.postWelcome({
+    botUserId: 'bot',
+    channel,
+    client: {
+      channels: {
+        fetch: async (id) => (id === staleChannel.id ? staleChannel : null),
+      },
+    },
+    guildId: 'guild-1',
+  });
+
+  assert.equal(outcome.guildBoundaryRejected, false);
+  assert.equal(outcome.pinned, true);
+  assert.equal(outcome.persisted, true);
+  assert.equal(outcome.removedOldCount, 0);
+  assert.equal(stale.state.deleted, 0);
+  assert.deepEqual(GuildConfigModel.updates[0].query, { guildId: 'guild-1' });
+  assert.match(warnings.join('\n'), /stale welcome guild boundary rejected/);
+});
+
 test('first server-local welcome does not run destructive cleanup when cleanup is off', async () => {
   const fresh = createMessage('fresh', 'Welcome vi');
   let cleanupCalls = 0;
   const channel = {
     id: 'channel-1',
+    guildId: 'guild-1',
     messages: { fetchPins: async () => ({ items: [] }) },
     send: async () => fresh,
   };
@@ -229,6 +287,63 @@ test('first server-local welcome does not run destructive cleanup when cleanup i
   );
 });
 
+test('forced repin rejects a cross-guild target before cleanup or send', async () => {
+  let configReads = 0;
+  let cleanupCalls = 0;
+  let sendCalls = 0;
+  const channel = {
+    id: 'channel-2',
+    guildId: 'guild-2',
+    messages: {
+      fetchPins: async () => {
+        throw new Error('pin scan must not run');
+      },
+    },
+    async send() {
+      sendCalls += 1;
+      throw new Error('send must not run');
+    },
+  };
+  const service = createAutoCheckWelcomeService({
+    GuildConfigModel: {
+      findOne() {
+        configReads += 1;
+        return { lean: async () => null };
+      },
+      async findOneAndUpdate() {
+        throw new Error('persistence must not run');
+      },
+    },
+    channelGuard: createAutoCheckChannelGuard(),
+    buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
+    getGuildLanguageFn: async () => 'vi',
+    cleanupMessages: async () => {
+      cleanupCalls += 1;
+      return { deleted: 1, failed: 0, truncated: false };
+    },
+    supportedLanguageCodes: ['en', 'vi', 'jp'],
+    logger: { warn() {} },
+  });
+
+  const outcome = await service.postWelcome({
+    botUserId: 'bot',
+    channel,
+    client: { channels: { fetch: async () => channel } },
+    cleanupEnabled: false,
+    forceCleanup: true,
+    guildId: 'guild-1',
+  });
+
+  assert.equal(outcome.guildBoundaryRejected, true);
+  assert.equal(outcome.posted, false);
+  assert.equal(outcome.pinned, false);
+  assert.equal(outcome.persisted, false);
+  assert.equal(outcome.cleanupAttempted, false);
+  assert.equal(configReads, 0);
+  assert.equal(cleanupCalls, 0);
+  assert.equal(sendCalls, 0);
+});
+
 test('forced repin cleans before posting even when scheduled cleanup is off', async () => {
   const old = createMessage('old', 'Welcome vi');
   const fresh = createMessage('fresh', 'Welcome vi');
@@ -246,6 +361,7 @@ test('forced repin cleans before posting even when scheduled cleanup is off', as
   };
   const channel = {
     id: 'channel-1',
+    guildId: 'guild-1',
     messages: {
       fetchPins: async () => ({ items: [{ message: old }] }),
       fetch: async () => old,
@@ -316,6 +432,7 @@ test('first welcome cleans non-pinned messages before posting and records the cl
   const events = [];
   const channel = {
     id: 'channel-1',
+    guildId: 'guild-1',
     messages: {
       fetchPins: async () => ({ items: [] }),
     },
@@ -488,6 +605,7 @@ test('autochannel config is not persisted when the fresh welcome cannot be pinne
   };
   const channel = {
     id: 'channel-1',
+    guildId: 'guild-1',
     messages: { fetchPins: async () => ({ items: [] }) },
     send: async () => fresh,
   };
@@ -520,6 +638,7 @@ test('first welcome skips destructive cleanup when pin discovery fails', async (
   let cleanupCalls = 0;
   const channel = {
     id: 'channel-1',
+    guildId: 'guild-1',
     messages: {
       fetchPins: async () => {
         throw new Error('pins unavailable');
@@ -559,6 +678,7 @@ test('incomplete first cleanup leaves the day unclaimed so the scheduler can ret
   const fresh = createMessage('fresh', 'Welcome en');
   const channel = {
     id: 'channel-1',
+    guildId: 'guild-1',
     messages: { fetchPins: async () => ({ items: [] }) },
     send: async () => fresh,
   };
@@ -592,6 +712,7 @@ test('welcome replacement rolls back the fresh message and preserves old pins on
   const fresh = createMessage('fresh', 'Welcome vi');
   const channel = {
     id: 'channel-1',
+    guildId: 'guild-1',
     messages: {
       fetchPins: async () => ({ items: [{ message: old }] }),
       fetch: async () => old,

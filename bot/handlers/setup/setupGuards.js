@@ -4,6 +4,7 @@ import { postAutoCheckWelcome } from '../../services/setup/autoCheckWelcome.js';
 import { postListNotifyWelcome } from '../../services/setup/listNotifyWelcome.js';
 import { checkBotPermissions } from '../../services/setup/channelPermissions.js';
 import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
+import { channelBelongsToGuild } from '../../services/setup/guildBoundary.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
 import { editAlert } from '../../utils/interactionReplies.js';
 import { t } from '../../services/i18n/index.js';
@@ -53,7 +54,10 @@ export async function resolveGuildTextChannel(interaction, channelId) {
       channel = null;
     }
   }
-  return channel?.type === ChannelType.GuildText ? channel : null;
+  return channel?.type === ChannelType.GuildText &&
+    channelBelongsToGuild(channel, interaction.guild?.id)
+    ? channel
+    : null;
 }
 
 export async function resolveWelcomePinContext(

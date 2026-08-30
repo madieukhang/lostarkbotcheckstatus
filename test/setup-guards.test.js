@@ -9,6 +9,7 @@ import {
   postSetupWelcome,
   reportMissingChannelPermissions,
   requireSetupGuildTextChannel,
+  resolveGuildTextChannel,
   resolveListNotifyWelcomePinContext,
   resolveWelcomePinContext,
 } from '../bot/handlers/setup/setupGuards.js';
@@ -67,6 +68,40 @@ test('setup permission guard keeps the shared localized missing-permission paylo
       lang: 'jp',
     },
   ]);
+});
+
+test('configured channel resolver accepts its guild and rejects another guild', async () => {
+  const ownGuildChannel = {
+    id: 'channel-1',
+    guildId: 'guild-1',
+    type: ChannelType.GuildText,
+  };
+  const crossGuildChannel = {
+    id: 'channel-2',
+    guildId: 'guild-2',
+    type: ChannelType.GuildText,
+  };
+  const interaction = {
+    guild: {
+      id: 'guild-1',
+      channels: {
+        cache: new Map([
+          [ownGuildChannel.id, ownGuildChannel],
+          [crossGuildChannel.id, crossGuildChannel],
+        ]),
+        fetch: async () => crossGuildChannel,
+      },
+    },
+  };
+
+  assert.strictEqual(
+    await resolveGuildTextChannel(interaction, ownGuildChannel.id),
+    ownGuildChannel
+  );
+  assert.equal(
+    await resolveGuildTextChannel(interaction, crossGuildChannel.id),
+    null
+  );
 });
 
 test('welcome-pin context resolves the configured channel and one canonical permission policy', async () => {

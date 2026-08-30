@@ -91,6 +91,7 @@ test('notification welcome persists the fresh pin before removing its predecesso
   };
   const channel = {
     id: 'notify-1',
+    guildId: 'guild-1',
     messages: {
       fetchPins: async () => ({ items: [{ message: old }] }),
       fetch: async () => old,
@@ -163,6 +164,7 @@ test('notification channel config is not persisted when its welcome cannot be pi
   });
   const channel = {
     id: 'notify-1',
+    guildId: 'guild-1',
     messages: { fetchPins: async () => ({ items: [] }) },
     send: async () => fresh,
   };
