@@ -366,7 +366,7 @@ export default {
       scopeBlocked: { title: 'Scope change blocked', footer: 'Remove the conflicting entry first, or merge them manually.' },
       noEffective: { title: 'Nothing would change', description: 'The values provided already match the current entry.' },
     },
-    change: { reason: 'Reason: "{old}" → "{next}"', list: 'List: {old} → {next}', raid: 'Raid: "{old}" → "{next}"', logs: 'Logs: updated', evidence: 'Evidence: updated', scope: 'Scope: {old} → {next}', append: 'Append alts: {names}', appendWithDuplicates: 'Append alts: {names} (skipped duplicates: {duplicates})' },
+    change: { reason: '📝 **Reason:** `{old}` → `{next}`', list: '📒 **List:** `{old}` → `{next}`', raid: '🗡️ **Raid:** `{old}` → `{next}`', logs: '🔗 **Logs:** updated', evidence: '📎 **Evidence:** updated', scope: '🌐 **Scope:** `{old}` → `{next}`', append: 'Append alts: {names}', appendWithDuplicates: 'Append alts: {names} (skipped duplicates: {duplicates})' },
     applyFailed: { title: 'Edit failed', description: 'I could not apply the edit.' },
     approval: { requiredTitle: 'List edit · Approval required', deliveryFailed: { title: 'I could not pass that edit on', footer: 'Nothing was changed. Try again, or go straight to an officer.' }, sent: { title: 'Edit request sent', description: 'An approver has been notified. The edit will apply after approval.', pending: 'Pending changes ({count})' } },
   },

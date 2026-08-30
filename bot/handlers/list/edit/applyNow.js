@@ -242,7 +242,7 @@ export async function applyListEditNow({
         guildId: interaction.guild.id,
         requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
         requestedByTag: interaction.user.tag,
-      }).catch(() => {});
+      }, { changes }).catch(() => {});
     }
 
   } catch (err) {

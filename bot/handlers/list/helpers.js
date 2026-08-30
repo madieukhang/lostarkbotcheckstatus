@@ -121,17 +121,31 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   const scopeTag = entry.scope === 'server' ? ` (${t('dialogue.broadcast.localTag', lang)})` : '';
   const rosterLink = rosterUrl(entry.name);
 
+  // Reason is prose and takes the full width · as an inline field it was
+  // squeezed into a third of the card and wrapped after a few words.
+  // Name and raid are short values and share the row above it.
   const fields = [
-    { name: t('dialogue.listEdit.success.name', lang), value: `[${entry.name}](${rosterLink})`, inline: true },
-    { name: t('dialogue.listEdit.success.reason', lang), value: entry.reason || t('dialogue.broadcast.notAvailable', lang), inline: true },
+    { name: `👤 ${t('dialogue.listEdit.success.name', lang)}`, value: `[${entry.name}](${rosterLink})`, inline: true },
   ];
   if (entry.raid) {
-    fields.push({ name: t('dialogue.listEdit.success.raid', lang), value: `\`${entry.raid}\``, inline: true });
+    fields.push({ name: `🗡️ ${t('dialogue.listEdit.success.raid', lang)}`, value: `\`${entry.raid}\``, inline: true });
   }
+  // One inline field alone already fills the row, so it needs no
+  // padding · two would otherwise split 50/50 instead of thirds.
+  if (fields.length > 1) {
+    while (fields.length % 3 !== 0) fields.push({ name: '\u200b', value: '\u200b', inline: true });
+  }
+  fields.push({
+    name: `📝 ${t('dialogue.listEdit.success.reason', lang)}`,
+    value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
+    inline: false,
+  });
   if (changes.length > 0) {
-    const changesText = changes.map((c) => `• ${c}`).join('\n');
+    // Each change line already carries its own icon and code-wrapped
+    // values, so a bullet in front of it only adds noise.
+    const changesText = changes.join('\n');
     fields.push({
-      name: t('dialogue.listEdit.success.changes', lang, { count: changes.length }),
+      name: `🔁 ${t('dialogue.listEdit.success.changes', lang, { count: changes.length })}`,
       value: changesText.length > 1024 ? changesText.slice(0, 1020) + '…' : changesText,
       inline: false,
     });

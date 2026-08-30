@@ -192,6 +192,7 @@ export function createBroadcastServices({
       displayUrl: preResolvedUrl,
       rosterCharacters = [],
       newAltNames = [],
+      changes = [],
     } = options;
     const isEnrich = action === 'enriched';
     const { color, icon } = getListContext(payload.type);
@@ -268,6 +269,18 @@ export function createBroadcastServices({
       }
       if (snap?.combatScore) {
         fields.push({ name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`, value: `\`${snap.combatScore}\``, inline: true });
+      }
+
+      // An edit broadcast said only "someone edited this entry", which
+      // left every reader to diff the card against a memory of the old
+      // one. The same change lines the editor saw go here too.
+      if (action === 'edited' && changes.length > 0) {
+        const changesText = changes.join('\n');
+        fields.push({
+          name: `🔁 ${t('dialogue.listEdit.success.changes', lang, { count: changes.length })}`,
+          value: changesText.length > 1024 ? `${changesText.slice(0, 1020)}…` : changesText,
+          inline: false,
+        });
       }
 
       const rosterFieldOptions = {
