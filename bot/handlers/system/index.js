@@ -13,14 +13,21 @@ const STATUS_GLYPH = Object.freeze({
   [STATUS.MAINTENANCE]: '🟡',
 });
 
-function formatStatus(status, lang) {
-  switch (status) {
-    case STATUS.ONLINE:      return `${STATUS_GLYPH[STATUS.ONLINE]} ${t('dialogue.system.status.labels.online', lang)}`;
-    case STATUS.OFFLINE:     return `${STATUS_GLYPH[STATUS.OFFLINE]} ${t('dialogue.system.status.labels.offline', lang)}`;
-    case STATUS.MAINTENANCE: return `${STATUS_GLYPH[STATUS.MAINTENANCE]} ${t('dialogue.system.status.labels.maintenance', lang)}`;
-    default:                 return `❓ ${t('dialogue.system.status.labels.unknown', lang)}`;
-  }
+const STATUS_LABEL_KEY = Object.freeze({
+  [STATUS.ONLINE]:      'online',
+  [STATUS.OFFLINE]:     'offline',
+  [STATUS.MAINTENANCE]: 'maintenance',
+});
+
+/**
+ * Localized word for a status, without the glyph. The per-server grid
+ * puts the glyph on the field label instead, so the value stays a plain
+ * token it can render as a badge.
+ */
+function statusLabel(status, lang) {
+  return t(`dialogue.system.status.labels.${STATUS_LABEL_KEY[status] || 'unknown'}`, lang);
 }
+
 
 export function resolveSystemHealth({
   onlineCount,
@@ -109,8 +116,20 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
         const pb = PRIORITY[b[1]] ?? 3;
         return pa - pb;
       });
+      // Pad the summary badges out to a whole row so the per-server grid
+      // starts on a line of its own instead of inheriting leftover
+      // columns from the counts above it.
+      while (fields.length % 3 !== 0) fields.push({ name: '​', value: '​', inline: true });
+
       for (const [server, status] of sortedServers) {
-        fields.push({ name: server, value: formatStatus(status, lang), inline: true });
+        // The status glyph leads the label, as every other card in the
+        // bot does · a bare server name was the one unlabelled field
+        // left, and it put the icon on the value instead.
+        fields.push({
+          name: `${STATUS_GLYPH[status] || '❓'} ${server}`,
+          value: `\`${statusLabel(status, lang)}\``,
+          inline: true,
+        });
       }
 
       const embed = createArtistEmbed(lang)

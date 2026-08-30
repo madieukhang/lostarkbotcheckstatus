@@ -14,6 +14,8 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Changed
+- `/la-status` puts the status glyph on the server's field label rather than its value, so the per-server grid reads like every other card (icon on the label, the value as a badge). The summary counts above it pad out to a whole row so the grid starts on a line of its own.
+- The hidden-roster suggestion list gains the 🔍 its twin on `/la-list add` already had; both render the same field from the same locale key.
 - The list-check result rows (typed `check <name>` and the screenshot path) follow the same grammar as the rest: CP carries its unit inside the badge (`≈4089.17 CP`), the raid is a badge rather than bracketed text, and every character name links to its roster page - the checked name, the entry it matched through, and the alts beneath it. Previously only the alts and the matched entry were plain text sitting beside linked names.
 
 ### Fixed

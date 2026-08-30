@@ -14,7 +14,7 @@ import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
-import { COLORS } from '../../utils/ui.js';
+import { COLORS, ICONS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
@@ -267,7 +267,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
             severity: AlertSeverity.ERROR,
             title: t('dialogue.listAdd.noRoster.title', lang),
             description: t('dialogue.listAdd.noRoster.withSuggestions', lang, { name }),
-            fields: [{ name: t('dialogue.listAdd.noRoster.suggestions', lang), value: formatSuggestionLines(filtered).slice(0, 1024), inline: false }],
+            fields: [{ name: `${ICONS.search} ${t('dialogue.listAdd.noRoster.suggestions', lang)}`, value: formatSuggestionLines(filtered).slice(0, 1024), inline: false }],
             footer: t('dialogue.listAdd.noRoster.suggestionFooter', lang),
             lang,
           })],
