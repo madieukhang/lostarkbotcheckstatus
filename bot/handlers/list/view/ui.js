@@ -272,23 +272,36 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  *
  *   1. Title bar    - list-icon + entry name + bible-link via setURL
  *   2. Reason field - full reason text (1024 char cap)
- *   3. Inline meta  - Raid · List · Added (3-up grid)
+ *   3. Inline meta  - Raid · List · Added · ilvl · CP · Added by,
+ *                     padded with zero-width spacers to whole 3-up rows
  *   4. Roster field - "Tracked alts" with linked names; falls back
  *                     to "(only this character)" if allCharacters is
  *                     just the entry name
  *   5. Evidence     - image, expired warning, or an explicit not-attached note
- *   6. Logs / Added by (optional) - kept from prior version
+ *   6. Logs (optional)
  *
- * The Roster field is the headline change vs the older detail card:
- * an officer auditing a blacklist hit can now see the full list of
- * names that resolve to this entry without re-running /la-list view
- * or hitting bible directly.
+ * `statMap` (lowercase name -> `{ className, itemLevel, combatScore }`,
+ * built by statMapFromRosterCharacters or a RosterSnapshot query) is what
+ * turns the alt rows from bare links into class + ilvl + CP rows and fills
+ * the ilvl / CP slots. It is optional: a caller with no roster data in hand
+ * gets the card without those slots rather than a grid of "N/A", which is
+ * why this reads as an upgrade on /la-roster and a no-op everywhere else
+ * until those callers pass one too.
  */
-export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false, lang = 'en' } = {}) {
+export function buildEvidenceEmbed(entry, displayUrl, {
+  includeAddedBy = false,
+  lang = 'en',
+  statMap = new Map(),
+} = {}) {
   const link = rosterUrl(entry.name);
   const fields = [
     { name: t('listView.evidence.reason', lang), value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
   ];
+
+  const snapshot = statMap.get(String(entry.name || '').trim().toLowerCase()) || null;
+  const itemLevel = Number(String(snapshot?.itemLevel ?? '').replace(/,/g, ''));
+  const combatScore = String(snapshot?.combatScore || '').trim();
+  const addedByDisplay = getAddedByDisplay(entry);
 
   const inlineMeta = [];
   if (entry.raid) inlineMeta.push({ name: t('listView.evidence.raid', lang), value: `\`${entry.raid}\``, inline: true });
@@ -299,6 +312,26 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false, 
   });
   if (entry.addedAt) {
     inlineMeta.push({ name: t('listView.evidence.added', lang), value: relativeTime(entry.addedAt), inline: true });
+  }
+  // ilvl and CP only appear when the caller supplied a stat snapshot.
+  // Rendering them as "N/A" would cost two slots on every surface that
+  // has no roster data to give, which is most of them.
+  if (Number.isFinite(itemLevel) && itemLevel > 0) {
+    inlineMeta.push({ name: t('listView.evidence.itemLevel', lang), value: `\`${itemLevel.toFixed(2)}\``, inline: true });
+  }
+  if (combatScore && combatScore !== '?') {
+    inlineMeta.push({ name: t('listView.evidence.combatPower', lang), value: `\`${combatScore}\``, inline: true });
+  }
+  // Added by joins the grid instead of trailing the card, the way the
+  // check-detail embed places it beside CP.
+  if (includeAddedBy && addedByDisplay) {
+    inlineMeta.push({ name: t('listView.evidence.addedBy', lang), value: addedByDisplay, inline: true });
+  }
+  // Discord packs three inline fields per row and stretches a lone
+  // trailing field to full width · pad to a whole row so the grid keeps
+  // its columns whatever combination of optional fields showed up.
+  while (inlineMeta.length % 3 !== 0) {
+    inlineMeta.push({ name: '\u200b', value: '\u200b', inline: true });
   }
   fields.push(...inlineMeta);
 
@@ -314,6 +347,7 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false, 
   const altsField = renderTrackedAltsField({
     names: entry.allCharacters,
     primaryName: entry.name,
+    statMap,
     emptySentinel: t('listView.evidence.onlyThisCharacter', lang),
     label: `🧬 ${t('dialogue.broadcast.fields.trackedAlts', lang)}`,
     overflowTemplate: t('dialogue.broadcast.more', lang),
@@ -346,11 +380,6 @@ export function buildEvidenceEmbed(entry, displayUrl, { includeAddedBy = false, 
       value: `[${t('listView.evidence.viewLogs', lang)}](${entry.logsUrl})`,
       inline: false,
     });
-  }
-
-  const addedByDisplay = getAddedByDisplay(entry);
-  if (includeAddedBy && addedByDisplay) {
-    embed.addFields({ name: t('listView.evidence.addedBy', lang), value: addedByDisplay, inline: true });
   }
 
   return embed;

@@ -41,6 +41,7 @@ import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { buildEvidenceEmbed } from '../list/view/ui.js';
 import { decorateListEntry } from '../list/helpers.js';
+import { statMapFromRosterCharacters } from '../list/trackedAltsRender.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
@@ -199,12 +200,13 @@ export async function handleRosterCommand(interaction) {
       // the actual fetch endpoint, controlled by the scraper/worker layer.
       .setURL(rosterUrl(name))
       .setDescription(fullDescription)
-      .setColor(embedColor)
-      .setFooter({ text: t('dialogue.roster.footer', lang) })
-      .setTimestamp();
+      .setColor(embedColor);
 
     const embeds = [embed];
     const statusLines = [];
+    // Stats for the evidence cards below · same roster this command just
+    // rendered, so no extra request and no snapshot-write race.
+    const rosterStatMap = statMapFromRosterCharacters(characters);
 
     if (trustedResult) {
       statusLines.push(`🛡️ ${t('dialogue.roster.trusted', lang, { name: trustedResult.name })}${trustedResult.reason ? ` · *${trustedResult.reason}*` : ''}`);
@@ -221,7 +223,7 @@ export async function handleRosterCommand(interaction) {
       // /la-roster hit would see less context than they would elsewhere.
       const blackImageUrl = await resolveDisplayImageUrl(blacklistResult, interaction.client);
       if (blackImageUrl) {
-        embeds.unshift(buildEvidenceEmbed(decorateListEntry(blacklistResult, 'black'), blackImageUrl, { lang }));
+        embeds.unshift(buildEvidenceEmbed(decorateListEntry(blacklistResult, 'black'), blackImageUrl, { lang, statMap: rosterStatMap }));
       }
     }
 
@@ -232,7 +234,7 @@ export async function handleRosterCommand(interaction) {
 
       const whiteImageUrl = await resolveDisplayImageUrl(whitelistResult, interaction.client);
       if (whiteImageUrl) {
-        embeds.unshift(buildEvidenceEmbed(decorateListEntry(whitelistResult, 'white'), whiteImageUrl, { lang }));
+        embeds.unshift(buildEvidenceEmbed(decorateListEntry(whitelistResult, 'white'), whiteImageUrl, { lang, statMap: rosterStatMap }));
       }
     }
 

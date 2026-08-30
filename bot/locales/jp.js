@@ -399,6 +399,8 @@ const jp = {
     successDescription: 'これからわたくしは **{flag} {label}** でお話しますわ。',
     unchangedTitle: '🌐 言語は変わっていません',
     unchangedDescription: 'もう **{flag} {label}** を使っていますわ。',
+      itemLevel: '📊 ilvl',
+      combatPower: '⚔️ CP',
     footer: 'いつでも /la-language-switch で変更できます',
   },
 };

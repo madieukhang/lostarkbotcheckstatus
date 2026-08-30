@@ -564,6 +564,8 @@ const en = {
     successDescription: 'I will speak **{flag} {label}** with you from now on.',
     unchangedTitle: '🌐 Language unchanged',
     unchangedDescription: "You're already using **{flag} {label}**.",
+      itemLevel: '📊 ilvl',
+      combatPower: '⚔️ CP',
     footer: 'Run /la-language-switch any time to switch back',
   },
 };
