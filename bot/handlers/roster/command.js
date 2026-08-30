@@ -211,15 +211,15 @@ export async function handleRosterCommand(interaction) {
     // rendered, so no extra request and no snapshot-write race.
     const rosterStatMap = statMapFromRosterCharacters(characters);
 
+    // Only trusted gets a status line. Blacklist and whitelist hits each
+    // open their own notice card above this one, which already names the
+    // list, the raid and the reason in full · repeating a truncated copy
+    // here pushed the roster's own summary line further down for nothing.
     if (trustedResult) {
       statusLines.push(`🛡️ ${t('dialogue.roster.trusted', lang, { name: trustedResult.name })}${trustedResult.reason ? ` · *${trustedResult.reason}*` : ''}`);
     }
 
     if (blacklistResult) {
-      const reason = blacklistResult.reason ? ` · *${blacklistResult.reason}*` : '';
-      const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
-      statusLines.push(`⛔ ${t('dialogue.roster.blacklisted', lang, { name })}${raid}${reason}`);
-
       // Notice shape: the same grammar as a list-change broadcast, with
       // the screenshot behind a button. This card is a side note on a
       // roster lookup, so it renders whether or not evidence exists ·
@@ -238,10 +238,6 @@ export async function handleRosterCommand(interaction) {
     }
 
     if (whitelistResult) {
-      const reason = whitelistResult.reason ? ` · *${whitelistResult.reason}*` : '';
-      const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
-      statusLines.push(`✅ ${t('dialogue.roster.whitelisted', lang, { name })}${raid}${reason}`);
-
       embeds.unshift(buildEvidenceEmbed(decorateListEntry(whitelistResult, 'white'), '', {
         lang,
         statMap: rosterStatMap,

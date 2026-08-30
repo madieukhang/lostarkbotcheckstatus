@@ -14,6 +14,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Changed
+- A blacklist or whitelist hit on `/la-roster` no longer repeats itself inside the roster card. The notice card above it already names the list, the raid and the full reason, while the status line carried a truncated copy and pushed the roster's own summary line further down. Trusted keeps its line, because a trusted match has no card of its own.
 - Mongo monitor claims now use Mongoose 9's `returnDocument: 'before'` option instead of deprecated `new: false`, preserving the existing pre-update-document semantics without startup warnings.
 - CP now carries its unit inside the badge everywhere a character row shows one: `≈4089.17 CP` instead of `CP ` followed by a separate badge. This matches the `/la-roster` roster rows and makes one badge equal one labelled value. Fields that already have a ⚔️ CP label keep a bare value, so the label is never said twice.
 - A list hit on `/la-roster` now renders as a notice card in the same shape as a list-change broadcast: title names the list, one Artist line names the character, and the evidence screenshot moves behind a 📎 **Xem evidence** button instead of being embedded full width. That card also renders when an entry has no evidence at all; previously the whole card was gated on an image existing, which hid the reason, stats and tracked alts along with it.
