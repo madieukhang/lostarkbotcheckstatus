@@ -1,7 +1,7 @@
 /**
  * monitor.js
  * Handles the periodic server-status polling loop.
- * Reads/writes state to a local JSON file and triggers Discord notifications
+ * Reads/writes monitor state in MongoDB and triggers Discord notifications
  * when the server transitions from offline/maintenance → online.
  */
 

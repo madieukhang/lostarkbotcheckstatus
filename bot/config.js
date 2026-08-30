@@ -107,9 +107,6 @@ const config = {
     .map((k) => (k || '').trim())
     .filter(Boolean),
 
-  /** @deprecated · use scraperApiKeys[0] instead (kept for backward compat) */
-  get scraperApiKey() { return this.scraperApiKeys[0] || ''; },
-
   /** Approver IDs for /la-list add approval flow (comma-separated Discord user IDs) */
   officerApproverIds: (process.env.OFFICER_APPROVER_IDS || '')
     .split(',').map((s) => s.trim()).filter(Boolean),
