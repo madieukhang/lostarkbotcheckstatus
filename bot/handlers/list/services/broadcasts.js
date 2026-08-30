@@ -134,6 +134,8 @@ export function buildTrackedAltsField(entry, statMap = new Map(), options = {}) 
     names: entry?.allCharacters,
     primaryName: entry?.name,
     statMap,
+    includePrimary: true,
+    label: '🧬 Tracked rosters',
     ...options,
   });
 }
@@ -269,7 +271,7 @@ export function createBroadcastServices({
       }
 
       const rosterFieldOptions = {
-        label: `${isEnrich ? '🆕' : '🧬'} ${t(`dialogue.broadcast.fields.${isEnrich ? 'newAlts' : 'trackedAlts'}`, lang)}`,
+        label: `${isEnrich ? '🆕' : '🧬'} ${t(`dialogue.broadcast.fields.${isEnrich ? 'newAlts' : 'trackedRosters'}`, lang)}`,
         overflowTemplate: t('dialogue.broadcast.more', lang),
       };
       const altsField = isEnrich

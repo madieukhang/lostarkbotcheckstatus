@@ -190,7 +190,7 @@ export default {
       enriched: '{icon} Tớ lần ra thêm **{newCount}** alt của {name} trong **{list}**{scope} - vị chi là **{total}** alt đang theo dõi.',
     },
     altOne: 'alt', altMany: 'alt',
-    fields: { reason: 'Lý do', raid: 'Raid', edited: 'Đã sửa', added: 'Đã thêm', itemLevel: 'ilvl', combatPower: 'CP', trackedAlts: 'Alt đang track', newAlts: 'Alt mới' },
+    fields: { reason: 'Lý do', raid: 'Raid', edited: 'Đã sửa', added: 'Đã thêm', itemLevel: 'ilvl', combatPower: 'CP', trackedAlts: 'Alt đang track', trackedRosters: 'Các roster đang track', newAlts: 'Alt mới' },
     notAvailable: 'Chưa có', more: '... và {count} tên khác',
     bulkTitle: 'Thêm hàng loạt{local} · {count} {entryWord}', localSuffix: ' (Nội bộ)', entryOne: 'entry', entryMany: 'entry',
   },
@@ -253,7 +253,7 @@ export default {
       title: 'Đã có trong {list}', direct: '**{name}** đã có trong {list}.', roster: '**{name}** đã có trong {list} qua roster của **{matched}**.', matchType: 'Kiểu trùng', rosterAlt: 'Alt cùng roster', exactName: 'Trùng tên chính xác', matchedName: 'Tên khớp', scope: 'Scope', addedBy: 'Được thêm bởi', timeAdded: 'Thời gian thêm', existingReason: 'Lý do hiện có', raid: 'Raid', footer: 'Dùng `/la-list view type:{type}` để xem đủ entry, hoặc `/la-list edit` để sửa.', contentDirect: '{name} đã tồn tại trong {list}.', contentRoster: '{name} đã tồn tại trong {list} qua roster {matched}.',
     },
     success: {
-      title: '{list} · Đã thêm · {name}', hero: '**{user}** đã thêm {name} vào **{list}**{scope}.', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Lý do', links: 'Liên kết', trackedAlts: 'Alt đang track' }, onlyCharacter: 'Entry này hiện chỉ track character vừa nhập.', roster: 'Roster', logs: 'Logs', evidenceLogs: 'Evidence logs', sourceVisible: 'roster hiển thị', sourceHidden: 'fallback từ roster ẩn', footer: 'Thêm bởi {user} · {source}', officerFallback: 'một officer', content: 'Đã duyệt thêm: **{name}** đã vào {list}.',
+      title: '{list} · Đã thêm · {name}', hero: '**{user}** đã thêm {name} vào **{list}**{scope}.', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Lý do', links: 'Liên kết', trackedRosters: 'Các roster đang track' }, onlyCharacter: 'Entry này hiện chỉ track character vừa nhập.', roster: 'Roster', logs: 'Logs', evidenceLogs: 'Evidence logs', sourceVisible: 'roster hiển thị', sourceHidden: 'fallback từ roster ẩn', footer: 'Thêm bởi {user} · {source}', officerFallback: 'một officer', content: 'Đã duyệt thêm: **{name}** đã vào {list}.',
     },
   },
   listView: {

@@ -28,6 +28,19 @@ test('tracked alts renderer defaults to the "🧬 Tracked alts" field label', ()
   assert.equal(field.name, '🧬 Tracked alts (1)');
 });
 
+test('tracked roster mode prepends the primary character and removes case-insensitive duplicates', () => {
+  const field = renderTrackedAltsField({
+    names: ['Altone', 'MAIN', 'altone'],
+    primaryName: 'Main',
+    includePrimary: true,
+    label: '🧬 Tracked rosters',
+  });
+
+  assert.equal(field.name, '🧬 Tracked rosters (2)');
+  assert.match(field.value, /^\*\*1\.\*\* \[Main\]/);
+  assert.match(field.value, /\n\*\*2\.\*\* \[Altone\]/);
+});
+
 test('tracked alts renderer supports a custom label + class icon for the enrich "New alts" field', async () => {
   // The enrich broadcast reuses this renderer with label "🆕 New alts" so the
   // just-appended alts render with the SAME class icon + ilvl vocabulary as the

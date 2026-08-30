@@ -40,7 +40,7 @@ test('broadcast snapshot hydration performs at most one roster fetch and persist
   assert.equal(persisted[0][1], 'Main');
 });
 
-test('list broadcast tracked alts include class icon, item level, and CP when known', () => {
+test('list broadcast tracked rosters include the primary character, class icon, item level, and CP', () => {
   const oldBardEmoji = CLASS_EMOJI_MAP.Bard;
   CLASS_EMOJI_MAP.Bard = '<:bard:1>';
 
@@ -54,17 +54,21 @@ test('list broadcast tracked alts include class icon, item level, and CP when kn
       allCharacters: ['Sphinx', 'Elynnä', 'NoSnap'],
     }, statMap);
 
-    assert.equal(field.name, '🧬 Tracked alts (2)');
+    assert.equal(field.name, '🧬 Tracked rosters (3)');
     // Numbering is now bold-prefixed (`**N.**`) since the broadcast
     // helper delegates to the shared trackedAltsRender · cross-surface
     // consistency with /la-list view evidence detail.
     assert.match(
       field.value,
-      /\*\*1\.\*\* <:bard:1> \[Elynnä\]\(https:\/\/lostark\.bible\/character\/NA\/Elynn%C3%A4\/roster\) · `1745\.00` · CP `4501\.38`/
+      /\*\*1\.\*\* \[Sphinx\]\(https:\/\/lostark\.bible\/character\/NA\/Sphinx\/roster\)/
     );
     assert.match(
       field.value,
-      /\*\*2\.\*\* \[NoSnap\]\(https:\/\/lostark\.bible\/character\/NA\/NoSnap\/roster\)/
+      /\*\*2\.\*\* <:bard:1> \[Elynnä\]\(https:\/\/lostark\.bible\/character\/NA\/Elynn%C3%A4\/roster\) · `1745\.00` · CP `4501\.38`/
+    );
+    assert.match(
+      field.value,
+      /\*\*3\.\*\* \[NoSnap\]\(https:\/\/lostark\.bible\/character\/NA\/NoSnap\/roster\)/
     );
   } finally {
     CLASS_EMOJI_MAP.Bard = oldBardEmoji;

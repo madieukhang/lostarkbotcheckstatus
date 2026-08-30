@@ -87,8 +87,11 @@ export function formatAltLine(name, index, record) {
  *
  * @param {Object} options
  * @param {string[]} options.names - allCharacters / discovered alts.
- * @param {string} options.primaryName - Entry's own name (filtered out).
+ * @param {string} options.primaryName - Entry's own name. Filtered out unless
+ *   `includePrimary` is enabled.
  * @param {Map<string, object>} [options.statMap] - Lowercase-name → snapshot record.
+ * @param {boolean} [options.includePrimary=false] - Prepend and retain the entry's
+ *   own character so roster-oriented fields include the complete tracked roster.
  * @param {string|null} [options.emptySentinel] - Field value when no alts.
  * @param {string} [options.label='🧬 Tracked alts'] - Field-name prefix. Lets
  *   the enrich broadcast reuse this renderer as a "🆕 New alts" field while
@@ -101,15 +104,23 @@ export function renderTrackedAltsField({
   names,
   primaryName,
   statMap = new Map(),
+  includePrimary = false,
   emptySentinel = null,
   label = '🧬 Tracked alts',
   overflowTemplate = '... and {count} more',
 } = {}) {
   const all = Array.isArray(names) ? names : [];
   const primaryKey = lcKey(primaryName);
-  const others = all
+  const candidates = includePrimary ? [primaryName, ...all] : all;
+  const seen = new Set();
+  const others = candidates
     .map((n) => String(n || '').trim())
-    .filter((n) => n && lcKey(n) !== primaryKey);
+    .filter((n) => {
+      const key = lcKey(n);
+      if (!n || (!includePrimary && key === primaryKey) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
   if (others.length === 0) {
     if (emptySentinel == null) return null;

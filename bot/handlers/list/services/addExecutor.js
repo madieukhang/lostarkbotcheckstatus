@@ -133,6 +133,27 @@ export function buildListAddSuccessHeader({
 }
 
 /**
+ * Build the complete roster field for an add-success card. The primary
+ * character is prepended even when an upstream roster result omitted it, and
+ * the shared renderer removes case-insensitive duplicates before counting.
+ */
+export function buildListAddTrackedRostersField({
+  names,
+  primaryName,
+  statMap = new Map(),
+  lang = 'en',
+}) {
+  return renderTrackedAltsField({
+    names,
+    primaryName,
+    statMap,
+    includePrimary: true,
+    label: `🧬 ${t('dialogue.listAdd.success.fields.trackedRosters', lang)}`,
+    overflowTemplate: t('dialogue.broadcast.more', lang),
+  });
+}
+
+/**
  * Build the executeListAddToDatabase executor.
  * @param {object} deps
  * @param {import('discord.js').Client} deps.client - Discord client
@@ -435,18 +456,15 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       ? t('dialogue.listAdd.success.sourceHidden', lang)
       : t('dialogue.listAdd.success.sourceVisible', lang);
 
-    // Tracked alts via shared renderer · class icon + ilvl come from the
-    // rosterCharacters parse buildRosterCharacters returned for this name.
-    // Visible-roster path supplies the statMap; hidden-roster path (which
-    // returns just [name]) naturally falls through to the empty sentinel.
+    // Complete tracked roster via the shared renderer · the character being
+    // added is always first, followed by its deduplicated roster characters.
+    // Class icon + ilvl come from buildRosterCharacters when available.
     const rosterStatMap = statMapFromRosterCharacters(rosterCharacters);
-    const altsField = renderTrackedAltsField({
+    const rostersField = buildListAddTrackedRostersField({
       names: allCharacters,
       primaryName: entry.name,
       statMap: rosterStatMap,
-      emptySentinel: `_${t('dialogue.listAdd.success.onlyCharacter', lang)}_`,
-      label: `🧬 ${t('dialogue.listAdd.success.fields.trackedAlts', lang)}`,
-      overflowTemplate: t('dialogue.broadcast.more', lang),
+      lang,
     });
 
     const requesterName = payload.requestedByDisplayName || payload.requestedByName || t('dialogue.listAdd.success.officerFallback', lang);
@@ -469,7 +487,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       fields.push({ name: `🌐 ${t('dialogue.listAdd.success.fields.scope', lang)}`, value: t(`dialogue.approval.scopeTag.${entryScope === 'server' ? 'local' : 'global'}`, lang), inline: true });
     }
     fields.push({ name: `📝 ${t('dialogue.listAdd.success.fields.reason', lang)}`, value: (payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false });
-    if (altsField) fields.push(altsField);
+    if (rostersField) fields.push(rostersField);
     fields.push({ name: `🔗 ${t('dialogue.listAdd.success.fields.links', lang)}`, value: linkParts.join(' · '), inline: false });
 
     const embed = buildAlertEmbed({

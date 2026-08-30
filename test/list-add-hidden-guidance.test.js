@@ -10,6 +10,7 @@ const {
   buildDuplicateAuditFields,
   buildHiddenRosterGuidance,
   buildListAddSuccessHeader,
+  buildListAddTrackedRostersField,
 } = await import('../bot/handlers/list/services/addExecutor.js');
 const { CLASS_EMOJI_MAP } = await import('../bot/models/Class.js');
 
@@ -100,4 +101,16 @@ test('list-add success keeps one list icon and links the primary name with its c
   } finally {
     CLASS_EMOJI_MAP.Paladin = oldPaladinEmoji;
   }
+});
+
+test('list-add success labels and counts the primary character plus its tracked roster', () => {
+  const field = buildListAddTrackedRostersField({
+    names: ['Hanako', 'HANAKO'],
+    primaryName: 'Tenshi',
+    lang: 'en',
+  });
+
+  assert.equal(field.name, '🧬 Tracked rosters (2)');
+  assert.match(field.value, /^\*\*1\.\*\* \[Tenshi\]/);
+  assert.match(field.value, /\n\*\*2\.\*\* \[Hanako\]/);
 });

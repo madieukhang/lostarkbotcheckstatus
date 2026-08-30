@@ -257,7 +257,7 @@ export default {
     },
     altOne: 'alt',
     altMany: 'alts',
-    fields: { reason: 'Reason', raid: 'Raid', edited: 'Edited', added: 'Added', itemLevel: 'ilvl', combatPower: 'CP', trackedAlts: 'Tracked alts', newAlts: 'New alts' },
+    fields: { reason: 'Reason', raid: 'Raid', edited: 'Edited', added: 'Added', itemLevel: 'ilvl', combatPower: 'CP', trackedAlts: 'Tracked alts', trackedRosters: 'Tracked rosters', newAlts: 'New alts' },
     notAvailable: 'N/A',
     more: '... and {count} more',
     bulkTitle: 'Bulk add{local} · {count} {entryWord}',
@@ -358,7 +358,7 @@ export default {
     },
     success: {
       title: '{list} · Added · {name}', hero: '**{user}** added {name} to **{list}**{scope}.',
-      fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Reason', links: 'Links', trackedAlts: 'Tracked alts' },
+      fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Reason', links: 'Links', trackedRosters: 'Tracked rosters' },
       onlyCharacter: 'Only this character is tracked on this entry.', roster: 'Roster', logs: 'Logs', evidenceLogs: 'Evidence logs',
       sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: 'Added by {user} · {source}', officerFallback: 'an officer',
       content: 'Add approved: **{name}** was added to {list}.',
