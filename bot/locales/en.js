@@ -354,7 +354,7 @@ const en = {
           name: '⚙️ Server Setup',
           lines: [
             '`/la-setup config action:<action>` runs every setup step (Manage Server only):',
-            '• `show` - full config · `repin` - refresh the pinned Artist guide',
+            '• `show` - full config · `repin` - clean unpinned messages and refresh the Artist guide',
             '• `set-auto-channel channel:#x` - screenshot + `check <name>` channel · `set-notify-channel channel:#x`',
             '• `cleanup-on` / `cleanup-off` - daily cleanup for this server · `notify-on` / `notify-off` - cross-server list notifications',
             '• `notify-cleanup` / `notify-repin` - clean or repin notifications · `notify-cleanup-on/off` - 30-minute schedule',

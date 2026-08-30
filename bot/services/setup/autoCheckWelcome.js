@@ -64,16 +64,22 @@ export function createAutoCheckWelcomeService({
   supportedLanguageCodes = getSupportedLanguages().map((entry) => entry.code),
   logger = console,
 } = {}) {
-  async function beforeSend({ channel, options, outcome, pinState }) {
-    if (
+  async function beforeSend({ channel, options, outcome, pinState, stored }) {
+    const forceCleanup = options.forceCleanup === true;
+    const shouldRunInitialCleanup =
       options.cleanupEnabled &&
       outcome.pinScanSucceeded &&
-      !outcome.hadOwnedWelcomePin
-    ) {
+      !outcome.hadOwnedWelcomePin;
+
+    if (forceCleanup || shouldRunInitialCleanup) {
       outcome.cleanupAttempted = true;
       try {
         const cleanup = await cleanupMessages(channel, {
-          protectedMessageIds: pinState.pinnedMessageIds,
+          protectedMessageIds: new Set([
+            ...pinState.pinnedMessageIds,
+            stored?.autoCheckWelcomeMessageId,
+            ...channelGuard.getProtectedMessageIds(channel.id),
+          ].filter(Boolean)),
         });
         outcome.cleanupDeleted = Number(cleanup?.deleted) || 0;
         outcome.cleanupFailed = Number(cleanup?.failed) || 0;
@@ -83,7 +89,7 @@ export function createAutoCheckWelcomeService({
         if (!outcome.cleanupComplete) {
           const failureSummary = formatCleanupFailureReasons(outcome.cleanupFailureReasons);
           logger.warn?.(
-            '[auto-check welcome] initial cleanup incomplete: deleted=' + outcome.cleanupDeleted +
+            '[auto-check welcome] cleanup incomplete: deleted=' + outcome.cleanupDeleted +
             ' failed=' + outcome.cleanupFailed +
             ' truncated=' + outcome.cleanupTruncated +
             (failureSummary ? ' errors=' + failureSummary : '')
@@ -91,7 +97,7 @@ export function createAutoCheckWelcomeService({
         }
       } catch (err) {
         outcome.cleanupFailed = 1;
-        logger.warn?.('[auto-check welcome] initial cleanup failed:', err?.message || err);
+        logger.warn?.('[auto-check welcome] cleanup failed:', err?.message || err);
       }
     }
 

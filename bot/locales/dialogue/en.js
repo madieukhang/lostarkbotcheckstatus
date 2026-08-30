@@ -165,7 +165,7 @@ export default {
       notifyRepin: 'Repin the notification guide',
       notifyOn: 'Turn global notifications ON',
       notifyOff: 'Turn global notifications OFF',
-      repin: 'Repin the welcome guide',
+      repin: 'Clean and repin the welcome guide',
     },
     showHint: 'Run `/la-setup config action:show` to review every setting.',
     notificationsEnabled: 'Global list notifications are **enabled** for this server.\nI will bring list changes from other servers here.',
@@ -220,7 +220,7 @@ export default {
     },
     repin: {
       noChannel: 'I cannot find an accessible saved auto-check channel. Run `/la-setup config action:set-auto-channel` first.',
-      missingPermissions: 'I cannot refresh the Artist guide in <#{channel}>. Missing: {missing}.',
+      missingPermissions: 'I cannot clean the channel and refresh the Artist guide in <#{channel}>. Missing: {missing}.',
       result: '{outcome} in <#{channel}>.',
     },
     language: {

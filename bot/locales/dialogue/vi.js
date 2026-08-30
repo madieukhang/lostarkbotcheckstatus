@@ -133,7 +133,7 @@ export default {
       notifyRepin: 'Ghim lại bảng notification',
       notifyOn: 'BẬT thông báo toàn cục',
       notifyOff: 'TẮT thông báo toàn cục',
-      repin: 'Ghim lại bảng hướng dẫn',
+      repin: 'Dọn và ghim lại bảng hướng dẫn',
     },
     showHint: 'Chạy `/la-setup config action:show` để xem lại mọi setting nha~',
     notificationsEnabled: 'Đã **bật** thông báo danh sách toàn cục cho server này.\nTớ sẽ mang các thay đổi từ server khác về đây.',
@@ -172,7 +172,7 @@ export default {
     },
     repin: {
       noChannel: 'Tớ không tìm thấy auto-check channel đã lưu và có thể truy cập. Chạy `/la-setup config action:set-auto-channel` trước nhé.',
-      missingPermissions: 'Tớ chưa thể làm mới bảng Artist trong <#{channel}>. Còn thiếu: {missing}.', result: '{outcome} trong <#{channel}>.',
+      missingPermissions: 'Tớ chưa thể dọn channel rồi làm mới bảng Artist trong <#{channel}>. Còn thiếu: {missing}.', result: '{outcome} trong <#{channel}>.',
     },
     language: {
       set: 'Đã đặt ngôn ngữ công khai của guild thành {flag} **{label}**.',

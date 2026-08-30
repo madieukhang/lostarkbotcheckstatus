@@ -189,7 +189,7 @@ const vi = {
           name: '⚙️ Cài đặt server',
           lines: [
             '`/la-setup config action:<action>` chạy mọi bước setup (cần Manage Server):',
-            '• `show` - xem toàn bộ config · `repin` - làm mới bảng hướng dẫn Artist đã ghim',
+            '• `show` - xem toàn bộ config · `repin` - dọn tin không ghim rồi làm mới bảng Artist',
             '• `set-auto-channel channel:#x` - channel nhận screenshot + `check <tên>` · `set-notify-channel channel:#x`',
             '• `cleanup-on` / `cleanup-off` - dọn hằng ngày cho server này · `notify-on` / `notify-off` - thông báo list xuyên server',
             '• `notify-cleanup` / `notify-repin` - dọn hoặc ghim lại notification · `notify-cleanup-on/off` - lịch dọn 30 phút',

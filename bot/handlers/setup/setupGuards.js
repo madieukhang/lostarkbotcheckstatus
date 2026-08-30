@@ -63,13 +63,17 @@ export async function resolveWelcomePinContext(
     resolveChannelFn = resolveGuildTextChannel,
     checkPermissionsFn = checkBotPermissions,
     resolveCleanupFn = resolveAutoCheckCleanupEnabled,
+    cleanupRequired = null,
   } = {},
 ) {
   const cleanupEnabled = resolveCleanupFn(guildConfig);
+  const cleanupPermissionRequired = typeof cleanupRequired === 'boolean'
+    ? cleanupRequired
+    : cleanupEnabled;
   const channel = await resolveChannelFn(interaction, guildConfig?.autoCheckChannelId);
   const permissions = channel
     ? checkPermissionsFn(channel, interaction.guild, {
-        cleanup: cleanupEnabled,
+        cleanup: cleanupPermissionRequired,
         welcomePin: true,
       })
     : null;
@@ -99,7 +103,7 @@ export async function resolveListNotifyWelcomePinContext(
 
 export async function postSetupWelcome(
   interaction,
-  { channel, cleanupEnabled, configSet },
+  { channel, cleanupEnabled, configSet, forceCleanup = false },
   { postWelcomeFn = postAutoCheckWelcome } = {},
 ) {
   return postWelcomeFn({
@@ -108,6 +112,7 @@ export async function postSetupWelcome(
     client: interaction.client,
     cleanupEnabled,
     ...(configSet ? { configSet } : {}),
+    ...(forceCleanup ? { forceCleanup: true } : {}),
     guildId: interaction.guild.id,
   });
 }

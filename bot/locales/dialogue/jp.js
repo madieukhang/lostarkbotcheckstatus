@@ -112,7 +112,7 @@ export default {
       notifyRepin: '通知 guide を再 pin',
       notifyOn: 'グローバル通知を ON',
       notifyOff: 'グローバル通知を OFF',
-      repin: 'ガイドを再 pin',
+      repin: 'チャンネルを整理してガイドを再 pin',
     },
     showHint: '`/la-setup config action:show` ですべての設定を確認できますわ。',
     notificationsEnabled: 'このサーバーのグローバル通知を **有効** にしました。\n他サーバーのリスト変更をここへ届けますわ。',
@@ -148,7 +148,7 @@ export default {
     },
     repin: {
       noChannel: 'アクセスできる保存済み auto-check チャンネルが見つかりません。先に `/la-setup config action:set-auto-channel` を実行してくださいませ。',
-      missingPermissions: '<#{channel}> の Artist ガイドを更新できません。足りない権限: {missing}。', result: '<#{channel}> で {outcome}',
+      missingPermissions: '<#{channel}> を整理して Artist ガイドを更新できません。足りない権限: {missing}。', result: '<#{channel}> で {outcome}',
     },
     language: {
       set: 'Guild の公開言語を {flag} **{label}** に設定しました。', noChannel: '保存済み auto-check または通知 channel がないため、更新する pin もありませんの。',

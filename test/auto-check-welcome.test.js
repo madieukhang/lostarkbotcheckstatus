@@ -229,6 +229,88 @@ test('first server-local welcome does not run destructive cleanup when cleanup i
   );
 });
 
+test('forced repin cleans before posting even when scheduled cleanup is off', async () => {
+  const old = createMessage('old', 'Welcome vi');
+  const fresh = createMessage('fresh', 'Welcome vi');
+  const events = [];
+  let protectedMessageIds = [];
+  const originalOldDelete = old.delete.bind(old);
+  old.delete = async () => {
+    events.push('delete:old');
+    await originalOldDelete();
+  };
+  const originalFreshPin = fresh.pin.bind(fresh);
+  fresh.pin = async () => {
+    events.push('pin:fresh');
+    await originalFreshPin();
+  };
+  const channel = {
+    id: 'channel-1',
+    messages: {
+      fetchPins: async () => ({ items: [{ message: old }] }),
+      fetch: async () => old,
+    },
+    async send() {
+      events.push('send:fresh');
+      return fresh;
+    },
+  };
+  const GuildConfigModel = createGuildConfig({
+    stored: {
+      autoCheckWelcomeMessageId: old.id,
+      autoCheckWelcomeChannelId: channel.id,
+    },
+  });
+  const originalPersist = GuildConfigModel.findOneAndUpdate.bind(GuildConfigModel);
+  GuildConfigModel.findOneAndUpdate = async (...args) => {
+    events.push('persist:fresh');
+    return originalPersist(...args);
+  };
+  const service = createAutoCheckWelcomeService({
+    GuildConfigModel,
+    channelGuard: createAutoCheckChannelGuard(),
+    buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
+    getGuildLanguageFn: async () => 'vi',
+    cleanupMessages: async (_channel, options) => {
+      events.push('cleanup:repin');
+      protectedMessageIds = [...options.protectedMessageIds];
+      return { deleted: 3, failed: 0, truncated: false };
+    },
+    getCleanupDayKey: () => '2026-08-30',
+    supportedLanguageCodes: ['en', 'vi', 'jp'],
+    logger: { warn() {} },
+  });
+
+  const outcome = await service.postWelcome({
+    botUserId: 'bot',
+    channel,
+    client: { channels: { fetch: async () => channel } },
+    cleanupEnabled: false,
+    forceCleanup: true,
+    guildId: 'guild-1',
+  });
+
+  assert.deepEqual(events, [
+    'cleanup:repin',
+    'send:fresh',
+    'pin:fresh',
+    'persist:fresh',
+    'delete:old',
+  ]);
+  assert.deepEqual(protectedMessageIds, ['old']);
+  assert.equal(outcome.hadOwnedWelcomePin, true);
+  assert.equal(outcome.cleanupAttempted, true);
+  assert.equal(outcome.cleanupComplete, true);
+  assert.equal(outcome.cleanupDeleted, 3);
+  assert.equal(outcome.pinned, true);
+  assert.equal(outcome.persisted, true);
+  assert.equal(outcome.removedOldCount, 1);
+  assert.equal(
+    GuildConfigModel.updates[0].update.$set.lastAutoCheckCleanupKey,
+    '2026-08-30'
+  );
+});
+
 test('first welcome cleans non-pinned messages before posting and records the cleanup day', async () => {
   const fresh = createMessage('fresh', 'Welcome vi');
   const events = [];

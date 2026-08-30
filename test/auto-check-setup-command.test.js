@@ -81,6 +81,21 @@ test('/la-setup autochannel does not claim the cleanup day before cleanup runs',
   assert.match(handlerSource, /!welcome\.pinned\s*\|\|\s*!welcome\.persisted/);
 });
 
+test('/la-setup repin forces cleanup and requires cleanup permission', () => {
+  const source = readFileSync(
+    new URL('../bot/handlers/setup/guildSetup.js', import.meta.url),
+    'utf8'
+  );
+  const start = source.indexOf('async function handleSetupRepin');
+  const end = source.indexOf('async function handleSetupLanguage');
+  const handlerSource = source.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.match(handlerSource, /cleanupRequired:\s*true/);
+  assert.match(handlerSource, /forceCleanup:\s*true/);
+  assert.match(handlerSource, /welcome\.cleanupComplete/);
+});
+
 test('/la-setup imports the Discord permission flags used by its guild guard', () => {
   const source = readFileSync(
     new URL('../bot/handlers/setup/guildSetup.js', import.meta.url),

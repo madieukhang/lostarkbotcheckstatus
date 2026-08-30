@@ -189,7 +189,7 @@ const jp = {
           name: '⚙️ サーバー設定',
           lines: [
             '`/la-setup config action:<action>` で全 setup を実行 (Manage Server 必要):',
-            '• `show` - 全 config を表示 · `repin` - pinned Artist guide を更新',
+            '• `show` - 全 config を表示 · `repin` - pin 以外を整理して Artist guide を更新',
             '• `set-auto-channel channel:#x` - screenshot + `check <name>` 用 channel · `set-notify-channel channel:#x`',
             '• `cleanup-on` / `cleanup-off` - この server の毎日 cleanup · `notify-on` / `notify-off` - server 間 list 通知',
             '• `notify-cleanup` / `notify-repin` - 通知を掃除または再 pin · `notify-cleanup-on/off` - 30分 schedule',

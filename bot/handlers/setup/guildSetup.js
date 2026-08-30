@@ -658,6 +658,7 @@ async function handleSetupRepin(interaction, lang) {
   const { cleanupEnabled, channel, permissions } = await resolveWelcomePinContext(
     interaction,
     guildConfig,
+    { cleanupRequired: true },
   );
   if (!channel) {
     await editNotice(
@@ -684,14 +685,20 @@ async function handleSetupRepin(interaction, lang) {
   const welcome = await postSetupWelcome(interaction, {
     channel,
     cleanupEnabled,
+    forceCleanup: true,
   });
+  const fullySuccessful =
+    welcome.pinned && welcome.persisted && welcome.cleanupComplete;
   await editNotice(
     interaction,
     t('dialogue.setup.repin.result', lang, {
       outcome: welcomeOutcomeText(welcome, lang),
       channel: channel.id,
     }),
-    { severity: AlertSeverity.SUCCESS, lang }
+    {
+      severity: fullySuccessful ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
+      lang,
+    }
   );
 }
 

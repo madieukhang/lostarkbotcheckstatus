@@ -45,7 +45,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 | `action:notify-cleanup-on` / `notify-cleanup-off` | Toggle the notification-channel cleanup sweep (off by default; every 30 minutes when enabled) |
 | `action:notify-on` / `notify-off` | Toggle global-list notifications |
 | `action:set-default-scope scope:global/server` | Default scope for `/la-list add` |
-| `action:set-language` / `action:repin` / `action:notify-repin` | Set public language / refresh the auto-check guide / refresh the notification guide |
+| `action:set-language` / `action:repin` / `action:notify-repin` | Set public language / clean non-pinned auto-check messages and refresh its guide / refresh the notification guide |
 | `action:notify-cleanup` | Run one notification-channel cleanup immediately |
 
 ### Status Icons

@@ -98,6 +98,26 @@ test('welcome-pin context resolves the configured channel and one canonical perm
   ]);
 });
 
+test('welcome-pin context can require cleanup permission while the schedule is off', async () => {
+  const interaction = { guild: { id: 'guild-1' } };
+  const guildConfig = { autoCheckChannelId: 'channel-1', autoCheckCleanupEnabled: false };
+  const channel = { id: 'channel-1' };
+  let permissionOptions;
+
+  const context = await resolveWelcomePinContext(interaction, guildConfig, {
+    resolveChannelFn: async () => channel,
+    resolveCleanupFn: () => false,
+    cleanupRequired: true,
+    checkPermissionsFn: (_channel, _guild, options) => {
+      permissionOptions = options;
+      return { ok: true, missing: [] };
+    },
+  });
+
+  assert.equal(context.cleanupEnabled, false);
+  assert.deepEqual(permissionOptions, { cleanup: true, welcomePin: true });
+});
+
 test('postSetupWelcome forwards the shared Discord and guild context with optional config changes', async () => {
   const client = { user: { id: 'bot-1' } };
   const interaction = {
@@ -110,7 +130,7 @@ test('postSetupWelcome forwards the shared Discord and guild context with option
 
   const outcome = await postSetupWelcome(
     interaction,
-    { channel, cleanupEnabled: false, configSet },
+    { channel, cleanupEnabled: false, configSet, forceCleanup: true },
     {
       postWelcomeFn: async (payload) => {
         forwarded = payload;
@@ -125,6 +145,7 @@ test('postSetupWelcome forwards the shared Discord and guild context with option
     client,
     cleanupEnabled: false,
     configSet,
+    forceCleanup: true,
     guildId: 'guild-1',
   });
   assert.deepEqual(outcome, { pinned: true, persisted: true });
