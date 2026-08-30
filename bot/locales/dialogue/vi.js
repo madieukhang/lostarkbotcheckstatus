@@ -44,7 +44,7 @@ export default {
       author: 'Artist · Trông server',
       title: '{server} online trở lại rồi',
       description: 'Đã đăng nhập lại được vào **{server}**. Vậy là đến giờ raid rồi nhỉ~',
-      serverField: 'Server', onlineAtField: 'Online từ', monitoredField: 'Cũng đang theo dõi',
+      serverField: 'Server', onlineAtField: 'Online từ',
       footer: 'Nguồn: playlostark.com · /la-status để xem trực tiếp',
     },
   },

@@ -11,6 +11,10 @@ import {
 import config from './bot/config.js';
 import { createReadyHandler } from './bot/app/lifecycle.js';
 import { createInteractionRouter } from './bot/app/interaction-router.js';
+import {
+  createProcessTerminator,
+  installProcessLifecycle,
+} from './bot/app/process-lifecycle.js';
 
 const client = new Client({
   intents: [
@@ -20,16 +24,20 @@ const client = new Client({
   ],
 });
 
-client.once(Events.ClientReady, createReadyHandler(client));
+const terminate = createProcessTerminator({ client });
+installProcessLifecycle({ terminate });
+
+client.once(Events.ClientReady, () => {
+  void createReadyHandler(client)().catch((error) => terminate({
+    label: 'Ready bootstrap failed',
+    error,
+    exitCode: 1,
+  }));
+});
 client.on(Events.InteractionCreate, createInteractionRouter({ client }));
 
-process.on('unhandledRejection', (reason) => {
-  console.error('[bot] Unhandled promise rejection:', reason);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('[bot] Uncaught exception:', err);
-  process.exit(1);
-});
-
-client.login(config.token);
+void client.login(config.token).catch((error) => terminate({
+  label: 'Discord login failed',
+  error,
+  exitCode: 1,
+}));

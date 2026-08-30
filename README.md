@@ -4,7 +4,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 
 ## Features
 
-- **Server monitoring** — polls one or more servers (default Thaemine), posts `@here` on offline-to-online transitions, `/la-status` for live check
+- **Server monitoring** — polls Thaemine only, posts `@here` on offline-to-online transitions, `/la-status` for live check
 - **Roster lookup** — `/la-roster` scrapes `lostark.bible`, tracks iLvl progression, cross-checks every list; `deep:true` runs Stronghold alt detection
 - **List management** — blacklist / whitelist / watchlist (`⛔` / `✅` / `⚠️`), global or server-scoped, trusted users protected from any list
 - **Bulk add** — `/la-list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast
@@ -217,7 +217,7 @@ flowchart LR
   AC --> S
 ```
 
-Server monitor runs out-of-band: `bot/monitor/monitor.js` polls `bot/monitor/serverStatus.js` every `CHECK_INTERVAL` seconds, persists state to `data/status.json`, and posts transitions directly via the Discord client without going through the handler layer.
+Server monitor runs out-of-band: `bot/monitor/monitor.js` polls `bot/monitor/serverStatus.js` every `CHECK_INTERVAL` seconds, persists the Thaemine transition/alert claim in MongoDB, and posts transitions directly via the Discord client without going through the handler layer.
 
 ## Requirements
 
@@ -244,7 +244,6 @@ Copy `.env.example` to `.env` and fill in values.
 | Var | Default | Notes |
 |---|---|---|
 | `CHECK_INTERVAL` | `30` | Status check interval in seconds (min 10) |
-| `TARGET_SERVERS` | `Thaemine` | Comma-separated server names to monitor |
 | `GEMINI_API_KEY` | — | Gemini API key for OCR |
 | `GEMINI_MODELS` | `gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Gemini 3.x-only priority list for OCR failover; older generations are ignored |
 | `LISTCHECK_ALT_ENRICHMENT` | `false` | Run background Stronghold alt scan after OCR hits; keep off to avoid request spikes |

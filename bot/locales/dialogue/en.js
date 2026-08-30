@@ -57,7 +57,6 @@ export default {
       description: 'Logins are open on **{server}** again. I suppose that means raid time~',
       serverField: 'Server',
       onlineAtField: 'Came online',
-      monitoredField: 'Also monitored',
       footer: 'Source: playlostark.com · /la-status for the live view',
     },
   },

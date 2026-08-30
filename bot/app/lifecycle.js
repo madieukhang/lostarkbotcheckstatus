@@ -15,6 +15,7 @@ import { connectDB } from '../db.js';
 import Blacklist from '../models/Blacklist.js';
 import RosterCache from '../models/RosterCache.js';
 import TrustedUser from '../models/TrustedUser.js';
+import ServerMonitorState from '../models/ServerMonitorState.js';
 import { backfillTrustedRosterLinks } from '../services/maintenance/trustedBackfill.js';
 import { registerCommands } from './command-registration.js';
 
@@ -39,6 +40,10 @@ export function createReadyHandler(client) {
   return async () => {
     console.log(`[bot] Logged in as ${client.user.tag}`);
     await connectDB();
+    // The unique serverName index is a correctness boundary: recovery-alert
+    // claims are only cross-instance safe when every Railway container sees
+    // the same singleton document for Thaemine.
+    await ServerMonitorState.createIndexes();
 
     Blacklist.syncIndexes().catch((err) =>
       console.warn('[bot] Blacklist syncIndexes:', err.message),

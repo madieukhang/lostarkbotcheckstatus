@@ -44,6 +44,7 @@ export async function writeHeartbeat({
  * @param {string} [opts.workerId]
  * @param {number} [opts.intervalMs=15000]
  * @param {object} [opts.logger=console]
+ * @param {Function} [opts.setIntervalFn=setInterval]
  * @returns {*} setInterval handle (pass to stopHeartbeat to cancel)
  */
 export function startHeartbeat({
@@ -51,18 +52,26 @@ export function startHeartbeat({
   workerId = DEFAULT_WORKER_ID,
   intervalMs = DEFAULT_INTERVAL_MS,
   logger = console,
+  setIntervalFn = setInterval,
 } = {}) {
   const startedAt = new Date();
+  let writeInFlight = false;
   const tick = () => {
-    writeHeartbeat({ WorkerHeartbeat, workerId, startedAt }).catch((err) => {
-      logger.warn?.(`[heartbeat] write failed: ${err.message}`);
-    });
+    if (writeInFlight) return;
+    writeInFlight = true;
+    writeHeartbeat({ WorkerHeartbeat, workerId, startedAt })
+      .catch((err) => {
+        logger.warn?.(`[heartbeat] write failed: ${err.message}`);
+      })
+      .finally(() => {
+        writeInFlight = false;
+      });
   };
 
   // Write once immediately so consumers see a fresh signal as soon as
   // the worker comes up, rather than waiting one full interval.
   tick();
-  const handle = setInterval(tick, intervalMs);
+  const handle = setIntervalFn(tick, intervalMs);
   if (handle.unref) handle.unref();
   return handle;
 }

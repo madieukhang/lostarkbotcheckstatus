@@ -75,14 +75,22 @@ async function main() {
   heartbeatHandle = startHeartbeat();
   console.log('[worker] heartbeat started');
 
-  process.on('SIGINT', async () => {
+  const shutdown = async (signal) => {
     if (stopping) return;
     stopping = true;
-    console.log('\n[worker] SIGINT received, shutting down...');
+    console.log(`\n[worker] ${signal} received, shutting down...`);
     stopHeartbeat(heartbeatHandle);
     await mongoose.disconnect();
     process.exit(0);
-  });
+  };
+  const requestShutdown = (signal) => {
+    void shutdown(signal).catch((err) => {
+      console.error(`[worker] ${signal} shutdown failed:`, err);
+      process.exit(1);
+    });
+  };
+  process.once('SIGINT', () => requestShutdown('SIGINT'));
+  process.once('SIGTERM', () => requestShutdown('SIGTERM'));
 
   await pollLoop();
 }

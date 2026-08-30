@@ -4,7 +4,7 @@ node_modules/
 # Environment variables – NEVER commit secrets
 .env
 
-# Runtime state file
+# Legacy/local runtime data (Thaemine monitor state now lives in MongoDB)
 data/
 
 # Dusk's local toolkit (not part of the bot)

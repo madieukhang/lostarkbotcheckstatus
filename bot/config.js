@@ -237,14 +237,8 @@ const config = {
   /** Lost Ark server status page URL */
   statusUrl: 'https://www.playlostark.com/en-gb/support/server-status',
 
-  /** The server name(s) to monitor (comma-separated, must match names on the status page exactly) */
-  targetServers: (process.env.TARGET_SERVERS || process.env.TARGET_SERVER || 'Thaemine')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
-
-  /** Path to the local state file */
-  stateFilePath: './data/status.json',
+  /** This deployment intentionally monitors Thaemine only. */
+  targetServers: Object.freeze(['Thaemine']),
 };
 
 export default config;

@@ -25,7 +25,7 @@ export default {
     onlineNotice: {
       author: 'Artist · サーバー見守り', title: '{server} がオンラインに戻りましたわ',
       description: '**{server}** にまたログインできますの。レイドのお時間ですわね〜',
-      serverField: 'サーバー', onlineAtField: 'オンライン復帰', monitoredField: 'ほかの監視対象', footer: 'Source: playlostark.com · /la-status でライブ表示',
+      serverField: 'サーバー', onlineAtField: 'オンライン復帰', footer: 'Source: playlostark.com · /la-status でライブ表示',
     },
   },
   stats: {

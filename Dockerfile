@@ -20,9 +20,6 @@ RUN npm ci --omit=dev
 # Copy the rest of the source code
 COPY . .
 
-# Ensure the data directory exists (persisted via volume in production)
-RUN mkdir -p data
-
 # The .env file should be mounted as a volume or provided via Docker secrets.
 # Do NOT bake secrets into the image.
 

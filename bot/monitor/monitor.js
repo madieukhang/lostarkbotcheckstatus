@@ -5,47 +5,17 @@
  * when the server transitions from offline/maintenance → online.
  */
 
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import config from '../config.js';
+import ServerMonitorState from '../models/ServerMonitorState.js';
 import { COLORS } from '../utils/ui.js';
 import { createArtistEmbed } from '../utils/artistVoice.js';
 import GuildConfig from '../models/GuildConfig.js';
 import { getGuildLanguage, t } from '../services/i18n/index.js';
 import { getMultiServerStatus, STATUS } from './serverStatus.js';
-
-// ─── State helpers ────────────────────────────────────────────────────────────
-
-/**
- * Load the persisted state from disk.
- * Returns a default object if the file is missing or corrupt.
- * @returns {Promise<object>}
- */
-async function loadState() {
-  try {
-    const raw = await fs.readFile(config.stateFilePath, 'utf-8');
-    return JSON.parse(raw);
-  } catch {
-    // File missing or malformed – start fresh
-    return {
-      initialStatus: null,
-      lastStatus: null,
-      lastCheckTime: null,
-      lastAlertTime: null,
-    };
-  }
-}
-
-/**
- * Persist the state object to disk. This path overwrites the target directly
- * because cross-platform write-then-rename is not used here.
- * @param {object} state
- */
-async function saveState(state) {
-  // Ensure the data directory exists before writing
-  await fs.mkdir(path.dirname(config.stateFilePath), { recursive: true });
-  await fs.writeFile(config.stateFilePath, JSON.stringify(state, null, 2), 'utf-8');
-}
+import {
+  finishRecoveryNotification,
+  observeServerStatus,
+} from './stateStore.js';
 
 // ─── Notification builder ─────────────────────────────────────────────────────
 
@@ -58,16 +28,9 @@ async function sendOnlineNotification(client, serverName) {
     const channel = await client.channels.fetch(config.channelId);
     if (!channel || !channel.isTextBased()) {
       console.error('[monitor] Notification channel not found or is not a text channel.');
-      return;
+      return false;
     }
     const lang = await getGuildLanguage(channel.guild?.id, { GuildConfigModel: GuildConfig });
-
-    // The other monitored servers, listed so the embed surfaces "is the
-    // rest of the cluster also up?" context without forcing the reader
-    // to run /la-status separately. Self-filter so the focal server
-    // isn't repeated in the secondary list.
-    const otherServers = (config.targetServers || [])
-      .filter((s) => s && s.toLowerCase() !== String(serverName).toLowerCase());
 
     const fields = [
       {
@@ -81,14 +44,6 @@ async function sendOnlineNotification(client, serverName) {
         inline: true,
       },
     ];
-    if (otherServers.length > 0) {
-      fields.push({
-        name: `📡 ${t('dialogue.system.onlineNotice.monitoredField', lang)}`,
-        value: otherServers.map((s) => `\`${s}\``).join(' · '),
-        inline: false,
-      });
-    }
-
     const embed = createArtistEmbed(lang)
       .setAuthor({ name: t('dialogue.system.onlineNotice.author', lang) })
       .setTitle(`🟢 ${t('dialogue.system.onlineNotice.title', lang, { server: serverName })}`)
@@ -101,8 +56,10 @@ async function sendOnlineNotification(client, serverName) {
     await channel.send({ content: '@here', embeds: [embed] });
 
     console.log(`[monitor] Online notification sent for ${serverName}.`);
+    return true;
   } catch (err) {
     console.error('[monitor] Failed to send notification:', err.message);
+    return false;
   }
 }
 
@@ -120,46 +77,6 @@ export function isInMaintenanceWindow(now = new Date()) {
   if (day === 3 && hour >= 7) return true;
   if (day === 4 && hour < 7) return true;
   return false;
-}
-
-/**
- * Keep the last definitive server state when the upstream page is incomplete.
- * UNKNOWN describes the observation, not a real server transition, so storing
- * it would erase the OFFLINE/MAINTENANCE state needed for recovery alerts.
- */
-export function resolvePersistedStatus(previousStatus, observedStatus) {
-  if (observedStatus == null || observedStatus === STATUS.UNKNOWN) {
-    return previousStatus ?? null;
-  }
-  return observedStatus;
-}
-
-/**
- * Apply one observed status to persisted per-server state.
- * Returns whether this observation is a confirmed down-to-online transition.
- */
-export function recordServerStatus(state, server, observedStatus) {
-  if (!state.servers) state.servers = {};
-  if (!state.servers[server]) {
-    state.servers[server] = { initialStatus: null, lastStatus: null, lastAlertTime: null };
-  }
-
-  const serverState = state.servers[server];
-
-  if (observedStatus === STATUS.UNKNOWN) {
-    return { serverState, shouldNotify: false };
-  }
-
-  if (serverState.initialStatus === null) {
-    serverState.initialStatus = observedStatus;
-  }
-
-  const wasDown =
-    serverState.lastStatus === STATUS.OFFLINE || serverState.lastStatus === STATUS.MAINTENANCE;
-  const shouldNotify = wasDown && observedStatus === STATUS.ONLINE;
-
-  serverState.lastStatus = resolvePersistedStatus(serverState.lastStatus, observedStatus);
-  return { serverState, shouldNotify };
 }
 
 /**
@@ -188,42 +105,37 @@ export function shouldRunScheduledCheck(now = new Date(), recoveryPending = fals
  * @returns {Promise<Map<string, string>>} Map of server name → STATUS
  */
 export async function checkStatus(client) {
-  const state = await loadState();
   const servers = config.targetServers;
   let statusMap;
 
-  // Ensure per-server state structure
-  if (!state.servers) state.servers = {};
-
   try {
     statusMap = await getMultiServerStatus(servers);
-    for (const [server, status] of statusMap) {
-      const prev = state.servers[server]?.lastStatus ?? 'unknown';
-      console.log(`[monitor] ${server}: ${status} (was: ${prev})`);
-    }
   } catch (err) {
     console.error('[monitor] Error fetching server status:', err.message);
-    state.lastCheckTime = new Date().toISOString();
-    await saveState(state);
     throw err;
   }
 
-  const now = new Date().toISOString();
-
   for (const [server, currentStatus] of statusMap) {
-    const { serverState, shouldNotify } = recordServerStatus(state, server, currentStatus);
+    const transition = await observeServerStatus({ server, status: currentStatus });
+    const previousStatus = transition.previousStatus ?? STATUS.UNKNOWN;
+    console.log(`[monitor] ${server}: ${currentStatus} (was: ${previousStatus})`);
 
-    if (shouldNotify) {
+    if (transition.shouldNotify) {
       console.log(`[monitor] ${server} came online – sending notification.`);
-      await sendOnlineNotification(client, server);
-      serverState.lastAlertTime = now;
+      const sent = await sendOnlineNotification(client, server);
+      await finishRecoveryNotification({
+        server,
+        claimId: transition.claimId,
+        sent,
+      });
+      if (!sent) {
+        // Keep the scheduler alive beyond the fixed maintenance window until
+        // Discord accepts the recovery alert. The Mongo claim was released
+        // above, so the next poll can retry safely.
+        statusMap.set(server, STATUS.UNKNOWN);
+      }
     }
   }
-
-  // Backward compat: keep top-level lastStatus for /la-status command
-  state.lastStatus = resolvePersistedStatus(state.lastStatus, statusMap.get(servers[0]));
-  state.lastCheckTime = now;
-  await saveState(state);
 
   return statusMap;
 }
@@ -277,16 +189,12 @@ export function startMonitor(client) {
 }
 
 /**
- * Reset the state file back to its default empty values.
- * @returns {Promise<void>}
+ * Clear the durable Thaemine monitor cursor. The next check establishes a
+ * fresh baseline and intentionally does not emit a recovery alert.
  */
 export async function resetState() {
-  const empty = {
-    initialStatus: null,
-    lastStatus: null,
-    lastCheckTime: null,
-    lastAlertTime: null,
-  };
-  await saveState(empty);
-  console.log('[monitor] State reset.');
+  await ServerMonitorState.deleteMany({
+    serverName: { $in: config.targetServers },
+  });
+  console.log('[monitor] Durable server state reset.');
 }

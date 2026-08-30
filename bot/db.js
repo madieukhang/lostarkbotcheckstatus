@@ -31,3 +31,12 @@ export async function connectDB() {
     console.error('[db] ❌ MongoDB error:', err.message);
   });
 }
+
+export async function disconnectDB() {
+  if (mongoose.connection.readyState === 0) {
+    connected = false;
+    return;
+  }
+  await mongoose.disconnect();
+  connected = false;
+}
