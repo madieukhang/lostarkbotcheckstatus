@@ -73,18 +73,20 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
     breakdown.push(`❓ **${notListedCount}** ${t('dialogue.search.notListed', lang)}`);
   }
   const matchWord = t(`dialogue.search.${results.length === 1 ? 'matchOne' : 'matchMany'}`, lang);
-  const summaryLine = breakdown.length > 0
-    ? t('dialogue.search.summary', lang, { count: results.length, word: matchWord, breakdown: breakdown.join(' · ') })
-    : t('dialogue.search.summaryPlain', lang, { count: results.length, word: matchWord });
 
-  const description = `${summaryLine}\n\n${lines.join('\n')}`.slice(0, 4096);
+  // The count lives in the title, the way every other list card carries
+  // its total. The breakdown line only earns its space once there is
+  // more than one result · with a single hit it restates the icon
+  // sitting on the row right below it.
+  const description = results.length > 1 && breakdown.length > 0
+    ? `${breakdown.join(' · ')}\n\n${lines.join('\n')}`.slice(0, 4096)
+    : lines.join('\n').slice(0, 4096);
 
   return createArtistEmbed(lang)
-    .setTitle(`🔍 ${t('dialogue.search.title', lang, { name })}`)
+    .setTitle(`🔍 ${t('dialogue.search.title', lang, { name })} · ${results.length} ${matchWord}`)
     .setDescription(description)
     .setColor(color)
     .setFooter({
       text: t('dialogue.search.footer', lang, { filters: filterParts.join(' · ') }),
-    })
-    .setTimestamp();
+    });
 }

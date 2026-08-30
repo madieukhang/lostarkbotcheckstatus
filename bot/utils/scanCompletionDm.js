@@ -20,8 +20,7 @@ import {
 
 import { COLORS, ICONS } from './ui.js';
 import { createArtistEmbed } from './artistVoice.js';
-import { rosterUrl } from './rosterLink.js';
-import { getClassEmoji } from '../models/Class.js';
+import { formatAltLine } from '../handlers/list/trackedAltsRender.js';
 import { t } from '../services/i18n/index.js';
 
 /**
@@ -60,15 +59,11 @@ function pickColor(token) {
 function buildAltLines(alts = [], lang = 'en') {
   if (!alts.length) return '';
   const visible = alts.slice(0, 10);
-  const lines = visible.map((alt, i) => {
-    const link = rosterUrl(alt.name);
-    const cls = alt.className || alt.classId || '?';
-    const classPrefix = getClassEmoji(cls) || cls;
-    const ilvl = typeof alt.itemLevel === 'number'
-      ? alt.itemLevel.toFixed(2)
-      : (alt.itemLevel || '?');
-    return `**${i + 1}.** ${classPrefix} [${alt.name}](${link}) · \`${ilvl}\``;
-  });
+  // Rendered through the shared row formatter rather than a local copy ·
+  // the copy is why this list never picked up later changes to the row,
+  // the CP badge being the most recent one.
+  const lines = visible.map((alt, i) =>
+    formatAltLine(alt.name, i, { ...alt, className: alt.className || alt.classId || '' }));
   const extra = alts.length > visible.length
     ? `\n*${t('dialogue.scan.dm.more', lang, { count: alts.length - visible.length })}*`
     : '';

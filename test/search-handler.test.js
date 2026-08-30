@@ -32,8 +32,12 @@ test('search summary counts names absent from the list database without double s
     ],
   });
 
-  const description = embed.toJSON().description;
-  assert.match(description, /Found \*\*2\*\* matches:/);
+  const json = embed.toJSON();
+  const description = json.description;
+  // The total lives in the title now; the description opens with the
+  // per-list breakdown instead of restating the count.
+  assert.match(json.title, /2 matches/);
+  assert.doesNotMatch(description, /Found \*\*2\*\*/);
   assert.match(description, /⛔ \*\*1\*\*/);
   assert.match(description, /🛡️ \*\*1\*\*/);
   assert.match(description, /❓ \*\*1\*\* not in list DB/);

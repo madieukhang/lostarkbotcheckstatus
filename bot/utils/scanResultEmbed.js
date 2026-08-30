@@ -31,8 +31,7 @@ import {
 import { COLORS, ICONS } from './ui.js';
 import { createArtistEmbed } from './artistVoice.js';
 import { truncateInlineText } from './discordText.js';
-import { rosterUrl } from './rosterLink.js';
-import { getClassEmoji } from '../models/Class.js';
+import { formatAltLine } from '../handlers/list/trackedAltsRender.js';
 import { t } from '../services/i18n/index.js';
 
 /**
@@ -91,19 +90,14 @@ const STATE_STYLE = {
 function buildAltList(alts, { newAltsSet, lang = 'en' } = {}) {
   if (!Array.isArray(alts) || alts.length === 0) return '';
   const visible = alts.slice(0, 25);
+  // Rows go through the shared formatter so this list keeps pace with
+  // every other character list in the bot · the local copy it replaces
+  // had already fallen behind on the CP badge. The "new" tag is appended
+  // here because it belongs to this card alone.
   const lines = visible.map((alt, i) => {
-    const link = rosterUrl(alt.name);
-    const cls = alt.className || alt.classId || '?';
-    // Class icon replaces the className text and sits BEFORE the
-    // character name (per project styling decision). Falls back to
-    // the className text when the bootstrap hasn't mapped this class
-    // yet so the row still carries the class info.
-    const classPrefix = getClassEmoji(cls) || cls;
-    const ilvl = typeof alt.itemLevel === 'number'
-      ? alt.itemLevel.toFixed(2)
-      : (alt.itemLevel || '?');
     const isNewMark = newAltsSet?.has(String(alt.name).toLowerCase()) ? ` \`${t('dialogue.scan.result.newTag', lang)}\`` : '';
-    return `${i + 1}. ${classPrefix} **[${alt.name}](${link})** · \`${ilvl}\`${isNewMark}`;
+    const record = { ...alt, className: alt.className || alt.classId || '' };
+    return `${formatAltLine(alt.name, i, record)}${isNewMark}`;
   });
   const extra = alts.length > visible.length
     ? `\n*${t('dialogue.scan.result.more', lang, { count: alts.length - visible.length })}*`
