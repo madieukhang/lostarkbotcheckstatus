@@ -34,6 +34,13 @@ import { truncateInlineText } from './discordText.js';
 import { formatAltLine } from '../handlers/list/trackedAltsRender.js';
 import { t } from '../services/i18n/index.js';
 
+const STOP_REASON_RULES = [
+  ['failure-storm', ({ pausedForFailureStorm }) => pausedForFailureStorm],
+  ['scan-aborted', ({ abortedBySystem }) => abortedBySystem],
+  ['stopped', ({ cancelled }) => cancelled],
+  ['cap-hit', ({ hasRemaining }) => hasRemaining],
+];
+
 /**
  * Compute the post-scan state from the result envelope. Stop reasons are
  * mutually exclusive (a scan either ran to completion, was stopped by
@@ -62,12 +69,8 @@ export function deriveScanState(result) {
   const remaining = Math.max(0, totalEligible - scanned);
   const hasRemaining = remaining > 0;
 
-  let stopReason;
-  if (pausedForFailureStorm) stopReason = 'failure-storm';
-  else if (abortedBySystem) stopReason = 'scan-aborted';
-  else if (cancelled) stopReason = 'stopped';
-  else if (hasRemaining) stopReason = 'cap-hit';
-  else stopReason = 'completed';
+  const flags = { pausedForFailureStorm, abortedBySystem, cancelled, hasRemaining };
+  const stopReason = STOP_REASON_RULES.find(([, matches]) => matches(flags))?.[0] ?? 'completed';
 
   return { stopReason, hasRemaining, remaining };
 }
@@ -79,6 +82,43 @@ const STATE_STYLE = {
   'scan-aborted': { icon: ICONS.warn, color: COLORS.warning, localeKey: 'aborted' },
   stopped: { icon: '🛑', color: COLORS.warning, localeKey: 'stopped' },
 };
+
+const KIND_LOCALE_KEYS = {
+  enrich: 'enrich',
+  'roster-hidden': 'hidden',
+};
+
+const STOP_HINT_BUILDERS = {
+  stopped: ({ state, lang }) => (
+    t('dialogue.scan.result.stoppedHint', lang, { remaining: state.remaining })
+  ),
+  'scan-aborted': ({ result, lang }) => t('dialogue.scan.result.abortedHint', lang, {
+    label: result.abortLabel || t('dialogue.scan.result.issue', lang),
+    detail: result.abortDetail || '',
+  }),
+  'failure-storm': ({ result, lang }) => {
+    const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
+    const failed = result.failedCandidates ?? 0;
+    const rate = attempted > 0 ? Math.round((failed / attempted) * 100) : 0;
+    const lastError = truncateInlineText(result.lastFailureReason, 140);
+    return t('dialogue.scan.result.failureHint', lang, {
+      failed,
+      attempted,
+      rate,
+      lastError: lastError
+        ? t('dialogue.scan.result.lastError', lang, { error: lastError })
+        : '',
+    });
+  },
+  'cap-hit': ({ state, result, lang }) => t('dialogue.scan.result.capHint', lang, {
+    cap: result.candidateLimit ?? t('dialogue.scan.result.configured', lang),
+    remaining: state.remaining,
+  }),
+};
+
+function buildStopHint(state, result, lang) {
+  return STOP_HINT_BUILDERS[state.stopReason]?.({ state, result, lang }) ?? '';
+}
 
 /**
  * Build the alt-list bullet block. Names link out to lostark.bible roster
@@ -146,10 +186,8 @@ export function buildScanResultEmbed({
 
   // Title carries kind + state in a single line. The state icon makes a
   // separate bold banner in the description redundant.
-  let kindLabel;
-  if (kind === 'enrich') kindLabel = t('dialogue.scan.result.kinds.enrich', lang);
-  else if (kind === 'roster-hidden') kindLabel = t('dialogue.scan.result.kinds.hidden', lang);
-  else kindLabel = t('dialogue.scan.result.kinds.deep', lang);
+  const kindLocaleKey = KIND_LOCALE_KEYS[kind] ?? 'deep';
+  const kindLabel = t(`dialogue.scan.result.kinds.${kindLocaleKey}`, lang);
   const stateLabel = t(`dialogue.scan.result.states.${style.localeKey}`, lang);
 
   const sections = [];
@@ -173,31 +211,7 @@ export function buildScanResultEmbed({
 
   // 3. Stop-reason hint. The title icon carries the outcome; this paragraph
   // carries the cause and next action in a shorter form than the prior copy.
-  let stopHint = '';
-  if (state.stopReason === 'stopped') {
-    stopHint = t('dialogue.scan.result.stoppedHint', lang, { remaining: state.remaining });
-  } else if (state.stopReason === 'scan-aborted') {
-    stopHint = t('dialogue.scan.result.abortedHint', lang, {
-      label: result.abortLabel || t('dialogue.scan.result.issue', lang),
-      detail: result.abortDetail || '',
-    });
-  } else if (state.stopReason === 'failure-storm') {
-    const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
-    const failed = result.failedCandidates ?? 0;
-    const rate = attempted > 0 ? Math.round((failed / attempted) * 100) : 0;
-    const lastError = truncateInlineText(result.lastFailureReason, 140);
-    stopHint = t('dialogue.scan.result.failureHint', lang, {
-      failed,
-      attempted,
-      rate,
-      lastError: lastError ? t('dialogue.scan.result.lastError', lang, { error: lastError }) : '',
-    });
-  } else if (state.stopReason === 'cap-hit') {
-    stopHint = t('dialogue.scan.result.capHint', lang, {
-      cap: result.candidateLimit ?? t('dialogue.scan.result.configured', lang),
-      remaining: state.remaining,
-    });
-  }
+  const stopHint = buildStopHint(state, result, lang);
   if (stopHint) sections.push(stopHint);
 
   // 4. Alt list block. The header also exposes the result count when scanning
@@ -266,6 +280,70 @@ export function buildScanResultEmbed({
   return { embed, state };
 }
 
+function createScanButton({ customId, labelKey, labelParams, emoji, style }, lang) {
+  const button = new ButtonBuilder()
+    .setCustomId(customId)
+    .setLabel(t(labelKey, lang, labelParams))
+    .setStyle(style);
+  return emoji ? button.setEmoji(emoji) : button;
+}
+
+function buildEnrichButtons({ sessionId, hasAlts, hasRemaining, newAltsCount, lang }) {
+  if (hasRemaining) {
+    return [
+      createScanButton({
+        customId: `list-enrich:continue:${sessionId}`,
+        labelKey: 'common.actions.continueScan',
+        emoji: ICONS.refresh,
+        style: ButtonStyle.Primary,
+      }, lang),
+      hasAlts ? createScanButton({
+        customId: `list-enrich:confirm:${sessionId}`,
+        labelKey: 'common.actions.savePartial',
+        labelParams: { count: newAltsCount ?? 0 },
+        style: ButtonStyle.Success,
+      }, lang) : null,
+      createScanButton({
+        customId: `list-enrich:cancel:${sessionId}`,
+        labelKey: 'common.actions.discard',
+        style: ButtonStyle.Secondary,
+      }, lang),
+    ].filter(Boolean);
+  }
+
+  return hasAlts
+    ? [
+      createScanButton({
+        customId: `list-enrich:confirm:${sessionId}`,
+        labelKey: 'common.actions.confirmAdd',
+        labelParams: { count: newAltsCount ?? 0 },
+        style: ButtonStyle.Success,
+      }, lang),
+      createScanButton({
+        customId: `list-enrich:cancel:${sessionId}`,
+        labelKey: 'common.actions.cancel',
+        style: ButtonStyle.Secondary,
+      }, lang),
+    ]
+    : [];
+}
+
+function buildRosterButtons({ sessionId, hasRemaining, lang }) {
+  return hasRemaining
+    ? [createScanButton({
+      customId: `roster-deep:continue:${sessionId}`,
+      labelKey: 'common.actions.continueScan',
+      emoji: ICONS.refresh,
+      style: ButtonStyle.Primary,
+    }, lang)]
+    : [];
+}
+
+const BUTTON_BUILDERS = {
+  enrich: buildEnrichButtons,
+  roster: buildRosterButtons,
+};
+
 /**
  * Build the action button row for the scan-result card. Button shape
  * depends on the calling command (enrich persists alts, roster deep does
@@ -293,67 +371,15 @@ export function buildScanResultButtons({
   newAltsCount,
   lang = 'en',
 }) {
-  const row = new ActionRowBuilder();
+  const buttons = BUTTON_BUILDERS[kind]?.({
+    sessionId,
+    hasAlts,
+    hasRemaining,
+    newAltsCount,
+    lang,
+  }) ?? [];
 
-  if (kind === 'enrich') {
-    if (hasRemaining) {
-      // Partial result: Continue lets the officer keep scanning,
-      // Save commits whatever was found so far, Discard drops the session.
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`list-enrich:continue:${sessionId}`)
-          .setLabel(t('common.actions.continueScan', lang))
-          .setEmoji(ICONS.refresh)
-          .setStyle(ButtonStyle.Primary)
-      );
-      if (hasAlts) {
-        row.addComponents(
-          new ButtonBuilder()
-            .setCustomId(`list-enrich:confirm:${sessionId}`)
-            .setLabel(t('common.actions.savePartial', lang, { count: newAltsCount ?? 0 }))
-            .setStyle(ButtonStyle.Success)
-        );
-      }
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`list-enrich:cancel:${sessionId}`)
-          .setLabel(t('common.actions.discard', lang))
-          .setStyle(ButtonStyle.Secondary)
-      );
-      return row;
-    }
-
-    // Full scan path: only Save + Cancel make sense (no Continue).
-    if (hasAlts) {
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`list-enrich:confirm:${sessionId}`)
-          .setLabel(t('common.actions.confirmAdd', lang, { count: newAltsCount ?? 0 }))
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId(`list-enrich:cancel:${sessionId}`)
-          .setLabel(t('common.actions.cancel', lang))
-          .setStyle(ButtonStyle.Secondary)
-      );
-      return row;
-    }
-
-    return null;
-  }
-
-  if (kind === 'roster') {
-    if (hasRemaining) {
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`roster-deep:continue:${sessionId}`)
-          .setLabel(t('common.actions.continueScan', lang))
-          .setEmoji(ICONS.refresh)
-          .setStyle(ButtonStyle.Primary)
-      );
-      return row;
-    }
-    return null;
-  }
-
-  return null;
+  return buttons.length > 0
+    ? new ActionRowBuilder().addComponents(...buttons)
+    : null;
 }
