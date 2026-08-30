@@ -49,6 +49,18 @@ import { handleHiddenRosterResult } from './hiddenRoster.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
 
 /**
+ * Render one visible-roster row. Both numeric stats use Discord code badges;
+ * CP keeps the approximation marker from lostark.bible and carries its unit
+ * after the value so the row reads `≈6180.57 CP`.
+ */
+export function formatVisibleRosterLine(character, index, {
+  classPrefix,
+  delta = '',
+} = {}) {
+  return `**${index + 1}.** ${classPrefix} ${character.name} · \`${character.itemLevel}\`${delta} · \`${character.combatScore} CP\``;
+}
+
+/**
  * Handle the /la-roster slash command.
  * Branches on `rosterVisibility` returned by buildRosterCharacters:
  * visible → render visible-roster embed (alt list + iLvl + class),
@@ -138,7 +150,7 @@ export async function handleRosterCommand(interaction) {
 
       const cls = c.className || t('dialogue.common.unknown', lang);
       const classPrefix = getClassEmoji(cls) || cls;
-      return `**${i + 1}.** ${classPrefix} ${c.name} · \`${c.itemLevel}\`${delta} · ${c.combatScore}`;
+      return formatVisibleRosterLine(c, i, { classPrefix, delta });
     });
 
     let description = lines.join('\n');
