@@ -362,6 +362,8 @@ const vi = {
       unavailable: 'Link ảnh đã hết hạn hoặc không khả dụng. Re-add evidence bằng `/la-list edit`.',
       logs: '🔗 Logs',
       viewLogs: 'Xem logs',
+      itemLevel: '📊 ilvl',
+      combatPower: '⚔️ CP',
       addedBy: '👤 Người thêm',
       onlyThisCharacter: '_Chỉ character này đang được track trong entry._',
       noImage: 'Entry này chưa có ảnh evidence.',
@@ -399,8 +401,6 @@ const vi = {
     successDescription: 'Từ giờ tớ sẽ nói với cậu bằng **{flag} {label}** nha~',
     unchangedTitle: '🌐 Ngôn ngữ không đổi',
     unchangedDescription: 'Cậu vẫn đang dùng **{flag} {label}** mà.',
-      itemLevel: '📊 ilvl',
-      combatPower: '⚔️ CP',
     footer: '/la-language-switch để đổi lại bất cứ lúc nào',
   },
 };

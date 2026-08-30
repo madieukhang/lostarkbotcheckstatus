@@ -527,6 +527,8 @@ const en = {
       unavailable: 'Image link expired or unavailable. Re-add evidence via `/la-list edit`.',
       logs: '🔗 Logs',
       viewLogs: 'View Logs',
+      itemLevel: '📊 ilvl',
+      combatPower: '⚔️ CP',
       addedBy: '👤 Added by',
       onlyThisCharacter: '_Only this character is tracked on this entry._',
       noImage: 'No evidence image for this entry.',
@@ -564,8 +566,6 @@ const en = {
     successDescription: 'I will speak **{flag} {label}** with you from now on.',
     unchangedTitle: '🌐 Language unchanged',
     unchangedDescription: "You're already using **{flag} {label}**.",
-      itemLevel: '📊 ilvl',
-      combatPower: '⚔️ CP',
     footer: 'Run /la-language-switch any time to switch back',
   },
 };

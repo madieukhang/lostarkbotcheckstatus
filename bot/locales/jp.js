@@ -362,6 +362,8 @@ const jp = {
       unavailable: '画像 link が期限切れ、または利用できません。`/la-list edit` で evidence を追加し直してください。',
       logs: '🔗 Logs',
       viewLogs: 'View Logs',
+      itemLevel: '📊 ilvl',
+      combatPower: '⚔️ CP',
       addedBy: '👤 Added by',
       onlyThisCharacter: '_この entry ではこの character だけが track されています._',
       noImage: 'この entry には evidence 画像がありません。',
@@ -399,8 +401,6 @@ const jp = {
     successDescription: 'これからわたくしは **{flag} {label}** でお話しますわ。',
     unchangedTitle: '🌐 言語は変わっていません',
     unchangedDescription: 'もう **{flag} {label}** を使っていますわ。',
-      itemLevel: '📊 ilvl',
-      combatPower: '⚔️ CP',
     footer: 'いつでも /la-language-switch で変更できます',
   },
 };
