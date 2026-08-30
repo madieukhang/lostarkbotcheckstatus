@@ -20,7 +20,7 @@ test('tracked alts renderer preserves comma-formatted item levels', () => {
   });
 
   assert.match(field.value, /`1745\.00`/);
-  assert.match(field.value, /CP `4501\.38`/);
+  assert.match(field.value, /`4501\.38 CP`/);
 });
 
 test('tracked alts renderer defaults to the "🧬 Tracked alts" field label', () => {

@@ -42,7 +42,7 @@ test('evidence card renders ilvl and CP when a stat map is supplied', () => {
   assert.equal(fieldValue(embed, 'ilvl'), '`1755.00`');
   assert.equal(fieldValue(embed, 'CP'), '`≈4820.12`');
   // Alt rows inherit the same class + ilvl + CP shape /la-check renders.
-  assert.match(fieldValue(embed, 'Alt đang track'), /Bard \[Hanako\]\(\S+\) · `1730\.83` · CP `≈3311\.40`/u);
+  assert.match(fieldValue(embed, 'Alt đang track'), /Bard \[Hanako\]\(\S+\) · `1730\.83` · `≈3311\.40 CP`/u);
 });
 
 test('evidence card without a stat map keeps its previous shape', () => {
@@ -83,4 +83,43 @@ test('added by joins the inline grid instead of trailing the card', () => {
 
   assert.ok(names.indexOf('👤 Người thêm') < names.findIndex((n) => n.includes('Alt đang track')));
   assert.equal(inlineNames(embed).filter((n) => n !== ZWSP).length, 6);
+});
+
+test('notice mode swaps the title bar for an Artist headline', () => {
+  const embed = buildEvidenceEmbed(makeEntry(), '', {
+    lang: 'vi',
+    statMap: statMapFromRosterCharacters(ROSTER),
+    headline: true,
+    attachImage: false,
+  }).toJSON();
+
+  // Same shape a list-change broadcast uses: the list is named in the
+  // title and the character in one spoken line under it.
+  assert.match(embed.title, /Kết quả kiểm tra · Blacklist/u);
+  assert.match(embed.description, /\[Tenshi\]/u);
+  assert.match(embed.description, /Blacklist/u);
+  // The name is already linked in that line, so the title drops its URL
+  // rather than offering the same link twice.
+  assert.equal(embed.url, undefined);
+  // List would restate the headline.
+  assert.equal(embed.fields.some((f) => f.name.includes('List')), false);
+});
+
+test('notice mode keeps evidence off the card entirely', () => {
+  const withImage = buildEvidenceEmbed(makeEntry(), 'https://cdn.example.test/e.png', {
+    lang: 'vi', headline: true, attachImage: false,
+  }).toJSON();
+  const withoutImage = buildEvidenceEmbed(makeEntry(), '', {
+    lang: 'vi', headline: true, attachImage: false,
+  }).toJSON();
+
+  // No embedded screenshot, and no "evidence unavailable" field either ·
+  // the button beside the card is the only evidence affordance.
+  assert.equal(withImage.image, undefined);
+  assert.equal(withoutImage.image, undefined);
+  assert.equal(withoutImage.fields.some((f) => f.name.includes('Evidence')), false);
+
+  // Detail mode is untouched and still embeds the screenshot.
+  const detail = buildEvidenceEmbed(makeEntry(), 'https://cdn.example.test/e.png', { lang: 'vi' }).toJSON();
+  assert.equal(detail.image.url, 'https://cdn.example.test/e.png');
 });

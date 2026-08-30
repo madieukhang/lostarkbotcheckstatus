@@ -64,7 +64,7 @@ test('list broadcast tracked rosters include the primary character, class icon, 
     );
     assert.match(
       field.value,
-      /\*\*2\.\*\* <:bard:1> \[Elynnä\]\(https:\/\/lostark\.bible\/character\/NA\/Elynn%C3%A4\/roster\) · `1745\.00` · CP `4501\.38`/
+      /\*\*2\.\*\* <:bard:1> \[Elynnä\]\(https:\/\/lostark\.bible\/character\/NA\/Elynn%C3%A4\/roster\) · `1745\.00` · `4501\.38 CP`/
     );
     assert.match(
       field.value,
@@ -85,7 +85,7 @@ test('list broadcast character lines fall back to class text when emoji is unava
 
   assert.equal(
     line,
-    '**1.** Breaker [AltName](https://lostark.bible/character/NA/AltName/roster) · `1710.50` · CP `3920`'
+    '**1.** Breaker [AltName](https://lostark.bible/character/NA/AltName/roster) · `1710.50` · `3920 CP`'
   );
 });
 

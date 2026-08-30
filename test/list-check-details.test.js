@@ -156,6 +156,6 @@ test('dropdown detail uses broadcast layout with added-by beside CP and evidence
   assert.equal(embed.fields[4].inline, true);
   assert.equal(embed.fields[5].value, 'Legacy Officer');
   assert.equal(embed.fields[5].inline, true);
-  assert.match(embed.fields[6].value, /`1711\.67` · CP `≈2981\.11`/u);
+  assert.match(embed.fields[6].value, /`1711\.67` · `≈2981\.11 CP`/u);
   assert.equal(embed.image.url, 'https://cdn.example.test/evidence.png');
 });

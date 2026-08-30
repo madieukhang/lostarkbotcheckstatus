@@ -37,9 +37,9 @@ import {
   buildStrongholdScanLimitEmbed,
   reserveStrongholdScanForInteraction,
 } from '../../utils/strongholdScanGate.js';
-import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { buildEvidenceEmbed } from '../list/view/ui.js';
+import { buildBroadcastEvidenceComponents } from '../list/evidence/broadcastButton.js';
 import { decorateListEntry } from '../list/helpers.js';
 import { statMapFromRosterCharacters } from '../list/trackedAltsRender.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
@@ -203,6 +203,9 @@ export async function handleRosterCommand(interaction) {
       .setColor(embedColor);
 
     const embeds = [embed];
+    // Evidence rows travel beside their card · both lists unshift, so the
+    // buttons unshift too and stay in the same order as the embeds.
+    const evidenceRows = [];
     const statusLines = [];
     // Stats for the evidence cards below · same roster this command just
     // rendered, so no extra request and no snapshot-write race.
@@ -217,14 +220,21 @@ export async function handleRosterCommand(interaction) {
       const raid = blacklistResult.raid ? ` [${blacklistResult.raid}]` : '';
       statusLines.push(`⛔ ${t('dialogue.roster.blacklisted', lang, { name })}${raid}${reason}`);
 
-      // Use the shared buildEvidenceEmbed so the inline evidence card
-      // matches /la-evidence, /la-search, /la-list view, /la-check.
-      // Was a title+image-only embed before · officer reviewing a
-      // /la-roster hit would see less context than they would elsewhere.
-      const blackImageUrl = await resolveDisplayImageUrl(blacklistResult, interaction.client);
-      if (blackImageUrl) {
-        embeds.unshift(buildEvidenceEmbed(decorateListEntry(blacklistResult, 'black'), blackImageUrl, { lang, statMap: rosterStatMap }));
-      }
+      // Notice shape: the same grammar as a list-change broadcast, with
+      // the screenshot behind a button. This card is a side note on a
+      // roster lookup, so it renders whether or not evidence exists ·
+      // the reason, stats and tracked alts are the point, and gating the
+      // whole card on an image used to hide all of it.
+      embeds.unshift(buildEvidenceEmbed(decorateListEntry(blacklistResult, 'black'), '', {
+        lang,
+        statMap: rosterStatMap,
+        headline: true,
+        attachImage: false,
+      }));
+      evidenceRows.unshift(...buildBroadcastEvidenceComponents(blacklistResult, {
+        legacyUrl: blacklistResult.imageUrl,
+        lang,
+      }));
     }
 
     if (whitelistResult) {
@@ -232,10 +242,16 @@ export async function handleRosterCommand(interaction) {
       const raid = whitelistResult.raid ? ` [${whitelistResult.raid}]` : '';
       statusLines.push(`✅ ${t('dialogue.roster.whitelisted', lang, { name })}${raid}${reason}`);
 
-      const whiteImageUrl = await resolveDisplayImageUrl(whitelistResult, interaction.client);
-      if (whiteImageUrl) {
-        embeds.unshift(buildEvidenceEmbed(decorateListEntry(whitelistResult, 'white'), whiteImageUrl, { lang, statMap: rosterStatMap }));
-      }
+      embeds.unshift(buildEvidenceEmbed(decorateListEntry(whitelistResult, 'white'), '', {
+        lang,
+        statMap: rosterStatMap,
+        headline: true,
+        attachImage: false,
+      }));
+      evidenceRows.unshift(...buildBroadcastEvidenceComponents(whitelistResult, {
+        legacyUrl: whitelistResult.imageUrl,
+        lang,
+      }));
     }
 
     if (statusLines.length > 0) {
@@ -249,7 +265,11 @@ export async function handleRosterCommand(interaction) {
       : { resultEmbed: null, components: [], result: null, meta: null };
 
     if (visibleDeep.resultEmbed) embeds.push(visibleDeep.resultEmbed);
-    await replyEditor.edit({ content: null, embeds, components: visibleDeep.components });
+    await replyEditor.edit({
+      content: null,
+      embeds,
+      components: [...evidenceRows, ...(visibleDeep.components || [])].slice(0, 5),
+    });
 
     // DM the caller when a deep scan was actually run (skip plain
     // /la-roster which finishes in seconds and doesn't warrant a

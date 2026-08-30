@@ -26,7 +26,8 @@ import { getAddedByDisplay } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
-import { renderTrackedAltsField } from '../trackedAltsRender.js';
+import { formatLinkedCharacter, renderTrackedAltsField } from '../trackedAltsRender.js';
+import { getListContext } from '../helpers.js';
 
 /**
  * Render the meta line that sits under each entry's name. Uses middot
@@ -292,6 +293,8 @@ export function buildEvidenceEmbed(entry, displayUrl, {
   includeAddedBy = false,
   lang = 'en',
   statMap = new Map(),
+  headline = false,
+  attachImage = true,
 } = {}) {
   const link = rosterUrl(entry.name);
   const fields = [
@@ -305,11 +308,14 @@ export function buildEvidenceEmbed(entry, displayUrl, {
 
   const inlineMeta = [];
   if (entry.raid) inlineMeta.push({ name: t('listView.evidence.raid', lang), value: `\`${entry.raid}\``, inline: true });
-  inlineMeta.push({
-    name: t('listView.evidence.list', lang),
-    value: getListTypeLabel(entry._listType, entry._label, lang),
-    inline: true,
-  });
+  if (!headline) {
+    // With a headline the list is already named in the sentence above.
+    inlineMeta.push({
+      name: t('listView.evidence.list', lang),
+      value: getListTypeLabel(entry._listType, entry._label, lang),
+      inline: true,
+    });
+  }
   if (entry.addedAt) {
     inlineMeta.push({ name: t('listView.evidence.added', lang), value: relativeTime(entry.addedAt), inline: true });
   }
@@ -355,15 +361,37 @@ export function buildEvidenceEmbed(entry, displayUrl, {
   if (altsField) fields.push(altsField);
 
   const embed = createArtistEmbed(lang)
-    .setTitle(`${entry._icon} ${entry.name}`)
-    .setURL(link)
     .addFields(fields)
     .setColor(entry._color)
     .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : undefined);
 
-  if (displayUrl) {
-    embed.setImage(displayUrl);
+  if (headline) {
+    // Notice shape, borrowed from the list-change broadcast: a title that
+    // names the list, then one Artist line naming the character. The name
+    // is linked inside that line, so the title drops its own URL rather
+    // than offering the same link twice.
+    const listLabel = getListTypeLabel(entry._listType, entry._label, lang);
+    const scopeTag = entry.scope === 'server'
+      ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
+      : '';
+    embed
+      .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
+      .setDescription(t('dialogue.check.details.headline', lang, {
+        icon: getListContext(entry._listType).icon,
+        name: formatLinkedCharacter(entry.name, snapshot),
+        list: listLabel,
+        scope: scopeTag,
+      }));
   } else {
+    embed.setTitle(`${entry._icon} ${entry.name}`).setURL(link);
+  }
+
+  // attachImage:false sends evidence to a button beside the card · a
+  // full-width screenshot dwarfs the data when this card is a side note
+  // rather than the thing the reader asked for.
+  if (attachImage && displayUrl) {
+    embed.setImage(displayUrl);
+  } else if (attachImage) {
     const evidenceMessage = entry.imageMessageId || entry.imageUrl
       ? t('listView.evidence.unavailable', lang)
       : t('listView.evidence.noImage', lang);

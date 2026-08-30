@@ -63,7 +63,9 @@ export function formatAltLine(name, index, record) {
   const statParts = [];
   const itemLevel = parsePositiveNumber(record?.itemLevel);
   if (itemLevel > 0) statParts.push(`\`${itemLevel.toFixed(2)}\``);
-  if (record?.combatScore && record.combatScore !== '?') statParts.push(`CP \`${record.combatScore}\``);
+  // CP carries its unit inside the badge, the way /la-roster rows read
+  // (`≈6180.57 CP`), so one badge is one value with its label.
+  if (record?.combatScore && record.combatScore !== '?') statParts.push(`\`${record.combatScore} CP\``);
   const statSuffix = statParts.length > 0 ? ` · ${statParts.join(' · ')}` : '';
   return `**${index + 1}.** ${formatLinkedCharacter(name, record, { bold: false })}${statSuffix}`;
 }
