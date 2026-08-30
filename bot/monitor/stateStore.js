@@ -31,7 +31,7 @@ export async function observeServerStatus({
           recoveryPending: false,
         },
       },
-      { upsert: true, new: false },
+      { upsert: true, returnDocument: 'before' },
     );
     return {
       previousStatus: previous?.lastStatus ?? null,
@@ -51,7 +51,7 @@ export async function observeServerStatus({
         },
         $unset: { alertClaimId: '', alertClaimUntil: '' },
       },
-      { upsert: true, new: false },
+      { upsert: true, returnDocument: 'before' },
     );
     return {
       previousStatus: previous?.lastStatus ?? null,
@@ -78,7 +78,7 @@ export async function observeServerStatus({
         alertClaimUntil: claimUntil,
       },
     },
-    { new: false },
+    { returnDocument: 'before' },
   );
 
   if (claimed) {
@@ -100,7 +100,7 @@ export async function observeServerStatus({
         recoveryPending: false,
       },
     },
-    { upsert: true, new: false },
+    { upsert: true, returnDocument: 'before' },
   );
   return {
     previousStatus: previous?.lastStatus ?? null,

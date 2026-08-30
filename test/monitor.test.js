@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   isInMaintenanceWindow,
@@ -66,7 +67,23 @@ test('down observations persist recoveryPending and clear stale alert claims', a
   assert.equal(calls[0].update.$set.lastStatus, STATUS.MAINTENANCE);
   assert.equal(calls[0].update.$set.recoveryPending, true);
   assert.deepEqual(calls[0].update.$unset, { alertClaimId: '', alertClaimUntil: '' });
-  assert.deepEqual(calls[0].options, { upsert: true, new: false });
+  assert.deepEqual(calls[0].options, {
+    upsert: true,
+    returnDocument: 'before',
+  });
+});
+
+test('monitor state writes use the current Mongoose returnDocument option', () => {
+  const source = readFileSync(
+    new URL('../bot/monitor/stateStore.js', import.meta.url),
+    'utf8'
+  );
+
+  assert.doesNotMatch(source, /\bnew\s*:/);
+  assert.equal(
+    [...source.matchAll(/returnDocument:\s*['"]before['"]/g)].length,
+    4
+  );
 });
 
 test('only one overlapping online observer wins the recovery claim', async () => {
