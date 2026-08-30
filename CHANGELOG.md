@@ -14,6 +14,12 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Changed
+- The list-check result rows (typed `check <name>` and the screenshot path) follow the same grammar as the rest: CP carries its unit inside the badge (`≈4089.17 CP`), the raid is a badge rather than bracketed text, and every character name links to its roster page - the checked name, the entry it matched through, and the alts beneath it. Previously only the alts and the matched entry were plain text sitting beside linked names.
+
+### Fixed
+- Embed titles render no markdown, so a notice whose first line carried bold or code marks reached the user with the literal `**` showing. The list-check progress card ("Read **1** name · checking the lists…") was one of them. `buildNoticeEmbed` now strips inline emphasis when it promotes that line into the title, which covers every notice in the bot rather than one string.
+
+### Changed
 - The `/la-search` card stops saying the same thing twice: the result count moves into the title, so the description opens straight into the results, and the per-list breakdown only appears once there is more than one hit. Its footer drops the data sources ("Characters: lostark.bible · Lists: bot database") and the timestamp Discord already prints beside the bot name, leaving just the filters that actually shaped the result.
 - The stronghold-scan result card and the scan-completion DM render their alt rows through the shared `formatAltLine` as well. They were the last two hand-rolled copies of that row, and the reason neither carried the CP badge.
 - Swept the rest of LoaLogs for the problems this session kept finding. `/la-search` badges its CP and raid like every other surface (`≈4089.17 CP`, `Kazeros Hard`) and renders the matched entry behind "via" as a real character - class icon and roster link - instead of bare bold text. The evidence card's roster field now includes the searched character itself and is labelled 🧬 tracked rosters, matching the broadcast card and the roster card printed beside it. The trusted-block and trust-removed cards give their reason the full width and icon-label their fields.

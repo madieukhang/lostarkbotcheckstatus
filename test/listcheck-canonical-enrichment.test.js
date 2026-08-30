@@ -583,7 +583,7 @@ test('trusted allCharacters match roster alts without a fresh roster scrape', as
 
     assert.equal(results[0].trustedEntry?.name, 'Clauseduk');
     assert.match(lines[0], /Morrahduk/);
-    assert.match(lines[0], /via \*\*Clauseduk\*\* · trusted/);
+    assert.match(lines[0], /via \*\*\[Clauseduk\]\(\S+\)\*\* · trusted/);
   } finally {
     globalThis.fetch = originalFetch;
   }

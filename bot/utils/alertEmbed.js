@@ -119,6 +119,23 @@ export function buildAlertEmbed({
 const LEADING_NOTICE_ICON = /^(?:✅|⚠️|❌|ℹ️|🛡️|⏳|🔍|🔔|🔕|🌐|🔒|🛑|✖️)\s*/u;
 
 /**
+ * Discord renders no markdown in an embed title, so bold and code marks
+ * promoted from a notice line arrive as literal `**` and backticks. The
+ * emphasis is dropped rather than the text: "Read **1** name" would
+ * otherwise reach the user with the asterisks showing.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function stripInlineMarkdown(value) {
+  return String(value ?? '')
+    .replace(/\*\*(.+?)\*\*/gsu, '$1')
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/gsu, '$1')
+    .replace(/__(.+?)__/gsu, '$1')
+    .replace(/`([^`]+)`/gu, '$1');
+}
+
+/**
  * Turn a localized text notice into the same compact embed shape used by
  * RaidManage. The first short line becomes the title; any remaining lines
  * become the description. This keeps simple command results readable without
@@ -137,7 +154,7 @@ export function buildNoticeEmbed(content, {
   const lines = text.split(/\r?\n/);
   const firstLine = (lines[0] || '').replace(LEADING_NOTICE_ICON, '').trim();
   const canPromoteFirstLine = !title && firstLine.length > 0 && firstLine.length <= 256;
-  const resolvedTitle = title || (canPromoteFirstLine ? firstLine : undefined);
+  const resolvedTitle = title || (canPromoteFirstLine ? stripInlineMarkdown(firstLine) : undefined);
   const description = canPromoteFirstLine
     ? lines.slice(1).join('\n').trim()
     : text;

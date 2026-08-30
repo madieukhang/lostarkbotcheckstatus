@@ -196,7 +196,12 @@ test('approval result posted in a guild channel uses guild-global language', asy
   assert.equal(sent[0].embeds.length, 1);
   assert.ok(
     sent[0].embeds[0].toJSON().title.includes(
-      localizedCopy.replace(`<@${payload.requestedByUserId}>`, '').trim()
+      // Embed titles render no markdown, so buildNoticeEmbed strips the
+      // emphasis when it promotes the first line into the title.
+      localizedCopy
+        .replace(`<@${payload.requestedByUserId}>`, '')
+        .replace(/\*\*/g, '')
+        .trim()
     )
   );
 });

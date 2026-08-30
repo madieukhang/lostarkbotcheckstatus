@@ -1,4 +1,5 @@
 import { getClassEmoji, isSupportClass } from '../../models/Class.js';
+import { rosterUrl } from '../../utils/rosterLink.js';
 import { t } from '../i18n/index.js';
 import { groupListCheckResults } from './displayGroups.js';
 import { didListCheckNameChange } from './matchResolution.js';
@@ -7,20 +8,44 @@ function normalizeName(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+// The names in these branches are characters in their own right, so they
+// link out to their roster page like every other name on the card. The
+// class icon is not available here: the check only holds a snapshot for
+// the name that was searched, not for the entry it matched.
+function linkName(name) {
+  const trimmed = String(name || '').trim();
+  return trimmed ? `[${trimmed}](${rosterUrl(trimmed)})` : trimmed;
+}
+
+const LIST_ENTRY_BRANCHES = [
+  ['black', 'blackEntry'],
+  ['white', 'whiteEntry'],
+  ['watch', 'watchEntry'],
+];
+
+const RESULT_STATES = [
+  { entryKey: 'blackEntry', icon: '⛔', priority: 0 },
+  { entryKey: 'watchEntry', icon: '⚠️', priority: 1 },
+  { entryKey: 'whiteEntry', icon: '✅', priority: 2 },
+  { entryKey: 'trustedEntry', icon: '🛡️', priority: 2, trustedOnly: true },
+];
+
+const NOT_LISTED_STATE = { icon: '❓', priority: 3 };
+
 function formatMatchContext(item, entry, listType, lang) {
   const detail = item.matchDetails?.[listType];
   if (detail?.kind === 'roster') {
     const matchedName = String(detail.matchedName || entry.name || '').trim();
     if (normalizeName(matchedName) === normalizeName(entry.name)) {
-      return t('dialogue.check.format.rosterVia', lang, { name: matchedName });
+      return t('dialogue.check.format.rosterVia', lang, { name: linkName(matchedName) });
     }
     return t('dialogue.check.format.rosterEntry', lang, {
-      name: matchedName,
-      entry: entry.name,
+      name: linkName(matchedName),
+      entry: linkName(entry.name),
     });
   }
   if (normalizeName(entry.name) !== normalizeName(item.name)) {
-    return t('dialogue.check.format.via', lang, { name: entry.name });
+    return t('dialogue.check.format.via', lang, { name: linkName(entry.name) });
   }
   return '';
 }
@@ -60,16 +85,111 @@ function getClassPrefix(item) {
 }
 
 function getStatSuffix(item) {
+  // CP carries its unit inside the badge, as every other character row
+  // in the bot does · one badge, one labelled value.
   return item.snapItemLevel > 0
-    ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · CP \`${item.snapCombatScore}\`` : ''}`
+    ? ` · \`${item.snapItemLevel.toFixed(2)}\`${item.snapCombatScore ? ` · \`${item.snapCombatScore} CP\`` : ''}`
     : '';
+}
+
+function formatBranch(parts) {
+  const content = parts.filter(Boolean).join(' · ');
+  return content ? `   ↳ ${content}` : '';
+}
+
+function formatBranchBlock(branches) {
+  return branches.length > 0 ? `\n${branches.join('\n')}` : '';
+}
+
+function wrapTrimmed(value, wrap) {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  return trimmed ? wrap(trimmed) : '';
+}
+
+function formatCorrectionBranch(item, lang) {
+  if (!didListCheckNameChange(item)) return '';
+  const correctionKey = item.inputSource === 'ocr' ? 'correctedOcr' : 'correctedText';
+  return formatBranch([t(`dialogue.check.format.${correctionKey}`, lang, {
+    input: item.inputName,
+    name: item.name,
+  })]);
+}
+
+function formatListEntryBranch(item, entry, listType, lang) {
+  if (!entry) return '';
+  return formatBranch([
+    formatMatchContext(item, entry, listType, lang),
+    wrapTrimmed(entry.reason, (reason) => `*${reason}*`),
+    wrapTrimmed(entry.raid, (raid) => `\`${raid}\``),
+  ]);
+}
+
+function formatAltsBranch(item, lang) {
+  const alts = pickAltsForDisplay(item);
+  if (alts.length === 0) return '';
+
+  const visible = alts.slice(0, 3);
+  const remainingCount = alts.length - visible.length;
+  const tail = remainingCount > 0
+    ? ` *${t('dialogue.check.format.more', lang, { count: remainingCount })}*`
+    : '';
+  const linked = visible.map(linkName);
+  return formatBranch([
+    `${t('dialogue.check.format.alts', lang)}: ${linked.join(', ')}${tail}`,
+  ]);
+}
+
+function collectResultBranches(item, lang) {
+  return [
+    formatCorrectionBranch(item, lang),
+    ...LIST_ENTRY_BRANCHES.map(([listType, entryKey]) => (
+      formatListEntryBranch(item, item[entryKey], listType, lang)
+    )),
+    formatAltsBranch(item, lang),
+  ].filter(Boolean);
+}
+
+function resolveResultState(item) {
+  return RESULT_STATES.find(({ entryKey }) => item[entryKey]) || NOT_LISTED_STATE;
+}
+
+function formatResultName(item, emphasizeName) {
+  if (!emphasizeName) return item.name;
+  return `**${linkName(item.name) || item.name}**`;
+}
+
+function formatStandardResult(item, state, classPrefix, statSuffix, branches, lang) {
+  const isListHit = Boolean(state.entryKey);
+  const scopeTag = state.entryKey === 'blackEntry' && item.blackEntry?.scope === 'server'
+    ? ` (${t('dialogue.check.format.local', lang)})`
+    : '';
+  const trustedTag = isListHit && item.trustedEntry ? ' 🛡️' : '';
+  return {
+    line: `${state.icon} ${classPrefix}${formatResultName(item, isListHit)}${scopeTag}${trustedTag}${statSuffix}${formatBranchBlock(branches)}`,
+    priority: state.priority,
+  };
+}
+
+function formatTrustedResult(item, state, classPrefix, statSuffix, branches, lang) {
+  const trustedContext = formatMatchContext(item, item.trustedEntry, 'trusted', lang);
+  const trustedLabel = t('dialogue.check.format.trusted', lang);
+  const directTag = trustedContext ? '' : ` · ${trustedLabel}`;
+  const trustedBranches = [
+    trustedContext ? formatBranch([trustedContext, trustedLabel]) : '',
+    ...branches,
+  ].filter(Boolean);
+
+  return {
+    line: `${state.icon} ${classPrefix}${formatResultName(item, true)}${statSuffix}${directTag}${formatBranchBlock(trustedBranches)}`,
+    priority: state.priority,
+  };
 }
 
 /**
  * Build the per-character line for an OCR check result.
  *
  * Layout:
- *   [status-icon] [class-icon] **Name** · `ilvl` · CP nnn
+ *   [status-icon] [class-icon] **Name** · `ilvl` · `nnn CP`
  *      ↳ via Other · reason · [raid]            (only when flagged)
  *      ↳ via Other · trusted                    (only when trusted via roster)
  *      ↳ alts: A, B, C +N more                  (when alts are known)
@@ -77,85 +197,14 @@ function getStatSuffix(item) {
  * @returns {{ line: string, priority: number }}
  */
 function formatResultLine(item, lang = 'en') {
-  const isBlack = Boolean(item.blackEntry);
-  const isWhite = Boolean(item.whiteEntry);
-  const isWatch = Boolean(item.watchEntry);
-
+  const state = resolveResultState(item);
   const classPrefix = getClassPrefix(item);
   const statSuffix = getStatSuffix(item);
+  const branches = collectResultBranches(item, lang);
 
-  const trustedTag = item.trustedEntry && (isBlack || isWhite || isWatch) ? ' 🛡️' : '';
-
-  const branches = [];
-  if (didListCheckNameChange(item)) {
-    const correctionKey = item.inputSource === 'ocr' ? 'correctedOcr' : 'correctedText';
-    branches.push(`   ↳ ${t(`dialogue.check.format.${correctionKey}`, lang, {
-      input: item.inputName,
-      name: item.name,
-    })}`);
-  }
-  for (const [listType, entry] of [
-    ['black', item.blackEntry],
-    ['white', item.whiteEntry],
-    ['watch', item.watchEntry],
-  ]) {
-    if (!entry) continue;
-    const parts = [];
-    const matchContext = formatMatchContext(item, entry, listType, lang);
-    if (matchContext) parts.push(matchContext);
-    if (entry.reason?.trim()) parts.push(`*${entry.reason.trim()}*`);
-    if (entry.raid?.trim()) parts.push(`[${entry.raid.trim()}]`);
-    if (parts.length > 0) branches.push(`   ↳ ${parts.join(' · ')}`);
-  }
-
-  // Alts line · capped at 3 visible with `+N more` overflow so the
-  // 4096-char embed description stays in budget even with 8 names.
-  // Hidden / missing rosters skip silently because discoveredAlts is
-  // only populated when rosterVisibility === 'visible'.
-  const alts = pickAltsForDisplay(item);
-  if (alts.length > 0) {
-    const visible = alts.slice(0, 3);
-    const tail = alts.length > visible.length ? ` *${t('dialogue.check.format.more', lang, { count: alts.length - visible.length })}*` : '';
-    branches.push(`   ↳ ${t('dialogue.check.format.alts', lang)}: ${visible.join(', ')}${tail}`);
-  }
-
-  const branchBlock = branches.length > 0 ? `\n${branches.join('\n')}` : '';
-
-  if (isBlack) {
-    const scopeTag = item.blackEntry?.scope === 'server' ? ` (${t('dialogue.check.format.local', lang)})` : '';
-    return {
-      line: `⛔ ${classPrefix}**${item.name}**${scopeTag}${trustedTag}${statSuffix}${branchBlock}`,
-      priority: 0,
-    };
-  }
-  if (isWatch) {
-    return {
-      line: `⚠️ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${branchBlock}`,
-      priority: 1,
-    };
-  }
-  if (isWhite) {
-    return {
-      line: `✅ ${classPrefix}**${item.name}**${trustedTag}${statSuffix}${branchBlock}`,
-      priority: 2,
-    };
-  }
-  if (item.trustedEntry) {
-    const trustedContext = formatMatchContext(item, item.trustedEntry, 'trusted', lang);
-    const directTag = trustedContext ? '' : ` · ${t('dialogue.check.format.trusted', lang)}`;
-    // Trusted-only branch reuses the same `branches` block built above
-    // so the alts line (if any) renders. Prepend the via-trusted note
-    // so it shows above alts in the same sub-list.
-    const trustedBranches = [];
-    if (trustedContext) trustedBranches.push(`   ↳ ${trustedContext} · ${t('dialogue.check.format.trusted', lang)}`);
-    for (const b of branches) trustedBranches.push(b);
-    const trustedBlock = trustedBranches.length > 0 ? `\n${trustedBranches.join('\n')}` : '';
-    return {
-      line: `🛡️ ${classPrefix}**${item.name}**${statSuffix}${directTag}${trustedBlock}`,
-      priority: 2,
-    };
-  }
-  return { line: `❓ ${classPrefix}${item.name}${statSuffix}${branchBlock}`, priority: 3 };
+  return state.trustedOnly
+    ? formatTrustedResult(item, state, classPrefix, statSuffix, branches, lang)
+    : formatStandardResult(item, state, classPrefix, statSuffix, branches, lang);
 }
 
 /**
@@ -174,13 +223,10 @@ export function formatCheckResults(results, lang = 'en') {
     return { ...formatResultLine(item, lang), item };
   });
 
-  formatted.sort((a, b) => {
-    if (a.priority !== b.priority) return a.priority - b.priority;
-    const aSupport = isSupportClass(a.item.snapClassName) ? 1 : 0;
-    const bSupport = isSupportClass(b.item.snapClassName) ? 1 : 0;
-    if (aSupport !== bSupport) return aSupport - bSupport;
-    return 0;
-  });
+  formatted.sort((a, b) => (
+    a.priority - b.priority
+    || Number(isSupportClass(a.item.snapClassName)) - Number(isSupportClass(b.item.snapClassName))
+  ));
 
   return formatted.map((f) => f.line);
 }

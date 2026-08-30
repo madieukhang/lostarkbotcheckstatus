@@ -61,7 +61,7 @@ test('unmatched OCR names render as not listed instead of roster lookup status',
   assert.equal(formattedLines.length, 1);
   assert.match(formattedLines[0], /Unlistedname/);
   assert.match(formattedLines[0], /1740\.50/);
-  assert.match(formattedLines[0], /CP `4246\.54`/);
+  assert.match(formattedLines[0], /`4246\.54 CP`/);
   assert.doesNotMatch(formattedLines[0], /lookup issue|no roster|unchecked|worker offline/i);
 
   const { counts, embed } = buildListCheckEmbed({

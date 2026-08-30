@@ -37,8 +37,10 @@ test('formatCheckResults renders roster-match branch context', () => {
   assert.equal(lines.length, 1);
   assert.match(lines[0], /^⛔/u);
   assert.match(lines[0], /\(Local\)/);
-  assert.match(lines[0], /via \*\*Mainchar\*\*/);
-  assert.match(lines[0], /CP `90000`/);
+  // The matched name links out like every other character name.
+  assert.match(lines[0], /via \*\*\[Mainchar\]\(\S+\)\*\*/);
+  // CP carries its unit inside the badge.
+  assert.match(lines[0], /`90000 CP`/);
 });
 
 test('formatCheckResults groups photographed characters backed by one roster entry', () => {
@@ -75,11 +77,12 @@ test('formatCheckResults groups photographed characters backed by one roster ent
   const lines = formatCheckResults(results, 'vi');
 
   assert.equal(lines.length, 1);
-  assert.match(lines[0], /^⛔ \*\*Dbbpallylastone\*\*/u);
+  assert.match(lines[0], /^⛔ \*\*\[Dbbpallylastone\]\(\S+\)\*\*/u);
   assert.match(lines[0], /🛡️/u);
-  assert.match(lines[0], /via \*\*Holynightdbb\*\*/u);
+  assert.match(lines[0], /via \*\*\[Holynightdbb\]\(\S+\)\*\*/u);
   assert.equal((lines[0].match(/Same roster report/gu) || []).length, 1);
-  assert.match(lines[0], /alt: Anotherpallydbb, Holypaladindbb, Pallydbbswift \*\+3 tên khác\*/u);
+  // Alt names link out too, so the officer can verify each one.
+  assert.match(lines[0], /alt: \[Anotherpallydbb\]\(\S+\), \[Holypaladindbb\]\(\S+\), \[Pallydbbswift\]\(\S+\) \*\+3 tên khác\*/u);
   assert.doesNotMatch(lines[0], /6 tên cùng roster|Trong ảnh:/u);
 });
 
@@ -119,7 +122,7 @@ test('formatCheckResults shows OCR correction and the roster path used to confir
   }]);
 
   assert.match(lines[0], /OCR \*\*Altchxr\*\* → lostark\.bible \*\*Altchar\*\*/);
-  assert.match(lines[0], /roster alt \*\*Rosteralt\*\* → entry \*\*Mainchar\*\*/);
+  assert.match(lines[0], /roster alt \*\*\[Rosteralt\]\(\S+\)\*\* → entry \*\*\[Mainchar\]\(\S+\)\*\*/);
 });
 
 test('formatCheckResults does not label a typed-name correction as OCR', () => {
@@ -133,4 +136,29 @@ test('formatCheckResults does not label a typed-name correction as OCR', () => {
 
   assert.match(line, /typed \*\*Altchxr\*\* → lostark\.bible \*\*Altchar\*\*/);
   assert.doesNotMatch(line, /OCR/);
+});
+
+test('formatCheckResults keeps list-state precedence without empty detail branches', () => {
+  const lines = formatCheckResults([
+    {
+      name: 'Allstates',
+      blackEntry: { name: 'Allstates', scope: 'server' },
+      watchEntry: { name: 'Allstates' },
+      whiteEntry: { name: 'Allstates' },
+      trustedEntry: { name: 'Allstates' },
+    },
+    { name: 'Watchchar', watchEntry: { name: 'Watchchar' } },
+    { name: 'Whitechar', whiteEntry: { name: 'Whitechar' } },
+    { name: 'Trustedchar', trustedEntry: { name: 'Trustedchar' } },
+    { name: 'Unknownchar' },
+  ]);
+
+  const lineFor = (name) => lines.find((line) => line.includes(name));
+
+  assert.match(lineFor('Allstates'), /^⛔.*\(Local\).*🛡️/u);
+  assert.doesNotMatch(lineFor('Allstates'), /↳/u);
+  assert.match(lineFor('Watchchar'), /^⚠️/u);
+  assert.match(lineFor('Whitechar'), /^✅/u);
+  assert.match(lineFor('Trustedchar'), /^🛡️/u);
+  assert.match(lineFor('Unknownchar'), /^❓/u);
 });
