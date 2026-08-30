@@ -10,12 +10,14 @@ function buildFakeScrapeJob({ pendingCount = 0 } = {}) {
   let stored = null;
   let initialInsert = null;
   let nextId = 1;
+  const updates = [];
 
   return {
     // Snapshot of the document at insert time. Useful for assertions
     // about the 'pending' state even after a flipTo('done') has mutated
     // the live record.
     inserted: () => (initialInsert ? { ...initialInsert } : null),
+    updates: () => [...updates],
     flipTo(state) {
       if (!stored) throw new Error('No job to flip');
       Object.assign(stored, state);
@@ -30,6 +32,14 @@ function buildFakeScrapeJob({ pendingCount = 0 } = {}) {
       };
       initialInsert = { ...stored };
       return stored;
+    },
+    async updateOne(filter, update) {
+      updates.push({ filter, update });
+      if (!stored || stored._id !== filter._id) return { modifiedCount: 0 };
+      const allowed = filter.status?.$in || [filter.status];
+      if (!allowed.includes(stored.status)) return { modifiedCount: 0 };
+      Object.assign(stored, update.$set || {});
+      return { modifiedCount: 1 };
     },
     findById(id) {
       return {
@@ -111,6 +121,15 @@ test('workerBibleClient honors the caller timeoutMs hint with a buffer', async (
     () => client.fetch('https://lostark.bible/character/NA/Test/__data.json', { timeoutMs: 2_000 }),
     /Worker fetch timed out after 7000ms/,
   );
+
+  const inserted = ScrapeJob.inserted();
+  assert.equal(inserted.deadlineAt.toISOString(), '1970-01-01T00:00:08.000Z');
+  assert.equal(ScrapeJob.updates().length, 1);
+  assert.deepEqual(ScrapeJob.updates()[0].filter, {
+    _id: inserted._id,
+    status: { $in: ['pending', 'in_progress'] },
+  });
+  assert.equal(ScrapeJob.updates()[0].update.$set.status, 'cancelled');
 });
 
 test('workerBibleClient strips non-serializable options before insert', async () => {

@@ -95,19 +95,20 @@ export function createWorkerBibleClient({
         );
       }
 
-      const job = await ScrapeJob.create({
-        url,
-        options: sanitized,
-        status: 'pending',
-      });
-
       // Bot-side timeout is the caller's hint plus a small buffer for
-      // the round trip through Mongo. Default 30s if caller didn't pin
-      // a timeoutMs, which matches fetchWithFallback's typical ceiling.
+      // the round trip through Mongo. Persist the deadline before insert so
+      // an offline worker cannot later process a request nobody is awaiting.
       const timeoutMs = sanitized.timeoutMs
         ? sanitized.timeoutMs + 5_000
         : defaultTimeoutMs;
       const deadline = now() + timeoutMs;
+
+      const job = await ScrapeJob.create({
+        url,
+        options: sanitized,
+        status: 'pending',
+        deadlineAt: new Date(deadline),
+      });
 
       while (now() < deadline) {
         const fresh = await ScrapeJob.findById(job._id).lean();
@@ -130,11 +131,32 @@ export function createWorkerBibleClient({
         if (fresh.status === 'failed') {
           throw new Error(`Worker fetch failed: ${fresh.error || 'unknown error'}`);
         }
+        if (fresh.status === 'cancelled') {
+          throw new Error(`Worker job ${job._id} was cancelled.`);
+        }
         await sleep(pollIntervalMs);
       }
 
+      const finalJob = await ScrapeJob.findById(job._id).lean();
+      const finalStatus = finalJob?.status || 'missing';
+      let cancellationFailure = '';
+      try {
+        await ScrapeJob.updateOne(
+          { _id: job._id, status: { $in: ['pending', 'in_progress'] } },
+          {
+            $set: {
+              status: 'cancelled',
+              completedAt: new Date(),
+              error: `Bot stopped waiting after ${timeoutMs}ms`,
+            },
+          },
+        );
+      } catch (err) {
+        cancellationFailure = `; cancellation failed: ${err?.message || String(err)}`;
+      }
+
       throw new Error(
-        `Worker fetch timed out after ${timeoutMs}ms (job ${job._id} still ${(await ScrapeJob.findById(job._id).lean())?.status || 'missing'}).`
+        `Worker fetch timed out after ${timeoutMs}ms (job ${job._id} still ${finalStatus})${cancellationFailure}.`
       );
     },
   };

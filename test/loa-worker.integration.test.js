@@ -13,7 +13,11 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 import ScrapeJob from '../bot/models/ScrapeJob.js';
-import { claimAndProcessOne } from '../bot/services/worker/scrape-worker.js';
+import {
+  claimAndProcessOne,
+  claimNextJob,
+  executeJob,
+} from '../bot/services/worker/scrape-worker.js';
 
 let mongod;
 const silentLogger = { log: () => {}, warn: () => {} };
@@ -136,4 +140,54 @@ test('claimAndProcessOne ignores non-pending jobs', async () => {
 
   const result = await claimAndProcessOne({ logger: silentLogger });
   assert.equal(result.state, 'idle');
+});
+
+test('a reclaimed scrape lease discards the stale worker result', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    await ScrapeJob.create({
+      url: 'https://example.com/lease',
+      status: 'pending',
+    });
+
+    const firstClaimAt = Date.parse('2026-08-30T00:00:00Z');
+    const oldClaim = await claimNextJob({
+      now: () => firstClaimAt,
+      staleAfterMs: 1_000,
+      claimId: 'old-claim',
+    });
+    const newClaim = await claimNextJob({
+      now: () => firstClaimAt + 1_001,
+      staleAfterMs: 1_000,
+      claimId: 'new-claim',
+    });
+
+    globalThis.fetch = async () => new Response('new-result', { status: 200 });
+    assert.equal((await executeJob(newClaim, { logger: silentLogger })).state, 'done');
+
+    globalThis.fetch = async () => new Response('old-result', { status: 200 });
+    assert.equal((await executeJob(oldClaim, { logger: silentLogger })).state, 'superseded');
+
+    const fresh = await ScrapeJob.findById(newClaim._id).lean();
+    assert.equal(fresh.status, 'done');
+    assert.equal(fresh.claimId, 'new-claim');
+    assert.equal(fresh.result.body, 'new-result');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('scrape worker does not claim an expired pending job', async () => {
+  const deadlineAt = new Date('2026-08-30T00:00:00Z');
+  await ScrapeJob.create({
+    url: 'https://example.com/expired',
+    status: 'pending',
+    deadlineAt,
+  });
+
+  const claim = await claimNextJob({
+    now: () => deadlineAt.getTime(),
+    claimId: 'should-not-claim',
+  });
+  assert.equal(claim, null);
 });

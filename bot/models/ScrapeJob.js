@@ -16,10 +16,19 @@ const scrapeJobSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['pending', 'in_progress', 'done', 'failed'],
+    enum: ['pending', 'in_progress', 'done', 'failed', 'cancelled'],
     default: 'pending',
     index: true,
   },
+
+  // Unique ownership token for the current lease. A stale worker may finish
+  // its fetch after another worker has reclaimed the job; this token prevents
+  // the stale result from overwriting the newer owner's result.
+  claimId: { type: String, default: null },
+
+  // Bot-side deadline. Expired jobs are never claimed, and a caller that has
+  // stopped waiting marks its job cancelled so it cannot clog the queue.
+  deadlineAt: { type: Date, default: null },
 
   // Populated when status === 'done'. Body is stored as a string because
   // bible responses are JSON or HTML text, and Mongoose's Mixed type
@@ -33,7 +42,7 @@ const scrapeJobSchema = new mongoose.Schema({
   // Populated when status === 'failed'.
   error: { type: String, default: null },
 
-  // TTL: auto-delete after 1 hour. Done/failed jobs no longer matter
+  // TTL: auto-delete after 1 hour. Done/failed/cancelled jobs no longer matter
   // once the bot has read the result, and stale pending jobs from a
   // crashed worker should not pile up.
   createdAt: { type: Date, default: Date.now, expires: 3600 },

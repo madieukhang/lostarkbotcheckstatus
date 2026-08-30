@@ -9,6 +9,8 @@
  * 2 min).
  */
 
+import { randomUUID } from 'node:crypto';
+
 import ScrapeJob from '../../models/ScrapeJob.js';
 import { FETCH_HEADERS } from '../roster/bibleHeaders.js';
 
@@ -28,11 +30,22 @@ export function buildClaimNextJobFilter({
   now = Date.now,
   staleAfterMs = DEFAULT_JOB_LEASE_MS,
 } = {}) {
-  const staleStartedBefore = new Date(now() - staleAfterMs);
+  const nowDate = new Date(now());
+  const staleStartedBefore = new Date(nowDate.getTime() - staleAfterMs);
   return {
-    $or: [
-      { status: 'pending' },
-      { status: 'in_progress', startedAt: { $lt: staleStartedBefore } },
+    $and: [
+      {
+        $or: [
+          { deadlineAt: null },
+          { deadlineAt: { $gt: nowDate } },
+        ],
+      },
+      {
+        $or: [
+          { status: 'pending' },
+          { status: 'in_progress', startedAt: { $lt: staleStartedBefore } },
+        ],
+      },
     ],
   };
 }
@@ -46,17 +59,19 @@ export function buildClaimNextJobFilter({
  * @returns {Promise<object|null>} claimed ScrapeJob doc or null
  */
 export async function claimNextJob(options = {}) {
+  const claimedAtMs = options.now?.() ?? Date.now();
+  const claimId = options.claimId || randomUUID();
   return ScrapeJob.findOneAndUpdate(
-    buildClaimNextJobFilter(options),
+    buildClaimNextJobFilter({ ...options, now: () => claimedAtMs }),
     {
-      $set: { status: 'in_progress', startedAt: new Date(options.now?.() ?? Date.now()) },
+      $set: { status: 'in_progress', startedAt: new Date(claimedAtMs), claimId },
       $unset: { completedAt: '', error: '', result: '' },
     },
     { sort: { createdAt: 1 }, returnDocument: 'after' },
   );
 }
 
-async function executeJob(job, { logger = console } = {}) {
+export async function executeJob(job, { logger = console } = {}) {
   const startedAt = Date.now();
   const timeoutMs = Number.isFinite(job.options?.timeoutMs) && job.options.timeoutMs > 0
     ? job.options.timeoutMs
@@ -73,8 +88,8 @@ async function executeJob(job, { logger = console } = {}) {
       headers[key] = value;
     });
 
-    await ScrapeJob.updateOne(
-      { _id: job._id },
+    const write = await ScrapeJob.updateOne(
+      { _id: job._id, status: 'in_progress', claimId: job.claimId },
       {
         $set: {
           status: 'done',
@@ -83,27 +98,36 @@ async function executeJob(job, { logger = console } = {}) {
         },
       },
     );
+    if (write.modifiedCount !== 1) {
+      logger.warn?.(`[worker] superseded ${job._id}; newer claim or cancellation owns the result`);
+      return { state: 'superseded' };
+    }
     logger.log?.(
       `[worker] done ${job._id} ${Date.now() - startedAt}ms ` +
       `HTTP ${res.status} ${body.length}B ${abbreviateUrl(job.url)}`,
     );
     return { state: 'done', status: res.status, bodyLength: body.length };
   } catch (err) {
-    await ScrapeJob.updateOne(
-      { _id: job._id },
+    const errorMessage = err?.message || String(err);
+    const write = await ScrapeJob.updateOne(
+      { _id: job._id, status: 'in_progress', claimId: job.claimId },
       {
         $set: {
           status: 'failed',
           completedAt: new Date(),
-          error: err.message || String(err),
+          error: errorMessage,
         },
       },
     );
+    if (write.modifiedCount !== 1) {
+      logger.warn?.(`[worker] superseded ${job._id}; stale failure was discarded`);
+      return { state: 'superseded' };
+    }
     logger.warn?.(
       `[worker] failed ${job._id} ${Date.now() - startedAt}ms ` +
-      `${err.message} ${abbreviateUrl(job.url)}`,
+      `${errorMessage} ${abbreviateUrl(job.url)}`,
     );
-    return { state: 'failed', error: err.message || String(err) };
+    return { state: 'failed', error: errorMessage };
   }
 }
 
@@ -114,7 +138,7 @@ async function executeJob(job, { logger = console } = {}) {
  * a deterministic single step.
  * @param {object} [opts]
  * @param {object} [opts.logger=console]
- * @returns {Promise<{state: "idle"|"done"|"failed", jobId?: string}>}
+ * @returns {Promise<{state: "idle"|"done"|"failed"|"superseded", jobId?: string}>}
  */
 export async function claimAndProcessOne({ logger = console } = {}) {
   const job = await claimNextJob();

@@ -60,15 +60,27 @@ const CLS = {
  * @returns {string}
  */
 function resolveStatusFromClass(className) {
-  const cls = className.toLowerCase();
-  if (cls.includes('--good') || cls.includes('--busy') || cls.includes('--full')) {
+  const classTokens = String(className || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const baseClass = CLS.STATUS_DIV.toLowerCase();
+  const modifiers = new Set(
+    classTokens.filter((token) => token.startsWith(`${baseClass}--`))
+  );
+
+  if (
+    modifiers.has(`${baseClass}--good`) ||
+    modifiers.has(`${baseClass}--busy`) ||
+    modifiers.has(`${baseClass}--full`)
+  ) {
     return STATUS.ONLINE;
   }
-  if (cls.includes('--maintenance')) {
+  if (modifiers.has(`${baseClass}--maintenance`)) {
     return STATUS.MAINTENANCE;
   }
-  // No recognised modifier → offline
-  return STATUS.OFFLINE;
+
+  // The live page represents offline with the base status class and no
+  // modifier. An unfamiliar modifier is schema drift, not proof of offline.
+  if (classTokens.includes(baseClass) && modifiers.size === 0) return STATUS.OFFLINE;
+  return STATUS.UNKNOWN;
 }
 
 /**
@@ -80,11 +92,90 @@ function resolveStatusFromClass(className) {
  * @returns {string}
  */
 function resolveStatusFromAriaLabel(ariaLabel) {
-  const label = ariaLabel.toLowerCase();
-  if (label.includes('online'))      return STATUS.ONLINE;
+  const label = String(ariaLabel || '').toLowerCase();
   if (label.includes('maintenance')) return STATUS.MAINTENANCE;
   if (label.includes('offline'))     return STATUS.OFFLINE;
+  if (label.includes('online') || label.includes('busy') || label.includes('full')) {
+    return STATUS.ONLINE;
+  }
   return STATUS.UNKNOWN;
+}
+
+/**
+ * Parse an already-fetched status page. Kept separate from network I/O so
+ * live markup variants can be covered by deterministic fixtures.
+ *
+ * @param {string} html
+ * @param {string[]} serverNames
+ * @param {object} [options]
+ * @param {object} [options.logger=console]
+ * @returns {Map<string, string>}
+ */
+export function parseServerStatuses(html, serverNames, { logger = console } = {}) {
+  const { document } = new JSDOM(html).window;
+  const serverRows = document.querySelectorAll(`.${CLS.SERVER_ROW}`);
+
+  logger.log?.(`[serverStatus] Checking ${serverNames.length} server(s): ${serverNames.join(', ')}`);
+
+  const targetByLowerName = new Map(serverNames.map((name) => [name.toLowerCase(), name]));
+  const statusMap = new Map();
+
+  for (const row of serverRows) {
+    const nameEl = row.querySelector(`.${CLS.SERVER_NAME}`);
+    if (!nameEl) continue;
+
+    const serverName = nameEl.textContent.trim();
+    const targetName = targetByLowerName.get(serverName.toLowerCase());
+    if (!targetName) continue;
+
+    // Prefer a definitive human-readable aria label. If the upstream adds a
+    // new phrase, UNKNOWN deliberately falls through to the CSS signal.
+    const ariaLabel = nameEl.getAttribute('aria-label') ?? '';
+    if (ariaLabel) {
+      const status = resolveStatusFromAriaLabel(ariaLabel);
+      logger.log?.(`[serverStatus] ${targetName}: "${ariaLabel}" → ${status}`);
+      if (status !== STATUS.UNKNOWN) {
+        statusMap.set(targetName, status);
+        continue;
+      }
+    }
+
+    // The inner status element owns the modifier. Selecting the base class
+    // token excludes the similarly named "-wrapper" element.
+    const statusEl = row.querySelector(`.${CLS.STATUS_DIV}`);
+    if (statusEl) {
+      const status = resolveStatusFromClass(statusEl.className);
+      logger.log?.(`[serverStatus] ${targetName}: class → ${status}`);
+      if (status !== STATUS.UNKNOWN) statusMap.set(targetName, status);
+    }
+  }
+
+  // Some page variants expose only aria-label nodes, outside the normal row.
+  const ariaNodes = document.querySelectorAll('[aria-label]');
+  for (const target of serverNames) {
+    if (statusMap.has(target)) continue;
+
+    for (const node of ariaNodes) {
+      const label = node.getAttribute('aria-label') ?? '';
+      if (!label.toLowerCase().startsWith(target.toLowerCase())) continue;
+
+      const status = resolveStatusFromAriaLabel(label);
+      logger.log?.(`[serverStatus] ${target}: fallback → ${status}`);
+      if (status !== STATUS.UNKNOWN) {
+        statusMap.set(target, status);
+        break;
+      }
+    }
+  }
+
+  for (const target of serverNames) {
+    if (!statusMap.has(target)) {
+      logger.error?.(`[serverStatus] Could not find "${target}" on the status page.`);
+      statusMap.set(target, STATUS.UNKNOWN);
+    }
+  }
+
+  return statusMap;
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -121,66 +212,5 @@ export async function getMultiServerStatus(serverNames) {
     throw new Error(`Failed to fetch server status page: ${err.message}`);
   }
 
-  // ── 2. Parse HTML ─────────────────────────────────────────────────────────
-  const { document } = new JSDOM(html).window;
-  const serverRows = document.querySelectorAll(`.${CLS.SERVER_ROW}`);
-
-  console.log(`[serverStatus] Checking ${serverNames.length} server(s): ${serverNames.join(', ')}`);
-
-  const targetSet = new Set(serverNames.map((n) => n.toLowerCase()));
-  const statusMap = new Map();
-
-  // ── 3. Walk server rows and match targets ─────────────────────────────────
-  for (const row of serverRows) {
-    const nameEl = row.querySelector(`.${CLS.SERVER_NAME}`);
-    if (!nameEl) continue;
-
-    const serverName = nameEl.textContent.trim();
-    if (!targetSet.has(serverName.toLowerCase())) continue;
-
-    // Primary: aria-label
-    const ariaLabel = nameEl.getAttribute('aria-label') ?? '';
-    if (ariaLabel) {
-      const status = resolveStatusFromAriaLabel(ariaLabel);
-      console.log(`[serverStatus] ${serverName}: "${ariaLabel}" → ${status}`);
-      statusMap.set(serverName, status);
-      continue;
-    }
-
-    // Secondary: CSS class modifier
-    const statusEls = row.querySelectorAll(`[class*="${CLS.STATUS_DIV}"]`);
-    for (const el of statusEls) {
-      if (!el.className.includes('--')) continue;
-      const status = resolveStatusFromClass(el.className);
-      console.log(`[serverStatus] ${serverName}: class → ${status}`);
-      statusMap.set(serverName, status);
-      break;
-    }
-  }
-
-  // ── 4. Fallback: aria-label search for any missing servers ────────────────
-  for (const target of serverNames) {
-    if (statusMap.has(target)) continue;
-
-    const ariaNodes = document.querySelectorAll(`[aria-label*="${target}"]`);
-    for (const node of ariaNodes) {
-      const label = node.getAttribute('aria-label') ?? '';
-      if (label.toLowerCase().startsWith(target.toLowerCase())) {
-        const status = resolveStatusFromAriaLabel(label);
-        console.log(`[serverStatus] ${target}: fallback → ${status}`);
-        statusMap.set(target, status);
-        break;
-      }
-    }
-  }
-
-  // ── 5. Mark missing servers as unknown ────────────────────────────────────
-  for (const target of serverNames) {
-    if (!statusMap.has(target)) {
-      console.error(`[serverStatus] Could not find "${target}" on the status page.`);
-      statusMap.set(target, STATUS.UNKNOWN);
-    }
-  }
-
-  return statusMap;
+  return parseServerStatuses(html, serverNames);
 }

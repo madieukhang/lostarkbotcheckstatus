@@ -11,11 +11,21 @@ test('scrape worker claims pending jobs and stale in-progress jobs only', () => 
   });
 
   assert.deepEqual(filter, {
-    $or: [
-      { status: 'pending' },
+    $and: [
       {
-        status: 'in_progress',
-        startedAt: { $lt: new Date(nowMs - 120_000) },
+        $or: [
+          { deadlineAt: null },
+          { deadlineAt: { $gt: new Date(nowMs) } },
+        ],
+      },
+      {
+        $or: [
+          { status: 'pending' },
+          {
+            status: 'in_progress',
+            startedAt: { $lt: new Date(nowMs - 120_000) },
+          },
+        ],
       },
     ],
   });
