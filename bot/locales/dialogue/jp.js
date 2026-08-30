@@ -274,7 +274,7 @@ export default {
   search: {
     bibleUnavailable: { title: 'Bible が応答しませんの', description: 'lostark.bible が今回は応答しませんでした。後でもう一度お試しくださいませ。' }, noResults: { title: '一致 character がありませんの', description: '**{name}** に一致する character を見つけられませんでしたわ。' },
     noFilteredResults: { title: 'Filter に合う結果がありませんの', description: 'Filter 適用後、**{name}** の結果はありませんでしたわ。', filters: 'Filters' }, failed: { title: '検索に失敗しましたの', description: '名前検索を完了できませんでしたわ。' },
-    title: '検索 · "{name}"', via: '**{name}** 経由 · ', noReason: '理由なし', notListed: 'list DB 未登録', summary: '**{count}** {word} を発見: {breakdown}', summaryPlain: '**{count}** {word} を発見', matchOne: 'match', matchMany: 'matches', footer: 'Filters: {filters} · Characters: lostark.bible · Lists: bot database',
+    title: '検索 · "{name}"', via: '{name} 経由 · ', noReason: '理由なし', notListed: 'list DB 未登録', summary: '**{count}** {word} を発見: {breakdown}', summaryPlain: '**{count}** {word} を発見', matchOne: 'match', matchMany: 'matches', footer: 'Filters: {filters} · Characters: lostark.bible · Lists: bot database',
     session: { title: 'あなたの search ではありませんの', description: 'この search を実行した人だけが evidence を開けますわ。' }, evidenceUnavailable: { title: 'Evidence を開けませんの', description: '画像 link が期限切れ、または保存 message が削除されていますわ。', footer: '`/la-list edit name:<entry> image:<file>` で再 upload してくださいませ。' },
   },
   evidenceCommand: {

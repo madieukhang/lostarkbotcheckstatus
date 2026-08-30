@@ -414,7 +414,7 @@ export default {
     noResults: { title: 'No matching characters', description: 'I could not find a character matching **{name}**.' },
     noFilteredResults: { title: 'No results match those filters', description: 'I found no **{name}** matches after applying these filters.', filters: 'Filters' },
     failed: { title: 'Search failed', description: 'I could not complete the name search.' },
-    title: 'Search · "{name}"', via: 'via **{name}** · ', noReason: 'no reason', notListed: 'not in list DB',
+    title: 'Search · "{name}"', via: 'via {name} · ', noReason: 'no reason', notListed: 'not in list DB',
     summary: 'Found **{count}** {word}: {breakdown}', summaryPlain: 'Found **{count}** {word}', matchOne: 'match', matchMany: 'matches',
     footer: 'Filters: {filters} · Characters: lostark.bible · Lists: bot database',
     session: { title: 'This is not your search', description: 'Only the person who ran this search can open its evidence.' },

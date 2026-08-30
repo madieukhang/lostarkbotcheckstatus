@@ -14,6 +14,10 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Changed
+- Swept the rest of LoaLogs for the problems this session kept finding. `/la-search` badges its CP and raid like every other surface (`≈4089.17 CP`, `Kazeros Hard`) and renders the matched entry behind "via" as a real character - class icon and roster link - instead of bare bold text. The evidence card's roster field now includes the searched character itself and is labelled 🧬 tracked rosters, matching the broadcast card and the roster card printed beside it. The trusted-block and trust-removed cards give their reason the full width and icon-label their fields.
+
+### Fixed
+- Picking an entry from the `/la-list view` evidence dropdown showed only a "no evidence attached" notice when that entry had no screenshot, hiding its reason, raid and tracked roster along with it. The card renders either way and says the evidence is missing, the same fix `/la-roster` needed.
 - The trust result card gives its reason the full width too, and pads character + added-by into a whole row, so a sentence no longer wraps inside a third of the card.
 - The enrich result card renders its new-alt rows through the shared `formatAltLine` instead of a local copy of the same line. The copy is why that card never picked up later changes to the row, the CP badge among them.
 - The multiadd approval summary's 👤 approved-by label gains an icon, matching every other label in the card family.

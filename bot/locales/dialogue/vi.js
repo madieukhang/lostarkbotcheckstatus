@@ -299,7 +299,7 @@ export default {
   search: {
     bibleUnavailable: { title: 'Bible đang không phản hồi', description: 'lostark.bible chưa trả lời lần này. Cậu thử lại sau nhé.' }, noResults: { title: 'Không có character khớp', description: 'Tớ không tìm thấy character nào khớp **{name}**.' },
     noFilteredResults: { title: 'Không có kết quả hợp bộ lọc', description: 'Không còn kết quả **{name}** nào sau khi áp dụng bộ lọc.', filters: 'Bộ lọc' }, failed: { title: 'Tìm kiếm thất bại', description: 'Tớ chưa hoàn tất được lượt tìm tên.' },
-    title: 'Tìm kiếm · "{name}"', via: 'via **{name}** · ', noReason: 'chưa có lý do', notListed: 'chưa có trong DB list', summary: 'Tìm thấy **{count}** {word}: {breakdown}', summaryPlain: 'Tìm thấy **{count}** {word}', matchOne: 'kết quả', matchMany: 'kết quả', footer: 'Bộ lọc: {filters} · Character: lostark.bible · List: database bot',
+    title: 'Tìm kiếm · "{name}"', via: 'via {name} · ', noReason: 'chưa có lý do', notListed: 'chưa có trong DB list', summary: 'Tìm thấy **{count}** {word}: {breakdown}', summaryPlain: 'Tìm thấy **{count}** {word}', matchOne: 'kết quả', matchMany: 'kết quả', footer: 'Bộ lọc: {filters} · Character: lostark.bible · List: database bot',
     session: { title: 'Đây không phải lượt tìm của cậu', description: 'Chỉ người chạy search này mới mở được evidence.' }, evidenceUnavailable: { title: 'Evidence không còn khả dụng', description: 'Link ảnh đã hết hạn hoặc message lưu ảnh bị xóa.', footer: 'Tải ảnh lên lại bằng `/la-list edit name:<entry> image:<file>` nhé.' },
   },
   evidenceCommand: {

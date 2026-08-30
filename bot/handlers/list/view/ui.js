@@ -351,12 +351,17 @@ export function buildEvidenceEmbed(entry, displayUrl, {
   // field (sentinel when empty) because it's part of the layout grammar
   // the officer expects · the field is removed only when there is no
   // entry at all, not when an entry happens to have no alts.
+  // The full roster, primary included · this is the same list the
+  // broadcast card renders (buildTrackedAltsField), and leaving the
+  // searched character out of it made the card disagree with the roster
+  // card printed right below it.
   const altsField = renderTrackedAltsField({
     names: entry.allCharacters,
     primaryName: entry.name,
     statMap,
+    includePrimary: true,
     emptySentinel: t('listView.evidence.onlyThisCharacter', lang),
-    label: `🧬 ${t('dialogue.broadcast.fields.trackedAlts', lang)}`,
+    label: `🧬 ${t('dialogue.broadcast.fields.trackedRosters', lang)}`,
     overflowTemplate: t('dialogue.broadcast.more', lang),
   });
   if (altsField) fields.push(altsField);
@@ -386,7 +391,7 @@ export function buildEvidenceEmbed(entry, displayUrl, {
       .setDescription(t(`dialogue.check.details.${isVia ? 'headlineVia' : 'headline'}`, lang, {
         icon: getListContext(entry._listType).icon,
         name: formatLinkedCharacter(entry.name, snapshot),
-        searched: `**${searched}**`,
+        searched: formatLinkedCharacter(searched, statMap.get(searched.toLowerCase())),
         list: listLabel,
         scope: scopeTag,
       }));

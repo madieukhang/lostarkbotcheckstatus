@@ -68,7 +68,7 @@ export function createTrustHandlers() {
         description: t('dialogue.trust.removed.description', lang, { name: deleted.name }),
         fields: [
           { name: `🧬 ${t('dialogue.trust.removed.character', lang)}`, value: `[${deleted.name}](${rosterLink})`, inline: true },
-          { name: `📝 ${t('dialogue.trust.removed.reason', lang)}`, value: (deleted.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: true },
+          { name: `📝 ${t('dialogue.trust.removed.reason', lang)}`, value: (deleted.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false },
           { name: `🕐 ${t('dialogue.trust.removed.since', lang)}`, value: trustedSince, inline: true },
           { name: `👤 ${t('dialogue.trust.removed.removedBy', lang)}`, value: interaction.user.tag, inline: false },
         ],

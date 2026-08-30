@@ -42,7 +42,7 @@ test('evidence card renders ilvl and CP when a stat map is supplied', () => {
   assert.equal(fieldValue(embed, 'ilvl'), '`1755.00`');
   assert.equal(fieldValue(embed, 'CP'), '`≈4820.12`');
   // Alt rows inherit the same class + ilvl + CP shape /la-check renders.
-  assert.match(fieldValue(embed, 'Alt đang track'), /Bard \[Hanako\]\(\S+\) · `1730\.83` · `≈3311\.40 CP`/u);
+  assert.match(fieldValue(embed, 'roster đang track'), /Bard \[Hanako\]\(\S+\) · `1730\.83` · `≈3311\.40 CP`/u);
 });
 
 test('evidence card without a stat map keeps its previous shape', () => {
@@ -54,7 +54,7 @@ test('evidence card without a stat map keeps its previous shape', () => {
   assert.equal(names.some((n) => n.includes('ilvl')), false);
   assert.equal(names.some((n) => n.includes('CP')), false);
   assert.equal(names.filter((n) => n !== ZWSP).length, 3);
-  assert.doesNotMatch(fieldValue(embed, 'Alt đang track'), /CP/u);
+  assert.doesNotMatch(fieldValue(embed, 'roster đang track'), /CP/u);
 });
 
 test('the inline meta grid always fills whole three-column rows', () => {
@@ -81,7 +81,7 @@ test('added by joins the inline grid instead of trailing the card', () => {
   });
   const names = embed.toJSON().fields.map((f) => f.name);
 
-  assert.ok(names.indexOf('👤 Người thêm') < names.findIndex((n) => n.includes('Alt đang track')));
+  assert.ok(names.indexOf('👤 Người thêm') < names.findIndex((n) => n.includes('roster đang track')));
   assert.equal(inlineNames(embed).filter((n) => n !== ZWSP).length, 6);
 });
 
@@ -138,7 +138,7 @@ test('notice mode names both sides when the hit came through a roster alt', () =
   }).toJSON();
 
   // Both sides are named: what was typed, and what actually hit.
-  assert.match(via.description, /\*\*Tenshi\*\* chung roster/u);
+  assert.match(via.description, /\*\*\[Tenshi\]\(\S+\)\*\* chung roster/u);
   assert.match(via.description, /\[Hanako\]/u);
 
   // Searching the blacklisted name itself keeps the direct wording, and

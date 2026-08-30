@@ -101,8 +101,9 @@ export function buildTrustedBlockEmbed(name, reason, { via, lang = 'en' } = {}) 
     title: t('dialogue.trustedBlock.title', lang),
     description,
     fields: [
-      { name: t('dialogue.trustedBlock.name', lang), value: `[${name}](${rosterLink})`, inline: true },
-      { name: t('dialogue.trustedBlock.reason', lang), value: reason || t('dialogue.broadcast.notAvailable', lang), inline: true },
+      { name: `👤 ${t('dialogue.trustedBlock.name', lang)}`, value: `[${name}](${rosterLink})`, inline: true },
+      // Reason is prose · inline it wrapped inside a third of the card.
+      { name: `📝 ${t('dialogue.trustedBlock.reason', lang)}`, value: reason || t('dialogue.broadcast.notAvailable', lang), inline: false },
     ],
     lang,
   });

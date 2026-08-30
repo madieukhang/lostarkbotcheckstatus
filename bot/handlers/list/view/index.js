@@ -286,15 +286,13 @@ export function createViewHandlers({
         if (componentInteraction.customId === 'listview_evidence') {
           const index = parseInt(componentInteraction.values[0], 10);
           const entry = allEntries[index];
-          if (!entry?.imageMessageId && !entry?.imageUrl) {
-            await replyNotice(componentInteraction, t('listView.evidence.noImage', lang), {
-              severity: AlertSeverity.WARNING,
-              lang,
-            });
-            return;
-          }
-
-          const displayUrl = await resolveDisplayImageUrl(entry, client);
+          // An entry without a screenshot still has a reason, a raid and
+          // its tracked alts · the card renders those and says the
+          // evidence is missing, which the old early return replaced
+          // with a bare "no image" notice and nothing else.
+          const displayUrl = entry?.imageMessageId || entry?.imageUrl
+            ? await resolveDisplayImageUrl(entry, client)
+            : '';
           const isOfficer = config.officerApproverIds.includes(componentInteraction.user.id)
             || config.seniorApproverIds.includes(componentInteraction.user.id);
           await replyEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, { includeAddedBy: isOfficer, lang }));

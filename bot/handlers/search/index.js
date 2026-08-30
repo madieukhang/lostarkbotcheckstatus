@@ -115,6 +115,24 @@ export async function handleSearchCommand(interaction) {
     // already carry name/cls/itemLevel but no CP, so the snapshot is
     // strictly additive when present.
     const snapshotMap = new Map(allSnapshots.map((s) => [s.name.toLowerCase(), s]));
+    // A roster match names an entry the search term did not, and that
+    // name gets rendered too · without its snapshot it would show as
+    // bare text beside rows that carry a class icon and a roster link.
+    const viaNames = [...new Set(
+      [...allBlack, ...allWhite, ...allWatch]
+        .map((entry) => entry?.name)
+        .filter((entryName) => entryName && !snapshotMap.has(entryName.toLowerCase()))
+    )];
+    if (viaNames.length > 0) {
+      try {
+        const viaSnapshots = await RosterSnapshot.find({ name: { $in: viaNames } })
+          .collation(collation)
+          .lean();
+        for (const snapshot of viaSnapshots) snapshotMap.set(snapshot.name.toLowerCase(), snapshot);
+      } catch (err) {
+        console.warn('[search] Snapshot lookup for matched entries failed (non-fatal):', err.message);
+      }
+    }
 
     const results = sliced.map((s) => {
       const snap = snapshotMap.get(s.name.toLowerCase()) || null;
@@ -133,7 +151,7 @@ export async function handleSearchCommand(interaction) {
     });
     resultCount = results.length;
 
-    const embed = buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang });
+    const embed = buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang, snapshotMap });
 
     // Build evidence dropdown for flagged entries with images (rehosted OR legacy)
     const flaggedWithImages = getFlaggedResultsWithImages(results);
