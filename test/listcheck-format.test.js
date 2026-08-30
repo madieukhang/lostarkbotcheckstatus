@@ -162,3 +162,32 @@ test('formatCheckResults keeps list-state precedence without empty detail branch
   assert.match(lineFor('Trustedchar'), /^🛡️/u);
   assert.match(lineFor('Unknownchar'), /^❓/u);
 });
+
+test('related names carry their class once the check has snapshots for them', () => {
+  // The searched name always had its class; the entry it matched through
+  // and the alts under it were the bare names on an otherwise icon-led
+  // row. relatedClasses is what the check service loads for them.
+  const item = {
+    name: 'Hanako',
+    snapClassName: 'Bard',
+    snapItemLevel: 1770,
+    blackEntry: {
+      name: 'Tenshi',
+      reason: 'griefing',
+      allCharacters: ['Tenshi', 'Mikazuki'],
+    },
+    matchDetails: { black: { kind: 'roster', matchedName: 'Tenshi' } },
+  };
+
+  const [bare] = formatCheckResults([{ ...item }], 'vi');
+  assert.doesNotMatch(bare, /Souleater/u);
+
+  const [enriched] = formatCheckResults([{
+    ...item,
+    relatedClasses: { tenshi: 'Souleater', mikazuki: 'Reaper' },
+  }], 'vi');
+  assert.match(enriched, /Souleater \[Tenshi\]/u);
+  assert.match(enriched, /Reaper \[Mikazuki\]/u);
+  // The searched name keeps exactly one class prefix, from snapClassName.
+  assert.equal((enriched.match(/Bard/gu) || []).length, 1);
+});

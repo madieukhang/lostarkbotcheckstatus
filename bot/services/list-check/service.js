@@ -61,6 +61,65 @@ export {
  * @returns {Promise<Array<object>>} Results with list entries, identity proof,
  *   and stored snapshot metadata
  */
+/**
+ * Collect the other character names a result row prints - the list entry
+ * it matched through and the alts beneath it - and stamp each item with a
+ * lowercased name -> className map for those.
+ *
+ * The searched name already carries snapClassName from the main query;
+ * this covers everyone else so a row does not mix icon-led names with
+ * bare ones. Missing snapshots are normal (nobody has run /la-roster on
+ * that name yet) and simply yield no icon.
+ *
+ * @param {Array<object>} results - mutated in place
+ * @returns {Promise<void>}
+ */
+async function attachRelatedClassNames(results) {
+  const wanted = new Set();
+  const relatedFor = (item) => [
+    item.blackEntry?.name,
+    item.whiteEntry?.name,
+    item.watchEntry?.name,
+    item.trustedEntry?.name,
+    ...(item.blackEntry?.allCharacters || []),
+    ...(item.whiteEntry?.allCharacters || []),
+    ...(item.watchEntry?.allCharacters || []),
+    ...(item.trustedEntry?.allCharacters || []),
+    ...(Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []),
+  ].map((name) => String(name || '').trim()).filter(Boolean);
+
+  for (const item of results) {
+    for (const name of relatedFor(item)) wanted.add(name);
+  }
+  if (wanted.size === 0) return;
+
+  let snapshots = [];
+  try {
+    snapshots = await RosterSnapshot.find({ name: { $in: [...wanted] } })
+      .collation({ locale: 'en', strength: 2 })
+      .lean();
+  } catch (err) {
+    console.warn('[listcheck] Related-name snapshot lookup failed (non-fatal):', err.message);
+    return;
+  }
+
+  const classByName = new Map();
+  for (const snapshot of snapshots) {
+    const className = snapshot?.classId ? getClassName(snapshot.classId) : '';
+    if (className) classByName.set(String(snapshot.name).toLowerCase(), className);
+  }
+  if (classByName.size === 0) return;
+
+  for (const item of results) {
+    const related = {};
+    for (const name of relatedFor(item)) {
+      const className = classByName.get(name.toLowerCase());
+      if (className) related[name.toLowerCase()] = className;
+    }
+    if (Object.keys(related).length > 0) item.relatedClasses = related;
+  }
+}
+
 export async function checkNamesAgainstLists(names, options = {}) {
   const startedAt = Date.now();
   const connectStartedAt = Date.now();
@@ -82,6 +141,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   // Blacklist: scope-aware query (owner sees all, others see global + own server)
   const blackQuery = buildBlacklistQuery(nameQuery, guildId);
 
+  // (see attachRelatedClassNames below for the entry/alt names)
   // RosterSnapshot has class/ilvl/CP populated by /la-roster runs.
   // Best-effort enrichment: names previously queried have rich data
   // surfaced inline; brand-new names render without (graceful fallback).
@@ -308,6 +368,14 @@ export async function checkNamesAgainstLists(names, options = {}) {
       item.identityVerificationSource ||= 'list-database';
     }
   }
+
+  // Class icons for the OTHER names a row prints: the entry it matched
+  // through and the alts under it. Those were the only bare names left on
+  // a row whose own name carries a class icon. Runs last so it sees the
+  // final identity set (canonicalization and discovered alts included),
+  // and is best-effort · a name never touched by /la-roster simply keeps
+  // no icon.
+  await attachRelatedClassNames(results);
 
   console.log([
     `[listcheck] Timing total=${Date.now() - startedAt}ms`,

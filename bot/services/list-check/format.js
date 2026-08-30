@@ -12,9 +12,15 @@ function normalizeName(value) {
 // link out to their roster page like every other name on the card. The
 // class icon is not available here: the check only holds a snapshot for
 // the name that was searched, not for the entry it matched.
-function linkName(name) {
+function linkName(name, item) {
   const trimmed = String(name || '').trim();
-  return trimmed ? `[${trimmed}](${rosterUrl(trimmed)})` : trimmed;
+  if (!trimmed) return trimmed;
+  // Class comes from the related-name snapshots the check service loads
+  // for the entry and its alts · the searched name has its own
+  // snapClassName, and everyone else was previously rendered bare.
+  const className = item?.relatedClasses?.[trimmed.toLowerCase()] || '';
+  const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
+  return `${classPrefix}[${trimmed}](${rosterUrl(trimmed)})`;
 }
 
 const LIST_ENTRY_BRANCHES = [
@@ -37,15 +43,15 @@ function formatMatchContext(item, entry, listType, lang) {
   if (detail?.kind === 'roster') {
     const matchedName = String(detail.matchedName || entry.name || '').trim();
     if (normalizeName(matchedName) === normalizeName(entry.name)) {
-      return t('dialogue.check.format.rosterVia', lang, { name: linkName(matchedName) });
+      return t('dialogue.check.format.rosterVia', lang, { name: linkName(matchedName, item) });
     }
     return t('dialogue.check.format.rosterEntry', lang, {
-      name: linkName(matchedName),
-      entry: linkName(entry.name),
+      name: linkName(matchedName, item),
+      entry: linkName(entry.name, item),
     });
   }
   if (normalizeName(entry.name) !== normalizeName(item.name)) {
-    return t('dialogue.check.format.via', lang, { name: linkName(entry.name) });
+    return t('dialogue.check.format.via', lang, { name: linkName(entry.name, item) });
   }
   return '';
 }
@@ -133,7 +139,7 @@ function formatAltsBranch(item, lang) {
   const tail = remainingCount > 0
     ? ` *${t('dialogue.check.format.more', lang, { count: remainingCount })}*`
     : '';
-  const linked = visible.map(linkName);
+  const linked = visible.map((altName) => linkName(altName, item));
   return formatBranch([
     `${t('dialogue.check.format.alts', lang)}: ${linked.join(', ')}${tail}`,
   ]);
