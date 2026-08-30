@@ -18,6 +18,10 @@ import { parseItemLevelValue } from './parsers.js';
 const sharedSuggestionCache = new Map();
 const CACHE_MISS = Symbol('name-suggestion-cache-miss');
 
+function normalizeSuggestionQuery(name) {
+  return String(name || '').trim().normalize('NFC');
+}
+
 function ensureLookupStats(context) {
   if (!context || typeof context !== 'object') return null;
   if (!context.stats || typeof context.stats !== 'object') {
@@ -175,7 +179,12 @@ export async function fetchNameSuggestions(name, options = {}) {
     suggestionContext,
     ...fetchOptions
   } = options;
-  const cacheKey = String(name || '').normalize('NFC').toLowerCase();
+  // The cache identity and outgoing payload must describe the same query.
+  // Otherwise an OCR/user input with surrounding whitespace or decomposed
+  // Unicode can bypass both request-local and shared dedupe, then fan out into
+  // duplicate Bible calls for a name we already have in flight.
+  const queryName = normalizeSuggestionQuery(name);
+  const cacheKey = queryName.toLowerCase();
   const requestCache = suggestionContext?.cache instanceof Map
     ? suggestionContext.cache
     : suggestionCache;
@@ -212,18 +221,18 @@ export async function fetchNameSuggestions(name, options = {}) {
 
   const request = (async () => {
     try {
-      const payload = Buffer.from(JSON.stringify([{ name: 1, region: 2 }, name, 'NA'])).toString('base64');
+      const payload = Buffer.from(JSON.stringify([{ name: 1, region: 2 }, queryName, 'NA'])).toString('base64');
       const targetUrl = `https://lostark.bible/_app/remote/ngsbie/search?payload=${encodeURIComponent(payload)}`;
       const res = await bibleClient.fetch(targetUrl, buildBibleFetchOptions(fetchOptions));
       if (!res.ok) {
-        console.warn(`[search] lostark.bible search API returned HTTP ${res.status} for "${name}"`);
+        console.warn(`[search] lostark.bible search API returned HTTP ${res.status} for "${queryName}"`);
         return null;
       }
 
       const json = await res.json();
       return decodeSearchResponse(json);
     } catch (err) {
-      console.warn(`[search] fetchNameSuggestions error for "${name}":`, err.message);
+      console.warn(`[search] fetchNameSuggestions error for "${queryName}":`, err.message);
       return null;
     }
   })();

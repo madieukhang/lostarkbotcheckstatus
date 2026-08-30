@@ -119,6 +119,32 @@ test('fetchNameSuggestions deduplicates concurrent lookups in one request cache'
   }
 });
 
+test('fetchNameSuggestions normalizes whitespace and Unicode before cache and network lookup', async () => {
+  const originalFetch = globalThis.fetch;
+  const suggestionCache = new Map();
+  const queries = [];
+
+  globalThis.fetch = async (url) => {
+    const payload = new URL(String(url)).searchParams.get('payload');
+    const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+    queries.push(decoded[1]);
+    const table = [{ _: 1 }, [2], [3, 4, 5], 'Zoë', 'bard', 1710];
+    return Response.json({ type: 'result', data: JSON.stringify(table) });
+  };
+
+  try {
+    const [first, second] = await Promise.all([
+      fetchNameSuggestions('  Zoe\u0308  ', { suggestionCache, allowScraperApi: false }),
+      fetchNameSuggestions('zoë', { suggestionCache, allowScraperApi: false }),
+    ]);
+
+    assert.deepEqual(queries, ['Zoë']);
+    assert.deepEqual(second, first);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('fetchNameSuggestions reuses successful lookups across request-local caches', async () => {
   const originalFetch = globalThis.fetch;
   let fetchCalls = 0;
