@@ -17,8 +17,6 @@ const SCRAPER_ATTEMPT_STATE_RULES = Object.freeze([
   { state: 'success', matches: ({ res }) => res.ok },
 ]);
 
-export { FETCH_HEADERS };
-
 /**
  * Smart fallback cache - remembers when direct fetch is blocked by Cloudflare.
  * Skips the wasted direct request for BLOCK_CACHE_MS after a 403/503.

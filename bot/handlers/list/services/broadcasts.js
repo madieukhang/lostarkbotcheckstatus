@@ -503,34 +503,35 @@ export function createBroadcastServices({
 
     const originGuildId = meta.guildId || '';
 
-    if (globalEntries.length > 0) {
-      const channelIds = await resolveBroadcastChannels(originGuildId, { onlyOwner: false });
-      if (channelIds.size > 0) {
-        await sendEmbedToChannels({
-          client,
-          channelIds,
-          buildPayload: async ({ channel }) => {
-            const lang = await getGuildLanguage(channel.guild?.id, { GuildConfigModel: GuildConfig });
-            return { embeds: [buildBulkEmbed(globalEntries, false, lang)] };
-          },
-          logLabel: '[multiadd] Bulk broadcast',
-        });
-      }
-    }
+    const deliveryRoutes = [
+      {
+        entries: globalEntries,
+        onlyOwner: false,
+        isLocal: false,
+        logLabel: '[multiadd] Bulk broadcast',
+      },
+      {
+        entries: serverEntries,
+        onlyOwner: true,
+        isLocal: true,
+        logLabel: '[multiadd] Bulk local broadcast',
+      },
+    ];
 
-    if (serverEntries.length > 0) {
-      const channelIds = await resolveBroadcastChannels(originGuildId, { onlyOwner: true });
-      if (channelIds.size > 0) {
-        await sendEmbedToChannels({
-          client,
-          channelIds,
-          buildPayload: async ({ channel }) => {
-            const lang = await getGuildLanguage(channel.guild?.id, { GuildConfigModel: GuildConfig });
-            return { embeds: [buildBulkEmbed(serverEntries, true, lang)] };
-          },
-          logLabel: '[multiadd] Bulk local broadcast',
-        });
-      }
+    for (const { entries, onlyOwner, isLocal, logLabel } of deliveryRoutes) {
+      if (entries.length === 0) continue;
+      const channelIds = await resolveBroadcastChannels(originGuildId, { onlyOwner });
+      if (channelIds.size === 0) continue;
+
+      await sendEmbedToChannels({
+        client,
+        channelIds,
+        buildPayload: async ({ channel }) => {
+          const lang = await getGuildLanguage(channel.guild?.id, { GuildConfigModel: GuildConfig });
+          return { embeds: [buildBulkEmbed(entries, isLocal, lang)] };
+        },
+        logLabel,
+      });
     }
   }
 

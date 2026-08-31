@@ -120,18 +120,22 @@ async function markEntryAsRehosted(model, entry, rehosted, stats) {
   console.warn(`[syncimages] Race detected for ${entry.name} - CAS update was no-op, orphan upload at ${rehosted.channelId}/${rehosted.messageId}`);
 }
 
+function buildSyncStatsFields(stats, lang) {
+  return [
+    { name: `✅ ${t('dialogue.syncImages.fields.synced', lang)}`, value: String(stats.synced), inline: true },
+    { name: `⚠️ ${t('dialogue.syncImages.fields.dead', lang)}`, value: String(stats.skippedDead), inline: true },
+    { name: `🔀 ${t('dialogue.syncImages.fields.raced', lang)}`, value: String(stats.skippedRaced), inline: true },
+    { name: `❌ ${t('dialogue.syncImages.fields.failed', lang)}`, value: String(stats.failed), inline: true },
+  ];
+}
+
 async function sendProgress(interaction, current, total, stats, lang) {
   await editPayload(interaction, {
     embeds: [
       createArtistEmbed(lang)
         .setTitle(`🔄 ${t('dialogue.syncImages.progressTitle', lang)}`)
         .setDescription(t('dialogue.syncImages.progressDescription', lang, { current, total }))
-        .addFields(
-          { name: `✅ ${t('dialogue.syncImages.fields.synced', lang)}`, value: String(stats.synced), inline: true },
-          { name: `⚠️ ${t('dialogue.syncImages.fields.dead', lang)}`, value: String(stats.skippedDead), inline: true },
-          { name: `🔀 ${t('dialogue.syncImages.fields.raced', lang)}`, value: String(stats.skippedRaced), inline: true },
-          { name: `❌ ${t('dialogue.syncImages.fields.failed', lang)}`, value: String(stats.failed), inline: true },
-        )
+        .addFields(...buildSyncStatsFields(stats, lang))
         .setColor(COLORS.warning)
         .setTimestamp(),
     ],
@@ -147,12 +151,7 @@ function buildSummaryPayload(interaction, total, stats, lang) {
   const summaryEmbed = createArtistEmbed(lang)
     .setTitle(`✅ ${t('dialogue.syncImages.completeTitle', lang)}`)
     .setDescription(t('dialogue.syncImages.completeDescription', lang, { total }))
-    .addFields(
-      { name: `✅ ${t('dialogue.syncImages.fields.synced', lang)}`, value: String(stats.synced), inline: true },
-      { name: `⚠️ ${t('dialogue.syncImages.fields.dead', lang)}`, value: String(stats.skippedDead), inline: true },
-      { name: `🔀 ${t('dialogue.syncImages.fields.raced', lang)}`, value: String(stats.skippedRaced), inline: true },
-      { name: `❌ ${t('dialogue.syncImages.fields.failed', lang)}`, value: String(stats.failed), inline: true },
-    )
+    .addFields(...buildSyncStatsFields(stats, lang))
     .setColor(summaryColor)
     .setFooter({ text: t('dialogue.syncImages.summaryFooter', lang, { user: interaction.user.tag }) })
     .setTimestamp();

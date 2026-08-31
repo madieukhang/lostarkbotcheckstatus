@@ -18,7 +18,6 @@ import {
   editEmbed,
   replyAlert,
   replyEmbed,
-  replyNotice,
 } from '../../../utils/interactionReplies.js';
 import {
   getCachedUserLanguage,

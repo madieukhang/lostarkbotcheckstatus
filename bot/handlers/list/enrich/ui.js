@@ -16,7 +16,6 @@
 
 import { LIST_LABELS } from './data.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { rosterUrl } from '../../../utils/rosterLink.js';
 import { ICONS } from '../../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../../utils/scanProgressEmbed.js';
 import { getClassName } from '../../../models/Class.js';

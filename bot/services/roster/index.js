@@ -1,5 +1,4 @@
 export {
-  FETCH_HEADERS,
   fetchWithFallback,
 } from './bibleFetch.js';
 
@@ -7,13 +6,11 @@ export { bibleClient } from './bibleClient.js';
 
 export {
   extractCharacterItemLevelFromHtml,
-  extractRosterClassMapFromHtml,
   parseCharacterMetaFromHtml,
   parseRosterCharactersFromHtml,
 } from './parsers.js';
 
 export {
-  clearNameSuggestionCache,
   createNameSuggestionContext,
   fetchNameSuggestions,
   formatSuggestionLines,
