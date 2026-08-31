@@ -1070,3 +1070,46 @@ test('worker-online canonicalization repairs short i/l look-alike names', async 
     stub.restore();
   }
 });
+
+test('worker-online enrichment keeps the server the roster page already reported', async () => {
+  await markWorkerOnline();
+
+  // The roster page is the only route that carries a server · the search
+  // endpoint answers with name/class/ilvl and nothing more. Enrichment
+  // used to reshape the record before saving and dropped `world` on the
+  // floor, so a page it had already paid for was scraped for nothing.
+  const rosterHtml = [
+    '<html><body>',
+    '<script>rosterLevel:250,stronghold:{level:70,name:"Yorn"},world:"Thaemine",class:"bard"</script>',
+    '<a href="/character/NA/Suzume/roster">',
+    '  <div class="text-lg font-semibold">Suzume<span>1770.00</span><span>4903.06</span></div>',
+    '</a>',
+    '</body></html>',
+  ].join('\n');
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/character/NA/')) {
+      return new Response(rosterHtml, { status: 200, headers: { 'content-type': 'text/html' } });
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const data = [[1], [2, 3, 4], 'Suzume', 'bard', 1770];
+      return Response.json({ type: 'result', result: JSON.stringify(data) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    await enrichListCheckResults(
+      [{ name: 'Suzume', snapClassId: '', snapClassName: '', snapItemLevel: 0, snapCombatScore: '' }],
+      { suggestionCache: new Map() },
+    );
+
+    const saved = await RosterSnapshot.findOne({ name: 'Suzume' }).lean();
+    assert.equal(saved?.world, 'Thaemine');
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearNameSuggestionCache();
+  }
+});

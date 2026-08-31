@@ -175,3 +175,38 @@ export function statMapFromRosterCharacters(rosterCharacters = []) {
   }
   return map;
 }
+
+/**
+ * Resolve the in-game server for an entry, reading across its roster.
+ *
+ * The server belongs to the roster, not to one character, so any sibling
+ * that has been scraped answers for all of them. This matters because a
+ * character's own snapshot often has none: rows written before the field
+ * existed carry nothing, and the name-search route that /la-check falls
+ * back to cannot report a server at all. The cards already hold every
+ * sibling's snapshot to print class + ilvl, so reading the server out of
+ * them costs no extra request.
+ *
+ * Display-time only · a value inferred this way is deliberately not
+ * written back, so a wrong guess costs one render rather than a stored
+ * row that outlives it.
+ *
+ * @param {{name?: string, allCharacters?: string[]}} entry - list entry
+ * @param {Map<string, {world?: string}>} [statMap] - snapshots keyed by
+ *   lowercased character name
+ * @returns {string} the server name, or '' when no sibling knows one
+ */
+export function resolveRosterWorld(entry, statMap = new Map()) {
+  const readWorld = (name) => String(statMap.get(lcKey(name))?.world || '').trim();
+
+  // The entry's own snapshot wins · only fall back to siblings when it
+  // has nothing to say.
+  const own = readWorld(entry?.name);
+  if (own) return own;
+
+  for (const sibling of entry?.allCharacters || []) {
+    const world = readWorld(sibling);
+    if (world) return world;
+  }
+  return '';
+}

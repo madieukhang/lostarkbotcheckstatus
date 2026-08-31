@@ -22,6 +22,7 @@ import {
   formatAltLine,
   formatLinkedCharacter,
   renderTrackedAltsField,
+  resolveRosterWorld,
 } from '../trackedAltsRender.js';
 
 const ACTION_VERB = Object.freeze({
@@ -140,9 +141,14 @@ export function buildTrackedAltsField(entry, statMap = new Map(), options = {}) 
   });
 }
 
-export function buildBroadcastFields({ entry, action, changes = [], snap, altsField, lang = 'en' }) {
+export function buildBroadcastFields({ entry, action, changes = [], snap, altsField, lang = 'en', statMap }) {
   const changesText = changes.join('\n');
-  const world = String(snap?.world || '').trim();
+  // Server is a roster-level fact, so a sibling's snapshot answers for
+  // this entry when its own row has none · see resolveRosterWorld. Falls
+  // back to `snap` alone for callers that pass no statMap.
+  const world = statMap
+    ? resolveRosterWorld(entry, statMap)
+    : String(snap?.world || '').trim();
   const inlineFields = [
     entry.raid
       ? { name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`, value: `\`${entry.raid}\``, inline: true }
@@ -369,7 +375,7 @@ export function createBroadcastServices({
       const altsField = isEnrich
         ? renderTrackedAltsField({ names: newAlts, primaryName: entry.name, statMap, ...rosterFieldOptions })
         : buildTrackedAltsField(entry, statMap, rosterFieldOptions);
-      const fields = buildBroadcastFields({ entry, action, changes, snap, altsField, lang });
+      const fields = buildBroadcastFields({ entry, action, changes, snap, altsField, lang, statMap });
 
       const titleKey = action in ACTION_VERB ? action : 'fallback';
       const embed = createArtistEmbed(lang)

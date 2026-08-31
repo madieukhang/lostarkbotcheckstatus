@@ -11,7 +11,7 @@ import { getAddedByDisplay } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
-import { renderTrackedAltsField } from '../trackedAltsRender.js';
+import { renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
 
 function normalizeNameKey(value) {
   return String(value || '').trim().toLowerCase();
@@ -33,10 +33,15 @@ function formatLinkedCheckName(entry, snapshot) {
   return `${classPrefix}**[${entry.name}](${rosterUrl(entry.name)})**`;
 }
 
-function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang }) {
+function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang, statMap }) {
   const notAvailable = t('dialogue.broadcast.notAvailable', lang);
   const itemLevel = parsePositiveNumber(snapshot?.itemLevel);
   const combatScore = String(snapshot?.combatScore || '').trim();
+  // Read the server across the roster, not just off this one snapshot ·
+  // most entries predate the field and the search-only enrichment route
+  // never reports one, so the entry's own row is usually blank while a
+  // sibling somebody ran /la-roster on knows the answer.
+  const world = resolveRosterWorld(entry, statMap);
   const inlineFields = [
     {
       name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`,
@@ -68,7 +73,7 @@ function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang }) {
       : null,
     {
       name: `🌍 ${t('dialogue.roster.server', lang)}`,
-      value: String(snapshot?.world || '').trim() ? `\`${snapshot.world}\`` : notAvailable,
+      value: world ? `\`${world}\`` : notAvailable,
       inline: true,
     },
   ].filter(Boolean);
@@ -144,7 +149,7 @@ export function buildCheckEntryDetailsEmbed(entry, {
     : '';
   const snapshot = statMap.get(normalizeNameKey(entry?.name)) || null;
   const fields = [
-    ...buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang }),
+    ...buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang, statMap }),
     buildTrackedAltsField(entry, statMap, lang),
   ].filter(Boolean);
 

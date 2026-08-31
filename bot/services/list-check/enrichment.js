@@ -62,7 +62,7 @@ export async function enrichListCheckResults(
 
   function applyEnrichment(
     item,
-    { classId, itemLevel, combatScore },
+    { classId, itemLevel, combatScore, world = '' },
     verificationSource,
   ) {
     item.identityVerified = true;
@@ -82,6 +82,11 @@ export async function enrichListCheckResults(
       itemLevel,
       classId,
       combatScore,
+      // Only the roster-page route can report a server · the name-search
+      // endpoint returns name/class/ilvl and nothing else. Passing '' is
+      // safe either way: upsertRosterSnapshots skips empty values rather
+      // than blanking a server an earlier scrape already stored.
+      world,
     });
   }
 
@@ -260,6 +265,10 @@ export async function enrichListCheckResults(
           classId,
           itemLevel: rosterItemLevel,
           combatScore: roster.targetCombatScore || targetRecord?.combatScore || '',
+          // Stamped identically on every record because the server
+          // belongs to the roster · the first one answers when the
+          // queried name is not itself in the parsed list.
+          world: targetRecord?.world || roster.rosterCharacters?.[0]?.world || '',
         }, 'bible-roster');
         if (roster.rosterVisibility === 'visible' && Array.isArray(roster.allCharacters)) {
           item.discoveredAlts = roster.allCharacters.filter(
