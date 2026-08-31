@@ -74,23 +74,27 @@ export const ICONS = Object.freeze({
 const INLINE_SPACER = Object.freeze({ name: '​', value: '​', inline: true });
 
 /**
- * Pad a run of inline fields out to a whole three-column row.
+ * Pad a run of inline fields out to whole three-column rows.
  *
- * Discord lays inline fields three to a line and stretches whatever is
- * left over, so four of them render as a row of three plus one banner
- * and two render as an awkward half-and-half. A single inline field
- * already fills its row on its own, so it is left alone.
+ * Discord lays inline fields three to a line and divides each line
+ * evenly between whatever it holds. That only looks wrong once a card
+ * has more than one line: four fields render as a row of three plus a
+ * single stretched banner, and five as three plus a half-and-half pair
+ * that does not line up with the row above it.
  *
- * Most cards here build their fields conditionally, which means the
- * count is only known after they are assembled · pad by count rather
- * than at fixed positions.
+ * Three or fewer need no help · one field fills its row, two split it
+ * evenly, three land on thirds. Padding those would shrink them to a
+ * third each and leave visible gaps, so they are returned untouched.
+ *
+ * Cards here build their fields conditionally, so the count is only
+ * known once they are assembled · pad by count, not at fixed positions.
  *
  * @param {Array<object>} inlineFields - fields already marked inline
  * @returns {Array<object>} the same fields plus any spacers needed
  */
 export function padInlineRow(inlineFields) {
   const padded = [...inlineFields];
-  if (padded.length > 1) {
+  if (padded.length > 3) {
     while (padded.length % 3 !== 0) padded.push(INLINE_SPACER);
   }
   return padded;

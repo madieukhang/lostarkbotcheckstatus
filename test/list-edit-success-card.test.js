@@ -36,9 +36,10 @@ test('edit success card gives reason the full width and icon-labels its fields',
     assert.match(byName(needle).name, /^\p{Extended_Pictographic}/u, needle);
   }
 
-  // Name + Raid share a row, padded to a whole three-column row.
-  assert.equal(embed.fields.filter((f) => f.inline).length, 3);
-  assert.equal(embed.fields.filter((f) => f.name === ZWSP).length, 1);
+  // Name + Raid share one row and split it evenly. Padding them to
+  // thirds would shrink both and leave a gap, so no spacer is added.
+  assert.equal(embed.fields.filter((f) => f.inline).length, 2);
+  assert.equal(embed.fields.some((f) => f.name === ZWSP), false);
 });
 
 test('a lone inline field is not padded into a third of a row', () => {

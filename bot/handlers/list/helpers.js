@@ -131,9 +131,10 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   if (entry.raid) {
     fields.push({ name: `🗡️ ${t('dialogue.listEdit.success.raid', lang)}`, value: `\`${entry.raid}\``, inline: true });
   }
-  // One inline field alone already fills the row, so it needs no
-  // padding · two would otherwise split 50/50 instead of thirds.
-  if (fields.length > 1) {
+  // Only a card with more than one row needs padding · up to three
+  // inline fields share a single row evenly on their own. Same rule as
+  // padInlineRow in utils/ui.js.
+  if (fields.length > 3) {
     while (fields.length % 3 !== 0) fields.push({ name: '\u200b', value: '\u200b', inline: true });
   }
   fields.push({

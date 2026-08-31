@@ -12,14 +12,16 @@ const { buildListEditSuccessEmbed, buildTrustedBlockEmbed, buildListAddApprovalE
 const { decorateListEntry } = await import('../bot/handlers/list/helpers.js');
 
 /**
- * Discord lays inline fields three to a row and stretches the leftovers,
- * so a card that emits 2, 4 or 5 of them renders a ragged final row.
- * One inline field alone is fine: it fills the row by itself.
+ * Discord lays inline fields three to a row and divides each row evenly
+ * between whatever it holds. That only reads as ragged once a card runs
+ * to more than one row: 4 renders as three plus a stretched banner, 5 as
+ * three plus a mismatched pair. Up to three is always fine, because one
+ * row on its own divides evenly however many it holds.
  */
 function assertWholeRows(label, fields) {
   const inlineCount = fields.filter((field) => field.inline).length;
   assert.ok(
-    inlineCount <= 1 || inlineCount % 3 === 0,
+    inlineCount <= 3 || inlineCount % 3 === 0,
     `${label}: ${inlineCount} inline fields leaves a ragged row`
   );
 }

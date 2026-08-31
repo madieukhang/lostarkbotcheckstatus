@@ -67,9 +67,11 @@ test('the inline meta grid always fills whole three-column rows', () => {
   ];
 
   for (const embed of cases) {
-    // A lone trailing inline field gets stretched to full width by
-    // Discord, which is what knocked the old card out of alignment.
-    assert.equal(inlineNames(embed).length % 3, 0, inlineNames(embed).join(' | '));
+    // Past one row, a leftover field is stretched or mismatched against
+    // the row above it. Up to three share a single row evenly, so those
+    // are left unpadded.
+    const inlineCount = inlineNames(embed).length;
+    assert.ok(inlineCount <= 3 || inlineCount % 3 === 0, inlineNames(embed).join(' | '));
   }
 });
 

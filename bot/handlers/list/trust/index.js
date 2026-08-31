@@ -118,7 +118,9 @@ function buildTrustSuccessFields({ existing, name, reason, allCharacters, roster
     { name: `🧬 ${t('dialogue.trust.success.character', lang)}`, value: `[${name}](${rosterUrl(name)})`, inline: true },
     { name: `👤 ${t(`dialogue.trust.success.${existing ? 'refreshedBy' : 'addedBy'}`, lang)}`, value: interaction.user.tag, inline: true },
   ];
-  while (fields.length % 3 !== 0) fields.push({ name: '\u200b', value: '\u200b', inline: true });
+  // Two inline fields already split their row evenly, so padding them
+  // to thirds would only add a visible gap · see padInlineRow.
+  if (fields.length > 3) while (fields.length % 3 !== 0) fields.push({ name: '\u200b', value: '\u200b', inline: true });
   fields.push({
     name: `📝 ${t('dialogue.trust.success.reason', lang)}`,
     value: (reason || existing?.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),

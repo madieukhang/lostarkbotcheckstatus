@@ -319,8 +319,9 @@ function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, la
   ].filter(Boolean);
   // Discord packs three inline fields per row and stretches a lone
   // trailing field to full width · pad to a whole row so the grid keeps
-  // its columns whatever combination of optional fields showed up.
-  while (inlineMeta.length % 3 !== 0) {
+  // its columns whatever combination of optional fields showed up. Three
+  // or fewer already share one row evenly, so they are left alone.
+  while (inlineMeta.length > 3 && inlineMeta.length % 3 !== 0) {
     inlineMeta.push({ name: '\u200b', value: '\u200b', inline: true });
   }
   return inlineMeta;
