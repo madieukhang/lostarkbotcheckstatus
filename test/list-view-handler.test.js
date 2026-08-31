@@ -3,9 +3,29 @@ import assert from 'node:assert/strict';
 import { MessageFlags } from 'discord.js';
 
 import {
+  buildBlacklistViewQuery,
   createViewHandlers,
   loadListEntries,
 } from '../bot/handlers/list/view/index.js';
+
+test('blacklist view scope query uses the first matching policy rule', () => {
+  assert.deepEqual(
+    buildBlacklistViewQuery({ isOwnerGuild: true, scopeFilter: 'all', viewGuildId: 'g1' }),
+    {}
+  );
+  assert.deepEqual(
+    buildBlacklistViewQuery({ isOwnerGuild: false, scopeFilter: 'global', viewGuildId: 'g1' }),
+    { $or: [{ scope: 'global' }, { scope: { $exists: false } }] }
+  );
+  assert.deepEqual(
+    buildBlacklistViewQuery({ isOwnerGuild: true, scopeFilter: 'server', viewGuildId: 'g1' }),
+    { scope: 'server' }
+  );
+  assert.deepEqual(
+    buildBlacklistViewQuery({ isOwnerGuild: false, scopeFilter: 'server', viewGuildId: 'g1' }),
+    { scope: 'server', guildId: 'g1' }
+  );
+});
 
 test('/la-list view acknowledges before rejecting DM usage with an ephemeral alert', async () => {
   const calls = [];

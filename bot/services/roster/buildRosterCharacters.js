@@ -24,6 +24,28 @@ virtualConsole.on('jsdomError', (err) => {
   console.warn('[jsdom] Parse warning:', err?.message || err);
 });
 
+export function stampRosterWorld(characters, world) {
+  const normalizedWorld = String(world || '').trim();
+  return normalizedWorld
+    ? characters.map((character) => ({ ...character, world: normalizedWorld }))
+    : characters;
+}
+
+function readTargetStats(targetRecord) {
+  const parsedItemLevel = Number.parseFloat(
+    String(targetRecord?.itemLevel ?? '0').replace(/,/g, '')
+  );
+  return {
+    itemLevel: Number.isFinite(parsedItemLevel) && parsedItemLevel > 0
+      ? parsedItemLevel
+      : null,
+    combatScore: targetRecord?.combatScore && targetRecord.combatScore !== '?'
+      ? targetRecord.combatScore
+      : null,
+    className: targetRecord?.className || null,
+  };
+}
+
 /**
  * Resolve a character's roster (siblings) via lostark.bible. Tries the
  * direct roster page first, then falls back to hidden-roster
@@ -72,9 +94,10 @@ export async function buildRosterCharacters(name, options = {}) {
       // it is read once and stamped onto every record · that is the shape
       // upsertRosterSnapshots stores and every card reads back.
       const world = parseCharacterMetaFromHtml(html)?.world || '';
-      const rosterChars = world
-        ? (await parseRosterCharactersFromHtml(html, document)).map((c) => ({ ...c, world }))
-        : await parseRosterCharactersFromHtml(html, document);
+      const rosterChars = stampRosterWorld(
+        await parseRosterCharactersFromHtml(html, document),
+        world
+      );
       rosterCharacters = rosterChars;
 
       // Find the queried character's record in the parsed list. Match
@@ -84,12 +107,10 @@ export async function buildRosterCharacters(name, options = {}) {
         (c) => String(c.name).toLowerCase() === String(name).toLowerCase()
       );
       if (targetRecord) {
-        const parsedIlvl = parseFloat(String(targetRecord.itemLevel ?? '0').replace(/,/g, ''));
-        if (!isNaN(parsedIlvl) && parsedIlvl > 0) targetItemLevel = parsedIlvl;
-        if (targetRecord.combatScore && targetRecord.combatScore !== '?') {
-          targetCombatScore = targetRecord.combatScore;
-        }
-        if (targetRecord.className) targetClassName = targetRecord.className;
+        const targetStats = readTargetStats(targetRecord);
+        targetItemLevel = targetStats.itemLevel;
+        targetCombatScore = targetStats.combatScore;
+        targetClassName = targetStats.className;
       }
 
       if (rosterChars.length > 0) {
@@ -127,6 +148,7 @@ export async function buildRosterCharacters(name, options = {}) {
               ...(altResult?.alts || []).filter((alt) => alt?.name),
             ];
           }
+          rosterCharacters = stampRosterWorld(rosterCharacters, meta.world);
         }
       }
     }

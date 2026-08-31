@@ -98,50 +98,51 @@ async function rejectInvalidListEditInput({
   additionalNamesRaw,
   lang,
 }) {
-  if (plan.invalidRaid) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.listAdd.command.invalidRaid', lang, {
-        raid: newRaidInput,
-        list: plan.targetType === 'black' ? 'blacklist' : 'whitelist',
-      }),
-      lang,
-    });
-    return true;
-  }
-
   const mayAppendNames = existing.addedByUserId === interaction.user.id
     || isOfficerOrSenior(interaction.user.id);
-  if (additionalNamesRaw && !mayAppendNames) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.TRUSTED,
-      ...t('dialogue.listEdit.command.additionalRestricted', lang),
-      lang,
-    });
-    return true;
-  }
-
-  if (!plan.hasRequestedChanges) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.WARNING,
-      ...t('dialogue.listEdit.command.noChanges', lang),
-      lang,
-    });
-    return true;
-  }
-
-  if (!plan.scopeApplicable) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.WARNING,
-      ...t('dialogue.listEdit.command.scopeNotApplicable', lang, {
-        list: t(`dialogue.broadcast.list.${plan.targetType}`, lang),
+  const rules = [
+    {
+      invalid: () => plan.invalidRaid,
+      alert: () => ({
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.listAdd.command.invalidRaid', lang, {
+          raid: newRaidInput,
+          list: plan.targetType === 'black' ? 'blacklist' : 'whitelist',
+        }),
+        lang,
       }),
-      lang,
-    });
-    return true;
-  }
-
-  return false;
+    },
+    {
+      invalid: () => additionalNamesRaw && !mayAppendNames,
+      alert: () => ({
+        severity: AlertSeverity.TRUSTED,
+        ...t('dialogue.listEdit.command.additionalRestricted', lang),
+        lang,
+      }),
+    },
+    {
+      invalid: () => !plan.hasRequestedChanges,
+      alert: () => ({
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.listEdit.command.noChanges', lang),
+        lang,
+      }),
+    },
+    {
+      invalid: () => !plan.scopeApplicable,
+      alert: () => ({
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.listEdit.command.scopeNotApplicable', lang, {
+          list: t(`dialogue.broadcast.list.${plan.targetType}`, lang),
+        }),
+        lang,
+      }),
+    },
+  ];
+  const violation = rules.find(({ invalid }) => invalid());
+  if (!violation) return false;
+  await editAlert(interaction, violation.alert());
+  return true;
 }
 
 async function rejectInvalidListEditState({

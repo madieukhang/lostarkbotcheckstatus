@@ -112,10 +112,12 @@ function listHitLines(entries, icon, noReason, lang) {
   ];
 }
 
-function buildHiddenDescription({ meta, guildMembers, hits, deep, lang }) {
+export function buildHiddenDescription({ meta, guildMembers, hits, deep, lang }) {
   const noReason = t('dialogue.roster.noReason', lang);
+  const world = String(meta.world || '').trim();
   const parts = [
     t('dialogue.roster.hiddenStatus', lang, { guild: meta.guildName, count: guildMembers.length }),
+    ...(world ? [`**${t('dialogue.roster.server', lang)}:** \`${world}\``] : []),
     t('dialogue.roster.stronghold', lang, {
       stronghold: meta.strongholdName,
       strongholdLevel: meta.strongholdLevel,

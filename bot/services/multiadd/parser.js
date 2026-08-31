@@ -18,6 +18,75 @@ const VALID_RAIDS = new Set(RAIDS);
 const VALID_TYPES = new Set(['black', 'white', 'watch']);
 const VALID_SCOPES = new Set(['global', 'server']);
 
+const CELL_VALUE_READERS = [
+  { matches: (value) => value == null, read: () => '' },
+  { matches: (value) => typeof value === 'string', read: (value) => value },
+  {
+    matches: (value) => ['number', 'boolean'].includes(typeof value),
+    read: (value) => String(value),
+  },
+  {
+    matches: (value) => typeof value === 'object' && 'hyperlink' in value,
+    read: (value) => value.hyperlink || value.text || '',
+  },
+  {
+    matches: (value) => typeof value === 'object' && Array.isArray(value.richText),
+    read: (value) => value.richText.map((part) => part.text || '').join(''),
+  },
+  {
+    matches: (value) => typeof value === 'object' && 'result' in value,
+    read: (value) => cellToString(value.result),
+  },
+];
+
+const ROW_VALIDATION_RULES = [
+  {
+    invalid: (_row, context) => context.acceptedCount >= MULTIADD_MAX_ROWS,
+    message: (row) => `Row ${row.rowNum}: exceeds ${MULTIADD_MAX_ROWS}-row limit · skipped.`,
+  },
+  {
+    invalid: (row) => !row.name,
+    message: (row) => `Row ${row.rowNum}: missing required field "name".`,
+  },
+  {
+    invalid: (row) => !row.type,
+    message: (row) => `Row ${row.rowNum}: missing required field "type".`,
+  },
+  {
+    invalid: (row) => !VALID_TYPES.has(row.type),
+    message: (row) => `Row ${row.rowNum}: type must be black/white/watch (got "${row.type}").`,
+  },
+  {
+    invalid: (row) => !row.reason,
+    message: (row) => `Row ${row.rowNum}: missing required field "reason".`,
+  },
+  {
+    invalid: (row) => row.raid && !VALID_RAIDS.has(row.raid),
+    message: (row) => `Row ${row.rowNum}: raid must be one of [${RAIDS.join(', ')}] (got "${row.raid}").`,
+  },
+  {
+    invalid: (row) => row.logs && !/^https?:\/\//i.test(row.logs),
+    message: (row) => `Row ${row.rowNum}: "logs" must start with http:// or https://.`,
+  },
+  {
+    invalid: (row) => row.image && !/^https?:\/\//i.test(row.image),
+    message: (row) => `Row ${row.rowNum}: "image" must start with http:// or https://.`,
+  },
+  {
+    invalid: (row) => row.scope && !VALID_SCOPES.has(row.scope),
+    message: (row) => `Row ${row.rowNum}: scope must be global/server (got "${row.scope}").`,
+  },
+  {
+    invalid: (row) => row.scope && row.type !== 'black',
+    message: (row) => `Row ${row.rowNum}: scope is ignored for type "${row.type}" (blacklist only).`,
+    warning: true,
+  },
+  {
+    invalid: (row, context) => context.seenNames.has(row.name.toLowerCase()),
+    message: (row) => `Row ${row.rowNum}: duplicate name "${row.name}" already appears earlier in the file.`,
+  },
+];
+
 /**
  * Coerce an ExcelJS cell value (any of: string, number, boolean,
  * hyperlink object, richText array, formula result wrapper) to a
@@ -26,19 +95,39 @@ const VALID_SCOPES = new Set(['global', 'server']);
  * @returns {string}
  */
 export function cellToString(value) {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
-  if (typeof value === 'object' && 'hyperlink' in value) {
-    return String(value.hyperlink || value.text || '').trim();
+  const reader = CELL_VALUE_READERS.find(({ matches }) => matches(value));
+  return String(reader ? reader.read(value) : value).trim();
+}
+
+/**
+ * Apply the ordered multiadd rules. Warnings accumulate, while the first
+ * blocking rule stops validation exactly where the former guard chain did.
+ */
+export function validateMultiaddRow(row, context) {
+  const warnings = [];
+  for (const rule of ROW_VALIDATION_RULES) {
+    if (!rule.invalid(row, context)) continue;
+    const message = rule.message(row);
+    if (rule.warning) {
+      warnings.push(message);
+      continue;
+    }
+    return { error: message, warnings };
   }
-  if (typeof value === 'object' && Array.isArray(value.richText)) {
-    return value.richText.map((r) => r.text || '').join('').trim();
-  }
-  if (typeof value === 'object' && 'result' in value) {
-    return cellToString(value.result);
-  }
-  return String(value).trim();
+  return { error: null, warnings };
+}
+
+function readMultiaddRow(row, rowNum) {
+  return {
+    rowNum,
+    name: cellToString(row.getCell(1).value),
+    type: cellToString(row.getCell(2).value).toLowerCase(),
+    reason: cellToString(row.getCell(3).value),
+    raid: cellToString(row.getCell(4).value),
+    logs: cellToString(row.getCell(5).value),
+    image: cellToString(row.getCell(6).value),
+    scope: cellToString(row.getCell(7).value).toLowerCase(),
+  };
 }
 
 /**
@@ -78,7 +167,6 @@ export async function parseMultiaddFile(buffer) {
   const rows = [];
   const errors = [];
   const seenNames = new Set();
-  let acceptedCount = 0;
   let headerRowNum = 0;
 
   sheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
@@ -92,80 +180,25 @@ export async function parseMultiaddFile(buffer) {
 
     if (rowNum <= headerRowNum) return;
 
-    const name = cellToString(row.getCell(1).value);
-    const type = cellToString(row.getCell(2).value).toLowerCase();
-    const reason = cellToString(row.getCell(3).value);
-    const raid = cellToString(row.getCell(4).value);
-    const logs = cellToString(row.getCell(5).value);
-    const image = cellToString(row.getCell(6).value);
-    const scope = cellToString(row.getCell(7).value).toLowerCase();
+    const parsedRow = readMultiaddRow(row, rowNum);
+    if (!parsedRow.name && !parsedRow.type && !parsedRow.reason) return;
+    if (parsedRow.reason.startsWith(EXAMPLE_REASON_PREFIX)) return;
 
-    if (!name && !type && !reason) return;
-    if (reason.startsWith(EXAMPLE_REASON_PREFIX)) return;
-
-    if (acceptedCount >= MULTIADD_MAX_ROWS) {
-      errors.push(`Row ${rowNum}: exceeds ${MULTIADD_MAX_ROWS}-row limit · skipped.`);
+    const validation = validateMultiaddRow(parsedRow, {
+      acceptedCount: rows.length,
+      seenNames,
+    });
+    errors.push(...validation.warnings);
+    if (validation.error) {
+      errors.push(validation.error);
       return;
     }
-
-    if (!name) {
-      errors.push(`Row ${rowNum}: missing required field "name".`);
-      return;
-    }
-    if (!type) {
-      errors.push(`Row ${rowNum}: missing required field "type".`);
-      return;
-    }
-    if (!VALID_TYPES.has(type)) {
-      errors.push(`Row ${rowNum}: type must be black/white/watch (got "${type}").`);
-      return;
-    }
-    if (!reason) {
-      errors.push(`Row ${rowNum}: missing required field "reason".`);
-      return;
-    }
-
-    if (raid && !VALID_RAIDS.has(raid)) {
-      errors.push(
-        `Row ${rowNum}: raid must be one of [${RAIDS.join(', ')}] (got "${raid}").`
-      );
-      return;
-    }
-    if (logs && !/^https?:\/\//i.test(logs)) {
-      errors.push(`Row ${rowNum}: "logs" must start with http:// or https://.`);
-      return;
-    }
-    if (image && !/^https?:\/\//i.test(image)) {
-      errors.push(`Row ${rowNum}: "image" must start with http:// or https://.`);
-      return;
-    }
-    if (scope && !VALID_SCOPES.has(scope)) {
-      errors.push(`Row ${rowNum}: scope must be global/server (got "${scope}").`);
-      return;
-    }
-
-    if (scope && type !== 'black') {
-      errors.push(`Row ${rowNum}: scope is ignored for type "${type}" (blacklist only).`);
-    }
-
-    const nameLower = name.toLowerCase();
-    if (seenNames.has(nameLower)) {
-      errors.push(`Row ${rowNum}: duplicate name "${name}" already appears earlier in the file.`);
-      return;
-    }
-    seenNames.add(nameLower);
+    seenNames.add(parsedRow.name.toLowerCase());
 
     rows.push({
-      rowNum,
-      name,
-      type,
-      reason,
-      raid,
-      logs,
-      image,
-      scope: type === 'black' ? scope : '',
+      ...parsedRow,
+      scope: parsedRow.type === 'black' ? parsedRow.scope : '',
     });
-    acceptedCount++;
   });
 
   if (headerRowNum === 0) {

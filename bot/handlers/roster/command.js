@@ -156,11 +156,14 @@ async function loadVisibleRosterMatches(characters, guildId) {
   return { blacklist, whitelist, trusted };
 }
 
-function rosterCardColor({ blacklist, whitelist, trusted }) {
-  if (blacklist) return COLORS.danger;
-  if (whitelist) return COLORS.success;
-  if (trusted) return COLORS.trustedSoft;
-  return COLORS.info;
+export function rosterCardColor(matches) {
+  const rules = [
+    { matches: () => matches.blacklist, color: COLORS.danger },
+    { matches: () => matches.whitelist, color: COLORS.success },
+    { matches: () => matches.trusted, color: COLORS.trustedSoft },
+    { matches: () => true, color: COLORS.info },
+  ];
+  return rules.find(({ matches: matchesRule }) => matchesRule()).color;
 }
 
 function prependEvidenceCards({ embeds, rows, matches, statMap, name, lang }) {

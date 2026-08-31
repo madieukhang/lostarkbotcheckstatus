@@ -95,6 +95,52 @@ import { rosterUrl } from '../../../utils/rosterLink.js';
 const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
 const PROGRESS_EDIT_FAILURE_LIMIT = 3;
 
+const SCAN_CANCEL_STATE_RULES = Object.freeze([
+  { state: 'finished', matches: ({ scan }) => !scan },
+  {
+    state: 'restricted',
+    matches: ({ scan, userId, isPrivileged }) => (
+      Boolean(scan) && !isPrivileged && scan.callerId !== userId
+    ),
+  },
+  {
+    state: 'already-stopping',
+    matches: ({ scan }) => Boolean(scan?.cancelFlag?.cancelled),
+  },
+]);
+
+export function resolveScanCancelState(context) {
+  return SCAN_CANCEL_STATE_RULES.find(({ matches }) => matches(context))?.state || 'ready';
+}
+
+async function settleScanCancelState({ state, interaction, lang }) {
+  switch (state) {
+    case 'finished':
+      await replyAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.enrich.scanFinished', lang),
+        lang,
+      });
+      return false;
+    case 'restricted':
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.enrich.stopRestricted', lang),
+        lang,
+      });
+      return false;
+    case 'already-stopping':
+      await replyNotice(interaction, t('dialogue.enrich.alreadyStopping', lang), {
+        severity: AlertSeverity.INFO,
+        titleIcon: '🛑',
+        lang,
+      });
+      return false;
+    default:
+      return true;
+  }
+}
+
 async function editEnrichError(replyEditor, key, lang, values = {}, { clearContent = false } = {}) {
   const payload = {
     embeds: [buildAlertEmbed({
@@ -909,31 +955,13 @@ export function createEnrichHandlers({ services }) {
     const lang = await resolveInteractionLang(interaction);
     const sessionId = interaction.customId.split(':')[1];
     const scan = getScan(sessionId);
-    if (!scan) {
-      await replyAlert(interaction, {
-        severity: AlertSeverity.WARNING,
-        ...t('dialogue.enrich.scanFinished', lang),
-        lang,
-      });
-      return;
-    }
-    if (!isOfficerOrSenior(interaction.user.id) && scan.callerId !== interaction.user.id) {
-      await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.enrich.stopRestricted', lang),
-        lang,
-      });
-      return;
-    }
-
-    if (scan.cancelFlag.cancelled) {
-      await replyNotice(interaction, t('dialogue.enrich.alreadyStopping', lang), {
-        severity: AlertSeverity.INFO,
-        titleIcon: '🛑',
-        lang,
-      });
-      return;
-    }
+    const state = resolveScanCancelState({
+      scan,
+      userId: interaction.user.id,
+      isPrivileged: isOfficerOrSenior(interaction.user.id),
+    });
+    const canCancel = await settleScanCancelState({ state, interaction, lang });
+    if (!canCancel) return;
 
     scan.cancelFlag.cancelled = true;
     scan.cancelFlag.reason = 'user-stopped';

@@ -28,43 +28,44 @@ function statusLabel(status, lang) {
   return t(`dialogue.system.status.labels.${STATUS_LABEL_KEY[status] || 'unknown'}`, lang);
 }
 
-
-export function resolveSystemHealth({
-  onlineCount,
-  offlineCount,
-  maintenanceCount,
-  unknownCount,
-  totalCount,
-}) {
-  if (offlineCount > 0) {
-    return {
-      state: 'offline',
-      titleIcon: STATUS_GLYPH[STATUS.OFFLINE],
-      color: COLORS.danger,
-      count: offlineCount,
-    };
-  }
-  if (maintenanceCount > 0) {
-    return {
-      state: 'maintenance',
-      titleIcon: STATUS_GLYPH[STATUS.MAINTENANCE],
-      color: COLORS.warning,
-      count: maintenanceCount,
-    };
-  }
-  if (onlineCount === totalCount && totalCount > 0) {
-    return {
-      state: 'online',
-      titleIcon: STATUS_GLYPH[STATUS.ONLINE],
-      color: COLORS.success,
-      count: totalCount,
-    };
-  }
-  return {
-    state: 'unknown',
-    titleIcon: '❓',
+const SYSTEM_HEALTH_RULES = [
+  {
+    matches: ({ offlineCount }) => offlineCount > 0,
+    state: 'offline',
+    status: STATUS.OFFLINE,
+    color: COLORS.danger,
+    countKey: 'offlineCount',
+  },
+  {
+    matches: ({ maintenanceCount }) => maintenanceCount > 0,
+    state: 'maintenance',
+    status: STATUS.MAINTENANCE,
     color: COLORS.warning,
-    count: unknownCount,
+    countKey: 'maintenanceCount',
+  },
+  {
+    matches: ({ onlineCount, totalCount }) => onlineCount === totalCount && totalCount > 0,
+    state: 'online',
+    status: STATUS.ONLINE,
+    color: COLORS.success,
+    countKey: 'totalCount',
+  },
+  {
+    matches: () => true,
+    state: 'unknown',
+    status: STATUS.UNKNOWN,
+    color: COLORS.warning,
+    countKey: 'unknownCount',
+  },
+];
+
+export function resolveSystemHealth(counts) {
+  const rule = SYSTEM_HEALTH_RULES.find(({ matches }) => matches(counts));
+  return {
+    state: rule.state,
+    titleIcon: STATUS_GLYPH[rule.status] || '❓',
+    color: rule.color,
+    count: counts[rule.countKey],
   };
 }
 

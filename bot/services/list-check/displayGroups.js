@@ -32,11 +32,9 @@ export function groupListCheckResults(results = []) {
     const persistedId = String(entry?._id || '').trim();
     if (persistedId) return `id:${persistedId}`;
     if (!entry || (typeof entry !== 'object' && typeof entry !== 'function')) return '';
-    if (!objectRefs.has(entry)) {
-      objectRefs.set(entry, nextObjectRef);
-      nextObjectRef += 1;
-    }
-    return `object:${objectRefs.get(entry)}`;
+    const objectRef = objectRefs.get(entry) ?? nextObjectRef++;
+    objectRefs.set(entry, objectRef);
+    return `object:${objectRef}`;
   }
 
   for (const [order, item] of results.entries()) {

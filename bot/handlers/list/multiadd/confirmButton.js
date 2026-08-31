@@ -20,6 +20,65 @@ import {
   isOfficerOrSenior,
 } from '../helpers.js';
 
+const MULTIADD_CONFIRM_STATE_RULES = Object.freeze([
+  { state: 'expired', matches: ({ pending }) => !pending },
+  {
+    state: 'not-yours',
+    matches: ({ pending, userId }) => Boolean(pending) && userId !== pending.requesterId,
+  },
+  { state: 'cancel', matches: ({ prefix }) => prefix === 'multiadd_cancel' },
+  { state: 'confirm', matches: ({ prefix }) => prefix === 'multiadd_confirm' },
+]);
+
+export function resolveMultiaddConfirmState(context) {
+  return MULTIADD_CONFIRM_STATE_RULES.find(({ matches }) => matches(context))?.state || 'ignore';
+}
+
+async function settleMultiaddConfirmState({
+  state,
+  interaction,
+  requestId,
+  lang,
+  clearMultiaddPending,
+}) {
+  switch (state) {
+    case 'expired':
+      await updateAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.multiadd.confirm.expired', lang),
+        lang,
+      }, {
+        content: '',
+        components: [],
+      });
+      return false;
+    case 'not-yours':
+      await replyAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.multiadd.confirm.notYours', lang),
+        lang,
+      });
+      return false;
+    case 'cancel':
+      clearMultiaddPending(requestId);
+      await updatePayload(interaction, {
+        content: '',
+        embeds: [buildAlertEmbed({
+          severity: AlertSeverity.INFO,
+          titleIcon: '✖️',
+          ...t('dialogue.multiadd.confirm.cancelled', lang),
+          lang,
+        })],
+        components: [],
+      });
+      return false;
+    case 'confirm':
+      return true;
+    default:
+      return false;
+  }
+}
+
 export function createMultiaddConfirmButtonHandler(deps) {
   const {
     client,
@@ -35,44 +94,19 @@ export function createMultiaddConfirmButtonHandler(deps) {
     const [prefix, requestId] = interaction.customId.split(':');
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     const pending = multiaddPending.get(requestId);
-
-    if (!pending) {
-      await updateAlert(interaction, {
-        severity: AlertSeverity.WARNING,
-        ...t('dialogue.multiadd.confirm.expired', lang),
-        lang,
-      }, {
-        content: '',
-        components: [],
-      });
-      return;
-    }
-
-    if (interaction.user.id !== pending.requesterId) {
-      await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.multiadd.confirm.notYours', lang),
-        lang,
-      });
-      return;
-    }
-
-    if (prefix === 'multiadd_cancel') {
-      clearMultiaddPending(requestId);
-      await updatePayload(interaction, {
-        content: '',
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.INFO,
-          titleIcon: '✖️',
-          ...t('dialogue.multiadd.confirm.cancelled', lang),
-          lang,
-        })],
-        components: [],
-      });
-      return;
-    }
-
-    if (prefix !== 'multiadd_confirm') return;
+    const state = resolveMultiaddConfirmState({
+      prefix,
+      pending,
+      userId: interaction.user.id,
+    });
+    const shouldConfirm = await settleMultiaddConfirmState({
+      state,
+      interaction,
+      requestId,
+      lang,
+      clearMultiaddPending,
+    });
+    if (!shouldConfirm) return;
 
     clearMultiaddPending(requestId);
 

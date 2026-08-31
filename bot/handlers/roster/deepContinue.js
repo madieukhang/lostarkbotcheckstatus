@@ -35,16 +35,21 @@ import { createRosterScanRuntime } from './progress.js';
 import { resolveRosterScanOutcome } from './completion.js';
 
 function getSessionAccessAlert(session, userId, lang) {
-  if (!session) {
-    return { severity: AlertSeverity.WARNING, ...t('dialogue.scan.sessionExpired', lang), lang };
-  }
-  if (session.callerId !== userId) {
-    return { severity: AlertSeverity.ERROR, ...t('dialogue.scan.notYourSession', lang), lang };
-  }
-  if (session.inProgress) {
-    return { severity: AlertSeverity.INFO, ...t('dialogue.scan.continueRunning', lang), lang };
-  }
-  return null;
+  const rules = [
+    {
+      denied: () => !session,
+      alert: () => ({ severity: AlertSeverity.WARNING, ...t('dialogue.scan.sessionExpired', lang), lang }),
+    },
+    {
+      denied: () => session.callerId !== userId,
+      alert: () => ({ severity: AlertSeverity.ERROR, ...t('dialogue.scan.notYourSession', lang), lang }),
+    },
+    {
+      denied: () => session.inProgress,
+      alert: () => ({ severity: AlertSeverity.INFO, ...t('dialogue.scan.continueRunning', lang), lang }),
+    },
+  ];
+  return rules.find(({ denied }) => denied())?.alert() || null;
 }
 
 function countContinuationCandidates(session) {

@@ -9,9 +9,11 @@ const {
   buildVisibleRosterLines,
   formatItemLevelDelta,
   formatVisibleRosterLine,
+  rosterCardColor,
 } = await import('../bot/handlers/roster/command.js');
 const { resolveRosterScanOutcome } = await import('../bot/handlers/roster/completion.js');
 const { mergeContinuationScanResult } = await import('../bot/handlers/roster/deepContinue.js');
+const { buildHiddenDescription } = await import('../bot/handlers/roster/hiddenRoster.js');
 
 test('/la-roster renders CP as a code badge with the unit after the score', () => {
   const line = formatVisibleRosterLine({
@@ -50,6 +52,48 @@ test('/la-roster visible rows reuse snapshot deltas without mutating input', () 
   assert.match(line, /Aresvn/);
   assert.match(line, /\*\(\+10\.00\)\*/);
   assert.equal(characters[0].itemLevel, '1790');
+});
+
+test('/la-roster hidden description shows a non-empty server name', () => {
+  const description = buildHiddenDescription({
+    meta: {
+      guildName: 'AinsGuild',
+      world: 'Thaemine',
+      strongholdName: 'AinsHome',
+      strongholdLevel: 70,
+      rosterLevel: 300,
+    },
+    guildMembers: [],
+    hits: { black: [], white: [] },
+    deep: false,
+    lang: 'en',
+  });
+
+  assert.match(description, /Server:\*\* `Thaemine`/);
+});
+
+test('/la-roster hidden description omits the server row when metadata has no world', () => {
+  const description = buildHiddenDescription({
+    meta: {
+      guildName: 'AinsGuild',
+      strongholdName: 'AinsHome',
+      strongholdLevel: 70,
+      rosterLevel: 300,
+    },
+    guildMembers: [],
+    hits: { black: [], white: [] },
+    deep: false,
+    lang: 'en',
+  });
+
+  assert.doesNotMatch(description, /Server:/);
+});
+
+test('/la-roster card color keeps blacklist-first outcome priority', () => {
+  assert.equal(rosterCardColor({ blacklist: {}, whitelist: {}, trusted: {} }), 0xed4245);
+  assert.equal(rosterCardColor({ blacklist: null, whitelist: {}, trusted: {} }), 0x57f287);
+  assert.equal(rosterCardColor({ blacklist: null, whitelist: null, trusted: {} }), 0x57d6a1);
+  assert.equal(rosterCardColor({ blacklist: null, whitelist: null, trusted: null }), 0x5865f2);
 });
 
 test('roster scan completion outcome is shared across terminal entry points', () => {

@@ -66,18 +66,31 @@ export function createListAddCommandHandler({
   }
 
   function validateListAddRequest(interaction, request, lang) {
-    if (!interaction.guild) return t('dialogue.common.serverOnly', lang);
-    if (!request.reason) return t('dialogue.listAdd.command.reasonRequired', lang);
-    if (request.raid === null) {
-      return t('dialogue.listAdd.command.invalidRaid', lang, {
-        raid: request.raidInput.trim(),
-        list: request.type === 'black' ? 'blacklist' : 'whitelist',
-      });
-    }
-    if (request.image?.contentType && !request.image.contentType.startsWith('image/')) {
-      return t('dialogue.listAdd.command.invalidImage', lang, { type: request.image.contentType });
-    }
-    return null;
+    const rules = [
+      {
+        invalid: () => !interaction.guild,
+        message: () => t('dialogue.common.serverOnly', lang),
+      },
+      {
+        invalid: () => !request.reason,
+        message: () => t('dialogue.listAdd.command.reasonRequired', lang),
+      },
+      {
+        invalid: () => request.raid === null,
+        message: () => t('dialogue.listAdd.command.invalidRaid', lang, {
+          raid: request.raidInput.trim(),
+          list: request.type === 'black' ? 'blacklist' : 'whitelist',
+        }),
+      },
+      {
+        invalid: () => request.image?.contentType && !request.image.contentType.startsWith('image/'),
+        message: () => t('dialogue.listAdd.command.invalidImage', lang, {
+          type: request.image.contentType,
+        }),
+      },
+    ];
+    const violation = rules.find(({ invalid }) => invalid());
+    return violation?.message() || null;
   }
 
   async function resolveListAddScope(request, guildId) {

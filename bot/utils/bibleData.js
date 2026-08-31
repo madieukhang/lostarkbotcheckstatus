@@ -41,9 +41,12 @@
  * @returns {any} Reconstructed value (primitives, plain objects, arrays).
  */
 export function decodeBibleData(data, idx, seen = new Set()) {
-  if (idx === undefined || idx === null || idx === -1) return null;
-  if (!Array.isArray(data)) return null;
-  if (seen.has(idx)) return null;
+  const invalidReference = idx === undefined
+    || idx === null
+    || idx === -1
+    || !Array.isArray(data)
+    || seen.has(idx);
+  if (invalidReference) return null;
   const value = data[idx];
   if (value === null || typeof value !== 'object') return value;
   // Track only object/array nodes; primitives can repeat freely without

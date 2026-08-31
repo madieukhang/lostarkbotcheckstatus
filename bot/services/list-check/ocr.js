@@ -12,6 +12,22 @@ const GEMINI_GENERATION_CONFIG = {
   maxOutputTokens: 512,
 };
 
+const GEMINI_FAILURE_FORMATTERS = {
+  network: (result) =>
+    `Gemini request failed on ${result.model}: ${result.error.message}`,
+  http: (result) =>
+    `Gemini request failed on ${result.model} (HTTP ${result.status}) ${result.bodyText}`.trim(),
+  'response:non-JSON response': () => 'Gemini did not return a JSON array.',
+  default: (result) => `All Gemini models failed: ${result.failures.join(' | ')}`,
+};
+
+function formatGeminiFailure(result) {
+  const key = result.type === 'response'
+    ? `${result.type}:${result.reason}`
+    : result.type;
+  return (GEMINI_FAILURE_FORMATTERS[key] || GEMINI_FAILURE_FORMATTERS.default)(result);
+}
+
 /** Known Lost Ark server/world names to filter from OCR results */
 const SERVER_NAMES = new Set([
   'azena', 'avesta', 'galatur', 'karta', 'ladon', 'kharmine',
@@ -392,11 +408,11 @@ export async function extractNamesFromImage(image, options = {}) {
       timing.geminiMs += elapsedMs;
     },
     onRetry: ({ type, model }) => {
-      if (type === 'network') {
-        console.warn(`[listcheck] Gemini timeout/network error on ${model}, trying fallback model.`);
-      } else if (type === 'http') {
-        console.warn(`[listcheck] Gemini quota/rate hit on ${model}, trying fallback model.`);
-      }
+      const retryMessages = {
+        network: `[listcheck] Gemini timeout/network error on ${model}, trying fallback model.`,
+        http: `[listcheck] Gemini quota/rate hit on ${model}, trying fallback model.`,
+      };
+      if (retryMessages[type]) console.warn(retryMessages[type]);
     },
     parseResponse: ({ finishReason, text, model }) => {
       if (finishReason && finishReason !== 'STOP') {
@@ -424,16 +440,7 @@ export async function extractNamesFromImage(image, options = {}) {
   });
 
   if (!geminiResult.ok) {
-    if (geminiResult.type === 'network') {
-      throw new Error(`Gemini request failed on ${geminiResult.model}: ${geminiResult.error.message}`);
-    }
-    if (geminiResult.type === 'http') {
-      throw new Error(`Gemini request failed on ${geminiResult.model} (HTTP ${geminiResult.status}) ${geminiResult.bodyText}`.trim());
-    }
-    if (geminiResult.type === 'response' && geminiResult.reason === 'non-JSON response') {
-      throw new Error('Gemini did not return a JSON array.');
-    }
-    throw new Error(`All Gemini models failed: ${geminiResult.failures.join(' | ')}`);
+    throw new Error(formatGeminiFailure(geminiResult));
   }
 
   if (geminiResult.value.emptyResponse) {

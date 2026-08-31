@@ -20,6 +20,22 @@ import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
 import { handleSyncImagesAction } from './syncImages.js';
 
+const EVIDENCE_CHANNEL_RULES = Object.freeze([
+  {
+    key: 'dialogue.remote.configMissing',
+    invalid: () => !config.ownerGuildId,
+  },
+  {
+    key: 'dialogue.remote.channelRequired',
+    invalid: ({ channel }) => !channel,
+  },
+  {
+    key: 'dialogue.remote.channelWrongType',
+    invalid: ({ channel }) => !channel.isTextBased?.(),
+    vars: ({ channel }) => ({ channel: channel.id }),
+  },
+]);
+
 function enabledLabel(enabled, lang, { on = '🔔', off = '🔕' } = {}) {
   return `${enabled ? on : off} ${t(`dialogue.remote.state.${enabled ? 'enabled' : 'disabled'}`, lang)}`;
 }
@@ -146,8 +162,8 @@ async function handleViewAction(interaction, lang) {
       });
       return;
     }
-    if (buttonInteraction.customId === 'remote_prev') currentPage = Math.max(0, currentPage - 1);
-    if (buttonInteraction.customId === 'remote_next') currentPage = Math.min(totalPages - 1, currentPage + 1);
+    const pageDelta = { remote_prev: -1, remote_next: 1 }[buttonInteraction.customId] || 0;
+    currentPage = Math.max(0, Math.min(totalPages - 1, currentPage + pageDelta));
     await updatePayload(buttonInteraction, {
       embeds: buildPage(currentPage),
       components: buildRemoteNavigation(currentPage, totalPages, lang),
@@ -157,12 +173,10 @@ async function handleViewAction(interaction, lang) {
 }
 
 function evidenceChannelValidation(channel, lang) {
-  if (!config.ownerGuildId) {
-    return { ...t('dialogue.remote.configMissing', lang), lang };
-  }
-  if (!channel) return { ...t('dialogue.remote.channelRequired', lang), lang };
-  if (!channel.isTextBased?.()) {
-    return { ...t('dialogue.remote.channelWrongType', lang, { channel: channel.id }), lang };
+  const context = { channel };
+  const failedRule = EVIDENCE_CHANNEL_RULES.find(({ invalid }) => invalid(context));
+  if (failedRule) {
+    return { ...t(failedRule.key, lang, failedRule.vars?.(context)), lang };
   }
   const member = channel.guild?.members?.me;
   if (!member) return null;
@@ -302,16 +316,14 @@ export async function handleSetupRemoteCommand(interaction) {
   const channelOpt = interaction.options.getChannel('channel');
 
   await connectDB();
-  if (action === 'view') {
-    await handleViewAction(interaction, lang);
-    return;
-  }
-  if (action === 'evidencechannel') {
-    await handleEvidenceChannelAction(interaction, channelOpt, lang);
-    return;
-  }
-  if (action === 'syncimages') {
-    await handleSyncImagesAction(interaction, lang);
+  const preGuildActions = {
+    view: () => handleViewAction(interaction, lang),
+    evidencechannel: () => handleEvidenceChannelAction(interaction, channelOpt, lang),
+    syncimages: () => handleSyncImagesAction(interaction, lang),
+  };
+  const preGuildHandler = preGuildActions[action];
+  if (preGuildHandler) {
+    await preGuildHandler();
     return;
   }
   if (!targetGuildId) {
@@ -327,11 +339,16 @@ export async function handleSetupRemoteCommand(interaction) {
     return;
   }
   const auditFields = { updatedByUserId: interaction.user.id, updatedByTag: interaction.user.tag };
-  if (action === 'off') {
-    await handleNotifyToggle(interaction, targetGuildId, guildName, auditFields, lang);
-    return;
-  }
-  if (action === 'defaultscope') {
-    await handleDefaultScope(interaction, targetGuildId, guildName, scopeValue, auditFields, lang);
-  }
+  const guildActions = {
+    off: () => handleNotifyToggle(interaction, targetGuildId, guildName, auditFields, lang),
+    defaultscope: () => handleDefaultScope(
+      interaction,
+      targetGuildId,
+      guildName,
+      scopeValue,
+      auditFields,
+      lang
+    ),
+  };
+  await guildActions[action]?.();
 }

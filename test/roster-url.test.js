@@ -9,6 +9,7 @@ import {
   fetchCharacterMeta,
   fetchGuildMembers,
   fetchWithFallback,
+  stampRosterWorld,
 } from '../bot/services/roster/index.js';
 import config from '../bot/config.js';
 import { clearMetaCache } from '../bot/utils/metaCache.js';
@@ -56,7 +57,7 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
     }
 
     return new Response(
-      'class:"bard",itemLevel:1723.33,rosterLevel:300,stronghold:{level:70,name:"AinsHome"},guild:{name:"AinsGuild",grade:"Member"}',
+      'class:"bard",itemLevel:1723.33,world:"Thaemine",rosterLevel:300,stronghold:{level:70,name:"AinsHome"},guild:{name:"AinsGuild",grade:"Member"}',
       { status: 200 }
     );
   };
@@ -70,6 +71,7 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
     assert.deepEqual(result.allCharacters, ['Ainslinn']);
     assert.equal(result.targetItemLevel, 1723.33);
     assert.equal(result.rosterVisibility, 'hidden');
+    assert.equal(result.rosterCharacters[0].world, 'Thaemine');
     assert.equal(requestedUrls[0], 'https://lostark.bible/character/NA/Ainslinn/roster');
     assert.equal(requestedUrls[1], 'https://lostark.bible/character/NA/Ainslinn/__data.json');
     assert.equal(requestedUrls[2], 'https://lostark.bible/character/NA/Ainslinn');
@@ -77,6 +79,19 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('hidden roster world stamping covers both the primary character and discovered alts', () => {
+  assert.deepEqual(
+    stampRosterWorld([
+      { name: 'Ainslinn' },
+      { name: 'Ainsalt', world: 'StaleWorld' },
+    ], ' Thaemine '),
+    [
+      { name: 'Ainslinn', world: 'Thaemine' },
+      { name: 'Ainsalt', world: 'Thaemine' },
+    ]
+  );
 });
 
 test('buildRosterCharacters keeps hidden roster fallback opt-in', async () => {
@@ -229,6 +244,67 @@ test('detectAltsViaStronghold reuses provided meta and guild members without tar
 
     assert.equal(result, null);
     assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearMetaCache();
+  }
+});
+
+test('detectAltsViaStronghold records a successful roster match and progress snapshot', async () => {
+  clearMetaCache();
+  const originalFetch = globalThis.fetch;
+  const progressSnapshots = [];
+
+  globalThis.fetch = async () => Response.json({
+    nodes: [
+      {
+        data: [
+          { header: 1 },
+          { rosterLevel: 2, stronghold: 3, guild: 6, class: 9, ilvl: 10 },
+          300,
+          { level: 4, name: 5 },
+          70,
+          'AinsHome',
+          { name: 7, grade: 8 },
+          'AinsGuild',
+          'Member',
+          'bard',
+          1750,
+        ],
+      },
+    ],
+  });
+
+  try {
+    const result = await detectAltsViaStronghold('Ainslinn', {
+      targetMeta: {
+        rosterLevel: 300,
+        strongholdLevel: 70,
+        strongholdName: 'AinsHome',
+        guildName: 'AinsGuild',
+        guildGrade: 'Member',
+        classId: 'bard',
+        itemLevel: 1790,
+      },
+      guildMembers: [
+        { name: 'Ainsalt', cls: 'bard', ilvl: 1750, rank: 'Member' },
+      ],
+      candidateLimit: 1,
+      mode: 'fast',
+      concurrency: 1,
+      retryOnRateLimit: false,
+      useScraperApiForCandidates: false,
+      onProgress: (snapshot) => progressSnapshots.push(snapshot),
+    });
+
+    assert.equal(result.attemptedCandidates, 1);
+    assert.equal(result.checkedCandidates, 1);
+    assert.equal(result.failedCandidates, 0);
+    assert.deepEqual(result.scannedNames, ['Ainsalt']);
+    assert.deepEqual(result.alts.map(({ name }) => name), ['Ainsalt']);
+    assert.equal(progressSnapshots.length, 1);
+    assert.equal(progressSnapshots[0].altsFound, 1);
+    assert.deepEqual(progressSnapshots[0].alts.map(({ name }) => name), ['Ainsalt']);
   } finally {
     globalThis.fetch = originalFetch;
     clearMetaCache();

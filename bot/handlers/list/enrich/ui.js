@@ -80,28 +80,23 @@ export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en') {
     })
     .join('\n');
 
-  // Sections are joined by blank lines so Discord renders each as a distinct
-  // visual block.
-  const sections = [];
+  const contextLines = [
+    session.scanStats?.guildName
+      ? `📍 ${t('dialogue.enrich.success.source', lang, { guild: session.scanStats.guildName })}`
+      : '',
+    session.targetIsHidden
+      ? `${ICONS.locked} ${t('dialogue.enrich.success.hidden', lang)}`
+      : '',
+  ].filter(Boolean);
 
-  sections.push(
-    `${ICONS.fox || '✨'} ${t('dialogue.enrich.success.appended', lang, { count: session.newAlts.length, list: t(`dialogue.broadcast.list.${session.type}`, lang) })}`
-  );
-
-  const contextLines = [];
-  if (session.scanStats?.guildName) {
-    contextLines.push(`📍 ${t('dialogue.enrich.success.source', lang, { guild: session.scanStats.guildName })}`);
-  }
-  if (session.targetIsHidden) {
-    contextLines.push(`${ICONS.locked} ${t('dialogue.enrich.success.hidden', lang)}`);
-  }
-  if (contextLines.length > 0) sections.push(contextLines.join('\n'));
-
-  if (altLines) {
-    sections.push(`**🆕 ${t('dialogue.enrich.success.newlyTracked', lang)}**\n${altLines}`);
-  }
-
-  sections.push(`💡 ${t('dialogue.enrich.success.tip', lang, { type: session.type })}`);
+  // Sections are declared in display order and empty optional blocks drop out
+  // in one place, instead of mutating the array through several adjacent ifs.
+  const sections = [
+    `${ICONS.fox || '✨'} ${t('dialogue.enrich.success.appended', lang, { count: session.newAlts.length, list: t(`dialogue.broadcast.list.${session.type}`, lang) })}`,
+    contextLines.join('\n'),
+    altLines ? `**🆕 ${t('dialogue.enrich.success.newlyTracked', lang)}**\n${altLines}` : '',
+    `💡 ${t('dialogue.enrich.success.tip', lang, { type: session.type })}`,
+  ].filter(Boolean);
 
   // Server-side trace for cases where confirmation appears not to persist.
   // matched/modified counters remain in logs because they are operational

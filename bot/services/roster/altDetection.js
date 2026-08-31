@@ -19,6 +19,47 @@ import { fetchCharacterMeta } from './characterMeta.js';
 import { fetchGuildMembers } from './guildMembers.js';
 import { inferHiddenRosterItemLevel } from './search.js';
 
+const TARGET_META_REQUIREMENTS = Object.freeze([
+  { missing: (meta) => !meta, message: 'No character meta found.' },
+  { missing: (meta) => !meta?.guildName, message: 'Character has no guild.' },
+  { missing: (meta) => !meta?.strongholdName, message: 'No stronghold data.' },
+]);
+
+function targetMetaFailure(meta) {
+  return TARGET_META_REQUIREMENTS.find(({ missing }) => missing(meta))?.message || '';
+}
+
+function calculateCandidateBackoff(backoff, { failed, rateLimitRetries }) {
+  // Multiplicative backoff on 429 grows quickly enough to satisfy bible's
+  // app-level limiter. Ordinary failures stay linear; clean successes recover
+  // gradually so one good response cannot immediately recreate a burst.
+  const rateLimitedBackoff = rateLimitRetries > 0
+    ? Math.min(
+        Math.round(backoff.current * Math.pow(1.6, rateLimitRetries)),
+        backoff.max
+      )
+    : backoff.current;
+
+  if (failed) return Math.min(rateLimitedBackoff + backoff.step, backoff.max);
+  return rateLimitRetries === 0
+    ? Math.max(rateLimitedBackoff - backoff.recover, backoff.min)
+    : rateLimitedBackoff;
+}
+
+function matchedAlt(candidate, candidateMeta, targetMeta) {
+  const matchesRoster = candidateMeta?.strongholdName === targetMeta.strongholdName
+    && candidateMeta?.rosterLevel === targetMeta.rosterLevel;
+  return matchesRoster
+    ? {
+        name: candidate.name,
+        classId: candidate.cls,
+        className: getClassName(candidate.cls),
+        itemLevel: candidate.ilvl,
+        rank: candidate.rank,
+      }
+    : null;
+}
+
 /**
  * Detect alt characters via the target's stronghold name. Runs inside a
  * scraperapi-usage scope so per-call counters surface in the audit
@@ -72,16 +113,9 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     fallbackOnRateLimit: false,
     viaWorker,
   });
-  if (!meta) {
-    console.log('[alt-detect] No character meta found.');
-    return null;
-  }
-  if (!meta.guildName) {
-    console.log('[alt-detect] Character has no guild.');
-    return null;
-  }
-  if (!meta.strongholdName) {
-    console.log('[alt-detect] No stronghold data.');
+  const invalidTargetReason = targetMetaFailure(meta);
+  if (invalidTargetReason) {
+    console.log(`[alt-detect] ${invalidTargetReason}`);
     return null;
   }
 
@@ -166,9 +200,10 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   let cancelledByFlag = false;
 
   function shouldPauseForFailureStorm() {
-    if (!failureGuardMinCandidates || !failureGuardFailedRate) return false;
-    if (attemptedCandidates < failureGuardMinCandidates) return false;
-    return failedCandidates / attemptedCandidates >= failureGuardFailedRate;
+    const guardEnabled = Boolean(failureGuardMinCandidates && failureGuardFailedRate);
+    return guardEnabled
+      && attemptedCandidates >= failureGuardMinCandidates
+      && failedCandidates / attemptedCandidates >= failureGuardFailedRate;
   }
 
   function recordFailureReason(reason) {
@@ -177,18 +212,102 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     failureReasons.set(normalized, (failureReasons.get(normalized) || 0) + 1);
   }
 
+  function shouldStopWorker() {
+    if (cancelFlag.cancelled) {
+      cancelledByFlag = true;
+      abortReason = cancelFlag.reason || 'user-stopped';
+      abortLabel = cancelFlag.label || 'Stopped by user';
+      abortDetail = cancelFlag.detail || 'Stop button clicked.';
+      return true;
+    }
+    return pausedForFailureStorm;
+  }
+
+  function recordCandidateOutcome(candidate, candidateMeta, rateLimitRetryCount, failureReason) {
+    const failed = candidateMeta === null;
+    backoff.current = calculateCandidateBackoff(backoff, {
+      failed,
+      rateLimitRetries: rateLimitRetryCount,
+    });
+
+    if (failed) {
+      failedCandidates++;
+      failedNames.push(candidate.name);
+      recordFailureReason(failureReason);
+      return;
+    }
+
+    checkedCandidates++;
+    scannedNames.push(candidate.name);
+    const alt = matchedAlt(candidate, candidateMeta, meta);
+    if (!alt) return;
+    alts.push(alt);
+    console.log(`[alt-detect] Match found: ${candidate.name}`);
+  }
+
+  function logOperatorProgress() {
+    const shouldLog = attemptedCandidates % 25 === 0
+      || attemptedCandidates === limitedCandidates.length;
+    if (!shouldLog) return;
+    console.log(
+      `[alt-detect] Progress ${attemptedCandidates}/${limitedCandidates.length};` +
+      ` checked ${checkedCandidates};` +
+      ` failed ${failedCandidates}; alts ${alts.length};` +
+      ` rate-limit retries ${rateLimitRetries}; backoff ${backoff.current}ms`
+    );
+  }
+
+  function emitUiProgress() {
+    const shouldEmit = attemptedCandidates % 5 === 0
+      || attemptedCandidates === limitedCandidates.length
+      || alts.length > 0;
+    if (!shouldEmit || typeof options.onProgress !== 'function') return;
+
+    // Pass a shallow snapshot of the current matches so the UI can render
+    // names during the scan. Display truncation belongs to the UI.
+    Promise.resolve(options.onProgress({
+      scannedCandidates: attemptedCandidates,
+      checkedCandidates,
+      attemptedCandidates,
+      totalCandidates: limitedCandidates.length,
+      failedCandidates,
+      altsFound: alts.length,
+      alts: alts.slice(),
+      currentBackoffMs: backoff.current,
+      rateLimitRetries,
+      lastFailureReason,
+      failureReasons: Object.fromEntries(failureReasons),
+    })).catch((err) => {
+      console.warn('[alt-detect] onProgress callback threw:', err?.message || err);
+    });
+  }
+
+  function pauseForFailureStorm() {
+    if (!shouldPauseForFailureStorm()) return false;
+    pausedForFailureStorm = true;
+    abortReason = 'bible-failure-storm';
+    abortLabel = 'Bible rejected candidate profiles';
+    abortDetail = `${failedCandidates}/${attemptedCandidates} candidate attempts failed.` +
+      (lastFailureReason ? ` Last error: ${lastFailureReason}.` : '');
+    console.warn(
+      `[alt-detect] Pausing ${name}: high failure rate ` +
+      `${failedCandidates}/${attemptedCandidates} (${Math.round((failedCandidates / attemptedCandidates) * 100)}%).`
+    );
+    return true;
+  }
+
+  async function waitForNextCandidate() {
+    if (nextCandidateIndex >= limitedCandidates.length) return;
+    // Jitter the inter-candidate sleep by +/- 15% so the cadence is not a
+    // perfectly periodic signal CF / bible's anti-bot heuristics can clock.
+    const jitterFactor = 0.85 + Math.random() * 0.3;
+    const sleepMs = Math.round(backoff.current * jitterFactor);
+    await new Promise((resolve) => setTimeout(resolve, sleepMs));
+  }
+
   async function scanWorker() {
     while (nextCandidateIndex < limitedCandidates.length) {
-      if (cancelFlag.cancelled) {
-        cancelledByFlag = true;
-        abortReason = cancelFlag.reason || 'user-stopped';
-        abortLabel = cancelFlag.label || 'Stopped by user';
-        abortDetail = cancelFlag.detail || 'Stop button clicked.';
-        break;
-      }
-      if (pausedForFailureStorm) {
-        break;
-      }
+      if (shouldStopWorker()) break;
       const cand = limitedCandidates[nextCandidateIndex++];
       attemptedNames.push(cand.name);
       let candidateRateLimitRetries = 0;
@@ -218,99 +337,15 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
       });
 
       attemptedCandidates++;
-      if (candidateRateLimitRetries > 0) {
-        // Multiplicative backoff on 429 (rather than linear +1500ms per
-        // retry). 1.6x grows fast enough that two consecutive rate-limits
-        // double the gap, which matches the pace bible's app-level
-        // limiter expects when it fires. Linear addition was slow to
-        // recover and predictable - bot-detection signal in disguise.
-        backoff.current = Math.min(
-          Math.round(backoff.current * Math.pow(1.6, candidateRateLimitRetries)),
-          backoff.max
-        );
-      }
-      if (candMeta === null) {
-        failedCandidates++;
-        failedNames.push(cand.name);
-        recordFailureReason(candidateFailureReason);
-        backoff.current = Math.min(backoff.current + backoff.step, backoff.max);
-      } else {
-        checkedCandidates++;
-        scannedNames.push(cand.name);
-        if (candidateRateLimitRetries === 0) {
-          backoff.current = Math.max(backoff.current - backoff.recover, backoff.min);
-        }
-        if (candMeta.strongholdName === meta.strongholdName && candMeta.rosterLevel === meta.rosterLevel) {
-          alts.push({
-            name: cand.name,
-            classId: cand.cls,
-            className: getClassName(cand.cls),
-            itemLevel: cand.ilvl,
-            rank: cand.rank,
-          });
-          console.log(`[alt-detect] Match found: ${cand.name}`);
-        }
-      }
+      recordCandidateOutcome(cand, candMeta, candidateRateLimitRetries, candidateFailureReason);
 
       // Console log stays per-25 (operator-facing). UI progress emits
       // per-5 so the embed can update more frequently between throttled edits;
       // the caller decides how often to actually push to Discord.
-      if (attemptedCandidates % 25 === 0 || attemptedCandidates === limitedCandidates.length) {
-        console.log(
-          `[alt-detect] Progress ${attemptedCandidates}/${limitedCandidates.length};` +
-          ` checked ${checkedCandidates};` +
-          ` failed ${failedCandidates}; alts ${alts.length};` +
-          ` rate-limit retries ${rateLimitRetries}; backoff ${backoff.current}ms`
-        );
-      }
-      if (
-        attemptedCandidates % 5 === 0
-        || attemptedCandidates === limitedCandidates.length
-        || alts.length > 0 && attemptedCandidates % 1 === 0
-      ) {
-        if (typeof options.onProgress === 'function') {
-          // Pass a shallow snapshot of the current matches so the UI can
-          // render names during the scan. Any display truncation belongs in
-          // the UI; the callback receives the complete match set.
-          Promise.resolve(options.onProgress({
-            scannedCandidates: attemptedCandidates,
-            checkedCandidates,
-            attemptedCandidates,
-            totalCandidates: limitedCandidates.length,
-            failedCandidates,
-            altsFound: alts.length,
-            alts: alts.slice(),
-            currentBackoffMs: backoff.current,
-            rateLimitRetries,
-            lastFailureReason,
-            failureReasons: Object.fromEntries(failureReasons),
-          })).catch((err) => {
-            console.warn('[alt-detect] onProgress callback threw:', err?.message || err);
-          });
-        }
-      }
-
-      if (shouldPauseForFailureStorm()) {
-        pausedForFailureStorm = true;
-        abortReason = 'bible-failure-storm';
-        abortLabel = 'Bible rejected candidate profiles';
-        abortDetail = `${failedCandidates}/${attemptedCandidates} candidate attempts failed.` +
-          (lastFailureReason ? ` Last error: ${lastFailureReason}.` : '');
-        console.warn(
-          `[alt-detect] Pausing ${name}: high failure rate ` +
-          `${failedCandidates}/${attemptedCandidates} (${Math.round((failedCandidates / attemptedCandidates) * 100)}%).`
-        );
-        break;
-      }
-
-      if (nextCandidateIndex < limitedCandidates.length) {
-        // Jitter the inter-candidate sleep by +/- 15% so the cadence
-        // is not a perfectly periodic signal CF / bible's anti-bot
-        // heuristics can clock. 0.85x .. 1.15x of backoff.current.
-        const jitterFactor = 0.85 + Math.random() * 0.3;
-        const sleepMs = Math.round(backoff.current * jitterFactor);
-        await new Promise((r) => setTimeout(r, sleepMs));
-      }
+      logOperatorProgress();
+      emitUiProgress();
+      if (pauseForFailureStorm()) break;
+      await waitForNextCandidate();
     }
   }
 

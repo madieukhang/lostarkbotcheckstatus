@@ -66,21 +66,24 @@ function resolveStatusFromClass(className) {
     classTokens.filter((token) => token.startsWith(`${baseClass}--`))
   );
 
-  if (
-    modifiers.has(`${baseClass}--good`) ||
-    modifiers.has(`${baseClass}--busy`) ||
-    modifiers.has(`${baseClass}--full`)
-  ) {
-    return STATUS.ONLINE;
-  }
-  if (modifiers.has(`${baseClass}--maintenance`)) {
-    return STATUS.MAINTENANCE;
-  }
-
-  // The live page represents offline with the base status class and no
-  // modifier. An unfamiliar modifier is schema drift, not proof of offline.
-  if (classTokens.includes(baseClass) && modifiers.size === 0) return STATUS.OFFLINE;
-  return STATUS.UNKNOWN;
+  const rules = [
+    {
+      matches: () => ['good', 'busy', 'full']
+        .some((modifier) => modifiers.has(`${baseClass}--${modifier}`)),
+      status: STATUS.ONLINE,
+    },
+    {
+      matches: () => modifiers.has(`${baseClass}--maintenance`),
+      status: STATUS.MAINTENANCE,
+    },
+    // The live page represents offline with the base status class and no
+    // modifier. An unfamiliar modifier is schema drift, not proof of offline.
+    {
+      matches: () => classTokens.includes(baseClass) && modifiers.size === 0,
+      status: STATUS.OFFLINE,
+    },
+  ];
+  return rules.find(({ matches }) => matches())?.status || STATUS.UNKNOWN;
 }
 
 /**
@@ -93,12 +96,13 @@ function resolveStatusFromClass(className) {
  */
 function resolveStatusFromAriaLabel(ariaLabel) {
   const label = String(ariaLabel || '').toLowerCase();
-  if (label.includes('maintenance')) return STATUS.MAINTENANCE;
-  if (label.includes('offline'))     return STATUS.OFFLINE;
-  if (label.includes('online') || label.includes('busy') || label.includes('full')) {
-    return STATUS.ONLINE;
-  }
-  return STATUS.UNKNOWN;
+  const rules = [
+    { tokens: ['maintenance'], status: STATUS.MAINTENANCE },
+    { tokens: ['offline'], status: STATUS.OFFLINE },
+    { tokens: ['online', 'busy', 'full'], status: STATUS.ONLINE },
+  ];
+  return rules.find(({ tokens }) => tokens.some((token) => label.includes(token)))?.status
+    || STATUS.UNKNOWN;
 }
 
 /**

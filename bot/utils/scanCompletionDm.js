@@ -99,15 +99,13 @@ export async function sendScanCompletionDm(opts) {
   //   3. Alt list (when matches exist)
   // Anything technical (counts, retries, ScraperAPI) goes into the
   // addFields stats grid below — keeps the description tight.
-  const heroLines = [];
-  heroLines.push(t('dialogue.scan.dm.hero', lang, {
-    command: commandLabel,
-    channel: channelMention ? t('dialogue.scan.dm.inChannel', lang, { channel: channelMention }) : '',
-  }));
-  if (guildName) {
-    heroLines.push('');
-    heroLines.push(`📍 ${t('dialogue.scan.dm.guild', lang, { guild: guildName })}`);
-  }
+  const heroLines = [
+    t('dialogue.scan.dm.hero', lang, {
+      command: commandLabel,
+      channel: channelMention ? t('dialogue.scan.dm.inChannel', lang, { channel: channelMention }) : '',
+    }),
+    ...(guildName ? ['', `📍 ${t('dialogue.scan.dm.guild', lang, { guild: guildName })}`] : []),
+  ];
 
   const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
   const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
@@ -115,30 +113,24 @@ export async function sendScanCompletionDm(opts) {
     { name: `🔍 ${t('dialogue.scan.dm.fields.checked', lang)}`, value: String(checkedCandidates), inline: true },
     { name: `🎯 ${t('dialogue.scan.dm.fields.found', lang)}`, value: String(alts.length), inline: true },
     { name: `⚠️ ${t('dialogue.scan.dm.fields.failed', lang)}`, value: String(result.failedCandidates ?? 0), inline: true },
-  ];
-  if (attemptedCandidates > checkedCandidates) {
-    statFields.push({
+    attemptedCandidates > checkedCandidates ? {
       name: `🔁 ${t('dialogue.scan.dm.fields.attempts', lang)}`,
       value: String(attemptedCandidates),
       inline: true,
-    });
-  }
-  if ((result.scraperApiRequests ?? 0) > 0) {
-    statFields.push({
+    } : null,
+    (result.scraperApiRequests ?? 0) > 0 ? {
       name: `🌐 ${t('dialogue.scan.dm.fields.scraper', lang)}`,
       value: String(result.scraperApiRequests),
       inline: true,
-    });
-  }
-  if (result.abortLabel) {
-    // Abort details deserve a full-width line because the explanation
-    // can run long ("Bible 503 storm: 78% failure across 120 attempts").
-    statFields.push({
+    } : null,
+    // Abort details deserve a full-width line because the explanation can
+    // run long ("Bible 503 storm: 78% failure across 120 attempts").
+    result.abortLabel ? {
       name: `🛑 ${t('dialogue.scan.dm.fields.stopReason', lang)}`,
       value: String(result.abortLabel).slice(0, 1024),
       inline: false,
-    });
-  }
+    } : null,
+  ].filter(Boolean);
 
   const embed = createArtistEmbed(lang)
     .setAuthor({ name: t('dialogue.scan.dm.author', lang) })
@@ -149,17 +141,14 @@ export async function sendScanCompletionDm(opts) {
     .setFooter({ text: t('dialogue.scan.dm.footer', lang) })
     .setTimestamp();
 
-  const components = [];
-  if (resultMessageUrl) {
-    components.push(
-      new ActionRowBuilder().addComponents(
+  const components = resultMessageUrl
+    ? [new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setLabel(t('common.actions.jumpToResult', lang))
           .setStyle(ButtonStyle.Link)
           .setURL(resultMessageUrl)
-      )
-    );
-  }
+      )]
+    : [];
 
   try {
     await user.send({ embeds: [embed], components });

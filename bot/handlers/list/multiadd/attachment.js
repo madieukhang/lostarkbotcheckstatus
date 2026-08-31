@@ -1,16 +1,24 @@
 import { t } from '../../../services/i18n/index.js';
 
 export function validateMultiaddAttachment(file, lang = 'en') {
-  if (!file) {
-    return t('dialogue.multiadd.attachment.required', lang);
-  }
-  if (!file.name?.toLowerCase().endsWith('.xlsx')) {
-    return t('dialogue.multiadd.attachment.wrongType', lang, { name: file.name });
-  }
-  if (file.size > 1024 * 1024) {
-    return t('dialogue.multiadd.attachment.tooLarge', lang, { size: (file.size / 1024).toFixed(1) });
-  }
-  return null;
+  const rules = [
+    {
+      invalid: () => !file,
+      message: () => t('dialogue.multiadd.attachment.required', lang),
+    },
+    {
+      invalid: () => !file?.name?.toLowerCase().endsWith('.xlsx'),
+      message: () => t('dialogue.multiadd.attachment.wrongType', lang, { name: file?.name }),
+    },
+    {
+      invalid: () => file.size > 1024 * 1024,
+      message: () => t('dialogue.multiadd.attachment.tooLarge', lang, {
+        size: (file.size / 1024).toFixed(1),
+      }),
+    },
+  ];
+  const violation = rules.find(({ invalid }) => invalid());
+  return violation?.message() || null;
 }
 
 export async function downloadMultiaddAttachment(file, lang = 'en') {

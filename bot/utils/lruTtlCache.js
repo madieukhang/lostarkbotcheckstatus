@@ -11,14 +11,14 @@ export function createLruTtlCache({
   cloneValue = (value) => value,
   now = Date.now,
 } = {}) {
-  if (typeof normalizeKey !== 'function') {
-    throw new TypeError('createLruTtlCache requires normalizeKey to be a function');
-  }
-  if (typeof cloneValue !== 'function') {
-    throw new TypeError('createLruTtlCache requires cloneValue to be a function');
-  }
-  if (typeof now !== 'function') {
-    throw new TypeError('createLruTtlCache requires now to be a function');
+  for (const [label, value] of [
+    ['normalizeKey', normalizeKey],
+    ['cloneValue', cloneValue],
+    ['now', now],
+  ]) {
+    if (typeof value !== 'function') {
+      throw new TypeError(`createLruTtlCache requires ${label} to be a function`);
+    }
   }
 
   const resolvePositiveSetting = (setting, label) => {

@@ -42,13 +42,20 @@ function countListCheckStates(results) {
   return counts;
 }
 
+const LIST_CHECK_OUTCOME_RULES = [
+  { matches: ({ black }) => black > 0, color: COLORS.danger, titleIcon: '⛔' },
+  { matches: ({ watch }) => watch > 0, color: COLORS.warning, titleIcon: '⚠️' },
+  {
+    matches: ({ white, trusted }) => white > 0 || trusted > 0,
+    color: COLORS.success,
+    titleIcon: '✅',
+  },
+  { matches: () => true, color: COLORS.info, titleIcon: '🔍' },
+];
+
 function resolveListCheckOutcome(counts) {
-  if (counts.black > 0) return { color: COLORS.danger, titleIcon: '⛔' };
-  if (counts.watch > 0) return { color: COLORS.warning, titleIcon: '⚠️' };
-  if (counts.white > 0 || counts.trusted > 0) {
-    return { color: COLORS.success, titleIcon: '✅' };
-  }
-  return { color: COLORS.info, titleIcon: '🔍' };
+  const { color, titleIcon } = LIST_CHECK_OUTCOME_RULES.find(({ matches }) => matches(counts));
+  return { color, titleIcon };
 }
 
 function buildBreakdownTitle(counts, titleIcon, limitedNamesCount, lang) {

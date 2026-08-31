@@ -43,6 +43,95 @@ export function createMultiaddHandlers({ client, services }) {
     multiaddPending.delete(requestId);
   }
 
+  async function handleTemplateAction(interaction, lang) {
+    try {
+      await editPayload(interaction, await buildTemplateReply(lang));
+    } catch (err) {
+      console.error('[multiadd] Template generation failed:', err);
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.multiadd.errors.template', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
+      });
+    }
+  }
+
+  async function handleFileAction(interaction, lang) {
+    const file = interaction.options.getAttachment('file');
+    const validationError = validateMultiaddAttachment(file, lang);
+    if (validationError) {
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: t('dialogue.multiadd.errors.invalidAttachment', lang),
+        description: validationError,
+        lang,
+      });
+      return;
+    }
+
+    const download = await downloadMultiaddAttachment(file, lang);
+    if (!download.ok) {
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        title: t('dialogue.multiadd.errors.download', lang),
+        description: download.content,
+        lang,
+      });
+      return;
+    }
+
+    const parsed = await parseMultiaddFile(download.buffer);
+    if (!parsed.ok) {
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.multiadd.errors.parse', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: parsed.error || t('dialogue.common.unknown', lang), inline: false }],
+        lang,
+      });
+      return;
+    }
+
+    if (parsed.rows.length === 0) {
+      await editEmbed(interaction, buildNoValidRowsEmbed(parsed.errors, lang));
+      return;
+    }
+
+    const requestId = randomUUID();
+    await connectDB();
+    const expiryTimer = setTimeout(() => {
+      multiaddPending.delete(requestId);
+    }, MULTIADD_PENDING_TTL_MS);
+
+    multiaddPending.set(requestId, {
+      rows: parsed.rows,
+      errors: parsed.errors,
+      requesterId: interaction.user.id,
+      requesterTag: interaction.user.tag,
+      requesterName: interaction.user.username,
+      requesterDisplayName: getInteractionDisplayName(interaction),
+      guildId: interaction.guild.id,
+      channelId: interaction.channelId,
+      createdAt: Date.now(),
+      expiryTimer,
+    });
+
+    await editPayload(interaction, buildPreviewReply(parsed, requestId, lang));
+  }
+
+  async function handleUnknownAction(interaction, lang, action) {
+    await editAlert(interaction, {
+      severity: AlertSeverity.ERROR,
+      ...t('dialogue.multiadd.errors.unknownAction', lang, { action }),
+      lang,
+    });
+  }
+
+  const actionHandlers = new Map([
+    ['template', handleTemplateAction],
+    ['file', handleFileAction],
+  ]);
+
   async function handleListMultiaddCommand(interaction) {
     const action = interaction.options.getString('action', true);
     await deferEphemeralReply(interaction);
@@ -57,89 +146,9 @@ export function createMultiaddHandlers({ client, services }) {
       return;
     }
 
-    if (action === 'template') {
-      try {
-        await editPayload(interaction, await buildTemplateReply(lang));
-      } catch (err) {
-        console.error('[multiadd] Template generation failed:', err);
-        await editAlert(interaction, {
-          severity: AlertSeverity.ERROR,
-          ...t('dialogue.multiadd.errors.template', lang),
-          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-          lang,
-        });
-      }
-      return;
-    }
-
-    if (action === 'file') {
-      const file = interaction.options.getAttachment('file');
-      const validationError = validateMultiaddAttachment(file, lang);
-      if (validationError) {
-        await editAlert(interaction, {
-          severity: AlertSeverity.ERROR,
-          title: t('dialogue.multiadd.errors.invalidAttachment', lang),
-          description: validationError,
-          lang,
-        });
-        return;
-      }
-
-      const download = await downloadMultiaddAttachment(file, lang);
-      if (!download.ok) {
-        await editAlert(interaction, {
-          severity: AlertSeverity.ERROR,
-          title: t('dialogue.multiadd.errors.download', lang),
-          description: download.content,
-          lang,
-        });
-        return;
-      }
-
-      const parsed = await parseMultiaddFile(download.buffer);
-      if (!parsed.ok) {
-        await editAlert(interaction, {
-          severity: AlertSeverity.ERROR,
-          ...t('dialogue.multiadd.errors.parse', lang),
-          fields: [{ name: t('dialogue.common.errorField', lang), value: parsed.error || t('dialogue.common.unknown', lang), inline: false }],
-          lang,
-        });
-        return;
-      }
-
-      if (parsed.rows.length === 0) {
-        await editEmbed(interaction, buildNoValidRowsEmbed(parsed.errors, lang));
-        return;
-      }
-
-      const requestId = randomUUID();
-      await connectDB();
-      const expiryTimer = setTimeout(() => {
-        multiaddPending.delete(requestId);
-      }, MULTIADD_PENDING_TTL_MS);
-
-      multiaddPending.set(requestId, {
-        rows: parsed.rows,
-        errors: parsed.errors,
-        requesterId: interaction.user.id,
-        requesterTag: interaction.user.tag,
-        requesterName: interaction.user.username,
-        requesterDisplayName: getInteractionDisplayName(interaction),
-        guildId: interaction.guild.id,
-        channelId: interaction.channelId,
-        createdAt: Date.now(),
-        expiryTimer,
-      });
-
-      await editPayload(interaction, buildPreviewReply(parsed, requestId, lang));
-      return;
-    }
-
-    await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.multiadd.errors.unknownAction', lang, { action }),
-      lang,
-    });
+    const actionHandler = actionHandlers.get(action)
+      || ((targetInteraction, targetLang) => handleUnknownAction(targetInteraction, targetLang, action));
+    await actionHandler(interaction, lang);
   }
 
   const sharedDeps = {

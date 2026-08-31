@@ -67,10 +67,9 @@ export async function handleSearchCommand(interaction) {
 
     suggestions = suggestions.filter((s) => {
       const ilvl = Number(s.itemLevel || 0);
-      if (ilvl < minIlvl) return false;
-      if (maxIlvl !== null && ilvl > maxIlvl) return false;
-      if (classFilter && s.cls !== classFilter) return false;
-      return true;
+      return ilvl >= minIlvl
+        && (maxIlvl === null || ilvl <= maxIlvl)
+        && (!classFilter || s.cls === classFilter);
     });
 
     if (suggestions.length === 0) {

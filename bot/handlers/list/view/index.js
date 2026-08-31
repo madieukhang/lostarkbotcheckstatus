@@ -42,23 +42,35 @@ function resolveTypes(type, scopeFilter) {
   return type === 'all' ? ['black', 'white', 'watch'] : [type];
 }
 
-function buildBlacklistViewQuery({ isOwnerGuild, scopeFilter, viewGuildId }) {
-  if (isOwnerGuild && (!scopeFilter || scopeFilter === 'all')) return {};
-  if (scopeFilter === 'global') {
-    return { $or: [{ scope: 'global' }, { scope: { $exists: false } }] };
-  }
-  if (scopeFilter === 'server') {
-    return isOwnerGuild
-      ? { scope: 'server' }
-      : { scope: 'server', guildId: viewGuildId };
-  }
-  return {
-    $or: [
-      { scope: 'global' },
-      { scope: { $exists: false } },
-      { scope: 'server', guildId: viewGuildId },
-    ],
-  };
+export function buildBlacklistViewQuery(context) {
+  const { isOwnerGuild, scopeFilter, viewGuildId } = context;
+  const rules = [
+    {
+      matches: () => isOwnerGuild && (!scopeFilter || scopeFilter === 'all'),
+      build: () => ({}),
+    },
+    {
+      matches: () => scopeFilter === 'global',
+      build: () => ({ $or: [{ scope: 'global' }, { scope: { $exists: false } }] }),
+    },
+    {
+      matches: () => scopeFilter === 'server',
+      build: () => isOwnerGuild
+        ? { scope: 'server' }
+        : { scope: 'server', guildId: viewGuildId },
+    },
+    {
+      matches: () => true,
+      build: () => ({
+        $or: [
+          { scope: 'global' },
+          { scope: { $exists: false } },
+          { scope: 'server', guildId: viewGuildId },
+        ],
+      }),
+    },
+  ];
+  return rules.find(({ matches }) => matches()).build();
 }
 
 export async function loadListEntries(

@@ -18,23 +18,19 @@ export function entryHasImage(entry) {
 }
 
 export function pickEvidenceEntry(result) {
-  if (entryHasImage(result?.black)) return result.black;
-  if (entryHasImage(result?.white)) return result.white;
-  if (entryHasImage(result?.watch)) return result.watch;
-  return null;
+  return ['black', 'white', 'watch']
+    .map((type) => result?.[type])
+    .find(entryHasImage) || null;
 }
 
 function getEvidenceStyle(result, entry) {
-  const isBlackEvidence = entry === result?.black;
-  const isWhiteEvidence = entry === result?.white;
-
-  if (isBlackEvidence) {
-    return { emoji: '⛔', label: 'blacklist', color: COLORS.danger, type: 'black' };
-  }
-  if (isWhiteEvidence) {
-    return { emoji: '✅', label: 'whitelist', color: COLORS.success, type: 'white' };
-  }
-  return { emoji: '⚠️', label: 'watchlist', color: COLORS.warning, type: 'watch' };
+  const styles = {
+    black: { emoji: '⛔', label: 'blacklist', color: COLORS.danger, type: 'black' },
+    white: { emoji: '✅', label: 'whitelist', color: COLORS.success, type: 'white' },
+    watch: { emoji: '⚠️', label: 'watchlist', color: COLORS.warning, type: 'watch' },
+  };
+  const type = ['black', 'white'].find((candidate) => entry === result?.[candidate]) || 'watch';
+  return styles[type];
 }
 
 export function getFlaggedResultsWithImages(results) {

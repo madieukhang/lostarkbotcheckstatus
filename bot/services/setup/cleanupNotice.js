@@ -20,10 +20,7 @@ import { EmbedBuilder } from 'discord.js';
 
 import { tPick } from '../i18n/index.js';
 import { COLORS } from '../../utils/ui.js';
-
-/** Volume thresholds, mirroring the RaidManage buckets. */
-const TRIVIAL_MAX = 5;
-const NORMAL_MAX = 20;
+import { resolveCleanupVolume } from './cleanupVolume.js';
 
 /**
  * Pick the tone bucket for a sweep result.
@@ -31,11 +28,7 @@ const NORMAL_MAX = 20;
  * @returns {'trivial'|'normal'|'heavy'|null} null when there is nothing to say
  */
 export function resolveCleanupVolumeBucket(deleted) {
-  const count = Number(deleted) || 0;
-  if (count <= 0) return null;
-  if (count <= TRIVIAL_MAX) return 'trivial';
-  if (count <= NORMAL_MAX) return 'normal';
-  return 'heavy';
+  return resolveCleanupVolume(deleted);
 }
 
 /**

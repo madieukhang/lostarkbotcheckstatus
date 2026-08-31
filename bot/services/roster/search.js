@@ -161,6 +161,35 @@ function decodeSearchResponse(json) {
   });
 }
 
+function incrementLookupStat(stats, key) {
+  if (stats) stats[key] += 1;
+}
+
+function resolveCachedSuggestion({
+  cacheKey,
+  requestCache,
+  canCache,
+  stats,
+}) {
+  if (canCache && requestCache.has(cacheKey)) {
+    incrementLookupStat(stats, 'requestCacheHits');
+    return { hit: true, value: requestCache.get(cacheKey) };
+  }
+  if (!cacheKey) return { hit: false, value: null };
+
+  const shared = getSharedSuggestion(cacheKey);
+  if (shared === CACHE_MISS) return { hit: false, value: null };
+
+  incrementLookupStat(stats, 'sharedCacheHits');
+  const sharedRequest = Promise.resolve(shared);
+  if (canCache) requestCache.set(cacheKey, sharedRequest);
+  const result = sharedRequest.then((value) => {
+    if (canCache && value === null) requestCache.delete(cacheKey);
+    return value;
+  });
+  return { hit: true, value: result };
+}
+
 /**
  * Hit the bible name-search endpoint and decode the reference-payload
  * JSON into a `[{name, cls, itemLevel}]` array. Returns null on
@@ -190,23 +219,10 @@ export async function fetchNameSuggestions(name, options = {}) {
     : suggestionCache;
   const canCache = requestCache instanceof Map && Boolean(cacheKey);
   const stats = ensureLookupStats(suggestionContext);
-
-  if (canCache && requestCache.has(cacheKey)) {
-    if (stats) stats.requestCacheHits += 1;
-    return requestCache.get(cacheKey);
-  }
-
-  if (cacheKey) {
-    const shared = getSharedSuggestion(cacheKey);
-    if (shared !== CACHE_MISS) {
-      if (stats) stats.sharedCacheHits += 1;
-      const sharedRequest = Promise.resolve(shared);
-      if (canCache) requestCache.set(cacheKey, sharedRequest);
-      const result = await sharedRequest;
-      if (canCache && result === null) requestCache.delete(cacheKey);
-      return result;
-    }
-  }
+  // Cache resolution must stay synchronous until a new in-flight request is
+  // registered; yielding here lets concurrent calls both observe a miss.
+  const cached = resolveCachedSuggestion({ cacheKey, requestCache, canCache, stats });
+  if (cached.hit) return cached.value;
 
   if (suggestionContext) {
     const maxNetworkLookups = Number.isFinite(suggestionContext.maxNetworkLookups)

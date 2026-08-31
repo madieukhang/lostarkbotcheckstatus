@@ -248,48 +248,43 @@ function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang }) {
 }
 
 function buildDuplicateMetadataFields(existed, isRosterMatch, lang) {
-  const fields = [{
-    name: `${ICONS.search} ${t('dialogue.listAdd.duplicate.matchType', lang)}`,
-    value: t(
-      `dialogue.listAdd.duplicate.${isRosterMatch ? 'rosterAlt' : 'exactName'}`,
-      lang
-    ),
-    inline: true,
-  }];
-  if (isRosterMatch) {
-    fields.push({
+  const fields = [
+    {
+      name: `${ICONS.search} ${t('dialogue.listAdd.duplicate.matchType', lang)}`,
+      value: t(
+        `dialogue.listAdd.duplicate.${isRosterMatch ? 'rosterAlt' : 'exactName'}`,
+        lang
+      ),
+      inline: true,
+    },
+    isRosterMatch ? {
       name: `🧬 ${t('dialogue.listAdd.duplicate.matchedName', lang)}`,
       value: `[${existed.name}](${rosterUrl(existed.name)})`,
       inline: true,
-    });
-  }
-  if (existed.scope) {
-    const scopeKey = existed.scope === 'server' ? 'local' : 'global';
-    fields.push({
+    } : null,
+    existed.scope ? {
       name: `🌐 ${t('dialogue.listAdd.duplicate.scope', lang)}`,
-      value: `[${t(`dialogue.approval.scopeTag.${scopeKey}`, lang)}]`,
+      value: `[${t(`dialogue.approval.scopeTag.${existed.scope === 'server' ? 'local' : 'global'}`, lang)}]`,
       inline: true,
-    });
-  }
+    } : null,
+  ].filter(Boolean);
   appendDuplicateAuditRow(fields, existed, lang);
   return fields;
 }
 
 function appendDuplicateDetailFields(fields, existed, lang) {
-  if (existed.reason) {
-    fields.push({
+  fields.push(...[
+    existed.reason ? {
       name: `📝 ${t('dialogue.listAdd.duplicate.existingReason', lang)}`,
       value: existed.reason.slice(0, 1024),
       inline: false,
-    });
-  }
-  if (existed.raid) {
-    fields.push({
+    } : null,
+    existed.raid ? {
       name: `🗡️ ${t('dialogue.listAdd.duplicate.raid', lang)}`,
       value: `\`${existed.raid}\``,
       inline: true,
-    });
-  }
+    } : null,
+  ].filter(Boolean));
   return fields;
 }
 

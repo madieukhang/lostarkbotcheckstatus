@@ -311,6 +311,41 @@ export async function dispatchCommandRoute(interaction, commandRoutes) {
   return true;
 }
 
+async function dispatchCustomIdRoute(interaction, routes) {
+  const route = findCustomIdRoute(routes, interaction.customId || '');
+  if (route) await handleRoute(interaction, route);
+}
+
+export async function dispatchComponentInteraction(interaction, {
+  buttonRoutes,
+  selectRoutes,
+  modalRoutes,
+  autocompleteRoutes,
+}) {
+  const dispatchers = [
+    {
+      matches: () => interaction.isButton(),
+      handle: () => dispatchCustomIdRoute(interaction, buttonRoutes),
+    },
+    {
+      matches: () => interaction.isStringSelectMenu(),
+      handle: () => dispatchCustomIdRoute(interaction, selectRoutes),
+    },
+    {
+      matches: () => interaction.isModalSubmit(),
+      handle: () => dispatchCustomIdRoute(interaction, modalRoutes),
+    },
+    {
+      matches: () => interaction.isAutocomplete(),
+      handle: () => handleAutocomplete(interaction, autocompleteRoutes),
+    },
+  ];
+  const dispatcher = dispatchers.find(({ matches }) => matches());
+  if (!dispatcher) return false;
+  await dispatcher.handle();
+  return true;
+}
+
 export function createInteractionRouter({ client }) {
   const systemHandlers = createSystemHandlers({
     checkStatus,
@@ -325,30 +360,13 @@ export function createInteractionRouter({ client }) {
   const commandRoutes = createCommandRoutes({ systemHandlers, listHandlers });
 
   return async function handleInteraction(interaction) {
-    const customId = interaction.customId || '';
-
-    if (interaction.isButton()) {
-      const route = findCustomIdRoute(buttonRoutes, customId);
-      if (route) await handleRoute(interaction, route);
-      return;
-    }
-
-    if (interaction.isStringSelectMenu()) {
-      const route = findCustomIdRoute(selectRoutes, customId);
-      if (route) await handleRoute(interaction, route);
-      return;
-    }
-
-    if (interaction.isModalSubmit()) {
-      const route = findCustomIdRoute(modalRoutes, customId);
-      if (route) await handleRoute(interaction, route);
-      return;
-    }
-
-    if (interaction.isAutocomplete()) {
-      await handleAutocomplete(interaction, autocompleteRoutes);
-      return;
-    }
+    const componentHandled = await dispatchComponentInteraction(interaction, {
+      buttonRoutes,
+      selectRoutes,
+      modalRoutes,
+      autocompleteRoutes,
+    });
+    if (componentHandled) return;
 
     if (interaction.type !== InteractionType.ApplicationCommand) return;
 

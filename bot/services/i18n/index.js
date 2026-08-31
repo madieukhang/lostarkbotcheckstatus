@@ -35,18 +35,25 @@ function lookupKey(tree, dottedKey) {
 }
 
 function applyVars(template, vars) {
-  if (Array.isArray(template)) {
-    return template.map((item) => applyVars(item, vars));
+  const templateType = Array.isArray(template) ? 'array' : typeof template;
+  switch (templateType) {
+    case 'array':
+      return template.map((item) => applyVars(item, vars));
+    case 'object':
+      return template
+        ? Object.fromEntries(
+            Object.entries(template).map(([key, value]) => [key, applyVars(value, vars)])
+          )
+        : template;
+    case 'string':
+      return vars
+        ? template.replace(/\{(\w+)\}/g, (match, name) => (
+            Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match
+          ))
+        : template;
+    default:
+      return template;
   }
-  if (template && typeof template === 'object') {
-    return Object.fromEntries(
-      Object.entries(template).map(([key, value]) => [key, applyVars(value, vars)])
-    );
-  }
-  if (typeof template !== 'string' || !vars) return template;
-  return template.replace(/\{(\w+)\}/g, (match, name) => (
-    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match
-  ));
 }
 
 export function t(key, lang = DEFAULT_LANGUAGE, vars = null) {
@@ -98,26 +105,34 @@ export function tPick(key, lang = DEFAULT_LANGUAGE, vars = null, opts = {}) {
 }
 
 function buildUserPreferenceSet(user, language) {
-  const $set = { language };
-  if (user?.username) $set.discordUsername = user.username;
-  if (user?.globalName) $set.discordGlobalName = user.globalName;
-  if (user?.displayName) $set.discordDisplayName = user.displayName;
-  return $set;
+  return Object.fromEntries([
+    ['language', language],
+    ['discordUsername', user?.username],
+    ['discordGlobalName', user?.globalName],
+    ['discordDisplayName', user?.displayName],
+  ].filter(([, value]) => Boolean(value)));
 }
 
-export async function getUserLanguage(discordId, { UserPreferenceModel } = {}) {
-  if (!discordId) return DEFAULT_LANGUAGE;
-  if (userLanguageCache.has(discordId)) return userLanguageCache.get(discordId);
-  if (!UserPreferenceModel) return DEFAULT_LANGUAGE;
+async function getStoredLanguage(id, { cache, Model, idField }) {
+  const cached = id ? cache.get(id) : undefined;
+  if (!id || cached || !Model) return cached || DEFAULT_LANGUAGE;
 
   try {
-    const doc = await UserPreferenceModel.findOne({ discordId }, { language: 1 }).lean();
+    const doc = await Model.findOne({ [idField]: id }, { language: 1 }).lean();
     const lang = normalizeLanguage(doc?.language);
-    userLanguageCache.set(discordId, lang);
+    cache.set(id, lang);
     return lang;
   } catch {
     return DEFAULT_LANGUAGE;
   }
+}
+
+export async function getUserLanguage(discordId, { UserPreferenceModel } = {}) {
+  return getStoredLanguage(discordId, {
+    cache: userLanguageCache,
+    Model: UserPreferenceModel,
+    idField: 'discordId',
+  });
 }
 
 export function getCachedUserLanguage(discordId) {
@@ -146,18 +161,11 @@ export function clearUserLanguageCache() {
 }
 
 export async function getGuildLanguage(guildId, { GuildConfigModel } = {}) {
-  if (!guildId) return DEFAULT_LANGUAGE;
-  if (guildLanguageCache.has(guildId)) return guildLanguageCache.get(guildId);
-  if (!GuildConfigModel) return DEFAULT_LANGUAGE;
-
-  try {
-    const doc = await GuildConfigModel.findOne({ guildId }, { language: 1 }).lean();
-    const lang = normalizeLanguage(doc?.language);
-    guildLanguageCache.set(guildId, lang);
-    return lang;
-  } catch {
-    return DEFAULT_LANGUAGE;
-  }
+  return getStoredLanguage(guildId, {
+    cache: guildLanguageCache,
+    Model: GuildConfigModel,
+    idField: 'guildId',
+  });
 }
 
 export async function setGuildLanguage(guildId, lang, { GuildConfigModel } = {}) {

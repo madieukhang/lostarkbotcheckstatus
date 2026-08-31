@@ -23,6 +23,21 @@ const LOOKUP_RESOLVED = 'resolved';
 const LOOKUP_UNRESOLVED = 'unresolved';
 const LOOKUP_UNAVAILABLE = 'unavailable';
 
+const SUGGESTION_MATCH_LOGGERS = {
+  diacritic: ({ originalName, chosenName }) =>
+    `[listcheck] Diacritic-tolerant match: OCR'd "${originalName}" -> canonical "${chosenName}"`,
+  fuzzy: ({ originalName, chosenName, distance, maxDistance }) =>
+    `[listcheck] Fuzzy match (edit dist ${distance} <= ${maxDistance}): OCR'd "${originalName}" -> canonical "${chosenName}"`,
+  lookalike: ({ originalName, chosenName }) =>
+    `[listcheck] Look-alike match: OCR'd "${originalName}" -> canonical "${chosenName}"`,
+  default: ({ originalName, chosenName }) =>
+    `[listcheck] Search canonical match: OCR'd "${originalName}" -> canonical "${chosenName}"`,
+};
+
+export function formatSuggestionMatchLog(reason, context) {
+  return (SUGGESTION_MATCH_LOGGERS[reason] || SUGGESTION_MATCH_LOGGERS.default)(context);
+}
+
 export async function enrichListCheckResults(
   results,
   { suggestionCache, suggestionContext } = {},
@@ -65,18 +80,16 @@ export async function enrichListCheckResults(
     { classId, itemLevel, combatScore, world = '' },
     verificationSource,
   ) {
-    item.identityVerified = true;
-    item.identityVerificationSource = verificationSource;
-    if (classId) {
-      item.snapClassId = classId;
-      item.snapClassName = getClassName(classId);
-    }
-    if (typeof itemLevel === 'number' && itemLevel > 0) {
-      item.snapItemLevel = itemLevel;
-    }
-    if (combatScore && combatScore !== '?') {
-      item.snapCombatScore = String(combatScore);
-    }
+    Object.assign(item, {
+      identityVerified: true,
+      identityVerificationSource: verificationSource,
+      ...(classId ? {
+        snapClassId: classId,
+        snapClassName: getClassName(classId),
+      } : {}),
+      ...(typeof itemLevel === 'number' && itemLevel > 0 ? { snapItemLevel: itemLevel } : {}),
+      ...(combatScore && combatScore !== '?' ? { snapCombatScore: String(combatScore) } : {}),
+    });
     pendingSnapshots.set(String(item.name).toLowerCase(), {
       name: item.name,
       itemLevel,
@@ -96,23 +109,12 @@ export async function enrichListCheckResults(
     if (!chosenName) return LOOKUP_UNRESOLVED;
 
     if (chosenName !== originalName) {
-      if (reason === 'diacritic') {
-        console.log(
-          `[listcheck] Diacritic-tolerant match: OCR'd "${originalName}" -> canonical "${chosenName}"`
-        );
-      } else if (reason === 'fuzzy') {
-        console.log(
-          `[listcheck] Fuzzy match (edit dist ${distance} <= ${maxDistance}): OCR'd "${originalName}" -> canonical "${chosenName}"`
-        );
-      } else if (reason === 'lookalike') {
-        console.log(
-          `[listcheck] Look-alike match: OCR'd "${originalName}" -> canonical "${chosenName}"`
-        );
-      } else {
-        console.log(
-          `[listcheck] Search canonical match: OCR'd "${originalName}" -> canonical "${chosenName}"`
-        );
-      }
+      console.log(formatSuggestionMatchLog(reason, {
+        originalName,
+        chosenName,
+        distance,
+        maxDistance,
+      }));
       item.name = chosenName;
     }
 

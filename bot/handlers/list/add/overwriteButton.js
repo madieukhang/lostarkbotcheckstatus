@@ -22,6 +22,31 @@ import {
   buildApprovalResultRow,
 } from '../helpers.js';
 
+function buildDuplicateLookupQuery(payload) {
+  const nameMatch = buildNameRosterQuery(normalizeCharacterName(payload.name));
+  if (payload.type !== 'black') return nameMatch;
+
+  const entryScope = payload.scope || 'global';
+  const scopeMatch = entryScope === 'server'
+    ? { scope: 'server', guildId: payload.guildId || '' }
+    : { $or: [{ scope: 'global' }, { scope: { $exists: false } }] };
+  return { $and: [nameMatch, scopeMatch] };
+}
+
+export async function findDuplicateEntry(model, payload) {
+  const lookupStrategies = [
+    () => payload.duplicateEntryId ? model.findById(payload.duplicateEntryId) : null,
+    () => model.findOne(buildDuplicateLookupQuery(payload))
+      .collation({ locale: 'en', strength: 2 }),
+  ];
+
+  for (const lookup of lookupStrategies) {
+    const entry = await lookup();
+    if (entry) return entry;
+  }
+  return null;
+}
+
 /**
  * Build the Overwrite / Keep-existing button handler for the duplicate
  * branch of /la-list add.
@@ -84,25 +109,9 @@ export function createListAddOverwriteButtonHandler({
     try {
       const { model } = getListContext(payload.type);
 
-      // Find the duplicate entry to update
-      let dupeEntry;
-      if (payload.duplicateEntryId) {
-        dupeEntry = await model.findById(payload.duplicateEntryId);
-      }
-      if (!dupeEntry) {
-        // Fallback: scope-aware find
-        const name = normalizeCharacterName(payload.name);
-        const nameMatch = buildNameRosterQuery(name);
-        if (payload.type === 'black') {
-          const entryScope = payload.scope || 'global';
-          const scopeMatch = entryScope === 'server'
-            ? { scope: 'server', guildId: payload.guildId || '' }
-            : { $or: [{ scope: 'global' }, { scope: { $exists: false } }] };
-          dupeEntry = await model.findOne({ $and: [nameMatch, scopeMatch] }).collation({ locale: 'en', strength: 2 });
-        } else {
-          dupeEntry = await model.findOne(nameMatch).collation({ locale: 'en', strength: 2 });
-        }
-      }
+      // Prefer the stored duplicate id, then fall back to a scope-aware name
+      // lookup when an older pending approval does not carry that id.
+      const dupeEntry = await findDuplicateEntry(model, payload);
 
       if (!dupeEntry) {
         await editPayload(interaction, {

@@ -86,10 +86,11 @@ export function buildDiaeresisDigraphVariants(value) {
 function buildSingleVisualSubstitutionVariants(value) {
   const source = String(value || '');
   const variants = new Set();
+  const replacements = { q: 'y', Q: 'Y' };
   for (let i = 1; i < source.length; i += 1) {
-    const ch = source[i];
-    if (ch === 'q') variants.add(`${source.slice(0, i)}y${source.slice(i + 1)}`);
-    if (ch === 'Q') variants.add(`${source.slice(0, i)}Y${source.slice(i + 1)}`);
+    const replacement = replacements[source[i]];
+    if (!replacement) continue;
+    variants.add(`${source.slice(0, i)}${replacement}${source.slice(i + 1)}`);
   }
   return [...variants].filter((variant) => variant !== source);
 }
@@ -271,12 +272,12 @@ export async function recoverViaPrefixIndel(name, options = {}) {
   const folded = asciiFoldName(name);
   // Need >=5 chars so a short prefix still leaves room for the indel.
   if (folded.length < 5) return null;
-  return recoverViaPrefixCandidates(name, (source, cand) => {
-    if (!cand) return false;
-    if (Math.abs(cand.length - folded.length) !== 1) return false;
-    if (levenshteinDistance(source, cand) !== 1) return false;
-    return isSubsequence(source, cand) || isSubsequence(cand, source);
-  }, options);
+  return recoverViaPrefixCandidates(name, (source, cand) => (
+    Boolean(cand)
+    && Math.abs(cand.length - folded.length) === 1
+    && levenshteinDistance(source, cand) === 1
+    && (isSubsequence(source, cand) || isSubsequence(cand, source))
+  ), options);
 }
 
 /**

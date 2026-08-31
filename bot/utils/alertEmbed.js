@@ -88,30 +88,20 @@ export function buildAlertEmbed({
   const finalColor = color ?? config.color;
 
   const embed = new EmbedBuilder().setColor(finalColor);
-
-  if (title) {
-    embed.setTitle(finalIcon ? `${finalIcon}  ${title}` : title);
-  }
-
-  if (description) {
-    embed.setDescription(description);
-  }
-
-  if (fields.length > 0) {
-    // Filter out fields with empty values · Discord rejects them
-    const cleanFields = fields.filter((f) => f.value !== undefined && f.value !== null && String(f.value).trim() !== '');
-    if (cleanFields.length > 0) {
-      embed.addFields(cleanFields);
-    }
-  }
-
-  if (footer) {
-    embed.setFooter({ text: footer });
-  }
-
-  if (timestamp) {
-    embed.setTimestamp(new Date());
-  }
+  // Filter out fields with empty values · Discord rejects them.
+  const cleanFields = fields.filter(
+    (field) => field.value !== undefined
+      && field.value !== null
+      && String(field.value).trim() !== ''
+  );
+  const mutations = [
+    { enabled: Boolean(title), apply: () => embed.setTitle(finalIcon ? `${finalIcon}  ${title}` : title) },
+    { enabled: Boolean(description), apply: () => embed.setDescription(description) },
+    { enabled: cleanFields.length > 0, apply: () => embed.addFields(cleanFields) },
+    { enabled: Boolean(footer), apply: () => embed.setFooter({ text: footer }) },
+    { enabled: timestamp, apply: () => embed.setTimestamp(new Date()) },
+  ];
+  mutations.filter(({ enabled }) => enabled).forEach(({ apply }) => apply());
 
   return decorateArtistEmbed(embed, { lang });
 }

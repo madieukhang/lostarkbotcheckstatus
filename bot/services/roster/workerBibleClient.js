@@ -32,6 +32,19 @@ function headersFromStored(stored) {
   return stored;
 }
 
+const WORKER_TERMINAL_STATUS_HANDLERS = {
+  done: ({ fresh }) => new Response(fresh.result?.body || null, {
+    status: fresh.result?.status ?? 0,
+    headers: headersFromStored(fresh.result?.headers),
+  }),
+  failed: ({ fresh }) => {
+    throw new Error(`Worker fetch failed: ${fresh.error || 'unknown error'}`);
+  },
+  cancelled: ({ jobId }) => {
+    throw new Error(`Worker job ${jobId} was cancelled.`);
+  },
+};
+
 // Strip anything the worker cannot use or that won't survive the
 // MongoDB round trip. Worker re-creates AbortSignal from timeoutMs.
 function sanitizeOptions(options = {}) {
@@ -117,23 +130,10 @@ export function createWorkerBibleClient({
             `Worker job ${job._id} disappeared (TTL expired or manually deleted).`
           );
         }
-        if (fresh.status === 'done') {
-          const headers = headersFromStored(fresh.result?.headers);
-          // Status 204/205/304 disallow a non-null body; coerce empty
-          // body strings to null so the Response constructor accepts
-          // them on every status code worker may have written.
-          const body = fresh.result?.body ? fresh.result.body : null;
-          return new Response(body, {
-            status: fresh.result?.status ?? 0,
-            headers,
-          });
-        }
-        if (fresh.status === 'failed') {
-          throw new Error(`Worker fetch failed: ${fresh.error || 'unknown error'}`);
-        }
-        if (fresh.status === 'cancelled') {
-          throw new Error(`Worker job ${job._id} was cancelled.`);
-        }
+        // Status 204/205/304 disallow a non-null body; the done handler
+        // coerces empty body strings to null before constructing Response.
+        const terminalHandler = WORKER_TERMINAL_STATUS_HANDLERS[fresh.status];
+        if (terminalHandler) return terminalHandler({ fresh, jobId: job._id });
         await sleep(pollIntervalMs);
       }
 

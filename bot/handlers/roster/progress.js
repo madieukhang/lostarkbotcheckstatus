@@ -179,19 +179,20 @@ export function formatDeepScanStats(altResult, lang = 'en') {
 
   const checked = altResult.checkedCandidates ?? altResult.scannedCandidates ?? 0;
   const attempted = altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0;
-  const parts = [t('dialogue.scan.stats.checked', lang, { count: checked })];
-  if (attempted > checked) {
-    parts.push(t('dialogue.scan.stats.attempted', lang, { count: attempted }));
-  }
-  if ((altResult.skippedCandidates ?? 0) > 0) {
-    parts.push(t('dialogue.scan.stats.skipped', lang, { count: altResult.skippedCandidates }));
-  }
-  if ((altResult.failedCandidates ?? 0) > 0) {
-    parts.push(t('dialogue.scan.stats.failed', lang, { count: altResult.failedCandidates }));
-  }
-  if (altResult.concurrency) {
-    parts.push(t('dialogue.scan.stats.concurrency', lang, { count: altResult.concurrency }));
-  }
-  parts.push(t('dialogue.scan.stats.scraper', lang, { state: t(`dialogue.scan.stats.${altResult.usedScraperApiForCandidates ? 'on' : 'off'}`, lang) }));
+  const optionalMetrics = [
+    { visible: attempted > checked, key: 'attempted', count: attempted },
+    { visible: (altResult.skippedCandidates ?? 0) > 0, key: 'skipped', count: altResult.skippedCandidates },
+    { visible: (altResult.failedCandidates ?? 0) > 0, key: 'failed', count: altResult.failedCandidates },
+    { visible: Boolean(altResult.concurrency), key: 'concurrency', count: altResult.concurrency },
+  ];
+  const parts = [
+    t('dialogue.scan.stats.checked', lang, { count: checked }),
+    ...optionalMetrics
+      .filter(({ visible }) => visible)
+      .map(({ key, count }) => t(`dialogue.scan.stats.${key}`, lang, { count })),
+    t('dialogue.scan.stats.scraper', lang, {
+      state: t(`dialogue.scan.stats.${altResult.usedScraperApiForCandidates ? 'on' : 'off'}`, lang),
+    }),
+  ];
   return parts.join(' · ');
 }

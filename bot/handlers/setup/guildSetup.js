@@ -729,18 +729,25 @@ async function handleSetupLanguage(interaction) {
     label: languageEntry.label,
   })}`;
   const refreshes = [];
-  if (guildConfig?.autoCheckChannelId) {
-    refreshes.push({
+  const refreshSpecs = [
+    {
+      enabled: Boolean(guildConfig?.autoCheckChannelId),
       surface: t('dialogue.setup.purpose.autoCheck', language),
-      context: await resolveWelcomePinContext(interaction, guildConfig),
+      resolveContext: () => resolveWelcomePinContext(interaction, guildConfig),
       post: postSetupWelcome,
-    });
-  }
-  if (guildConfig?.listNotifyChannelId) {
-    refreshes.push({
+    },
+    {
+      enabled: Boolean(guildConfig?.listNotifyChannelId),
       surface: t('dialogue.setup.purpose.notification', language),
-      context: await resolveListNotifyWelcomePinContext(interaction, guildConfig),
+      resolveContext: () => resolveListNotifyWelcomePinContext(interaction, guildConfig),
       post: postListNotifySetupWelcome,
+    },
+  ];
+  for (const spec of refreshSpecs.filter(({ enabled }) => enabled)) {
+    refreshes.push({
+      surface: spec.surface,
+      context: await spec.resolveContext(),
+      post: spec.post,
     });
   }
 

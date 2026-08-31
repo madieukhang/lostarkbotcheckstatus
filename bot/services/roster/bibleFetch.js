@@ -11,6 +11,12 @@ import config from '../../config.js';
 import { recordScraperApiRequest } from '../../utils/scraperApiUsage.js';
 import { FETCH_HEADERS } from './bibleHeaders.js';
 
+const SCRAPER_ATTEMPT_STATE_RULES = Object.freeze([
+  { state: 'network-error', matches: ({ error }) => Boolean(error) },
+  { state: 'dead-key', matches: ({ keyDead }) => keyDead },
+  { state: 'success', matches: ({ res }) => res.ok },
+]);
+
 export { FETCH_HEADERS };
 
 /**
@@ -65,6 +71,11 @@ async function tryScraperApi(url, key, keyIndex) {
   }
 }
 
+function scraperAttemptState({ res, keyDead, error }) {
+  const context = { res, keyDead, error };
+  return SCRAPER_ATTEMPT_STATE_RULES.find(({ matches }) => matches(context))?.state || 'response';
+}
+
 async function fetchViaScraperApi(url) {
   const keys = config.scraperApiKeys || [];
   if (keys.length === 0) return null;
@@ -79,13 +90,19 @@ async function fetchViaScraperApi(url) {
     }
 
     const { res, keyDead, error } = await tryScraperApi(url, key, i);
-    if (error) { errors.push(`Key #${i + 1}: ${error.message}`); continue; }
-    if (keyDead) { errors.push(`Key #${i + 1}: HTTP ${res.status}`); continue; }
-    if (res.ok) {
-      console.log(`[scraperapi] Key #${i + 1} success`);
-      return res;
+    switch (scraperAttemptState({ res, keyDead, error })) {
+      case 'network-error':
+        errors.push(`Key #${i + 1}: ${error.message}`);
+        continue;
+      case 'dead-key':
+        errors.push(`Key #${i + 1}: HTTP ${res.status}`);
+        continue;
+      case 'success':
+        console.log(`[scraperapi] Key #${i + 1} success`);
+        return res;
+      default:
+        return res;
     }
-    return res;
   }
 
   console.error(`[scraperapi] All ${keys.length} key(s) failed: ${errors.join(' | ')}`);

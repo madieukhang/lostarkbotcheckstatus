@@ -59,15 +59,11 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     }
 
     // Resolve the freshest possible URL: rehost-aware first, legacy fallback.
-    let freshUrl = null;
-    let isLegacy = false;
-    if (payload.imageMessageId && payload.imageChannelId) {
-      freshUrl = await refreshImageUrl(payload.imageMessageId, payload.imageChannelId, client);
-    }
-    if (!freshUrl && payload.imageUrl) {
-      freshUrl = payload.imageUrl;
-      isLegacy = true;
-    }
+    const rehostedUrl = payload.imageMessageId && payload.imageChannelId
+      ? await refreshImageUrl(payload.imageMessageId, payload.imageChannelId, client)
+      : null;
+    const freshUrl = rehostedUrl || payload.imageUrl || null;
+    const isLegacy = !rehostedUrl && Boolean(payload.imageUrl);
 
     if (!freshUrl) {
       await editAlert(interaction, {

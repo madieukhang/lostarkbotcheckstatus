@@ -2,15 +2,12 @@ import { EmbedBuilder } from 'discord.js';
 
 import { tPick } from '../i18n/index.js';
 import { COLORS } from '../../utils/ui.js';
+import { resolveCleanupVolume } from './cleanupVolume.js';
 
 export const LIST_NOTIFY_CLEANUP_NOTICE_TTL_MS = 5 * 60 * 1000;
 
 export function resolveListNotifyCleanupVolumeBucket(deleted) {
-  const count = Number(deleted) || 0;
-  if (count <= 0) return 'empty';
-  if (count <= 5) return 'trivial';
-  if (count <= 20) return 'normal';
-  return 'heavy';
+  return resolveCleanupVolume(deleted, { emptyBucket: 'empty' });
 }
 
 export function buildListNotifyCleanupNoticeEmbed(

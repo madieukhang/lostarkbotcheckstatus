@@ -8,6 +8,7 @@ process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/test';
 let createButtonRoutes;
 let createCommandRoutes;
 let createSelectRoutes;
+let dispatchComponentInteraction;
 let dispatchCommandRoute;
 let findCustomIdRoute;
 
@@ -16,9 +17,31 @@ test.before(async () => {
     createButtonRoutes,
     createCommandRoutes,
     createSelectRoutes,
+    dispatchComponentInteraction,
     dispatchCommandRoute,
     findCustomIdRoute,
   } = await import('../bot/app/interaction-router.js'));
+});
+
+test('interaction router component dispatch table selects exactly one interaction kind', async () => {
+  const calls = [];
+  const interaction = {
+    customId: 'button:123',
+    isButton: () => true,
+    isStringSelectMenu: () => false,
+    isModalSubmit: () => false,
+    isAutocomplete: () => false,
+  };
+
+  const handled = await dispatchComponentInteraction(interaction, {
+    buttonRoutes: [{ prefix: 'button:', prefixes: ['button:'], handle: async () => calls.push('button') }],
+    selectRoutes: [{ prefixes: ['select:'], handle: async () => calls.push('select') }],
+    modalRoutes: [],
+    autocompleteRoutes: {},
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(calls, ['button']);
 });
 
 test('interaction router button table dispatches list-enrich actions by customId prefix', async () => {

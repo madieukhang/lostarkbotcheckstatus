@@ -34,6 +34,51 @@ import {
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getListContext } from '../helpers.js';
 
+const REMOVE_COLOR_BY_TYPE = {
+  black: 0xed4245,
+  white: 0x57f287,
+  watch: 0xfee75c,
+};
+
+const REMOVE_RESULT_PRESENTATIONS = [
+  {
+    matches: ({ oks, fails }) => fails.length > 0 && oks.length === 0,
+    resolve: ({ name, lang }) => ({
+      color: 0xfee75c,
+      titleIcon: '⚠️',
+      title: t('dialogue.remove.titles.blocked', lang, { name }),
+    }),
+  },
+  {
+    matches: ({ oks, fails }) => oks.length === 1 && fails.length === 0,
+    resolve: ({ oks, name, lang }) => ({
+      color: REMOVE_COLOR_BY_TYPE[oks[0].type] || 0xfee75c,
+      titleIcon: oks[0].icon,
+      title: t('dialogue.remove.titles.one', lang, { list: oks[0].label, name }),
+    }),
+  },
+  {
+    matches: ({ oks }) => oks.length > 1,
+    resolve: ({ oks, name, lang }) => ({
+      color: 0x57f287,
+      titleIcon: '🗑️',
+      title: t('dialogue.remove.titles.many', lang, { count: oks.length, name }),
+    }),
+  },
+  {
+    matches: () => true,
+    resolve: ({ name, lang }) => ({
+      color: 0xfee75c,
+      titleIcon: '⚠️',
+      title: t('dialogue.remove.titles.mixed', lang, { name }),
+    }),
+  },
+];
+
+export function resolveRemoveResultPresentation(context) {
+  return REMOVE_RESULT_PRESENTATIONS.find(({ matches }) => matches(context)).resolve(context);
+}
+
 /**
  * Build the /la-list remove handler bag.
  * @param {object} deps
@@ -124,26 +169,12 @@ export function createRemoveHandlers({ services }) {
         const oks = outcomes.filter((o) => o.ok);
         const fails = outcomes.filter((o) => !o.ok);
 
-        let color;
-        let titleIcon;
-        let title;
-        if (fails.length > 0 && oks.length === 0) {
-          color = 0xfee75c;
-          titleIcon = '⚠️';
-          title = t('dialogue.remove.titles.blocked', lang, { name });
-        } else if (oks.length === 1 && fails.length === 0) {
-          color = oks[0].type === 'black' ? 0xed4245 : oks[0].type === 'white' ? 0x57f287 : 0xfee75c;
-          titleIcon = oks[0].icon;
-          title = t('dialogue.remove.titles.one', lang, { list: oks[0].label, name });
-        } else if (oks.length > 1) {
-          color = 0x57f287;
-          titleIcon = '🗑️';
-          title = t('dialogue.remove.titles.many', lang, { count: oks.length, name });
-        } else {
-          color = 0xfee75c;
-          titleIcon = '⚠️';
-          title = t('dialogue.remove.titles.mixed', lang, { name });
-        }
+        const { color, titleIcon, title } = resolveRemoveResultPresentation({
+          oks,
+          fails,
+          name,
+          lang,
+        });
 
         const sections = [];
         if (oks.length > 0) {

@@ -54,12 +54,10 @@ export async function cleanupChannelMessages(
       }
     }
 
-    if (fetched.size < 100) break;
-    if (!before) {
-      truncated = true;
-      break;
-    }
-    if (page === maxPages - 1) truncated = true;
+    const pageComplete = fetched.size < 100;
+    const cursorMissing = !before;
+    truncated ||= !pageComplete && (cursorMissing || page === maxPages - 1);
+    if (pageComplete || cursorMissing) break;
   }
 
   return { deleted, failed, scanned, truncated, failureReasons };

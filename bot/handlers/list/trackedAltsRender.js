@@ -30,10 +30,7 @@ function lcKey(value) {
 }
 
 function classNameFromRecord(record) {
-  if (!record) return '';
-  if (record.className) return record.className;
-  if (record.classId) return getClassName(record.classId);
-  return '';
+  return record?.className || (record?.classId ? getClassName(record.classId) : '');
 }
 
 function parsePositiveNumber(value) {
