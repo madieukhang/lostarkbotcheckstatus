@@ -24,12 +24,15 @@ test('broadcast fields keep optional metadata ordered without empty placeholders
     lang: 'en',
   });
 
-  assert.equal(fields.length, 7);
+  // Reason, four inline metadata fields padded to a whole three-column
+  // row, then changes and the roster list.
+  assert.equal(fields.length, 9);
   assert.equal(fields[1].value, '`Aegir`');
   assert.equal(fields[3].value, '`1790.00`');
   assert.equal(fields[4].value, '`6180.57`');
-  assert.match(fields[5].value, /old → new/);
-  assert.equal(fields[6], rosterField);
+  assert.equal(fields.filter((field) => field.inline).length % 3, 0);
+  assert.match(fields[7].value, /old → new/);
+  assert.equal(fields[8], rosterField);
 
   const minimal = buildBroadcastFields({
     entry: { name: 'Main', reason: '' },

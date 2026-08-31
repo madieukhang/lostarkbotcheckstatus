@@ -14,6 +14,10 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Added
+- An embedded evidence screenshot now gets a **📎 Evidence** heading above it, on every card that shows one inline: check detail, evidence detail, `/la-list add` success and its approval card, and `/la-list edit` success. Discord gives an embed image no caption of its own, so it used to run straight on from whatever field came last, usually the roster list. Cards that put evidence behind a button are untouched, since there is no image on the card to caption.
+- The list-change broadcast carries **🌍 Server** too, and its inline metadata pads out to whole three-column rows. With four fields (Raid / Added / ilvl / CP) Discord left CP alone on a second row and stretched it across the card; `padInlineRow` in `utils/ui.js` is now the one helper every card uses for this.
+
+### Added
 - `RosterSnapshot` stores the server (`world`), written by both `/la-roster` and the roster fetch behind `/la-list add` and the checks. It is only written when known, so a scrape that could not read it never blanks a value an earlier one stored, and older snapshots simply have none until their next fetch.
 - The check-result detail card gained a **🌍 Server** field, which also completes its second inline row: Added by used to sit next to CP with an empty third slot, so Discord stretched the pair across the card. Its roster list now counts the entry itself and is labelled 🧬 Danh sách roster, matching the evidence and broadcast cards it sits beside.
 - `/la-roster` names the in-game server the roster belongs to: **🌍 Server: `Thaemine`**, above the top-character line. lostark.bible calls the field `world` and embeds it in the same SSR payload the page already carries stronghold and guild in, so reading it costs no extra request. The line is omitted when the page does not report one.

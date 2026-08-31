@@ -382,6 +382,14 @@ function applyEvidenceHeader(embed, entry, snapshot, { headline, viaName, statMa
 
 function applyEvidenceMedia(embed, entry, displayUrl, { attachImage, lang }) {
   if (attachImage && displayUrl) {
+    // A heading for the image, so it does not run straight on from the
+    // roster list above it. Notice mode sends evidence to a button and
+    // never reaches here, which is right · there is nothing to caption.
+    embed.addFields({
+      name: t('listView.evidence.attached', lang),
+      value: t('listView.evidence.attachedHint', lang),
+      inline: false,
+    });
     embed.setImage(displayUrl);
     return;
   }

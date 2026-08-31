@@ -14,7 +14,7 @@ import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
 import { upsertRosterSnapshots } from '../../../services/roster/rosterSnapshots.js';
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
-import { COLORS, relativeTime } from '../../../utils/ui.js';
+import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { getListContext, listTypeIcon } from '../helpers.js';
 import { buildBroadcastEvidenceComponents } from '../evidence/broadcastButton.js';
@@ -142,12 +142,8 @@ export function buildTrackedAltsField(entry, statMap = new Map(), options = {}) 
 
 export function buildBroadcastFields({ entry, action, changes = [], snap, altsField, lang = 'en' }) {
   const changesText = changes.join('\n');
-  return [
-    {
-      name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
-      value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
-      inline: false,
-    },
+  const world = String(snap?.world || '').trim();
+  const inlineFields = [
     entry.raid
       ? { name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`, value: `\`${entry.raid}\``, inline: true }
       : null,
@@ -164,6 +160,18 @@ export function buildBroadcastFields({ entry, action, changes = [], snap, altsFi
     snap?.combatScore
       ? { name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`, value: `\`${snap.combatScore}\``, inline: true }
       : null,
+    world
+      ? { name: `🌍 ${t('dialogue.roster.server', lang)}`, value: `\`${world}\``, inline: true }
+      : null,
+  ].filter(Boolean);
+
+  return [
+    {
+      name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
+      value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
+      inline: false,
+    },
+    ...padInlineRow(inlineFields),
     action === 'edited' && changesText
       ? {
           name: `🔁 ${t('dialogue.listEdit.success.changes', lang, { count: changes.length })}`,

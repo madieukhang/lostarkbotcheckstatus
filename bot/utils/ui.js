@@ -68,6 +68,35 @@ export const ICONS = Object.freeze({
 });
 
 /**
+ * Zero-width-space field used to fill an inline row. Frozen so a caller
+ * cannot mutate the shared object out from under every other card.
+ */
+const INLINE_SPACER = Object.freeze({ name: '​', value: '​', inline: true });
+
+/**
+ * Pad a run of inline fields out to a whole three-column row.
+ *
+ * Discord lays inline fields three to a line and stretches whatever is
+ * left over, so four of them render as a row of three plus one banner
+ * and two render as an awkward half-and-half. A single inline field
+ * already fills its row on its own, so it is left alone.
+ *
+ * Most cards here build their fields conditionally, which means the
+ * count is only known after they are assembled · pad by count rather
+ * than at fixed positions.
+ *
+ * @param {Array<object>} inlineFields - fields already marked inline
+ * @returns {Array<object>} the same fields plus any spacers needed
+ */
+export function padInlineRow(inlineFields) {
+  const padded = [...inlineFields];
+  if (padded.length > 1) {
+    while (padded.length % 3 !== 0) padded.push(INLINE_SPACER);
+  }
+  return padded;
+}
+
+/**
  * Discord native relative timestamp (`<t:UNIX:R>`). Renders client-side
  * and ticks live without a message edit, so a "5 minutes ago" footer
  * stays accurate over the embed's lifetime. Returns `''` for falsy or

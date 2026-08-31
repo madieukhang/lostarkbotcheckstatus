@@ -9,7 +9,7 @@ import { t } from '../../../services/i18n/index.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { getAddedByDisplay } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
-import { ICONS, relativeTime } from '../../../utils/ui.js';
+import { ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
 import { renderTrackedAltsField } from '../trackedAltsRender.js';
 
@@ -37,12 +37,7 @@ function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang }) {
   const notAvailable = t('dialogue.broadcast.notAvailable', lang);
   const itemLevel = parsePositiveNumber(snapshot?.itemLevel);
   const combatScore = String(snapshot?.combatScore || '').trim();
-  return [
-    {
-      name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
-      value: (entry.reason || notAvailable).slice(0, 1024),
-      inline: false,
-    },
+  const inlineFields = [
     {
       name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`,
       value: entry.raid ? `\`${entry.raid}\`` : notAvailable,
@@ -71,14 +66,24 @@ function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang }) {
           inline: true,
         }
       : null,
-    // Server completes the second row. Without it Added by sat alone
-    // beside CP and Discord stretched the pair across the card.
     {
       name: `🌍 ${t('dialogue.roster.server', lang)}`,
       value: String(snapshot?.world || '').trim() ? `\`${snapshot.world}\`` : notAvailable,
       inline: true,
     },
   ].filter(Boolean);
+
+  return [
+    {
+      name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
+      value: (entry.reason || notAvailable).slice(0, 1024),
+      inline: false,
+    },
+    // Added by is optional, so the inline count is 5 or 6 depending on
+    // the caller · padding by count keeps both cases on whole rows
+    // instead of leaving a stretched banner at the end.
+    ...padInlineRow(inlineFields),
+  ];
 }
 
 function buildTrackedAltsField(entry, statMap, lang) {
@@ -97,6 +102,15 @@ function buildTrackedAltsField(entry, statMap, lang) {
 
 function applyCheckEvidence(embed, entry, displayUrl, lang) {
   if (displayUrl) {
+    // An embedded image has no caption of its own, so it butted straight
+    // up against whichever field came last. A heading field gives it the
+    // same footing as the roster list above it. Cards that put evidence
+    // behind a button need none of this · there is no image to caption.
+    embed.addFields({
+      name: t('listView.evidence.attached', lang),
+      value: t('listView.evidence.attachedHint', lang),
+      inline: false,
+    });
     embed.setImage(displayUrl);
     return;
   }

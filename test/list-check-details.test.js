@@ -153,6 +153,9 @@ test('dropdown detail uses broadcast layout with added-by beside CP and evidence
     '👤 Người thêm',
     '🌍 Server',
     '🧬 Danh sách roster (2)',
+    // The embedded screenshot gets a heading of its own so it does not
+    // run straight on from the roster list.
+    '📎 Evidence',
   ]);
   assert.equal(embed.fields.filter((field) => field.inline).length % 3, 0);
   // ilvl and CP sit side by side, so both read as code values.

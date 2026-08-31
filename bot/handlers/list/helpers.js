@@ -163,6 +163,13 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   });
 
   if (freshDisplayUrl) {
+    // Heading for the embedded image · without it the screenshot runs
+    // straight on from the change list above it.
+    embed.addFields({
+      name: t('listView.evidence.attached', lang),
+      value: t('listView.evidence.attachedHint', lang),
+      inline: false,
+    });
     embed.setImage(freshDisplayUrl);
   }
 
@@ -271,6 +278,13 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   });
 
   if (payload.imageUrl) {
+    // Heading for the embedded image, as on every other card that shows
+    // one inline rather than behind a button.
+    embed.addFields({
+      name: t('listView.evidence.attached', lang),
+      value: t('listView.evidence.attachedHint', lang),
+      inline: false,
+    });
     embed.setImage(payload.imageUrl);
   }
 

@@ -512,7 +512,16 @@ async function buildSuccessfulAddResult({
     lang,
   });
   const freshDisplayUrl = await resolveDisplayImageUrl(entry, client);
-  if (freshDisplayUrl) embed.setImage(freshDisplayUrl);
+  if (freshDisplayUrl) {
+    // Heading for the embedded image, same as the other cards that show
+    // one · it otherwise butts straight against the last field.
+    embed.addFields({
+      name: t('listView.evidence.attached', lang),
+      value: t('listView.evidence.attachedHint', lang),
+      inline: false,
+    });
+    embed.setImage(freshDisplayUrl);
+  }
   dispatchListAddBroadcast({
     payload,
     entry,
