@@ -97,7 +97,15 @@ async function fetchRosterCharacters(name, deep) {
   // The in-game server rides in the same SSR payload this page already
   // carries, so reading it here costs nothing extra.
   const world = parseCharacterMetaFromHtml(html)?.world || '';
-  return { characters: await parseRosterCharactersFromHtml(html, document), world };
+  // Stamped onto every record, the way buildRosterCharacters does it ·
+  // the server belongs to the roster, so carrying it on the characters
+  // themselves is what lets the cards built from them show it without
+  // threading a separate argument through every builder.
+  const characters = await parseRosterCharactersFromHtml(html, document);
+  return {
+    characters: world ? characters.map((c) => ({ ...c, world })) : characters,
+    world,
+  };
 }
 
 async function loadPreviousSnapshotMap(characters) {
@@ -223,11 +231,8 @@ function notifyVisibleDeepCompletion({ interaction, replyEditor, visibleDeep, na
 
 async function handleVisibleRosterResult({ interaction, replyEditor, name, deep, deepOptions, characters, lang, world = '' }) {
   const previousSnapshots = await loadPreviousSnapshotMap(characters);
-  // The server belongs to the roster, so every character in it gets the
-  // same value · this is what lets the other cards show a server for a
-  // name they have never fetched themselves.
-  const snapshotRecords = world ? characters.map((c) => ({ ...c, world })) : characters;
-  upsertRosterSnapshots(snapshotRecords, name)
+  // Records already carry the server · fetchRosterCharacters stamps it.
+  upsertRosterSnapshots(characters, name)
     .catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
 
   const matches = await loadVisibleRosterMatches(characters, interaction.guild?.id);

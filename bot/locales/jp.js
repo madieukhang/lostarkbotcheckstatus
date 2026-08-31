@@ -404,6 +404,7 @@ const jp = {
       itemLevel: '📊 ilvl',
       combatPower: '⚔️ CP',
       addedBy: '👤 Added by',
+      server: '🌍 Server',
       onlyThisCharacter: '_この entry ではこの character だけが track されています._',
       noImage: 'この entry には evidence 画像がありません。',
     },

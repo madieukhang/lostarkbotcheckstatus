@@ -404,6 +404,7 @@ const vi = {
       itemLevel: '📊 ilvl',
       combatPower: '⚔️ CP',
       addedBy: '👤 Người thêm',
+      server: '🌍 Server',
       onlyThisCharacter: '_Chỉ character này đang được track trong entry._',
       noImage: 'Entry này chưa có ảnh evidence.',
     },

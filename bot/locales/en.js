@@ -569,6 +569,7 @@ const en = {
       itemLevel: '📊 ilvl',
       combatPower: '⚔️ CP',
       addedBy: '👤 Added by',
+      server: '🌍 Server',
       onlyThisCharacter: '_Only this character is tracked on this entry._',
       noImage: 'No evidence image for this entry.',
     },

@@ -26,7 +26,7 @@ import { getAddedByDisplay } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
-import { formatLinkedCharacter, renderTrackedAltsField } from '../trackedAltsRender.js';
+import { formatLinkedCharacter, renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
 import { getListContext } from '../helpers.js';
 
 /**
@@ -269,7 +269,7 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  *
  *   1. Title bar    - list-icon + entry name + bible-link via setURL
  *   2. Reason field - full reason text (1024 char cap)
- *   3. Inline meta  - Raid · List · Added · ilvl · CP · Added by,
+ *   3. Inline meta  - Raid · List · Added · ilvl · CP · Added by · Server,
  *                     padded with zero-width spacers to whole 3-up rows
  *   4. Roster field - "Tracked alts" with linked names; falls back
  *                     to "(only this character)" if allCharacters is
@@ -285,10 +285,14 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  * why this reads as an upgrade on /la-roster and a no-op everywhere else
  * until those callers pass one too.
  */
-function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, lang }) {
+function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, lang, statMap }) {
   const itemLevel = Number(String(snapshot?.itemLevel ?? '').replace(/,/g, ''));
   const combatScore = String(snapshot?.combatScore || '').trim();
   const addedByDisplay = getAddedByDisplay(entry);
+  // Read across the roster, not just this character's own row · the
+  // server belongs to the roster, so a sibling answers for a name whose
+  // snapshot predates the field. See resolveRosterWorld.
+  const world = resolveRosterWorld(entry, statMap);
   const inlineMeta = [
     entry.raid
       ? { name: t('listView.evidence.raid', lang), value: `\`${entry.raid}\``, inline: true }
@@ -316,6 +320,11 @@ function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, la
     includeAddedBy && addedByDisplay
       ? { name: t('listView.evidence.addedBy', lang), value: addedByDisplay, inline: true }
       : null,
+  // Server sits last so it lands after Added by, the same field order
+  // the check-detail card beside it uses.
+    world
+      ? { name: t('listView.evidence.server', lang), value: `\`${world}\``, inline: true }
+      : null,
   ].filter(Boolean);
   // Discord packs three inline fields per row and stretches a lone
   // trailing field to full width · pad to a whole row so the grid keeps
@@ -330,7 +339,7 @@ function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, la
 function buildEvidenceFields(entry, snapshot, { includeAddedBy, headline, lang, statMap }) {
   const fields = [
     { name: t('listView.evidence.reason', lang), value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
-    ...buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, lang }),
+    ...buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, lang, statMap }),
   ];
 
   // Roster (allCharacters) field. Counts alts excluding the entry's own

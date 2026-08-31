@@ -8,7 +8,10 @@ process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 const { resolveRosterWorld } = await import('../bot/handlers/list/trackedAltsRender.js');
 const { buildCheckEntryDetailsEmbed } = await import('../bot/handlers/list/check/ui.js');
 const { buildBroadcastFields } = await import('../bot/handlers/list/services/broadcasts.js');
+const { buildEvidenceEmbed } = await import('../bot/handlers/list/view/ui.js');
 const { decorateListEntry } = await import('../bot/handlers/list/helpers.js');
+
+const ZWSP = '​';
 
 const ENTRY = {
   name: 'Tenshi',
@@ -83,6 +86,30 @@ test('the broadcast card reads the server across the roster too', () => {
   });
 
   assert.equal(serverValue(fields), '`Elpon`');
+});
+
+test('the la-roster hit card carries Server and stays at five fields', () => {
+  // This is the card /la-roster puts above the roster it just fetched.
+  // It had four inline fields, so CP sat alone on a second row. Server
+  // makes five, which pads to one whole spare slot rather than a gap.
+  const statMap = new Map([
+    ['tenshi', { name: 'Tenshi', classId: 'bard', itemLevel: 1770, combatScore: '≈4903.06' }],
+    ['hanako', { name: 'Hanako', world: 'Thaemine' }],
+  ]);
+  const fields = buildEvidenceEmbed(decorateListEntry(ENTRY, 'black'), '', {
+    lang: 'vi',
+    statMap,
+    headline: true,
+    attachImage: false,
+    viaName: 'Hanako',
+  }).toJSON().fields;
+  const inlineNames = fields.filter((f) => f.inline).map((f) => f.name);
+
+  assert.equal(serverValue(fields), '`Thaemine`');
+  assert.equal(inlineNames.filter((name) => name !== ZWSP).length, 5);
+  // No "Added by" on this card · the officer who filed the entry is not
+  // what the searcher is being warned about.
+  assert.equal(inlineNames.some((name) => name.includes('Người thêm')), false);
 });
 
 test('the broadcast card falls back to its own snapshot with no stat map', () => {
