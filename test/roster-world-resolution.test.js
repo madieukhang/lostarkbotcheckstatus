@@ -7,7 +7,9 @@ process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const { resolveRosterWorld } = await import('../bot/handlers/list/trackedAltsRender.js');
 const { buildCheckEntryDetailsEmbed } = await import('../bot/handlers/list/check/ui.js');
-const { buildBroadcastFields } = await import('../bot/handlers/list/services/broadcasts.js');
+const { buildBroadcastFields, mergeRosterStatRecords } = await import('../bot/handlers/list/services/broadcasts.js');
+const { buildListAddSuccessFields } = await import('../bot/handlers/list/services/addExecutor.js');
+const { statMapFromRosterCharacters } = await import('../bot/handlers/list/trackedAltsRender.js');
 const { buildEvidenceEmbed } = await import('../bot/handlers/list/view/ui.js');
 const { decorateListEntry } = await import('../bot/handlers/list/helpers.js');
 
@@ -110,6 +112,76 @@ test('the la-roster hit card carries Server and stays at five fields', () => {
   // No "Added by" on this card · the officer who filed the entry is not
   // what the searcher is being warned about.
   assert.equal(inlineNames.some((name) => name.includes('Người thêm')), false);
+});
+
+test('the server survives the broadcast stat-record normalizer', () => {
+  // Regression: the broadcast card built its map through
+  // normalizeRosterStatRecord, which rebuilt each record from a fixed
+  // list of five fields and silently dropped the server. The card had a
+  // Server field and a resolver and still rendered nothing, because the
+  // map feeding them could never carry one. Building the map by hand in
+  // a test hides this · go through the real merge.
+  const statMap = mergeRosterStatRecords([
+    { name: 'Tenshi', classId: 'bard', itemLevel: 1770, combatScore: '≈4903.06', world: 'Thaemine' },
+    { name: 'Hanako', classId: 'bard', itemLevel: 1724.33 },
+  ]);
+
+  assert.equal(statMap.get('tenshi').world, 'Thaemine');
+  const fields = buildBroadcastFields({
+    entry: ENTRY,
+    action: 'added',
+    snap: statMap.get('tenshi'),
+    lang: 'vi',
+    statMap,
+  });
+  assert.equal(serverValue(fields), '`Thaemine`');
+});
+
+test('the la-list add success card carries Server on whole rows', () => {
+  // The add flow reads the roster page itself, so the server is in hand
+  // by the time this card is built.
+  const statMap = statMapFromRosterCharacters([
+    { name: 'Tenshi', classId: 'bard', itemLevel: 1770, combatScore: '≈4903.06', world: 'Thaemine' },
+  ]);
+  const fields = buildListAddSuccessFields({
+    payload: { type: 'black', raid: 'Kazeros Hard', reason: 'sup lo' },
+    entry: ENTRY,
+    entryScope: { scope: 'global' },
+    icon: '⛔',
+    labelCap: 'Blacklist',
+    linkParts: ['[Roster](https://x.test)'],
+    lang: 'vi',
+    statMap,
+  });
+  const inlineNames = fields.filter((f) => f.inline).map((f) => f.name);
+
+  assert.equal(serverValue(fields), '`Thaemine`');
+  // List + Raid + Scope + Server is four, which Discord would split as a
+  // row of three plus one stretched banner.
+  assert.equal(inlineNames.filter((name) => name !== ZWSP).length, 4);
+  assert.equal(inlineNames.length % 3, 0);
+});
+
+test('a non-blacklist add keeps its single inline row unpadded', () => {
+  // Whitelist has no scope field, so list + raid + server is exactly one
+  // row and needs no spacers.
+  const statMap = statMapFromRosterCharacters([
+    { name: 'Tenshi', classId: 'bard', itemLevel: 1770, world: 'Thaemine' },
+  ]);
+  const fields = buildListAddSuccessFields({
+    payload: { type: 'white', raid: '', reason: 'ok' },
+    entry: ENTRY,
+    entryScope: { scope: 'server' },
+    icon: '✅',
+    labelCap: 'Whitelist',
+    linkParts: ['[Roster](https://x.test)'],
+    lang: 'vi',
+    statMap,
+  });
+  const inlineNames = fields.filter((f) => f.inline).map((f) => f.name);
+
+  assert.equal(inlineNames.length, 3);
+  assert.equal(inlineNames.some((name) => name === ZWSP), false);
 });
 
 test('the broadcast card falls back to its own snapshot with no stat map', () => {

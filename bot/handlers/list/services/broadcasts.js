@@ -58,6 +58,10 @@ function normalizeRosterStatRecord(record) {
     className: String(record?.className || '').trim(),
     itemLevel: parseItemLevel(record?.itemLevel),
     combatScore: normalizeCombatScore(record?.combatScore),
+    // Carried through because this reshaping is the only thing standing
+    // between the roster read and the card · a field dropped here is
+    // invisible to every caller no matter what fed the record in.
+    world: String(record?.world || '').trim(),
   };
 }
 

@@ -26,13 +26,14 @@ import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { BLANK_FIELD_VALUE, ICONS, relativeTime } from '../../../utils/ui.js';
+import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl, logsUrl } from '../../../utils/rosterLink.js';
 import {
   formatLinkedCharacter,
   renderTrackedAltsField,
+  resolveRosterWorld,
   statMapFromRosterCharacters,
 } from '../trackedAltsRender.js';
 import {
@@ -365,7 +366,24 @@ function buildSuccessLinkParts(entryName, payload, lang) {
   return links;
 }
 
-function buildSuccessFields({
+/**
+ * Build the field grid for the `/la-list add` success card: the inline
+ * run (list, raid, scope, server) padded to whole rows, then the
+ * full-width reason, roster list and links.
+ * @param {object} options
+ * @param {object} options.payload - the add request (raid, reason, type)
+ * @param {object} options.entry - the saved list entry
+ * @param {{scope: string}} options.entryScope - resolved scope of the entry
+ * @param {string} options.icon - list-status icon shown beside the label
+ * @param {string} options.labelCap - capitalized list name
+ * @param {object} [options.rostersField] - prebuilt roster-list field
+ * @param {string[]} options.linkParts - rendered links, joined with a dot
+ * @param {string} options.lang - locale for every label
+ * @param {Map<string, object>} [options.statMap] - roster snapshots, used
+ *   to resolve the server across the roster
+ * @returns {Array<object>} embed fields, inline ones padded to whole rows
+ */
+export function buildListAddSuccessFields({
   payload,
   entry,
   entryScope,
@@ -374,19 +392,35 @@ function buildSuccessFields({
   rostersField,
   linkParts,
   lang,
+  statMap,
 }) {
-  const fields = [
+  const inlineFields = [
     { name: `📒 ${t('dialogue.listAdd.success.fields.list', lang)}`, value: `${icon} ${labelCap}`, inline: true },
     { name: `🗡️ ${t('dialogue.listAdd.success.fields.raid', lang)}`, value: payload.raid ? `\`${payload.raid}\`` : t('dialogue.broadcast.notAvailable', lang), inline: true },
   ];
   if (payload.type === 'black') {
     const scopeKey = entryScope.scope === 'server' ? 'local' : 'global';
-    fields.push({
+    inlineFields.push({
       name: `🌐 ${t('dialogue.listAdd.success.fields.scope', lang)}`,
       value: t(`dialogue.approval.scopeTag.${scopeKey}`, lang),
       inline: true,
     });
   }
+  // The add flow has just read the roster page, so the server is known
+  // here without another request · resolveRosterWorld also covers the
+  // case where the entry's own record is the one missing it.
+  const world = resolveRosterWorld(entry, statMap);
+  if (world) {
+    inlineFields.push({
+      name: `🌍 ${t('dialogue.roster.server', lang)}`,
+      value: `\`${world}\``,
+      inline: true,
+    });
+  }
+
+  // Blacklist adds reach four inline fields (list, raid, scope, server),
+  // which Discord would render as a row of three plus one banner.
+  const fields = [...padInlineRow(inlineFields)];
   fields.push({
     name: `📝 ${t('dialogue.listAdd.success.fields.reason', lang)}`,
     value: (payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
@@ -431,7 +465,7 @@ function buildListAddSuccessEmbed({
     primaryRecord: rosterStatMap.get(entry.name.toLowerCase()) || null,
     lang,
   });
-  const fields = buildSuccessFields({
+  const fields = buildListAddSuccessFields({
     payload,
     entry,
     entryScope,
@@ -440,6 +474,7 @@ function buildListAddSuccessEmbed({
     rostersField,
     linkParts: buildSuccessLinkParts(entry.name, payload, lang),
     lang,
+    statMap: rosterStatMap,
   });
   const sourceKey = rosterVisibility === 'hidden' ? 'sourceHidden' : 'sourceVisible';
   return buildAlertEmbed({
