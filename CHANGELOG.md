@@ -14,6 +14,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Changed
+- The Vietnamese label for the roster field reads "Danh sách roster" instead of "Các roster đang track", on both the broadcast card and the `/la-list add` result. No plural "s": Vietnamese does not mark plurals with a suffix, and the roster card already counts in the singular ("14 character"). English and Japanese keep their own natural wording.
 - Every character name on a list-check row now carries its class icon, not just the one that was searched. The entry a row matched through and the alts beneath it were the bare names sitting next to an icon-led name; the check service loads their snapshots in one extra query after the identity set is final, and a name nobody has run `/la-roster` on simply renders without an icon as before.
 - `/la-status` puts the status glyph on the server's field label rather than its value, so the per-server grid reads like every other card (icon on the label, the value as a badge). The summary counts above it pad out to a whole row so the grid starts on a line of its own.
 - The hidden-roster suggestion list gains the 🔍 its twin on `/la-list add` already had; both render the same field from the same locale key.

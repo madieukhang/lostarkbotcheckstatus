@@ -42,7 +42,7 @@ test('evidence card renders ilvl and CP when a stat map is supplied', () => {
   assert.equal(fieldValue(embed, 'ilvl'), '`1755.00`');
   assert.equal(fieldValue(embed, 'CP'), '`≈4820.12`');
   // Alt rows inherit the same class + ilvl + CP shape /la-check renders.
-  assert.match(fieldValue(embed, 'roster đang track'), /Bard \[Hanako\]\(\S+\) · `1730\.83` · `≈3311\.40 CP`/u);
+  assert.match(fieldValue(embed, 'Danh sách roster'), /Bard \[Hanako\]\(\S+\) · `1730\.83` · `≈3311\.40 CP`/u);
 });
 
 test('evidence card without a stat map keeps its previous shape', () => {
@@ -54,7 +54,7 @@ test('evidence card without a stat map keeps its previous shape', () => {
   assert.equal(names.some((n) => n.includes('ilvl')), false);
   assert.equal(names.some((n) => n.includes('CP')), false);
   assert.equal(names.filter((n) => n !== ZWSP).length, 3);
-  assert.doesNotMatch(fieldValue(embed, 'roster đang track'), /CP/u);
+  assert.doesNotMatch(fieldValue(embed, 'Danh sách roster'), /CP/u);
 });
 
 test('the inline meta grid always fills whole three-column rows', () => {
@@ -81,7 +81,7 @@ test('added by joins the inline grid instead of trailing the card', () => {
   });
   const names = embed.toJSON().fields.map((f) => f.name);
 
-  assert.ok(names.indexOf('👤 Người thêm') < names.findIndex((n) => n.includes('roster đang track')));
+  assert.ok(names.indexOf('👤 Người thêm') < names.findIndex((n) => n.includes('Danh sách roster')));
   assert.equal(inlineNames(embed).filter((n) => n !== ZWSP).length, 6);
 });
 
