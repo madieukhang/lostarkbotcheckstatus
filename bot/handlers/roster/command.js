@@ -25,6 +25,7 @@ import RosterSnapshot from '../../models/RosterSnapshot.js';
 import UserPreference from '../../models/UserPreference.js';
 import {
   bibleClient,
+  parseCharacterMetaFromHtml,
   parseRosterCharactersFromHtml,
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
@@ -93,7 +94,10 @@ async function fetchRosterCharacters(name, deep) {
 
   const html = await response.text();
   const { document } = new JSDOM(html, { virtualConsole }).window;
-  return parseRosterCharactersFromHtml(html, document);
+  // The in-game server rides in the same SSR payload this page already
+  // carries, so reading it here costs nothing extra.
+  const world = parseCharacterMetaFromHtml(html)?.world || '';
+  return { characters: await parseRosterCharactersFromHtml(html, document), world };
 }
 
 async function loadPreviousSnapshotMap(characters) {
@@ -106,7 +110,7 @@ async function loadPreviousSnapshotMap(characters) {
   return new Map(snapshots.map((snapshot) => [snapshot.name.toLowerCase(), snapshot]));
 }
 
-function buildRosterDescription(characters, previousSnapshots, lang) {
+function buildRosterDescription(characters, previousSnapshots, lang, world = '') {
   const lines = buildVisibleRosterLines(characters, previousSnapshots, lang);
   const rosterLines = lines.join('\n');
   const description = rosterLines.length > 4000
@@ -116,12 +120,18 @@ function buildRosterDescription(characters, previousSnapshots, lang) {
   if (!topCharacter) return description;
 
   const topClass = topCharacter.className || topCharacter.classId || '?';
-  const summary = t('dialogue.roster.topCharacter', lang, {
-    class: getClassEmoji(topClass) || topClass,
-    name: topCharacter.name,
-    ilvl: topCharacter.itemLevel || '?',
-  });
-  return `${summary}\n\n${description}`.slice(0, 4096);
+  const header = [
+    // The in-game server, when bible reported one. This bot is used
+    // across servers, so "which one is this" is the first thing a reader
+    // needs before the names mean anything.
+    world ? `🌍 **${t('dialogue.roster.server', lang)}:** \`${world}\`` : '',
+    t('dialogue.roster.topCharacter', lang, {
+      class: getClassEmoji(topClass) || topClass,
+      name: topCharacter.name,
+      ilvl: topCharacter.itemLevel || '?',
+    }),
+  ].filter(Boolean).join('\n');
+  return `${header}\n\n${description}`.slice(0, 4096);
 }
 
 async function loadVisibleRosterMatches(characters, guildId) {
@@ -162,8 +172,8 @@ function prependEvidenceCards({ embeds, rows, matches, statMap, name, lang }) {
   }
 }
 
-function buildVisibleRosterPresentation({ characters, previousSnapshots, matches, name, lang }) {
-  const fullDescription = buildRosterDescription(characters, previousSnapshots, lang);
+function buildVisibleRosterPresentation({ characters, previousSnapshots, matches, name, lang, world = '' }) {
+  const fullDescription = buildRosterDescription(characters, previousSnapshots, lang, world);
   const embed = createArtistEmbed(lang)
     .setTitle(`🛡️ ${t('dialogue.roster.title', lang, {
       name,
@@ -223,6 +233,7 @@ async function handleVisibleRosterResult({ interaction, replyEditor, name, deep,
     matches,
     name,
     lang,
+    world,
   });
   const visibleDeep = deep
     ? await runVisibleRosterDeepScan({
@@ -295,7 +306,7 @@ export async function handleRosterCommand(interaction) {
   const replyEditor = createLongRunningReplyEditor(interaction);
 
   try {
-    const characters = await fetchRosterCharacters(name, deep);
+    const { characters, world } = await fetchRosterCharacters(name, deep);
 
     if (characters.length === 0) {
       await handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions });

@@ -503,7 +503,7 @@ export default {
   },
   roster: {
     deepRestricted: { title: 'Officer access only', description: '`/la-roster deep:true` runs a long Stronghold scan through the residential worker. Officers and seniors may use it; run without `deep:true` for the basic roster.' },
-    title: '{name} roster · {count} {word}', characterOne: 'character', characterMany: 'characters', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`',
+    title: '{name} roster · {count} {word}', characterOne: 'character', characterMany: 'characters', server: 'Server', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`',
     trusted: '**{name}** is trusted.',
     fetchFailed: { title: 'Roster fetch failed', description: 'I could not fetch the roster from lostark.bible.' },
     hiddenTitle: 'Hidden roster · {name}', hiddenStatus: 'Roster is hidden. Guild: **{guild}** ({count} members)', stronghold: 'Stronghold: **{stronghold}** Lv.{strongholdLevel} · Roster Lv.{rosterLevel}', noDeep: 'Stronghold deep scan was not run. Use `deep:true` to scan same-account alts.', blackGuild: 'Blacklisted guild members ({count}):', whiteGuild: 'Whitelisted guild members ({count}):', noReason: 'no reason', guildFooter: '{count} guild {word}{stats} · Source: lostark.bible', memberOne: 'member', memberMany: 'members',

@@ -68,6 +68,10 @@ export function parseCharacterMetaFromHtml(html) {
   const rlMatch = html.match(/rosterLevel:(\d+)/);
   const shMatch = html.match(/stronghold:\{[^}]*level:(\d+),name:"([^"]+)"\}/);
   const guildMatch = html.match(/guild:\{name:"([^"]+)",grade:"([^"]+)"\}/);
+  // The in-game server. bible calls it `world` and puts it in the same
+  // SSR payload as stronghold and guild, right before `class:` · the URL
+  // only carries the region (NA / CE), which is a coarser thing.
+  const worldMatch = html.match(/world:"([^"]+)"/);
   const itemLevel = extractCharacterItemLevelFromHtml(html);
   let classId = '';
   if (rlMatch) {
@@ -82,6 +86,7 @@ export function parseCharacterMetaFromHtml(html) {
     strongholdName: shMatch[2],
     guildName: guildMatch ? guildMatch[1] : null,
     guildGrade: guildMatch ? guildMatch[2] : null,
+    world: worldMatch ? worldMatch[1] : null,
     classId,
     itemLevel,
   };
@@ -98,6 +103,7 @@ export function shapeCharacterMetaFromHeader(header) {
     strongholdName: stronghold.name,
     guildName: guild?.name ?? null,
     guildGrade: guild?.grade ?? null,
+    world: typeof header.world === 'string' ? header.world : null,
     classId: typeof header.class === 'string' ? header.class : '',
     itemLevel: typeof header.ilvl === 'number' ? header.ilvl : null,
   };

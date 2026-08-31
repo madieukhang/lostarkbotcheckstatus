@@ -8,6 +8,7 @@ export { bibleClient } from './bibleClient.js';
 export {
   extractCharacterItemLevelFromHtml,
   extractRosterClassMapFromHtml,
+  parseCharacterMetaFromHtml,
   parseRosterCharactersFromHtml,
 } from './parsers.js';
 
