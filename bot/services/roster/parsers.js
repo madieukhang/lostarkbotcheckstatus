@@ -41,6 +41,12 @@ export function extractRosterClassMapFromHtml(html) {
 export async function parseRosterCharactersFromHtml(html, document) {
   const rosterClassMap = extractRosterClassMapFromHtml(html);
   const characters = [];
+  // The region is pinned to NA on purpose · every fetch path in the bot
+  // requests /character/NA/, so the pages this ever sees are NA pages.
+  // Worth knowing before changing it: on a page from another region this
+  // selector matches nothing, the function returns an empty list, and the
+  // caller reads that as "roster hidden" rather than an error. So a
+  // non-NA character fails silently, and this line is where it starts.
   const links = document.querySelectorAll('a[href^="/character/NA/"]');
 
   for (const link of links) {
