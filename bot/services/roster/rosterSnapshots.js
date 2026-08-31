@@ -40,6 +40,10 @@ export async function upsertRosterSnapshots(
       };
       const combatScore = normalizeCombatScore(record?.combatScore);
       if (combatScore) set.combatScore = combatScore;
+      // Only written when known · a scrape that could not read the world
+      // must not blank the value a previous one stored.
+      const world = String(record?.world || '').trim();
+      if (world) set.world = world;
       return {
         updateOne: {
           filter: { name },

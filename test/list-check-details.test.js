@@ -141,6 +141,9 @@ test('dropdown detail uses broadcast layout with added-by beside CP and evidence
   assert.match(embed.description, /Rosterprimary/u);
   assert.match(embed.description, /hiện nằm trong \*\*Blacklist\*\*/u);
   assert.doesNotMatch(embed.description, /vừa được thêm/u);
+  // Two full inline rows: Raid / Added / ilvl, then CP / Added by /
+  // Server. Without Server the second row held two fields and Discord
+  // stretched them across the card.
   assert.deepEqual(embed.fields.map((field) => field.name), [
     '📝 Lý do',
     '🗡️ Raid',
@@ -148,14 +151,18 @@ test('dropdown detail uses broadcast layout with added-by beside CP and evidence
     '📊 ilvl',
     '⚔️ CP',
     '👤 Người thêm',
-    '🧬 Alt đang track (1)',
+    '🌍 Server',
+    '🧬 Danh sách roster (2)',
   ]);
+  assert.equal(embed.fields.filter((field) => field.inline).length % 3, 0);
   // ilvl and CP sit side by side, so both read as code values.
   assert.equal(embed.fields[3].value, '`1725.50`');
   assert.equal(embed.fields[4].value, '`≈3136.08`');
   assert.equal(embed.fields[4].inline, true);
   assert.equal(embed.fields[5].value, 'Legacy Officer');
   assert.equal(embed.fields[5].inline, true);
-  assert.match(embed.fields[6].value, /`1711\.67` · `≈2981\.11 CP`/u);
+  // The roster list counts the entry itself now, not just its alts.
+  assert.match(embed.fields[7].value, /`1711\.67` · `≈2981\.11 CP`/u);
+  assert.match(embed.fields[7].value, /Rosterprimary/u);
   assert.equal(embed.image.url, 'https://cdn.example.test/evidence.png');
 });

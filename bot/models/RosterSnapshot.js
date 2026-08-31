@@ -22,6 +22,14 @@ const rosterSnapshotSchema = new mongoose.Schema({
   /** The roster/account this character belongs to (main character name) */
   rosterName: { type: String, default: '', trim: true },
 
+  /**
+   * In-game server, as bible reports it (`world` in its SSR payload):
+   * "Thaemine", "Elpon". Empty for snapshots written before this field
+   * existed; every render site treats that as "unknown" and omits the
+   * line rather than guessing.
+   */
+  world: { type: String, default: '', trim: true },
+
   /** When this snapshot was last updated */
   updatedAt: { type: Date, default: Date.now },
 });

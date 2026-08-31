@@ -65,20 +65,32 @@ function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang }) {
     },
     includeAddedBy
       ? {
+          // listView.evidence.* carries its icon inside the string.
           name: t('listView.evidence.addedBy', lang),
           value: getAddedByDisplay(entry) || notAvailable,
           inline: true,
         }
       : null,
+    // Server completes the second row. Without it Added by sat alone
+    // beside CP and Discord stretched the pair across the card.
+    {
+      name: `🌍 ${t('dialogue.roster.server', lang)}`,
+      value: String(snapshot?.world || '').trim() ? `\`${snapshot.world}\`` : notAvailable,
+      inline: true,
+    },
   ].filter(Boolean);
 }
 
 function buildTrackedAltsField(entry, statMap, lang) {
+  // The whole roster, entry included · this card sits next to the same
+  // list on the evidence and broadcast cards, and leaving the entry out
+  // made it one name shorter than both of them.
   return renderTrackedAltsField({
     names: entry.allCharacters,
     primaryName: entry.name,
     statMap,
-    label: `🧬 ${t('dialogue.broadcast.fields.trackedAlts', lang)}`,
+    includePrimary: true,
+    label: `🧬 ${t('dialogue.broadcast.fields.trackedRosters', lang)}`,
     overflowTemplate: t('dialogue.broadcast.more', lang),
   });
 }

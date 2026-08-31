@@ -15,7 +15,7 @@ import { bibleClient } from './bibleClient.js';
 import { fetchCharacterMeta } from './characterMeta.js';
 import { inferHiddenRosterItemLevel } from './search.js';
 import { detectAltsViaStronghold } from './altDetection.js';
-import { parseRosterCharactersFromHtml } from './parsers.js';
+import { parseCharacterMetaFromHtml, parseRosterCharactersFromHtml } from './parsers.js';
 
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('error', () => {});
@@ -68,7 +68,13 @@ export async function buildRosterCharacters(name, options = {}) {
       // duplicate did its own DOM walk and a separate rosterClassMap
       // lookup that could silently fail for some names · routing
       // through the proven function eliminates that drift.
-      const rosterChars = await parseRosterCharactersFromHtml(html, document);
+      // The server is a property of the roster, not of each character, so
+      // it is read once and stamped onto every record · that is the shape
+      // upsertRosterSnapshots stores and every card reads back.
+      const world = parseCharacterMetaFromHtml(html)?.world || '';
+      const rosterChars = world
+        ? (await parseRosterCharactersFromHtml(html, document)).map((c) => ({ ...c, world }))
+        : await parseRosterCharactersFromHtml(html, document);
       rosterCharacters = rosterChars;
 
       // Find the queried character's record in the parsed list. Match

@@ -14,6 +14,8 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Added
+- `RosterSnapshot` stores the server (`world`), written by both `/la-roster` and the roster fetch behind `/la-list add` and the checks. It is only written when known, so a scrape that could not read it never blanks a value an earlier one stored, and older snapshots simply have none until their next fetch.
+- The check-result detail card gained a **🌍 Server** field, which also completes its second inline row: Added by used to sit next to CP with an empty third slot, so Discord stretched the pair across the card. Its roster list now counts the entry itself and is labelled 🧬 Danh sách roster, matching the evidence and broadcast cards it sits beside.
 - `/la-roster` names the in-game server the roster belongs to: **🌍 Server: `Thaemine`**, above the top-character line. lostark.bible calls the field `world` and embeds it in the same SSR payload the page already carries stronghold and guild in, so reading it costs no extra request. The line is omitted when the page does not report one.
 
 ### Changed

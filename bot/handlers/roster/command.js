@@ -221,9 +221,13 @@ function notifyVisibleDeepCompletion({ interaction, replyEditor, visibleDeep, na
   }).catch(() => {});
 }
 
-async function handleVisibleRosterResult({ interaction, replyEditor, name, deep, deepOptions, characters, lang }) {
+async function handleVisibleRosterResult({ interaction, replyEditor, name, deep, deepOptions, characters, lang, world = '' }) {
   const previousSnapshots = await loadPreviousSnapshotMap(characters);
-  upsertRosterSnapshots(characters, name)
+  // The server belongs to the roster, so every character in it gets the
+  // same value · this is what lets the other cards show a server for a
+  // name they have never fetched themselves.
+  const snapshotRecords = world ? characters.map((c) => ({ ...c, world })) : characters;
+  upsertRosterSnapshots(snapshotRecords, name)
     .catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
 
   const matches = await loadVisibleRosterMatches(characters, interaction.guild?.id);
@@ -320,6 +324,7 @@ export async function handleRosterCommand(interaction) {
       deepOptions,
       characters,
       lang,
+      world,
     });
   } catch (err) {
     await replyEditor.edit({
