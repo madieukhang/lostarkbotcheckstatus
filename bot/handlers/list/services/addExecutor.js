@@ -31,6 +31,7 @@ import { t } from '../../../services/i18n/index.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl, logsUrl } from '../../../utils/rosterLink.js';
 import {
+  formatRosterStatBadges,
   formatLinkedCharacter,
   renderTrackedAltsField,
   resolveRosterWorld,
@@ -363,7 +364,7 @@ function buildSuccessLinkParts(entryName, payload, lang) {
 
 /**
  * Build the field grid for the `/la-list add` success card: the inline
- * run (list, raid, scope, server) padded to whole rows, then the
+ * run (list, raid, scope, server, item level, CP) padded to whole rows, then the
  * full-width reason, roster list and links.
  * @param {object} options
  * @param {object} options.payload - the add request (raid, reason, type)
@@ -413,8 +414,23 @@ export function buildListAddSuccessFields({
     });
   }
 
-  // Blacklist adds reach four inline fields (list, raid, scope, server),
-  // which Discord would render as a row of three plus one banner.
+  const primaryRecord = statMap?.get(String(entry?.name || '').trim().toLowerCase());
+  const statBadges = formatRosterStatBadges(primaryRecord);
+  inlineFields.push(...[
+    statBadges.itemLevel ? {
+      name: `📊 ${t('dialogue.broadcast.fields.itemLevel', lang)}`,
+      value: statBadges.itemLevel,
+      inline: true,
+    } : null,
+    statBadges.combatPower ? {
+      name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`,
+      value: statBadges.combatPower,
+      inline: true,
+    } : null,
+  ].filter(Boolean));
+
+  // Optional roster stats can leave a partial second row. Pad only after every
+  // available value is known so Discord never stretches a lone field.
   const fields = [...padInlineRow(inlineFields)];
   fields.push({
     name: `📝 ${t('dialogue.listAdd.success.fields.reason', lang)}`,

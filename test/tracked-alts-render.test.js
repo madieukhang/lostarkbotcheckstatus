@@ -6,9 +6,17 @@ process.env.CHANNEL_ID ||= 'test';
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const {
+  formatRosterStatBadges,
   renderTrackedAltsField,
   statMapFromRosterCharacters,
 } = await import('../bot/handlers/list/trackedAltsRender.js');
+
+test('roster stat badges keep CP inside the badge without duplicating its unit', () => {
+  assert.deepEqual(
+    formatRosterStatBadges({ itemLevel: '1,732.50', combatScore: '≈3334.54 CP' }),
+    { itemLevel: '`1732.50`', combatPower: '`≈3334.54 CP`' }
+  );
+});
 
 test('tracked alts renderer preserves comma-formatted item levels', () => {
   const field = renderTrackedAltsField({

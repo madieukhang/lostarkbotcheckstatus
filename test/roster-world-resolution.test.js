@@ -137,7 +137,7 @@ test('the server survives the broadcast stat-record normalizer', () => {
   assert.equal(serverValue(fields), '`Thaemine`');
 });
 
-test('the la-list add success card carries Server on whole rows', () => {
+test('the la-list add success card restores Server, item level, and CP on whole rows', () => {
   // The add flow reads the roster page itself, so the server is in hand
   // by the time this card is built.
   const statMap = statMapFromRosterCharacters([
@@ -154,17 +154,21 @@ test('the la-list add success card carries Server on whole rows', () => {
     statMap,
   });
   const inlineNames = fields.filter((f) => f.inline).map((f) => f.name);
+  const itemLevel = fields.find((field) => field.name.includes('ilvl'));
+  const combatPower = fields.find((field) => field.name.includes('CP'));
 
   assert.equal(serverValue(fields), '`Thaemine`');
-  // List + Raid + Scope + Server is four, which Discord would split as a
-  // row of three plus one stretched banner.
-  assert.equal(inlineNames.filter((name) => name !== ZWSP).length, 4);
+  assert.equal(itemLevel?.value, '`1770.00`');
+  assert.equal(combatPower?.value, '`≈4903.06 CP`');
+  // List + Raid + Scope / Server + ilvl + CP fill two complete rows.
+  assert.equal(inlineNames.filter((name) => name !== ZWSP).length, 6);
   assert.equal(inlineNames.length % 3, 0);
+  assert.equal(inlineNames.includes(ZWSP), false);
 });
 
-test('a non-blacklist add keeps its single inline row unpadded', () => {
-  // Whitelist has no scope field, so list + raid + server is exactly one
-  // row and needs no spacers.
+test('a non-blacklist add pads a partial stat row and omits unavailable CP', () => {
+  // Whitelist has no scope field and this snapshot has no CP. The available
+  // values remain visible while the final partial row stays aligned.
   const statMap = statMapFromRosterCharacters([
     { name: 'Tenshi', classId: 'bard', itemLevel: 1770, world: 'Thaemine' },
   ]);
@@ -180,8 +184,28 @@ test('a non-blacklist add keeps its single inline row unpadded', () => {
   });
   const inlineNames = fields.filter((f) => f.inline).map((f) => f.name);
 
-  assert.equal(inlineNames.length, 3);
-  assert.equal(inlineNames.some((name) => name === ZWSP), false);
+  assert.equal(fields.find((field) => field.name.includes('ilvl'))?.value, '`1770.00`');
+  assert.equal(fields.some((field) => field.name.includes('CP')), false);
+  assert.equal(inlineNames.filter((name) => name !== ZWSP).length, 4);
+  assert.equal(inlineNames.length, 6);
+  assert.equal(inlineNames.filter((name) => name === ZWSP).length, 2);
+});
+
+test('the la-list add success card skips item level and CP when the primary snapshot is absent', () => {
+  const fields = buildListAddSuccessFields({
+    payload: { type: 'black', raid: 'Kazeros Hard', reason: 'sup lo' },
+    entry: ENTRY,
+    entryScope: { scope: 'global' },
+    icon: '⛔',
+    labelCap: 'Blacklist',
+    linkParts: ['[Roster](https://x.test)'],
+    lang: 'vi',
+    statMap: new Map(),
+  });
+
+  assert.equal(fields.some((field) => field.name.includes('ilvl')), false);
+  assert.equal(fields.some((field) => field.name.includes('CP')), false);
+  assert.equal(fields.filter((field) => field.inline).length, 3);
 });
 
 test('the broadcast card falls back to its own snapshot with no stat map', () => {

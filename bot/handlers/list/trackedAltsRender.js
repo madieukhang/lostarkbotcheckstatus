@@ -39,6 +39,23 @@ function parsePositiveNumber(value) {
 }
 
 /**
+ * Format the two numeric roster values once so standalone metadata fields and
+ * tracked-roster rows cannot drift on precision, code badges, or the CP unit.
+ */
+export function formatRosterStatBadges(record) {
+  const itemLevel = parsePositiveNumber(record?.itemLevel);
+  const combatScore = String(record?.combatScore ?? '').trim();
+  const combatPower = combatScore && combatScore !== '?'
+    ? (/\sCP$/iu.test(combatScore) ? combatScore : `${combatScore} CP`)
+    : '';
+
+  return {
+    itemLevel: itemLevel > 0 ? `\`${itemLevel.toFixed(2)}\`` : '',
+    combatPower: combatPower ? `\`${combatPower}\`` : '',
+  };
+}
+
+/**
  * Render one character with the same class-icon + roster-link vocabulary used
  * across list cards. The class name remains a readable fallback while custom
  * application emoji are still bootstrapping.
@@ -57,15 +74,8 @@ export function formatLinkedCharacter(name, record, { bold = true } = {}) {
  * preview surfaces that don't have a snapshot map).
  */
 export function formatAltLine(name, index, record) {
-  const itemLevel = parsePositiveNumber(record?.itemLevel);
-  // CP carries its unit inside the badge, the way /la-roster rows read
-  // (`≈6180.57 CP`), so one badge is one value with its label.
-  const statParts = [
-    itemLevel > 0 ? `\`${itemLevel.toFixed(2)}\`` : '',
-    record?.combatScore && record.combatScore !== '?'
-      ? `\`${record.combatScore} CP\``
-      : '',
-  ].filter(Boolean);
+  const { itemLevel, combatPower } = formatRosterStatBadges(record);
+  const statParts = [itemLevel, combatPower].filter(Boolean);
   const statSuffix = statParts.length > 0 ? ` · ${statParts.join(' · ')}` : '';
   return `**${index + 1}.** ${formatLinkedCharacter(name, record, { bold: false })}${statSuffix}`;
 }
