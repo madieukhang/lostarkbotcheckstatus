@@ -9,6 +9,10 @@ import {
 } from 'discord.js';
 
 import config from './bot/config.js';
+import {
+  installDiscordGatewayDiagnostics,
+  startDiscordLogin,
+} from './bot/app/discord-startup.js';
 import { createReadyHandler } from './bot/app/lifecycle.js';
 import { createInteractionRouter } from './bot/app/interaction-router.js';
 import {
@@ -26,6 +30,7 @@ const client = new Client({
 
 const terminate = createProcessTerminator({ client });
 installProcessLifecycle({ terminate });
+installDiscordGatewayDiagnostics(client);
 
 client.once(Events.ClientReady, () => {
   void createReadyHandler(client)().catch((error) => terminate({
@@ -36,8 +41,4 @@ client.once(Events.ClientReady, () => {
 });
 client.on(Events.InteractionCreate, createInteractionRouter({ client }));
 
-void client.login(config.token).catch((error) => terminate({
-  label: 'Discord login failed',
-  error,
-  exitCode: 1,
-}));
+void startDiscordLogin({ client, token: config.token, terminate });
