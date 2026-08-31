@@ -26,7 +26,7 @@ import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { ICONS, relativeTime } from '../../../utils/ui.js';
+import { BLANK_FIELD_VALUE, ICONS, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl, logsUrl } from '../../../utils/rosterLink.js';
@@ -517,7 +517,7 @@ async function buildSuccessfulAddResult({
     // one · it otherwise butts straight against the last field.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: t('listView.evidence.attachedHint', lang),
+      value: BLANK_FIELD_VALUE,
       inline: false,
     });
     embed.setImage(freshDisplayUrl);

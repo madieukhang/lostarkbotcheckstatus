@@ -398,7 +398,6 @@ const vi = {
       added: '🕐 Đã thêm',
       evidence: 'Evidence',
       attached: '📎 Evidence',
-      attachedHint: 'Ảnh nằm ngay bên dưới.',
       unavailable: 'Link ảnh đã hết hạn hoặc không khả dụng. Re-add evidence bằng `/la-list edit`.',
       logs: '🔗 Logs',
       viewLogs: 'Xem logs',

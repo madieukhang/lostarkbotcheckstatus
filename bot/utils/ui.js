@@ -68,6 +68,14 @@ export const ICONS = Object.freeze({
 });
 
 /**
+ * Value for a field that is only a heading. Discord rejects an empty
+ * field value, so a zero-width space stands in and the label renders on
+ * its own · used to caption an embedded image without adding a line of
+ * text that just restates what the reader can already see.
+ */
+export const BLANK_FIELD_VALUE = '​';
+
+/**
  * Zero-width-space field used to fill an inline row. Frozen so a caller
  * cannot mutate the shared object out from under every other card.
  */

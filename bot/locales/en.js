@@ -563,7 +563,6 @@ const en = {
       added: '🕐 Added',
       evidence: 'Evidence',
       attached: '📎 Evidence',
-      attachedHint: 'Image is right below.',
       unavailable: 'Image link expired or unavailable. Re-add evidence via `/la-list edit`.',
       logs: '🔗 Logs',
       viewLogs: 'View Logs',

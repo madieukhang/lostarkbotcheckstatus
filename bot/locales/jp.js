@@ -398,7 +398,6 @@ const jp = {
       added: '🕐 Added',
       evidence: 'Evidence',
       attached: '📎 Evidence',
-      attachedHint: '画像はすぐ下にありますの。',
       unavailable: '画像 link が期限切れ、または利用できません。`/la-list edit` で evidence を追加し直してください。',
       logs: '🔗 Logs',
       viewLogs: 'View Logs',

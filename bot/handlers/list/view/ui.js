@@ -24,7 +24,7 @@ import {
 } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
-import { COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
+import { BLANK_FIELD_VALUE, COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField } from '../trackedAltsRender.js';
 import { getListContext } from '../helpers.js';
@@ -388,7 +388,7 @@ function applyEvidenceMedia(embed, entry, displayUrl, { attachImage, lang }) {
     // never reaches here, which is right · there is nothing to caption.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: t('listView.evidence.attachedHint', lang),
+      value: BLANK_FIELD_VALUE,
       inline: false,
     });
     embed.setImage(displayUrl);

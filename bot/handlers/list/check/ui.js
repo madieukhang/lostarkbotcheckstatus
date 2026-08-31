@@ -9,7 +9,7 @@ import { t } from '../../../services/i18n/index.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { getAddedByDisplay } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
-import { ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
+import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
 import { renderTrackedAltsField } from '../trackedAltsRender.js';
 
@@ -108,7 +108,7 @@ function applyCheckEvidence(embed, entry, displayUrl, lang) {
     // behind a button need none of this · there is no image to caption.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: t('listView.evidence.attachedHint', lang),
+      value: BLANK_FIELD_VALUE,
       inline: false,
     });
     embed.setImage(displayUrl);

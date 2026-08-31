@@ -14,7 +14,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `test/locale-invariants.test.js`: key-set parity across en/vi/jp, per-key placeholder SET parity, variant-sibling parity, pool shape, and no em-dash.
 
 ### Added
-- An embedded evidence screenshot now gets a **📎 Evidence** heading above it, on every card that shows one inline: check detail, evidence detail, `/la-list add` success and its approval card, and `/la-list edit` success. Discord gives an embed image no caption of its own, so it used to run straight on from whatever field came last, usually the roster list. Cards that put evidence behind a button are untouched, since there is no image on the card to caption.
+- An embedded evidence screenshot now gets a **📎 Evidence** heading above it, on every card that shows one inline: check detail, evidence detail, `/la-list add` success and its approval card, and `/la-list edit` success. Discord gives an embed image no caption of its own, so it used to run straight on from whatever field came last, usually the roster list. The heading stands alone with no caption line under it - the image is directly below, and a sentence saying so only restates what the reader can already see. Cards that put evidence behind a button are untouched, since there is no image on the card to caption.
 - The list-change broadcast carries **🌍 Server** too, and its inline metadata pads out to whole three-column rows. With four fields (Raid / Added / ilvl / CP) Discord left CP alone on a second row and stretched it across the card; `padInlineRow` in `utils/ui.js` is now the one helper every card uses for this.
 
 ### Added

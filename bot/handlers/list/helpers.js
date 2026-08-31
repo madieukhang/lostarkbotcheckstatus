@@ -17,7 +17,7 @@ import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
-import { COLORS, ICONS } from '../../utils/ui.js';
+import { BLANK_FIELD_VALUE, COLORS, ICONS } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
 import { renderTrackedAltsField } from './trackedAltsRender.js';
 
@@ -168,7 +168,7 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
     // straight on from the change list above it.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: t('listView.evidence.attachedHint', lang),
+      value: BLANK_FIELD_VALUE,
       inline: false,
     });
     embed.setImage(freshDisplayUrl);
@@ -283,7 +283,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     // one inline rather than behind a button.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: t('listView.evidence.attachedHint', lang),
+      value: BLANK_FIELD_VALUE,
       inline: false,
     });
     embed.setImage(payload.imageUrl);
