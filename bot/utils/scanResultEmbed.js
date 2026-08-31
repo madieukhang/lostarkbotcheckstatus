@@ -28,7 +28,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 
-import { COLORS, ICONS } from './ui.js';
+import { COLORS, ICONS, padInlineRow } from './ui.js';
 import { createArtistEmbed } from './artistVoice.js';
 import { truncateInlineText } from './discordText.js';
 import { formatAltLine } from '../handlers/list/trackedAltsRender.js';
@@ -182,7 +182,10 @@ function buildResultFields(result, state, altCount, lang) {
       value: String(value),
       inline: true,
     })));
-  return fields;
+  // Three fixed counters plus up to four optional ones, so the total
+  // lands anywhere from three to seven · pad so the stats grid keeps its
+  // columns instead of ending on a stretched leftover.
+  return padInlineRow(fields);
 }
 
 function buildResultFooter(target, result, lang) {

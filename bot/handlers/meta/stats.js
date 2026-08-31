@@ -9,7 +9,7 @@
 
 import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { connectDB } from '../../db.js';
-import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
+import { COLORS, ICONS, padInlineRow, relativeTime } from '../../utils/ui.js';
 import { deferEphemeralReply, editEmbed } from '../../utils/interactionReplies.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
@@ -77,7 +77,9 @@ export async function handleStatsCommand(interaction) {
   const embed = createArtistEmbed(lang)
     .setTitle(`📊 ${t('dialogue.stats.title', lang)}`)
     .setDescription(t('dialogue.stats.description', lang))
-    .addFields(
+    // Five inline panels · padded to six so the second row keeps the
+    // same three columns as the first instead of splitting in half.
+    .addFields(...padInlineRow([
       {
         name: `${ICONS.shield} ${t('dialogue.stats.listsField', lang)}`,
         value: [
@@ -133,7 +135,7 @@ export async function handleStatsCommand(interaction) {
           : t('dialogue.stats.scraperIdle', lang),
         inline: true,
       },
-    )
+    ]))
     .setColor(COLORS.info)
     .setFooter({ text: t('dialogue.stats.footer', lang) })
     .setTimestamp();
