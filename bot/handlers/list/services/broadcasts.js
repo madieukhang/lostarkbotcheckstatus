@@ -141,6 +141,22 @@ export function buildTrackedAltsField(entry, statMap = new Map(), options = {}) 
   });
 }
 
+/**
+ * Build the field grid for a list-change broadcast: full-width reason,
+ * then the inline metadata row, then the change list and roster list.
+ * @param {object} options
+ * @param {object} options.entry - the list entry being announced
+ * @param {'added'|'edited'|'removed'|'enriched'} options.action - drives
+ *   the timestamp label and whether the change list is rendered
+ * @param {string[]} [options.changes] - one line per edited field
+ * @param {object} [options.snap] - the entry's own RosterSnapshot
+ * @param {object} [options.altsField] - prebuilt roster-list field
+ * @param {string} [options.lang='en'] - locale for every label
+ * @param {Map<string, object>} [options.statMap] - snapshots for the whole
+ *   roster · lets the server fall back to a sibling. Omit to read the
+ *   server off `snap` alone.
+ * @returns {Array<object>} embed fields, inline ones padded to whole rows
+ */
 export function buildBroadcastFields({ entry, action, changes = [], snap, altsField, lang = 'en', statMap }) {
   const changesText = changes.join('\n');
   // Server is a roster-level fact, so a sibling's snapshot answers for
