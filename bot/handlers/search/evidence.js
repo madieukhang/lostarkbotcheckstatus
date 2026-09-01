@@ -13,7 +13,7 @@ import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../list/view/ui.js';
 
 /** Detect whether an entry has any image evidence (rehosted OR legacy). */
-export function entryHasImage(entry) {
+function entryHasImage(entry) {
   return Boolean(entry?.imageMessageId || entry?.imageUrl);
 }
 

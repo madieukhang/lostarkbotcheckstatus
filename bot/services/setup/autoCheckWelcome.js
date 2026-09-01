@@ -7,7 +7,7 @@ import {
   t,
 } from '../i18n/index.js';
 import { getVietnamDayKey } from './autoCheckCleanup.js';
-import { autoCheckChannelGuard } from './autoCheckChannelGuard.js';
+import { channelLifecycleGuard } from './channelLifecycleGuard.js';
 import {
   cleanupChannelMessages,
   formatCleanupFailureReasons,
@@ -60,7 +60,7 @@ export function createAutoCheckWelcomeService({
   getGuildLanguageFn = getGuildLanguage,
   cleanupMessages = cleanupChannelMessages,
   getCleanupDayKey = getVietnamDayKey,
-  channelGuard = autoCheckChannelGuard,
+  channelGuard = channelLifecycleGuard,
   supportedLanguageCodes = getSupportedLanguages().map((entry) => entry.code),
   logger = console,
 } = {}) {

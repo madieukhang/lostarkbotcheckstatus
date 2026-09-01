@@ -244,7 +244,7 @@ const en = {
     cleanupName: '🧹 I tidy this channel once a day',
     cleanupValue: [
       'At **00:00 Asia/Ho_Chi_Minh (17:00 UTC)** I delete every non-pinned message here to keep it tidy.',
-      'Pinned messages stay - move anything important elsewhere before the sweep.',
+      'Pinned messages stay. If anything was removed, I leave one plain message that deletes itself after five minutes.',
     ],
     cleanupDisabledName: '🛡️ This server keeps its own messages',
     cleanupDisabledValue: [

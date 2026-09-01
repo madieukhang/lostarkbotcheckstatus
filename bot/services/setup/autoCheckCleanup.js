@@ -1,7 +1,7 @@
 import GuildConfig from '../../models/GuildConfig.js';
 import { getGuildLanguage } from '../i18n/index.js';
 import { postCleanupNotice } from './cleanupNotice.js';
-import { autoCheckChannelGuard } from './autoCheckChannelGuard.js';
+import { channelLifecycleGuard } from './channelLifecycleGuard.js';
 import { checkBotPermissions } from './channelPermissions.js';
 import {
   buildAutoCheckCleanupEligibility,
@@ -18,14 +18,8 @@ import {
   resolveGuildTextChannel,
 } from './cleanupRuntime.js';
 
-// Backward-compatible public name used by the existing auto-check tests and
-// welcome service. The implementation is channel-generic so notify cleanup can
-// share the same old-message and partial-failure behavior.
-export const cleanupAutoCheckChannelMessages = cleanupChannelMessages;
-export { formatCleanupFailureReasons };
-
-export const AUTO_CHECK_CLEANUP_TICK_MS = 15 * 60 * 1000;
-export const AUTO_CHECK_CLEANUP_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+const AUTO_CHECK_CLEANUP_TICK_MS = 15 * 60 * 1000;
+const AUTO_CHECK_CLEANUP_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 const dayKeyFormatter = new Intl.DateTimeFormat('en', {
   timeZone: AUTO_CHECK_CLEANUP_TIME_ZONE,
@@ -53,10 +47,10 @@ async function resolveConfiguredChannel(client, config) {
 
 export function createAutoCheckCleanupService({
   GuildConfigModel = GuildConfig,
-  cleanupMessages = cleanupAutoCheckChannelMessages,
+  cleanupMessages = cleanupChannelMessages,
   nowDate = () => new Date(),
   resolveChannel = resolveConfiguredChannel,
-  channelGuard = autoCheckChannelGuard,
+  channelGuard = channelLifecycleGuard,
   checkPermissions = checkBotPermissions,
   postNotice = postCleanupNotice,
   getGuildLanguageFn = getGuildLanguage,
@@ -137,11 +131,10 @@ export function createAutoCheckCleanupService({
               ' deleted=' + outcome.deleted
             );
 
-            // Leave a sign, otherwise the channel just looks emptied and
-            // nobody can tell tidying apart from messages going missing.
-            // Posted after the sweep so this run cannot delete its own notice,
-            // and left standing until tomorrow's sweep: at 00:00 local time a
-            // self-deleting notice would be seen by nobody.
+            // Leave a short-lived sign, otherwise the channel just looks
+            // emptied and nobody can tell tidying apart from messages going
+            // missing. Posting after the sweep also prevents this run from
+            // deleting its own notice.
             const lang = await getGuildLanguageFn(config.guildId, { GuildConfigModel });
             await postNotice(channel, outcome.deleted, lang, { logger });
           } catch (err) {

@@ -118,7 +118,7 @@ export default {
     notificationsEnabled: 'このサーバーのグローバル通知を **有効** にしました。\n他サーバーのリスト変更をここへ届けますわ。',
     notificationsDisabled: 'このサーバーのグローバル通知を **無効** にしました。\n他サーバーの変更は静かにしておきますの。\n\n`/la-setup config action:notify-on` をもう一度実行するか、通知チャンネルを設定すると再び有効になりますわ。',
     autoCleanup: {
-      enabled: 'Auto-cleanup は **この server だけで有効** ですの。00:00 Asia/Ho_Chi_Minh に auto-check channel の pinned 以外を削除しますわ。`/la-setup config action:cleanup-off` で停止できますの。',
+      enabled: 'Auto-cleanup は **この server だけで有効** ですの。00:00 Asia/Ho_Chi_Minh に auto-check channel の pinned 以外を削除しますわ。削除があった時は通常 message を1件残し、5分後に自動削除しますの。`/la-setup config action:cleanup-off` で停止できますの。',
       disabled: 'Auto-cleanup は **この server では無効** ですの。Auto-check は動きますが、通常の message は削除いたしませんわ。必要なら `/la-setup config action:cleanup-on` で個別に有効化できますの。',
       noChannel: 'Cleanup を有効にする前に `/la-setup config action:set-auto-channel` で auto-check channel を設定してくださいませ。',
       guideNotRefreshed: 'Cleanup 設定は安全に変更しましたが、pinned guide を更新できませんでしたの。足りない権限: {missing}。',

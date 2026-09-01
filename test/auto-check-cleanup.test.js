@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import { Collection } from 'discord.js';
 
 import {
-  cleanupAutoCheckChannelMessages,
   createAutoCheckCleanupScheduler,
   createAutoCheckCleanupService,
-  formatCleanupFailureReasons,
   getVietnamDayKey,
 } from '../bot/services/setup/autoCheckCleanup.js';
-import { createAutoCheckChannelGuard } from '../bot/services/setup/autoCheckChannelGuard.js';
+import {
+  cleanupChannelMessages,
+  formatCleanupFailureReasons,
+} from '../bot/services/setup/channelCleanup.js';
+import { createChannelLifecycleGuard } from '../bot/services/setup/channelLifecycleGuard.js';
 
 function createMessage(id, { pinned = false, deleteError = null } = {}) {
   const state = { deleted: 0 };
@@ -54,7 +56,7 @@ test('daily cleanup paginates and deletes every non-pinned message', async () =>
     },
   };
 
-  const outcome = await cleanupAutoCheckChannelMessages(channel);
+  const outcome = await cleanupChannelMessages(channel);
 
   assert.deepEqual(fetches, [
     { limit: 100 },
@@ -80,7 +82,7 @@ test('daily cleanup never deletes an explicitly protected welcome ID', async () 
     },
   };
 
-  const outcome = await cleanupAutoCheckChannelMessages(channel, {
+  const outcome = await cleanupChannelMessages(channel, {
     protectedMessageIds: ['welcome'],
   });
 
@@ -103,7 +105,7 @@ test('daily cleanup groups Discord deletion errors for actionable logs', async (
     },
   };
 
-  const outcome = await cleanupAutoCheckChannelMessages(channel);
+  const outcome = await cleanupChannelMessages(channel);
 
   assert.equal(outcome.failed, 2);
   assert.deepEqual(outcome.failureReasons, {
@@ -116,7 +118,7 @@ test('daily cleanup groups Discord deletion errors for actionable logs', async (
 });
 
 test('per-channel guard serializes cleanup work and releases after completion', async () => {
-  const guard = createAutoCheckChannelGuard();
+  const guard = createChannelLifecycleGuard();
   const events = [];
   let releaseFirst;
   const first = guard.runExclusive('channel-1', async () => {
@@ -140,7 +142,7 @@ test('per-channel guard serializes cleanup work and releases after completion', 
 });
 
 test('shared channel guard protects more than one setup welcome in the same channel', () => {
-  const guard = createAutoCheckChannelGuard();
+  const guard = createChannelLifecycleGuard();
   guard.rememberWelcome('shared-channel', 'auto-welcome');
   guard.rememberWelcome('shared-channel', 'notify-welcome');
 
@@ -210,7 +212,7 @@ test('daily scheduler forwards stored and in-process welcome IDs as protected', 
       return config;
     },
   };
-  const guard = createAutoCheckChannelGuard();
+  const guard = createChannelLifecycleGuard();
   guard.rememberWelcome('channel-1', 'fresh-welcome');
   let cleanupOptions;
   const service = createAutoCheckCleanupService({

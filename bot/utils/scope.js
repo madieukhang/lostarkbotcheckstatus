@@ -18,7 +18,7 @@ import GuildConfig from '../models/GuildConfig.js';
  *   entries whose guildId was stored as an empty string
  * @returns {object|null} Scope filter to $and with name query, or null for owner (no filter needed)
  */
-export function buildBlacklistScopeFilter(
+function buildBlacklistScopeFilter(
   guildId,
   { ownerSeesAll = true, includeEmptyServerScope = false } = {}
 ) {

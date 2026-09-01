@@ -40,7 +40,7 @@
  * @param {Set<number>} [seen] - In-progress indexes for cycle guard.
  * @returns {any} Reconstructed value (primitives, plain objects, arrays).
  */
-export function decodeBibleData(data, idx, seen = new Set()) {
+function decodeBibleData(data, idx, seen = new Set()) {
   const invalidReference = idx === undefined
     || idx === null
     || idx === -1

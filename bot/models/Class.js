@@ -88,7 +88,7 @@ export function resolveClassId(value) {
  * Matches sister bot RaidManage's SUPPORT_CLASS_NAMES so the two bots
  * agree on role classification.
  */
-export const SUPPORT_CLASS_NAMES = new Set([
+const SUPPORT_CLASS_NAMES = new Set([
   'Bard',
   'Paladin',
   'Artist',

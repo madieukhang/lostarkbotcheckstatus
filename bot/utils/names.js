@@ -20,7 +20,7 @@ function normalizeNameGlyphs(raw) {
     .normalize('NFC');
 }
 
-export const CHARACTER_NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}\p{N}]{1,19}$/u;
+const CHARACTER_NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}\p{N}]{1,19}$/u;
 
 /**
  * Stable identity key for character-name maps, sets, and caches.

@@ -118,7 +118,7 @@ export async function loadCheckDetailStatMap(entry, {
   }
 }
 
-export function createAutoCheckEvidenceHandler({ client }) {
+function createAutoCheckEvidenceHandler({ client }) {
   return async function handleAutoCheckEvidenceSelect(interaction) {
     const raw = interaction.values?.[0] || '';
     const parsed = parseListEntryRef(raw);

@@ -29,7 +29,6 @@ import {
 } from './matchResolution.js';
 import { hasDatabaseListMatch } from './verification.js';
 export {
-  hasDatabaseListMatch,
   isCharacterIdentityVerified,
   partitionListCheckResultsByVerification,
 } from './verification.js';

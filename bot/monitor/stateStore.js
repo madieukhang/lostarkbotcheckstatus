@@ -141,5 +141,3 @@ export async function finishRecoveryNotification({
   );
   return Number(result?.modifiedCount) > 0;
 }
-
-export { DEFAULT_ALERT_CLAIM_MS };

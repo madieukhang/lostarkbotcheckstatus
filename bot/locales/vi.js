@@ -79,7 +79,7 @@ const vi = {
     cleanupName: '🧹 Mỗi ngày tớ dọn channel này một lần',
     cleanupValue: [
       'Đúng **00:00 Asia/Ho_Chi_Minh (17:00 UTC)**, tớ xoá mọi tin nhắn không ghim ở đây cho gọn.',
-      'Tin đã ghim thì tớ để yên - có gì quan trọng thì chuyển đi chỗ khác trước giờ dọn nha.',
+      'Tin đã ghim thì tớ để yên. Nếu có tin bị dọn, tớ để lại một tin nhắn thường rồi tự xóa sau 5 phút.',
     ],
     cleanupDisabledName: '🛡️ Server này tự giữ tin nhắn của mình',
     cleanupDisabledValue: [

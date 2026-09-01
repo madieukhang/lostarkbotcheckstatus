@@ -171,7 +171,7 @@ export default {
     notificationsEnabled: 'Global list notifications are **enabled** for this server.\nI will bring list changes from other servers here.',
     notificationsDisabled: 'Global list notifications are **disabled** for this server.\nI will keep cross-server list changes quiet.\n\nRun `/la-setup config action:notify-on` again, or set a notify channel to enable them.',
     autoCleanup: {
-      enabled: 'Auto-cleanup is **enabled for this server only**. At 00:00 Asia/Ho_Chi_Minh, non-pinned messages in its auto-check channel may be deleted. Use `/la-setup config action:cleanup-off` to stop it.',
+      enabled: 'Auto-cleanup is **enabled for this server only**. At 00:00 Asia/Ho_Chi_Minh, non-pinned messages in its auto-check channel may be deleted. If anything was removed, I leave one plain message that deletes itself after five minutes. Use `/la-setup config action:cleanup-off` to stop it.',
       disabled: 'Auto-cleanup is **off for this server**. Auto-check remains active, but I will not delete ordinary messages. Use `/la-setup config action:cleanup-on` to opt in.',
       noChannel: 'Set an auto-check channel with `/la-setup config action:set-auto-channel` before enabling cleanup.',
       guideNotRefreshed: 'Cleanup was changed safely, but I could not refresh the pinned guide. Missing: {missing}.',

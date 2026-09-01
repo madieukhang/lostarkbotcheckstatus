@@ -139,7 +139,7 @@ export default {
     notificationsEnabled: 'Đã **bật** thông báo danh sách toàn cục cho server này.\nTớ sẽ mang các thay đổi từ server khác về đây.',
     notificationsDisabled: 'Đã **tắt** thông báo danh sách toàn cục cho server này.\nTớ sẽ giữ yên các thay đổi từ server khác.\n\nChạy lại `/la-setup config action:notify-on` hoặc đặt notify channel để bật lại.',
     autoCleanup: {
-      enabled: 'Auto-cleanup đang **bật riêng cho server này**. Lúc 00:00 Asia/Ho_Chi_Minh, tin không ghim trong auto-check channel có thể bị xoá. Dùng `/la-setup config action:cleanup-off` để tắt.',
+      enabled: 'Auto-cleanup đang **bật riêng cho server này**. Lúc 00:00 Asia/Ho_Chi_Minh, tin không ghim trong auto-check channel có thể bị xoá. Nếu có tin bị dọn, tớ để lại một tin nhắn thường rồi tự xóa sau 5 phút. Dùng `/la-setup config action:cleanup-off` để tắt.',
       disabled: 'Auto-cleanup đang **tắt cho server này**. Auto-check vẫn chạy nhưng tớ sẽ không xoá tin nhắn thông thường. Dùng `/la-setup config action:cleanup-on` nếu muốn bật riêng.',
       noChannel: 'Hãy đặt auto-check channel bằng `/la-setup config action:set-auto-channel` trước khi bật cleanup.',
       guideNotRefreshed: 'Cleanup đã đổi an toàn, nhưng tớ chưa làm mới được bảng ghim. Còn thiếu: {missing}.',

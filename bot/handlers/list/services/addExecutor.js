@@ -289,7 +289,7 @@ function appendDuplicateDetailFields(fields, existed, lang) {
   return fields;
 }
 
-export function buildDuplicateListAddResult({ existed, name, labelCap, type, lang }) {
+function buildDuplicateListAddResult({ existed, name, labelCap, type, lang }) {
   const isRosterMatch = normalizeNameKey(existed.name) !== normalizeNameKey(name);
   const variant = isRosterMatch ? 'roster' : 'direct';
   const contentVariant = isRosterMatch ? 'contentRoster' : 'contentDirect';

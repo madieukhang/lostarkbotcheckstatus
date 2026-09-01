@@ -66,7 +66,7 @@ export function decorateListEntry(entry, listType) {
  * /la-check evidence dropdown). Centralised so the shape can evolve
  * (length tweak, separator change) in one place instead of three.
  */
-export const LIST_ENTRY_ID_RE = /^[0-9a-fA-F]{24}$/;
+const LIST_ENTRY_ID_RE = /^[0-9a-fA-F]{24}$/;
 
 /**
  * Parse the canonical `<listType>:<_id>` value encoding used by every

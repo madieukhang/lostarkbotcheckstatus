@@ -5,7 +5,7 @@ import {
   buildListNotifyWelcomeEmbed,
   createListNotifyWelcomeService,
 } from '../bot/services/setup/listNotifyWelcome.js';
-import { createChannelLifecycleGuard } from '../bot/services/setup/autoCheckChannelGuard.js';
+import { createChannelLifecycleGuard } from '../bot/services/setup/channelLifecycleGuard.js';
 
 function fakeEmbed(title) {
   return { toJSON: () => ({ title }) };

@@ -21,7 +21,10 @@ import {
   buildSearchEvidenceComponents,
   getFlaggedResultsWithImages,
 } from './evidence.js';
-import { buildEntryMap, sortBlacklistForScopePriority } from './matches.js';
+import {
+  buildListEntryMap as buildEntryMap,
+  sortBlacklistForScopePriority,
+} from '../../utils/listEntryMap.js';
 import { buildSearchResultEmbed } from './ui.js';
 
 export async function handleSearchCommand(interaction) {

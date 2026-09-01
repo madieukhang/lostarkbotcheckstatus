@@ -18,7 +18,7 @@ const DEFAULT_WORKER_ID = process.env.WORKER_ID || 'default';
 // the startedAt to the moment the worker process came up so bot side
 // can show "worker up since X" without relying on the worker preserving
 // state across crashes.
-export async function writeHeartbeat({
+async function writeHeartbeat({
   WorkerHeartbeat = WorkerHeartbeatDefault,
   workerId = DEFAULT_WORKER_ID,
   startedAt = new Date(),

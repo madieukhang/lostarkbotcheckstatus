@@ -7,7 +7,7 @@ import {
   t,
 } from '../i18n/index.js';
 import { COLORS } from '../../utils/ui.js';
-import { listNotifyChannelGuard } from './listNotifyChannelGuard.js';
+import { channelLifecycleGuard } from './channelLifecycleGuard.js';
 import { createPinnedWelcomeService } from './pinnedWelcome.js';
 
 function asText(value) {
@@ -45,7 +45,7 @@ export function createListNotifyWelcomeService({
   GuildConfigModel = GuildConfig,
   buildWelcomeEmbed = buildListNotifyWelcomeEmbed,
   getGuildLanguageFn = getGuildLanguage,
-  channelGuard = listNotifyChannelGuard,
+  channelGuard = channelLifecycleGuard,
   supportedLanguageCodes = getSupportedLanguages().map((entry) => entry.code),
   logger = console,
 } = {}) {

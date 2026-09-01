@@ -30,7 +30,7 @@ import { AlertSeverity, buildNoticeEmbed } from './alertEmbed.js';
  * Always reads from the OWNER guild's GuildConfig (not per-guild) · there
  * is one bot-wide evidence channel.
  */
-export async function getEvidenceChannelId() {
+async function getEvidenceChannelId() {
   if (!config.ownerGuildId) return null;
   const ownerConfig = await getGuildConfig(config.ownerGuildId);
   return ownerConfig?.evidenceChannelId || null;

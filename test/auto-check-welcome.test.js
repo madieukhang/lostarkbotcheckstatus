@@ -6,7 +6,7 @@ import {
   createAutoCheckWelcomeService,
 } from '../bot/services/setup/autoCheckWelcome.js';
 import { createAutoCheckCleanupService } from '../bot/services/setup/autoCheckCleanup.js';
-import { createAutoCheckChannelGuard } from '../bot/services/setup/autoCheckChannelGuard.js';
+import { createChannelLifecycleGuard } from '../bot/services/setup/channelLifecycleGuard.js';
 
 function fakeEmbed(title) {
   return {
@@ -59,9 +59,12 @@ test('auto-check welcome presents Artist as the channel host and explains daily 
   assert.match(embed.description, /check TênMột TênHai/u);
   assert.match(embed.description, /check TênMột, TênHai/u);
   assert.doesNotMatch(embed.description, /LoaLogs/i);
-  assert.match(embed.fields.map((field) => field.value).join('\n'), /00:00/);
-  assert.match(embed.fields.map((field) => field.value).join('\n'), /\/la-help/);
-  assert.match(embed.fields.map((field) => field.value).join('\n'), /check <name>/i);
+  const fieldsText = embed.fields.map((field) => field.value).join('\n');
+  assert.match(fieldsText, /00:00/);
+  assert.match(fieldsText, /tin nhắn thường/i);
+  assert.match(fieldsText, /5 phút/i);
+  assert.match(fieldsText, /\/la-help/);
+  assert.match(fieldsText, /check <name>/i);
 });
 
 test('server-local welcome says cleanup is off and does not promise deletion', () => {
@@ -221,7 +224,7 @@ test('welcome replacement leaves a cross-guild stale reference untouched', async
   });
   const service = createAutoCheckWelcomeService({
     GuildConfigModel,
-    channelGuard: createAutoCheckChannelGuard(),
+    channelGuard: createChannelLifecycleGuard(),
     buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
     getGuildLanguageFn: async () => 'vi',
     supportedLanguageCodes: ['en', 'vi', 'jp'],
@@ -314,7 +317,7 @@ test('forced repin rejects a cross-guild target before cleanup or send', async (
         throw new Error('persistence must not run');
       },
     },
-    channelGuard: createAutoCheckChannelGuard(),
+    channelGuard: createChannelLifecycleGuard(),
     buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
     getGuildLanguageFn: async () => 'vi',
     cleanupMessages: async () => {
@@ -384,7 +387,7 @@ test('forced repin cleans before posting even when scheduled cleanup is off', as
   };
   const service = createAutoCheckWelcomeService({
     GuildConfigModel,
-    channelGuard: createAutoCheckChannelGuard(),
+    channelGuard: createChannelLifecycleGuard(),
     buildWelcomeEmbed: (lang) => fakeEmbed('Welcome ' + lang),
     getGuildLanguageFn: async () => 'vi',
     cleanupMessages: async (_channel, options) => {
@@ -530,7 +533,7 @@ test('welcome setup and daily cleanup cannot race across the send-to-pin window'
       return { ...state };
     },
   };
-  const guard = createAutoCheckChannelGuard();
+  const guard = createChannelLifecycleGuard();
   const fresh = createMessage('fresh', 'Welcome vi');
   const channel = {
     id: 'channel-1',

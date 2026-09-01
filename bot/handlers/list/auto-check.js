@@ -35,7 +35,7 @@ const COOLDOWN_MS = 10_000; // 10 seconds between checks per user
 const processedMessages = new Map(); // messageId -> timestamp
 const inFlightMessages = new Set();
 const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
-export const AUTO_CHECK_MAX_NAMES = 8;
+const AUTO_CHECK_MAX_NAMES = 8;
 
 /**
  * Parse an explicit auto-check text request. Bare names and words such as

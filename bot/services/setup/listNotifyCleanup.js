@@ -10,11 +10,11 @@ import {
   prepareCleanupChannel,
   resolveGuildTextChannel,
 } from './cleanupRuntime.js';
-import { listNotifyChannelGuard } from './listNotifyChannelGuard.js';
+import { channelLifecycleGuard } from './channelLifecycleGuard.js';
 import { postListNotifyCleanupNotice } from './listNotifyCleanupNotice.js';
 import { postListNotifyWelcomeLocked } from './listNotifyWelcome.js';
 
-export const LIST_NOTIFY_CLEANUP_TICK_MS = 30 * 60 * 1000;
+const LIST_NOTIFY_CLEANUP_TICK_MS = 30 * 60 * 1000;
 
 /** Asia/Ho_Chi_Minh half-hour cursor, matching RaidManage's cleanup cadence. */
 export function getVietnamHalfHourKey(date = new Date()) {
@@ -45,7 +45,7 @@ export function createListNotifyCleanupService({
   getGuildLanguageFn = getGuildLanguage,
   nowDate = () => new Date(),
   resolveChannel = resolveConfiguredChannel,
-  channelGuard = listNotifyChannelGuard,
+  channelGuard = channelLifecycleGuard,
   checkPermissions = checkBotPermissions,
   logger = console,
 } = {}) {

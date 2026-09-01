@@ -187,5 +187,3 @@ export async function setGuildLanguage(guildId, lang, { GuildConfigModel } = {})
 export function clearGuildLanguageCache() {
   guildLanguageCache.clear();
 }
-
-export { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, TRANSLATIONS };

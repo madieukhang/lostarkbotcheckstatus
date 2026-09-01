@@ -1,7 +1,7 @@
 /**
- * Serialize destructive channel lifecycle work and remember the welcome that
- * must survive a cleanup sweep. The implementation is shared by auto-check
- * and list-notification channels; the legacy export stays for compatibility.
+ * Serialize destructive channel lifecycle work and remember welcome messages
+ * that must survive a cleanup sweep. Auto-check and list-notification flows
+ * deliberately share the same singleton because they may target one channel.
  */
 export function createChannelLifecycleGuard() {
   const channelTails = new Map();
@@ -61,5 +61,4 @@ export function createChannelLifecycleGuard() {
   };
 }
 
-export const createAutoCheckChannelGuard = createChannelLifecycleGuard;
-export const autoCheckChannelGuard = createChannelLifecycleGuard();
+export const channelLifecycleGuard = createChannelLifecycleGuard();

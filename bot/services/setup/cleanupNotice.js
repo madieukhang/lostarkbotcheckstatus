@@ -6,21 +6,15 @@
  * morning cannot tell whether the bot tidied up or whether messages went
  * missing. The notice explains the disappearance.
  *
- * Two deliberate differences from the RaidManage cleanup notice, both driven
- * by cadence. RaidManage sweeps every 30 minutes, so its sign self-deletes
- * after 5 minutes and it posts even on an empty sweep. This sweep runs once a
- * day at 00:00 Asia/Ho_Chi_Minh, so:
- *  - the notice STAYS until the next sweep removes it, otherwise nobody awake
- *    at midnight would be the only person who ever saw it;
- *  - nothing is posted when nothing was deleted, because a nightly "there was
- *    nothing to clean" is noise in a quiet channel.
+ * This sweep runs once a day at 00:00 Asia/Ho_Chi_Minh. It keeps the useful
+ * RaidManage behavior (a short-lived plain-text sign) while staying quiet when
+ * nothing was deleted.
  */
 
-import { EmbedBuilder } from 'discord.js';
-
 import { tPick } from '../i18n/index.js';
-import { COLORS } from '../../utils/ui.js';
 import { resolveCleanupVolume } from './cleanupVolume.js';
+
+export const AUTO_CHECK_CLEANUP_NOTICE_TTL_MS = 5 * 60 * 1000;
 
 /**
  * Pick the tone bucket for a sweep result.
@@ -32,20 +26,17 @@ export function resolveCleanupVolumeBucket(deleted) {
 }
 
 /**
- * Build the post-sweep notice embed.
+ * Build the post-sweep notice text.
  * @param {number} deleted - messages removed by the sweep
  * @param {string} lang - guild language
  * @param {{translate?: Function}} [deps] - translate injected for tests
- * @returns {import('discord.js').EmbedBuilder|null} null when nothing to post
+ * @returns {string|null} null when nothing should be posted
  */
-export function buildCleanupNoticeEmbed(deleted, lang, { translate = tPick } = {}) {
+export function buildCleanupNoticeContent(deleted, lang, { translate = tPick } = {}) {
   const bucket = resolveCleanupVolumeBucket(deleted);
   if (!bucket) return null;
 
-  return new EmbedBuilder()
-    .setColor(COLORS.muted)
-    .setDescription(translate(`dialogue.cleanupNotice.${bucket}`, lang, { n: Number(deleted) }))
-    .setTimestamp();
+  return translate(`dialogue.cleanupNotice.${bucket}`, lang, { n: Number(deleted) });
 }
 
 /**
@@ -54,14 +45,28 @@ export function buildCleanupNoticeEmbed(deleted, lang, { translate = tPick } = {
  * @param {import('discord.js').TextChannel} channel
  * @param {number} deleted
  * @param {string} lang
- * @param {{translate?: Function, logger?: Console}} [deps]
+ * @param {{translate?: Function, logger?: Console, setTimeoutFn?: Function}} [deps]
  * @returns {Promise<boolean>} whether a notice was actually posted
  */
-export async function postCleanupNotice(channel, deleted, lang, { translate, logger = console } = {}) {
-  const embed = buildCleanupNoticeEmbed(deleted, lang, translate ? { translate } : {});
-  if (!embed) return false;
+export async function postCleanupNotice(
+  channel,
+  deleted,
+  lang,
+  {
+    translate,
+    logger = console,
+    setTimeoutFn = setTimeout,
+  } = {}
+) {
+  const content = buildCleanupNoticeContent(deleted, lang, translate ? { translate } : {});
+  if (!content) return false;
   try {
-    await channel.send({ embeds: [embed] });
+    const message = await channel.send({ content });
+    const timer = setTimeoutFn(
+      () => message.delete().catch(() => {}),
+      AUTO_CHECK_CLEANUP_NOTICE_TTL_MS
+    );
+    timer?.unref?.();
     return true;
   } catch (err) {
     logger.warn?.('[auto-check cleanup] notice post failed:', err?.message || err);

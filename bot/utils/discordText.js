@@ -1,4 +1,4 @@
-export const DISCORD_CONTENT_LIMIT = 2000;
+const DISCORD_CONTENT_LIMIT = 2000;
 
 export function truncateInlineText(value, limit, suffix = '...') {
   const text = String(value || '').trim();

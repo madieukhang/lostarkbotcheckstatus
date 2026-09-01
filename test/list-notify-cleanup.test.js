@@ -2,10 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  autoCheckChannelGuard,
+  channelLifecycleGuard,
   createChannelLifecycleGuard,
-} from '../bot/services/setup/autoCheckChannelGuard.js';
-import { listNotifyChannelGuard } from '../bot/services/setup/listNotifyChannelGuard.js';
+} from '../bot/services/setup/channelLifecycleGuard.js';
 import {
   createListNotifyCleanupScheduler,
   createListNotifyCleanupService,
@@ -28,8 +27,9 @@ function createConfig(overrides = {}) {
   };
 }
 
-test('auto-check and notification lifecycle share one guard for same-channel setups', () => {
-  assert.strictEqual(listNotifyChannelGuard, autoCheckChannelGuard);
+test('channel lifecycle exposes one shared guard for same-channel setup flows', () => {
+  assert.equal(typeof channelLifecycleGuard.runExclusive, 'function');
+  assert.equal(typeof channelLifecycleGuard.getProtectedMessageIds, 'function');
 });
 
 test('notification cleanup cursor rolls on Vietnam half-hour boundaries', () => {

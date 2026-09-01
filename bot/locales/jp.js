@@ -79,7 +79,7 @@ const jp = {
     cleanupName: '🧹 この channel は毎日わたくしが片付けますわ',
     cleanupValue: [
       '毎日 **00:00 Asia/Ho_Chi_Minh (日本時間 02:00)** に、pinned 以外の全 message をわたくしが削除しますわ。',
-      'Pinned message は残りますの。大切な内容は cleanup 前に別の場所へ移してね♪',
+      'Pinned message は残りますの。削除があった時は通常 message を1件残し、5分後に自動削除しますわ。',
     ],
     cleanupDisabledName: '🛡️ この server の message はそのまま残しますわ',
     cleanupDisabledValue: [

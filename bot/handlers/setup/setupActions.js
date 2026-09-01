@@ -3,7 +3,7 @@
  * visibility: a toggle only appears in autocomplete when it would change state.
  */
 
-export const SETUP_ACTION_CHOICES = Object.freeze([
+const SETUP_ACTION_CHOICES = Object.freeze([
   { value: 'show', labelKey: 'show' },
   { value: 'set-auto-channel', labelKey: 'setAutoChannel' },
   { value: 'set-notify-channel', labelKey: 'setNotifyChannel' },

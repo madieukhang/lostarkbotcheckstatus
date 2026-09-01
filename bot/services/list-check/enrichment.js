@@ -34,7 +34,7 @@ const SUGGESTION_MATCH_LOGGERS = {
     `[listcheck] Search canonical match: OCR'd "${originalName}" -> canonical "${chosenName}"`,
 };
 
-export function formatSuggestionMatchLog(reason, context) {
+function formatSuggestionMatchLog(reason, context) {
   return (SUGGESTION_MATCH_LOGGERS[reason] || SUGGESTION_MATCH_LOGGERS.default)(context);
 }
 
