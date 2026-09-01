@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 
 import {
   buildRosterCharacters,
-  clearGuildMembersCache,
   detectAltsViaStronghold,
-  extractCharacterItemLevelFromHtml,
   fetchCharacterMeta,
   fetchGuildMembers,
-  fetchWithFallback,
-  stampRosterWorld,
 } from '../bot/services/roster/index.js';
+import { fetchWithFallback } from '../bot/services/roster/bibleFetch.js';
+import { stampRosterWorld } from '../bot/services/roster/buildRosterCharacters.js';
+import { clearGuildMembersCache } from '../bot/services/roster/guildMembers.js';
+import { extractCharacterItemLevelFromHtml } from '../bot/services/roster/parsers.js';
 import config from '../bot/config.js';
 import { clearMetaCache } from '../bot/utils/metaCache.js';
 

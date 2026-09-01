@@ -1,11 +1,6 @@
-export {
-  fetchWithFallback,
-} from './bibleFetch.js';
-
 export { bibleClient } from './bibleClient.js';
 
 export {
-  extractCharacterItemLevelFromHtml,
   parseCharacterMetaFromHtml,
   parseRosterCharactersFromHtml,
 } from './parsers.js';
@@ -18,7 +13,6 @@ export {
 
 export {
   buildRosterCharacters,
-  stampRosterWorld,
 } from './buildRosterCharacters.js';
 
 export {
@@ -30,7 +24,6 @@ export {
 } from './characterMeta.js';
 
 export {
-  clearGuildMembersCache,
   fetchGuildMembers,
 } from './guildMembers.js';
 

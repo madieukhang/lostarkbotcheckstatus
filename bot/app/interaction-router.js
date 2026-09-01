@@ -14,13 +14,15 @@ import GuildConfig from '../models/GuildConfig.js';
 import { buildSetupActionChoices } from '../handlers/setup/setupActions.js';
 import { resolveAutoCheckCleanupEnabled } from '../services/setup/autoCheckCleanupPolicy.js';
 import { createSystemHandlers } from '../handlers/system/index.js';
-import { handleRosterCommand, handleRosterDeepContinueButton } from '../handlers/roster/index.js';
+import { handleRosterCommand } from '../handlers/roster/command.js';
+import { handleRosterDeepContinueButton } from '../handlers/roster/deepContinue.js';
 import {
   createListHandlers,
   handleListEvidenceAutocomplete,
 } from '../handlers/list/index.js';
 import { handleSearchCommand } from '../handlers/search/index.js';
-import { handleSetupCommand, handleSetupRemoteCommand } from '../handlers/setup/index.js';
+import { handleSetupCommand } from '../handlers/setup/guildSetup.js';
+import { handleSetupRemoteCommand } from '../handlers/setup/remote.js';
 import { handleStatsCommand } from '../handlers/meta/stats.js';
 import { handleHelpCommand, handleHelpSelect } from '../handlers/meta/help.js';
 import {

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 
 import config from '../bot/config.js';
 import {
-  clearOcrCache,
   extractNamesFromImage,
 } from '../bot/services/list-check/service.js';
+import { clearOcrCache } from '../bot/services/list-check/ocr.js';
 
 test('extractNamesFromImage caches OCR results for repeated attachment URLs', async () => {
   clearOcrCache();

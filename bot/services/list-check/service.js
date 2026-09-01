@@ -13,7 +13,7 @@ import TrustedUser from '../../models/TrustedUser.js';
 import { getClassName } from '../../models/Class.js';
 import { normalizeNameKey } from '../../utils/names.js';
 export { formatCheckResults } from './format.js';
-export { clearOcrCache, extractNamesFromImage } from './ocr.js';
+export { extractNamesFromImage } from './ocr.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 import {
   buildListEntryMap as buildEntryMap,
