@@ -1,5 +1,6 @@
 import config from '../../config.js';
 import { findBibleNode } from '../../utils/bibleData.js';
+import { normalizeNameKey } from '../../utils/names.js';
 import {
   configureMetaCache,
   getCachedMeta,
@@ -23,13 +24,9 @@ const RETRYABLE_META_STATUSES = new Set([429, 502, 503, 504]);
 const DEFAULT_META_RETRY_DELAY_MS = 5000;
 const MAX_META_RETRY_DELAY_MS = 15 * 1000;
 
-function normalizeMetaFetchKey(name) {
-  return String(name || '').trim().toLowerCase();
-}
-
 function buildMetaInflightKey(name, options = {}) {
   return JSON.stringify({
-    name: normalizeMetaFetchKey(name),
+    name: normalizeNameKey(name),
     allowScraperApi: options.allowScraperApi !== false,
     preferScraperApi: options.preferScraperApi === true,
     fallbackOnRateLimit: options.fallbackOnRateLimit === true,

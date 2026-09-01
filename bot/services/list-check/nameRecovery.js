@@ -1,4 +1,5 @@
 import config from '../../config.js';
+import { normalizeNameKey } from '../../utils/names.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 
 /**
@@ -143,7 +144,7 @@ async function recoverViaPrefixCandidates(name, predicate, options = {}) {
     for (const s of suggestions) {
       const cand = asciiFoldName(String(s.name));
       if (!predicate(folded, cand)) continue;
-      matches.set(String(s.name).toLowerCase(), s);
+      matches.set(normalizeNameKey(s.name), s);
     }
     if (matches.size > before && suggestions.length < 10) break;
   }
@@ -182,11 +183,24 @@ function levenshteinDistance(a, b) {
 export function chooseCanonicalSuggestion(name, suggestions) {
   if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
 
+  // Every recovery pass needs the same string/key/folded forms. Build them
+  // once per suggestion instead of repeating Unicode normalization in the
+  // exact, diacritic, look-alike, and fuzzy branches below.
+  const candidates = suggestions.map((suggestion) => {
+    const candidateName = String(suggestion?.name || '');
+    return {
+      suggestion,
+      name: candidateName,
+      key: normalizeNameKey(candidateName),
+      canonical: stripDiacritics(candidateName),
+    };
+  });
+
   // First pass: case-insensitive exact match for cases where Gemini preserved
   // every character but changed casing.
-  const target = String(name).toLowerCase();
-  let chosen = suggestions.find((s) => String(s.name).toLowerCase() === target);
-  if (chosen) return { chosen, reason: 'exact' };
+  const target = normalizeNameKey(name);
+  let match = candidates.find((candidate) => candidate.key === target);
+  if (match) return { chosen: match.suggestion, reason: 'exact' };
 
   // Second pass: diacritic-tolerant match. Gemini sometimes adds,
   // drops, or swaps marks; bible's search can still return the real
@@ -196,16 +210,19 @@ export function chooseCanonicalSuggestion(name, suggestions) {
   // Aürélià), the OCR string must be exact; otherwise guessing from
   // search order silently assigns the wrong class/ilvl to a real player.
   const targetCanonical = stripDiacritics(name);
-  const diacriticMatches = suggestions.filter(
-    (s) => stripDiacritics(String(s.name)) === targetCanonical
+  const diacriticMatches = candidates.filter(
+    (candidate) => candidate.canonical === targetCanonical
   );
   if (diacriticMatches.length === 1) {
-    return { chosen: diacriticMatches[0], reason: 'diacritic' };
+    return { chosen: diacriticMatches[0].suggestion, reason: 'diacritic' };
   }
   const ambiguousDiacriticMatch = diacriticMatches.length > 1;
   if (ambiguousDiacriticMatch && hasAnyDiacritic(name)) {
     const ranked = diacriticMatches
-      .map((s) => ({ suggestion: s, distance: diacriticDistance(name, String(s.name)) }))
+      .map((candidate) => ({
+        suggestion: candidate.suggestion,
+        distance: diacriticDistance(name, candidate.name),
+      }))
       .sort((a, b) => a.distance - b.distance);
     if (ranked[0]?.distance < ranked[1]?.distance) {
       return { chosen: ranked[0].suggestion, reason: 'diacritic' };
@@ -218,8 +235,8 @@ export function chooseCanonicalSuggestion(name, suggestions) {
 
   const targetVisual = visualNameKey(name);
   if (targetVisual !== targetCanonical) {
-    chosen = suggestions.find((s) => visualNameKey(String(s.name)) === targetVisual);
-    if (chosen) return { chosen, reason: 'lookalike' };
+    match = candidates.find((candidate) => visualNameKey(candidate.name) === targetVisual);
+    if (match) return { chosen: match.suggestion, reason: 'lookalike' };
   }
 
   // Fourth pass: edit-distance fuzzy match. Recovers small OCR errors
@@ -228,14 +245,11 @@ export function chooseCanonicalSuggestion(name, suggestions) {
   const maxDistance = Math.min(2, Math.floor(targetCanonical.length / 6));
   let bestMatch = null;
   let bestDistance = Infinity;
-  for (const s of suggestions) {
-    const dist = levenshteinDistance(
-      targetCanonical,
-      stripDiacritics(String(s.name))
-    );
+  for (const candidate of candidates) {
+    const dist = levenshteinDistance(targetCanonical, candidate.canonical);
     if (dist < bestDistance) {
       bestDistance = dist;
-      bestMatch = s;
+      bestMatch = candidate.suggestion;
     }
   }
 
@@ -317,7 +331,7 @@ export async function recoverViaVisualSubstitution(name, options = {}) {
     const candidateBase = stripDiacritics(String(match.chosen.name));
     if (candidateBase !== stripDiacritics(variant)) continue;
     if (levenshteinDistance(source, candidateBase) !== 1) continue;
-    matches.set(String(match.chosen.name).toLowerCase(), match.chosen);
+    matches.set(normalizeNameKey(match.chosen.name), match.chosen);
   }
 
   return matches.size === 1 ? [...matches.values()][0] : null;

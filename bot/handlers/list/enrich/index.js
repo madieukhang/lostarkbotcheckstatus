@@ -39,7 +39,7 @@ import {
   detectAltsViaStronghold,
   buildRosterCharacters,
 } from '../../../services/roster/index.js';
-import { normalizeCharacterName } from '../../../utils/names.js';
+import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../../utils/scanPermissions.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
@@ -223,12 +223,12 @@ export function buildInitialEnrichProgress({
   startedAt,
 }) {
   const excludedNames = new Set(
-    (existingSession?.scannedNames ?? []).map((candidate) => String(candidate).toLowerCase())
+    (existingSession?.scannedNames ?? []).map(normalizeNameKey)
   );
   const passEligible = guildMembers.filter((member) => (
     member.name !== name
     && member.ilvl >= 1700
-    && !excludedNames.has(String(member.name).toLowerCase())
+    && !excludedNames.has(normalizeNameKey(member.name))
   )).length;
   const passLimit = resolvedCap || passEligible;
   return {
@@ -400,9 +400,9 @@ function buildCumulativeScanCounts(existingSession, result) {
 
 function findNewEnrichAlts(alts, existingCharacters) {
   const knownNames = new Set(
-    (existingCharacters || []).map((candidate) => String(candidate).toLowerCase())
+    (existingCharacters || []).map(normalizeNameKey)
   );
-  return alts.filter((alt) => !knownNames.has(String(alt.name).toLowerCase()));
+  return alts.filter((alt) => !knownNames.has(normalizeNameKey(alt.name)));
 }
 
 function buildEnrichSessionProgress({ alts, newAlts, scannedNames, counts, meta }) {
@@ -524,7 +524,7 @@ function buildEnrichResultCard({
     },
     result: cumulativeResult,
     alts: cumulative.alts,
-    newAltsSet: new Set(cumulative.newAlts.map((alt) => String(alt.name).toLowerCase())),
+    newAltsSet: new Set(cumulative.newAlts.map((alt) => normalizeNameKey(alt.name))),
     kind: 'enrich',
     contextStyle: { icon: style.icon, color: style.color },
     summaryLine: t('dialogue.enrich.summary', lang, {

@@ -1,5 +1,9 @@
 import config from '../../config.js';
-import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
+import {
+  isValidCharacterName,
+  normalizeCharacterName,
+  normalizeNameKey,
+} from '../../utils/names.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 import { createLruTtlCache } from '../../utils/lruTtlCache.js';
 import { fetchNameSuggestions } from '../roster/search.js';
@@ -201,13 +205,13 @@ function filterAndDeduplicateNames(parsed) {
   const names = parsed
     .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
     .filter(
-      (name) => isValidCharacterName(name) && !SERVER_NAMES.has(name.toLowerCase())
+      (name) => isValidCharacterName(name) && !SERVER_NAMES.has(normalizeNameKey(name))
     );
 
   const seen = new Set();
   const unique = [];
   for (const name of names) {
-    const key = name.toLowerCase();
+    const key = normalizeNameKey(name);
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(name);
@@ -241,15 +245,15 @@ async function findAmbiguousOcrChoices(
     }
     if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
 
-    const lower = name.toLowerCase();
-    const exact = suggestions.find((s) => String(s.name).toLowerCase() === lower);
+    const nameKey = normalizeNameKey(name);
+    const exact = suggestions.find((suggestion) => normalizeNameKey(suggestion.name) === nameKey);
     if (!exact) return null;
 
     const base = stripDiacritics(name);
     const markedSiblings = suggestions
       .filter((s) => {
         const candidate = String(s.name || '');
-        return candidate.toLowerCase() !== lower
+        return normalizeNameKey(candidate) !== nameKey
           && stripDiacritics(candidate) === base
           && hasAnyDiacritic(candidate);
       })

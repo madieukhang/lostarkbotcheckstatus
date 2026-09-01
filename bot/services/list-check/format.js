@@ -1,12 +1,9 @@
 import { getClassEmoji, isSupportClass } from '../../models/Class.js';
+import { normalizeNameKey } from '../../utils/names.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { t } from '../i18n/index.js';
 import { groupListCheckResults } from './displayGroups.js';
 import { didListCheckNameChange } from './matchResolution.js';
-
-function normalizeName(value) {
-  return String(value || '').trim().toLowerCase();
-}
 
 // The names in these branches are characters in their own right, so they
 // link out to their roster page like every other name on the card. The
@@ -18,7 +15,7 @@ function linkName(name, item) {
   // Class comes from the related-name snapshots the check service loads
   // for the entry and its alts · the searched name has its own
   // snapClassName, and everyone else was previously rendered bare.
-  const className = item?.relatedClasses?.[trimmed.toLowerCase()] || '';
+  const className = item?.relatedClasses?.[normalizeNameKey(trimmed)] || '';
   const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
   return `${classPrefix}[${trimmed}](${rosterUrl(trimmed)})`;
 }
@@ -42,7 +39,7 @@ function formatMatchContext(item, entry, listType, lang) {
   const detail = item.matchDetails?.[listType];
   if (detail?.kind === 'roster') {
     const matchedName = String(detail.matchedName || entry.name || '').trim();
-    if (normalizeName(matchedName) === normalizeName(entry.name)) {
+    if (normalizeNameKey(matchedName) === normalizeNameKey(entry.name)) {
       return t('dialogue.check.format.rosterVia', lang, { name: linkName(matchedName, item) });
     }
     return t('dialogue.check.format.rosterEntry', lang, {
@@ -50,7 +47,7 @@ function formatMatchContext(item, entry, listType, lang) {
       entry: linkName(entry.name, item),
     });
   }
-  if (normalizeName(entry.name) !== normalizeName(item.name)) {
+  if (normalizeNameKey(entry.name) !== normalizeNameKey(item.name)) {
     return t('dialogue.check.format.via', lang, { name: linkName(entry.name, item) });
   }
   return '';
@@ -71,12 +68,12 @@ function pickAltsForDisplay(item, excludedNames = [item.name]) {
     ? sourceEntry.allCharacters
     : (Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []);
   if (raw.length === 0) return [];
-  const seen = new Set(excludedNames.map(normalizeName).filter(Boolean));
+  const seen = new Set(excludedNames.map(normalizeNameKey).filter(Boolean));
   const out = [];
   for (const n of raw) {
     const trimmed = String(n || '').trim();
     if (!trimmed) continue;
-    const key = trimmed.toLowerCase();
+    const key = normalizeNameKey(trimmed);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(trimmed);

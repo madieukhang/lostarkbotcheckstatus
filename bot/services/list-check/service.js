@@ -11,6 +11,7 @@ import Watchlist from '../../models/Watchlist.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import TrustedUser from '../../models/TrustedUser.js';
 import { getClassName } from '../../models/Class.js';
+import { normalizeNameKey } from '../../utils/names.js';
 export { formatCheckResults } from './format.js';
 export { clearOcrCache, extractNamesFromImage } from './ocr.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
@@ -75,27 +76,37 @@ export {
  * @returns {Promise<void>}
  */
 async function attachRelatedClassNames(results) {
-  const wanted = new Set();
-  const relatedFor = (item) => [
-    item.blackEntry?.name,
-    item.whiteEntry?.name,
-    item.watchEntry?.name,
-    item.trustedEntry?.name,
-    ...(item.blackEntry?.allCharacters || []),
-    ...(item.whiteEntry?.allCharacters || []),
-    ...(item.watchEntry?.allCharacters || []),
-    ...(item.trustedEntry?.allCharacters || []),
-    ...(Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []),
-  ].map((name) => String(name || '').trim()).filter(Boolean);
-
-  for (const item of results) {
-    for (const name of relatedFor(item)) wanted.add(name);
+  const relatedGroups = results.map((item) => {
+    const namesByKey = new Map();
+    const rawNames = [
+      item.blackEntry?.name,
+      item.whiteEntry?.name,
+      item.watchEntry?.name,
+      item.trustedEntry?.name,
+      ...(item.blackEntry?.allCharacters || []),
+      ...(item.whiteEntry?.allCharacters || []),
+      ...(item.watchEntry?.allCharacters || []),
+      ...(item.trustedEntry?.allCharacters || []),
+      ...(Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []),
+    ];
+    for (const rawName of rawNames) {
+      const name = String(rawName || '').trim().normalize('NFC');
+      const key = normalizeNameKey(name);
+      if (key && !namesByKey.has(key)) namesByKey.set(key, name);
+    }
+    return { item, namesByKey };
+  });
+  const wantedByKey = new Map();
+  for (const { namesByKey } of relatedGroups) {
+    for (const [key, name] of namesByKey) {
+      if (!wantedByKey.has(key)) wantedByKey.set(key, name);
+    }
   }
-  if (wanted.size === 0) return;
+  if (wantedByKey.size === 0) return;
 
   let snapshots = [];
   try {
-    snapshots = await RosterSnapshot.find({ name: { $in: [...wanted] } })
+    snapshots = await RosterSnapshot.find({ name: { $in: [...wantedByKey.values()] } })
       .collation({ locale: 'en', strength: 2 })
       .lean();
   } catch (err) {
@@ -106,15 +117,15 @@ async function attachRelatedClassNames(results) {
   const classByName = new Map();
   for (const snapshot of snapshots) {
     const className = snapshot?.classId ? getClassName(snapshot.classId) : '';
-    if (className) classByName.set(String(snapshot.name).toLowerCase(), className);
+    if (className) classByName.set(normalizeNameKey(snapshot.name), className);
   }
   if (classByName.size === 0) return;
 
-  for (const item of results) {
+  for (const { item, namesByKey } of relatedGroups) {
     const related = {};
-    for (const name of relatedFor(item)) {
-      const className = classByName.get(name.toLowerCase());
-      if (className) related[name.toLowerCase()] = className;
+    for (const key of namesByKey.keys()) {
+      const className = classByName.get(key);
+      if (className) related[key] = className;
     }
     if (Object.keys(related).length > 0) item.relatedClasses = related;
   }
@@ -143,7 +154,7 @@ async function loadInitialListData(names, guildId) {
   ]);
   return {
     maps: createListMaps({ black, white, watch, trusted }),
-    snapshots: new Map(snapshots.map((snapshot) => [snapshot.name.toLowerCase(), snapshot])),
+    snapshots: new Map(snapshots.map((snapshot) => [normalizeNameKey(snapshot.name), snapshot])),
   };
 }
 
@@ -157,7 +168,7 @@ function resolveAllMappedMatches(maps, candidates) {
 }
 
 function createInitialListCheckResult(name, inputSource, maps, snapshots) {
-  const snapshot = snapshots.get(name.toLowerCase()) || null;
+  const snapshot = snapshots.get(normalizeNameKey(name)) || null;
   const matches = resolveAllMappedMatches(maps, [{ name, origin: 'checked' }]);
   const initialListMatch = Object.values(matches).some((match) => Boolean(match.entry));
   return {
@@ -225,41 +236,39 @@ async function reconcileEnrichedListMatches(results, guildId) {
 }
 
 function collectTrustedAltNames(results) {
-  const names = new Set();
+  const namesByKey = new Map();
   for (const item of results) {
     if (item.trustedEntry) continue;
-    for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
-      for (const name of entry?.allCharacters || []) names.add(name);
-    }
-    if (Array.isArray(item.discoveredAlts)) {
-      for (const name of item.discoveredAlts) names.add(name);
+    for (const rawName of rosterRelationshipNames(item)) {
+      const name = String(rawName || '').trim().normalize('NFC');
+      const key = normalizeNameKey(name);
+      if (key && !namesByKey.has(key)) namesByKey.set(key, name);
     }
   }
-  return names;
+  return namesByKey;
+}
+
+function* rosterRelationshipNames(item) {
+  for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
+    yield* (entry?.allCharacters || []);
+  }
+  yield* (Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []);
 }
 
 function findTrustedRosterMatch(item, trustedMap) {
-  for (const entry of [item.blackEntry, item.whiteEntry, item.watchEntry]) {
-    for (const name of entry?.allCharacters || []) {
-      const match = trustedMap.get(String(name).toLowerCase());
-      if (match) return { entry: match, matchedName: name };
-    }
-  }
-  if (Array.isArray(item.discoveredAlts)) {
-    for (const name of item.discoveredAlts) {
-      const match = trustedMap.get(String(name).toLowerCase());
-      if (match) return { entry: match, matchedName: name };
-    }
+  for (const name of rosterRelationshipNames(item)) {
+    const match = trustedMap.get(normalizeNameKey(name));
+    if (match) return { entry: match, matchedName: name };
   }
   return null;
 }
 
 async function resolveTrustedRosterMatches(results) {
-  const names = collectTrustedAltNames(results);
-  if (names.size === 0) return 0;
+  const namesByKey = collectTrustedAltNames(results);
+  if (namesByKey.size === 0) return 0;
 
   const startedAt = Date.now();
-  const entries = await TrustedUser.find(buildNameRosterQuery([...names]))
+  const entries = await TrustedUser.find(buildNameRosterQuery([...namesByKey.values()]))
     .collation(LIST_COLLATION)
     .lean();
   const elapsedMs = Date.now() - startedAt;

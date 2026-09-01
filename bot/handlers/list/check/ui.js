@@ -7,15 +7,11 @@
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { t } from '../../../services/i18n/index.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
-import { getAddedByDisplay } from '../../../utils/names.js';
+import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
 import { renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
-
-function normalizeNameKey(value) {
-  return String(value || '').trim().toLowerCase();
-}
 
 function parsePositiveNumber(value) {
   const parsed = Number(String(value ?? '').replace(/,/g, ''));

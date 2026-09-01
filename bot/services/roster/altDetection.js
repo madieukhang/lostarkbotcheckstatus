@@ -11,6 +11,7 @@
 
 import config from '../../config.js';
 import { getClassName } from '../../models/Class.js';
+import { normalizeNameKey } from '../../utils/names.js';
 import {
   getCurrentScraperApiUsageScopeSnapshot,
   runWithScraperApiUsageScope,
@@ -143,13 +144,14 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   // don't have to match bible's capitalisation exactly.
   const excludeSet = new Set(
     (Array.isArray(options.excludeNames) ? options.excludeNames : [])
-      .map((n) => String(n).toLowerCase())
+      .map(normalizeNameKey)
   );
+  const targetKey = normalizeNameKey(name);
   const baseCandidates = members
-    .filter((m) => m.name !== name && m.ilvl >= 1700)
+    .filter((member) => normalizeNameKey(member.name) !== targetKey && member.ilvl >= 1700)
     .sort((a, b) => (b.ilvl || 0) - (a.ilvl || 0));
   const candidates = excludeSet.size > 0
-    ? baseCandidates.filter((m) => !excludeSet.has(String(m.name).toLowerCase()))
+    ? baseCandidates.filter((member) => !excludeSet.has(normalizeNameKey(member.name)))
     : baseCandidates;
   const excludedCandidates = baseCandidates.length - candidates.length;
   const limitedCandidates = candidateLimit > 0 ? candidates.slice(0, candidateLimit) : candidates;

@@ -1,6 +1,7 @@
 import config from '../../config.js';
 import { findBibleNode } from '../../utils/bibleData.js';
 import { createLruTtlCache } from '../../utils/lruTtlCache.js';
+import { normalizeNameKey } from '../../utils/names.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
 import { parseGuildMembersFromHtml } from './parsers.js';
@@ -8,13 +9,9 @@ import { parseGuildMembersFromHtml } from './parsers.js';
 const guildMembersCache = createLruTtlCache({
   ttlMs: () => config.guildMembersCacheTtlMs,
   maxSize: () => config.guildMembersCacheMaxSize,
-  normalizeKey: normalizeGuildMembersCacheKey,
+  normalizeKey: normalizeNameKey,
 });
 const inFlightGuildMemberFetches = new Map();
-
-function normalizeGuildMembersCacheKey(key) {
-  return String(key || '').trim().toLowerCase();
-}
 
 function getCachedGuildMembers(cacheKey) {
   return guildMembersCache.get(cacheKey);
@@ -84,7 +81,7 @@ export async function fetchGuildMembers(name, options = {}) {
     const cached = getCachedGuildMembers(cacheKey);
     if (cached !== undefined) return cached;
 
-    const normalizedKey = normalizeGuildMembersCacheKey(cacheKey);
+    const normalizedKey = normalizeNameKey(cacheKey);
     const inFlight = inFlightGuildMemberFetches.get(normalizedKey);
     if (inFlight) return inFlight;
 

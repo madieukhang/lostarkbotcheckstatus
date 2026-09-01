@@ -21,7 +21,7 @@ import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { normalizeCharacterName } from '../../../utils/names.js';
+import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
@@ -201,8 +201,9 @@ export function createRemoveHandlers({ services }) {
         // with > 1 char wins (entries usually share the same roster).
         const sourceEntry = (outcomes.find((o) => Array.isArray(o.entry.allCharacters) && o.entry.allCharacters.length > 1))?.entry;
         if (sourceEntry) {
+          const sourceEntryKey = normalizeNameKey(sourceEntry.name);
           const others = (sourceEntry.allCharacters || []).filter(
-            (n) => String(n).toLowerCase() !== String(sourceEntry.name).toLowerCase()
+            (name) => normalizeNameKey(name) !== sourceEntryKey
           );
           if (others.length > 0) {
             const visible = others.slice(0, 6);

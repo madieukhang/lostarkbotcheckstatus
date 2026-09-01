@@ -39,3 +39,8 @@ test('refreshing a cache key moves it to the MRU edge', () => {
   assert.equal(getCachedMeta('Beta'), undefined);
   assert.deepEqual(getCachedMeta('Gamma'), { value: 4 });
 });
+
+test('metadata cache shares canonically equivalent Unicode keys', () => {
+  setCachedMeta('Zoë', { value: 1 });
+  assert.deepEqual(getCachedMeta('  ZOE\u0308  '), { value: 1 });
+});

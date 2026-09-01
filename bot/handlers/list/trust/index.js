@@ -5,7 +5,11 @@ import Blacklist from '../../../models/Blacklist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
-import { normalizeCharacterName, normalizeRosterNames } from '../../../utils/names.js';
+import {
+  normalizeCharacterName,
+  normalizeNameKey,
+  normalizeRosterNames,
+} from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
@@ -60,7 +64,7 @@ async function replyExistingTrust(interaction, name, existing, lang) {
   await editAlert(interaction, {
     severity: AlertSeverity.WARNING,
     title: t('dialogue.trust.already.title', lang),
-    description: existing.name.toLowerCase() === name.toLowerCase()
+    description: normalizeNameKey(existing.name) === normalizeNameKey(name)
       ? t('dialogue.trust.already.direct', lang, { name: existing.name })
       : t('dialogue.trust.already.via', lang, { name, matched: existing.name }),
     lang,
@@ -156,7 +160,7 @@ function buildTrustSuccessEmbed(args) {
 async function handleTrustAddition(interaction, name, reason, lang) {
   const existing = await TrustedUser.findOne(buildNameRosterQuery([name]))
     .collation({ locale: 'en', strength: 2 });
-  if (existing && existing.name.toLowerCase() !== name.toLowerCase()) {
+  if (existing && normalizeNameKey(existing.name) !== normalizeNameKey(name)) {
     await replyExistingTrust(interaction, name, existing, lang);
     return;
   }

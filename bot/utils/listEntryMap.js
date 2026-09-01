@@ -1,11 +1,13 @@
+import { normalizeNameKey } from './names.js';
+
 export function buildNameRosterQuery(names = []) {
   const values = Array.isArray(names) ? names : [names];
   const list = [];
   const seen = new Set();
   for (const value of values) {
-    const name = String(value || '').trim();
+    const name = String(value || '').trim().normalize('NFC');
     if (!name) continue;
-    const key = name.toLowerCase();
+    const key = normalizeNameKey(name);
     if (seen.has(key)) continue;
     seen.add(key);
     list.push(name);
@@ -21,10 +23,11 @@ export function buildNameRosterQuery(names = []) {
 export function buildListEntryMap(entries) {
   const map = new Map();
   for (const entry of entries || []) {
-    map.set(String(entry.name || '').toLowerCase(), entry);
+    const primaryKey = normalizeNameKey(entry.name);
+    if (primaryKey) map.set(primaryKey, entry);
     for (const character of (entry.allCharacters || [])) {
-      const lower = String(character || '').toLowerCase();
-      if (!map.has(lower) || entry.scope === 'server') map.set(lower, entry);
+      const key = normalizeNameKey(character);
+      if (key && (!map.has(key) || entry.scope === 'server')) map.set(key, entry);
     }
   }
   return map;

@@ -21,13 +21,10 @@
  */
 
 import { getClassEmoji, getClassName } from '../../models/Class.js';
+import { normalizeNameKey } from '../../utils/names.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 
 const FIELD_VALUE_LIMIT = 1024;
-
-function lcKey(value) {
-  return String(value || '').trim().toLowerCase();
-}
 
 function classNameFromRecord(record) {
   return record?.className || (record?.classId ? getClassName(record.classId) : '');
@@ -122,13 +119,13 @@ export function renderTrackedAltsField({
   overflowTemplate = '... and {count} more',
 } = {}) {
   const all = Array.isArray(names) ? names : [];
-  const primaryKey = lcKey(primaryName);
+  const primaryKey = normalizeNameKey(primaryName);
   const candidates = includePrimary ? [primaryName, ...all] : all;
   const seen = new Set();
   const others = candidates
     .map((n) => String(n || '').trim())
     .filter((n) => {
-      const key = lcKey(n);
+      const key = normalizeNameKey(n);
       if (!n || (!includePrimary && key === primaryKey) || seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -150,7 +147,7 @@ export function renderTrackedAltsField({
   const lines = [];
   const overflowText = (count) => String(overflowTemplate).replace('{count}', String(count));
   for (const name of others) {
-    const line = formatAltLine(name, lines.length, statMap.get(lcKey(name)));
+    const line = formatAltLine(name, lines.length, statMap.get(normalizeNameKey(name)));
     const hiddenAfterThis = others.length - lines.length - 1;
     const overflowLine = hiddenAfterThis > 0 ? `\n*${overflowText(hiddenAfterThis)}*` : '';
     const candidate = [...lines, line].join('\n') + overflowLine;
@@ -178,7 +175,7 @@ export function statMapFromRosterCharacters(rosterCharacters = []) {
   const map = new Map();
   for (const record of rosterCharacters || []) {
     if (!record?.name) continue;
-    map.set(lcKey(record.name), record);
+    map.set(normalizeNameKey(record.name), record);
   }
   return map;
 }
@@ -204,7 +201,7 @@ export function statMapFromRosterCharacters(rosterCharacters = []) {
  * @returns {string} the server name, or '' when no sibling knows one
  */
 export function resolveRosterWorld(entry, statMap = new Map()) {
-  const readWorld = (name) => String(statMap.get(lcKey(name))?.world || '').trim();
+  const readWorld = (name) => String(statMap.get(normalizeNameKey(name))?.world || '').trim();
 
   // The entry's own snapshot wins · only fall back to siblings when it
   // has nothing to say.

@@ -3,8 +3,14 @@ import assert from 'node:assert/strict';
 
 import {
   normalizeCharacterName,
+  normalizeNameKey,
   parseAdditionalNames,
 } from '../bot/utils/names.js';
+
+test('normalizeNameKey gives composed and decomposed names one identity', () => {
+  assert.equal(normalizeNameKey('  ZOE\u0308  '), 'zoë');
+  assert.equal(normalizeNameKey('Zoë'), 'zoë');
+});
 
 test('parseAdditionalNames returns empty result for falsy input', () => {
   assert.deepEqual(parseAdditionalNames(''), { added: [], duplicates: [] });

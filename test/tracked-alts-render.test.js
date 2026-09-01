@@ -49,6 +49,20 @@ test('tracked roster mode prepends the primary character and removes case-insens
   assert.match(field.value, /\n\*\*2\.\*\* \[Altone\]/);
 });
 
+test('tracked roster stats survive composed versus decomposed Unicode spelling', () => {
+  const field = renderTrackedAltsField({
+    names: ['Zoe\u0308'],
+    primaryName: 'Main',
+    statMap: statMapFromRosterCharacters([
+      { name: 'Zoë', itemLevel: 1745, combatScore: '4000' },
+    ]),
+  });
+
+  assert.match(field.value, /Zoë/);
+  assert.match(field.value, /`1745\.00`/);
+  assert.match(field.value, /`4000 CP`/);
+});
+
 test('tracked alts renderer supports a custom label + class icon for the enrich "New alts" field', async () => {
   // The enrich broadcast reuses this renderer with label "🆕 New alts" so the
   // just-appended alts render with the SAME class icon + ilvl vocabulary as the

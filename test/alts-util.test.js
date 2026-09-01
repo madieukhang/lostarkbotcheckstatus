@@ -21,3 +21,13 @@ test('mergeAltsByName dedupes case-insensitively and lets newer entries win', ()
     { name: 'Ciel', itemLevel: 1720 },
   ]);
 });
+
+test('mergeAltsByName dedupes canonically equivalent Unicode names', () => {
+  assert.deepEqual(
+    mergeAltsByName(
+      [{ name: 'Zoe\u0308', itemLevel: 1700 }],
+      [{ name: 'Zoë', itemLevel: 1740 }],
+    ),
+    [{ name: 'Zoë', itemLevel: 1740 }],
+  );
+});

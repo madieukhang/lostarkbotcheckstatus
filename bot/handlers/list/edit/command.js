@@ -14,6 +14,7 @@ import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import {
   normalizeCharacterName,
+  normalizeNameKey,
   getInteractionDisplayName,
 } from '../../../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
@@ -190,7 +191,7 @@ async function rejectInvalidListEditState({
   );
   if (!trustedCheck) return false;
 
-  const isSelf = trustedCheck.name.toLowerCase() === existing.name.toLowerCase();
+  const isSelf = normalizeNameKey(trustedCheck.name) === normalizeNameKey(existing.name);
   await editEmbed(
     interaction,
     buildTrustedBlockEmbed(

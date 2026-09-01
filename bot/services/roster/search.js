@@ -11,6 +11,7 @@
 import config from '../../config.js';
 import { getClassName } from '../../models/Class.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
+import { normalizeNameKey } from '../../utils/names.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
 import { parseItemLevelValue } from './parsers.js';
@@ -213,7 +214,7 @@ export async function fetchNameSuggestions(name, options = {}) {
   // Unicode can bypass both request-local and shared dedupe, then fan out into
   // duplicate Bible calls for a name we already have in flight.
   const queryName = normalizeSuggestionQuery(name);
-  const cacheKey = queryName.toLowerCase();
+  const cacheKey = normalizeNameKey(queryName);
   const requestCache = suggestionContext?.cache instanceof Map
     ? suggestionContext.cache
     : suggestionCache;
@@ -281,7 +282,8 @@ export async function fetchNameSuggestions(name, options = {}) {
  */
 export async function inferHiddenRosterItemLevel(name, options = {}) {
   const suggestions = await fetchNameSuggestions(name, options);
-  const exact = suggestions?.find((s) => s.name?.toLowerCase() === name.toLowerCase());
+  const targetKey = normalizeNameKey(name);
+  const exact = suggestions?.find((suggestion) => normalizeNameKey(suggestion.name) === targetKey);
   return exact ? parseItemLevelValue(exact.itemLevel) : null;
 }
 

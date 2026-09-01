@@ -9,6 +9,7 @@
  */
 
 import { JSDOM, VirtualConsole } from 'jsdom';
+import { normalizeNameKey } from '../../utils/names.js';
 
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
@@ -103,8 +104,9 @@ export async function buildRosterCharacters(name, options = {}) {
       // Find the queried character's record in the parsed list. Match
       // is case-insensitive because OCR'd / user-typed names may not
       // match bible's capitalisation exactly.
+      const targetKey = normalizeNameKey(name);
       const targetRecord = rosterChars.find(
-        (c) => String(c.name).toLowerCase() === String(name).toLowerCase()
+        (character) => normalizeNameKey(character.name) === targetKey
       );
       if (targetRecord) {
         const targetStats = readTargetStats(targetRecord);

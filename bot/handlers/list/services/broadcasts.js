@@ -16,6 +16,7 @@ import { upsertRosterSnapshots } from '../../../services/roster/rosterSnapshots.
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
 import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
+import { normalizeNameKey } from '../../../utils/names.js';
 import { getListContext, listTypeIcon } from '../helpers.js';
 import { buildBroadcastEvidenceComponents } from '../evidence/broadcastButton.js';
 import {
@@ -34,10 +35,6 @@ const ACTION_VERB = Object.freeze({
   // here only feeds the card title ("List enriched broadcast").
   enriched: 'enriched',
 });
-
-function normalizeNameKey(value) {
-  return String(value || '').trim().toLowerCase();
-}
 
 function parseItemLevel(value) {
   const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
@@ -362,7 +359,8 @@ export function createBroadcastServices({
     // guild only needs to know the entry grew, not by whom).
     const newAlts = (Array.isArray(newAltNames) ? newAltNames : []).filter(Boolean);
     const newCount = newAlts.length;
-    const totalTracked = Math.max(0, allChars.filter((n) => normalizeNameKey(n) !== normalizeNameKey(entry.name)).length);
+    const entryKey = normalizeNameKey(entry.name);
+    const totalTracked = Math.max(0, allChars.filter((name) => normalizeNameKey(name) !== entryKey).length);
     function buildPayloadForLanguage(lang) {
       const listLabel = t(`dialogue.broadcast.list.${payload.type}`, lang);
       const scopeTag = entry.scope === 'server'
@@ -450,7 +448,7 @@ export function createBroadcastServices({
         const snaps = await RosterSnapshot.find({ name: { $in: allBulkNames } })
           .collation({ locale: 'en', strength: 2 })
           .lean();
-        snapshotMap = new Map(snaps.map((s) => [s.name.toLowerCase(), s]));
+        snapshotMap = new Map(snaps.map((snapshot) => [normalizeNameKey(snapshot.name), snapshot]));
       } catch (err) {
         console.warn('[list] Snapshot lookup for bulk broadcast failed (non-fatal):', err.message);
       }
@@ -458,7 +456,7 @@ export function createBroadcastServices({
 
     const renderBulkLine = (i, t, r) => {
       const name = r.entry?.name || r.name;
-      const snap = snapshotMap.get(String(name).toLowerCase());
+      const snap = snapshotMap.get(normalizeNameKey(name));
       const cls = snap?.classId ? getClassName(snap.classId) : '';
       const classPrefix = cls ? `${getClassEmoji(cls) || cls} ` : '';
       const reasonShort = (r.entry?.reason || '').length > 60

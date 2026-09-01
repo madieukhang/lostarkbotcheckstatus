@@ -31,6 +31,7 @@ import {
 import { COLORS, ICONS, padInlineRow } from './ui.js';
 import { createArtistEmbed } from './artistVoice.js';
 import { truncateInlineText } from './discordText.js';
+import { normalizeNameKey } from './names.js';
 import { formatAltLine } from '../handlers/list/trackedAltsRender.js';
 import { t } from '../services/i18n/index.js';
 
@@ -135,7 +136,7 @@ function buildAltList(alts, { newAltsSet, lang = 'en' } = {}) {
   // had already fallen behind on the CP badge. The "new" tag is appended
   // here because it belongs to this card alone.
   const lines = visible.map((alt, i) => {
-    const isNewMark = newAltsSet?.has(String(alt.name).toLowerCase()) ? ` \`${t('dialogue.scan.result.newTag', lang)}\`` : '';
+    const isNewMark = newAltsSet?.has(normalizeNameKey(alt.name)) ? ` \`${t('dialogue.scan.result.newTag', lang)}\`` : '';
     const record = { ...alt, className: alt.className || alt.classId || '' };
     return `${formatAltLine(alt.name, i, record)}${isNewMark}`;
   });

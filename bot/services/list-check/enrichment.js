@@ -1,7 +1,7 @@
 import config from '../../config.js';
 import { getClassName, resolveClassId } from '../../models/Class.js';
 import { mapWithConcurrency } from '../../utils/async.js';
-import { normalizeCharacterName } from '../../utils/names.js';
+import { normalizeCharacterName, normalizeNameKey } from '../../utils/names.js';
 import { buildRosterCharacters } from '../roster/buildRosterCharacters.js';
 import {
   createNameSuggestionContext,
@@ -90,7 +90,7 @@ export async function enrichListCheckResults(
       ...(typeof itemLevel === 'number' && itemLevel > 0 ? { snapItemLevel: itemLevel } : {}),
       ...(combatScore && combatScore !== '?' ? { snapCombatScore: String(combatScore) } : {}),
     });
-    pendingSnapshots.set(String(item.name).toLowerCase(), {
+    pendingSnapshots.set(normalizeNameKey(item.name), {
       name: item.name,
       itemLevel,
       classId,
@@ -150,7 +150,7 @@ export async function enrichListCheckResults(
 
     if (suggestions.length === 0) {
       const folded = asciiFoldName(originalName);
-      if (folded && folded !== originalName.toLowerCase()) {
+      if (folded && folded !== normalizeNameKey(originalName)) {
         console.log(
           `[listcheck] Search empty for "${originalName}", retrying with ASCII fold "${folded}"`
         );
@@ -245,8 +245,9 @@ export async function enrichListCheckResults(
           return applyPrimarySearchEnrichment(item);
         }
 
+        const requestedItemKey = normalizeNameKey(item.name);
         const targetRecord = (roster.rosterCharacters || []).find(
-          (character) => String(character.name).toLowerCase() === item.name.toLowerCase()
+          (character) => normalizeNameKey(character.name) === requestedItemKey
         );
         if (targetRecord?.name) {
           const canonical = normalizeCharacterName(targetRecord.name);
@@ -273,8 +274,9 @@ export async function enrichListCheckResults(
           world: targetRecord?.world || roster.rosterCharacters?.[0]?.world || '',
         }, 'bible-roster');
         if (roster.rosterVisibility === 'visible' && Array.isArray(roster.allCharacters)) {
+          const itemKey = normalizeNameKey(item.name);
           item.discoveredAlts = roster.allCharacters.filter(
-            (name) => String(name).toLowerCase() !== item.name.toLowerCase()
+            (name) => normalizeNameKey(name) !== itemKey
           );
         }
         workerResolved += 1;

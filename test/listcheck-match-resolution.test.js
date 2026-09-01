@@ -51,3 +51,25 @@ test('mapped list resolution returns an explicit empty result when final candida
     { entry: null, detail: null },
   );
 });
+
+test('list matching treats canonically equivalent Unicode names as one character', () => {
+  const composed = 'Zoë';
+  const decomposed = 'Zoe\u0308';
+  const candidates = buildListMatchCandidates({
+    inputName: decomposed,
+    name: composed,
+    discoveredAlts: [decomposed, 'Altchar'],
+  });
+
+  assert.equal(didListCheckNameChange({ inputName: decomposed, name: composed }), false);
+  assert.deepEqual(candidates, [
+    { name: composed, origin: 'checked' },
+    { name: 'Altchar', origin: 'roster' },
+  ]);
+  assert.equal(
+    resolveMappedListMatch(new Map([['zoë', { name: composed }]]), [
+      { name: decomposed, origin: 'checked' },
+    ]).entry.name,
+    composed,
+  );
+});

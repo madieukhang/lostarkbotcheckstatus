@@ -22,6 +22,18 @@ function normalizeNameGlyphs(raw) {
 
 export const CHARACTER_NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}\p{N}]{1,19}$/u;
 
+/**
+ * Stable identity key for character-name maps, sets, and caches.
+ *
+ * Keep display normalization in `normalizeCharacterName`; identity lookups only
+ * need whitespace removal, canonical Unicode composition, and case folding.
+ * Centralizing that smaller contract prevents each roster/list surface from
+ * inventing a subtly different key (especially for decomposed diacritics).
+ */
+export function normalizeNameKey(value) {
+  return String(value || '').trim().normalize('NFC').toLowerCase();
+}
+
 export function isValidCharacterName(value) {
   return CHARACTER_NAME_RE.test(String(value || '').normalize('NFC'));
 }
@@ -38,7 +50,7 @@ export function normalizeRosterNames(primaryName, rosterNames = []) {
   for (const raw of [primaryName, ...rosterNames]) {
     const clean = normalizeCharacterName(raw);
     if (!clean) continue;
-    const key = clean.toLowerCase();
+    const key = normalizeNameKey(clean);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(clean);
@@ -87,7 +99,7 @@ export function parseAdditionalNames(raw, existing = [], primaryName = '') {
   if (!raw || typeof raw !== 'string') return { added: [], duplicates: [] };
   const existingSet = new Set(
     [...existing, primaryName]
-      .map((n) => (n || '').toLowerCase())
+      .map(normalizeNameKey)
       .filter(Boolean)
   );
   const seen = new Set();
@@ -96,7 +108,7 @@ export function parseAdditionalNames(raw, existing = [], primaryName = '') {
   for (const part of raw.split(',')) {
     const normalized = normalizeCharacterName(part);
     if (!normalized) continue;
-    const lower = normalized.toLowerCase();
+    const lower = normalizeNameKey(normalized);
     if (seen.has(lower)) continue;
     seen.add(lower);
     if (existingSet.has(lower)) {

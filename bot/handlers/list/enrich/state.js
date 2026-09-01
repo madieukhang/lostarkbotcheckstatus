@@ -1,4 +1,5 @@
 import { createExpiringSessionStore } from '../../../utils/expiringSessionStore.js';
+import { normalizeNameKey } from '../../../utils/names.js';
 
 const ENRICH_COOLDOWN_MS = 30 * 1000;
 const SESSION_TTL_MS = 5 * 60 * 1000;
@@ -7,7 +8,7 @@ const enrichCooldown = new Map();
 const sessionStore = createExpiringSessionStore({ ttlMs: SESSION_TTL_MS });
 
 export function getCooldownWaitSeconds(name) {
-  const cooldownKey = name.toLowerCase();
+  const cooldownKey = normalizeNameKey(name);
   const lastRun = enrichCooldown.get(cooldownKey);
   if (!lastRun) return 0;
   const remainingMs = ENRICH_COOLDOWN_MS - (Date.now() - lastRun);
@@ -15,7 +16,7 @@ export function getCooldownWaitSeconds(name) {
 }
 
 export function markCooldown(name) {
-  enrichCooldown.set(name.toLowerCase(), Date.now());
+  enrichCooldown.set(normalizeNameKey(name), Date.now());
 }
 
 export function createEnrichSession(payload) {

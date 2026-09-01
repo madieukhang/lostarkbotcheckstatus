@@ -22,7 +22,7 @@ import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import {
   refreshImageUrl,
 } from '../../../utils/imageRehost.js';
-import { getAddedByDisplay } from '../../../utils/names.js';
+import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
@@ -71,8 +71,9 @@ function buildEntryMetaLine({ entry, freshUrl, lang = 'en' }) {
  * that budget on deep rosters; the detail view and DM expose the full list.
  */
 function buildEntryRosterLine(entry, lang = 'en') {
+  const primaryKey = normalizeNameKey(entry.name);
   const others = (entry.allCharacters || [])
-    .filter((n) => String(n).toLowerCase() !== String(entry.name).toLowerCase());
+    .filter((name) => normalizeNameKey(name) !== primaryKey);
   if (others.length === 0) return '';
   const visible = others.slice(0, 3);
   const linked = visible.map((n) => `[${n}](${rosterUrl(n)})`);
@@ -378,13 +379,13 @@ function applyEvidenceHeader(embed, entry, snapshot, { headline, viaName, statMa
     ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
     : '';
   const searched = String(viaName || '').trim();
-  const isVia = searched && searched.toLowerCase() !== String(entry.name || '').toLowerCase();
+  const isVia = searched && normalizeNameKey(searched) !== normalizeNameKey(entry.name);
   embed
     .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
     .setDescription(t(`dialogue.check.details.${isVia ? 'headlineVia' : 'headline'}`, lang, {
       icon: getListContext(entry._listType).icon,
       name: formatLinkedCharacter(entry.name, snapshot),
-      searched: formatLinkedCharacter(searched, statMap.get(searched.toLowerCase())),
+      searched: formatLinkedCharacter(searched, statMap.get(normalizeNameKey(searched))),
       list: listLabel,
       scope: scopeTag,
     }));
@@ -423,7 +424,7 @@ export function buildEvidenceEmbed(entry, displayUrl, {
   attachImage = true,
   viaName = '',
 } = {}) {
-  const snapshot = statMap.get(String(entry.name || '').trim().toLowerCase()) || null;
+  const snapshot = statMap.get(normalizeNameKey(entry.name)) || null;
   const fields = buildEvidenceFields(entry, snapshot, {
     includeAddedBy,
     headline,

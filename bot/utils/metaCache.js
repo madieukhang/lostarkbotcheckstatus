@@ -36,13 +36,14 @@
  */
 
 import { createLruTtlCache } from './lruTtlCache.js';
+import { normalizeNameKey } from './names.js';
 
 let metaCacheTtlMs = 30 * 60 * 1000;
 let metaCacheMaxSize = 5000;
 const cache = createLruTtlCache({
   ttlMs: () => metaCacheTtlMs,
   maxSize: () => metaCacheMaxSize,
-  normalizeKey: normalize,
+  normalizeKey: normalizeNameKey,
 });
 
 export function configureMetaCache({ ttlMs, maxSize } = {}) {
@@ -60,8 +61,4 @@ export function setCachedMeta(name, meta) {
 
 export function clearMetaCache() {
   cache.clear();
-}
-
-function normalize(name) {
-  return String(name || '').trim().toLowerCase();
 }

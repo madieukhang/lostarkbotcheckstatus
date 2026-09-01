@@ -41,6 +41,22 @@ test('buildNameRosterQuery returns a safe no-match query for empty input', () =>
   );
 });
 
+test('list queries and maps dedupe canonically equivalent Unicode names', () => {
+  const decomposed = 'Zoe\u0308';
+  assert.deepEqual(
+    buildNameRosterQuery([decomposed, 'Zoë']),
+    {
+      $or: [
+        { name: { $in: ['Zoë'] } },
+        { allCharacters: { $in: ['Zoë'] } },
+      ],
+    },
+  );
+
+  const entry = { name: 'Main', allCharacters: ['Zoë'], scope: 'global' };
+  assert.equal(buildListEntryMap([entry]).get('zoë'), entry);
+});
+
 test('list entry maps keep server-scoped rows as the highest-priority match', () => {
   const global = { name: 'Main', allCharacters: ['Alt'], scope: 'global' };
   const server = { name: 'Other', allCharacters: ['Alt'], scope: 'server' };

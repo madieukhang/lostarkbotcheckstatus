@@ -1,6 +1,4 @@
-function normalizeName(value) {
-  return String(value || '').trim().toLowerCase();
-}
+import { normalizeNameKey } from '../../utils/names.js';
 
 /**
  * Whether enrichment changed the identity supplied by OCR or typed input.
@@ -8,8 +6,8 @@ function normalizeName(value) {
  * a different list entry and would add noise to the confirmation card.
  */
 export function didListCheckNameChange(item) {
-  const inputName = normalizeName(item?.inputName);
-  const finalName = normalizeName(item?.name);
+  const inputName = normalizeNameKey(item?.inputName);
+  const finalName = normalizeNameKey(item?.name);
   return Boolean(inputName && finalName && inputName !== finalName);
 }
 
@@ -23,7 +21,7 @@ export function buildListMatchCandidates(item) {
 
   function add(name, origin) {
     const clean = String(name || '').trim();
-    const key = normalizeName(clean);
+    const key = normalizeNameKey(clean);
     if (!key || seen.has(key)) return;
     seen.add(key);
     candidates.push({ name: clean, origin });
@@ -42,13 +40,13 @@ export function buildListMatchCandidates(item) {
  */
 export function resolveMappedListMatch(map, candidates) {
   for (const candidate of candidates || []) {
-    const entry = map?.get(normalizeName(candidate?.name));
+    const entry = map?.get(normalizeNameKey(candidate?.name));
     if (!entry) continue;
 
     const matchedName = String(candidate.name || '').trim();
     let kind = 'tracked';
     if (candidate.origin === 'roster') kind = 'roster';
-    else if (normalizeName(entry.name) === normalizeName(matchedName)) kind = 'direct';
+    else if (normalizeNameKey(entry.name) === normalizeNameKey(matchedName)) kind = 'direct';
 
     return {
       entry,

@@ -22,7 +22,7 @@ import {
   fetchNameSuggestions,
   upsertRosterSnapshots,
 } from '../../../services/roster/index.js';
-import { normalizeCharacterName } from '../../../utils/names.js';
+import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
@@ -157,7 +157,7 @@ export function buildListAddTrackedRostersField({
 
 function buildTrustedRejection(name, trustedEntry, lang, { viaRoster = false } = {}) {
   const trustedName = trustedEntry.name;
-  const via = trustedName.toLowerCase() === name.toLowerCase()
+  const via = normalizeNameKey(trustedName) === normalizeNameKey(name)
     ? {}
     : { via: trustedName };
   return {
@@ -290,7 +290,7 @@ function appendDuplicateDetailFields(fields, existed, lang) {
 }
 
 export function buildDuplicateListAddResult({ existed, name, labelCap, type, lang }) {
-  const isRosterMatch = existed.name.toLowerCase() !== name.toLowerCase();
+  const isRosterMatch = normalizeNameKey(existed.name) !== normalizeNameKey(name);
   const variant = isRosterMatch ? 'roster' : 'direct';
   const contentVariant = isRosterMatch ? 'contentRoster' : 'contentDirect';
   const values = { name, list: labelCap, matched: existed.name };
@@ -414,7 +414,7 @@ export function buildListAddSuccessFields({
     });
   }
 
-  const primaryRecord = statMap?.get(String(entry?.name || '').trim().toLowerCase());
+  const primaryRecord = statMap?.get(normalizeNameKey(entry?.name));
   const statBadges = formatRosterStatBadges(primaryRecord);
   inlineFields.push(...[
     statBadges.itemLevel ? {
@@ -473,7 +473,7 @@ function buildListAddSuccessEmbed({
     entryName: entry.name,
     listLabel: labelCap,
     scopeTag: resolveSuccessScopeTag(payload, entryScope, lang),
-    primaryRecord: rosterStatMap.get(entry.name.toLowerCase()) || null,
+    primaryRecord: rosterStatMap.get(normalizeNameKey(entry.name)) || null,
     lang,
   });
   const fields = buildListAddSuccessFields({
