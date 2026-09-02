@@ -15,16 +15,16 @@ import {
 } from '../../services/roster/index.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
-import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
+import {
+  buildListEntryMap as buildEntryMap,
+  buildNameRosterQuery,
+  sortBlacklistForScopePriority,
+} from '../../utils/listEntryMap.js';
 import {
   attachSearchEvidenceCollector,
   buildSearchEvidenceComponents,
   getFlaggedResultsWithImages,
 } from './evidence.js';
-import {
-  buildListEntryMap as buildEntryMap,
-  sortBlacklistForScopePriority,
-} from '../../utils/listEntryMap.js';
 import { buildSearchResultEmbed } from './ui.js';
 
 export async function handleSearchCommand(interaction) {

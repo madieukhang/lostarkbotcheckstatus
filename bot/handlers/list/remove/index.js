@@ -286,7 +286,6 @@ export function createRemoveHandlers({ services }) {
         content: '',
         components: [],
       });
-      return;
     } catch (err) {
       console.error('[list] ❌ Remove failed:', err.message);
       await editAlert(interaction, {

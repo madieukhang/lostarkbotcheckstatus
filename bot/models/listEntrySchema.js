@@ -8,10 +8,27 @@ import mongoose from 'mongoose';
 
 const CASE_INSENSITIVE_COLLATION = Object.freeze({ locale: 'en', strength: 2 });
 
-function buildCommonFields() {
+export function buildRosterIdentityFields() {
   return {
     name: { type: String, required: true, trim: true },
     reason: { type: String, default: '', trim: true },
+    allCharacters: { type: [String], default: [] },
+    enrichmentSource: {
+      type: String,
+      enum: ['bible', 'manual', 'local-sync', null],
+      default: null,
+    },
+    enrichedAt: { type: Date, default: null },
+
+    addedByUserId: { type: String, default: '' },
+    addedByTag: { type: String, default: '' },
+    addedAt: { type: Date, default: Date.now },
+  };
+}
+
+function buildCommonFields() {
+  return {
+    ...buildRosterIdentityFields(),
     raid: { type: String, default: '', trim: true },
     logsUrl: { type: String, default: '', trim: true },
 
@@ -21,19 +38,10 @@ function buildCommonFields() {
     imageMessageId: { type: String, default: '', trim: true },
     imageChannelId: { type: String, default: '', trim: true },
 
-    allCharacters: { type: [String], default: [] },
-    enrichmentSource: {
-      type: String,
-      enum: ['bible', 'manual', 'local-sync', null],
-      default: null,
-    },
-    enrichedAt: { type: Date, default: null },
-
     addedByUserId: { type: String, default: '', trim: true },
     addedByTag: { type: String, default: '', trim: true },
     addedByName: { type: String, default: '', trim: true },
     addedByDisplayName: { type: String, default: '', trim: true },
-    addedAt: { type: Date, default: Date.now },
   };
 }
 

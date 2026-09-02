@@ -122,12 +122,16 @@ function buildCorrectionFooterPart(correctedResults, lang) {
   });
 }
 
+function resolveCheckHintKey({ counts, flaggedCount, mode }) {
+  if (mode !== 'auto') return flaggedCount > 0 ? 'rosterTip' : 'rerunTip';
+  if (flaggedCount > 0) return 'quickFlagged';
+  return counts.notListed > 0 ? 'quickClean' : '';
+}
+
 function buildCheckFooter({ counts, flaggedCount, correctedResults, mode, lang }) {
   const statusKey = flaggedCount > 0 ? 'flagged' : 'clear';
   const correction = buildCorrectionFooterPart(correctedResults, lang);
-  const hintKey = mode === 'auto'
-    ? (flaggedCount > 0 ? 'quickFlagged' : counts.notListed > 0 ? 'quickClean' : '')
-    : (flaggedCount > 0 ? 'rosterTip' : 'rerunTip');
+  const hintKey = resolveCheckHintKey({ counts, flaggedCount, mode });
   return [
     `// ${t(`dialogue.check.embed.${statusKey}`, lang, { count: flaggedCount })}`,
     correction,

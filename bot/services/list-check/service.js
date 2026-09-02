@@ -35,6 +35,12 @@ export {
 
 // ─── Name checking ──────────────────────────────────────────────────────────
 
+function rememberNormalizedName(namesByKey, rawName) {
+  const name = String(rawName || '').trim().normalize('NFC');
+  const key = normalizeNameKey(name);
+  if (key && !namesByKey.has(key)) namesByKey.set(key, name);
+}
+
 /**
  * Check an array of names against database-backed lists.
  *
@@ -89,9 +95,7 @@ async function attachRelatedClassNames(results) {
       ...(Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []),
     ];
     for (const rawName of rawNames) {
-      const name = String(rawName || '').trim().normalize('NFC');
-      const key = normalizeNameKey(name);
-      if (key && !namesByKey.has(key)) namesByKey.set(key, name);
+      rememberNormalizedName(namesByKey, rawName);
     }
     return { item, namesByKey };
   });
@@ -103,7 +107,7 @@ async function attachRelatedClassNames(results) {
   }
   if (wantedByKey.size === 0) return;
 
-  let snapshots = [];
+  let snapshots;
   try {
     snapshots = await RosterSnapshot.find({ name: { $in: [...wantedByKey.values()] } })
       .collation({ locale: 'en', strength: 2 })
@@ -239,9 +243,7 @@ function collectTrustedAltNames(results) {
   for (const item of results) {
     if (item.trustedEntry) continue;
     for (const rawName of rosterRelationshipNames(item)) {
-      const name = String(rawName || '').trim().normalize('NFC');
-      const key = normalizeNameKey(name);
-      if (key && !namesByKey.has(key)) namesByKey.set(key, name);
+      rememberNormalizedName(namesByKey, rawName);
     }
   }
   return namesByKey;

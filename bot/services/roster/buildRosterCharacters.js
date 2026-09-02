@@ -8,7 +8,7 @@
  * can render a single embed without try/catch sprawl.
  */
 
-import { JSDOM, VirtualConsole } from 'jsdom';
+import { JSDOM } from 'jsdom';
 import { normalizeNameKey } from '../../utils/names.js';
 
 import { buildBibleFetchOptions } from './bibleFetch.js';
@@ -16,14 +16,10 @@ import { bibleClient } from './bibleClient.js';
 import { fetchCharacterMeta } from './characterMeta.js';
 import { inferHiddenRosterItemLevel } from './search.js';
 import { detectAltsViaStronghold } from './altDetection.js';
+import { createRosterVirtualConsole } from './dom.js';
 import { parseCharacterMetaFromHtml, parseRosterCharactersFromHtml } from './parsers.js';
 
-const virtualConsole = new VirtualConsole();
-virtualConsole.on('error', () => {});
-virtualConsole.on('jsdomError', (err) => {
-  if (err?.type === 'css parsing') return;
-  console.warn('[jsdom] Parse warning:', err?.message || err);
-});
+const virtualConsole = createRosterVirtualConsole();
 
 export function stampRosterWorld(characters, world) {
   const normalizedWorld = String(world || '').trim();

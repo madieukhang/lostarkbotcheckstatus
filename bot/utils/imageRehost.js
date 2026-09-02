@@ -25,6 +25,12 @@ import config from '../config.js';
 import { getGuildConfig } from './scope.js';
 import { AlertSeverity, buildNoticeEmbed } from './alertEmbed.js';
 
+const EVIDENCE_LIST_ICON = Object.freeze({
+  black: '⛔',
+  watch: '⚠️',
+  white: '✅',
+});
+
 /**
  * Resolve the configured evidence channel ID, or null if not configured.
  * Always reads from the OWNER guild's GuildConfig (not per-guild) · there
@@ -133,10 +139,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     // image is for. Mentions remain disabled to avoid archive-channel pings.
     const auditLines = [];
     if (meta.entryName) {
-      const icon = meta.listType === 'black' ? '⛔'
-        : meta.listType === 'white' ? '✅'
-        : meta.listType === 'watch' ? '⚠️'
-        : '📎';
+      const icon = EVIDENCE_LIST_ICON[meta.listType] || '📎';
       auditLines.push(`${icon} **${meta.entryName}**`);
     }
     if (meta.addedBy) auditLines.push(`Added by: ${meta.addedBy}`);

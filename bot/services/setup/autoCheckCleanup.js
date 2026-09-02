@@ -7,10 +7,7 @@ import {
   buildAutoCheckCleanupEligibility,
   resolveAutoCheckCleanupEnabled,
 } from './autoCheckCleanupPolicy.js';
-import {
-  cleanupChannelMessages,
-  formatCleanupFailureReasons,
-} from './channelCleanup.js';
+import { cleanupChannelMessages } from './channelCleanup.js';
 import {
   createCleanupScheduler,
   createIncompleteCleanupError,

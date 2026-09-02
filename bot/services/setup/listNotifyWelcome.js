@@ -49,7 +49,7 @@ export function createListNotifyWelcomeService({
   supportedLanguageCodes = getSupportedLanguages().map((entry) => entry.code),
   logger = console,
 } = {}) {
-  const service = createPinnedWelcomeService({
+  return createPinnedWelcomeService({
     GuildConfigModel,
     buildWelcomeEmbed: (lang, options) => buildWelcomeEmbed(lang, {
       cleanupEnabled: Boolean(options?.cleanupEnabled),
@@ -62,8 +62,6 @@ export function createListNotifyWelcomeService({
     logLabel: 'list-notify welcome',
     logger,
   });
-
-  return service;
 }
 
 const productionWelcomeService = createListNotifyWelcomeService();

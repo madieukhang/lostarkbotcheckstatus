@@ -5,38 +5,12 @@
  */
 
 import mongoose from 'mongoose';
+import { buildRosterIdentityFields } from './listEntrySchema.js';
 
-const trustedUserSchema = new mongoose.Schema({
-  /** Character name (main) */
-  name: { type: String, required: true, trim: true },
-
-  /** Reason for trust (e.g. "Guild officer", "Known veteran") */
-  reason: { type: String, default: '', trim: true },
-
-  /** Full roster snapshot used to trust every alt on the same account */
-  allCharacters: { type: [String], default: [] },
-
-  /**
-   * Where `allCharacters` was last touched from. Mirrors the list-entry
-   * schemas so trusted entries can participate in the same stale-data
-   * reasoning later.
-   */
-  enrichmentSource: {
-    type: String,
-    enum: ['bible', 'manual', 'local-sync', null],
-    default: null,
-  },
-
-  /** Timestamp of the most recent `allCharacters` write. */
-  enrichedAt: { type: Date, default: null },
-
-  /** Who added this trusted entry */
-  addedByUserId: { type: String, default: '' },
-  addedByTag: { type: String, default: '' },
-
-  /** When this entry was added */
-  addedAt: { type: Date, default: Date.now },
-});
+// Trusted entries participate in the same roster-identity and enrichment
+// contract as blacklist/whitelist/watchlist entries, without their evidence
+// and raid-specific fields.
+const trustedUserSchema = new mongoose.Schema(buildRosterIdentityFields());
 
 // Case-insensitive unique index (matches collation used in lookups)
 trustedUserSchema.index(

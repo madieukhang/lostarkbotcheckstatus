@@ -177,7 +177,7 @@ export function startMonitor(client) {
   // Run immediately on startup, then on each interval tick
   void runCheck('Initial');
 
-  const handle = setInterval(() => {
+  return setInterval(() => {
     if (!shouldRunScheduledCheck(new Date(), recoveryPending)) {
       return;
     }
@@ -185,7 +185,6 @@ export function startMonitor(client) {
     void runCheck('Scheduled');
   }, config.checkIntervalMs);
 
-  return handle;
 }
 
 /**

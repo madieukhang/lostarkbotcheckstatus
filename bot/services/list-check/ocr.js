@@ -232,7 +232,7 @@ async function findAmbiguousOcrChoices(
     // contains a mark, the normal canonical matcher can rank it safely.
     if (hasAnyDiacritic(name)) return null;
 
-    let suggestions = null;
+    let suggestions;
     try {
       suggestions = await fetchNameSuggestions(name, {
         timeoutMs: 5000,

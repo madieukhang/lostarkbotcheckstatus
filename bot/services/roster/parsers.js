@@ -26,7 +26,7 @@ export function extractCharacterItemLevelFromHtml(html) {
 
 function extractRosterClassMapFromHtml(html) {
   const rosterClassMap = new Map();
-  const regex = /name:\"([^\"]+)\",class:\"([^\"]+)\"/g;
+  const regex = /name:"([^"]+)",class:"([^"]+)"/g;
 
   let match;
   while ((match = regex.exec(html)) !== null) {

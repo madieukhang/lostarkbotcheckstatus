@@ -7,15 +7,8 @@
  */
 
 import { createArtistEmbed } from '../../utils/artistVoice.js';
-import { JSDOM, VirtualConsole } from 'jsdom';
-
-const virtualConsole = new VirtualConsole();
-virtualConsole.on('error', () => {});
-virtualConsole.on('jsdomError', (err) => {
-  if (err?.type === 'css parsing') return;
-  console.warn('[jsdom] Parse warning:', err?.message || err);
-});
-
+import { JSDOM } from 'jsdom';
+import { createRosterVirtualConsole } from '../../services/roster/dom.js';
 import { connectDB } from '../../db.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
@@ -50,6 +43,8 @@ import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
 import { resolveRosterScanOutcome } from './completion.js';
+
+const virtualConsole = createRosterVirtualConsole();
 
 /**
  * Render one visible-roster row. Both numeric stats use Discord code badges;

@@ -5,6 +5,7 @@ import config from '../../config.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { editPayload } from '../../utils/interactionReplies.js';
+import { sleep } from '../../utils/async.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
@@ -66,7 +67,7 @@ async function rehostWithRetry(downloadUrl, entry, type, interaction, stats) {
     } catch (err) {
       if (attempt === 1) {
         firstAttemptError = err.message;
-        await new Promise((r) => setTimeout(r, 2000));
+        await sleep(2000);
         continue;
       }
 
@@ -270,7 +271,7 @@ export async function handleSyncImagesAction(interaction, lang = 'en') {
     }
 
     if (i < legacyEntries.length - 1) {
-      await new Promise((r) => setTimeout(r, 500));
+      await sleep(500);
     }
 
     if ((i + 1) % 10 === 0 && i + 1 < legacyEntries.length) {

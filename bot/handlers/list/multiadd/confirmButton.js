@@ -6,6 +6,7 @@ import UserPreference from '../../../models/UserPreference.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { sleep } from '../../../utils/async.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   editPayload,
@@ -193,7 +194,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
           _rehost: rehost,
         });
         if (i < pending.rows.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 200));
+          await sleep(200);
         }
       }
 

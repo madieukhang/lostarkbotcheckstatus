@@ -167,7 +167,7 @@ function createAutoCheckEvidenceHandler({ client }) {
 export function createCheckHandlers({ client }) {
   async function handleListCheckCommand(interaction) {
     const image = interaction.options.getAttachment('image', true);
-    let names = [];
+    let names;
     const suggestionContext = createNameSuggestionContext({
       maxNetworkLookups: config.listcheckSuggestionLookupBudget,
     });

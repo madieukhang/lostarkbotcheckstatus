@@ -1,4 +1,6 @@
-export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export const sleep = (ms) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
 
 export async function mapWithConcurrency(items, concurrency, worker) {
   const results = new Array(items.length);

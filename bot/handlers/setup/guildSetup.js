@@ -61,6 +61,13 @@ export function welcomeOutcomeText(outcome, lang) {
   return [cleanupLine, `⚠️ ${t(failureKey, lang)}`].filter(Boolean).join('\n');
 }
 
+function buildCleanupToggleMessage(namespace, enabled, guideLine, lang) {
+  const state = enabled ? 'enabled' : 'disabled';
+  const icon = enabled ? '🧹' : '🛡️';
+  return `${icon} ${t(`dialogue.setup.${namespace}.${state}`, lang)}`
+    + `${guideLine}\n${t('dialogue.setup.showHint', lang)}`;
+}
+
 /**
  * Handle the set-auto-channel action
  */
@@ -311,10 +318,7 @@ async function handleSetupCleanup(interaction, lang, enabled) {
 
   await editNotice(
     interaction,
-    `${enabled ? '🧹' : '🛡️'} ${t(
-      `dialogue.setup.autoCleanup.${enabled ? 'enabled' : 'disabled'}`,
-      lang
-    )}${guideLine}\n${t('dialogue.setup.showHint', lang)}`,
+    buildCleanupToggleMessage('autoCleanup', enabled, guideLine, lang),
     {
       severity: enabled ? AlertSeverity.SUCCESS : AlertSeverity.INFO,
       lang,
@@ -396,10 +400,7 @@ async function handleSetupListNotifyCleanupToggle(interaction, lang, enabled) {
 
   await editNotice(
     interaction,
-    `${enabled ? '🧹' : '🛡️'} ${t(
-      `dialogue.setup.listNotifyCleanup.${enabled ? 'enabled' : 'disabled'}`,
-      lang
-    )}${guideLine}\n${t('dialogue.setup.showHint', lang)}`,
+    buildCleanupToggleMessage('listNotifyCleanup', enabled, guideLine, lang),
     {
       severity: enabled ? AlertSeverity.SUCCESS : AlertSeverity.INFO,
       lang,

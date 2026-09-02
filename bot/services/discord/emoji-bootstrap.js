@@ -41,6 +41,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { CLASS_NAMES, CLASS_EMOJI_MAP } from '../../models/Class.js';
+import { sleep as delay } from '../../utils/async.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -158,10 +159,6 @@ function createAliasIndex(aliasGroups) {
     }
   }
   return { canonicalByAlias, aliases };
-}
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function cleanupAliasEmoji({ client, appId, namespace, existingByName, aliases, delayMs }) {

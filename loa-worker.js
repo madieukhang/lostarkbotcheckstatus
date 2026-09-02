@@ -24,15 +24,12 @@ import mongoose from 'mongoose';
 
 import { claimAndProcessOne } from './bot/services/worker/scrape-worker.js';
 import { startHeartbeat, stopHeartbeat } from './bot/services/worker/heartbeat.js';
+import { sleep } from './bot/utils/async.js';
 
 const POLL_IDLE_MS = 1000;
 
 let stopping = false;
 let heartbeatHandle = null;
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 async function pollLoop() {
   while (!stopping) {

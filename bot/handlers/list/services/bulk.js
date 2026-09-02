@@ -8,6 +8,7 @@
  */
 
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
+import { sleep } from '../../../utils/async.js';
 
 import { connectDB } from '../../../db.js';
 import { getGuildConfig } from '../../../utils/scope.js';
@@ -137,7 +138,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
       const row = rows[i];
       await executeBulkRow(row, meta, guildDefaultScope, results);
       await reportBulkProgress(onProgress, i + 1, rows.length);
-      if (i < rows.length - 1) await new Promise((resolve) => setTimeout(resolve, 200));
+      if (i < rows.length - 1) await sleep(200);
     }
 
     return results;

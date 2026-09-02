@@ -12,6 +12,7 @@
 import config from '../../config.js';
 import { getClassName } from '../../models/Class.js';
 import { normalizeNameKey } from '../../utils/names.js';
+import { sleep } from '../../utils/async.js';
 import {
   getCurrentScraperApiUsageScopeSnapshot,
   runWithScraperApiUsageScope,
@@ -304,7 +305,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     // perfectly periodic signal CF / bible's anti-bot heuristics can clock.
     const jitterFactor = 0.85 + Math.random() * 0.3;
     const sleepMs = Math.round(backoff.current * jitterFactor);
-    await new Promise((resolve) => setTimeout(resolve, sleepMs));
+    await sleep(sleepMs);
   }
 
   async function scanWorker() {

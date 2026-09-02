@@ -112,7 +112,7 @@ export function createAutocompleteRoutes() {
         return;
       }
       // action field: read the guild's current state so toggles hide correctly.
-      let cfg = null;
+      let cfg;
       try {
         cfg = interaction.guild
           ? await GuildConfig.findOne({ guildId: interaction.guild.id }).lean()
