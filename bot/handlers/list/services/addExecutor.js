@@ -71,16 +71,19 @@ function buildInlineSpacer() {
 }
 
 /**
- * Build the three-slot audit row for an "already exists" result. Legacy
- * entries may lack one or both values, so both visible fields retain a
- * localized fallback instead of disappearing and shifting the card layout.
+ * Build the three-slot audit row for an "already exists" result. The add
+ * flow has already loaded the submitted character's roster, so its Server
+ * can fill the former spacer without another request. Legacy/hidden results
+ * that do not expose a Server keep the spacer and the same stable layout.
  *
  * @param {object} existed
  * @param {string} [lang='en']
+ * @param {{world?: string}} [options]
  * @returns {Array<{name: string, value: string, inline: true}>}
  */
-export function buildDuplicateAuditFields(existed, lang = 'en') {
+export function buildDuplicateAuditFields(existed, lang = 'en', { world = '' } = {}) {
   const fallback = t('dialogue.broadcast.notAvailable', lang);
+  const normalizedWorld = String(world || '').trim();
   return [
     {
       name: `👤 ${t('dialogue.listAdd.duplicate.addedBy', lang)}`,
@@ -92,20 +95,26 @@ export function buildDuplicateAuditFields(existed, lang = 'en') {
       value: relativeTime(existed.addedAt) || fallback,
       inline: true,
     },
-    // Keep the audit pair on the same three-column grid as Match type / Scope.
-    // Without this final slot Discord stretches two fields to 50/50 and makes
-    // Time added look shifted to the right.
-    buildInlineSpacer(),
+    normalizedWorld ? {
+      name: `🌍 ${t('dialogue.roster.server', lang)}`,
+      value: `\`${normalizedWorld}\``,
+      inline: true,
+    } : buildInlineSpacer(),
   ];
 }
 
 /**
  * Pad preceding inline metadata to a complete row, then append the stable
- * Added by / Time added / spacer row.
+ * Added by / Time added / Server row (or a spacer when Server is unknown).
+ * @param {Array<object>} fields
+ * @param {object} existed
+ * @param {string} [lang='en']
+ * @param {{world?: string}} [options]
+ * @returns {Array<object>}
  */
-export function appendDuplicateAuditRow(fields, existed, lang = 'en') {
+export function appendDuplicateAuditRow(fields, existed, lang = 'en', options = {}) {
   while (fields.length % 3 !== 0) fields.push(buildInlineSpacer());
-  fields.push(...buildDuplicateAuditFields(existed, lang));
+  fields.push(...buildDuplicateAuditFields(existed, lang, options));
   return fields;
 }
 
@@ -248,7 +257,7 @@ function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang }) {
   };
 }
 
-function buildDuplicateMetadataFields(existed, isRosterMatch, lang) {
+function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap) {
   const fields = [
     {
       name: `${ICONS.search} ${t('dialogue.listAdd.duplicate.matchType', lang)}`,
@@ -269,7 +278,9 @@ function buildDuplicateMetadataFields(existed, isRosterMatch, lang) {
       inline: true,
     } : null,
   ].filter(Boolean);
-  appendDuplicateAuditRow(fields, existed, lang);
+  appendDuplicateAuditRow(fields, existed, lang, {
+    world: resolveRosterWorld(existed, statMap),
+  });
   return fields;
 }
 
@@ -289,13 +300,20 @@ function appendDuplicateDetailFields(fields, existed, lang) {
   return fields;
 }
 
-function buildDuplicateListAddResult({ existed, name, labelCap, type, lang }) {
+export function buildDuplicateListAddResult({
+  existed,
+  name,
+  labelCap,
+  type,
+  lang,
+  statMap = new Map(),
+}) {
   const isRosterMatch = normalizeNameKey(existed.name) !== normalizeNameKey(name);
   const variant = isRosterMatch ? 'roster' : 'direct';
   const contentVariant = isRosterMatch ? 'contentRoster' : 'contentDirect';
   const values = { name, list: labelCap, matched: existed.name };
   const fields = appendDuplicateDetailFields(
-    buildDuplicateMetadataFields(existed, isRosterMatch, lang),
+    buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap),
     existed,
     lang
   );
@@ -659,6 +677,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
         labelCap,
         type: payload.type,
         lang,
+        statMap: statMapFromRosterCharacters(roster.rosterCharacters),
       });
     }
 

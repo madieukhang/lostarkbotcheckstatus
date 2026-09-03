@@ -8,6 +8,7 @@ process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 const {
   appendDuplicateAuditRow,
   buildDuplicateAuditFields,
+  buildDuplicateListAddResult,
   buildHiddenRosterGuidance,
   buildListAddSuccessHeader,
   buildListAddTrackedRostersField,
@@ -32,12 +33,12 @@ test('hidden roster add guidance avoids enrich button without a guild', () => {
   assert.equal(guidance.components.length, 0);
 });
 
-test('duplicate roster card aligns its icon-labelled audit pair on a three-column row', () => {
+test('duplicate roster card fills the audit row third slot with Server', () => {
   const addedAt = new Date('2026-05-17T10:30:00Z');
   const fields = buildDuplicateAuditFields({
     addedByDisplayName: 'meow',
     addedAt,
-  }, 'en');
+  }, 'en', { world: 'Vairgrys' });
 
   assert.deepEqual(fields, [
     { name: '👤 Added by', value: 'meow', inline: true },
@@ -46,8 +47,45 @@ test('duplicate roster card aligns its icon-labelled audit pair on a three-colum
       value: `<t:${Math.floor(addedAt.getTime() / 1000)}:R>`,
       inline: true,
     },
-    { name: '\u200b', value: '\u200b', inline: true },
+    { name: '🌍 Server', value: '`Vairgrys`', inline: true },
   ]);
+});
+
+test('duplicate roster result uses the freshly loaded roster Server in its full six-cell grid', () => {
+  const existed = {
+    name: 'Lungzhu',
+    scope: 'global',
+    addedByDisplayName: 'Bao',
+    addedAt: new Date('2026-05-17T10:30:00Z'),
+    reason: 'zdps',
+    raid: 'Kazeros Nor',
+    allCharacters: ['Lungzhu', 'Zhaohang'],
+  };
+  const result = buildDuplicateListAddResult({
+    existed,
+    name: 'Zhaohang',
+    labelCap: 'Blacklist',
+    type: 'black',
+    lang: 'en',
+    statMap: new Map([
+      ['zhaohang', { name: 'Zhaohang', world: 'Vairgrys' }],
+    ]),
+  });
+  const fields = result.embeds[0].toJSON().fields;
+  const metadataGrid = fields.slice(0, 6);
+
+  assert.equal(metadataGrid.every((field) => field.inline), true);
+  assert.deepEqual(metadataGrid.map((field) => field.name), [
+    '🔍 Match type',
+    '🧬 Matched name',
+    '🌐 Scope',
+    '👤 Added by',
+    '🕐 Time added',
+    '🌍 Server',
+  ]);
+  assert.equal(metadataGrid[5].value, '`Vairgrys`');
+  assert.equal(fields[6].inline, false, 'reason starts the detail section after the grid');
+  assert.equal(fields[7].name, '🗡️ Raid');
 });
 
 test('duplicate audit row starts after match metadata and keeps Time added in column two', () => {
