@@ -312,7 +312,7 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  *
  *   1. Title bar    - list-icon + entry name + bible-link via setURL
  *   2. Reason field - full reason text (1024 char cap)
- *   3. Inline meta  - Raid · List · Added · ilvl · Server · Added by · CP,
+ *   3. Inline meta  - Raid · List · CP · ilvl · Added · Added by · Server,
  *                     padded with zero-width spacers to whole 3-up rows
  *   4. Roster field - "Tracked alts" with linked names; falls back
  *                     to "(only this character)" if allCharacters is
@@ -346,26 +346,26 @@ function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, la
       value: getListTypeLabel(entry._listType, entry._label, lang),
       inline: true,
     } : null,
-    entry.addedAt
-      ? { name: t('listView.evidence.added', lang), value: relativeTime(entry.addedAt), inline: true }
-      : null,
   // ilvl and CP only appear when the caller supplied a stat snapshot.
   // Rendering them as "N/A" would cost two slots on every surface that
   // has no roster data to give, which is most of them.
+    combatScore && combatScore !== '?'
+      ? { name: t('listView.evidence.combatPower', lang), value: `\`${combatScore}\``, inline: true }
+      : null,
     Number.isFinite(itemLevel) && itemLevel > 0
       ? { name: t('listView.evidence.itemLevel', lang), value: `\`${itemLevel.toFixed(2)}\``, inline: true }
       : null,
-  // The second row starts with Server. Added by stays in the middle when
-  // available and CP closes the row, giving the headline card a stable
-  // Raid / Added / ilvl then Server / Added by / CP reading order.
-    world
-      ? { name: t('listView.evidence.server', lang), value: `\`${world}\``, inline: true }
+    entry.addedAt
+      ? { name: t('listView.evidence.added', lang), value: relativeTime(entry.addedAt), inline: true }
       : null,
+  // Added by and Server retain their previous relative positions. Only CP
+  // and Added swap places, so the /la-roster headline reads Raid / CP /
+  // ilvl then Added / Server without disturbing the rest of the card.
     includeAddedBy && addedByDisplay
       ? { name: t('listView.evidence.addedBy', lang), value: addedByDisplay, inline: true }
       : null,
-    combatScore && combatScore !== '?'
-      ? { name: t('listView.evidence.combatPower', lang), value: `\`${combatScore}\``, inline: true }
+    world
+      ? { name: t('listView.evidence.server', lang), value: `\`${world}\``, inline: true }
       : null,
   ].filter(Boolean);
   // Discord packs three inline fields per row and stretches a lone

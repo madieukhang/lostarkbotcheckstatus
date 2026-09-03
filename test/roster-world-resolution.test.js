@@ -92,8 +92,8 @@ test('the broadcast card reads the server across the roster too', () => {
 
 test('the la-roster hit card carries Server and stays at five fields', () => {
   // This is the card /la-roster puts above the roster it just fetched.
-  // It had four inline fields, so CP sat alone on a second row. Server
-  // makes five, which pads to one whole spare slot rather than a gap.
+  // Five real fields use one trailing pad; the exact order below locks the
+  // requested CP / Added swap while Server retains its original position.
   const statMap = new Map([
     ['tenshi', { name: 'Tenshi', classId: 'bard', itemLevel: 1770, combatScore: '≈4903.06' }],
     ['hanako', { name: 'Hanako', world: 'Thaemine' }],
@@ -110,10 +110,10 @@ test('the la-roster hit card carries Server and stays at five fields', () => {
   assert.equal(serverValue(fields), '`Thaemine`');
   assert.deepEqual(inlineNames, [
     '🗡️ Raid',
-    '🕐 Đã thêm',
-    '📊 ilvl',
-    '🌍 Server',
     '⚔️ CP',
+    '📊 ilvl',
+    '🕐 Đã thêm',
+    '🌍 Server',
     ZWSP,
   ]);
   // No "Added by" on this card · the officer who filed the entry is not
