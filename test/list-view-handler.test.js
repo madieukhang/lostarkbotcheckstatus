@@ -157,6 +157,8 @@ test('/la-list view reuses its session snapshot for pagination and reloads only 
   assert.equal(fetchReplyCalls, 0);
   assert.equal(loadCalls, 1);
   assert.equal(statLoadCalls, 1);
+  assert.match(messageEdits[0].embeds[0].toJSON().description, /Blocked8/u);
+  assert.doesNotMatch(messageEdits[0].embeds[0].toJSON().description, /Blocked9/u);
 
   const click = async (customId) => collectHandler({
     customId,
@@ -167,6 +169,7 @@ test('/la-list view reuses its session snapshot for pagination and reloads only 
   await click('listview_next');
   assert.equal(loadCalls, 1, 'recent navigation should reuse the session snapshot');
   assert.equal(statLoadCalls, 1, 'pagination should reuse the same stat map');
+  assert.match(messageEdits.at(-1).embeds[0].toJSON().description, /Blocked9/u);
 
   currentRows = buildRows(12);
   await click('listview_prev');

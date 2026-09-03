@@ -66,7 +66,7 @@ function buildEntryMetaLine({ entry, lang = 'en' }) {
  * and is filtered out because line 1 already displays it. Capped at 3 visible alts with a
  * `+N more` suffix; entries with no alts skip this line entirely.
  *
- * Why compact: /la-list view renders 10 entries per page and Discord's
+ * Why compact: /la-list view renders 8 entries per page and Discord's
  * description hard cap is 4096 chars. Showing every alt inline can exceed
  * that budget on deep rosters; the detail view and DM expose the full list.
  */

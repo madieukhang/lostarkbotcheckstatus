@@ -42,7 +42,7 @@ test('/la-list view loads one compact stat map before the pure renderer runs', a
     getListContext,
     guildNameCache: new Map(),
     isOwnerGuild: false,
-    itemsPerPage: 10,
+    itemsPerPage: 8,
     page: 0,
     totalPages: 1,
   };
@@ -96,7 +96,7 @@ test('/la-list view keeps every entry whole when rich class and alt markup reach
   CLASS_EMOJI_MAP.Bard = '<:bard_abcdef:123456789012345678>';
   try {
     const statMap = new Map();
-    const allEntries = Array.from({ length: 10 }, (_, index) => {
+    const allEntries = Array.from({ length: 8 }, (_, index) => {
       const suffix = String(index + 1).padStart(2, '0');
       const name = `Character${suffix}Longname`;
       const alts = Array.from({ length: 8 }, (_, altIndex) => `Alt${suffix}${altIndex}Longcharacter`);
@@ -115,13 +115,13 @@ test('/la-list view keeps every entry whole when rich class and alt markup reach
       getListContext,
       guildNameCache: new Map(),
       isOwnerGuild: false,
-      itemsPerPage: 10,
+      itemsPerPage: 8,
       page: 0,
       statMap,
     }).toJSON().description;
 
     assert.ok(description.length <= 4096);
-    assert.match(description, /Character10Longname/u);
+    assert.match(description, /Character08Longname/u);
     assert.doesNotMatch(description, /<:[^>\n]*$/u);
   } finally {
     CLASS_EMOJI_MAP.Bard = previousEmoji;
@@ -131,7 +131,7 @@ test('/la-list view keeps every entry whole when rich class and alt markup reach
 test('/la-list view renders localized pagination and evidence controls', () => {
   const rows = buildListViewComponents({
     allEntries: [buildEntry()],
-    itemsPerPage: 10,
+    itemsPerPage: 8,
     lang: 'vi',
     page: 0,
     totalPages: 2,
@@ -159,7 +159,7 @@ test('/la-list view shows list markers only where rows from different lists are 
     getListContext,
     guildNameCache: new Map(),
     isOwnerGuild: false,
-    itemsPerPage: 10,
+    itemsPerPage: 8,
     page: 0,
   };
 
@@ -187,7 +187,7 @@ test('/la-list view evidence values keep their absolute index without page scans
   ];
   const rows = buildListViewComponents({
     allEntries,
-    itemsPerPage: 10,
+    itemsPerPage: 8,
     lang: 'en',
     page: 0,
     totalPages: 1,

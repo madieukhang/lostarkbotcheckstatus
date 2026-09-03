@@ -35,7 +35,7 @@ import {
 } from './ui.js';
 import { loadListViewStatMap } from './pageData.js';
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 8;
 
 function resolveTypes(type, scopeFilter) {
   if (scopeFilter && type === 'all') return ['black'];
