@@ -68,6 +68,35 @@ test('formatCheckResults does not add a via line for a direct list hit', () => {
   assert.doesNotMatch(line, /\n   ↳ (?:via|roster alt) /u);
 });
 
+test('formatCheckResults omits via characters from the alt preview and overflow count', () => {
+  const [line] = formatCheckResults([{
+    name: 'Toddo',
+    blackEntry: {
+      name: 'Moistbabydoll',
+      reason: 'report',
+      raid: 'Act 4 Hard',
+      scope: 'global',
+      allCharacters: [
+        'Moistbabydoll',
+        'Toddo',
+        'Levosh',
+        'Neriavesta',
+        'Fourthalt',
+        'Fifthalt',
+      ],
+    },
+  }], 'vi');
+
+  assert.match(line, /\n   ↳ via \*\*\[Moistbabydoll\]\(\S+\)\*\*/u);
+  const altLine = line.split('\n').find((part) => part.includes('↳ alt:'));
+  assert.ok(altLine);
+  assert.doesNotMatch(altLine, /Moistbabydoll/u);
+  assert.match(
+    altLine,
+    /\[Levosh\]\(\S+\), \[Neriavesta\]\(\S+\), \[Fourthalt\]\(\S+\) \*\+1 tên khác\*/u,
+  );
+});
+
 test('formatCheckResults groups photographed characters backed by one roster entry', () => {
   const names = [
     'Dbbpallylastone',

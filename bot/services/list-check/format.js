@@ -36,6 +36,14 @@ const RESULT_STATES = [
 
 const NOT_LISTED_STATE = { icon: '❓', priority: 3 };
 
+function collectAltExcludedNames(item) {
+  return [
+    item.name,
+    ...RESULT_STATES.map(({ entryKey }) => item[entryKey]?.name),
+    ...Object.values(item.matchDetails || {}).map((detail) => detail?.matchedName),
+  ];
+}
+
 function formatMatchContext(item, entry, listType, lang) {
   const detail = item.matchDetails?.[listType];
   if (detail?.kind === 'roster') {
@@ -61,9 +69,10 @@ function formatMatchContext(item, entry, listType, lang) {
  *   2. `item.discoveredAlts` from the online enrichment branch
  *      (worker-online buildRosterCharacters; only when roster was
  *      publicly visible).
- * Filters out the item's own name and dedupes case-insensitively.
+ * Filters out the item's own name plus names already rendered by a `via`
+ * branch, then dedupes case-insensitively.
  */
-export function pickAltsForDisplay(item, excludedNames = [item.name]) {
+export function pickAltsForDisplay(item, excludedNames = collectAltExcludedNames(item)) {
   const sourceEntry = item.blackEntry || item.whiteEntry || item.watchEntry || item.trustedEntry;
   const raw = (sourceEntry?.allCharacters && sourceEntry.allCharacters.length > 0)
     ? sourceEntry.allCharacters
