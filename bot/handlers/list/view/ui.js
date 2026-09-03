@@ -312,7 +312,7 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  *
  *   1. Title bar    - list-icon + entry name + bible-link via setURL
  *   2. Reason field - full reason text (1024 char cap)
- *   3. Inline meta  - Raid · List · Added · ilvl · CP · Added by · Server,
+ *   3. Inline meta  - Raid · List · Added · ilvl · Server · Added by · CP,
  *                     padded with zero-width spacers to whole 3-up rows
  *   4. Roster field - "Tracked alts" with linked names; falls back
  *                     to "(only this character)" if allCharacters is
@@ -355,18 +355,17 @@ function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, la
     Number.isFinite(itemLevel) && itemLevel > 0
       ? { name: t('listView.evidence.itemLevel', lang), value: `\`${itemLevel.toFixed(2)}\``, inline: true }
       : null,
-    combatScore && combatScore !== '?'
-      ? { name: t('listView.evidence.combatPower', lang), value: `\`${combatScore}\``, inline: true }
+  // The second row starts with Server. Added by stays in the middle when
+  // available and CP closes the row, giving the headline card a stable
+  // Raid / Added / ilvl then Server / Added by / CP reading order.
+    world
+      ? { name: t('listView.evidence.server', lang), value: `\`${world}\``, inline: true }
       : null,
-  // Added by joins the grid instead of trailing the card, the way the
-  // check-detail embed places it beside CP.
     includeAddedBy && addedByDisplay
       ? { name: t('listView.evidence.addedBy', lang), value: addedByDisplay, inline: true }
       : null,
-  // Server sits last so it lands after Added by, the same field order
-  // the check-detail card beside it uses.
-    world
-      ? { name: t('listView.evidence.server', lang), value: `\`${world}\``, inline: true }
+    combatScore && combatScore !== '?'
+      ? { name: t('listView.evidence.combatPower', lang), value: `\`${combatScore}\``, inline: true }
       : null,
   ].filter(Boolean);
   // Discord packs three inline fields per row and stretches a lone

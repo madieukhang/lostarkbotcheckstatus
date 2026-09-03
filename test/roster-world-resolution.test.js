@@ -108,7 +108,14 @@ test('the la-roster hit card carries Server and stays at five fields', () => {
   const inlineNames = fields.filter((f) => f.inline).map((f) => f.name);
 
   assert.equal(serverValue(fields), '`Thaemine`');
-  assert.equal(inlineNames.filter((name) => name !== ZWSP).length, 5);
+  assert.deepEqual(inlineNames, [
+    '🗡️ Raid',
+    '🕐 Đã thêm',
+    '📊 ilvl',
+    '🌍 Server',
+    '⚔️ CP',
+    ZWSP,
+  ]);
   // No "Added by" on this card · the officer who filed the entry is not
   // what the searcher is being warned about.
   assert.equal(inlineNames.some((name) => name.includes('Người thêm')), false);
