@@ -96,12 +96,11 @@ test('/la-list view loads all list collections concurrently and keeps global rec
   assert.equal(entries[0]._label, 'white-label');
 });
 
-test('/la-list view reuses editReply Message and refreshes an aged or explicitly refreshed snapshot', async () => {
-  let nowMs = 0;
+test('/la-list view reuses its session snapshot for pagination and reloads only on refresh', async () => {
   let loadCalls = 0;
   let fetchReplyCalls = 0;
   let collectHandler = null;
-  const componentEdits = [];
+  const messageEdits = [];
   const buildRows = (count) => Array.from({ length: count }, (_, index) => ({
     name: `Blocked${index + 1}`,
     reason: 'test',
@@ -129,7 +128,10 @@ test('/la-list view reuses editReply Message and refreshes an aged or explicitly
       getString: (name) => (name === 'type' ? 'black' : null),
     },
     deferReply: async () => {},
-    editReply: async () => replyMessage,
+    editReply: async (payload) => {
+      messageEdits.push(payload);
+      return replyMessage;
+    },
     fetchReply: async () => {
       fetchReplyCalls += 1;
       return replyMessage;
@@ -142,12 +144,12 @@ test('/la-list view reuses editReply Message and refreshes an aged or explicitly
       loadCalls += 1;
       return currentRows;
     },
+    hydratePage: async () => ({}),
     getLanguage: async () => 'en',
-    now: () => nowMs,
-    refreshTtlMs: 5_000,
   });
 
   await handleListViewCommand(interaction);
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(fetchReplyCalls, 0);
   assert.equal(loadCalls, 1);
 
@@ -155,25 +157,80 @@ test('/la-list view reuses editReply Message and refreshes an aged or explicitly
     customId,
     user: { id: 'viewer-live' },
     deferUpdate: async () => {},
-    editReply: async (payload) => {
-      componentEdits.push(payload);
-      return replyMessage;
-    },
   });
 
-  nowMs = 4_000;
   await click('listview_next');
   assert.equal(loadCalls, 1, 'recent navigation should reuse the session snapshot');
 
   currentRows = buildRows(12);
-  nowMs = 6_000;
   await click('listview_prev');
-  assert.equal(loadCalls, 2, 'aged navigation should refresh from Mongo');
-  assert.match(componentEdits.at(-1).embeds[0].toJSON().title, /12 entries/);
+  assert.equal(loadCalls, 1, 'pagination should not turn into an implicit full-list query');
+  assert.match(messageEdits.at(-1).embeds[0].toJSON().title, /11 entries/);
 
   currentRows = buildRows(13);
-  nowMs = 6_001;
   await click('listview_refresh');
-  assert.equal(loadCalls, 3, 'the refresh button should bypass the snapshot TTL');
-  assert.match(componentEdits.at(-1).embeds[0].toJSON().title, /13 entries/);
+  assert.equal(loadCalls, 2, 'the refresh button should explicitly reload the list');
+  assert.match(messageEdits.at(-1).embeds[0].toJSON().title, /13 entries/);
+});
+
+test('/la-list view renders before slow evidence and class hydration completes', async () => {
+  let collectHandler = null;
+  let releaseHydration;
+  let hydrationStarted = false;
+  const messageEdits = [];
+  const hydrationGate = new Promise((resolve) => {
+    releaseHydration = resolve;
+  });
+  const replyMessage = {
+    createMessageComponentCollector() {
+      return {
+        on(event, handler) {
+          if (event === 'collect') collectHandler = handler;
+          return this;
+        },
+      };
+    },
+  };
+  const interaction = {
+    guild: { id: 'guild-first-render' },
+    user: { id: 'viewer-first-render' },
+    options: {
+      getString: (name) => (name === 'type' ? 'black' : null),
+    },
+    deferReply: async () => {},
+    editReply: async (payload) => {
+      messageEdits.push(payload);
+      return replyMessage;
+    },
+  };
+  const { handleListViewCommand } = createViewHandlers({
+    client: { guilds: { cache: new Map() } },
+    connectDatabase: async () => {},
+    getLanguage: async () => 'en',
+    hydratePage: async () => {
+      hydrationStarted = true;
+      await hydrationGate;
+      return { evidenceCount: 1, snapshotCount: 1 };
+    },
+    loadEntries: async () => [{
+      name: 'Fastfirst',
+      reason: 'test',
+      addedAt: new Date('2026-01-01T00:00:00Z'),
+      _listType: 'black',
+      _label: 'Blacklist',
+      _color: 0xed4245,
+      _icon: '⛔',
+    }],
+  });
+
+  await handleListViewCommand(interaction);
+
+  assert.equal(hydrationStarted, true);
+  assert.equal(messageEdits.length, 1, 'the initial page should not wait for background hydration');
+  assert.equal(typeof collectHandler, 'function');
+
+  releaseHydration();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(messageEdits.length, 2, 'hydrated decorations should update the visible page once');
 });

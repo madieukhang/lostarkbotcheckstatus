@@ -19,15 +19,15 @@ import {
 } from 'discord.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
-import {
-  refreshImageUrl,
-} from '../../../utils/imageRehost.js';
+import { getEvidenceMessageCacheKey } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
 import { getListContext } from '../helpers.js';
+
+export const LIST_VIEW_ALT_PREVIEW_LIMIT = 3;
 
 /**
  * Render the meta line that sits under each entry's name. Uses middot
@@ -70,30 +70,46 @@ function buildEntryMetaLine({ entry, freshUrl, lang = 'en' }) {
  * description hard cap is 4096 chars. Showing every alt inline can exceed
  * that budget on deep rosters; the detail view and DM expose the full list.
  */
-function buildEntryRosterLine(entry, lang = 'en') {
+export function pickListViewAlts(entry) {
   const primaryKey = normalizeNameKey(entry.name);
-  const others = (entry.allCharacters || [])
-    .filter((name) => normalizeNameKey(name) !== primaryKey);
+  const seen = new Set([primaryKey].filter(Boolean));
+  const others = [];
+  for (const rawName of entry.allCharacters || []) {
+    const name = String(rawName || '').trim();
+    const key = normalizeNameKey(name);
+    if (!name || !key || seen.has(key)) continue;
+    seen.add(key);
+    others.push(name);
+    if (others.length >= LIST_VIEW_ALT_PREVIEW_LIMIT) break;
+  }
+  return others;
+}
+
+function buildEntryRosterLine(entry, lang = 'en', statMap = new Map()) {
+  const others = pickListViewAlts(entry);
   if (others.length === 0) return '';
-  const visible = others.slice(0, 3);
-  const linked = visible.map((n) => `[${n}](${rosterUrl(n)})`);
-  const tail = others.length > visible.length
-    ? ` *${t('listView.meta.more', lang, { count: others.length - visible.length })}*`
+  const totalOthers = new Set(
+    (entry.allCharacters || [])
+      .map((name) => normalizeNameKey(name))
+      .filter((key) => key && key !== normalizeNameKey(entry.name))
+  ).size;
+  const linked = others.map((name) => (
+    formatLinkedCharacter(name, statMap.get(normalizeNameKey(name)), { bold: false })
+  ));
+  const tail = totalOthers > others.length
+    ? ` *${t('listView.meta.more', lang, { count: totalOthers - others.length })}*`
     : '';
   return `   ↳ ${t('listView.meta.alts', lang)}: ${linked.join(', ')}${tail}`;
 }
 
-function getEvidenceCacheKey(entry) {
-  if (!entry.imageMessageId || !entry.imageChannelId) return '';
-  return `${entry.imageChannelId}:${entry.imageMessageId}`;
-}
-
-export function buildTrustedListEmbed(entries, lang = 'en') {
+export function buildTrustedListEmbed(entries, lang = 'en', statMap = new Map()) {
   const lines = entries.flatMap((entry) => {
-    const link = rosterUrl(entry.name);
-    const head = `${ICONS.shield} **[${entry.name}](${link})**`;
+    const head = `${ICONS.shield} ${formatLinkedCharacter(
+      entry.name,
+      statMap.get(normalizeNameKey(entry.name)),
+    )}`;
     const meta = buildEntryMetaLine({ entry, freshUrl: '', lang });
-    const rosterLine = buildEntryRosterLine(entry, lang);
+    const rosterLine = buildEntryRosterLine(entry, lang, statMap);
     return [head, meta, rosterLine].filter(Boolean).concat('');
   });
   // Drop the trailing blank line before footer-adjacent content.
@@ -111,10 +127,9 @@ export function buildTrustedListEmbed(entries, lang = 'en') {
     .setTimestamp();
 }
 
-export async function buildListPageEmbed(options) {
+export function buildListPageEmbed(options) {
   const {
     allEntries,
-    client,
     currentType,
     getListContext,
     guildNameCache,
@@ -123,25 +138,18 @@ export async function buildListPageEmbed(options) {
     lang = 'en',
     page,
     evidenceUrlCache,
-    refreshImageUrlFn = refreshImageUrl,
+    statMap = new Map(),
     totalPages,
   } = options;
   const start = page * itemsPerPage;
   const pageEntries = allEntries.slice(start, start + itemsPerPage);
-  const freshUrls = await Promise.all(
-    pageEntries.map(async (entry) => {
-      if (entry.imageMessageId && entry.imageChannelId) {
-        const cacheKey = getEvidenceCacheKey(entry);
-        if (evidenceUrlCache?.has(cacheKey)) {
-          return evidenceUrlCache.get(cacheKey) || '';
-        }
-        const fresh = await refreshImageUrlFn(entry.imageMessageId, entry.imageChannelId, client);
-        if (fresh) evidenceUrlCache?.set(cacheKey, fresh);
-        return fresh || '';
-      }
-      return entry.imageUrl || '';
-    })
-  );
+  const freshUrls = pageEntries.map((entry) => {
+    const cacheKey = getEvidenceMessageCacheKey(entry);
+    if (cacheKey && evidenceUrlCache?.has(cacheKey)) {
+      return evidenceUrlCache.get(cacheKey) || '';
+    }
+    return entry.imageUrl || '';
+  });
 
   // Two-line entry layout. Line 1 is name + list-type icon + scope tag;
   // line 2 (prefixed `└ `) carries reason / raid / time / evidence link.
@@ -158,10 +166,13 @@ export async function buildListPageEmbed(options) {
         scopeTag = ` \`[${t('listView.scope.local', lang)}]\``;
       }
     }
-    const link = rosterUrl(entry.name);
-    const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${entry._icon} **[${entry.name}](${link})**${scopeTag}`;
+    const linkedName = formatLinkedCharacter(
+      entry.name,
+      statMap.get(normalizeNameKey(entry.name)),
+    );
+    const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${entry._icon} ${linkedName}${scopeTag}`;
     const meta = buildEntryMetaLine({ entry, freshUrl: freshUrls[index], lang });
-    const rosterLine = buildEntryRosterLine(entry, lang);
+    const rosterLine = buildEntryRosterLine(entry, lang, statMap);
     lines.push(...[head, meta, rosterLine].filter(Boolean), '');
   });
   if (lines[lines.length - 1] === '') lines.pop();

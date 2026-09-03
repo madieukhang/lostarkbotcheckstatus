@@ -31,6 +31,13 @@ const EVIDENCE_LIST_ICON = Object.freeze({
   white: '✅',
 });
 
+/** Stable request-local key for one rehosted evidence message. */
+export function getEvidenceMessageCacheKey(entry) {
+  const channelId = String(entry?.imageChannelId || '').trim();
+  const messageId = String(entry?.imageMessageId || '').trim();
+  return channelId && messageId ? `${channelId}:${messageId}` : '';
+}
+
 /**
  * Resolve the configured evidence channel ID, or null if not configured.
  * Always reads from the OWNER guild's GuildConfig (not per-guild) · there

@@ -9,6 +9,7 @@ import config from '../../../config.js';
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
+import { createLatestOnlyQueue } from '../../../utils/async.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
@@ -32,9 +33,9 @@ import {
   buildListViewComponents,
   buildTrustedListEmbed,
 } from './ui.js';
+import { hydrateListViewPage } from './pageData.js';
 
 const ITEMS_PER_PAGE = 10;
-const LIST_VIEW_REFRESH_TTL_MS = 5000;
 
 function resolveTypes(type, scopeFilter) {
   if (scopeFilter && type === 'all') return ['black'];
@@ -120,6 +121,16 @@ async function buildGuildNameCache({
   return guildNameCache;
 }
 
+function seedGuildNameCache({ allEntries, client, isOwnerGuild, guildNameCache = new Map() }) {
+  if (!isOwnerGuild) return guildNameCache;
+  for (const entry of allEntries) {
+    if (entry.scope !== 'server' || !entry.guildId || guildNameCache.has(entry.guildId)) continue;
+    const cachedGuild = client?.guilds?.cache?.get?.(entry.guildId);
+    if (cachedGuild?.name) guildNameCache.set(entry.guildId, cachedGuild.name);
+  }
+  return guildNameCache;
+}
+
 /**
  * Build the /la-list view handler bag.
  * @param {object} deps
@@ -135,13 +146,11 @@ async function buildGuildNameCache({
 export function createViewHandlers({
   client,
   connectDatabase = connectDB,
+  hydratePage = hydrateListViewPage,
   loadEntries = loadListEntries,
   getLanguage = getUserLanguage,
   now = Date.now,
-  refreshTtlMs = LIST_VIEW_REFRESH_TTL_MS,
 } = {}) {
-  const normalizedRefreshTtlMs = Math.max(0, Number(refreshTtlMs) || 0);
-
   async function handleListViewCommand(interaction) {
     if (!interaction.guild) {
       await deferReply(interaction, { ephemeral: true });
@@ -154,14 +163,19 @@ export function createViewHandlers({
       return;
     }
 
+    const startedAt = Number(now());
     await deferReply(interaction);
-    const lang = await getLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-
+    const acknowledgedAt = Number(now());
+    let lang = getCachedUserLanguage(interaction.user.id);
     const type = interaction.options.getString('type', true);
     const scopeFilter = interaction.options.getString('scope') || '';
 
     try {
-      await connectDatabase();
+      const [resolvedLang] = await Promise.all([
+        getLanguage(interaction.user.id, { UserPreferenceModel: UserPreference }),
+        connectDatabase(),
+      ]);
+      lang = resolvedLang || lang;
 
       if (type === 'trusted') {
         const trustedEntries = await TrustedUser.find({}).sort({ addedAt: -1 }).lean();
@@ -175,7 +189,24 @@ export function createViewHandlers({
           });
           return;
         }
-        await editEmbed(interaction, buildTrustedListEmbed(trustedEntries, lang));
+        const statMap = new Map();
+        const loadedSnapshotNames = new Set();
+        await editEmbed(interaction, buildTrustedListEmbed(trustedEntries, lang, statMap));
+        console.log(
+          `[list-view] rendered type=trusted entries=${trustedEntries.length} ackMs=${acknowledgedAt - startedAt} openMs=${Number(now()) - startedAt}`
+        );
+        void hydratePage({
+          client,
+          entries: trustedEntries,
+          loadedSnapshotNames,
+          refreshEvidence: false,
+          statMap,
+        }).then(({ snapshotCount = 0 } = {}) => {
+          console.log(`[list-view] background type=trusted snapshots=${snapshotCount}`);
+          return editEmbed(interaction, buildTrustedListEmbed(trustedEntries, lang, statMap));
+        }).catch((err) => {
+          console.warn('[list-view] Trusted class hydration failed:', err.message);
+        });
         return;
       }
 
@@ -198,18 +229,17 @@ export function createViewHandlers({
         return;
       }
 
-      const guildNameCache = await buildGuildNameCache({ allEntries, client, isOwnerGuild });
+      const guildNameCache = seedGuildNameCache({ allEntries, client, isOwnerGuild });
       let totalPages = Math.max(1, Math.ceil(allEntries.length / ITEMS_PER_PAGE));
       let currentPage = 0;
-      let snapshotLoadedAtMs = Number(now());
+      let dataRevision = 0;
       let refreshPromise = null;
       const evidenceUrlCache = new Map();
+      const hydrationPromises = new Map();
+      const loadedSnapshotNames = new Set();
+      const statMap = new Map();
 
-      const refreshEntries = ({ force = false } = {}) => {
-        const snapshotAgeMs = Math.max(0, Number(now()) - snapshotLoadedAtMs);
-        if (!force && snapshotAgeMs < normalizedRefreshTtlMs) {
-          return Promise.resolve(false);
-        }
+      const refreshEntries = () => {
         if (refreshPromise) return refreshPromise;
 
         refreshPromise = (async () => {
@@ -219,17 +249,15 @@ export function createViewHandlers({
             type,
             viewGuildId,
           });
-          await buildGuildNameCache({
-            allEntries: nextEntries,
-            client,
-            isOwnerGuild,
-            guildNameCache,
-          });
           allEntries = nextEntries;
           totalPages = Math.max(1, Math.ceil(allEntries.length / ITEMS_PER_PAGE));
           currentPage = Math.min(currentPage, totalPages - 1);
+          dataRevision += 1;
           evidenceUrlCache.clear();
-          snapshotLoadedAtMs = Number(now());
+          hydrationPromises.clear();
+          loadedSnapshotNames.clear();
+          statMap.clear();
+          seedGuildNameCache({ allEntries, client, isOwnerGuild, guildNameCache });
           return true;
         })().finally(() => {
           refreshPromise = null;
@@ -239,7 +267,6 @@ export function createViewHandlers({
 
       const pageOptions = () => ({
         allEntries,
-        client,
         currentType: type,
         evidenceUrlCache,
         getListContext,
@@ -248,6 +275,7 @@ export function createViewHandlers({
         itemsPerPage: ITEMS_PER_PAGE,
         lang,
         page: currentPage,
+        statMap,
         totalPages,
       });
       const componentOptions = () => ({
@@ -258,9 +286,81 @@ export function createViewHandlers({
         totalPages,
       });
 
-      const messageFromEdit = await editEmbed(interaction, await buildListPageEmbed(pageOptions()), {
+      const firstRenderStartedAt = Number(now());
+      const messageFromEdit = await editEmbed(interaction, buildListPageEmbed(pageOptions()), {
         components: buildListViewComponents(componentOptions()),
       });
+      console.log(
+        `[list-view] rendered type=${type} entries=${allEntries.length} ackMs=${acknowledgedAt - startedAt} firstRenderMs=${Number(now()) - firstRenderStartedAt} openMs=${Number(now()) - startedAt}`
+      );
+
+      let collectorEnded = false;
+      const renderQueue = createLatestOnlyQueue(async () => {
+        if (collectorEnded) return;
+        await editEmbed(interaction, buildListPageEmbed(pageOptions()), {
+          components: buildListViewComponents(componentOptions()),
+        });
+      }, {
+        onError: (err, labels) => {
+          console.warn(
+            `[list-view] ${labels.join('+') || 'update'} render failed:`,
+            err.message,
+          );
+        },
+      });
+
+      const schedulePageHydration = (label, { includeGuildNames = false } = {}) => {
+        const requestedPage = currentPage;
+        const requestedRevision = dataRevision;
+        const hydrationKey = `${requestedRevision}:${requestedPage}`;
+        if (hydrationPromises.has(hydrationKey)) {
+          return hydrationPromises.get(hydrationKey);
+        }
+
+        const pageEntries = allEntries.slice(
+          requestedPage * ITEMS_PER_PAGE,
+          (requestedPage + 1) * ITEMS_PER_PAGE,
+        );
+        const hydrationStartedAt = Number(now());
+        const tasks = [hydratePage({
+          client,
+          entries: pageEntries,
+          evidenceUrlCache,
+          loadedSnapshotNames,
+          statMap,
+        })];
+        if (includeGuildNames) {
+          tasks.push(buildGuildNameCache({
+            allEntries,
+            client,
+            isOwnerGuild,
+            guildNameCache,
+          }));
+        }
+
+        const hydrationPromise = Promise.all(tasks)
+          .then(([stats = {}]) => {
+            console.log(
+              `[list-view] background page=${requestedPage + 1} snapshots=${stats.snapshotCount || 0} evidence=${stats.evidenceCount || 0} ms=${Number(now()) - hydrationStartedAt}`
+            );
+            if (
+              collectorEnded
+              || requestedRevision !== dataRevision
+              || requestedPage !== currentPage
+            ) return;
+            return renderQueue.request(label);
+          })
+          .catch((err) => {
+            console.warn('[list-view] Background hydration failed:', err.message);
+          })
+          .finally(() => {
+            hydrationPromises.delete(hydrationKey);
+          });
+        hydrationPromises.set(hydrationKey, hydrationPromise);
+        return hydrationPromise;
+      };
+
+      void schedulePageHydration('initial-extras', { includeGuildNames: true });
 
       const reply = messageFromEdit?.createMessageComponentCollector
         ? messageFromEdit
@@ -283,13 +383,16 @@ export function createViewHandlers({
         const isRefresh = componentInteraction.customId === 'listview_refresh';
         if (isPrevious || isNext || isRefresh) {
           await componentInteraction.deferUpdate();
-          await refreshEntries({ force: isRefresh }).catch((err) => {
-            console.warn('[list] Live view refresh failed:', err.message);
-          });
+          if (isRefresh) {
+            await refreshEntries().catch((err) => {
+              console.warn('[list] Live view refresh failed:', err.message);
+            });
+          }
           if (isPrevious) currentPage = Math.max(0, currentPage - 1);
           if (isNext) currentPage = Math.min(totalPages - 1, currentPage + 1);
-          await editEmbed(componentInteraction, await buildListPageEmbed(pageOptions()), {
-            components: buildListViewComponents(componentOptions()),
+          await renderQueue.request(isRefresh ? 'refresh' : 'pagination');
+          void schedulePageHydration(isRefresh ? 'refresh-extras' : 'page-extras', {
+            includeGuildNames: isRefresh,
           });
           return;
         }
@@ -306,11 +409,17 @@ export function createViewHandlers({
             : '';
           const isOfficer = config.officerApproverIds.includes(componentInteraction.user.id)
             || config.seniorApproverIds.includes(componentInteraction.user.id);
-          await replyEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, { includeAddedBy: isOfficer, lang }));
+          await replyEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, {
+            includeAddedBy: isOfficer,
+            lang,
+            statMap,
+          }));
         }
       });
 
       collector.on('end', async () => {
+        collectorEnded = true;
+        await renderQueue.flush();
         await editComponents(interaction, buildExpiredComponents(lang)).catch(() => {});
       });
     } catch (err) {
