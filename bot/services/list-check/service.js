@@ -4,22 +4,21 @@
  * Used by both /la-check command and auto-check channel handler.
  */
 
+import config from '../../config.js';
 import { connectDB } from '../../db.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import TrustedUser from '../../models/TrustedUser.js';
 import { getClassName } from '../../models/Class.js';
 import {
+  buildListEntryMap as buildEntryMap,
+  buildNameRosterQuery,
+} from '../../utils/listEntryMap.js';
+import {
   buildNameKeyMap,
   normalizeNameKey,
   normalizeNameList,
 } from '../../utils/names.js';
-export { formatCheckResults } from './format.js';
-export { extractNamesFromImage } from './ocr.js';
-import {
-  buildListEntryMap as buildEntryMap,
-  buildNameRosterQuery,
-} from '../../utils/listEntryMap.js';
-import { applyMarkedSiblingLevelCorrections } from './partyCorrections.js';
+import { createNameSuggestionContext } from '../roster/search.js';
 import { enrichListCheckResults } from './enrichment.js';
 import { LIST_LOOKUP_COLLATION, loadListLookup } from './lookup.js';
 import {
@@ -27,7 +26,12 @@ import {
   didListCheckNameChange,
   resolveMappedListMatch,
 } from './matchResolution.js';
+import { applyMarkedSiblingLevelCorrections } from './partyCorrections.js';
+import { attachRelatedClassNames } from './relatedClasses.js';
 import { hasDatabaseListMatch } from './verification.js';
+
+export { formatCheckResults } from './format.js';
+export { extractNamesFromImage } from './ocr.js';
 export {
   isCharacterIdentityVerified,
   partitionListCheckResultsByVerification,
@@ -39,99 +43,6 @@ function rememberNormalizedName(namesByKey, rawName) {
   const name = String(rawName || '').trim().normalize('NFC');
   const key = normalizeNameKey(name);
   if (key && !namesByKey.has(key)) namesByKey.set(key, name);
-}
-
-/**
- * Check an array of names against database-backed lists.
- *
- * After DB cross-check, items missing class+ilvl snapshot data go
- * through a targeted enrichment phase that routes by worker health:
- *   - Worker online  → `buildRosterCharacters` via worker. Single
- *     bible roster-page scrape returns class + ilvl + CP for the
- *     target AND the full alt list. Result populates the snapshot
- *     plus `item.discoveredAlts` so the formatter can render alts
- *     for OCR'd names with no DB hit.
- *   - Worker offline → `fetchNameSuggestions` direct from Railway
- *     (lightweight search endpoint, less aggressive CF protection
- *     than the per-character page route). Class + ilvl only; alts
- *     are not available in this mode.
- * Both paths persist class + ilvl to RosterSnapshot so subsequent
- * checks on the same name hit the cache for free.
- *
- * @param {string[]} names
- * @param {object} [options]
- * @param {string} [options.guildId] - Guild ID for including server-scoped blacklist entries
- * @param {'ocr'|'text'} [options.inputSource='text'] - How the checked name was supplied
- * @param {Map} [options.suggestionCache] - request-local Bible search cache
- * @param {object} [options.suggestionContext] - request-wide Bible lookup budget and metrics
- * @returns {Promise<Array<object>>} Results with list entries, identity proof,
- *   and stored snapshot metadata
- */
-/**
- * Collect the other character names a result row prints - the list entry
- * it matched through and the alts beneath it - and stamp each item with a
- * lowercased name -> className map for those.
- *
- * The searched name already carries snapClassName from the main query;
- * this covers everyone else so a row does not mix icon-led names with
- * bare ones. Missing snapshots are normal (nobody has run /la-roster on
- * that name yet) and simply yield no icon.
- *
- * @param {Array<object>} results - mutated in place
- * @returns {Promise<void>}
- */
-async function attachRelatedClassNames(results) {
-  const classByName = new Map();
-  const relatedGroups = results.map((item) => {
-    const namesByKey = new Map();
-    const itemKey = normalizeNameKey(item.name);
-    if (itemKey && item.snapClassName) classByName.set(itemKey, item.snapClassName);
-    const rawNames = [
-      item.blackEntry?.name,
-      item.whiteEntry?.name,
-      item.watchEntry?.name,
-      item.trustedEntry?.name,
-      ...(item.blackEntry?.allCharacters || []),
-      ...(item.whiteEntry?.allCharacters || []),
-      ...(item.watchEntry?.allCharacters || []),
-      ...(item.trustedEntry?.allCharacters || []),
-      ...(Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []),
-    ];
-    for (const rawName of rawNames) {
-      rememberNormalizedName(namesByKey, rawName);
-    }
-    return { item, namesByKey };
-  });
-  const wantedByKey = new Map();
-  for (const { namesByKey } of relatedGroups) {
-    for (const [key, name] of namesByKey) {
-      if (!classByName.has(key) && !wantedByKey.has(key)) wantedByKey.set(key, name);
-    }
-  }
-
-  if (wantedByKey.size > 0) {
-    try {
-      const snapshots = await RosterSnapshot.find({ name: { $in: [...wantedByKey.values()] } })
-        .collation(LIST_LOOKUP_COLLATION)
-        .lean();
-      for (const snapshot of snapshots) {
-        const className = snapshot?.classId ? getClassName(snapshot.classId) : '';
-        if (className) classByName.set(normalizeNameKey(snapshot.name), className);
-      }
-    } catch (err) {
-      console.warn('[listcheck] Related-name snapshot lookup failed (non-fatal):', err.message);
-    }
-  }
-  if (classByName.size === 0) return;
-
-  for (const { item, namesByKey } of relatedGroups) {
-    const related = {};
-    for (const key of namesByKey.keys()) {
-      const className = classByName.get(key);
-      if (className) related[key] = className;
-    }
-    if (Object.keys(related).length > 0) item.relatedClasses = related;
-  }
 }
 
 async function loadInitialListData(names, guildId) {
@@ -283,9 +194,26 @@ function logListCheckTiming(startedAt, names, timings) {
     `enrichment=${timings.enrichment}ms`,
     `refreshDb=${timings.refreshDb}ms`,
     `trustedDb=${timings.trustedDb}ms`,
+    `relatedClass=${timings.relatedClass}ms`,
   ].join(' '));
 }
 
+/**
+ * Check an array of names against database-backed lists.
+ *
+ * After DB cross-check, missing character metadata goes through bounded Bible
+ * enrichment. The checked names and the three alt names the card can display
+ * share one request cache and network budget; related-name repair is direct
+ * only and never spends ScraperAPI quota.
+ *
+ * @param {string[]} names
+ * @param {object} [options]
+ * @param {string} [options.guildId] - Guild ID for server-scoped blacklist entries
+ * @param {'ocr'|'text'} [options.inputSource='text'] - How names were supplied
+ * @param {Map} [options.suggestionCache] - request-local Bible search cache
+ * @param {object} [options.suggestionContext] - request-wide lookup budget and metrics
+ * @returns {Promise<Array<object>>} Results with list and snapshot metadata
+ */
 export async function checkNamesAgainstLists(names, options = {}) {
   const startedAt = Date.now();
   // OCR refinement can collapse two candidates into the same canonical name;
@@ -302,6 +230,10 @@ export async function checkNamesAgainstLists(names, options = {}) {
     suggestionCache,
     suggestionContext,
   } = options;
+  const requestSuggestionContext = suggestionContext || createNameSuggestionContext({
+    cache: suggestionCache,
+    maxNetworkLookups: config.listcheckSuggestionLookupBudget,
+  });
 
   const initialDbStartedAt = Date.now();
   const initialData = await loadInitialListData(checkedNames, guildId);
@@ -318,7 +250,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   const enrichmentStartedAt = Date.now();
   const enrichmentOutcome = await enrichListCheckResults(results, {
     suggestionCache,
-    suggestionContext,
+    suggestionContext: requestSuggestionContext,
   });
   const enrichmentTotalMs = Date.now() - enrichmentStartedAt;
 
@@ -371,9 +303,14 @@ export async function checkNamesAgainstLists(names, options = {}) {
   // through and the alts under it. Those were the only bare names left on
   // a row whose own name carries a class icon. Runs last so it sees the
   // final identity set (canonicalization and discovered alts included),
-  // and is best-effort · a name never touched by /la-roster simply keeps
-  // no icon.
-  await attachRelatedClassNames(results);
+  // and is best-effort · if both snapshot and direct search are unavailable,
+  // the name remains a valid bare roster link.
+  const relatedClassStartedAt = Date.now();
+  await attachRelatedClassNames(results, {
+    suggestionCache,
+    suggestionContext: requestSuggestionContext,
+  });
+  const relatedClassMs = Date.now() - relatedClassStartedAt;
 
   logListCheckTiming(startedAt, checkedNames, {
     connect: connectMs,
@@ -382,6 +319,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     enrichment: enrichmentMs,
     refreshDb: refreshDbMs,
     trustedDb: trustedDbMs,
+    relatedClass: relatedClassMs,
   });
   return results;
 }

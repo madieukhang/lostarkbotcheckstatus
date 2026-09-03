@@ -5,10 +5,11 @@ import { t } from '../i18n/index.js';
 import { groupListCheckResults } from './displayGroups.js';
 import { didListCheckNameChange } from './matchResolution.js';
 
+export const LIST_CHECK_ALT_PREVIEW_LIMIT = 3;
+
 // The names in these branches are characters in their own right, so they
-// link out to their roster page like every other name on the card. The
-// class icon is not available here: the check only holds a snapshot for
-// the name that was searched, not for the entry it matched.
+// link out to their roster page like every other name on the card. Their
+// class metadata comes from the related-name snapshot/search pass in service.
 function linkName(name, item) {
   const trimmed = String(name || '').trim();
   if (!trimmed) return trimmed;
@@ -62,7 +63,7 @@ function formatMatchContext(item, entry, listType, lang) {
  *      publicly visible).
  * Filters out the item's own name and dedupes case-insensitively.
  */
-function pickAltsForDisplay(item, excludedNames = [item.name]) {
+export function pickAltsForDisplay(item, excludedNames = [item.name]) {
   const sourceEntry = item.blackEntry || item.whiteEntry || item.watchEntry || item.trustedEntry;
   const raw = (sourceEntry?.allCharacters && sourceEntry.allCharacters.length > 0)
     ? sourceEntry.allCharacters
@@ -131,7 +132,7 @@ function formatAltsBranch(item, lang) {
   const alts = pickAltsForDisplay(item);
   if (alts.length === 0) return '';
 
-  const visible = alts.slice(0, 3);
+  const visible = alts.slice(0, LIST_CHECK_ALT_PREVIEW_LIMIT);
   const remainingCount = alts.length - visible.length;
   const tail = remainingCount > 0
     ? ` *${t('dialogue.check.format.more', lang, { count: remainingCount })}*`

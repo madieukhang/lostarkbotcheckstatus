@@ -101,6 +101,84 @@ test('shared list-check batch dedupes canonical names before DB and enrichment w
   }
 });
 
+test('listed roster hydrates the three visible alt class icons when snapshots are missing', async () => {
+  await Promise.all([
+    RosterSnapshot.create({
+      name: 'Ruincarnation',
+      classId: 'dragon_knight',
+      itemLevel: 1761.6666,
+      rosterName: 'Ruincarnation',
+    }),
+    Blacklist.create({
+      name: 'Ruincarnation',
+      reason: 'existing report',
+      raid: 'Kazeros Nor',
+      scope: 'global',
+      guildId: '',
+      allCharacters: [
+        'Ruincarnation',
+        'Dakuraito',
+        'Yumekafuyuki',
+        'Mindycaron',
+        'Hiddenfourth',
+      ],
+    }),
+  ]);
+
+  const classByName = new Map([
+    ['Dakuraito', ['holyknight_female', 1734.1666]],
+    ['Yumekafuyuki', ['force_master', 1720.8334]],
+    ['Mindycaron', ['berserker_female', 1735]],
+  ]);
+  const originalFetch = globalThis.fetch;
+  const queriedNames = [];
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    assert.match(requestedUrl, /^https:\/\/lostark\.bible\/_app\/remote\/ngsbie\/search\?/u);
+    const payload = new URL(requestedUrl).searchParams.get('payload');
+    const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+    const name = decoded[1];
+    queriedNames.push(name);
+    const [classId, itemLevel] = classByName.get(name) || ['', 0];
+    const data = classId ? [[1], [2, 3, 4], name, classId, itemLevel] : [[]];
+    return Response.json({ type: 'result', result: JSON.stringify(data) });
+  };
+
+  try {
+    const [result] = await checkNamesAgainstLists(['Ruincarnation'], {
+      guildId: 'guild-1',
+    });
+    const [line] = formatCheckResults([result], 'vi');
+
+    assert.deepEqual(new Set(queriedNames), new Set(classByName.keys()));
+    assert.equal(result.relatedClasses?.dakuraito, 'Valkyrie');
+    assert.equal(result.relatedClasses?.yumekafuyuki, 'Soulfist');
+    assert.equal(result.relatedClasses?.mindycaron, 'Slayer');
+    assert.equal(result.relatedClasses?.hiddenfourth, undefined);
+    assert.match(line, /Valkyrie \[Dakuraito\]\(\S+\)/u);
+    assert.match(line, /Soulfist \[Yumekafuyuki\]\(\S+\)/u);
+    assert.match(line, /Slayer \[Mindycaron\]\(\S+\)/u);
+
+    const hydrated = await RosterSnapshot.find({
+      name: { $in: [...classByName.keys()] },
+    }).lean();
+    assert.equal(hydrated.length, 3);
+    assert.ok(hydrated.every((snapshot) => snapshot.rosterName === 'Ruincarnation'));
+
+    globalThis.fetch = async (url) => {
+      throw new Error(`unexpected repeat lookup after snapshot repair: ${url}`);
+    };
+    const [cachedResult] = await checkNamesAgainstLists(['Ruincarnation'], {
+      guildId: 'guild-1',
+    });
+    assert.equal(cachedResult.relatedClasses?.dakuraito, 'Valkyrie');
+    assert.equal(cachedResult.relatedClasses?.yumekafuyuki, 'Soulfist');
+    assert.equal(cachedResult.relatedClasses?.mindycaron, 'Slayer');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('shared list lookup prefers only the requesting guild blacklist over global', async () => {
   await Promise.all([
     RosterSnapshot.create({

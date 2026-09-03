@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { CLASS_EMOJI_MAP } from '../bot/models/Class.js';
 import { formatCheckResults } from '../bot/services/list-check/format.js';
 
 test('formatCheckResults sorts same-priority DPS before supports', () => {
@@ -182,12 +183,26 @@ test('related names carry their class once the check has snapshots for them', ()
   const [bare] = formatCheckResults([{ ...item }], 'vi');
   assert.doesNotMatch(bare, /Souleater/u);
 
-  const [enriched] = formatCheckResults([{
-    ...item,
-    relatedClasses: { tenshi: 'Souleater', mikazuki: 'Reaper' },
-  }], 'vi');
-  assert.match(enriched, /Souleater \[Tenshi\]/u);
-  assert.match(enriched, /Reaper \[Mikazuki\]/u);
-  // The searched name keeps exactly one class prefix, from snapClassName.
-  assert.equal((enriched.match(/Bard/gu) || []).length, 1);
+  const previousEmoji = {
+    Bard: CLASS_EMOJI_MAP.Bard,
+    Souleater: CLASS_EMOJI_MAP.Souleater,
+    Reaper: CLASS_EMOJI_MAP.Reaper,
+  };
+  Object.assign(CLASS_EMOJI_MAP, {
+    Bard: '<:bard:101>',
+    Souleater: '<:souleater:102>',
+    Reaper: '<:reaper:103>',
+  });
+  try {
+    const [enriched] = formatCheckResults([{
+      ...item,
+      relatedClasses: { tenshi: 'Souleater', mikazuki: 'Reaper' },
+    }], 'vi');
+    assert.match(enriched, /<:souleater:102> \[Tenshi\]/u);
+    assert.match(enriched, /<:reaper:103> \[Mikazuki\]/u);
+    // The searched name keeps exactly one class prefix, from snapClassName.
+    assert.equal((enriched.match(/<:bard:101>/gu) || []).length, 1);
+  } finally {
+    Object.assign(CLASS_EMOJI_MAP, previousEmoji);
+  }
 });
