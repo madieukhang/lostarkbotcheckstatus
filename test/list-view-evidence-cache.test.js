@@ -7,6 +7,7 @@ import {
   buildExpiredComponents,
   buildListPageEmbed,
   buildListViewComponents,
+  buildTrustedListEmbed,
 } from '../bot/handlers/list/view/ui.js';
 
 const getListContext = () => ({
@@ -120,6 +121,32 @@ test('/la-list view renders localized pagination and evidence controls', () => {
   assert.equal(expiredPager[0].label, '前へ');
   assert.equal(expiredPager[2].label, '次へ');
   assert.match(expiredPager[1].label, /\/la-list view/);
+});
+
+test('/la-list view shows list markers only where rows from different lists are mixed', () => {
+  const entry = buildEntry({ _icon: '⛔' });
+  const baseOptions = {
+    allEntries: [entry],
+    getListContext,
+    guildNameCache: new Map(),
+    isOwnerGuild: false,
+    itemsPerPage: 10,
+    page: 0,
+  };
+
+  const typedDescription = buildListPageEmbed({
+    ...baseOptions,
+    currentType: 'black',
+  }).toJSON().description;
+  const mixedDescription = buildListPageEmbed({
+    ...baseOptions,
+    currentType: 'all',
+  }).toJSON().description;
+  const trustedDescription = buildTrustedListEmbed([entry], 'en').toJSON().description;
+
+  assert.doesNotMatch(typedDescription, /⛔/u);
+  assert.match(mixedDescription, /^` 1` ⛔ /u);
+  assert.doesNotMatch(trustedDescription, /🛡️/u);
 });
 
 test('/la-list view evidence values keep their absolute index without page scans', () => {

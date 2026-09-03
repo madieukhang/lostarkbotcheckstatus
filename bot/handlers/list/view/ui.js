@@ -102,10 +102,10 @@ function buildEntryRosterLine(entry, lang = 'en', statMap = new Map()) {
 
 export function buildTrustedListEmbed(entries, lang = 'en', statMap = new Map()) {
   const lines = entries.flatMap((entry) => {
-    const head = `${ICONS.shield} ${formatLinkedCharacter(
+    const head = formatLinkedCharacter(
       entry.name,
       statMap.get(normalizeNameKey(entry.name)),
-    )}`;
+    );
     const meta = buildEntryMetaLine({ entry, lang });
     const rosterLine = buildEntryRosterLine(entry, lang, statMap);
     return [head, meta, rosterLine].filter(Boolean).concat('');
@@ -160,7 +160,10 @@ export function buildListPageEmbed(options) {
       entry.name,
       statMap.get(normalizeNameKey(entry.name)),
     );
-    const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${entry._icon} ${linkedName}${scopeTag}`;
+    // A typed view already names and color-codes its list in the title. Keep
+    // the row marker only in the mixed view, where it carries real meaning.
+    const listMarker = currentType === 'all' ? `${entry._icon} ` : '';
+    const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${listMarker}${linkedName}${scopeTag}`;
     const meta = buildEntryMetaLine({ entry, lang });
     const rosterLine = buildEntryRosterLine(entry, lang, statMap);
     lines.push(...[head, meta, rosterLine].filter(Boolean), '');
