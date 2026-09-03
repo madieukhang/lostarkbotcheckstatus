@@ -81,7 +81,7 @@ test('OCR image card uses the compact camera author and omits redundant chrome',
   assert.equal(rendered.footer, undefined);
   assert.equal(rendered.timestamp, undefined);
   assert.match(rendered.description, /^⛔ \*\*\[Altone\]\(\S+\)\*\*/u);
-  assert.match(rendered.description, /alt: \[Alttwo\]\(\S+\)/u);
+  assert.match(rendered.description, /alts: \[Alttwo\]\(\S+\)/u);
   assert.doesNotMatch(rendered.description, /2 tên cùng roster|Trong ảnh:/u);
 });
 

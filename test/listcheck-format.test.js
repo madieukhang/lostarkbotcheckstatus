@@ -88,7 +88,7 @@ test('formatCheckResults omits via characters from the alt preview and overflow 
   }], 'vi');
 
   assert.match(line, /\n   ↳ via \*\*\[Moistbabydoll\]\(\S+\)\*\*/u);
-  const altLine = line.split('\n').find((part) => part.includes('↳ alt:'));
+  const altLine = line.split('\n').find((part) => part.includes('↳ alts:'));
   assert.ok(altLine);
   assert.doesNotMatch(altLine, /Moistbabydoll/u);
   assert.match(
@@ -136,7 +136,7 @@ test('formatCheckResults groups photographed characters backed by one roster ent
   assert.match(lines[0], /via \*\*\[Holynightdbb\]\(\S+\)\*\*/u);
   assert.equal((lines[0].match(/Same roster report/gu) || []).length, 1);
   // Alt names link out too, so the officer can verify each one.
-  assert.match(lines[0], /alt: \[Anotherpallydbb\]\(\S+\), \[Holypaladindbb\]\(\S+\), \[Pallydbbswift\]\(\S+\) \*\+3 tên khác\*/u);
+  assert.match(lines[0], /alts: \[Anotherpallydbb\]\(\S+\), \[Holypaladindbb\]\(\S+\), \[Pallydbbswift\]\(\S+\) \*\+3 tên khác\*/u);
   assert.doesNotMatch(lines[0], /6 tên cùng roster|Trong ảnh:/u);
 });
 
