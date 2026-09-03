@@ -33,7 +33,7 @@ import {
   buildListViewComponents,
   buildTrustedListEmbed,
 } from './ui.js';
-import { hydrateListViewPage } from './pageData.js';
+import { loadListViewStatMap } from './pageData.js';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -99,28 +99,6 @@ export async function loadListEntries(
   return allEntries;
 }
 
-async function buildGuildNameCache({
-  allEntries,
-  client,
-  isOwnerGuild,
-  guildNameCache = new Map(),
-}) {
-  if (!isOwnerGuild) return guildNameCache;
-
-  const serverGuildIds = [...new Set(
-    allEntries.filter((entry) => entry.scope === 'server' && entry.guildId).map((entry) => entry.guildId)
-  )].filter((guildId) => !guildNameCache.has(guildId));
-  await Promise.all(serverGuildIds.map(async (guildId) => {
-    try {
-      const guild = await client.guilds.fetch(guildId);
-      guildNameCache.set(guildId, guild.name);
-    } catch {
-      guildNameCache.set(guildId, guildId);
-    }
-  }));
-  return guildNameCache;
-}
-
 function seedGuildNameCache({ allEntries, client, isOwnerGuild, guildNameCache = new Map() }) {
   if (!isOwnerGuild) return guildNameCache;
   for (const entry of allEntries) {
@@ -142,9 +120,9 @@ function seedGuildNameCache({ allEntries, client, isOwnerGuild, guildNameCache =
 export function createViewHandlers({
   client,
   connectDatabase = connectDB,
-  hydratePage = hydrateListViewPage,
   loadEntries = loadListEntries,
   getLanguage = getUserLanguage,
+  loadStatMap = loadListViewStatMap,
   now = Date.now,
 } = {}) {
   async function handleListViewCommand(interaction) {
@@ -174,7 +152,10 @@ export function createViewHandlers({
       lang = resolvedLang || lang;
 
       if (type === 'trusted') {
-        const trustedEntries = await TrustedUser.find({}).sort({ addedAt: -1 }).lean();
+        const [trustedEntries, statMap] = await Promise.all([
+          TrustedUser.find({}).sort({ addedAt: -1 }).lean(),
+          loadStatMap(),
+        ]);
         if (trustedEntries.length === 0) {
           await editAlert(interaction, {
             severity: AlertSeverity.INFO,
@@ -185,28 +166,19 @@ export function createViewHandlers({
           });
           return;
         }
-        const statMap = new Map();
-        const loadedSnapshotNames = new Set();
         await editEmbed(interaction, buildTrustedListEmbed(trustedEntries, lang, statMap));
         console.log(
-          `[list-view] rendered type=trusted entries=${trustedEntries.length} ackMs=${acknowledgedAt - startedAt} openMs=${Number(now()) - startedAt}`
+          `[list-view] rendered type=trusted entries=${trustedEntries.length} snapshots=${statMap.size} ackMs=${acknowledgedAt - startedAt} openMs=${Number(now()) - startedAt}`
         );
-        void hydratePage({
-          entries: trustedEntries,
-          loadedSnapshotNames,
-          statMap,
-        }).then(({ snapshotCount = 0 } = {}) => {
-          console.log(`[list-view] background type=trusted snapshots=${snapshotCount}`);
-          return editEmbed(interaction, buildTrustedListEmbed(trustedEntries, lang, statMap));
-        }).catch((err) => {
-          console.warn('[list-view] Trusted class hydration failed:', err.message);
-        });
         return;
       }
 
       const viewGuildId = interaction.guild.id;
       const isOwnerGuild = viewGuildId === config.ownerGuildId;
-      let allEntries = await loadEntries({ isOwnerGuild, scopeFilter, type, viewGuildId });
+      let [allEntries, statMap] = await Promise.all([
+        loadEntries({ isOwnerGuild, scopeFilter, type, viewGuildId }),
+        loadStatMap(),
+      ]);
 
       if (allEntries.length === 0) {
         const ctx = type === 'all' ? null : getListContext(type);
@@ -226,29 +198,20 @@ export function createViewHandlers({
       const guildNameCache = seedGuildNameCache({ allEntries, client, isOwnerGuild });
       let totalPages = Math.max(1, Math.ceil(allEntries.length / ITEMS_PER_PAGE));
       let currentPage = 0;
-      let dataRevision = 0;
       let refreshPromise = null;
-      const hydrationPromises = new Map();
-      const loadedSnapshotNames = new Set();
-      const statMap = new Map();
 
       const refreshEntries = () => {
         if (refreshPromise) return refreshPromise;
 
         refreshPromise = (async () => {
-          const nextEntries = await loadEntries({
-            isOwnerGuild,
-            scopeFilter,
-            type,
-            viewGuildId,
-          });
+          const [nextEntries, nextStatMap] = await Promise.all([
+            loadEntries({ isOwnerGuild, scopeFilter, type, viewGuildId }),
+            loadStatMap(),
+          ]);
           allEntries = nextEntries;
+          statMap = nextStatMap;
           totalPages = Math.max(1, Math.ceil(allEntries.length / ITEMS_PER_PAGE));
           currentPage = Math.min(currentPage, totalPages - 1);
-          dataRevision += 1;
-          hydrationPromises.clear();
-          loadedSnapshotNames.clear();
-          statMap.clear();
           seedGuildNameCache({ allEntries, client, isOwnerGuild, guildNameCache });
           return true;
         })().finally(() => {
@@ -281,7 +244,7 @@ export function createViewHandlers({
         components: buildListViewComponents(componentOptions()),
       });
       console.log(
-        `[list-view] rendered type=${type} entries=${allEntries.length} ackMs=${acknowledgedAt - startedAt} firstRenderMs=${Number(now()) - firstRenderStartedAt} openMs=${Number(now()) - startedAt}`
+        `[list-view] rendered type=${type} entries=${allEntries.length} snapshots=${statMap.size} ackMs=${acknowledgedAt - startedAt} firstRenderMs=${Number(now()) - firstRenderStartedAt} openMs=${Number(now()) - startedAt}`
       );
 
       let collectorEnded = false;
@@ -298,57 +261,6 @@ export function createViewHandlers({
           );
         },
       });
-
-      const schedulePageHydration = (label, { includeGuildNames = false } = {}) => {
-        const requestedPage = currentPage;
-        const requestedRevision = dataRevision;
-        const hydrationKey = `${requestedRevision}:${requestedPage}`;
-        if (hydrationPromises.has(hydrationKey)) {
-          return hydrationPromises.get(hydrationKey);
-        }
-
-        const pageEntries = allEntries.slice(
-          requestedPage * ITEMS_PER_PAGE,
-          (requestedPage + 1) * ITEMS_PER_PAGE,
-        );
-        const hydrationStartedAt = Number(now());
-        const tasks = [hydratePage({
-          entries: pageEntries,
-          loadedSnapshotNames,
-          statMap,
-        })];
-        if (includeGuildNames) {
-          tasks.push(buildGuildNameCache({
-            allEntries,
-            client,
-            isOwnerGuild,
-            guildNameCache,
-          }));
-        }
-
-        const hydrationPromise = Promise.all(tasks)
-          .then(([stats = {}]) => {
-            console.log(
-              `[list-view] background page=${requestedPage + 1} snapshots=${stats.snapshotCount || 0} ms=${Number(now()) - hydrationStartedAt}`
-            );
-            if (
-              collectorEnded
-              || requestedRevision !== dataRevision
-              || requestedPage !== currentPage
-            ) return;
-            return renderQueue.request(label);
-          })
-          .catch((err) => {
-            console.warn('[list-view] Background hydration failed:', err.message);
-          })
-          .finally(() => {
-            hydrationPromises.delete(hydrationKey);
-          });
-        hydrationPromises.set(hydrationKey, hydrationPromise);
-        return hydrationPromise;
-      };
-
-      void schedulePageHydration('initial-extras', { includeGuildNames: true });
 
       const reply = messageFromEdit?.createMessageComponentCollector
         ? messageFromEdit
@@ -379,9 +291,6 @@ export function createViewHandlers({
           if (isPrevious) currentPage = Math.max(0, currentPage - 1);
           if (isNext) currentPage = Math.min(totalPages - 1, currentPage + 1);
           await renderQueue.request(isRefresh ? 'refresh' : 'pagination');
-          void schedulePageHydration(isRefresh ? 'refresh-extras' : 'page-extras', {
-            includeGuildNames: isRefresh,
-          });
           return;
         }
 

@@ -27,12 +27,14 @@ import { formatLinkedCharacter, renderTrackedAltsField, resolveRosterWorld } fro
 import { getListContext } from '../helpers.js';
 
 export const LIST_VIEW_ALT_PREVIEW_LIMIT = 3;
+const EMBED_DESCRIPTION_LIMIT = 4096;
+const ALT_PREVIEW_FIT_LEVELS = Object.freeze([LIST_VIEW_ALT_PREVIEW_LIMIT, 2, 1, 0]);
 
 /**
  * Render the meta line that sits under each entry's name. Uses middot
  * separators to match the rest of the embed family. Falsy fields are
- * dropped silently so entries without a raid / image don't show empty
- * separators.
+ * dropped silently so entries without a reason, raid, or timestamp don't show
+ * empty separators.
  */
 function capitalizeLabel(value) {
   const text = String(value || '');
@@ -68,7 +70,9 @@ function buildEntryMetaLine({ entry, lang = 'en' }) {
  * description hard cap is 4096 chars. Showing every alt inline can exceed
  * that budget on deep rosters; the detail view and DM expose the full list.
  */
-export function pickListViewAlts(entry) {
+export function pickListViewAlts(entry, limit = LIST_VIEW_ALT_PREVIEW_LIMIT) {
+  const safeLimit = Math.max(0, Math.floor(Number(limit) || 0));
+  if (safeLimit === 0) return [];
   const primaryKey = normalizeNameKey(entry.name);
   const seen = new Set([primaryKey].filter(Boolean));
   const others = [];
@@ -78,13 +82,18 @@ export function pickListViewAlts(entry) {
     if (!name || !key || seen.has(key)) continue;
     seen.add(key);
     others.push(name);
-    if (others.length >= LIST_VIEW_ALT_PREVIEW_LIMIT) break;
+    if (others.length >= safeLimit) break;
   }
   return others;
 }
 
-function buildEntryRosterLine(entry, lang = 'en', statMap = new Map()) {
-  const others = pickListViewAlts(entry);
+function buildEntryRosterLine(
+  entry,
+  lang = 'en',
+  statMap = new Map(),
+  previewLimit = LIST_VIEW_ALT_PREVIEW_LIMIT,
+) {
+  const others = pickListViewAlts(entry, previewLimit);
   if (others.length === 0) return '';
   const totalOthers = new Set(
     (entry.allCharacters || [])
@@ -100,24 +109,55 @@ function buildEntryRosterLine(entry, lang = 'en', statMap = new Map()) {
   return `   ↳ ${t('listView.meta.alts', lang)}: ${linked.join(', ')}${tail}`;
 }
 
+function buildFittingDescription(render, renderMinimal) {
+  for (const previewLimit of ALT_PREVIEW_FIT_LEVELS) {
+    const description = render({ includeMeta: true, previewLimit });
+    if (description.length <= EMBED_DESCRIPTION_LIMIT) return description;
+  }
+
+  const headsOnly = render({ includeMeta: false, previewLimit: 0 });
+  if (headsOnly.length <= EMBED_DESCRIPTION_LIMIT) return headsOnly;
+
+  // Corrupt or manually inserted overlong names should degrade to short plain
+  // rows, never make Discord reject the embed or expose half an emoji token.
+  const minimal = renderMinimal();
+  if (minimal.length <= EMBED_DESCRIPTION_LIMIT) return minimal;
+
+  const keptLines = [];
+  for (const line of minimal.split('\n')) {
+    const candidate = [...keptLines, line, '…'].join('\n');
+    if (candidate.length > EMBED_DESCRIPTION_LIMIT) break;
+    keptLines.push(line);
+  }
+  return [...keptLines, '…'].join('\n');
+}
+
+function compactPlainName(value) {
+  return String(value || 'Unknown')
+    .replace(/[\r\n`*_~|\\]/gu, '')
+    .trim()
+    .slice(0, 40) || 'Unknown';
+}
+
 export function buildTrustedListEmbed(entries, lang = 'en', statMap = new Map()) {
-  const lines = entries.flatMap((entry) => {
-    const head = formatLinkedCharacter(
-      entry.name,
-      statMap.get(normalizeNameKey(entry.name)),
-    );
-    const meta = buildEntryMetaLine({ entry, lang });
-    const rosterLine = buildEntryRosterLine(entry, lang, statMap);
-    return [head, meta, rosterLine].filter(Boolean).concat('');
-  });
-  // Drop the trailing blank line before footer-adjacent content.
-  if (lines[lines.length - 1] === '') lines.pop();
+  const description = buildFittingDescription(
+    ({ includeMeta, previewLimit }) => entries.map((entry) => {
+      const head = formatLinkedCharacter(
+        entry.name,
+        statMap.get(normalizeNameKey(entry.name)),
+      );
+      const meta = includeMeta ? buildEntryMetaLine({ entry, lang }) : '';
+      const rosterLine = buildEntryRosterLine(entry, lang, statMap, previewLimit);
+      return [head, meta, rosterLine].filter(Boolean).join('\n');
+    }).join('\n\n'),
+    () => entries.map((entry) => `**${compactPlainName(entry.name)}**`).join('\n'),
+  );
 
   // Count rides the title (matches the list-page card); the footer keeps
   // the "what trusted means" reminder + the manage hint.
   return createArtistEmbed()
     .setTitle(`${ICONS.shield} ${t('listView.trusted.title', lang)} · ${entries.length}`)
-    .setDescription(lines.join('\n').slice(0, 4096))
+    .setDescription(description)
     .setColor(COLORS.trustedSoft)
     .setFooter({
       text: t('listView.trusted.footer', lang),
@@ -140,35 +180,33 @@ export function buildListPageEmbed(options) {
   const start = page * itemsPerPage;
   const pageEntries = allEntries.slice(start, start + itemsPerPage);
 
-  // Two-line entry layout. Line 1 is name + list-type icon + scope tag;
-  // line 2 (prefixed `└ `) carries reason / raid / time. Evidence stays in
-  // the detail selector below instead of being duplicated on every row.
-  // Empty lines separate entries. Discord applies a 4096-character
-  // description cap, so rendering truncates at an entry boundary.
-  const lines = [];
-  pageEntries.forEach((entry, index) => {
-    let scopeTag = '';
-    if (entry.scope === 'server') {
-      if (isOwnerGuild && entry.guildId) {
-        const guildName = guildNameCache.get(entry.guildId) || entry.guildId;
-        scopeTag = ` \`[${t('listView.scope.localWithGuild', lang, { guildName })}]\``;
-      } else {
-        scopeTag = ` \`[${t('listView.scope.local', lang)}]\``;
+  const renderDescription = ({ includeMeta, previewLimit }) => {
+    // Empty lines separate complete entry blocks. When rich alt rows exceed
+    // Discord's budget, every row steps down to 2, 1, then 0 preview alts;
+    // no arbitrary string slice can cut through an emoji or Markdown link.
+    return pageEntries.map((entry, index) => {
+      let scopeTag = '';
+      if (entry.scope === 'server') {
+        if (isOwnerGuild && entry.guildId) {
+          const guildName = guildNameCache.get(entry.guildId) || entry.guildId;
+          scopeTag = ` \`[${t('listView.scope.localWithGuild', lang, { guildName })}]\``;
+        } else {
+          scopeTag = ` \`[${t('listView.scope.local', lang)}]\``;
+        }
       }
-    }
-    const linkedName = formatLinkedCharacter(
-      entry.name,
-      statMap.get(normalizeNameKey(entry.name)),
-    );
-    // A typed view already names and color-codes its list in the title. Keep
-    // the row marker only in the mixed view, where it carries real meaning.
-    const listMarker = currentType === 'all' ? `${entry._icon} ` : '';
-    const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${listMarker}${linkedName}${scopeTag}`;
-    const meta = buildEntryMetaLine({ entry, lang });
-    const rosterLine = buildEntryRosterLine(entry, lang, statMap);
-    lines.push(...[head, meta, rosterLine].filter(Boolean), '');
-  });
-  if (lines[lines.length - 1] === '') lines.pop();
+      const linkedName = formatLinkedCharacter(
+        entry.name,
+        statMap.get(normalizeNameKey(entry.name)),
+      );
+      // A typed view already names and color-codes its list in the title. Keep
+      // the row marker only in the mixed view, where it carries real meaning.
+      const listMarker = currentType === 'all' ? `${entry._icon} ` : '';
+      const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${listMarker}${linkedName}${scopeTag}`;
+      const meta = includeMeta ? buildEntryMetaLine({ entry, lang }) : '';
+      const rosterLine = buildEntryRosterLine(entry, lang, statMap, previewLimit);
+      return [head, meta, rosterLine].filter(Boolean).join('\n');
+    }).join('\n\n');
+  };
 
   const ctx = currentType === 'all' ? null : getListContext(currentType);
   const labelCap = getListTypeLabel(currentType, ctx?.label, lang);
@@ -176,7 +214,13 @@ export function buildListPageEmbed(options) {
 
   // Count stays in the title and page context stays in the controls below;
   // repeating either above the rows only delays the information requested.
-  const description = lines.join('\n').slice(0, 4096);
+  const description = buildFittingDescription(
+    renderDescription,
+    () => pageEntries.map((entry, index) => {
+      const listMarker = currentType === 'all' ? `${entry._icon} ` : '';
+      return `\`${String(start + index + 1).padStart(2, ' ')}\` ${listMarker}**${compactPlainName(entry.name)}**`;
+    }).join('\n'),
+  );
 
   return createArtistEmbed()
     .setTitle(`${titleIcon} ${labelCap} · ${allEntries.length} ${t('listView.summary.entries', lang)}`)

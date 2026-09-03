@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CLASS_EMOJI_MAP } from '../bot/models/Class.js';
-import { hydrateListViewPage } from '../bot/handlers/list/view/pageData.js';
+import { loadListViewStatMap } from '../bot/handlers/list/view/pageData.js';
 import {
   buildExpiredComponents,
   buildListPageEmbed,
@@ -30,10 +30,8 @@ function buildEntry(overrides = {}) {
   };
 }
 
-test('/la-list view hydrates its class cache once, outside the pure renderer', async () => {
+test('/la-list view loads one compact stat map before the pure renderer runs', async () => {
   let snapshotCalls = 0;
-  const loadedSnapshotNames = new Set();
-  const statMap = new Map();
   const entry = buildEntry({
     allCharacters: ['Testchar', 'Altchar'],
     imageUrl: 'https://cdn.example/evidence.png',
@@ -46,19 +44,17 @@ test('/la-list view hydrates its class cache once, outside the pure renderer', a
     isOwnerGuild: false,
     itemsPerPage: 10,
     page: 0,
-    statMap,
     totalPages: 1,
   };
-  const hydrateOptions = {
-    entries: [entry],
-    loadedSnapshotNames,
-    statMap,
+  const statMap = await loadListViewStatMap({
     RosterSnapshotModel: {
-      find({ name }) {
+      find(query, projection) {
         snapshotCalls += 1;
-        assert.deepEqual(new Set(name.$in), new Set(['Testchar', 'Altchar']));
+        assert.deepEqual(query, {});
+        assert.equal(projection._id, 0);
+        assert.equal(projection.name, 1);
+        assert.equal(projection.classId, 1);
         return {
-          collation() { return this; },
           async lean() {
             return [
               { name: 'Testchar', classId: 'bard' },
@@ -68,13 +64,10 @@ test('/la-list view hydrates its class cache once, outside the pure renderer', a
         };
       },
     },
-  };
+  });
+  options.statMap = statMap;
 
-  const coldEmbed = buildListPageEmbed(options);
-  const coldDescription = coldEmbed.toJSON().description;
-  assert.match(coldDescription, /^` 1`/u);
-  assert.doesNotMatch(coldDescription, /cdn\.example/u);
-  assert.doesNotMatch(coldDescription, /^Page /u);
+  assert.equal(snapshotCalls, 1);
 
   const previousEmoji = {
     Bard: CLASS_EMOJI_MAP.Bard,
@@ -85,17 +78,53 @@ test('/la-list view hydrates its class cache once, outside the pure renderer', a
     Reaper: '<:reaper:102>',
   });
   try {
-    await hydrateListViewPage(hydrateOptions);
-    const firstEmbed = buildListPageEmbed(options);
-    await hydrateListViewPage(hydrateOptions);
-    const secondEmbed = buildListPageEmbed(options);
+    const embed = buildListPageEmbed(options);
+    const description = embed.toJSON().description;
 
-    assert.equal(snapshotCalls, 1);
-    assert.match(firstEmbed.toJSON().description, /<:bard:101> \*\*\[Testchar\]/u);
-    assert.match(firstEmbed.toJSON().description, /<:reaper:102> \[Altchar\]/u);
-    assert.doesNotMatch(secondEmbed.toJSON().description, /cdn\.example/u);
+    assert.match(description, /^` 1`/u);
+    assert.doesNotMatch(description, /cdn\.example/u);
+    assert.doesNotMatch(description, /^Page /u);
+    assert.match(description, /<:bard:101> \*\*\[Testchar\]/u);
+    assert.match(description, /<:reaper:102> \[Altchar\]/u);
   } finally {
     Object.assign(CLASS_EMOJI_MAP, previousEmoji);
+  }
+});
+
+test('/la-list view keeps every entry whole when rich class and alt markup reaches the embed cap', () => {
+  const previousEmoji = CLASS_EMOJI_MAP.Bard;
+  CLASS_EMOJI_MAP.Bard = '<:bard_abcdef:123456789012345678>';
+  try {
+    const statMap = new Map();
+    const allEntries = Array.from({ length: 10 }, (_, index) => {
+      const suffix = String(index + 1).padStart(2, '0');
+      const name = `Character${suffix}Longname`;
+      const alts = Array.from({ length: 8 }, (_, altIndex) => `Alt${suffix}${altIndex}Longcharacter`);
+      for (const characterName of [name, ...alts]) {
+        statMap.set(characterName.toLowerCase(), { name: characterName, classId: 'bard' });
+      }
+      return buildEntry({
+        name,
+        allCharacters: [name, ...alts],
+        reason: 'x'.repeat(80),
+      });
+    });
+    const description = buildListPageEmbed({
+      allEntries,
+      currentType: 'black',
+      getListContext,
+      guildNameCache: new Map(),
+      isOwnerGuild: false,
+      itemsPerPage: 10,
+      page: 0,
+      statMap,
+    }).toJSON().description;
+
+    assert.ok(description.length <= 4096);
+    assert.match(description, /Character10Longname/u);
+    assert.doesNotMatch(description, /<:[^>\n]*$/u);
+  } finally {
+    CLASS_EMOJI_MAP.Bard = previousEmoji;
   }
 });
 

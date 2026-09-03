@@ -98,6 +98,7 @@ test('/la-list view loads all list collections concurrently and keeps global rec
 
 test('/la-list view reuses its session snapshot for pagination and reloads only on refresh', async () => {
   let loadCalls = 0;
+  let statLoadCalls = 0;
   let fetchReplyCalls = 0;
   let collectHandler = null;
   const messageEdits = [];
@@ -144,7 +145,10 @@ test('/la-list view reuses its session snapshot for pagination and reloads only 
       loadCalls += 1;
       return currentRows;
     },
-    hydratePage: async () => ({}),
+    loadStatMap: async () => {
+      statLoadCalls += 1;
+      return new Map();
+    },
     getLanguage: async () => 'en',
   });
 
@@ -152,6 +156,7 @@ test('/la-list view reuses its session snapshot for pagination and reloads only 
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(fetchReplyCalls, 0);
   assert.equal(loadCalls, 1);
+  assert.equal(statLoadCalls, 1);
 
   const click = async (customId) => collectHandler({
     customId,
@@ -161,6 +166,7 @@ test('/la-list view reuses its session snapshot for pagination and reloads only 
 
   await click('listview_next');
   assert.equal(loadCalls, 1, 'recent navigation should reuse the session snapshot');
+  assert.equal(statLoadCalls, 1, 'pagination should reuse the same stat map');
 
   currentRows = buildRows(12);
   await click('listview_prev');
@@ -170,16 +176,18 @@ test('/la-list view reuses its session snapshot for pagination and reloads only 
   currentRows = buildRows(13);
   await click('listview_refresh');
   assert.equal(loadCalls, 2, 'the refresh button should explicitly reload the list');
+  assert.equal(statLoadCalls, 2, 'the refresh button should reload the stat map too');
   assert.match(messageEdits.at(-1).embeds[0].toJSON().title, /13 entries/);
 });
 
-test('/la-list view renders before slow class hydration completes', async () => {
+test('/la-list view loads entries and stats concurrently, then renders the complete page once', async () => {
   let collectHandler = null;
-  let releaseHydration;
-  let hydrationStarted = false;
+  let entriesStarted = false;
+  let statsStarted = false;
+  let releaseLoads;
   const messageEdits = [];
-  const hydrationGate = new Promise((resolve) => {
-    releaseHydration = resolve;
+  const loadGate = new Promise((resolve) => {
+    releaseLoads = resolve;
   });
   const replyMessage = {
     createMessageComponentCollector() {
@@ -207,30 +215,37 @@ test('/la-list view renders before slow class hydration completes', async () => 
     client: { guilds: { cache: new Map() } },
     connectDatabase: async () => {},
     getLanguage: async () => 'en',
-    hydratePage: async () => {
-      hydrationStarted = true;
-      await hydrationGate;
-      return { snapshotCount: 1 };
+    loadStatMap: async () => {
+      statsStarted = true;
+      await loadGate;
+      return new Map([['fastfirst', { name: 'Fastfirst', classId: 'bard' }]]);
     },
-    loadEntries: async () => [{
-      name: 'Fastfirst',
-      reason: 'test',
-      addedAt: new Date('2026-01-01T00:00:00Z'),
-      _listType: 'black',
-      _label: 'Blacklist',
-      _color: 0xed4245,
-      _icon: '⛔',
-    }],
+    loadEntries: async () => {
+      entriesStarted = true;
+      await loadGate;
+      return [{
+        name: 'Fastfirst',
+        reason: 'test',
+        addedAt: new Date('2026-01-01T00:00:00Z'),
+        _listType: 'black',
+        _label: 'Blacklist',
+        _color: 0xed4245,
+        _icon: '⛔',
+      }];
+    },
   });
 
-  await handleListViewCommand(interaction);
+  const commandPromise = handleListViewCommand(interaction);
+  await new Promise((resolve) => setImmediate(resolve));
 
-  assert.equal(hydrationStarted, true);
-  assert.equal(messageEdits.length, 1, 'the initial page should not wait for background hydration');
+  assert.equal(entriesStarted, true);
+  assert.equal(statsStarted, true, 'the stat query should overlap the list query');
+  assert.equal(messageEdits.length, 0, 'an incomplete page should never be displayed');
+
+  releaseLoads();
+  await commandPromise;
+
+  assert.equal(messageEdits.length, 1, 'the complete page should render once');
+  assert.match(messageEdits[0].embeds[0].toJSON().description, /Bard \*\*\[Fastfirst\]/u);
   assert.equal(typeof collectHandler, 'function');
-
-  releaseHydration();
-  await new Promise((resolve) => setImmediate(resolve));
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(messageEdits.length, 2, 'hydrated decorations should update the visible page once');
 });

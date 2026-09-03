@@ -1,73 +1,35 @@
 /**
- * Background data hydration for /la-list view.
+ * Snapshot data for /la-list view.
  *
- * The first page render must not wait for decorative class metadata. This
- * module fills the request-local snapshot cache after the response is visible;
- * the pure UI renderer then reuses it.
+ * The list collections and this compact snapshot projection are loaded in
+ * parallel. At the current production size the projection is about 250 KiB,
+ * which is cheaper than showing an incomplete page and editing it again after
+ * a second, sequential query for the visible rows.
  */
 
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
-import { normalizeNameKey } from '../../../utils/names.js';
-import { pickListViewAlts } from './ui.js';
+import { buildNameKeyMap } from '../../../utils/names.js';
 
-const SNAPSHOT_COLLATION = Object.freeze({ locale: 'en', strength: 2 });
+const LIST_VIEW_SNAPSHOT_PROJECTION = Object.freeze({
+  _id: 0,
+  name: 1,
+  classId: 1,
+  itemLevel: 1,
+  combatScore: 1,
+  world: 1,
+});
 
-function rememberName(namesByKey, rawName) {
-  const name = String(rawName || '').trim().normalize('NFC');
-  const key = normalizeNameKey(name);
-  if (key && !namesByKey.has(key)) namesByKey.set(key, name);
-}
-
-export function collectListViewCharacterNames(entries) {
-  const namesByKey = new Map();
-  for (const entry of entries || []) {
-    rememberName(namesByKey, entry?.name);
-    for (const altName of pickListViewAlts(entry)) {
-      rememberName(namesByKey, altName);
-    }
-  }
-  return namesByKey;
-}
-
-async function hydrateSnapshotCache({
-  entries,
-  loadedSnapshotNames,
-  RosterSnapshotModel,
-  statMap,
-}) {
-  const visibleNames = collectListViewCharacterNames(entries);
-  const pendingNames = [...visibleNames]
-    .filter(([key]) => !loadedSnapshotNames.has(key))
-    .map(([, name]) => name);
-  if (pendingNames.length === 0) return 0;
-
-  const snapshots = await RosterSnapshotModel.find({ name: { $in: pendingNames } })
-    .collation(SNAPSHOT_COLLATION)
-    .lean();
-  for (const key of visibleNames.keys()) loadedSnapshotNames.add(key);
-  for (const snapshot of snapshots) {
-    const key = normalizeNameKey(snapshot?.name);
-    if (key) statMap.set(key, snapshot);
-  }
-  return snapshots.length;
-}
-
-export async function hydrateListViewPage({
-  entries,
-  loadedSnapshotNames = new Set(),
+export async function loadListViewStatMap({
   RosterSnapshotModel = RosterSnapshot,
-  statMap = new Map(),
 } = {}) {
   try {
-    const snapshotCount = await hydrateSnapshotCache({
-      entries,
-      loadedSnapshotNames,
-      RosterSnapshotModel,
-      statMap,
-    });
-    return { snapshotCount };
+    const snapshots = await RosterSnapshotModel
+      .find({}, LIST_VIEW_SNAPSHOT_PROJECTION)
+      .lean();
+    return buildNameKeyMap(snapshots);
   } catch (err) {
-    console.warn('[list-view] Class snapshot hydration failed:', err.message);
-    return { snapshotCount: 0 };
+    // Class/stat decoration is useful but must not make the list unavailable.
+    console.warn('[list-view] Snapshot preload failed:', err.message);
+    return new Map();
   }
 }
