@@ -173,7 +173,7 @@ test('/la-list view reuses its session snapshot for pagination and reloads only 
   assert.match(messageEdits.at(-1).embeds[0].toJSON().title, /13 entries/);
 });
 
-test('/la-list view renders before slow evidence and class hydration completes', async () => {
+test('/la-list view renders before slow class hydration completes', async () => {
   let collectHandler = null;
   let releaseHydration;
   let hydrationStarted = false;
@@ -210,7 +210,7 @@ test('/la-list view renders before slow evidence and class hydration completes',
     hydratePage: async () => {
       hydrationStarted = true;
       await hydrationGate;
-      return { evidenceCount: 1, snapshotCount: 1 };
+      return { snapshotCount: 1 };
     },
     loadEntries: async () => [{
       name: 'Fastfirst',

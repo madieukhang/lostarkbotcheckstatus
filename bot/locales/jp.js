@@ -358,7 +358,6 @@ const jp = {
       trusted: 'Trusted users',
     },
     summary: {
-      header: 'Page **{page}** / {totalPages} · **{shown}** 件を表示中',
       entries: 'entries',
       footer: '/la-list view で更新 · 下のボタンで page 移動',
     },
@@ -367,7 +366,6 @@ const jp = {
       localWithGuild: 'Local: {guildName}',
     },
     meta: {
-      evidence: 'evidence',
       alts: 'alts',
       more: '+{count} more',
     },

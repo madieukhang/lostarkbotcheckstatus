@@ -19,7 +19,6 @@ import {
 } from 'discord.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
-import { getEvidenceMessageCacheKey } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
@@ -47,14 +46,13 @@ function getListTypeLabel(type, fallback, lang) {
   return translated === `listView.labels.${type}` ? capitalizeLabel(fallback) : translated;
 }
 
-function buildEntryMetaLine({ entry, freshUrl, lang = 'en' }) {
+function buildEntryMetaLine({ entry, lang = 'en' }) {
   const parts = [
     entry.reason
       ? (entry.reason.length > 80 ? entry.reason.slice(0, 77) + '...' : entry.reason)
       : '',
     entry.raid ? `\`${entry.raid}\`` : '',
     entry.addedAt ? relativeTime(entry.addedAt) : '',
-    freshUrl ? `[${ICONS.evidence} ${t('listView.meta.evidence', lang)}](${freshUrl})` : '',
   ].filter(Boolean);
   return parts.length > 0 ? `└ ${parts.join(' · ')}` : '';
 }
@@ -108,7 +106,7 @@ export function buildTrustedListEmbed(entries, lang = 'en', statMap = new Map())
       entry.name,
       statMap.get(normalizeNameKey(entry.name)),
     )}`;
-    const meta = buildEntryMetaLine({ entry, freshUrl: '', lang });
+    const meta = buildEntryMetaLine({ entry, lang });
     const rosterLine = buildEntryRosterLine(entry, lang, statMap);
     return [head, meta, rosterLine].filter(Boolean).concat('');
   });
@@ -137,22 +135,14 @@ export function buildListPageEmbed(options) {
     itemsPerPage,
     lang = 'en',
     page,
-    evidenceUrlCache,
     statMap = new Map(),
-    totalPages,
   } = options;
   const start = page * itemsPerPage;
   const pageEntries = allEntries.slice(start, start + itemsPerPage);
-  const freshUrls = pageEntries.map((entry) => {
-    const cacheKey = getEvidenceMessageCacheKey(entry);
-    if (cacheKey && evidenceUrlCache?.has(cacheKey)) {
-      return evidenceUrlCache.get(cacheKey) || '';
-    }
-    return entry.imageUrl || '';
-  });
 
   // Two-line entry layout. Line 1 is name + list-type icon + scope tag;
-  // line 2 (prefixed `└ `) carries reason / raid / time / evidence link.
+  // line 2 (prefixed `└ `) carries reason / raid / time. Evidence stays in
+  // the detail selector below instead of being duplicated on every row.
   // Empty lines separate entries. Discord applies a 4096-character
   // description cap, so rendering truncates at an entry boundary.
   const lines = [];
@@ -171,7 +161,7 @@ export function buildListPageEmbed(options) {
       statMap.get(normalizeNameKey(entry.name)),
     );
     const head = `\`${String(start + index + 1).padStart(2, ' ')}\` ${entry._icon} ${linkedName}${scopeTag}`;
-    const meta = buildEntryMetaLine({ entry, freshUrl: freshUrls[index], lang });
+    const meta = buildEntryMetaLine({ entry, lang });
     const rosterLine = buildEntryRosterLine(entry, lang, statMap);
     lines.push(...[head, meta, rosterLine].filter(Boolean), '');
   });
@@ -181,15 +171,9 @@ export function buildListPageEmbed(options) {
   const labelCap = getListTypeLabel(currentType, ctx?.label, lang);
   const titleIcon = ctx?.icon || ICONS.search;
 
-  // Total count lives in the title (same `Subject · count` shape as the
-  // /la-list add result card), so the description header only carries
-  // page context. Empty line below separates it from the entry block.
-  const headerLine = t('listView.summary.header', lang, {
-    page: page + 1,
-    totalPages,
-    shown: pageEntries.length,
-  });
-  const description = [headerLine, '', ...lines].join('\n').slice(0, 4096);
+  // Count stays in the title and page context stays in the controls below;
+  // repeating either above the rows only delays the information requested.
+  const description = lines.join('\n').slice(0, 4096);
 
   return createArtistEmbed()
     .setTitle(`${titleIcon} ${labelCap} · ${allEntries.length} ${t('listView.summary.entries', lang)}`)

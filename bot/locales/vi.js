@@ -358,7 +358,6 @@ const vi = {
       trusted: 'Trusted users',
     },
     summary: {
-      header: 'Trang **{page}** / {totalPages} · đang hiện **{shown}**',
       entries: 'entry',
       footer: 'Refresh bằng /la-list view · dùng nút bên dưới để chuyển trang',
     },
@@ -367,7 +366,6 @@ const vi = {
       localWithGuild: 'Local: {guildName}',
     },
     meta: {
-      evidence: 'evidence',
       alts: 'alts',
       more: '+{count} nữa',
     },

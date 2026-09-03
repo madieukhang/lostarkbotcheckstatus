@@ -29,17 +29,17 @@ function buildEntry(overrides = {}) {
   };
 }
 
-test('/la-list view hydrates evidence and class caches once, outside the pure renderer', async () => {
-  let refreshCalls = 0;
+test('/la-list view hydrates its class cache once, outside the pure renderer', async () => {
   let snapshotCalls = 0;
-  const evidenceUrlCache = new Map();
   const loadedSnapshotNames = new Set();
   const statMap = new Map();
-  const entry = buildEntry({ allCharacters: ['Testchar', 'Altchar'] });
+  const entry = buildEntry({
+    allCharacters: ['Testchar', 'Altchar'],
+    imageUrl: 'https://cdn.example/evidence.png',
+  });
   const options = {
     allEntries: [entry],
     currentType: 'black',
-    evidenceUrlCache,
     getListContext,
     guildNameCache: new Map(),
     isOwnerGuild: false,
@@ -49,18 +49,9 @@ test('/la-list view hydrates evidence and class caches once, outside the pure re
     totalPages: 1,
   };
   const hydrateOptions = {
-    client: { id: 'client' },
     entries: [entry],
-    evidenceUrlCache,
     loadedSnapshotNames,
     statMap,
-    refreshImageUrlFn: async (messageId, channelId, client) => {
-      refreshCalls += 1;
-      assert.equal(messageId, 'message-1');
-      assert.equal(channelId, 'channel-1');
-      assert.equal(client.id, 'client');
-      return 'https://cdn.example/fresh.png';
-    },
     RosterSnapshotModel: {
       find({ name }) {
         snapshotCalls += 1;
@@ -79,7 +70,10 @@ test('/la-list view hydrates evidence and class caches once, outside the pure re
   };
 
   const coldEmbed = buildListPageEmbed(options);
-  assert.doesNotMatch(coldEmbed.toJSON().description, /cdn\.example/u);
+  const coldDescription = coldEmbed.toJSON().description;
+  assert.match(coldDescription, /^` 1`/u);
+  assert.doesNotMatch(coldDescription, /cdn\.example/u);
+  assert.doesNotMatch(coldDescription, /^Page /u);
 
   const previousEmoji = {
     Bard: CLASS_EMOJI_MAP.Bard,
@@ -95,12 +89,10 @@ test('/la-list view hydrates evidence and class caches once, outside the pure re
     await hydrateListViewPage(hydrateOptions);
     const secondEmbed = buildListPageEmbed(options);
 
-    assert.equal(refreshCalls, 1);
     assert.equal(snapshotCalls, 1);
-    assert.match(firstEmbed.toJSON().description, /https:\/\/cdn\.example\/fresh\.png/);
     assert.match(firstEmbed.toJSON().description, /<:bard:101> \*\*\[Testchar\]/u);
     assert.match(firstEmbed.toJSON().description, /<:reaper:102> \[Altchar\]/u);
-    assert.match(secondEmbed.toJSON().description, /https:\/\/cdn\.example\/fresh\.png/);
+    assert.doesNotMatch(secondEmbed.toJSON().description, /cdn\.example/u);
   } finally {
     Object.assign(CLASS_EMOJI_MAP, previousEmoji);
   }
@@ -128,43 +120,6 @@ test('/la-list view renders localized pagination and evidence controls', () => {
   assert.equal(expiredPager[0].label, '前へ');
   assert.equal(expiredPager[2].label, '次へ');
   assert.match(expiredPager[1].label, /\/la-list view/);
-});
-
-test('/la-list view drops a stale legacy evidence URL after refresh confirms it is unavailable', async () => {
-  const entry = buildEntry({ imageUrl: 'https://cdn.example/stale.png' });
-  const evidenceUrlCache = new Map();
-  const options = {
-    allEntries: [entry],
-    currentType: 'black',
-    evidenceUrlCache,
-    getListContext,
-    guildNameCache: new Map(),
-    isOwnerGuild: false,
-    itemsPerPage: 10,
-    page: 0,
-    totalPages: 1,
-  };
-
-  assert.match(buildListPageEmbed(options).toJSON().description, /stale\.png/u);
-
-  await hydrateListViewPage({
-    client: {},
-    entries: [entry],
-    evidenceUrlCache,
-    loadedSnapshotNames: new Set(),
-    refreshImageUrlFn: async () => '',
-    RosterSnapshotModel: {
-      find() {
-        return {
-          collation() { return this; },
-          async lean() { return []; },
-        };
-      },
-    },
-    statMap: new Map(),
-  });
-
-  assert.doesNotMatch(buildListPageEmbed(options).toJSON().description, /stale\.png/u);
 });
 
 test('/la-list view evidence values keep their absolute index without page scans', () => {

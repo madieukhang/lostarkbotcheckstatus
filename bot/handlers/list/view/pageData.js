@@ -1,16 +1,12 @@
 /**
  * Background data hydration for /la-list view.
  *
- * The first page render must not wait for Discord evidence-message fetches or
- * decorative class metadata. This module fills request-local caches after the
- * response is visible; the pure UI renderer then reuses those caches.
+ * The first page render must not wait for decorative class metadata. This
+ * module fills the request-local snapshot cache after the response is visible;
+ * the pure UI renderer then reuses it.
  */
 
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
-import {
-  getEvidenceMessageCacheKey,
-  refreshImageUrl,
-} from '../../../utils/imageRehost.js';
 import { normalizeNameKey } from '../../../utils/names.js';
 import { pickListViewAlts } from './ui.js';
 
@@ -56,55 +52,22 @@ async function hydrateSnapshotCache({
   return snapshots.length;
 }
 
-async function hydrateEvidenceCache({
-  client,
-  entries,
-  evidenceUrlCache,
-  refreshImageUrlFn,
-}) {
-  const pendingByKey = new Map();
-  for (const entry of entries || []) {
-    const cacheKey = getEvidenceMessageCacheKey(entry);
-    if (cacheKey && !evidenceUrlCache.has(cacheKey)) {
-      pendingByKey.set(cacheKey, entry);
-    }
-  }
-
-  const refreshed = await Promise.all([...pendingByKey].map(async ([cacheKey, entry]) => {
-    try {
-      const url = await refreshImageUrlFn(entry.imageMessageId, entry.imageChannelId, client);
-      return [cacheKey, url || ''];
-    } catch (err) {
-      console.warn(`[list-view] Evidence refresh failed for ${cacheKey}:`, err.message);
-      return [cacheKey, ''];
-    }
-  }));
-  for (const [cacheKey, url] of refreshed) evidenceUrlCache.set(cacheKey, url);
-  return refreshed.filter(([, url]) => Boolean(url)).length;
-}
-
 export async function hydrateListViewPage({
-  client,
   entries,
-  evidenceUrlCache = new Map(),
   loadedSnapshotNames = new Set(),
-  refreshEvidence = true,
-  refreshImageUrlFn = refreshImageUrl,
   RosterSnapshotModel = RosterSnapshot,
   statMap = new Map(),
 } = {}) {
-  const snapshotTask = hydrateSnapshotCache({
-    entries,
-    loadedSnapshotNames,
-    RosterSnapshotModel,
-    statMap,
-  }).catch((err) => {
+  try {
+    const snapshotCount = await hydrateSnapshotCache({
+      entries,
+      loadedSnapshotNames,
+      RosterSnapshotModel,
+      statMap,
+    });
+    return { snapshotCount };
+  } catch (err) {
     console.warn('[list-view] Class snapshot hydration failed:', err.message);
-    return 0;
-  });
-  const evidenceTask = refreshEvidence
-    ? hydrateEvidenceCache({ client, entries, evidenceUrlCache, refreshImageUrlFn })
-    : Promise.resolve(0);
-  const [snapshotCount, evidenceCount] = await Promise.all([snapshotTask, evidenceTask]);
-  return { evidenceCount, snapshotCount };
+    return { snapshotCount: 0 };
+  }
 }

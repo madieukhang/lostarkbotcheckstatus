@@ -137,11 +137,7 @@ function seedGuildNameCache({ allEntries, client, isOwnerGuild, guildNameCache =
  * @param {import('discord.js').Client} deps.client - Discord client
  *   (used to refresh rehosted evidence URLs when the dropdown asks
  *   for an image that's past its CDN expiry)
- * @returns {{
- *   handleListViewCommand: Function,
- *   handleListViewPaginateButton: Function,
- *   handleListViewEvidenceSelect: Function,
- * }}
+ * @returns {{handleListViewCommand: Function}}
  */
 export function createViewHandlers({
   client,
@@ -196,10 +192,8 @@ export function createViewHandlers({
           `[list-view] rendered type=trusted entries=${trustedEntries.length} ackMs=${acknowledgedAt - startedAt} openMs=${Number(now()) - startedAt}`
         );
         void hydratePage({
-          client,
           entries: trustedEntries,
           loadedSnapshotNames,
-          refreshEvidence: false,
           statMap,
         }).then(({ snapshotCount = 0 } = {}) => {
           console.log(`[list-view] background type=trusted snapshots=${snapshotCount}`);
@@ -234,7 +228,6 @@ export function createViewHandlers({
       let currentPage = 0;
       let dataRevision = 0;
       let refreshPromise = null;
-      const evidenceUrlCache = new Map();
       const hydrationPromises = new Map();
       const loadedSnapshotNames = new Set();
       const statMap = new Map();
@@ -253,7 +246,6 @@ export function createViewHandlers({
           totalPages = Math.max(1, Math.ceil(allEntries.length / ITEMS_PER_PAGE));
           currentPage = Math.min(currentPage, totalPages - 1);
           dataRevision += 1;
-          evidenceUrlCache.clear();
           hydrationPromises.clear();
           loadedSnapshotNames.clear();
           statMap.clear();
@@ -268,7 +260,6 @@ export function createViewHandlers({
       const pageOptions = () => ({
         allEntries,
         currentType: type,
-        evidenceUrlCache,
         getListContext,
         guildNameCache,
         isOwnerGuild,
@@ -276,7 +267,6 @@ export function createViewHandlers({
         lang,
         page: currentPage,
         statMap,
-        totalPages,
       });
       const componentOptions = () => ({
         allEntries,
@@ -323,9 +313,7 @@ export function createViewHandlers({
         );
         const hydrationStartedAt = Number(now());
         const tasks = [hydratePage({
-          client,
           entries: pageEntries,
-          evidenceUrlCache,
           loadedSnapshotNames,
           statMap,
         })];
@@ -341,7 +329,7 @@ export function createViewHandlers({
         const hydrationPromise = Promise.all(tasks)
           .then(([stats = {}]) => {
             console.log(
-              `[list-view] background page=${requestedPage + 1} snapshots=${stats.snapshotCount || 0} evidence=${stats.evidenceCount || 0} ms=${Number(now()) - hydrationStartedAt}`
+              `[list-view] background page=${requestedPage + 1} snapshots=${stats.snapshotCount || 0} ms=${Number(now()) - hydrationStartedAt}`
             );
             if (
               collectorEnded

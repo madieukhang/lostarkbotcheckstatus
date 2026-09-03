@@ -523,7 +523,6 @@ const en = {
       trusted: 'Trusted Users',
     },
     summary: {
-      header: 'Page **{page}** / {totalPages} · showing **{shown}**',
       entries: 'entries',
       footer: 'Refresh with /la-list view · navigate with the buttons below',
     },
@@ -532,7 +531,6 @@ const en = {
       localWithGuild: 'Local: {guildName}',
     },
     meta: {
-      evidence: 'evidence',
       alts: 'alts',
       more: '+{count} more',
     },
