@@ -75,3 +75,23 @@ test('search result row shows evidence marker when later flagged entry has image
 
   assert.match(embed.toJSON().description, /📎/u);
 });
+
+test('search treats composed and decomposed names as the same direct list hit', () => {
+  const embed = buildSearchResultEmbed({
+    name: 'Zoë',
+    minIlvl: 1700,
+    maxIlvl: null,
+    classFilter: null,
+    results: [{
+      name: 'Zoë',
+      cls: 'bard',
+      itemLevel: 1700,
+      black: { name: 'Zoe\u0308', reason: 'direct hit' },
+      white: null,
+      watch: null,
+      trusted: null,
+    }],
+  });
+
+  assert.doesNotMatch(embed.toJSON().description, /\bvia\b/iu);
+});

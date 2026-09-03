@@ -6,10 +6,12 @@ import { formatLinkedCharacter } from '../list/trackedAltsRender.js';
 import { COLORS } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
 import { hasDatabaseListMatch } from '../../services/list-check/verification.js';
+import { normalizeNameKey } from '../../utils/names.js';
 import { pickEvidenceEntry } from './evidence.js';
 
 export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang = 'en', snapshotMap = new Map() }) {
   const lines = results.map((result, index) => {
+    const resultKey = normalizeNameKey(result.name);
     const cls = getClassName(result.cls);
     const classPrefix = getClassEmoji(cls) || cls;
     const ilvl = Number(result.itemLevel || 0).toFixed(2);
@@ -35,13 +37,14 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
 
     for (const entry of [result.black, result.white, result.watch]) {
       if (!entry) continue;
-      const isRosterMatch = entry.name.toLowerCase() !== result.name.toLowerCase();
+      const entryKey = normalizeNameKey(entry.name);
+      const isRosterMatch = entryKey !== resultKey;
       // The matched entry is a character in its own right · render it the
       // way every other character on this card is rendered instead of as
       // bare bold text.
       const via = isRosterMatch
         ? t('dialogue.search.via', lang, {
-          name: formatLinkedCharacter(entry.name, snapshotMap.get(entry.name.toLowerCase())),
+          name: formatLinkedCharacter(entry.name, snapshotMap.get(entryKey)),
         })
         : '';
       const raidSuffix = entry.raid ? ` \`${entry.raid}\`` : '';

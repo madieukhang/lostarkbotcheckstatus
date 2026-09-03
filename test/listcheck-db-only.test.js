@@ -45,6 +45,15 @@ test('ocr list check handlers do not queue post-check roster enrichment', () => 
   assert.doesNotMatch(slashCheckSource, /viaWorker|hiddenRosterFallback/);
 });
 
+test('both screenshot entry points enable targeted diacritic refinement', () => {
+  const autoCheckSource = readRepoFile('../bot/handlers/list/auto-check.js');
+  const slashCheckSource = readRepoFile('../bot/handlers/list/check/index.js');
+
+  for (const source of [autoCheckSource, slashCheckSource]) {
+    assert.match(source, /refineAmbiguousDiacritics:\s*true/u);
+  }
+});
+
 test('unmatched OCR names render as not listed instead of roster lookup status', () => {
   const results = [{
     name: 'Unlistedname',

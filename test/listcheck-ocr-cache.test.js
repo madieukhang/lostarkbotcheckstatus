@@ -6,6 +6,7 @@ import {
   extractNamesFromImage,
 } from '../bot/services/list-check/service.js';
 import { clearOcrCache } from '../bot/services/list-check/ocr.js';
+import { clearNameSuggestionCache } from '../bot/services/roster/search.js';
 
 test('extractNamesFromImage caches OCR results for repeated attachment URLs', async () => {
   clearOcrCache();
@@ -353,7 +354,7 @@ test('extractNamesFromImage can refine dropped umlauts with a targeted candidate
     if (requestedUrl.includes('generativelanguage.googleapis.com')) {
       geminiCalls += 1;
       const text = geminiCalls === 1
-        ? JSON.stringify(['Cruelfighter', 'Qiylyn'])
+        ? JSON.stringify(['Cruelfighter', 'Cr\u00fcelfighter', 'Qiylyn'])
         : JSON.stringify({ Cruelfighter: 'Cr\u00fcelfighter' });
       return Response.json({
         candidates: [
@@ -375,8 +376,76 @@ test('extractNamesFromImage can refine dropped umlauts with a targeted candidate
       contentType: 'image/png',
     }, { refineAmbiguousDiacritics: true });
 
-    assert.deepEqual(names, ['Cr\u00fcelfighter', 'Qiylyn']);
+    assert.deepEqual(
+      names,
+      ['Cr\u00fcelfighter', 'Qiylyn'],
+      'refinement must collapse OCR rows that converge on one canonical character',
+    );
     assert.equal(geminiCalls, 2);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
+});
+
+test('extractNamesFromImage rechecks a wrong accent even when it exactly names another character', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  let geminiCalls = 0;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/wrong-accent-image.png') {
+      return new Response(new Uint8Array([20, 21, 22]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const data = [
+        [1, 5],
+        [2, 3, 4],
+        'Crüelfighter',
+        'infighter_male',
+        1768.3334,
+        [6, 7, 8],
+        'Crúelfighter',
+        'blade',
+        1640,
+      ];
+      return Response.json({ type: 'result', result: JSON.stringify(data) });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      geminiCalls += 1;
+      const text = geminiCalls === 1
+        ? JSON.stringify(['Crúelfighter'])
+        : JSON.stringify({ 'Crúelfighter': 'Crüelfighter' });
+      return Response.json({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text }] },
+        }],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'wrong-accent-image',
+      url: 'https://cdn.discordapp.com/wrong-accent-image.png',
+      contentType: 'image/png',
+    }, { refineAmbiguousDiacritics: true });
+
+    assert.deepEqual(names, ['Crüelfighter']);
+    assert.equal(geminiCalls, 2, 'ambiguous marked spelling should trigger one targeted image pass');
   } finally {
     config.geminiApiKey = originalKey;
     globalThis.fetch = originalFetch;
@@ -391,17 +460,20 @@ test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', 
   const originalModels = [...config.geminiModels];
   const originalMaxNames = config.listcheckMaxNames;
   const originalConcurrency = config.listcheckRosterLookupConcurrency;
+  const originalLookupTimeoutMs = config.listcheckRosterLookupTimeoutMs;
   const names = Array.from({ length: 10 }, (_, index) => `Benchname${index}`);
   let searchCalls = 0;
   let activeSearches = 0;
   let maxActiveSearches = 0;
+  const searchSignals = [];
 
   config.geminiApiKey = 'fake-gemini-key';
   config.geminiModels = ['fake-model'];
   config.listcheckMaxNames = 8;
   config.listcheckRosterLookupConcurrency = 3;
+  config.listcheckRosterLookupTimeoutMs = 500;
 
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, init = {}) => {
     const requestedUrl = String(url);
 
     if (requestedUrl === 'https://cdn.discordapp.com/refine-concurrency.png') {
@@ -422,6 +494,7 @@ test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', 
 
     if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
       searchCalls += 1;
+      searchSignals.push(init.signal);
       activeSearches += 1;
       maxActiveSearches = Math.max(maxActiveSearches, activeSearches);
       await new Promise((resolve) => setTimeout(resolve, 15));
@@ -448,26 +521,111 @@ test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', 
     assert.equal(searchCalls, 8, 'refinement should stop at the configured list-check limit');
     assert.ok(maxActiveSearches > 1, 'refinement searches should overlap');
     assert.ok(maxActiveSearches <= 3, 'refinement must respect configured concurrency');
+    assert.ok(searchSignals.every((signal) => signal === searchSignals[0]));
+    assert.equal(searchSignals[0]?.aborted, false, 'all searches should share one live phase deadline');
   } finally {
     globalThis.fetch = originalFetch;
     config.geminiApiKey = originalKey;
     config.geminiModels = originalModels;
     config.listcheckMaxNames = originalMaxNames;
     config.listcheckRosterLookupConcurrency = originalConcurrency;
+    config.listcheckRosterLookupTimeoutMs = originalLookupTimeoutMs;
     clearOcrCache();
   }
 });
 
-test('extractNamesFromImage fails over across rate limits and non-JSON model responses', async () => {
+test('ambiguous-name refinement stops scheduling queued searches after its shared deadline', async () => {
+  clearOcrCache();
+  clearNameSuggestionCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  const originalMaxNames = config.listcheckMaxNames;
+  const originalConcurrency = config.listcheckRosterLookupConcurrency;
+  const originalLookupTimeoutMs = config.listcheckRosterLookupTimeoutMs;
+  const names = Array.from({ length: 8 }, (_, index) => `Timeoutname${index}`);
+  let searchCalls = 0;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels = ['fake-model'];
+  config.listcheckMaxNames = 8;
+  config.listcheckRosterLookupConcurrency = 3;
+  config.listcheckRosterLookupTimeoutMs = 20;
+
+  globalThis.fetch = async (url, init = {}) => {
+    const requestedUrl = String(url);
+    if (requestedUrl === 'https://cdn.discordapp.com/refine-deadline.png') {
+      return new Response(new Uint8Array([28, 29, 30]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      return Response.json({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text: JSON.stringify(names) }] },
+        }],
+      });
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      searchCalls += 1;
+      return new Promise((_resolve, reject) => {
+        // A real fetch socket keeps Node alive while AbortSignal.timeout uses
+        // an unref'ed timer. This short guard gives the mock the same lifetime.
+        const networkGuard = setTimeout(
+          () => reject(new Error('mock network guard expired')),
+          1000,
+        );
+        const rejectOnAbort = () => {
+          clearTimeout(networkGuard);
+          reject(init.signal?.reason || new DOMException('phase timeout', 'TimeoutError'));
+        };
+        if (init.signal?.aborted) rejectOnAbort();
+        else init.signal?.addEventListener('abort', rejectOnAbort, { once: true });
+      });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const result = await extractNamesFromImage({
+      id: 'refine-deadline',
+      url: 'https://cdn.discordapp.com/refine-deadline.png',
+      contentType: 'image/png',
+    }, { refineAmbiguousDiacritics: true });
+
+    assert.deepEqual(result, names, 'deadline fallback must keep the original OCR names');
+    assert.equal(searchCalls, 3, 'only the first concurrency batch should reach the network');
+  } finally {
+    globalThis.fetch = originalFetch;
+    config.geminiApiKey = originalKey;
+    config.geminiModels = originalModels;
+    config.listcheckMaxNames = originalMaxNames;
+    config.listcheckRosterLookupConcurrency = originalConcurrency;
+    config.listcheckRosterLookupTimeoutMs = originalLookupTimeoutMs;
+    clearOcrCache();
+    clearNameSuggestionCache();
+  }
+});
+
+test('extractNamesFromImage uses a Gemini 3-safe request while failing over recoverable errors', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;
   const originalKey = config.geminiApiKey;
   const originalModels = [...config.geminiModels];
   const requestedModels = [];
+  const generationConfigs = [];
+  const requestSignals = [];
 
   config.geminiApiKey = 'fake-gemini-key';
-  config.geminiModels = ['rate-limited-model', 'non-json-model', 'working-model'];
-  globalThis.fetch = async (url) => {
+  config.geminiModels = [
+    'rate-limited-model',
+    'server-error-model',
+    'non-json-model',
+    'working-model',
+  ];
+  globalThis.fetch = async (url, init = {}) => {
     const requestedUrl = String(url);
     if (requestedUrl === 'https://cdn.discordapp.com/model-failover.png') {
       return new Response(new Uint8Array([22, 23, 24]), {
@@ -479,8 +637,13 @@ test('extractNamesFromImage fails over across rate limits and non-JSON model res
     if (requestedUrl.includes('generativelanguage.googleapis.com')) {
       const model = decodeURIComponent(requestedUrl.match(/models\/([^:]+):/)?.[1] || '');
       requestedModels.push(model);
+      generationConfigs.push(JSON.parse(init.body).generationConfig);
+      requestSignals.push(init.signal);
       if (model === 'rate-limited-model') {
         return new Response('RESOURCE_EXHAUSTED', { status: 429 });
+      }
+      if (model === 'server-error-model') {
+        return new Response('TEMPORARY_UPSTREAM_FAILURE', { status: 502 });
       }
       if (model === 'non-json-model') {
         return Response.json({
@@ -504,6 +667,12 @@ test('extractNamesFromImage fails over across rate limits and non-JSON model res
 
     assert.deepEqual(names, ['Fallbackname']);
     assert.deepEqual(requestedModels, config.geminiModels);
+    assert.deepEqual(
+      generationConfigs,
+      config.geminiModels.map(() => ({ maxOutputTokens: 512 })),
+    );
+    assert.ok(requestSignals.every((signal) => signal === requestSignals[0]));
+    assert.equal(requestSignals[0]?.aborted, false, 'fallback models should share one live deadline');
   } finally {
     globalThis.fetch = originalFetch;
     config.geminiApiKey = originalKey;
@@ -591,6 +760,45 @@ test('extractNamesFromImage rejects oversized downloads even when content-length
         contentType: 'image/png',
       }),
       /Image file too large/
+    );
+    assert.equal(requestedUrls.length, 1);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
+});
+
+test('extractNamesFromImage rejects inline payloads that exceed Gemini limit after encoding', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  const requestedUrls = [];
+
+  config.geminiApiKey = 'fake-gemini-key';
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    requestedUrls.push(requestedUrl);
+
+    if (requestedUrl === 'https://cdn.discordapp.com/base64-overhead.png') {
+      // 15 MiB becomes 20 MiB as base64 before JSON and prompt overhead.
+      return new Response(new Uint8Array(15 * 1024 * 1024), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    throw new Error('Gemini should not receive an oversized inline request');
+  };
+
+  try {
+    await assert.rejects(
+      () => extractNamesFromImage({
+        id: 'base64-overhead',
+        url: 'https://cdn.discordapp.com/base64-overhead.png',
+        contentType: 'image/png',
+      }),
+      /inline request too large/,
     );
     assert.equal(requestedUrls.length, 1);
   } finally {

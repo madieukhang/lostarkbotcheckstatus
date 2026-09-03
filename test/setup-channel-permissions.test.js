@@ -77,3 +77,26 @@ test('daily cleanup permission check identifies revoked Manage Messages', () => 
 
   assert.deepEqual(result.missing, ['Manage Messages']);
 });
+
+test('permission lookup failures fail closed for cleanup and pinning', () => {
+  const channel = {
+    permissionsFor() {
+      throw new Error('Discord permission cache unavailable');
+    },
+  };
+
+  const result = checkBotPermissions(channel, guild, {
+    cleanup: true,
+    welcomePin: true,
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.missing, [
+    'View Channel',
+    'Send Messages',
+    'Read Message History',
+    'Embed Links',
+    'Manage Messages',
+    'Pin Messages',
+  ]);
+});

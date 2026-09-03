@@ -23,7 +23,10 @@ import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
-import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
+import {
+  buildNameRosterQuery,
+  pickPreferredListEntry,
+} from '../../../utils/listEntryMap.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import UserPreference from '../../../models/UserPreference.js';
@@ -87,7 +90,13 @@ async function findEntryByName({ name, preferredType, guildId }) {
   for (const type of types) {
     const { model } = getListContext(type);
     const query = buildScopedListQuery(type, buildListEvidenceNameQuery(name), guildId);
-    const entry = await model.findOne(query).collation(COLLATION).lean();
+    const entry = type === 'black'
+      ? pickPreferredListEntry(
+          await model.find(query).collation(COLLATION).lean(),
+          [name],
+          { preferServerScope: true, preferredGuildId: guildId },
+        )
+      : await model.findOne(query).collation(COLLATION).lean();
     if (entry) return { entry, type };
   }
   return { entry: null, type: null };

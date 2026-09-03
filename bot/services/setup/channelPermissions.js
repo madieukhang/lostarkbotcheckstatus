@@ -35,6 +35,8 @@ export function checkBotPermissions(
   try {
     perms = channel?.permissionsFor?.(botMember);
   } catch {
+    // Permission lookup gates destructive cleanup/pinning, so uncertainty
+    // must fail closed rather than accidentally authorizing the operation.
     perms = null;
   }
   const missing = !perms

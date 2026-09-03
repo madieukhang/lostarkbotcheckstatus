@@ -14,6 +14,23 @@ import { extractCharacterItemLevelFromHtml } from '../bot/services/roster/parser
 import config from '../bot/config.js';
 import { clearMetaCache } from '../bot/utils/metaCache.js';
 
+function createGuildMembersResponse(memberName = 'Guildmate') {
+  return Response.json({
+    nodes: [{
+      data: [
+        { guild: 1 },
+        { members: 2 },
+        [6],
+        memberName,
+        'bard',
+        'Member',
+        [3, 4, 7, 5, -1],
+        1700,
+      ],
+    }],
+  });
+}
+
 test('buildRosterCharacters encodes character names in roster URLs', async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = '';
@@ -406,22 +423,7 @@ test('fetchGuildMembers can disable ScraperAPI fallback and cache guild member l
     assert.equal(requestedUrl.includes('api.scraperapi.com'), false);
 
     if (requestedUrl.endsWith('/guild/__data.json')) {
-      return Response.json({
-        nodes: [
-          {
-            data: [
-              { guild: 1 },
-              { members: 2 },
-              [6],
-              'Guildmate',
-              'bard',
-              'Member',
-              [3, 4, 7, 5, -1],
-              1700,
-            ],
-          },
-        ],
-      });
+      return createGuildMembersResponse();
     }
 
     throw new Error(`unexpected URL: ${requestedUrl}`);
@@ -433,7 +435,7 @@ test('fetchGuildMembers can disable ScraperAPI fallback and cache guild member l
       cacheKey: 'AinsGuild',
     });
     const second = await fetchGuildMembers('OtherAlt', {
-      allowScraperApi: false,
+      allowScraperApi: true,
       cacheKey: 'AinsGuild',
     });
 
@@ -445,6 +447,41 @@ test('fetchGuildMembers can disable ScraperAPI fallback and cache guild member l
     ]);
   } finally {
     config.scraperApiKeys.splice(0, config.scraperApiKeys.length, ...originalKeys);
+    globalThis.fetch = originalFetch;
+    clearGuildMembersCache();
+  }
+});
+
+test('fetchGuildMembers isolates policy-distinct in-flight requests', async () => {
+  clearGuildMembersCache();
+  const originalFetch = globalThis.fetch;
+  const requestedUrls = [];
+
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    requestedUrls.push(requestedUrl);
+    const memberName = requestedUrl.includes('/StrictCaller/')
+      ? 'StrictMember'
+      : 'DefaultMember';
+    return createGuildMembersResponse(memberName);
+  };
+
+  try {
+    const [strictMembers, defaultMembers] = await Promise.all([
+      fetchGuildMembers('StrictCaller', {
+        allowScraperApi: false,
+        cacheKey: 'SharedGuild',
+      }),
+      fetchGuildMembers('DefaultCaller', {
+        allowScraperApi: true,
+        cacheKey: 'SharedGuild',
+      }),
+    ]);
+
+    assert.equal(requestedUrls.length, 2);
+    assert.equal(strictMembers[0]?.name, 'StrictMember');
+    assert.equal(defaultMembers[0]?.name, 'DefaultMember');
+  } finally {
     globalThis.fetch = originalFetch;
     clearGuildMembersCache();
   }

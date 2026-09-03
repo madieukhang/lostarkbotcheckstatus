@@ -217,15 +217,17 @@ test('auto-check message handler keeps image OCR as the priority over a text cap
   const checked = [];
   const inputSources = [];
   let extracted = 0;
+  let extractionOptions = null;
   const image = { id: 'image-1', contentType: 'image/png' };
   const handler = createAutoCheckMessageHandler({
     client: { user: { id: 'bot-user' } },
     imageChecksEnabled: true,
     isAutoCheckChannelFn: async () => true,
     getGuildLanguageFn: async () => 'en',
-    extractNamesFromImageFn: async (input) => {
+    extractNamesFromImageFn: async (input, options) => {
       extracted += 1;
       assert.equal(input, image);
+      extractionOptions = options;
       return ['FromImage'];
     },
     checkNamesAgainstListsFn: async (names, options) => {
@@ -255,6 +257,9 @@ test('auto-check message handler keeps image OCR as the priority over a text cap
   await handler(message);
 
   assert.equal(extracted, 1);
+  assert.equal(extractionOptions?.refineAmbiguousDiacritics, true);
+  assert.ok(extractionOptions?.suggestionCache instanceof Map);
+  assert.equal(extractionOptions?.suggestionContext?.cache, extractionOptions?.suggestionCache);
   assert.deepEqual(checked, [['FromImage']]);
   assert.deepEqual(inputSources, ['ocr']);
 });

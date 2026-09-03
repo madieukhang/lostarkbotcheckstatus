@@ -1,3 +1,5 @@
+// Ordered newest-to-oldest: OCR walks this chain only when the current model
+// is unavailable, rate-limited, or returns an unusable response.
 export const DEFAULT_GEMINI_MODELS = Object.freeze([
   'gemini-3.8-flash',
   'gemini-3.7-flash',

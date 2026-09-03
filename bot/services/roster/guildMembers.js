@@ -13,6 +13,19 @@ const guildMembersCache = createLruTtlCache({
 });
 const inFlightGuildMemberFetches = new Map();
 
+// Completed guild data is transport-agnostic and may share the normal cache.
+// Pending work is policy-sensitive so opted-out callers never inherit a proxy.
+function buildGuildMembersInflightKey(cacheKey, options = {}) {
+  return JSON.stringify({
+    cacheKey: normalizeNameKey(cacheKey),
+    allowScraperApi: options.allowScraperApi !== false,
+    preferScraperApi: options.preferScraperApi === true,
+    fallbackOnRateLimit: options.fallbackOnRateLimit === true,
+    viaWorker: options.viaWorker === true,
+    timeoutMs: options.timeoutMs || 0,
+  });
+}
+
 function getCachedGuildMembers(cacheKey) {
   return guildMembersCache.get(cacheKey);
 }
@@ -81,8 +94,8 @@ export async function fetchGuildMembers(name, options = {}) {
     const cached = getCachedGuildMembers(cacheKey);
     if (cached !== undefined) return cached;
 
-    const normalizedKey = normalizeNameKey(cacheKey);
-    const inFlight = inFlightGuildMemberFetches.get(normalizedKey);
+    const inFlightKey = buildGuildMembersInflightKey(cacheKey, options);
+    const inFlight = inFlightGuildMemberFetches.get(inFlightKey);
     if (inFlight) return inFlight;
 
     const fetchPromise = fetchGuildMembersUncached(name, options)
@@ -91,9 +104,9 @@ export async function fetchGuildMembers(name, options = {}) {
         return members;
       })
       .finally(() => {
-        inFlightGuildMemberFetches.delete(normalizedKey);
+        inFlightGuildMemberFetches.delete(inFlightKey);
       });
-    inFlightGuildMemberFetches.set(normalizedKey, fetchPromise);
+    inFlightGuildMemberFetches.set(inFlightKey, fetchPromise);
     return fetchPromise;
   }
 

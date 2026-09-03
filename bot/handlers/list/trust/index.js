@@ -11,7 +11,10 @@ import {
   normalizeRosterNames,
 } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
-import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
+import {
+  buildNameRosterQuery,
+  pickPreferredListEntry,
+} from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, replyAlert } from '../../../utils/interactionReplies.js';
 import { COLORS } from '../../../utils/ui.js';
@@ -80,9 +83,13 @@ async function findRosterTrustConflict(existing, allCharacters) {
 
 async function rejectBlacklistedTrust(interaction, name, allCharacters, lang) {
   const guildId = interaction.guild?.id || '';
-  const blacklisted = await Blacklist.findOne(
+  const entries = await Blacklist.find(
     buildBlacklistQuery(buildNameRosterQuery(allCharacters), guildId)
   ).collation({ locale: 'en', strength: 2 }).lean();
+  const blacklisted = pickPreferredListEntry(entries, allCharacters, {
+    preferServerScope: true,
+    preferredGuildId: guildId,
+  });
   if (!blacklisted) return false;
   await editAlert(interaction, {
     severity: AlertSeverity.WARNING,

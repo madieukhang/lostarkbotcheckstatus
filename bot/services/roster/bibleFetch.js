@@ -44,16 +44,23 @@ export function buildBibleFetchOptions(options = {}) {
     viaWorker: options.viaWorker === true,
     timeoutMs: options.timeoutMs,
   };
-  if (options.timeoutMs) {
+  // A caller may provide one signal for an entire multi-request phase. Keep
+  // that absolute deadline instead of silently restarting the timeout for
+  // every direct/proxy attempt.
+  if (options.signal) {
+    fetchOptions.signal = options.signal;
+  } else if (options.timeoutMs) {
     fetchOptions.signal = AbortSignal.timeout(options.timeoutMs);
   }
   return fetchOptions;
 }
 
-async function tryScraperApi(url, key, keyIndex) {
+async function tryScraperApi(url, key, keyIndex, signal) {
   const proxyUrl = `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(url)}`;
   try {
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(30000) });
+    const res = await fetch(proxyUrl, {
+      signal: signal || AbortSignal.timeout(30000),
+    });
     recordScraperApiRequest({ keyIndex, status: res.status, ok: res.ok });
     if (res.status === 401 || res.status === 403 || res.status === 429) {
       const body = await res.text().catch(() => '');
@@ -64,8 +71,10 @@ async function tryScraperApi(url, key, keyIndex) {
     return { res, keyDead: false };
   } catch (err) {
     recordScraperApiRequest({ keyIndex, error: err });
-    console.warn(`[scraperapi] Key #${keyIndex + 1} network error: ${err.message}`);
-    return { res: null, keyDead: false, error: err };
+    const callerAborted = signal?.aborted === true;
+    const reason = callerAborted ? 'caller deadline reached' : `network error: ${err.message}`;
+    console.warn(`[scraperapi] Key #${keyIndex + 1} ${reason}`);
+    return { res: null, keyDead: false, error: err, callerAborted };
   }
 }
 
@@ -74,12 +83,19 @@ function scraperAttemptState({ res, keyDead, error }) {
   return SCRAPER_ATTEMPT_STATE_RULES.find(({ matches }) => matches(context))?.state || 'response';
 }
 
-async function fetchViaScraperApi(url) {
+async function fetchViaScraperApi(url, { signal } = {}) {
   const keys = config.scraperApiKeys || [];
   if (keys.length === 0) return null;
 
   const errors = [];
+  let callerDeadlineReached = false;
   for (let i = 0; i < keys.length; i++) {
+    if (signal?.aborted) {
+      errors.push('caller deadline reached');
+      callerDeadlineReached = true;
+      break;
+    }
+
     const key = keys[i];
     const deadUntil = deadKeysUntil.get(key) || 0;
     if (Date.now() < deadUntil) {
@@ -87,7 +103,12 @@ async function fetchViaScraperApi(url) {
       continue;
     }
 
-    const { res, keyDead, error } = await tryScraperApi(url, key, i);
+    const { res, keyDead, error, callerAborted } = await tryScraperApi(url, key, i, signal);
+    if (callerAborted) {
+      errors.push(`Key #${i + 1}: caller deadline reached`);
+      callerDeadlineReached = true;
+      break;
+    }
     switch (scraperAttemptState({ res, keyDead, error })) {
       case 'network-error':
         errors.push(`Key #${i + 1}: ${error.message}`);
@@ -103,7 +124,12 @@ async function fetchViaScraperApi(url) {
     }
   }
 
-  console.error(`[scraperapi] All ${keys.length} key(s) failed: ${errors.join(' | ')}`);
+  const summary = errors.join(' | ');
+  if (callerDeadlineReached) {
+    console.warn(`[scraperapi] Stopped at caller deadline: ${summary}`);
+  } else {
+    console.error(`[scraperapi] All ${keys.length} key(s) failed: ${summary}`);
+  }
   return null;
 }
 
@@ -129,15 +155,16 @@ export async function fetchWithFallback(url, options = {}) {
     ...fetchOptions
   } = options;
   const hasKey = allowScraperApi && config.scraperApiKeys?.length > 0;
+  const proxyOptions = { signal: fetchOptions.signal };
 
   if (preferScraperApi && hasKey) {
-    const proxyRes = await fetchViaScraperApi(url);
+    const proxyRes = await fetchViaScraperApi(url, proxyOptions);
     if (proxyRes) return proxyRes;
     console.warn(`[fetch] ScraperAPI preferred but unavailable, falling back to direct fetch: ${url}`);
   }
 
   if (Date.now() < directBlockedUntil && hasKey) {
-    const res = await fetchViaScraperApi(url);
+    const res = await fetchViaScraperApi(url, proxyOptions);
     if (res) return res;
     console.warn(`[fetch] All ScraperAPI keys dead, attempting direct fetch despite cache: ${url}`);
   }
@@ -151,8 +178,8 @@ export async function fetchWithFallback(url, options = {}) {
     });
   } catch (err) {
     console.warn(`[fetch] Direct fetch failed: ${err.message}`);
-    if (hasKey) {
-      const proxyRes = await fetchViaScraperApi(url);
+    if (hasKey && !fetchOptions.signal?.aborted) {
+      const proxyRes = await fetchViaScraperApi(url, proxyOptions);
       if (proxyRes) return proxyRes;
     }
     throw err;
@@ -163,9 +190,10 @@ export async function fetchWithFallback(url, options = {}) {
       directBlockedUntil = Date.now() + BLOCK_CACHE_MS;
     }
     console.warn(`[fetch] ${res.status} on direct fetch. Falling back to ScraperAPI: ${url}`);
-    const proxyRes = await fetchViaScraperApi(url);
+    const proxyRes = await fetchViaScraperApi(url, proxyOptions);
     if (proxyRes) return proxyRes;
-    console.error(`[fetch] All ScraperAPI fallbacks failed for ${url}, returning original ${res.status}`);
+    const log = fetchOptions.signal?.aborted ? console.warn : console.error;
+    log(`[fetch] ScraperAPI fallback unavailable for ${url}, returning original ${res.status}`);
   }
 
   return res;

@@ -7,14 +7,24 @@ import {
 import { mapWithConcurrency } from '../../utils/async.js';
 import { createLruTtlCache } from '../../utils/lruTtlCache.js';
 import { fetchNameSuggestions } from '../roster/search.js';
-import { hasAnyDiacritic, stripDiacritics } from './nameRecovery.js';
+import { stripDiacritics } from './nameRecovery.js';
 
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
-const GEMINI_GENERATION_CONFIG = {
-  temperature: 0,
-  topP: 0.1,
+const MAX_GEMINI_INLINE_REQUEST_BYTES = 20 * 1024 * 1024;
+const GEMINI_REQUEST_TIMEOUT_MS = 30_000;
+// Gemini 3.6+ deprecated the legacy sampling knobs. Keeping this payload to
+// generation-neutral limits lets every model in the fallback chain accept it.
+const GEMINI_GENERATION_CONFIG = Object.freeze({
   maxOutputTokens: 512,
-};
+});
+const GEMINI_FAILOVER_HTTP_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
+const GEMINI_FAILOVER_BODY_HINTS = Object.freeze([
+  'resource_exhausted',
+  'quota',
+  'rate limit',
+  'too many requests',
+  'is not found',
+]);
 
 const GEMINI_FAILURE_FORMATTERS = {
   network: (result) =>
@@ -88,16 +98,11 @@ const GEMINI_PROMPT = [
 // ─── Gemini OCR ─────────────────────────────────────────────────────────────
 
 function shouldFailoverGeminiModel(status, bodyText) {
-  // 404 = model not found, 429 = rate limit, 503 = overloaded · all should try next model
-  if (status === 404 || status === 429 || status === 503) return true;
+  // Auth and malformed-request failures stay terminal: replaying the same bad
+  // request across every model only adds latency and burns quota.
+  if (GEMINI_FAILOVER_HTTP_STATUSES.has(status)) return true;
   const text = (bodyText || '').toLowerCase();
-  return (
-    text.includes('resource_exhausted') ||
-    text.includes('quota') ||
-    text.includes('rate limit') ||
-    text.includes('too many requests') ||
-    text.includes('is not found')
-  );
+  return GEMINI_FAILOVER_BODY_HINTS.some((hint) => text.includes(hint));
 }
 
 function createGeminiRequestBody(prompt, imageBase64, mimeType) {
@@ -130,9 +135,18 @@ async function requestGeminiWithFallback({
   onModelElapsed = () => {},
   onRetry = () => {},
 }) {
-  const requestBody = createGeminiRequestBody(prompt, imageBase64, mimeType);
+  // Inline images can approach Gemini's request limit. Serialize once so each
+  // model fallback reuses the same large string instead of reallocating it.
+  const requestBody = JSON.stringify(createGeminiRequestBody(prompt, imageBase64, mimeType));
+  if (Buffer.byteLength(requestBody, 'utf8') >= MAX_GEMINI_INLINE_REQUEST_BYTES) {
+    throw new Error('Gemini inline request too large (must be under 20MB including encoding).');
+  }
   const models = config.geminiModels;
   const failures = [];
+  // Failover models share one wall-clock budget. A hung primary must not get
+  // a fresh 30 seconds for every fallback in the chain; quick 404/429/5xx
+  // responses still leave almost the full budget for the next model.
+  const requestSignal = AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS);
 
   for (let i = 0; i < models.length; i += 1) {
     const model = models[i];
@@ -146,12 +160,15 @@ async function requestGeminiWithFallback({
       aiRes = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(30000),
+        body: requestBody,
+        signal: requestSignal,
       });
     } catch (error) {
       onModelElapsed(Date.now() - modelStartedAt);
       failures.push(`${model}: ${error.name || error.message}`);
+      if (requestSignal.aborted) {
+        return { ok: false, type: 'network', model, error, failures };
+      }
       if (hasFallback) {
         onRetry({ type: 'network', model, error });
         continue;
@@ -202,17 +219,13 @@ async function requestGeminiWithFallback({
 }
 
 function filterAndDeduplicateNames(parsed) {
-  const names = parsed
-    .map((item) => (typeof item === 'string' ? normalizeCharacterName(item) : ''))
-    .filter(
-      (name) => isValidCharacterName(name) && !SERVER_NAMES.has(normalizeNameKey(name))
-    );
-
   const seen = new Set();
   const unique = [];
-  for (const name of names) {
+  for (const item of parsed || []) {
+    if (typeof item !== 'string') continue;
+    const name = normalizeCharacterName(item);
     const key = normalizeNameKey(name);
-    if (seen.has(key)) continue;
+    if (!isValidCharacterName(name) || SERVER_NAMES.has(key) || seen.has(key)) continue;
     seen.add(key);
     unique.push(name);
   }
@@ -225,17 +238,21 @@ async function findAmbiguousOcrChoices(
   { suggestionCache, suggestionContext } = {},
 ) {
   const concurrency = config.listcheckRosterLookupConcurrency || 3;
+  const lookupTimeoutMs = config.listcheckRosterLookupTimeoutMs || 6000;
+  // One absolute deadline bounds the whole candidate-discovery phase. Without
+  // it, eight slow names at concurrency 3 could restart the timeout in three
+  // waves, and each direct failure could restart it again through ScraperAPI.
+  const lookupSignal = AbortSignal.timeout(lookupTimeoutMs);
   const choices = await mapWithConcurrency(names, concurrency, async (name) => {
-    // This refinement is only for the dangerous case where Gemini
-    // dropped a visible mark entirely (e.g. Crüelfighter -> Cruelfighter)
-    // and Bible also has a real unmarked character. If the OCR already
-    // contains a mark, the normal canonical matcher can rank it safely.
-    if (hasAnyDiacritic(name)) return null;
+    // Workers may still have queued names after the shared deadline expires.
+    // Skip those locally instead of creating already-aborted HTTP requests.
+    if (lookupSignal.aborted) return null;
 
     let suggestions;
     try {
       suggestions = await fetchNameSuggestions(name, {
-        timeoutMs: 5000,
+        timeoutMs: lookupTimeoutMs,
+        signal: lookupSignal,
         suggestionCache,
         suggestionContext,
       });
@@ -245,24 +262,30 @@ async function findAmbiguousOcrChoices(
     }
     if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
 
-    const nameKey = normalizeNameKey(name);
-    const exact = suggestions.find((suggestion) => normalizeNameKey(suggestion.name) === nameKey);
-    if (!exact) return null;
-
+    // A wrong mark can be just as dangerous as a dropped mark: the OCR result
+    // may exactly spell a different real character (ü -> ú/ù/ï). Collect every
+    // Bible identity with the same ASCII base and let the second vision pass
+    // decide from the glyphs, never from search ordering or item level.
     const base = stripDiacritics(name);
-    const markedSiblings = suggestions
-      .filter((s) => {
-        const candidate = String(s.name || '');
-        return normalizeNameKey(candidate) !== nameKey
-          && stripDiacritics(candidate) === base
-          && hasAnyDiacritic(candidate);
-      })
-      .map((s) => String(s.name));
+    const candidatesByKey = new Map();
+    for (const suggestion of suggestions) {
+      const candidate = normalizeCharacterName(suggestion?.name);
+      if (!candidate || stripDiacritics(candidate) !== base) continue;
+      candidatesByKey.set(normalizeNameKey(candidate), candidate);
+    }
+    if (candidatesByKey.size < 2) return null;
 
-    if (markedSiblings.length === 0) return null;
+    const nameKey = normalizeNameKey(name);
+    const alternatives = [...candidatesByKey.entries()]
+      .filter(([candidateKey]) => candidateKey !== nameKey)
+      .map(([, candidate]) => candidate);
+    if (alternatives.length === 0) return null;
     return {
       original: name,
-      candidates: [String(exact.name), ...markedSiblings],
+      // The original is always the safe fallback when the dots/accents are not
+      // legible enough. It need not be a Bible result: a later verification
+      // stage will reject it instead of forcing one of the alternatives.
+      candidates: [name, ...alternatives],
     };
   });
 
@@ -316,10 +339,10 @@ async function refineAmbiguousOcrNames(
 
   const prompt = [
     'This is a targeted correction pass for Lost Ark raid lobby OCR.',
-    'The first OCR pass may have DROPPED visible diacritics from character names.',
+    'The first OCR pass may have DROPPED, ADDED, or CONFUSED visible diacritics in character names.',
     'Inspect only the visible player-name text in the image. Do not choose by item level, class, roster popularity, or search ranking.',
     'For each key below, choose exactly one candidate from its candidate list. If the visible glyphs are unclear, keep the original key.',
-    'Pay special attention to two-dot umlauts above letters, especially ü versus plain u.',
+    'Pay special attention to two-dot umlauts and distinguish ü/ö/ï/ë from plain, acute, and grave-accent forms.',
     'Return a JSON object only, mapping each original key to the chosen candidate.',
     'Candidates:',
     choiceLines,
@@ -341,11 +364,12 @@ async function refineAmbiguousOcrNames(
 
 /**
  * Extract character names from an image using Gemini OCR.
- * Handles model failover on quota/rate limits and network errors.
+ * Fails over on model availability, quota/rate limits, transient upstream
+ * failures, network errors, and structurally unusable responses.
  *
  * @param {object} image - Discord attachment or { url, contentType }
  * @param {object} [options]
- * @param {boolean} [options.refineAmbiguousDiacritics=false] - second-pass OCR for exact unmarked names with marked Bible siblings
+ * @param {boolean} [options.refineAmbiguousDiacritics=false] - second-pass OCR for names with multiple same-base Bible spellings
  * @param {Map} [options.suggestionCache] - request-local Bible search cache
  * @param {object} [options.suggestionContext] - request-wide Bible lookup budget and metrics
  * @returns {Promise<string[]>} Array of normalized character names
@@ -411,10 +435,10 @@ export async function extractNamesFromImage(image, options = {}) {
     onModelElapsed: (elapsedMs) => {
       timing.geminiMs += elapsedMs;
     },
-    onRetry: ({ type, model }) => {
+    onRetry: ({ type, model, status }) => {
       const retryMessages = {
         network: `[listcheck] Gemini timeout/network error on ${model}, trying fallback model.`,
-        http: `[listcheck] Gemini quota/rate hit on ${model}, trying fallback model.`,
+        http: `[listcheck] Gemini recoverable HTTP ${status} on ${model}, trying fallback model.`,
       };
       if (retryMessages[type]) console.warn(retryMessages[type]);
     },
@@ -465,6 +489,10 @@ export async function extractNamesFromImage(image, options = {}) {
     } finally {
       timing.refineMs = Date.now() - refineStartedAt;
     }
+    // Two distinct OCR strings may converge on the same Bible-confirmed name.
+    // Collapse them before caching so the shared check pipeline never repeats
+    // Mongo/enrichment/render work for one character.
+    names = filterAndDeduplicateNames(names);
   }
   setCachedOcrNames(cacheKey, names);
   timing.status = 'ok';

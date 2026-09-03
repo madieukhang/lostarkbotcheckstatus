@@ -23,7 +23,10 @@ import Watchlist from '../../../models/Watchlist.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
-import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
+import {
+  buildNameRosterQuery,
+  pickPreferredListEntry,
+} from '../../../utils/listEntryMap.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
@@ -101,9 +104,8 @@ export function createRemoveHandlers({ services }) {
 
       const removeGuildId = interaction.guild?.id || '';
       const nameQuery = buildNameRosterQuery(name);
-      const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
-        Blacklist.findOne(buildBlacklistQuery(nameQuery, removeGuildId))
-          .sort({ scope: -1 })
+      const [blackEntries, whiteEntry, watchEntry] = await Promise.all([
+        Blacklist.find(buildBlacklistQuery(nameQuery, removeGuildId))
           .collation({ locale: 'en', strength: 2 })
           .lean(),
         Whitelist.findOne(nameQuery)
@@ -113,6 +115,10 @@ export function createRemoveHandlers({ services }) {
           .collation({ locale: 'en', strength: 2 })
           .lean(),
       ]);
+      const blackEntry = pickPreferredListEntry(blackEntries, [name], {
+        preferServerScope: true,
+        preferredGuildId: removeGuildId,
+      });
 
       // Collect all found entries
       const found = [

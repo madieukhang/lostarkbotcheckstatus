@@ -2,14 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildNameKeyMap,
   normalizeCharacterName,
   normalizeNameKey,
+  normalizeNameList,
   parseAdditionalNames,
 } from '../bot/utils/names.js';
 
 test('normalizeNameKey gives composed and decomposed names one identity', () => {
   assert.equal(normalizeNameKey('  ZOE\u0308  '), 'zoë');
   assert.equal(normalizeNameKey('Zoë'), 'zoë');
+});
+
+test('normalizeNameList preserves first-seen order while deduping Unicode identities', () => {
+  assert.deepEqual(
+    normalizeNameList([' Zoe\u0308 ', 'OTHER', 'Zoë', '', null, 123, 'other']),
+    ['Zoë', 'OTHER'],
+  );
+});
+
+test('buildNameKeyMap indexes records with the same Unicode identity contract', () => {
+  const snapshot = { name: 'Zoe\u0308', itemLevel: 1700 };
+  assert.equal(buildNameKeyMap([snapshot]).get('zoë'), snapshot);
 });
 
 test('parseAdditionalNames returns empty result for falsy input', () => {

@@ -185,8 +185,8 @@ async function resolveEnrichMeta({ name, existingSession, lang, replyEditor }) {
   return meta;
 }
 
-async function loadEnrichTarget({ name, existingSession, lang, replyEditor }) {
-  const found = await findEntryByName(name);
+async function loadEnrichTarget({ name, guildId, existingSession, lang, replyEditor }) {
+  const found = await findEntryByName(name, guildId);
   if (!found) {
     await editEnrichError(replyEditor, 'dialogue.enrich.noEntry', lang, { name });
     return null;
@@ -617,6 +617,7 @@ export function createEnrichHandlers({ services }) {
     const replyEditor = createLongRunningReplyEditor(interaction);
     const target = await loadEnrichTarget({
       name,
+      guildId: interaction.guild?.id || '',
       existingSession,
       lang,
       replyEditor,

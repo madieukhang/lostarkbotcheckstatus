@@ -133,7 +133,7 @@ const config = {
   /** Optional Gemini API key for image-based /la-check name extraction */
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
 
-  /** Gemini model priority list for image parsing with auto-failover on quota limits */
+  /** Gemini model priority list for image parsing with recoverable-error failover */
   geminiModels: geminiModelResolution.models,
 
   /**

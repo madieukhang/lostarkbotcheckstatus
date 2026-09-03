@@ -18,7 +18,10 @@ import {
   getInteractionDisplayName,
 } from '../../../utils/names.js';
 import { buildBlacklistQuery, getGuildConfig } from '../../../utils/scope.js';
-import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
+import {
+  buildNameRosterQuery,
+  pickPreferredListEntry,
+} from '../../../utils/listEntryMap.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
@@ -57,11 +60,15 @@ function readListEditInput(interaction) {
 
 async function findListEditTarget({ name, guildId, collation }) {
   const query = buildNameRosterQuery(name);
-  const [blackEntry, whiteEntry, watchEntry] = await Promise.all([
-    Blacklist.findOne(buildBlacklistQuery(query, guildId)).sort({ scope: -1 }).collation(collation),
+  const [blackEntries, whiteEntry, watchEntry] = await Promise.all([
+    Blacklist.find(buildBlacklistQuery(query, guildId)).collation(collation),
     Whitelist.findOne(query).collation(collation),
     Watchlist.findOne(query).collation(collation),
   ]);
+  const blackEntry = pickPreferredListEntry(blackEntries, [name], {
+    preferServerScope: true,
+    preferredGuildId: guildId,
+  });
   return {
     existing: blackEntry || whiteEntry || watchEntry,
     currentType: blackEntry ? 'black' : whiteEntry ? 'white' : 'watch',

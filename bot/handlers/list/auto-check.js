@@ -22,7 +22,11 @@ import { createNameSuggestionContext } from '../../services/roster/search.js';
 import { getGuildConfig } from '../../utils/scope.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
-import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
+import {
+  isValidCharacterName,
+  normalizeCharacterName,
+  normalizeNameKey,
+} from '../../utils/names.js';
 import { getGuildLanguage, t, tPick } from '../../services/i18n/index.js';
 import { buildAutoCheckEvidenceRow } from './check/index.js';
 
@@ -62,7 +66,7 @@ export function parseAutoCheckText(content) {
       continue;
     }
     const name = normalizeCharacterName(token);
-    const key = name.toLocaleLowerCase('en');
+    const key = normalizeNameKey(name);
     if (!name || seen.has(key)) continue;
     seen.add(key);
     names.push(name);

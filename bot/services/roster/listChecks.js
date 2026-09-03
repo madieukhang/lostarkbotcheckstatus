@@ -11,7 +11,12 @@ import { connectDB } from '../../db.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
-import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
+import {
+  buildNameRosterQuery,
+  pickPreferredListEntry,
+} from '../../utils/listEntryMap.js';
+
+const LIST_COLLATION = Object.freeze({ locale: 'en', strength: 2 });
 
 /**
  * Project a Blacklist/Whitelist entry to the slim shape the embeds
@@ -42,8 +47,9 @@ export function shapeRosterListHit(entry) {
 
 /**
  * Look up a roster's names against the Blacklist collection.
- * Returns the FIRST hit (sorted by scope DESC · guild > global) so
- * server-scoped entries take precedence over global ones.
+ * Fetches every matching row, then applies the shared deterministic priority:
+ * requesting guild Server > another owner-visible Server > Global/legacy;
+ * exact primary > roster alias inside one scope tier.
  * @param {string[]} names - character names from the OCR/roster
  * @param {{guildId?: string}} [options] - scope filter
  * @returns {Promise<object|null>} shaped hit or null on no match / error
@@ -55,10 +61,13 @@ export async function handleRosterBlackListCheck(names, options = {}) {
     const { guildId } = options;
     const nameQuery = buildNameRosterQuery(names);
 
-    const entry = await Blacklist.findOne(buildBlacklistQuery(nameQuery, guildId))
-      .sort({ scope: -1 })
-      .collation({ locale: 'en', strength: 2 })
+    const entries = await Blacklist.find(buildBlacklistQuery(nameQuery, guildId))
+      .collation(LIST_COLLATION)
       .lean();
+    const entry = pickPreferredListEntry(entries, names, {
+      preferServerScope: true,
+      preferredGuildId: guildId,
+    });
 
     if (entry) {
       console.log(`[blacklist] "${entry.name}" is BLACKLISTED - reason: ${entry.reason || '(none)'}`);
@@ -79,7 +88,7 @@ export async function handleRosterWhiteListCheck(names) {
     await connectDB();
 
     const entry = await Whitelist.findOne(buildNameRosterQuery(names))
-      .collation({ locale: 'en', strength: 2 })
+      .collation(LIST_COLLATION)
       .lean();
 
     if (entry) {

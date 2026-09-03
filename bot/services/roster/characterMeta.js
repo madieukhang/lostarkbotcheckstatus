@@ -24,6 +24,8 @@ const RETRYABLE_META_STATUSES = new Set([429, 502, 503, 504]);
 const DEFAULT_META_RETRY_DELAY_MS = 5000;
 const MAX_META_RETRY_DELAY_MS = 15 * 1000;
 
+// In-flight sharing must preserve transport and retry policy. Otherwise a
+// strict no-proxy caller could inherit a worker/ScraperAPI request (or vice versa).
 function buildMetaInflightKey(name, options = {}) {
   return JSON.stringify({
     name: normalizeNameKey(name),
@@ -31,6 +33,7 @@ function buildMetaInflightKey(name, options = {}) {
     preferScraperApi: options.preferScraperApi === true,
     fallbackOnRateLimit: options.fallbackOnRateLimit === true,
     retryOnRateLimit: options.retryOnRateLimit !== false,
+    viaWorker: options.viaWorker === true,
     timeoutMs: options.timeoutMs || 0,
     rateLimitRetryDelayMs: options.rateLimitRetryDelayMs || 0,
   });

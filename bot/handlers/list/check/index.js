@@ -24,6 +24,7 @@ import {
 } from '../../../utils/interactionReplies.js';
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { normalizeNameList } from '../../../utils/names.js';
 import { ICONS } from '../../../utils/ui.js';
 import { getUserLanguage, t, tPick } from '../../../services/i18n/index.js';
 import {
@@ -101,10 +102,10 @@ export function buildAutoCheckEvidenceRow(results, lang = 'en') {
 export async function loadCheckDetailStatMap(entry, {
   RosterSnapshotModel = RosterSnapshot,
 } = {}) {
-  const names = [...new Set([
+  const names = normalizeNameList([
     entry?.name,
     ...(Array.isArray(entry?.allCharacters) ? entry.allCharacters : []),
-  ].filter(Boolean))];
+  ]);
   if (names.length === 0) return new Map();
 
   try {

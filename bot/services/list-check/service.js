@@ -5,23 +5,23 @@
  */
 
 import { connectDB } from '../../db.js';
-import Blacklist from '../../models/Blacklist.js';
-import Whitelist from '../../models/Whitelist.js';
-import Watchlist from '../../models/Watchlist.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import TrustedUser from '../../models/TrustedUser.js';
 import { getClassName } from '../../models/Class.js';
-import { normalizeNameKey } from '../../utils/names.js';
+import {
+  buildNameKeyMap,
+  normalizeNameKey,
+  normalizeNameList,
+} from '../../utils/names.js';
 export { formatCheckResults } from './format.js';
 export { extractNamesFromImage } from './ocr.js';
-import { buildBlacklistQuery } from '../../utils/scope.js';
 import {
   buildListEntryMap as buildEntryMap,
   buildNameRosterQuery,
-  sortBlacklistForScopePriority,
 } from '../../utils/listEntryMap.js';
 import { applyMarkedSiblingLevelCorrections } from './partyCorrections.js';
 import { enrichListCheckResults } from './enrichment.js';
+import { LIST_LOOKUP_COLLATION, loadListLookup } from './lookup.js';
 import {
   buildListMatchCandidates,
   didListCheckNameChange,
@@ -81,8 +81,11 @@ function rememberNormalizedName(namesByKey, rawName) {
  * @returns {Promise<void>}
  */
 async function attachRelatedClassNames(results) {
+  const classByName = new Map();
   const relatedGroups = results.map((item) => {
     const namesByKey = new Map();
+    const itemKey = normalizeNameKey(item.name);
+    if (itemKey && item.snapClassName) classByName.set(itemKey, item.snapClassName);
     const rawNames = [
       item.blackEntry?.name,
       item.whiteEntry?.name,
@@ -102,25 +105,22 @@ async function attachRelatedClassNames(results) {
   const wantedByKey = new Map();
   for (const { namesByKey } of relatedGroups) {
     for (const [key, name] of namesByKey) {
-      if (!wantedByKey.has(key)) wantedByKey.set(key, name);
+      if (!classByName.has(key) && !wantedByKey.has(key)) wantedByKey.set(key, name);
     }
   }
-  if (wantedByKey.size === 0) return;
 
-  let snapshots;
-  try {
-    snapshots = await RosterSnapshot.find({ name: { $in: [...wantedByKey.values()] } })
-      .collation({ locale: 'en', strength: 2 })
-      .lean();
-  } catch (err) {
-    console.warn('[listcheck] Related-name snapshot lookup failed (non-fatal):', err.message);
-    return;
-  }
-
-  const classByName = new Map();
-  for (const snapshot of snapshots) {
-    const className = snapshot?.classId ? getClassName(snapshot.classId) : '';
-    if (className) classByName.set(normalizeNameKey(snapshot.name), className);
+  if (wantedByKey.size > 0) {
+    try {
+      const snapshots = await RosterSnapshot.find({ name: { $in: [...wantedByKey.values()] } })
+        .collation(LIST_LOOKUP_COLLATION)
+        .lean();
+      for (const snapshot of snapshots) {
+        const className = snapshot?.classId ? getClassName(snapshot.classId) : '';
+        if (className) classByName.set(normalizeNameKey(snapshot.name), className);
+      }
+    } catch (err) {
+      console.warn('[listcheck] Related-name snapshot lookup failed (non-fatal):', err.message);
+    }
   }
   if (classByName.size === 0) return;
 
@@ -134,30 +134,14 @@ async function attachRelatedClassNames(results) {
   }
 }
 
-const LIST_COLLATION = { locale: 'en', strength: 2 };
-
-function createListMaps({ black, white, watch, trusted }) {
-  sortBlacklistForScopePriority(black);
-  return {
-    black: buildEntryMap(black),
-    white: buildEntryMap(white),
-    watch: buildEntryMap(watch),
-    trusted: buildEntryMap(trusted),
-  };
-}
-
 async function loadInitialListData(names, guildId) {
-  const nameQuery = buildNameRosterQuery(names);
-  const [black, white, watch, trusted, snapshots] = await Promise.all([
-    Blacklist.find(buildBlacklistQuery(nameQuery, guildId)).collation(LIST_COLLATION).lean(),
-    Whitelist.find(nameQuery).collation(LIST_COLLATION).lean(),
-    Watchlist.find(nameQuery).collation(LIST_COLLATION).lean(),
-    TrustedUser.find(nameQuery).collation(LIST_COLLATION).lean(),
-    RosterSnapshot.find({ name: { $in: names } }).collation(LIST_COLLATION).lean(),
+  const [lookup, snapshots] = await Promise.all([
+    loadListLookup(names, { guildId }),
+    RosterSnapshot.find({ name: { $in: names } }).collation(LIST_LOOKUP_COLLATION).lean(),
   ]);
   return {
-    maps: createListMaps({ black, white, watch, trusted }),
-    snapshots: new Map(snapshots.map((snapshot) => [normalizeNameKey(snapshot.name), snapshot])),
+    maps: lookup.maps,
+    snapshots: buildNameKeyMap(snapshots),
   };
 }
 
@@ -218,22 +202,17 @@ async function reconcileEnrichedListMatches(results, guildId) {
     didListCheckNameChange(item)
     || (Array.isArray(item.discoveredAlts) && item.discoveredAlts.length > 0)
   ));
-  const names = new Set();
+  const namesByKey = new Map();
   for (const item of items) {
-    for (const candidate of buildListMatchCandidates(item)) names.add(candidate.name);
+    for (const candidate of buildListMatchCandidates(item)) {
+      rememberNormalizedName(namesByKey, candidate.name);
+    }
   }
-  if (names.size === 0) return 0;
+  if (namesByKey.size === 0) return 0;
 
-  const nameQuery = buildNameRosterQuery([...names]);
   const startedAt = Date.now();
-  const [black, white, watch, trusted] = await Promise.all([
-    Blacklist.find(buildBlacklistQuery(nameQuery, guildId)).collation(LIST_COLLATION).lean(),
-    Whitelist.find(nameQuery).collation(LIST_COLLATION).lean(),
-    Watchlist.find(nameQuery).collation(LIST_COLLATION).lean(),
-    TrustedUser.find(nameQuery).collation(LIST_COLLATION).lean(),
-  ]);
+  const { maps } = await loadListLookup([...namesByKey.values()], { guildId });
   const elapsedMs = Date.now() - startedAt;
-  const maps = createListMaps({ black, white, watch, trusted });
   for (const item of items) replaceListMatches(item, maps);
   return elapsedMs;
 }
@@ -270,7 +249,7 @@ async function resolveTrustedRosterMatches(results) {
 
   const startedAt = Date.now();
   const entries = await TrustedUser.find(buildNameRosterQuery([...namesByKey.values()]))
-    .collation(LIST_COLLATION)
+    .collation(LIST_LOOKUP_COLLATION)
     .lean();
   const elapsedMs = Date.now() - startedAt;
   if (entries.length === 0) return elapsedMs;
@@ -309,6 +288,11 @@ function logListCheckTiming(startedAt, names, timings) {
 
 export async function checkNamesAgainstLists(names, options = {}) {
   const startedAt = Date.now();
+  // OCR refinement can collapse two candidates into the same canonical name;
+  // enforcing uniqueness here protects every caller and avoids duplicate DB,
+  // enrichment, and render work while retaining the image/text input order.
+  const checkedNames = normalizeNameList(names);
+  if (checkedNames.length === 0) return [];
   const connectStartedAt = Date.now();
   await connectDB();
   const connectMs = Date.now() - connectStartedAt;
@@ -320,9 +304,9 @@ export async function checkNamesAgainstLists(names, options = {}) {
   } = options;
 
   const initialDbStartedAt = Date.now();
-  const initialData = await loadInitialListData(names, guildId);
+  const initialData = await loadInitialListData(checkedNames, guildId);
   const initialDbMs = Date.now() - initialDbStartedAt;
-  const results = names.map((name) => createInitialListCheckResult(
+  const results = checkedNames.map((name) => createInitialListCheckResult(
     name,
     inputSource,
     initialData.maps,
@@ -391,7 +375,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
   // no icon.
   await attachRelatedClassNames(results);
 
-  logListCheckTiming(startedAt, names, {
+  logListCheckTiming(startedAt, checkedNames, {
     connect: connectMs,
     initialDb: initialDbMs,
     correction: correctionMs,

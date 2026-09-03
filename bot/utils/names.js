@@ -34,6 +34,38 @@ export function normalizeNameKey(value) {
   return String(value || '').trim().normalize('NFC').toLowerCase();
 }
 
+/**
+ * Clean and deduplicate a batch of character names without changing its order.
+ * The first spelling is retained for display, while NFC/case-equivalent values
+ * share one identity. This is the common boundary for OCR, text, and DB batches.
+ */
+export function normalizeNameList(values = []) {
+  const input = Array.isArray(values) ? values : [values];
+  const names = [];
+  const seen = new Set();
+
+  for (const raw of input) {
+    if (typeof raw !== 'string') continue;
+    const name = raw.trim().normalize('NFC');
+    const key = normalizeNameKey(name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+
+  return names;
+}
+
+/** Build a canonical-name index for snapshots or other name-bearing records. */
+export function buildNameKeyMap(values = [], getName = (value) => value?.name) {
+  const map = new Map();
+  for (const value of values || []) {
+    const key = normalizeNameKey(getName(value));
+    if (key) map.set(key, value);
+  }
+  return map;
+}
+
 export function isValidCharacterName(value) {
   return CHARACTER_NAME_RE.test(String(value || '').normalize('NFC'));
 }

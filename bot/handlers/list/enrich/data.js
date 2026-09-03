@@ -1,6 +1,8 @@
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
+import { pickPreferredListEntry } from '../../../utils/listEntryMap.js';
+import { buildBlacklistQuery } from '../../../utils/scope.js';
 import { COLORS } from '../../../utils/ui.js';
 
 const COLLATION = { locale: 'en', strength: 2 };
@@ -21,12 +23,20 @@ export const MODELS_BY_TYPE = {
   watch: Watchlist,
 };
 
-export async function findEntryByName(name) {
-  const black = await Blacklist.findOne({ name }).collation(COLLATION).lean();
-  if (black) return { type: 'black', entry: black };
-  const white = await Whitelist.findOne({ name }).collation(COLLATION).lean();
-  if (white) return { type: 'white', entry: white };
-  const watch = await Watchlist.findOne({ name }).collation(COLLATION).lean();
-  if (watch) return { type: 'watch', entry: watch };
-  return null;
+export async function findEntryByName(name, guildId = '') {
+  const query = { name };
+  const [blackEntries, white, watch] = await Promise.all([
+    Blacklist.find(buildBlacklistQuery(query, guildId)).collation(COLLATION).lean(),
+    Whitelist.findOne(query).collation(COLLATION).lean(),
+    Watchlist.findOne(query).collation(COLLATION).lean(),
+  ]);
+  const black = pickPreferredListEntry(blackEntries, [name], {
+    preferServerScope: true,
+    preferredGuildId: guildId,
+  });
+  return [
+    { type: 'black', entry: black },
+    { type: 'white', entry: white },
+    { type: 'watch', entry: watch },
+  ].find(({ entry }) => Boolean(entry)) || null;
 }

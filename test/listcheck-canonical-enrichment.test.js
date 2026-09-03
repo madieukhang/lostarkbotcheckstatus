@@ -13,6 +13,10 @@ process.env.SCRAPERAPI_KEY_3 = '';
 
 let mongod;
 let checkNamesAgainstLists;
+let handleRosterBlackListCheck;
+let findEnrichEntryByName;
+let extractNamesFromImage;
+let clearOcrCache;
 let enrichListCheckResults;
 let formatCheckResults;
 let connectDB;
@@ -30,7 +34,14 @@ test.before(async () => {
   process.env.MONGODB_URI = mongod.getUri();
 
   ({ connectDB } = await import('../bot/db.js'));
-  ({ checkNamesAgainstLists, formatCheckResults } = await import('../bot/services/list-check/service.js'));
+  ({
+    checkNamesAgainstLists,
+    extractNamesFromImage,
+    formatCheckResults,
+  } = await import('../bot/services/list-check/service.js'));
+  ({ clearOcrCache } = await import('../bot/services/list-check/ocr.js'));
+  ({ handleRosterBlackListCheck } = await import('../bot/services/roster/listChecks.js'));
+  ({ findEntryByName: findEnrichEntryByName } = await import('../bot/handlers/list/enrich/data.js'));
   ({ enrichListCheckResults } = await import('../bot/services/list-check/enrichment.js'));
   ({ default: RosterSnapshot } = await import('../bot/models/RosterSnapshot.js'));
   ({ default: WorkerHeartbeat } = await import('../bot/models/WorkerHeartbeat.js'));
@@ -50,6 +61,7 @@ test.after(async () => {
 });
 
 test.beforeEach(async () => {
+  clearOcrCache();
   clearNameSuggestionCache();
   await Promise.all([
     RosterSnapshot.deleteMany({}),
@@ -59,6 +71,200 @@ test.beforeEach(async () => {
     Watchlist.deleteMany({}),
     TrustedUser.deleteMany({}),
   ]);
+});
+
+test('shared list-check batch dedupes canonical names before DB and enrichment work', async () => {
+  await RosterSnapshot.create({
+    name: 'Zoë',
+    classId: 'bard',
+    itemLevel: 1700,
+    rosterName: 'Zoë',
+  });
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    throw new Error(`unexpected enrichment fetch: ${url}`);
+  };
+
+  try {
+    const results = await checkNamesAgainstLists([' Zoe\u0308 ', 'ZOË', 'Zoë'], {
+      guildId: 'guild-1',
+      inputSource: 'ocr',
+    });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].inputName, 'Zoë');
+    assert.equal(results[0].snapClassId, 'bard');
+    assert.equal(results[0].snapItemLevel, 1700);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('shared list lookup prefers only the requesting guild blacklist over global', async () => {
+  await Promise.all([
+    RosterSnapshot.create({
+      name: 'Scopedchar',
+      classId: 'bard',
+      itemLevel: 1700,
+      rosterName: 'Scopedchar',
+    }),
+    Blacklist.create({
+      name: 'Scopedchar',
+      reason: 'global reason',
+      scope: 'global',
+      guildId: '',
+    }),
+    Blacklist.create({
+      name: 'Scopedchar',
+      reason: 'guild one reason',
+      scope: 'server',
+      guildId: 'guild-1',
+    }),
+  ]);
+
+  const [guildOne] = await checkNamesAgainstLists(['Scopedchar'], { guildId: 'guild-1' });
+  const [guildTwo] = await checkNamesAgainstLists(['Scopedchar'], { guildId: 'guild-2' });
+
+  assert.equal(guildOne.blackEntry?.reason, 'guild one reason');
+  assert.equal(guildTwo.blackEntry?.reason, 'global reason');
+});
+
+test('owner-wide visibility still selects its own server record deterministically', async () => {
+  const previousOwnerGuildId = config.ownerGuildId;
+  config.ownerGuildId = 'owner-guild';
+  try {
+    await Promise.all([
+      RosterSnapshot.create({
+        name: 'Ownerchar',
+        classId: 'bard',
+        itemLevel: 1700,
+        rosterName: 'Ownerchar',
+      }),
+      Blacklist.create({
+        name: 'Ownerchar',
+        reason: 'global reason',
+        scope: 'global',
+        guildId: '',
+      }),
+      Blacklist.create({
+        name: 'Ownerchar',
+        reason: 'other server reason',
+        scope: 'server',
+        guildId: 'other-guild',
+        addedAt: new Date('2026-09-01T00:00:00Z'),
+      }),
+      Blacklist.create({
+        name: 'Ownerchar',
+        reason: 'owner server reason',
+        scope: 'server',
+        guildId: 'owner-guild',
+        addedAt: new Date('2026-01-01T00:00:00Z'),
+      }),
+    ]);
+
+    const [checkResult] = await checkNamesAgainstLists(['Ownerchar'], {
+      guildId: 'owner-guild',
+    });
+    const rosterResult = await handleRosterBlackListCheck(['Ownerchar'], {
+      guildId: 'owner-guild',
+    });
+    const enrichResult = await findEnrichEntryByName('Ownerchar', 'owner-guild');
+    const unrelatedGuildResult = await findEnrichEntryByName('Ownerchar', 'unrelated-guild');
+
+    assert.equal(checkResult.blackEntry?.reason, 'owner server reason');
+    assert.equal(rosterResult?.reason, 'owner server reason');
+    assert.equal(enrichResult?.entry?.reason, 'owner server reason');
+    assert.equal(unrelatedGuildResult?.entry?.reason, 'global reason');
+  } finally {
+    config.ownerGuildId = previousOwnerGuildId;
+  }
+});
+
+test('image diacritic refinement prevents an exact wrong-accent blacklist hit end to end', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  const suggestionCache = new Map();
+  let geminiCalls = 0;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  await Promise.all([
+    Blacklist.create({
+      name: 'Crüelfighter',
+      reason: 'actual screenshot identity',
+      scope: 'global',
+      guildId: '',
+    }),
+    Blacklist.create({
+      name: 'Crúelfighter',
+      reason: 'wrong accent identity',
+      scope: 'global',
+      guildId: '',
+    }),
+  ]);
+
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl === 'https://cdn.discordapp.com/e2e-diacritic.png') {
+      return new Response(new Uint8Array([41, 42, 43]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      const data = [
+        [1, 5],
+        [2, 3, 4],
+        'Crüelfighter',
+        'infighter_male',
+        1768.3334,
+        [6, 7, 8],
+        'Crúelfighter',
+        'blade',
+        1640,
+      ];
+      return Response.json({ type: 'result', result: JSON.stringify(data) });
+    }
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      geminiCalls += 1;
+      const text = geminiCalls === 1
+        ? JSON.stringify(['Crúelfighter'])
+        : JSON.stringify({ 'Crúelfighter': 'Crüelfighter' });
+      return Response.json({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text }] },
+        }],
+      });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'e2e-diacritic',
+      url: 'https://cdn.discordapp.com/e2e-diacritic.png',
+      contentType: 'image/png',
+    }, {
+      refineAmbiguousDiacritics: true,
+      suggestionCache,
+    });
+    const [result] = await checkNamesAgainstLists(names, {
+      guildId: 'guild-1',
+      inputSource: 'ocr',
+      suggestionCache,
+    });
+
+    assert.deepEqual(names, ['Crüelfighter']);
+    assert.equal(result.name, 'Crüelfighter');
+    assert.equal(result.blackEntry?.reason, 'actual screenshot identity');
+    assert.notEqual(result.blackEntry?.reason, 'wrong accent identity');
+    assert.equal(geminiCalls, 2);
+  } finally {
+    config.geminiApiKey = originalKey;
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+  }
 });
 
 test('enrichment completes every primary lookup before bounded deep recovery', async () => {
