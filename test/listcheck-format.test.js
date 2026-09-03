@@ -38,10 +38,34 @@ test('formatCheckResults renders roster-match branch context', () => {
   assert.equal(lines.length, 1);
   assert.match(lines[0], /^⛔/u);
   assert.match(lines[0], /\(Local\)/);
-  // The matched name links out like every other character name.
-  assert.match(lines[0], /via \*\*\[Mainchar\]\(\S+\)\*\*/);
+  // The report stays together, while the indirect match gets its own line
+  // immediately after it so a long reason cannot bury the roster link.
+  assert.match(
+    lines[0],
+    /\n   ↳ \*RMT\* · `Act 4 Hard`\n   ↳ via \*\*\[Mainchar\]\(\S+\)\*\*/u,
+  );
   // CP carries its unit inside the badge.
   assert.match(lines[0], /`90000 CP`/);
+});
+
+test('formatCheckResults does not add a via line for a direct list hit', () => {
+  const [line] = formatCheckResults([{
+    name: 'Mainchar',
+    blackEntry: {
+      name: 'Mainchar',
+      reason: 'A deliberately long report remains beside its raid',
+      raid: 'Act 4 Hard',
+      scope: 'global',
+    },
+    snapClassName: 'Berserker',
+    snapItemLevel: 1720,
+  }]);
+
+  assert.match(
+    line,
+    /\n   ↳ \*A deliberately long report remains beside its raid\* · `Act 4 Hard`$/u,
+  );
+  assert.doesNotMatch(line, /\n   ↳ (?:via|roster alt) /u);
 });
 
 test('formatCheckResults groups photographed characters backed by one roster entry', () => {

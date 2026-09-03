@@ -119,13 +119,17 @@ function formatCorrectionBranch(item, lang) {
   })]);
 }
 
-function formatListEntryBranch(item, entry, listType, lang) {
-  if (!entry) return '';
-  return formatBranch([
-    formatMatchContext(item, entry, listType, lang),
-    wrapTrimmed(entry.reason, (reason) => `*${reason}*`),
-    wrapTrimmed(entry.raid, (raid) => `\`${raid}\``),
-  ]);
+function formatListEntryBranches(item, entry, listType, lang) {
+  if (!entry) return [];
+  return [
+    // Keep the report itself compact: reason and raid describe the same entry.
+    // An indirect match is navigation context, so it gets a separate line.
+    formatBranch([
+      wrapTrimmed(entry.reason, (reason) => `*${reason}*`),
+      wrapTrimmed(entry.raid, (raid) => `\`${raid}\``),
+    ]),
+    formatBranch([formatMatchContext(item, entry, listType, lang)]),
+  ].filter(Boolean);
 }
 
 function formatAltsBranch(item, lang) {
@@ -146,8 +150,8 @@ function formatAltsBranch(item, lang) {
 function collectResultBranches(item, lang) {
   return [
     formatCorrectionBranch(item, lang),
-    ...LIST_ENTRY_BRANCHES.map(([listType, entryKey]) => (
-      formatListEntryBranch(item, item[entryKey], listType, lang)
+    ...LIST_ENTRY_BRANCHES.flatMap(([listType, entryKey]) => (
+      formatListEntryBranches(item, item[entryKey], listType, lang)
     )),
     formatAltsBranch(item, lang),
   ].filter(Boolean);
