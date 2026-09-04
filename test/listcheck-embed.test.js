@@ -126,7 +126,7 @@ test('a compact card gains the elapsed line and nothing else', () => {
   });
   const j = embed.toJSON();
 
-  assert.equal(j.footer.text, 'TOOK 4.2s');
+  assert.equal(j.footer.text, '⏱️ TOOK 4.2s');
   assert.equal(j.title, undefined);
   assert.equal(j.timestamp, undefined);
   // None of the full-chrome footer parts came along.
@@ -159,9 +159,9 @@ test('the full footer puts elapsed between the status and the hint', () => {
   const parts = embed.toJSON().footer.text.split(' · ');
 
   assert.match(parts[0], /^\/\//u, 'status kicker stays first');
-  assert.ok(parts.includes('TOOK 1.8s'));
+  assert.ok(parts.includes('⏱️ TOOK 1.8s'));
   assert.ok(
-    parts.indexOf('TOOK 1.8s') < parts.findIndex((p) => p.startsWith('SRC')),
+    parts.indexOf('⏱️ TOOK 1.8s') < parts.findIndex((p) => p.startsWith('SRC')),
     'elapsed sits ahead of the source citation'
   );
 });
@@ -175,7 +175,7 @@ test('elapsed rounds to one decimal because the extra digits are noise', () => {
     return embed.toJSON().footer.text;
   };
 
-  assert.equal(seconds(4237), 'TOOK 4.2s');
-  assert.equal(seconds(4249), 'TOOK 4.2s');
-  assert.equal(seconds(340), 'TOOK 0.3s');
+  assert.equal(seconds(4237), '⏱️ TOOK 4.2s');
+  assert.equal(seconds(4249), '⏱️ TOOK 4.2s');
+  assert.equal(seconds(340), '⏱️ TOOK 0.3s');
 });
