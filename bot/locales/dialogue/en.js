@@ -517,7 +517,11 @@ export default {
     title: '{name} roster · {count} {word}', characterOne: 'character', characterMany: 'characters', server: 'Server', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`',
     trusted: '**{name}** is trusted.',
     fetchFailed: { title: 'Roster fetch failed', description: 'I could not fetch the roster from lostark.bible.' },
-    hiddenTitle: 'Hidden roster · {name}', hiddenStatus: 'Roster is hidden. Guild: **{guild}** ({count} members)', stronghold: 'Stronghold: **{stronghold}** Lv.{strongholdLevel} · Roster Lv.{rosterLevel}', noDeep: 'Stronghold deep scan was not run. Use `deep:true` to scan same-account alts.', blackGuild: 'Blacklisted guild members ({count}):', whiteGuild: 'Whitelisted guild members ({count}):', noReason: 'no reason', guildFooter: '{count} guild {word}{stats} · Source: lostark.bible', memberOne: 'member', memberMany: 'members',
+    hiddenTitle: 'Hidden roster · {name}', hiddenLine: { variants: [
+      'This roster is locked, so I cannot read a single character off it. The guild is still open though, so I worked from there.',
+      'They hid the roster, so no characters for me. The guild page is public at least, and this is what it gave up.',
+      'Roster closed, no characters visible. Here is everything the guild side still shows.',
+    ] }, guildField: 'Guild', membersField: 'Members', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: 'Not run', deepDone: 'Done', hiddenFooter: 'Source: lostark.bible{stats} · deep:true to look for same-account alts', hiddenStatus: 'Roster is hidden. Guild: **{guild}** ({count} members)', stronghold: 'Stronghold: **{stronghold}** Lv.{strongholdLevel} · Roster Lv.{rosterLevel}', noDeep: 'Stronghold deep scan was not run. Use `deep:true` to scan same-account alts.', blackGuild: 'Blacklisted guild members ({count})', whiteGuild: 'Whitelisted guild members ({count})', noReason: 'no reason', guildFooter: '{count} guild {word}{stats} · Source: lostark.bible', memberOne: 'member', memberMany: 'members',
   },
   enrich: {
     noEntry: { title: 'No list entry', description: '**{name}** is not in any list.', footer: 'Create the entry with `/la-list add` first; enrich only appends to existing entries.' },

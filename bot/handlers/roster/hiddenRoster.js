@@ -14,12 +14,17 @@ import { connectDB } from '../../db.js';
 import config from '../../config.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
-import { COLORS, ICONS } from '../../utils/ui.js';
+import { COLORS, ICONS, padInlineRow } from '../../utils/ui.js';
+import RosterSnapshot from '../../models/RosterSnapshot.js';
+import {
+  formatLinkedCharacter,
+  statMapFromRosterCharacters,
+} from '../list/trackedAltsRender.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import UserPreference from '../../models/UserPreference.js';
-import { getUserLanguage, t } from '../../services/i18n/index.js';
+import { getUserLanguage, t, tPick } from '../../services/i18n/index.js';
 import {
   detectAltsViaStronghold,
   fetchCharacterMeta,
@@ -101,33 +106,96 @@ async function runHiddenDeepScan({ interaction, replyEditor, name, meta, guildMe
   }
 }
 
-function listHitLines(entries, icon, noReason, lang) {
+/**
+ * One field per list that had a hit among the guild members.
+ *
+ * Whoever reads this card is deciding whether to take the person into a
+ * raid, so each row carries what that decision needs: the class icon and
+ * ilvl beside the name, then the reason. They used to be bold plain text
+ * with the raid in square brackets.
+ *
+ * @param {Array<object>} entries - list entries that matched a guildmate
+ * @param {string} icon - the list's status glyph
+ * @param {string} noReason - fallback text for an entry with no reason
+ * @param {string} lang - locale for the label
+ * @param {Map<string, object>} statMap - roster snapshots for the rows
+ * @returns {{name: string, value: string, inline: false}} embed field
+ */
+function buildHitField(entries, icon, noReason, lang, statMap) {
   const headingKey = icon === '⛔' ? 'blackGuild' : 'whiteGuild';
-  return [
-    '',
-    `**${icon} ${t(`dialogue.roster.${headingKey}`, lang, { count: entries.length })}**`,
-    ...entries.map((entry) => (
-      `${icon} **${entry.name}** · ${entry.reason || noReason}${entry.raid ? ` [${entry.raid}]` : ''}`
-    )),
-  ];
+  const rows = entries.map((entry, index) => {
+    const record = statMap.get(String(entry.name || '').toLowerCase());
+    const level = Number(String(record?.itemLevel ?? '').replace(/,/g, ''));
+    const ilvl = Number.isFinite(level) && level > 0 ? ` · \`${level.toFixed(2)}\`` : '';
+    const raid = entry.raid ? ` · \`${entry.raid}\`` : '';
+    return `**${index + 1}.** ${formatLinkedCharacter(entry.name, record)}${ilvl}${raid}`
+      + `\n${entry.reason || noReason}`;
+  });
+  return {
+    name: `${icon} ${t(`dialogue.roster.${headingKey}`, lang, { count: entries.length })}`,
+    value: rows.join('\n').slice(0, 1024),
+    inline: false,
+  };
 }
 
-export function buildHiddenDescription({ meta, guildMembers, hits, deep, lang }) {
+/**
+ * The card's fields: a grid of what the guild page still gave up, then a
+ * field per list that had a hit.
+ *
+ * These six were a paragraph of prose, which is where the bot's last
+ * `**Server:** \`X\`` line lived. They are discrete labelled facts, so
+ * they belong in a grid like every other card.
+ *
+ * @param {object} options
+ * @param {{guildName: string, strongholdName: string, strongholdLevel: number, rosterLevel: number, world?: string}} options.meta
+ * @param {Array<object>} options.guildMembers - the scanned guild roster
+ * @param {{black: Array<object>, white: Array<object>}} options.hits
+ * @param {boolean} options.deep - whether a Stronghold deep scan ran
+ * @param {string} options.lang - locale for every label
+ * @param {Map<string, object>} [options.statMap] - snapshots for hit rows
+ * @returns {Array<object>} embed fields, inline ones on whole rows
+ */
+export function buildHiddenFields({ meta, guildMembers, hits, deep, lang, statMap = new Map() }) {
   const noReason = t('dialogue.roster.noReason', lang);
   const world = String(meta.world || '').trim();
-  const parts = [
-    t('dialogue.roster.hiddenStatus', lang, { guild: meta.guildName, count: guildMembers.length }),
-    ...(world ? [`**${t('dialogue.roster.server', lang)}:** \`${world}\``] : []),
-    t('dialogue.roster.stronghold', lang, {
-      stronghold: meta.strongholdName,
-      strongholdLevel: meta.strongholdLevel,
-      rosterLevel: meta.rosterLevel,
-    }),
-    ...(!deep ? ['', t('dialogue.roster.noDeep', lang)] : []),
-    ...(hits.black.length > 0 ? listHitLines(hits.black, '⛔', noReason, lang) : []),
-    ...(hits.white.length > 0 ? listHitLines(hits.white, '✅', noReason, lang) : []),
-  ];
-  return parts.join('\n');
+  const inlineFields = padInlineRow([
+    meta.guildName ? {
+      name: `🏛️ ${t('dialogue.roster.guildField', lang)}`,
+      value: `\`${meta.guildName}\``,
+      inline: true,
+    } : null,
+    {
+      name: `👥 ${t('dialogue.roster.membersField', lang)}`,
+      value: `\`${guildMembers.length}\``,
+      inline: true,
+    },
+    world ? {
+      name: `🌍 ${t('dialogue.roster.server', lang)}`,
+      value: `\`${world}\``,
+      inline: true,
+    } : null,
+    meta.strongholdName ? {
+      name: `🏰 ${t('dialogue.roster.strongholdField', lang)}`,
+      value: `\`${meta.strongholdName}\` · \`Lv.${meta.strongholdLevel}\``,
+      inline: true,
+    } : null,
+    meta.rosterLevel ? {
+      name: `📈 ${t('dialogue.roster.rosterLevelField', lang)}`,
+      value: `\`Lv.${meta.rosterLevel}\``,
+      inline: true,
+    } : null,
+    {
+      name: `🔬 ${t('dialogue.roster.deepField', lang)}`,
+      value: `\`${t(`dialogue.roster.${deep ? 'deepDone' : 'deepNotRun'}`, lang)}\``,
+      inline: true,
+    },
+  ].filter(Boolean));
+
+  return [
+    ...inlineFields,
+    hits.black.length > 0 ? buildHitField(hits.black, '⛔', noReason, lang, statMap) : null,
+    hits.white.length > 0 ? buildHitField(hits.white, '✅', noReason, lang, statMap) : null,
+  ].filter(Boolean);
 }
 
 function hiddenRosterColor(hits) {
@@ -136,18 +204,19 @@ function hiddenRosterColor(hits) {
   return COLORS.warning;
 }
 
-function buildHiddenPrimaryEmbed({ name, meta, guildMembers, hits, deep, altResult, lang }) {
-  const description = buildHiddenDescription({ meta, guildMembers, hits, deep, lang });
+function buildHiddenPrimaryEmbed({ name, meta, guildMembers, hits, deep, altResult, lang, statMap }) {
   const deepStats = formatDeepScanStats(altResult, lang);
   return createArtistEmbed(lang)
     .setTitle(`🔒 ${t('dialogue.roster.hiddenTitle', lang, { name })}`)
     .setURL(bibleProfileUrl(name))
-    .setDescription(description.length > 4000 ? `${description.slice(0, 4000)}\n…` : description)
+    // Open with what cannot be seen · that is the subject of this card,
+    // and it makes the grid below read as "here is what I got anyway"
+    // rather than as an ordinary information table.
+    .setDescription(tPick('dialogue.roster.hiddenLine', lang))
+    .addFields(buildHiddenFields({ meta, guildMembers, hits, deep, lang, statMap }))
     .setColor(hiddenRosterColor(hits))
     .setFooter({
-      text: t('dialogue.roster.guildFooter', lang, {
-        count: guildMembers.length,
-        word: t(`dialogue.roster.${guildMembers.length === 1 ? 'memberOne' : 'memberMany'}`, lang),
+      text: t('dialogue.roster.hiddenFooter', lang, {
         stats: deepStats ? ` · ${deepStats}` : '',
       }),
     })
@@ -278,6 +347,22 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
       lang,
     })
     : { result: null, errorEmbed: null };
+  // Snapshots for the hit rows only · the names are already known from
+  // the list lookup above, so this is one indexed read on a path that has
+  // just finished a guild scan.
+  const hitNames = [...hits.black, ...hits.white].map((entry) => entry.name).filter(Boolean);
+  let hitStatMap = new Map();
+  if (hitNames.length > 0) {
+    try {
+      const snapshots = await RosterSnapshot.find({ name: { $in: hitNames } })
+        .collation({ locale: 'en', strength: 2 })
+        .lean();
+      hitStatMap = statMapFromRosterCharacters(snapshots);
+    } catch (err) {
+      console.warn('[roster] Snapshot lookup for hidden-roster hits failed (non-fatal):', err.message);
+    }
+  }
+
   const primaryEmbed = buildHiddenPrimaryEmbed({
     name,
     meta,
@@ -286,6 +371,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
     deep,
     altResult: scan.result,
     lang,
+    statMap: hitStatMap,
   });
   const payload = buildHiddenReply({
     interaction,

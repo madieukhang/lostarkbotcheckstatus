@@ -9,6 +9,10 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Changed
+- The hidden-roster card from `/la-roster` opens with what cannot be seen, then lays out what the guild page still gave up. Guild, members, **🌍 Server**, Stronghold, roster level and deep-scan state were a paragraph of prose; they are six labelled facts, so they now fill two whole rows as badges. That paragraph held the last `**Server:** \`X\`` line left anywhere in the bot. Each blacklist or whitelist hit becomes its own field, and its rows carry a class icon, a linked name, ilvl and a badged raid rather than bold plain text with the raid in square brackets - whoever reads this card is deciding on a raid invite, and that is what the decision needs.
+- `buildHiddenDescription` is replaced by `buildHiddenFields`, which returns embed fields instead of one joined string.
+
 ### Fixed
 - The `/la-list remove` card records **who removed an entry and when**. It carried neither, so a removal - the one action in the bot that cannot be undone - left no trace of who took it out, while the card that adds an entry has always shown "added by" and "time added".
 
