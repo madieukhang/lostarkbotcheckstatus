@@ -94,4 +94,16 @@ test('attempt timeout preserves fallback time without starving the active model'
     fallbackReserveMs: 10_000,
     hasFallback: false,
   }), 30_000);
+  assert.equal(resolveGeminiAttemptTimeoutMs({
+    remainingMs: 30_000,
+    modelTimeoutMs: 15_000,
+    fallbackReserveMs: 10_000,
+    hasFallback: true,
+  }), 15_000, 'a promoted model keeps its own cap while preserving another fallback');
+  assert.equal(resolveGeminiAttemptTimeoutMs({
+    remainingMs: 15_000,
+    modelTimeoutMs: 15_000,
+    fallbackReserveMs: 10_000,
+    hasFallback: false,
+  }), 15_000, 'after a timeout, the next model can consume the remainder');
 });

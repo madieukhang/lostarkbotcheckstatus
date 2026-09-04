@@ -249,6 +249,10 @@ async function requestGeminiWithFallback({
   // responses still leave almost the full budget for the next model.
   const requestSignal = AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS);
   const requestDeadline = Date.now() + GEMINI_REQUEST_TIMEOUT_MS;
+  // Keep one more model reachable after quick recoverable failures. Once an
+  // attempt actually times out, the next model may use the remainder because
+  // that timeout already consumed the protected portion of the deadline.
+  let protectNextFallback = true;
 
   for (let i = 0; i < models.length; i += 1) {
     const model = models[i];
@@ -259,25 +263,26 @@ async function requestGeminiWithFallback({
       return { ok: false, type: 'network', model, error, failures };
     }
 
-    const preferredModelTimeoutMs = config.geminiPrimaryTimeoutOverridden
+    const preferredModelTimeoutMs = i === 0 && config.geminiPrimaryTimeoutOverridden
       ? config.geminiPrimaryTimeoutMs
       : resolveDefaultGeminiPrimaryTimeoutMs(model);
-    const modelTimeoutMs = i === 0
-      ? Math.min(preferredModelTimeoutMs || 8_000, GEMINI_REQUEST_TIMEOUT_MS)
-      : remainingMs;
-    // Reserve time exactly once, for the first failover. Reapplying the same
-    // reserve after A has already failed fragments B and C into attempts too
-    // short to finish. The promoted model receives the shared remainder; if it
-    // returns a quick recoverable error, the loop can still move on to C.
-    const shouldProtectFallback = i === 0 && hasFallback;
+    // Every model keeps its model-aware cap. A promoted fallback must not take
+    // the entire shared deadline merely because the previous model returned a
+    // quick 429/503; that would prevent the next healthy model from running.
+    const modelTimeoutMs = Math.min(
+      preferredModelTimeoutMs || 8_000,
+      remainingMs,
+    );
+    const shouldProtectFallback = protectNextFallback && hasFallback;
     const attemptTimeoutMs = resolveGeminiAttemptTimeoutMs({
       remainingMs,
       modelTimeoutMs,
       fallbackReserveMs: config.geminiFallbackReserveMs || 10_000,
       hasFallback: shouldProtectFallback,
     });
-    // Only the initial attempt needs a reserve-driven soft deadline. The shared
-    // signal remains the hard wall-clock cap for the entire fallback chain.
+    // Quick recoverable failures keep producing soft deadlines. A real timeout
+    // flips protectNextFallback off so the promoted model receives whatever is
+    // left under the one shared hard deadline.
     const modelSignal = attemptTimeoutMs < remainingMs
       ? AbortSignal.any([requestSignal, AbortSignal.timeout(attemptTimeoutMs)])
       : requestSignal;
@@ -304,10 +309,12 @@ async function requestGeminiWithFallback({
         return { ok: false, type: 'network', model, error, failures };
       }
       if (modelSignal.aborted && hasFallback) {
+        protectNextFallback = false;
         onRetry({ type: 'timeout', model, error, timeoutMs: attemptTimeoutMs, cooldownMs });
         continue;
       }
       if (hasFallback) {
+        protectNextFallback = true;
         onRetry({ type: 'network', model, error, cooldownMs });
         continue;
       }
@@ -327,6 +334,7 @@ async function requestGeminiWithFallback({
           retryAfterMs,
         );
         if (hasFallback) {
+          protectNextFallback = true;
           onRetry({ type: 'http', model, status: aiRes.status, bodyText, cooldownMs });
           continue;
         }
@@ -350,7 +358,10 @@ async function requestGeminiWithFallback({
     });
     if (parsed?.retry === true) {
       failures.push(`${model}: ${parsed.reason}`);
-      if (hasFallback) continue;
+      if (hasFallback) {
+        protectNextFallback = true;
+        continue;
+      }
       return {
         ok: false,
         type: 'response',

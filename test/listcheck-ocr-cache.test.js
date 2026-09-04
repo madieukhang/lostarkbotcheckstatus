@@ -680,14 +680,10 @@ test('extractNamesFromImage uses a Gemini 3-safe request while failing over reco
       })),
     );
     assert.ok(requestSignals.every((signal) => signal?.aborted === false));
-    assert.notEqual(
-      requestSignals[0],
-      requestSignals[1],
-      'the initial model should have a reserve-driven soft deadline',
-    );
-    assert.ok(
-      requestSignals.slice(1).every((signal) => signal === requestSignals[1]),
-      'after the first failover, the promoted model should receive the shared remainder',
+    assert.equal(
+      new Set(requestSignals).size,
+      requestSignals.length,
+      'each quick recoverable failure should preserve a fresh soft deadline for the next model',
     );
   } finally {
     globalThis.fetch = originalFetch;

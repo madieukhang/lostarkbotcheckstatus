@@ -289,17 +289,31 @@ export function createAutoCheckMessageHandler({
     });
   }
 
-  async function rejectEmptyNames(message, request, requestUi, lang) {
+  function buildPartialImageWarning(request, failedImageCount, lang) {
+    if (failedImageCount === 0) return null;
+    return buildAlertEmbed({
+      severity: AlertSeverity.WARNING,
+      ...t('dialogue.check.partialImages', lang, {
+        failed: failedImageCount,
+        count: request.images.length,
+      }),
+      timestamp: false,
+      lang,
+    });
+  }
+
+  async function rejectEmptyNames(message, request, requestUi, lang, failedImageCount = 0) {
     const alert = request.textRequest
       ? t('dialogue.check.text.empty', lang)
       : t('dialogue.check.noNames', lang);
+    const partialWarning = buildPartialImageWarning(request, failedImageCount, lang);
     const payload = {
       content: null,
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
         ...alert,
         lang,
-      })],
+      }), partialWarning].filter(Boolean),
       components: [],
     };
     if (requestUi.progressMsg) await requestUi.progressMsg.edit(payload);
@@ -340,14 +354,22 @@ export function createAutoCheckMessageHandler({
     return components;
   }
 
-  async function rejectUnverifiedBatch(message, progressMsg, unverifiedCount, lang) {
+  async function rejectUnverifiedBatch(
+    message,
+    request,
+    progressMsg,
+    unverifiedCount,
+    failedImageCount,
+    lang,
+  ) {
+    const partialWarning = buildPartialImageWarning(request, failedImageCount, lang);
     await progressMsg.edit({
       content: null,
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.noVerifiedNames', lang, { count: unverifiedCount }),
         lang,
-      })],
+      }), partialWarning].filter(Boolean),
       components: [],
     });
     await removeSearchReaction(message);
@@ -357,7 +379,13 @@ export function createAutoCheckMessageHandler({
   async function processAutoCheckRequest(message, request, requestUi, lang) {
     const startedAt = requestUi.startedAt;
     const inputKind = request.images.length > 0 ? 'image' : 'text';
-    console.log(`[auto-check] ${inputKind} request from ${message.author.tag} in #${message.channel.name}, processing...`);
+    const attachmentDetail = request.images.length > 0
+      ? ` attachments=${request.images.length}`
+      : '';
+    console.log(
+      `[auto-check] ${inputKind} request${attachmentDetail}`
+      + ` from ${message.author.tag} in #${message.channel.name}, processing...`,
+    );
     await message.react('🔍').catch(() => {});
     if (await rejectInvalidTextRequest(message, request.textRequest, lang)) return;
 
@@ -365,6 +393,7 @@ export function createAutoCheckMessageHandler({
       maxNetworkLookups: config.listcheckSuggestionLookupBudget,
     });
     const names = [];
+    const failedImages = [];
     if (request.images.length > 0) {
       const seenNames = new Set();
       for (const [index, image] of request.images.entries()) {
@@ -375,19 +404,39 @@ export function createAutoCheckMessageHandler({
           }),
           imageLimitLine(request, lang),
         ], lang);
-        const extractedNames = await extractNamesFromImageFn(image, {
-          refineAmbiguousDiacritics: true,
-          suggestionCache: suggestionContext.cache,
-          suggestionContext,
-        });
-        mergeUniqueNames(names, extractedNames, seenNames);
+        try {
+          const extractedNames = await extractNamesFromImageFn(image, {
+            refineAmbiguousDiacritics: true,
+            suggestionCache: suggestionContext.cache,
+            suggestionContext,
+          });
+          mergeUniqueNames(names, extractedNames, seenNames);
+        } catch (error) {
+          failedImages.push({ index: index + 1, error });
+          console.warn(
+            `[auto-check] OCR image ${index + 1}/${request.images.length} failed:`
+            + ` ${error?.message || String(error)}; continuing batch.`,
+          );
+        }
       }
+      console.log(
+        `[auto-check] image batch OCR complete attachments=${request.images.length}`
+        + ` failed=${failedImages.length} names=${names.length}.`,
+      );
     } else {
       mergeUniqueNames(names, request.textRequest?.names || [], new Set());
     }
 
+    if (request.images.length > 0 && failedImages.length === request.images.length) {
+      const lastError = failedImages.at(-1)?.error;
+      throw new Error(
+        `OCR failed for all ${request.images.length} image(s).`
+        + ` Last error: ${lastError?.message || String(lastError)}`,
+      );
+    }
+
     if (names.length === 0) {
-      await rejectEmptyNames(message, request, requestUi, lang);
+      await rejectEmptyNames(message, request, requestUi, lang, failedImages.length);
       return;
     }
 
@@ -407,7 +456,14 @@ export function createAutoCheckMessageHandler({
     });
     const { verified: results, unverified } = partitionListCheckResultsByVerification(checkedResults);
     if (results.length === 0) {
-      await rejectUnverifiedBatch(message, requestUi.progressMsg, unverified.length, lang);
+      await rejectUnverifiedBatch(
+        message,
+        request,
+        requestUi.progressMsg,
+        unverified.length,
+        failedImages.length,
+        lang,
+      );
       return;
     }
 
@@ -422,13 +478,14 @@ export function createAutoCheckMessageHandler({
       lang,
       elapsedMs: Date.now() - startedAt,
     });
+    const partialWarning = buildPartialImageWarning(request, failedImages.length, lang);
     await requestUi.progressMsg.edit({
       content: null,
-      embeds: [embed],
+      embeds: [embed, partialWarning].filter(Boolean),
       components: buildAutoCheckComponents(results, lang),
     });
     await removeSearchReaction(message);
-    await message.react('✅').catch(() => {});
+    await message.react(failedImages.length > 0 ? '⚠️' : '✅').catch(() => {});
   }
 
   return async function handleAutoCheckMessage(message) {

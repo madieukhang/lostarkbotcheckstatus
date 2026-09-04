@@ -420,6 +420,62 @@ test('auto-check queues rapid image messages instead of dropping them to cooldow
   assert.equal(second.edits.at(-1).embeds[0].title, 'Second');
 });
 
+test('auto-check keeps partial results when one image OCR attempt fails', async () => {
+  resetAutoCheckDedupeForTest();
+  const extractedOrder = [];
+  const checked = [];
+  const replies = [];
+  const edits = [];
+  const reactions = [];
+  const handler = createAutoCheckMessageHandler({
+    client: { user: { id: 'bot-user' } },
+    imageChecksEnabled: true,
+    isAutoCheckChannelFn: async () => true,
+    getGuildLanguageFn: async () => 'en',
+    extractNamesFromImageFn: async (image) => {
+      extractedOrder.push(image.id);
+      if (image.id === 'partial-image-1') throw new Error('temporary Gemini failure');
+      return ['Survivor'];
+    },
+    checkNamesAgainstListsFn: async (names) => {
+      checked.push(names);
+      return names.map((name) => ({ name, blackEntry: { name } }));
+    },
+    formatCheckResultsFn: () => ['formatted'],
+    buildListCheckEmbedFn: () => ({ embed: { title: 'partial-check' } }),
+    buildAutoCheckEvidenceRowFn: () => null,
+  });
+  const message = {
+    id: 'partial-image-message',
+    content: '',
+    channelId: 'channel-1',
+    guild: { id: 'guild-1' },
+    author: { id: 'partial-user', bot: false, tag: 'PartialUser#0001' },
+    attachments: attachmentsOf(
+      { id: 'partial-image-1', contentType: 'image/png' },
+      { id: 'partial-image-2', contentType: 'image/png' },
+    ),
+    channel: { name: 'loa-check' },
+    reactions: { cache: { get: () => null } },
+    react: async (emoji) => reactions.push(emoji),
+    reply: async (payload) => {
+      replies.push(payload);
+      return { edit: async (editPayload) => edits.push(editPayload) };
+    },
+  };
+
+  await handler(message);
+
+  assert.deepEqual(extractedOrder, ['partial-image-1', 'partial-image-2']);
+  assert.deepEqual(checked, [['Survivor']]);
+  assert.equal(replies.length, 1);
+  const finalEdit = edits.at(-1);
+  assert.equal(finalEdit.embeds[0].title, 'partial-check');
+  assert.match(finalEdit.embeds[1].toJSON().title, /some images could not be read/i);
+  assert.match(finalEdit.embeds[1].toJSON().description, /\*\*1\/2\*\*/u);
+  assert.deepEqual(reactions, ['🔍', '⚠️']);
+});
+
 test('auto-check replaces the live status card when image processing fails', async () => {
   resetAutoCheckDedupeForTest();
   const replies = [];
