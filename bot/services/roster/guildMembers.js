@@ -1,6 +1,6 @@
 import config from '../../config.js';
 import { findBibleNode } from '../../utils/bibleData.js';
-import { createLruTtlCache } from '../../utils/lruTtlCache.js';
+import { createLruTtlCache } from '../../utils/cache/lruTtlCache.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';

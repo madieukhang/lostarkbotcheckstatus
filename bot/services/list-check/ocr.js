@@ -9,7 +9,7 @@ import {
   normalizeNameKey,
 } from '../../utils/names.js';
 import { mapWithConcurrency } from '../../utils/async.js';
-import { createLruTtlCache } from '../../utils/lruTtlCache.js';
+import { createLruTtlCache } from '../../utils/cache/lruTtlCache.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 import { stripDiacritics } from './nameRecovery.js';
 

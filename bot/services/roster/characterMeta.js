@@ -5,7 +5,7 @@ import {
   configureMetaCache,
   getCachedMeta,
   setCachedMeta,
-} from '../../utils/metaCache.js';
+} from '../../utils/cache/metaCache.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
 import {

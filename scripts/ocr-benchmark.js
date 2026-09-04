@@ -57,8 +57,8 @@ if (runs > 20) throw new Error('--runs must be 20 or fewer to avoid accidental q
 
 process.env.GEMINI_MAX_OUTPUT_TOKENS = String(tokenCap);
 const [{ extractNamesFromImage, clearOcrCache }, { default: config }] = await Promise.all([
-  import('./bot/services/list-check/ocr.js'),
-  import('./bot/config.js'),
+  import('../bot/services/list-check/ocr.js'),
+  import('../bot/config.js'),
 ]);
 
 const mimeType = resolveMimeType(imagePath);

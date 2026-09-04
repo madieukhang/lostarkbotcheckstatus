@@ -7,3 +7,19 @@ data/
 .git/
 *.md
 .gitignore
+
+# Development instructions, tests, and local working files are not runtime input.
+.agent/
+.agents/
+.claude/
+.codex/
+.superpowers/
+.playwright-mcp/
+docs/
+test/
+exports/
+scripts/
+dusk-check.js
+coverage/
+*.log
+.env.*

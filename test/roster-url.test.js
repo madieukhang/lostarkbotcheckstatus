@@ -12,7 +12,7 @@ import { stampRosterWorld } from '../bot/services/roster/buildRosterCharacters.j
 import { clearGuildMembersCache } from '../bot/services/roster/guildMembers.js';
 import { extractCharacterItemLevelFromHtml } from '../bot/services/roster/parsers.js';
 import config from '../bot/config.js';
-import { clearMetaCache } from '../bot/utils/metaCache.js';
+import { clearMetaCache } from '../bot/utils/cache/metaCache.js';
 
 function createGuildMembersResponse(memberName = 'Guildmate') {
   return Response.json({

@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node bot.js",
     "dev": "node --watch bot.js",
-    "test": "node --test",
-    "benchmark:ocr": "node ocr-benchmark.js"
+    "test": "node --test test",
+    "benchmark:ocr": "node scripts/ocr-benchmark.js"
   },
   "engines": {
     "node": ">=20.19.0"

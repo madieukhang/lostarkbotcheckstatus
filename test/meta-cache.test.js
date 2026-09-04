@@ -6,7 +6,7 @@ import {
   configureMetaCache,
   getCachedMeta,
   setCachedMeta,
-} from '../bot/utils/metaCache.js';
+} from '../bot/utils/cache/metaCache.js';
 
 const DEFAULT_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_MAX_SIZE = 5000;

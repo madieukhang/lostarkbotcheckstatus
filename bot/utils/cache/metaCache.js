@@ -36,7 +36,7 @@
  */
 
 import { createLruTtlCache } from './lruTtlCache.js';
-import { normalizeNameKey } from './names.js';
+import { normalizeNameKey } from '../names.js';
 
 let metaCacheTtlMs = 30 * 60 * 1000;
 let metaCacheMaxSize = 5000;

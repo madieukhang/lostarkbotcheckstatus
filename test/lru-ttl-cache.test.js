@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createLruTtlCache } from '../bot/utils/lruTtlCache.js';
+import { createLruTtlCache } from '../bot/utils/cache/lruTtlCache.js';
 
 test('LRU TTL cache expires lazily and refreshes recency on reads', () => {
   let currentTime = 100;
@@ -49,3 +49,21 @@ test('cloneValue isolates cached arrays on both writes and reads', () => {
 
   assert.deepEqual(cache.get('names'), ['Alpha']);
 });
+
+for (const writeKey of ['delta', 'gamma']) {
+  test(`lowering the dynamic size limit trims the cache when writing ${writeKey}`, () => {
+    let maxSize = 3;
+    const cache = createLruTtlCache({ ttlMs: 100, maxSize: () => maxSize });
+    cache.set('alpha', 1);
+    cache.set('beta', 2);
+    cache.set('gamma', 3);
+
+    maxSize = 1;
+    cache.set(writeKey, 4);
+
+    assert.equal(cache.get('alpha'), undefined);
+    assert.equal(cache.get('beta'), undefined);
+    if (writeKey !== 'gamma') assert.equal(cache.get('gamma'), undefined);
+    assert.equal(cache.get(writeKey), 4);
+  });
+}

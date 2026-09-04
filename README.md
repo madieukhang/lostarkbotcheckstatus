@@ -143,7 +143,8 @@ Sample blacklist document:
 LostArk_LoaLogs/
 |-- bot.js                         # Minimal Discord client entrypoint
 |-- loa-worker.js                  # Bible worker process entrypoint
-|-- dusk-check.js                  # Diagnostic helper (local dev only)
+|-- AGENTS.md                      # Repository instructions for coding agents
+|-- .agent/                        # Repository map + verification workflow
 |
 |-- bot/
 |   |-- app/                       # Startup, slash registration, interaction router
@@ -184,11 +185,13 @@ LostArk_LoaLogs/
 |   |   |-- roster/               # lostark.bible client, parsers, search, roster/deep-scan helpers
 |   |   `-- worker/               # Scrape queue worker + heartbeat
 |   |-- utils/                    # Shared embeds, scan sessions, text/scope/cache/name helpers
+|   |   `-- cache/                # Shared LRU/TTL primitive + character metadata cache
 |   `-- models/                   # Mongoose schemas + indexes
 |
 |-- assets/class-icons/            # Class icon PNGs for Discord application emoji
 |-- exports/                       # Historical CSV/XLSX drops (gitignored)
-|-- data/                          # Persisted runtime state
+|-- data/                          # Local/legacy data + benchmark fixtures (gitignored)
+|-- scripts/                       # Development tools (ocr-benchmark.js)
 |-- test/                          # node --test coverage for handlers/services/utils
 |-- Dockerfile
 |-- railway.toml
@@ -203,6 +206,11 @@ Five compose principles:
 3. **Services wrap external I/O by domain.** `services/roster/index.js` is the public lostark.bible facade, `services/list-check/service.js` owns Gemini OCR/list matching, `services/multiadd/index.js` owns Excel import/export, and `services/worker/*` owns background scrape work.
 4. **Utilities stay pure where possible.** Cross-feature formatting/session helpers live under `utils/`; OCR/name cleanup is centralized in `utils/names.js` so slash check, auto-check, and list edits normalize the same way.
 5. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` export `create*({ client, ... })` factories. `app/interaction-router.js` builds those closures once and routes slash commands, buttons, modals, selects, and autocomplete through them.
+
+For maintenance, start with [AGENTS.md](AGENTS.md) and the
+[repository guide](.agent/README.md). Keep development tools in `scripts/` and
+temporary agent notes in `.agent/local/` (gitignored). Docker excludes these
+development files while keeping the bot, worker, and runtime assets.
 
 Interaction flow:
 
@@ -223,7 +231,7 @@ Server monitor runs out-of-band: `bot/monitor/monitor.js` polls `bot/monitor/ser
 
 ## Requirements
 
-- Node.js ≥ 20
+- Node.js ≥ 20.19.0
 - MongoDB (Atlas or self-hosted)
 - Discord bot token + channel ID
 - Gemini API key (optional — only needed for `/la-check` + auto-check)
@@ -315,7 +323,7 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 1. Push code to the GitHub branch Railway tracks.
 2. Create the Railway service → link repo.
 3. In **Variables** tab, set every env var (minimum: `DISCORD_TOKEN`, `CHANNEL_ID`, `MONGODB_URI`).
-4. Railway builds from `Dockerfile` (node:20-slim, `npm install --omit=dev`) and starts via `node bot.js`.
+4. Railway builds from `Dockerfile` (node:20-slim, `npm ci --omit=dev`) and starts via `node bot.js`.
 5. Flip **Message Content Intent** on in Discord Developer Portal if using auto-check channels, otherwise auto-check won't fire.
 
 Slash commands register through Discord's global endpoint on boot (`ClientReady` handler), so a Railway redeploy is enough to push schema changes — no separate CLI step.

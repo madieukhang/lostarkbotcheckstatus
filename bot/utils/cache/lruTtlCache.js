@@ -1,8 +1,15 @@
 /**
- * Process-local LRU cache with lazy TTL expiration.
+ * Process-local LRU cache with lazy TTL expiration and bounded writes.
  *
  * The cache owns the repeated miss/expiry/touch/eviction flow. Callers keep
  * responsibility for deciding which values are safe to cache.
+ * @param {object} options Cache configuration.
+ * @param {number | (() => number)} options.ttlMs Entry lifetime in milliseconds.
+ * @param {number | (() => number)} options.maxSize Maximum number of entries.
+ * @param {Function} [options.normalizeKey] Canonicalize lookup and write keys.
+ * @param {Function} [options.cloneValue] Copy values on reads and writes.
+ * @param {() => number} [options.now] Clock used to calculate expiry.
+ * @returns {{clear: Function, get: Function, set: Function}} Cache operations.
  */
 export function createLruTtlCache({
   ttlMs,
@@ -57,10 +64,12 @@ export function createLruTtlCache({
     const key = normalizeKey(rawKey);
     if (!key) return false;
 
-    // Updating an existing entry must not evict an unrelated key at capacity.
-    const existed = entries.delete(key);
     const limit = resolvePositiveSetting(maxSize, 'maxSize');
-    if (!existed && entries.size >= limit) {
+
+    // Remove the old value first so refreshing a key needs no extra slot.
+    // Dynamic limits can shrink by more than one entry between writes.
+    entries.delete(key);
+    while (entries.size >= limit) {
       const oldestKey = entries.keys().next().value;
       entries.delete(oldestKey);
     }
