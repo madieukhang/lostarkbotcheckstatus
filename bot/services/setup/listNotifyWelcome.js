@@ -14,30 +14,22 @@ function asText(value) {
   return Array.isArray(value) ? value.join('\n') : String(value || '');
 }
 
+/**
+ * Build the notification pin with the channel's retained/cleanup instructions.
+ * @param {string} lang
+ * @param {{cleanupEnabled?: boolean}} [options]
+ * @returns {EmbedBuilder}
+ */
 export function buildListNotifyWelcomeEmbed(lang, { cleanupEnabled = false } = {}) {
   const cleanupKey = cleanupEnabled ? 'cleanup' : 'cleanupDisabled';
   return new EmbedBuilder()
     .setColor(COLORS.info)
     .setTitle(t('listNotifyWelcome.title', lang))
     .setDescription(asText(t('listNotifyWelcome.description', lang)))
-    .addFields(
-      {
-        name: t('listNotifyWelcome.activityName', lang),
-        value: asText(t('listNotifyWelcome.activityValue', lang)),
-      },
-      {
-        name: t('listNotifyWelcome.scopeName', lang),
-        value: asText(t('listNotifyWelcome.scopeValue', lang)),
-      },
-      {
-        name: t(`listNotifyWelcome.${cleanupKey}Name`, lang),
-        value: asText(t(`listNotifyWelcome.${cleanupKey}Value`, lang)),
-      },
-      {
-        name: t('listNotifyWelcome.commandsName', lang),
-        value: asText(t('listNotifyWelcome.commandsValue', lang)),
-      }
-    )
+    .addFields(['activity', 'scope', cleanupKey, 'commands'].map(key => ({
+      name: t(`listNotifyWelcome.${key}Name`, lang),
+      value: asText(t(`listNotifyWelcome.${key}Value`, lang)),
+    })))
     .setFooter({ text: t('listNotifyWelcome.footer', lang) });
 }
 

@@ -19,38 +19,22 @@ function asText(value) {
   return Array.isArray(value) ? value.join('\n') : String(value || '');
 }
 
+/**
+ * Build the welcome pin, keeping its field order and cleanup-state instructions.
+ * @param {string} lang
+ * @param {{cleanupEnabled?: boolean}} [options]
+ * @returns {EmbedBuilder}
+ */
 export function buildAutoCheckWelcomeEmbed(lang, { cleanupEnabled = false } = {}) {
   const cleanupKey = cleanupEnabled ? 'cleanup' : 'cleanupDisabled';
   return new EmbedBuilder()
     .setColor(COLORS.info)
     .setTitle(t('autoCheckWelcome.title', lang))
     .setDescription(asText(t('autoCheckWelcome.description', lang)))
-    .addFields(
-      {
-        name: t('autoCheckWelcome.howName', lang),
-        value: asText(t('autoCheckWelcome.howValue', lang)),
-      },
-      {
-        name: t('autoCheckWelcome.listsName', lang),
-        value: asText(t('autoCheckWelcome.listsValue', lang)),
-      },
-      {
-        name: t('autoCheckWelcome.scopeName', lang),
-        value: asText(t('autoCheckWelcome.scopeValue', lang)),
-      },
-      {
-        name: t(`autoCheckWelcome.${cleanupKey}Name`, lang),
-        value: asText(t(`autoCheckWelcome.${cleanupKey}Value`, lang)),
-      },
-      {
-        name: t('autoCheckWelcome.quickAddName', lang),
-        value: asText(t('autoCheckWelcome.quickAddValue', lang)),
-      },
-      {
-        name: t('autoCheckWelcome.commandsName', lang),
-        value: asText(t('autoCheckWelcome.commandsValue', lang)),
-      }
-    )
+    .addFields(['how', 'lists', 'scope', cleanupKey, 'quickAdd', 'commands'].map(key => ({
+      name: t(`autoCheckWelcome.${key}Name`, lang),
+      value: asText(t(`autoCheckWelcome.${key}Value`, lang)),
+    })))
     .setFooter({ text: t('autoCheckWelcome.footer', lang) });
 }
 
