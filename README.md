@@ -249,7 +249,7 @@ Copy `.env.example` to `.env` and fill in values.
 | `GEMINI_API_KEY` | — | Gemini API key for OCR |
 | `GEMINI_MODELS` | `gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Gemini 3.x-only priority catalog before the waitlist is applied; older generations are ignored |
 | `GEMINI_MODEL_WAITLIST` | `gemini-3.8-flash` | Comma-separated models temporarily excluded from OCR; set `none` or `off` to restore the full configured chain |
-| `GEMINI_PRIMARY_TIMEOUT_MS` | model-aware | Optional soft-timeout override; defaults to 15s for the current 3.7 primary and 8s when 3.8 is restored; fallbacks share the remaining 30s budget |
+| `GEMINI_PRIMARY_TIMEOUT_MS` | model-aware | Optional soft-timeout override; the current 3.7 primary gets the full 30s budget, while restored 3.8 defaults to an 8s soft cap; quick recoverable failures still leave the shared remainder for fallbacks |
 | `LISTCHECK_ALT_ENRICHMENT` | `false` | Run background Stronghold alt scan after OCR hits; keep off to avoid request spikes |
 | `LISTCHECK_ALT_ENRICHMENT_LIMIT` | `1` | Max flagged OCR names to enrich per screenshot when enrichment is enabled |
 | `LISTCHECK_ALT_ENRICHMENT_CANDIDATE_LIMIT` | `80` | Max guild candidates checked per OCR background alt scan |

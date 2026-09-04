@@ -18,7 +18,7 @@ export const DEFAULT_GEMINI_MODEL_WAITLIST = Object.freeze([
 
 const DEFAULT_PRIMARY_TIMEOUT_MS_BY_MODEL = Object.freeze({
   'gemini-3.8-flash': 8_000,
-  'gemini-3.7-flash': 15_000,
+  'gemini-3.7-flash': 30_000,
 });
 
 export function isGemini3Model(model) {

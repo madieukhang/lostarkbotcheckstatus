@@ -70,6 +70,6 @@ test('waitlist validation is case-insensitive and primary timeout follows the ac
 
   assert.deepEqual(resolution.waitlisted, ['gemini-3.8-flash']);
   assert.deepEqual(resolution.rejected, ['gemini-2.5-flash']);
-  assert.equal(resolveDefaultGeminiPrimaryTimeoutMs(resolution.models[0]), 15_000);
+  assert.equal(resolveDefaultGeminiPrimaryTimeoutMs(resolution.models[0]), 30_000);
   assert.equal(resolveDefaultGeminiPrimaryTimeoutMs('gemini-3.8-flash'), 8_000);
 });

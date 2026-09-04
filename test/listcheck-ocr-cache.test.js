@@ -675,10 +675,11 @@ test('extractNamesFromImage uses a Gemini 3-safe request while failing over reco
         thinkingConfig: { thinkingLevel: 'low' },
       })),
     );
-    assert.notEqual(requestSignals[0], requestSignals[1], 'primary should combine a soft and hard deadline');
-    assert.ok(requestSignals.slice(1).every((signal) => signal === requestSignals[1]));
-    assert.equal(requestSignals[0]?.aborted, false, 'primary soft deadline should remain live');
-    assert.equal(requestSignals[1]?.aborted, false, 'fallback models should share one live hard deadline');
+    assert.ok(
+      requestSignals.every((signal) => signal === requestSignals[0]),
+      '3.7 primary and quick-error fallbacks should share one hard deadline',
+    );
+    assert.equal(requestSignals[0]?.aborted, false, 'shared hard deadline should remain live');
   } finally {
     globalThis.fetch = originalFetch;
     config.geminiApiKey = originalKey;
