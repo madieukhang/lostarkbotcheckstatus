@@ -265,13 +265,18 @@ async function requestGeminiWithFallback({
     const modelTimeoutMs = i === 0
       ? Math.min(preferredModelTimeoutMs || 8_000, GEMINI_REQUEST_TIMEOUT_MS)
       : remainingMs;
+    // Reserve time exactly once, for the first failover. Reapplying the same
+    // reserve after A has already failed fragments B and C into attempts too
+    // short to finish. The promoted model receives the shared remainder; if it
+    // returns a quick recoverable error, the loop can still move on to C.
+    const shouldProtectFallback = i === 0 && hasFallback;
     const attemptTimeoutMs = resolveGeminiAttemptTimeoutMs({
       remainingMs,
       modelTimeoutMs,
       fallbackReserveMs: config.geminiFallbackReserveMs || 10_000,
-      hasFallback,
+      hasFallback: shouldProtectFallback,
     });
-    // Every non-final attempt can receive its own soft deadline. The shared
+    // Only the initial attempt needs a reserve-driven soft deadline. The shared
     // signal remains the hard wall-clock cap for the entire fallback chain.
     const modelSignal = attemptTimeoutMs < remainingMs
       ? AbortSignal.any([requestSignal, AbortSignal.timeout(attemptTimeoutMs)])
