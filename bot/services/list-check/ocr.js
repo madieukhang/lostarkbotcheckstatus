@@ -12,10 +12,14 @@ import { stripDiacritics } from './nameRecovery.js';
 const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_GEMINI_INLINE_REQUEST_BYTES = 20 * 1024 * 1024;
 const GEMINI_REQUEST_TIMEOUT_MS = 30_000;
-// Gemini 3.6+ deprecated the legacy sampling knobs. Keeping this payload to
-// generation-neutral limits lets every model in the fallback chain accept it.
+// Gemini 3.6+ deprecated the legacy sampling knobs. OCR is a bounded extraction
+// task, so low thinking preserves the glyph-reading benefit without letting
+// hidden reasoning consume the compact response budget. JSON mode also avoids
+// spending tokens on markdown fences or prose around the requested payload.
 const GEMINI_GENERATION_CONFIG = Object.freeze({
-  maxOutputTokens: 512,
+  maxOutputTokens: 1024,
+  responseMimeType: 'application/json',
+  thinkingConfig: Object.freeze({ thinkingLevel: 'low' }),
 });
 const GEMINI_FAILOVER_HTTP_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
 const GEMINI_FAILOVER_BODY_HINTS = Object.freeze([
@@ -32,6 +36,7 @@ const GEMINI_FAILURE_FORMATTERS = {
   http: (result) =>
     `Gemini request failed on ${result.model} (HTTP ${result.status}) ${result.bodyText}`.trim(),
   'response:non-JSON response': () => 'Gemini did not return a JSON array.',
+  'response:max output tokens': () => 'Gemini output was truncated at the token limit.',
   default: (result) => `All Gemini models failed: ${result.failures.join(' | ')}`,
 };
 
@@ -123,7 +128,20 @@ function extractGeminiResponse(payload) {
   return {
     finishReason: candidate?.finishReason,
     text,
+    usageMetadata: payload?.usageMetadata,
   };
+}
+
+function formatGeminiTokenUsage(usageMetadata) {
+  if (!usageMetadata || typeof usageMetadata !== 'object') return '';
+  const fields = [
+    ['prompt', usageMetadata.promptTokenCount],
+    ['output', usageMetadata.candidatesTokenCount],
+    ['thoughts', usageMetadata.thoughtsTokenCount],
+    ['total', usageMetadata.totalTokenCount],
+  ].filter(([, value]) => Number.isFinite(value));
+  if (fields.length === 0) return '';
+  return `, tokens: ${fields.map(([label, value]) => `${label}=${value}`).join(' ')}`;
 }
 
 async function requestGeminiWithFallback({
@@ -442,9 +460,18 @@ export async function extractNamesFromImage(image, options = {}) {
       };
       if (retryMessages[type]) console.warn(retryMessages[type]);
     },
-    parseResponse: ({ finishReason, text, model }) => {
+    parseResponse: ({ finishReason, text, model, usageMetadata }) => {
       if (finishReason && finishReason !== 'STOP') {
-        console.warn(`[listcheck] Gemini (${model}) finishReason: ${finishReason}, text: ${text.slice(0, 100)}`);
+        console.warn(
+          `[listcheck] Gemini (${model}) finishReason: ${finishReason}`
+          + `${formatGeminiTokenUsage(usageMetadata)}, text: ${text.slice(0, 100)}`,
+        );
+      }
+
+      // A syntactically closed array can still be only the prefix of the lobby
+      // when generation hit its ceiling. Never accept it as a complete roster.
+      if (finishReason === 'MAX_TOKENS') {
+        return { retry: true, reason: 'max output tokens' };
       }
 
       if (!text) return { value: { parsed: [], emptyResponse: true } };

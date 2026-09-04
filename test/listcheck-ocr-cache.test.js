@@ -669,12 +669,90 @@ test('extractNamesFromImage uses a Gemini 3-safe request while failing over reco
     assert.deepEqual(requestedModels, config.geminiModels);
     assert.deepEqual(
       generationConfigs,
-      config.geminiModels.map(() => ({ maxOutputTokens: 512 })),
+      config.geminiModels.map(() => ({
+        maxOutputTokens: 1024,
+        responseMimeType: 'application/json',
+        thinkingConfig: { thinkingLevel: 'low' },
+      })),
     );
     assert.ok(requestSignals.every((signal) => signal === requestSignals[0]));
     assert.equal(requestSignals[0]?.aborted, false, 'fallback models should share one live deadline');
   } finally {
     globalThis.fetch = originalFetch;
+    config.geminiApiKey = originalKey;
+    config.geminiModels = originalModels;
+    clearOcrCache();
+  }
+});
+
+test('extractNamesFromImage rejects a MAX_TOKENS prefix even when it is valid JSON', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  const requestedModels = [];
+  const warnings = [];
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels = ['truncated-model', 'working-model'];
+  console.warn = (...args) => warnings.push(args.join(' '));
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl === 'https://cdn.discordapp.com/max-tokens.png') {
+      return new Response(new Uint8Array([31, 32, 33]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      const model = decodeURIComponent(requestedUrl.match(/models\/([^:]+):/)?.[1] || '');
+      requestedModels.push(model);
+      if (model === 'truncated-model') {
+        return Response.json({
+          candidates: [{
+            finishReason: 'MAX_TOKENS',
+            content: { parts: [{ text: '["Linhieee"]' }] },
+          }],
+          usageMetadata: {
+            promptTokenCount: 220,
+            candidatesTokenCount: 18,
+            thoughtsTokenCount: 1006,
+            totalTokenCount: 1244,
+          },
+        });
+      }
+      return Response.json({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text: '["Linhieee","Prèf"]' }] },
+        }],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'max-tokens',
+      url: 'https://cdn.discordapp.com/max-tokens.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(names, ['Linhieee', 'Prèf']);
+    assert.deepEqual(requestedModels, config.geminiModels);
+    assert.ok(
+      warnings.some((message) => (
+        message.includes('finishReason: MAX_TOKENS')
+        && message.includes('thoughts=1006')
+      )),
+      'MAX_TOKENS diagnostics should include available thought-token usage',
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
     config.geminiApiKey = originalKey;
     config.geminiModels = originalModels;
     clearOcrCache();
