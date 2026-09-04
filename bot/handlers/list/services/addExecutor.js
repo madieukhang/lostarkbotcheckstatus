@@ -71,54 +71,6 @@ function buildInlineSpacer() {
 }
 
 /**
- * Build the three-slot audit row for an "already exists" result. The add
- * flow has already loaded the submitted character's roster, so its Server
- * can fill the former spacer without another request. Legacy/hidden results
- * that do not expose a Server keep the spacer and the same stable layout.
- *
- * @param {object} existed
- * @param {string} [lang='en']
- * @param {{world?: string}} [options]
- * @returns {Array<{name: string, value: string, inline: true}>}
- */
-export function buildDuplicateAuditFields(existed, lang = 'en', { world = '' } = {}) {
-  const fallback = t('dialogue.broadcast.notAvailable', lang);
-  const normalizedWorld = String(world || '').trim();
-  return [
-    {
-      name: `👤 ${t('dialogue.listAdd.duplicate.addedBy', lang)}`,
-      value: existed.addedByDisplayName || existed.addedByTag || fallback,
-      inline: true,
-    },
-    {
-      name: `🕐 ${t('dialogue.listAdd.duplicate.timeAdded', lang)}`,
-      value: relativeTime(existed.addedAt) || fallback,
-      inline: true,
-    },
-    normalizedWorld ? {
-      name: `🌍 ${t('dialogue.roster.server', lang)}`,
-      value: `\`${normalizedWorld}\``,
-      inline: true,
-    } : buildInlineSpacer(),
-  ];
-}
-
-/**
- * Pad preceding inline metadata to a complete row, then append the stable
- * Added by / Time added / Server row (or a spacer when Server is unknown).
- * @param {Array<object>} fields
- * @param {object} existed
- * @param {string} [lang='en']
- * @param {{world?: string}} [options]
- * @returns {Array<object>}
- */
-export function appendDuplicateAuditRow(fields, existed, lang = 'en', options = {}) {
-  while (fields.length % 3 !== 0) fields.push(buildInlineSpacer());
-  fields.push(...buildDuplicateAuditFields(existed, lang, options));
-  return fields;
-}
-
-/**
  * Build the title icon + hero line shared by direct and approval-completed
  * adds. The list icon is the only title prefix; the linked primary character
  * carries its class icon in the description.
@@ -257,16 +209,22 @@ function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang }) {
   };
 }
 
+/**
+ * The inline grid under the reason pair. There is no "match type" field:
+ * the opening sentence already says whether this was the same name or a
+ * roster alt, and a field repeating it in other words earns nothing.
+ * @param {object} existed - the entry already in the list
+ * @param {boolean} isRosterMatch - true when the typed name is not the
+ *   listed one, which is what makes the matched name worth naming
+ * @param {string} lang - locale for every label
+ * @param {Map<string, object>} statMap - roster snapshots, for the class
+ *   icon on the matched name and for the server
+ * @returns {Array<object>} inline fields, padded to whole rows
+ */
 function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap) {
-  const fields = [
-    {
-      name: `${ICONS.search} ${t('dialogue.listAdd.duplicate.matchType', lang)}`,
-      value: t(
-        `dialogue.listAdd.duplicate.${isRosterMatch ? 'rosterAlt' : 'exactName'}`,
-        lang
-      ),
-      inline: true,
-    },
+  const fallback = t('dialogue.broadcast.notAvailable', lang);
+  const world = resolveRosterWorld(existed, statMap);
+  const inlineFields = [
     isRosterMatch ? {
       name: `🧬 ${t('dialogue.listAdd.duplicate.matchedName', lang)}`,
       value: formatLinkedCharacter(
@@ -275,32 +233,67 @@ function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap) {
       ),
       inline: true,
     } : null,
+    world ? {
+      name: `🌍 ${t('dialogue.roster.server', lang)}`,
+      value: `\`${world}\``,
+      inline: true,
+    } : null,
     existed.scope ? {
       name: `🌐 ${t('dialogue.listAdd.duplicate.scope', lang)}`,
       value: `[${t(`dialogue.approval.scopeTag.${existed.scope === 'server' ? 'local' : 'global'}`, lang)}]`,
       inline: true,
-    } : null,
-  ].filter(Boolean);
-  appendDuplicateAuditRow(fields, existed, lang, {
-    world: resolveRosterWorld(existed, statMap),
-  });
-  return fields;
-}
-
-function appendDuplicateDetailFields(fields, existed, lang) {
-  fields.push(...[
-    existed.reason ? {
-      name: `📝 ${t('dialogue.listAdd.duplicate.existingReason', lang)}`,
-      value: existed.reason.slice(0, 1024),
-      inline: false,
     } : null,
     existed.raid ? {
       name: `🗡️ ${t('dialogue.listAdd.duplicate.raid', lang)}`,
       value: `\`${existed.raid}\``,
       inline: true,
     } : null,
-  ].filter(Boolean));
-  return fields;
+    {
+      name: `👤 ${t('dialogue.listAdd.duplicate.addedBy', lang)}`,
+      value: existed.addedByDisplayName || existed.addedByTag || fallback,
+      inline: true,
+    },
+    {
+      name: `🕐 ${t('dialogue.listAdd.duplicate.timeAdded', lang)}`,
+      value: relativeTime(existed.addedAt) || fallback,
+      inline: true,
+    },
+  ].filter(Boolean);
+  return padInlineRow(inlineFields);
+}
+
+/**
+ * The pair of full-width reason blocks that open the card.
+ *
+ * This is what the card exists for. The officer has just typed a reason
+ * believing they were recording something new; setting it directly under
+ * the stored one lets them see at a glance whether it adds anything, and
+ * therefore whether to go run `/la-list edit`. Without it they have to
+ * scroll back to their own command to compare.
+ *
+ * @param {object} existed - the entry already in the list
+ * @param {string} typedReason - the reason from this add attempt
+ * @param {string} lang - locale for both labels
+ * @returns {Array<object>} one or two full-width fields
+ */
+function buildDuplicateReasonFields(existed, typedReason, lang) {
+  const fallback = t('dialogue.broadcast.notAvailable', lang);
+  const typed = String(typedReason || '').trim();
+  return [
+    {
+      name: `📝 ${t('dialogue.listAdd.duplicate.storedReason', lang)}`,
+      value: (existed.reason || fallback).slice(0, 1024),
+      inline: false,
+    },
+    // Rendered whenever the attempt carried one, even when it matches the
+    // stored reason word for word · two identical lines say "yours adds
+    // nothing" more plainly than a field that quietly disappears.
+    typed ? {
+      name: `✏️ ${t('dialogue.listAdd.duplicate.typedReason', lang)}`,
+      value: typed.slice(0, 1024),
+      inline: false,
+    } : null,
+  ].filter(Boolean);
 }
 
 export function buildDuplicateListAddResult({
@@ -310,6 +303,7 @@ export function buildDuplicateListAddResult({
   type,
   lang,
   statMap = new Map(),
+  typedReason = '',
 }) {
   const isRosterMatch = normalizeNameKey(existed.name) !== normalizeNameKey(name);
   const variant = isRosterMatch ? 'roster' : 'direct';
@@ -318,24 +312,23 @@ export function buildDuplicateListAddResult({
   // The add flow already fetched this roster. Reuse its stat map so both
   // identities in the duplicate sentence carry the same class-icon + Bible
   // link vocabulary as every other list card, without another network call.
+  // Bold + list icon match the /la-check headline this sentence is modelled
+  // on, so the two cards read as the same voice.
   const descriptionValues = {
     ...values,
-    name: formatLinkedCharacter(
-      name,
-      statMap.get(normalizeNameKey(name)),
-      { bold: false },
-    ),
+    icon: getListContext(type).icon,
+    name: formatLinkedCharacter(name, statMap.get(normalizeNameKey(name))),
     matched: formatLinkedCharacter(
       existed.name,
       statMap.get(normalizeNameKey(existed.name)),
-      { bold: false },
     ),
   };
-  const fields = appendDuplicateDetailFields(
-    buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap),
-    existed,
-    lang
-  );
+  // Reason pair first, grid after · the same order every other card in the
+  // bot uses, and it puts the decision the officer has to make at the top.
+  const fields = [
+    ...buildDuplicateReasonFields(existed, typedReason, lang),
+    ...buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap),
+  ];
   return {
     ok: false,
     isDuplicate: true,
@@ -697,6 +690,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
         type: payload.type,
         lang,
         statMap: statMapFromRosterCharacters(roster.rosterCharacters),
+        typedReason: payload.reason,
       });
     }
 

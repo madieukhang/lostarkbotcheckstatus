@@ -6,14 +6,14 @@ process.env.CHANNEL_ID ||= 'test';
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const {
-  appendDuplicateAuditRow,
-  buildDuplicateAuditFields,
   buildDuplicateListAddResult,
   buildHiddenRosterGuidance,
   buildListAddSuccessHeader,
   buildListAddTrackedRostersField,
 } = await import('../bot/handlers/list/services/addExecutor.js');
 const { CLASS_EMOJI_MAP } = await import('../bot/models/Class.js');
+
+const ZWSP = '​';
 
 test('hidden roster add guidance offers enrich when bible exposes a guild', () => {
   const guidance = buildHiddenRosterGuidance('Ainslinn', 'Bullet Shell');
@@ -33,25 +33,7 @@ test('hidden roster add guidance avoids enrich button without a guild', () => {
   assert.equal(guidance.components.length, 0);
 });
 
-test('duplicate roster card fills the audit row third slot with Server', () => {
-  const addedAt = new Date('2026-05-17T10:30:00Z');
-  const fields = buildDuplicateAuditFields({
-    addedByDisplayName: 'meow',
-    addedAt,
-  }, 'en', { world: 'Vairgrys' });
-
-  assert.deepEqual(fields, [
-    { name: '👤 Added by', value: 'meow', inline: true },
-    {
-      name: '🕐 Time added',
-      value: `<t:${Math.floor(addedAt.getTime() / 1000)}:R>`,
-      inline: true,
-    },
-    { name: '🌍 Server', value: '`Vairgrys`', inline: true },
-  ]);
-});
-
-test('duplicate roster result uses the freshly loaded roster Server in its full six-cell grid', () => {
+test('duplicate roster result opens with the reason pair and fills a whole six-cell grid', () => {
   const existed = {
     name: 'Lungzhu',
     scope: 'global',
@@ -77,67 +59,95 @@ test('duplicate roster result uses the freshly loaded roster Server in its full 
         ['zhaohang', { name: 'Zhaohang', className: 'Paladin', world: 'Vairgrys' }],
         ['lungzhu', { name: 'Lungzhu', className: 'Bard', world: 'Vairgrys' }],
       ]),
+      typedReason: 'ninja loot g2',
     });
     const embed = result.embeds[0].toJSON();
     const fields = embed.fields;
-    const metadataGrid = fields.slice(0, 6);
 
+    // Both identities carry a class icon and a Bible link, bolded the way
+    // the /la-check headline this sentence is modelled on does it.
     assert.match(
       embed.description,
-      /<:paladin:42> \[Zhaohang\]\(https:\/\/lostark\.bible\/character\/NA\/Zhaohang\/roster\)/u,
+      /<:paladin:42> \*\*\[Zhaohang\]\(https:\/\/lostark\.bible\/character\/NA\/Zhaohang\/roster\)\*\*/u,
     );
     assert.match(
       embed.description,
-      /<:bard:43> \[Lungzhu\]\(https:\/\/lostark\.bible\/character\/NA\/Lungzhu\/roster\)/u,
+      /<:bard:43> \*\*\[Lungzhu\]\(https:\/\/lostark\.bible\/character\/NA\/Lungzhu\/roster\)\*\*/u,
     );
-    assert.equal(metadataGrid.every((field) => field.inline), true);
-    assert.deepEqual(metadataGrid.map((field) => field.name), [
-      '🔍 Match type',
+    assert.match(embed.description, /shares a roster with/u);
+    // The sentence has to say the add did not happen, or the officer is
+    // left unsure whether their entry was recorded.
+    assert.match(embed.description, /Nothing new was saved/u);
+
+    // Reason pair opens the card: stored above, typed directly under it.
+    assert.deepEqual(fields.slice(0, 2).map((f) => [f.name, f.value, f.inline]), [
+      ['📝 Stored reason', 'zdps', false],
+      ['✏️ Reason you just typed', 'ninja loot g2', false],
+    ]);
+
+    const grid = fields.slice(2);
+    assert.equal(grid.every((field) => field.inline), true);
+    assert.deepEqual(grid.map((field) => field.name), [
       '🧬 Matched name',
+      '🌍 Server',
       '🌐 Scope',
+      '🗡️ Raid',
       '👤 Added by',
       '🕐 Time added',
-      '🌍 Server',
     ]);
+    // Six fills two rows exactly, so nothing needs a spacer.
+    assert.equal(grid.some((field) => field.name === ZWSP), false);
     assert.equal(
-      metadataGrid[1].value,
+      grid[0].value,
       '<:bard:43> **[Lungzhu](https://lostark.bible/character/NA/Lungzhu/roster)**',
     );
-    assert.equal(metadataGrid[5].value, '`Vairgrys`');
-    assert.equal(fields[6].inline, false, 'reason starts the detail section after the grid');
-    assert.equal(fields[7].name, '🗡️ Raid');
+    assert.equal(grid[1].value, '`Vairgrys`');
+    assert.equal(grid[3].value, '`Kazeros Nor`');
+
+    // Match type is gone · the sentence above already says how it matched.
+    assert.equal(fields.some((field) => field.name.includes('Match type')), false);
   } finally {
     CLASS_EMOJI_MAP.Paladin = oldPaladinEmoji;
     CLASS_EMOJI_MAP.Bard = oldBardEmoji;
   }
 });
 
-test('duplicate audit row starts after match metadata and keeps Time added in column two', () => {
-  const fields = [
-    { name: 'Match type', value: 'Exact name', inline: true },
-    { name: 'Scope', value: '[Global]', inline: true },
-  ];
+test('duplicate card drops the typed-reason block when the add carried none', () => {
+  const result = buildDuplicateListAddResult({
+    existed: { name: 'Lungzhu', reason: 'zdps', addedByDisplayName: 'Bao' },
+    name: 'Lungzhu',
+    labelCap: 'Blacklist',
+    type: 'black',
+    lang: 'en',
+  });
+  const fields = result.embeds[0].toJSON().fields;
 
-  appendDuplicateAuditRow(fields, {
-    addedByDisplayName: 'meow',
-    addedAt: new Date('2026-05-17T10:30:00Z'),
-  }, 'en');
-
-  assert.equal(fields.length, 6);
-  assert.equal(fields[2].name, '\u200b', 'metadata row is padded to three columns');
-  assert.equal(fields[3].name, '👤 Added by');
-  assert.equal(fields[4].name, '🕐 Time added');
-  assert.equal(fields[5].name, '\u200b', 'audit row keeps a fixed third column');
+  assert.deepEqual(fields.filter((f) => !f.inline).map((f) => f.name), ['📝 Stored reason']);
+  // Direct name match with no scope, raid or server leaves two inline
+  // fields, and two split one row evenly, so they stay unpadded.
+  assert.deepEqual(fields.filter((f) => f.inline).map((f) => f.name), [
+    '👤 Added by',
+    '🕐 Time added',
+  ]);
+  assert.equal(fields.some((f) => f.name === ZWSP), false);
 });
 
-test('duplicate audit fields tolerate missing legacy metadata', () => {
-  const fields = buildDuplicateAuditFields({}, 'vi');
+test('duplicate card tolerates an entry with no stored metadata at all', () => {
+  const result = buildDuplicateListAddResult({
+    existed: { name: 'Lungzhu' },
+    name: 'Lungzhu',
+    labelCap: 'Blacklist',
+    type: 'black',
+    lang: 'vi',
+  });
+  const fields = result.embeds[0].toJSON().fields;
 
-  assert.deepEqual(fields, [
-    { name: '👤 Được thêm bởi', value: 'Chưa có', inline: true },
-    { name: '🕐 Thời gian thêm', value: 'Chưa có', inline: true },
-    { name: '\u200b', value: '\u200b', inline: true },
-  ]);
+  // Legacy rows written before these columns existed must fall back
+  // rather than render an empty value Discord would reject.
+  assert.equal(fields[0].name, '📝 Lý do đang lưu');
+  assert.equal(fields[0].value, 'Chưa có');
+  assert.equal(fields[1].value, 'Chưa có');
+  assert.equal(fields[2].value, 'Chưa có');
 });
 
 test('list-add success keeps one list icon and links the primary name with its class icon', () => {

@@ -393,9 +393,9 @@ export default {
       title: 'Item level is too low', description: '**{name}** does not meet the minimum item level for list entries.', character: 'Character', itemLevel: 'Item level', minimum: 'Minimum required', targetList: 'Target list', footer: 'The ilvl gate keeps inactive or unleveled alts from becoming noise.', content: '{name} has item level {level}, below 1700.',
     },
     duplicate: {
-      title: 'Already in {list}', direct: '**{name}** is already in {list}.', roster: '**{name}** is already in {list} through roster match **{matched}**.',
-      matchType: 'Match type', rosterAlt: 'Roster alt', exactName: 'Exact name', matchedName: 'Matched name', scope: 'Scope', addedBy: 'Added by', timeAdded: 'Time added', existingReason: 'Existing reason', raid: 'Raid',
-      footer: 'Use `/la-list view type:{type}` for the full entry, or `/la-list edit` to change it.', contentDirect: '{name} already exists in {list}.', contentRoster: '{name} already exists in {list} through roster match {matched}.',
+      title: 'Already in {list}', direct: '{icon} {name} is already on the **{list}**. Nothing new was saved.', roster: '{icon} {name} shares a roster with {matched}, who is already on the **{list}**. Nothing new was saved.',
+      matchedName: 'Matched name', scope: 'Scope', addedBy: 'Added by', timeAdded: 'Time added', storedReason: 'Stored reason', typedReason: 'Reason you just typed', raid: 'Raid',
+      footer: 'Use `/la-list edit` to add your reason to this entry.', contentDirect: '{name} already exists in {list}.', contentRoster: '{name} already exists in {list} through roster match {matched}.',
     },
     success: {
       title: '{list} · Added · {name}', hero: '**{user}** added {name} to **{list}**{scope}.',

@@ -9,6 +9,12 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Changed
+- The `/la-list add` "already in the list" card is built around the decision the officer actually has to make. It now shows **📝 Lý do đang lưu** and **✏️ Lý do cậu vừa gõ** as a pair of full-width blocks at the top, so they can see at a glance whether their information adds anything and therefore whether to go run `/la-list edit`. Previously the card showed only the stored reason, and comparing meant scrolling back to their own command.
+- That card's opening sentence follows the `/la-check` headline: "X chung roster với Y, và người này đã nằm trong Blacklist rồi", both names carrying their class icon and Bible link. It closes by saying nothing was saved, which the old wording left implicit.
+- **🔍 Kiểu trùng** is gone from that card and **🌍 Server** takes its slot. The opening sentence already says whether this was the same name or a roster alt, so the field only restated it in other words. Raid moves up into the grid, which lands it on exactly six inline fields and two whole rows; it used to trail after the full-width reason on its own, where Discord stretched it across the card.
+- `buildDuplicateAuditFields` and `appendDuplicateAuditRow` are removed. Both existed to pad and append a fixed audit row, which the shared `padInlineRow` now handles for the whole grid at once.
+
 ### Added
 - Notification channels now have the same managed lifecycle as RaidManage: `/la-setup` posts and tracks a pinned guide, can refresh that pin, can run an immediate cleanup, and offers a separate opt-in cleanup schedule every 30 minutes. Cleanup preserves every pinned message plus both managed guides when auto-check and notifications share one channel, refreshes the notification guide after the sweep, and leaves a five-minute cleanup notice. Existing notification embeds and the auto-check cleanup preference are unchanged.
 - `Guardian Raid` is now a canonical raid option for `/la-list add` and `/la-list edit`, including blacklist entries. The shared raid catalog also carries it into the multiadd spreadsheet dropdown and validation.
