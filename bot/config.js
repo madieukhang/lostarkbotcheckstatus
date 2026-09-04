@@ -159,6 +159,9 @@ const config = {
   /** Optional Gemini API key for image-based /la-check name extraction */
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
 
+  /** Response ceiling for Gemini OCR, including visible output and thinking tokens. */
+  geminiMaxOutputTokens: parsePositiveIntEnv('GEMINI_MAX_OUTPUT_TOKENS', 768),
+
   /** Gemini model priority list for image parsing with recoverable-error failover */
   geminiModels: geminiModelWaitlistResolution.models,
 

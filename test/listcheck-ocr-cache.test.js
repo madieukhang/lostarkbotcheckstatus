@@ -670,7 +670,7 @@ test('extractNamesFromImage uses a Gemini 3-safe request while failing over reco
     assert.deepEqual(
       generationConfigs,
       config.geminiModels.map(() => ({
-        maxOutputTokens: 1024,
+        maxOutputTokens: 768,
         responseMimeType: 'application/json',
         thinkingConfig: { thinkingLevel: 'low' },
       })),

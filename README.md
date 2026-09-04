@@ -247,6 +247,7 @@ Copy `.env.example` to `.env` and fill in values.
 |---|---|---|
 | `CHECK_INTERVAL` | `30` | Status check interval in seconds (min 10) |
 | `GEMINI_API_KEY` | — | Gemini API key for OCR |
+| `GEMINI_MAX_OUTPUT_TOKENS` | `768` | OCR response ceiling, including visible output and thinking tokens; configurable for repeatable A/B benchmarks |
 | `GEMINI_MODELS` | `gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Gemini 3.x-only priority catalog before the waitlist is applied; older generations are ignored |
 | `GEMINI_MODEL_WAITLIST` | `gemini-3.8-flash` | Comma-separated models temporarily excluded from OCR; set `none` or `off` to restore the full configured chain |
 | `GEMINI_PRIMARY_TIMEOUT_MS` | model-aware | Optional soft-timeout override; the current 3.7 primary gets the full 30s budget, while restored 3.8 defaults to an 8s soft cap; quick recoverable failures still leave the shared remainder for fallbacks |
@@ -289,6 +290,16 @@ npm install
 cp .env.example .env    # then edit
 npm start               # or: npm run dev (node --watch)
 ```
+
+## Benchmark OCR
+
+Run the production OCR path against one local reference image. This sends the image to Gemini and consumes API quota; the optional expected file is a JSON array of exact names.
+
+```bash
+npm run benchmark:ocr -- --image "C:\\path\\lobby.png" --expected "C:\\path\\lobby.expected.json" --tokens 768 --runs 3
+```
+
+The local `data/` directory is git-ignored, so private benchmark screenshots and expected-name sidecars can be kept there without publishing them.
 
 ## Run with Docker
 

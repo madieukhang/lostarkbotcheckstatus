@@ -17,7 +17,7 @@ const GEMINI_REQUEST_TIMEOUT_MS = 30_000;
 // hidden reasoning consume the compact response budget. JSON mode also avoids
 // spending tokens on markdown fences or prose around the requested payload.
 const GEMINI_GENERATION_CONFIG = Object.freeze({
-  maxOutputTokens: 1024,
+  maxOutputTokens: config.geminiMaxOutputTokens,
   responseMimeType: 'application/json',
   thinkingConfig: Object.freeze({ thinkingLevel: 'low' }),
 });
