@@ -21,6 +21,11 @@
 
 - `bot/utils/names.js` là nơi chuẩn hóa tên; tránh tạo quy tắc riêng cho slash,
   auto-check hay list edit. Các tên Unicode tương đương phải giữ cùng semantics.
+- `rememberNormalizedName` giữ cách viết đầu tiên và thứ tự tên trong một Map.
+  `createApprovalMessageUpdater` ở list services cập nhật tin nhắn đang bấm trước
+  khi đồng bộ các DM còn lại; builder nhận ngôn ngữ của từng người nhận.
+- Mọi nút tiêu thụ pending approval, gồm giữ/ghi đè, phải kiểm tra `approverIds`
+  qua `resolvePendingApprovalAccess` trước khi xóa yêu cầu.
 - Đọc `bot/config/geminiModels.js` và test tương ứng để biết model chain hiện tại;
   không sao chép một danh sách version vào tài liệu rồi coi đó là nguồn chuẩn.
 - OCR retry/cache phải giữ phân biệt lỗi transient với kết quả hợp lệ, đồng thời

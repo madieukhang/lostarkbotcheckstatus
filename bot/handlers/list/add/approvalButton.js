@@ -19,7 +19,7 @@ import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { deferUpdate, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
+import { deferUpdate, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   buildApprovalResultRow,
@@ -30,6 +30,7 @@ import {
   resolvePendingApprovalAccess,
 } from '../services/pendingApprovalAccess.js';
 import { handleApprovedEditRequest } from './editApproval.js';
+import { createApprovalMessageUpdater } from '../services/approvals.js';
 
 /**
  * Build the Approve / Reject / Edit button handler for /la-list add.
@@ -77,6 +78,9 @@ export function createListAddApprovalButtonHandler({
     }
 
     const isApproveAction = action === 'listadd_approve';
+    const updateApprovers = createApprovalMessageUpdater({
+      interaction, payload, lang, syncApproverDmMessages,
+    });
 
     // Acknowledge immediately, then show processing state to avoid 3s timeout issues.
     await deferUpdate(interaction);
@@ -87,18 +91,9 @@ export function createListAddApprovalButtonHandler({
         t(`dialogue.approval.flow.${isApproveAction ? 'processingApprove' : 'processingReject'}`, targetLang, { user: interaction.user.tag }),
         { severity: AlertSeverity.INFO, titleIcon: '⏳', lang: targetLang }
       )],
-      components: [buildApprovalProcessingRow(action, lang)],
+      components: [buildApprovalProcessingRow(action, targetLang)],
     });
-    await editPayload(interaction, buildProcessingPayload(lang));
-
-    await syncApproverDmMessages(
-      payload,
-      (targetLang) => ({
-        ...buildProcessingPayload(targetLang),
-        components: [buildApprovalProcessingRow(action, targetLang)],
-      }),
-      { excludeMessageId: interaction.message.id }
-    );
+    await updateApprovers(buildProcessingPayload);
 
     if (!isApproveAction) {
       await PendingApproval.deleteOne({ requestId });
@@ -109,18 +104,9 @@ export function createListAddApprovalButtonHandler({
           t('dialogue.approval.flow.rejectedBy', targetLang, { user: interaction.user.tag }),
           { severity: AlertSeverity.ERROR, titleIcon: '✖️', lang: targetLang }
         )],
-        components: [buildApprovalResultRow('Rejected', lang)],
+        components: [buildApprovalResultRow('Rejected', targetLang)],
       });
-      await editPayload(interaction, buildRejectedPayload(lang));
-
-      await syncApproverDmMessages(
-        payload,
-        (targetLang) => ({
-          ...buildRejectedPayload(targetLang),
-          components: [buildApprovalResultRow('Rejected', targetLang)],
-        }),
-        { excludeMessageId: interaction.message.id }
-      );
+      await updateApprovers(buildRejectedPayload);
 
       await notifyRequesterAboutDecision(payload, null, true);
       return;
@@ -187,13 +173,7 @@ export function createListAddApprovalButtonHandler({
           };
         };
 
-        await editPayload(interaction, buildDuplicatePayload(lang));
-
-        await syncApproverDmMessages(
-          payload,
-          buildDuplicatePayload,
-          { excludeMessageId: interaction.message.id }
-        );
+        await updateApprovers(buildDuplicatePayload);
         // Don't delete PendingApproval · needed for overwrite flow
         return;
       }
@@ -213,18 +193,9 @@ export function createListAddApprovalButtonHandler({
             lang: targetLang,
           }
         )],
-        components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', lang)],
+        components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', targetLang)],
       });
-      await editPayload(interaction, buildCompletedPayload(lang));
-
-      await syncApproverDmMessages(
-        payload,
-        (targetLang) => ({
-          ...buildCompletedPayload(targetLang),
-          components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', targetLang)],
-        }),
-        { excludeMessageId: interaction.message.id }
-      );
+      await updateApprovers(buildCompletedPayload);
 
       await notifyRequesterAboutDecision(payload, result, false);
     } catch (err) {
@@ -241,13 +212,7 @@ export function createListAddApprovalButtonHandler({
         components: [buildApprovalResultRow('Failed', targetLang)],
       });
 
-      await editPayload(interaction, buildFailurePayload(lang));
-
-      await syncApproverDmMessages(
-        payload,
-        buildFailurePayload,
-        { excludeMessageId: interaction.message.id }
-      );
+      await updateApprovers(buildFailurePayload);
 
       await notifyRequesterAboutDecision(
         payload,

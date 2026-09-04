@@ -17,6 +17,7 @@ import {
   buildNameKeyMap,
   normalizeNameKey,
   normalizeNameList,
+  rememberNormalizedName,
 } from '../../utils/names.js';
 import { createNameSuggestionContext } from '../roster/search.js';
 import { enrichListCheckResults } from './enrichment.js';
@@ -38,12 +39,6 @@ export {
 } from './verification.js';
 
 // ─── Name checking ──────────────────────────────────────────────────────────
-
-function rememberNormalizedName(namesByKey, rawName) {
-  const name = String(rawName || '').trim().normalize('NFC');
-  const key = normalizeNameKey(name);
-  if (key && !namesByKey.has(key)) namesByKey.set(key, name);
-}
 
 async function loadInitialListData(names, guildId) {
   const [lookup, snapshots] = await Promise.all([

@@ -1,8 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createApprovalServices } from '../bot/handlers/list/services/approvals.js';
+import { createApprovalServices, createApprovalMessageUpdater } from '../bot/handlers/list/services/approvals.js';
 import { t } from '../bot/services/i18n/index.js';
+
+test('approval updater edits the clicked message first and excludes it from localized DM sync', async () => {
+  const calls = [];
+  const payload = { requestId: 'request' };
+  const updater = createApprovalMessageUpdater({
+    interaction: {
+      message: { id: 'clicked' },
+      editReply: async value => { calls.push(['edit', value]); },
+    },
+    payload,
+    lang: 'en',
+    syncApproverDmMessages: async (actual, build, options) => {
+      assert.equal(actual, payload);
+      assert.deepEqual(options, { excludeMessageId: 'clicked' });
+      calls.push(['sync', build('jp')]);
+    },
+  });
+  await updater(lang => ({ content: lang }));
+  assert.deepEqual(calls, [['edit', { content: 'en' }], ['sync', { content: 'jp' }]]);
+});
+
+test('approval updater does not fan out when the clicked message update fails', async () => {
+  const updater = createApprovalMessageUpdater({
+    interaction: { editReply: async () => { throw new Error('edit failed'); } },
+    payload: {},
+    lang: 'en',
+    syncApproverDmMessages: async () => assert.fail('Sync must follow a successful edit'),
+  });
+  await assert.rejects(updater(() => ({})), /edit failed/);
+});
 
 function createDmUser(id, sentByUser, { bot = false } = {}) {
   return {

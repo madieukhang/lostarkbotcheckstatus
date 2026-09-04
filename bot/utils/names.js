@@ -41,19 +41,23 @@ export function normalizeNameKey(value) {
  */
 export function normalizeNameList(values = []) {
   const input = Array.isArray(values) ? values : [values];
-  const names = [];
-  const seen = new Set();
-
+  const names = new Map();
   for (const raw of input) {
-    if (typeof raw !== 'string') continue;
-    const name = raw.trim().normalize('NFC');
-    const key = normalizeNameKey(name);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    names.push(name);
+    if (typeof raw === 'string') rememberNormalizedName(names, raw);
   }
+  return [...names.values()];
+}
 
-  return names;
+/**
+ * Collect a canonical name once while preserving its first display spelling.
+ * @param {Map<string, string>} namesByKey Destination index.
+ * @param {unknown} rawName Name to trim, NFC-normalize, and index.
+ * @returns {void}
+ */
+export function rememberNormalizedName(namesByKey, rawName) {
+  const name = String(rawName || '').trim().normalize('NFC');
+  const key = normalizeNameKey(name);
+  if (key && !namesByKey.has(key)) namesByKey.set(key, name);
 }
 
 /** Build a canonical-name index for snapshots or other name-bearing records. */

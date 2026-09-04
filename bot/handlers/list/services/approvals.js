@@ -25,6 +25,21 @@ import { AlertSeverity, buildNoticeEmbed } from '../../../utils/alertEmbed.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
+import { editPayload } from '../../../utils/interactionReplies.js';
+
+/**
+ * Update the clicked approval message before syncing the other approver DMs.
+ * @param {object} context Interaction, pending payload, language, and DM sync function.
+ * @returns {Function} Async updater accepting a locale-specific payload builder.
+ */
+export function createApprovalMessageUpdater({ interaction, payload, lang, syncApproverDmMessages }) {
+  return async (buildPayload) => {
+    await editPayload(interaction, buildPayload(lang));
+    await syncApproverDmMessages(payload, buildPayload, {
+      excludeMessageId: interaction.message.id,
+    });
+  };
+}
 
 /**
  * Build the approval DM service bag.

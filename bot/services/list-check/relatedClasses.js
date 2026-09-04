@@ -8,7 +8,7 @@ import config from '../../config.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import { getClassName } from '../../models/Class.js';
 import { mapWithConcurrency } from '../../utils/async.js';
-import { normalizeNameKey } from '../../utils/names.js';
+import { normalizeNameKey, rememberNormalizedName } from '../../utils/names.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 import { upsertRosterSnapshots } from '../roster/rosterSnapshots.js';
 import {
@@ -23,12 +23,6 @@ const RELATED_ENTRY_KEYS = Object.freeze([
   ['watch', 'watchEntry'],
   ['trusted', 'trustedEntry'],
 ]);
-
-function rememberNormalizedName(namesByKey, rawName) {
-  const name = String(rawName || '').trim().normalize('NFC');
-  const key = normalizeNameKey(name);
-  if (key && !namesByKey.has(key)) namesByKey.set(key, name);
-}
 
 function collectRenderedRelatedNames(item) {
   const namesByKey = new Map();

@@ -21,6 +21,11 @@ import {
   getListContext,
   buildApprovalResultRow,
 } from '../helpers.js';
+import {
+  PENDING_APPROVAL_ACCESS,
+  resolvePendingApprovalAccess,
+} from '../services/pendingApprovalAccess.js';
+import { createApprovalMessageUpdater } from '../services/approvals.js';
 
 function buildDuplicateLookupQuery(payload) {
   const nameMatch = buildNameRosterQuery(normalizeCharacterName(payload.name));
@@ -67,18 +72,27 @@ export function createListAddOverwriteButtonHandler({
 
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-    const payload = await PendingApproval.findOneAndDelete({ requestId }).lean();
+    const { payload, status } = await resolvePendingApprovalAccess({
+      PendingApprovalModel: PendingApproval,
+      requestId,
+      approverId: interaction.user.id,
+      consume: true,
+    });
 
     if (!payload) {
+      const notAuthorized = status === PENDING_APPROVAL_ACCESS.notAuthorized;
       await replyAlert(interaction, {
-        severity: AlertSeverity.WARNING,
-        ...t('dialogue.approval.flow.expired', lang),
+        severity: notAuthorized ? AlertSeverity.ERROR : AlertSeverity.WARNING,
+        ...t(`dialogue.approval.flow.${notAuthorized ? 'notAuthorized' : 'expired'}`, lang),
         lang,
       });
       return;
     }
 
     await deferUpdate(interaction);
+    const updateApprovers = createApprovalMessageUpdater({
+      interaction, payload, lang, syncApproverDmMessages,
+    });
 
     if (!isOverwrite) {
       // Keep existing · just clean up
@@ -88,18 +102,9 @@ export function createListAddOverwriteButtonHandler({
           t('dialogue.approval.flow.keptExisting', targetLang, { name: payload.name }),
           { severity: AlertSeverity.SUCCESS, lang: targetLang }
         )],
-        components: [buildApprovalResultRow('Kept Existing', lang)],
+        components: [buildApprovalResultRow('Kept Existing', targetLang)],
       });
-      await editPayload(interaction, buildKeptPayload(lang));
-
-      await syncApproverDmMessages(
-        payload,
-        (targetLang) => ({
-          ...buildKeptPayload(targetLang),
-          components: [buildApprovalResultRow('Kept Existing', targetLang)],
-        }),
-        { excludeMessageId: interaction.message.id }
-      );
+      await updateApprovers(buildKeptPayload);
 
       await notifyRequesterAboutDecision(payload, null, true);
       return;
@@ -173,18 +178,9 @@ export function createListAddOverwriteButtonHandler({
           t('dialogue.approval.flow.overwritten', targetLang, { user: interaction.user.tag }),
           { severity: AlertSeverity.SUCCESS, lang: targetLang }
         )],
-        components: [buildApprovalResultRow('Overwritten', lang)],
+        components: [buildApprovalResultRow('Overwritten', targetLang)],
       });
-      await editPayload(interaction, buildOverwrittenPayload(lang));
-
-      await syncApproverDmMessages(
-        payload,
-        (targetLang) => ({
-          ...buildOverwrittenPayload(targetLang),
-          components: [buildApprovalResultRow('Overwritten', targetLang)],
-        }),
-        { excludeMessageId: interaction.message.id }
-      );
+      await updateApprovers(buildOverwrittenPayload);
 
       // Broadcast overwrite: global to all, server-scoped to owner only
       broadcastListChange('edited', dupeEntry, {
