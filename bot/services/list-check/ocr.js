@@ -151,6 +151,7 @@ async function requestGeminiWithFallback({
   parseResponse,
   onModelStart = () => {},
   onModelElapsed = () => {},
+  onModelUsage = () => {},
   onRetry = () => {},
 }) {
   // Inline images can approach Gemini's request limit. Serialize once so each
@@ -169,6 +170,16 @@ async function requestGeminiWithFallback({
   for (let i = 0; i < models.length; i += 1) {
     const model = models[i];
     const hasFallback = i < models.length - 1;
+    const primaryTimeoutMs = Math.min(
+      config.geminiPrimaryTimeoutMs || 12_000,
+      GEMINI_REQUEST_TIMEOUT_MS,
+    );
+    // Give the preferred model a fair chance without letting one slow success
+    // consume most of the user-facing deadline. Later models retain the shared
+    // remainder; a single-model override still receives the full hard timeout.
+    const modelSignal = i === 0 && hasFallback && primaryTimeoutMs < GEMINI_REQUEST_TIMEOUT_MS
+      ? AbortSignal.any([requestSignal, AbortSignal.timeout(primaryTimeoutMs)])
+      : requestSignal;
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
     const modelStartedAt = Date.now();
     onModelStart(model);
@@ -179,13 +190,17 @@ async function requestGeminiWithFallback({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: requestBody,
-        signal: requestSignal,
+        signal: modelSignal,
       });
     } catch (error) {
       onModelElapsed(Date.now() - modelStartedAt);
       failures.push(`${model}: ${error.name || error.message}`);
       if (requestSignal.aborted) {
         return { ok: false, type: 'network', model, error, failures };
+      }
+      if (modelSignal.aborted && hasFallback) {
+        onRetry({ type: 'timeout', model, error, timeoutMs: primaryTimeoutMs });
+        continue;
       }
       if (hasFallback) {
         onRetry({ type: 'network', model, error });
@@ -213,6 +228,7 @@ async function requestGeminiWithFallback({
     }
 
     const payload = await aiRes.json();
+    onModelUsage(payload?.usageMetadata);
     const parsed = await parseResponse({
       ...extractGeminiResponse(payload),
       model,
@@ -401,7 +417,12 @@ export async function extractNamesFromImage(image, options = {}) {
     names: 0,
     downloadMs: 0,
     geminiMs: 0,
+    geminiAttempts: 0,
     refineMs: 0,
+    promptTokens: 0,
+    outputTokens: 0,
+    thoughtTokens: 0,
+    totalTokens: 0,
   };
 
   try {
@@ -449,13 +470,26 @@ export async function extractNamesFromImage(image, options = {}) {
     mimeType,
     onModelStart: (model) => {
       timing.model = model;
+      timing.geminiAttempts += 1;
     },
     onModelElapsed: (elapsedMs) => {
       timing.geminiMs += elapsedMs;
     },
-    onRetry: ({ type, model, status }) => {
+    onModelUsage: (usageMetadata = {}) => {
+      const tokenFields = [
+        ['promptTokens', usageMetadata.promptTokenCount],
+        ['outputTokens', usageMetadata.candidatesTokenCount],
+        ['thoughtTokens', usageMetadata.thoughtsTokenCount],
+        ['totalTokens', usageMetadata.totalTokenCount],
+      ];
+      for (const [field, value] of tokenFields) {
+        if (Number.isFinite(value)) timing[field] += value;
+      }
+    },
+    onRetry: ({ type, model, status, timeoutMs }) => {
       const retryMessages = {
         network: `[listcheck] Gemini timeout/network error on ${model}, trying fallback model.`,
+        timeout: `[listcheck] Gemini primary ${model} exceeded ${timeoutMs}ms, trying fallback model.`,
         http: `[listcheck] Gemini recoverable HTTP ${status} on ${model}, trying fallback model.`,
       };
       if (retryMessages[type]) console.warn(retryMessages[type]);
@@ -533,9 +567,14 @@ export async function extractNamesFromImage(image, options = {}) {
       `cache=${timing.cache}`,
       `download=${timing.downloadMs}ms`,
       `gemini=${timing.geminiMs}ms`,
+      `attempts=${timing.geminiAttempts}`,
       `refine=${timing.refineMs}ms`,
       `model=${timing.model}`,
       `names=${timing.names}`,
+      `promptTokens=${timing.promptTokens}`,
+      `outputTokens=${timing.outputTokens}`,
+      `thoughtTokens=${timing.thoughtTokens}`,
+      `totalTokens=${timing.totalTokens}`,
       `searchNetwork=${lookupStats.networkLookups || 0}`,
       `searchRequestCache=${lookupStats.requestCacheHits || 0}`,
       `searchSharedCache=${lookupStats.sharedCacheHits || 0}`,

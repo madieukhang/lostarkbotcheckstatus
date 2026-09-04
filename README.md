@@ -247,7 +247,8 @@ Copy `.env.example` to `.env` and fill in values.
 |---|---|---|
 | `CHECK_INTERVAL` | `30` | Status check interval in seconds (min 10) |
 | `GEMINI_API_KEY` | — | Gemini API key for OCR |
-| `GEMINI_MODELS` | `gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Gemini 3.x-only priority list for OCR failover; older generations are ignored |
+| `GEMINI_MODELS` | `gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Gemini 3.x-only priority list for OCR failover; older generations are ignored |
+| `GEMINI_PRIMARY_TIMEOUT_MS` | `12000` | Soft timeout for the preferred OCR model; fallbacks keep the remainder of the shared 30s budget |
 | `LISTCHECK_ALT_ENRICHMENT` | `false` | Run background Stronghold alt scan after OCR hits; keep off to avoid request spikes |
 | `LISTCHECK_ALT_ENRICHMENT_LIMIT` | `1` | Max flagged OCR names to enrich per screenshot when enrichment is enabled |
 | `LISTCHECK_ALT_ENRICHMENT_CANDIDATE_LIMIT` | `80` | Max guild candidates checked per OCR background alt scan |

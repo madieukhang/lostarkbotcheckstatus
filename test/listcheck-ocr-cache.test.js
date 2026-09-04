@@ -675,12 +675,100 @@ test('extractNamesFromImage uses a Gemini 3-safe request while failing over reco
         thinkingConfig: { thinkingLevel: 'low' },
       })),
     );
-    assert.ok(requestSignals.every((signal) => signal === requestSignals[0]));
-    assert.equal(requestSignals[0]?.aborted, false, 'fallback models should share one live deadline');
+    assert.notEqual(requestSignals[0], requestSignals[1], 'primary should combine a soft and hard deadline');
+    assert.ok(requestSignals.slice(1).every((signal) => signal === requestSignals[1]));
+    assert.equal(requestSignals[0]?.aborted, false, 'primary soft deadline should remain live');
+    assert.equal(requestSignals[1]?.aborted, false, 'fallback models should share one live hard deadline');
   } finally {
     globalThis.fetch = originalFetch;
     config.geminiApiKey = originalKey;
     config.geminiModels = originalModels;
+    clearOcrCache();
+  }
+});
+
+test('extractNamesFromImage abandons a slow primary without exhausting the shared deadline', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  const originalPrimaryTimeoutMs = config.geminiPrimaryTimeoutMs;
+  const requestedModels = [];
+  const requestSignals = [];
+  const warnings = [];
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels = ['slow-primary-model', 'working-fallback-model'];
+  config.geminiPrimaryTimeoutMs = 20;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  globalThis.fetch = async (url, init = {}) => {
+    const requestedUrl = String(url);
+    if (requestedUrl === 'https://cdn.discordapp.com/slow-primary.png') {
+      return new Response(new Uint8Array([34, 35, 36]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      const model = decodeURIComponent(requestedUrl.match(/models\/([^:]+):/)?.[1] || '');
+      requestedModels.push(model);
+      requestSignals.push(init.signal);
+      if (model === 'slow-primary-model') {
+        return new Promise((_resolve, reject) => {
+          const networkGuard = setTimeout(
+            () => reject(new Error('mock network guard expired')),
+            1000,
+          );
+          const rejectOnAbort = () => {
+            clearTimeout(networkGuard);
+            reject(init.signal?.reason || new DOMException('phase timeout', 'TimeoutError'));
+          };
+          if (init.signal?.aborted) rejectOnAbort();
+          else init.signal?.addEventListener('abort', rejectOnAbort, { once: true });
+        });
+      }
+      return Response.json({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text: '["Fastfallback"]' }] },
+        }],
+        usageMetadata: {
+          promptTokenCount: 300,
+          candidatesTokenCount: 8,
+          thoughtsTokenCount: 40,
+          totalTokenCount: 348,
+        },
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'slow-primary',
+      url: 'https://cdn.discordapp.com/slow-primary.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(names, ['Fastfallback']);
+    assert.deepEqual(requestedModels, config.geminiModels);
+    assert.equal(requestSignals[0]?.aborted, true, 'primary soft deadline should abort only its request');
+    assert.equal(requestSignals[1]?.aborted, false, 'fallback should retain the shared deadline');
+    assert.ok(
+      warnings.some((message) => (
+        message.includes('slow-primary-model exceeded 20ms')
+        && message.includes('trying fallback model')
+      )),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    config.geminiApiKey = originalKey;
+    config.geminiModels = originalModels;
+    config.geminiPrimaryTimeoutMs = originalPrimaryTimeoutMs;
     clearOcrCache();
   }
 });
