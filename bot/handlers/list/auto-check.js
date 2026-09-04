@@ -42,6 +42,8 @@ const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
 const AUTO_CHECK_MAX_NAMES_PER_IMAGE = 8;
 const AUTO_CHECK_MAX_BATCH_NAMES = 24;
 const AUTO_CHECK_MAX_IMAGES = 3;
+const AUTO_CHECK_MAX_COOLDOWN_RETRY_AFTER_MS = 60_000;
+const AUTO_CHECK_COOLDOWN_WAIT_BUFFER_MS = 250;
 
 // Gemini OCR is intentionally serialized. A burst of two or three screenshots
 // should become visible queued work instead of concurrent requests that compete
@@ -226,6 +228,7 @@ export function createAutoCheckMessageHandler({
   buildAutoCheckEvidenceRowFn = buildAutoCheckEvidenceRow,
   maxNames = config.listcheckMaxNames || AUTO_CHECK_MAX_NAMES_PER_IMAGE,
   imageChecksEnabled = Boolean(config.geminiApiKey),
+  waitFn = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
 } = {}) {
   function resolveRequest(message) {
     const imageAttachments = message.attachments.filter(
@@ -395,6 +398,7 @@ export function createAutoCheckMessageHandler({
     });
     const names = [];
     const failedImages = [];
+    let cooldownRetryUsed = false;
     if (request.images.length > 0) {
       const seenNames = new Set();
       for (const [index, image] of request.images.entries()) {
@@ -406,11 +410,51 @@ export function createAutoCheckMessageHandler({
           imageLimitLine(request, lang),
         ], lang);
         try {
-          const extractedNames = await extractNamesFromImageFn(image, {
-            refineAmbiguousDiacritics: true,
-            suggestionCache: suggestionContext.cache,
-            suggestionContext,
-          });
+          let extractedNames;
+          while (true) {
+            try {
+              extractedNames = await extractNamesFromImageFn(image, {
+                refineAmbiguousDiacritics: true,
+                suggestionCache: suggestionContext.cache,
+                suggestionContext,
+              });
+              break;
+            } catch (error) {
+              const retryAfterMs = Number(error?.retryAfterMs);
+              const canWaitAndRetry = (
+                !cooldownRetryUsed
+                && error?.code === 'GEMINI_MODELS_COOLING_DOWN'
+                && Number.isFinite(retryAfterMs)
+                && retryAfterMs > 0
+                && retryAfterMs <= AUTO_CHECK_MAX_COOLDOWN_RETRY_AFTER_MS
+              );
+              if (!canWaitAndRetry) throw error;
+
+              cooldownRetryUsed = true;
+              const waitMs = Math.ceil(retryAfterMs) + AUTO_CHECK_COOLDOWN_WAIT_BUFFER_MS;
+              const retrySeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+              console.warn(
+                `[auto-check] all Gemini models cooling down; retrying image`
+                + ` ${index + 1}/${request.images.length} in ${retrySeconds}s.`,
+              );
+              await setProgressMessage(message, requestUi, [
+                t('dialogue.check.imageCooldownWait', lang, {
+                  current: index + 1,
+                  count: request.images.length,
+                  seconds: retrySeconds,
+                }),
+                imageLimitLine(request, lang),
+              ], lang);
+              await waitFn(waitMs);
+              await setProgressMessage(message, requestUi, [
+                t('dialogue.check.imageProgress', lang, {
+                  current: index + 1,
+                  count: request.images.length,
+                }),
+                imageLimitLine(request, lang),
+              ], lang);
+            }
+          }
           mergeUniqueNames(names, extractedNames, seenNames);
         } catch (error) {
           failedImages.push({ index: index + 1, error });

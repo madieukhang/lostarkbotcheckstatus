@@ -191,6 +191,28 @@ function selectAvailableGeminiModels(models, now = Date.now()) {
   return { available, skipped };
 }
 
+function createGeminiFailureError(result) {
+  const error = new Error(formatGeminiFailure(result));
+  let retryAfterMs = Number(result?.retryAfterMs);
+
+  // A request can start with available models and still finish after every one
+  // has entered the process-local circuit breaker. Preserve that state on the
+  // thrown error so the batch coordinator can wait once instead of sending the
+  // next attachment into a guaranteed zero-attempt failure.
+  if (!Number.isFinite(retryAfterMs) || retryAfterMs <= 0) {
+    const { available, skipped } = selectAvailableGeminiModels(config.geminiModels);
+    if (available.length === 0 && skipped.length > 0) {
+      retryAfterMs = Math.min(...skipped.map((item) => item.remainingMs));
+    }
+  }
+
+  if (Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+    error.code = 'GEMINI_MODELS_COOLING_DOWN';
+    error.retryAfterMs = Math.ceil(retryAfterMs);
+  }
+  return error;
+}
+
 function coolDownGeminiModel(model, reason, retryAfterMs = 0, now = Date.now()) {
   const configuredMs = Math.max(1, config.geminiModelCooldownMs || 60_000);
   const cooldownMs = Math.min(
@@ -666,7 +688,7 @@ export async function extractNamesFromImage(image, options = {}) {
   });
 
   if (!geminiResult.ok) {
-    throw new Error(formatGeminiFailure(geminiResult));
+    throw createGeminiFailureError(geminiResult);
   }
 
   if (geminiResult.value.emptyResponse) {

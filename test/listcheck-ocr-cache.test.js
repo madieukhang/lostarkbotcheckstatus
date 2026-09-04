@@ -918,22 +918,23 @@ test('extractNamesFromImage fails fast when every configured model is cooling do
   };
 
   try {
-    await assert.rejects(
-      () => extractNamesFromImage({
+    const firstError = await extractNamesFromImage({
         id: 'all-cooling-first',
         url: 'https://cdn.discordapp.com/all-cooling-first.png',
         contentType: 'image/png',
-      }),
-      /HTTP 503/,
-    );
-    await assert.rejects(
-      () => extractNamesFromImage({
+      }).then(() => null, (error) => error);
+    assert.match(firstError?.message || '', /HTTP 503/);
+    assert.equal(firstError?.code, 'GEMINI_MODELS_COOLING_DOWN');
+    assert.ok(firstError?.retryAfterMs > 0);
+
+    const secondError = await extractNamesFromImage({
         id: 'all-cooling-second',
         url: 'https://cdn.discordapp.com/all-cooling-second.png',
         contentType: 'image/png',
-      }),
-      /temporarily cooling down/,
-    );
+      }).then(() => null, (error) => error);
+    assert.match(secondError?.message || '', /temporarily cooling down/);
+    assert.equal(secondError?.code, 'GEMINI_MODELS_COOLING_DOWN');
+    assert.ok(secondError?.retryAfterMs > 0);
     assert.equal(geminiCalls, 2, 'the second request must not hammer cooled-down models');
   } finally {
     globalThis.fetch = originalFetch;

@@ -340,6 +340,74 @@ test('auto-check reads up to three attached images sequentially and deduplicates
   assert.equal(edits.at(-1).embeds[0].title, 'batch-check');
 });
 
+test('auto-check waits once for Gemini cooldown and retries the current image before continuing', async () => {
+  resetAutoCheckDedupeForTest();
+  const images = [1, 2].map((number) => ({
+    id: `cooldown-image-${number}`,
+    contentType: 'image/png',
+  }));
+  const extractedOrder = [];
+  const waits = [];
+  const replies = [];
+  const edits = [];
+  const checked = [];
+  let firstImageAttempts = 0;
+  const handler = createAutoCheckMessageHandler({
+    client: { user: { id: 'bot-user' } },
+    imageChecksEnabled: true,
+    isAutoCheckChannelFn: async () => true,
+    getGuildLanguageFn: async () => 'en',
+    waitFn: async (delayMs) => waits.push(delayMs),
+    extractNamesFromImageFn: async (image) => {
+      extractedOrder.push(image.id);
+      if (image.id === 'cooldown-image-1' && firstImageAttempts++ === 0) {
+        const error = new Error('Gemini request failed after all models cooled down');
+        error.code = 'GEMINI_MODELS_COOLING_DOWN';
+        error.retryAfterMs = 30_000;
+        throw error;
+      }
+      return [image.id === 'cooldown-image-1' ? 'Recovered' : 'Second'];
+    },
+    checkNamesAgainstListsFn: async (names) => {
+      checked.push(names);
+      return names.map((name) => ({ name, blackEntry: { name } }));
+    },
+    formatCheckResultsFn: () => ['formatted'],
+    buildListCheckEmbedFn: () => ({ embed: { title: 'cooldown-check' } }),
+    buildAutoCheckEvidenceRowFn: () => null,
+  });
+  const message = {
+    id: 'cooldown-image-message',
+    content: '',
+    channelId: 'channel-1',
+    guild: { id: 'guild-1' },
+    author: { id: 'cooldown-user', bot: false, tag: 'CooldownUser#0001' },
+    attachments: attachmentsOf(...images),
+    channel: { name: 'loa-check' },
+    reactions: { cache: { get: () => null } },
+    react: async () => {},
+    reply: async (payload) => {
+      replies.push(payload);
+      return { edit: async (editPayload) => edits.push(editPayload) };
+    },
+  };
+
+  await handler(message);
+
+  assert.deepEqual(extractedOrder, [
+    'cooldown-image-1',
+    'cooldown-image-1',
+    'cooldown-image-2',
+  ]);
+  assert.deepEqual(waits, [30_250]);
+  assert.deepEqual(checked, [['Recovered', 'Second']]);
+  assert.equal(replies.length, 1, 'cooldown retry must reuse the live status card');
+  assert.ok(edits.some((payload) => (
+    /retrying image 1\/2 in 30s/i.test(payload.embeds[0].toJSON().title)
+  )));
+  assert.equal(edits.at(-1).embeds[0].title, 'cooldown-check');
+});
+
 test('auto-check scales the name cap across multiple attached images', async () => {
   resetAutoCheckDedupeForTest();
   const firstParty = [
