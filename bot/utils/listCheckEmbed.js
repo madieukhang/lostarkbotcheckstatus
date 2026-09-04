@@ -23,7 +23,7 @@
  */
 
 import { createArtistEmbed } from './artistVoice.js';
-import { t } from '../services/i18n/index.js';
+import { t, tPick } from '../services/i18n/index.js';
 import { groupListCheckResults } from '../services/list-check/displayGroups.js';
 import { didListCheckNameChange } from '../services/list-check/matchResolution.js';
 import { COLORS } from './ui.js';
@@ -147,6 +147,35 @@ function buildElapsedFooterPart(elapsedMs, lang) {
   });
 }
 
+// Same shape as the cleanup notice's volume buckets: the tone scales with
+// the number rather than one line covering every case.
+const ELAPSED_TONE_RULES = [
+  { maxSeconds: 6, key: 'elapsedQuick' },
+  { maxSeconds: 20, key: 'elapsedSteady' },
+  { maxSeconds: Number.POSITIVE_INFINITY, key: 'elapsedSlow' },
+];
+
+/**
+ * The spoken version of the elapsed line, for cards that carry no other
+ * footer.
+ *
+ * A compact card is written in sentence case and speaks to the reader
+ * ("...cậu gửi nè"), so the uppercase HUD label reads as a fragment of a
+ * different card when it lands there alone. It also states a bare number:
+ * at 30s that is almost a complaint with nobody acknowledging it. This
+ * one talks, and its tone follows how long the wait actually was.
+ *
+ * @param {number|null} elapsedMs - measured by the caller, null to omit
+ * @param {string} lang - locale for the pool
+ * @returns {string} one spoken line, or '' when no measurement was passed
+ */
+function buildElapsedNotice(elapsedMs, lang) {
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return '';
+  const seconds = elapsedMs / 1000;
+  const { key } = ELAPSED_TONE_RULES.find((rule) => seconds <= rule.maxSeconds);
+  return tPick(`dialogue.check.embed.${key}`, lang, { seconds: seconds.toFixed(1) });
+}
+
 function buildCheckFooter({ counts, flaggedCount, correctedResults, mode, lang, elapsedMs }) {
   const statusKey = flaggedCount > 0 ? 'flagged' : 'clear';
   const correction = buildCorrectionFooterPart(correctedResults, lang);
@@ -259,7 +288,7 @@ export function buildListCheckEmbed({
     // only fact the rows above cannot carry, and it is the thing someone
     // staring at a progress message wants answered. It goes in alone, so
     // the card gains a single grey line rather than the whole chrome back.
-    const elapsedPart = buildElapsedFooterPart(elapsedMs, lang);
+    const elapsedPart = buildElapsedNotice(elapsedMs, lang);
     if (elapsedPart) embed.setFooter({ text: elapsedPart });
   } else {
     embed

@@ -113,7 +113,7 @@ test('list-check card reports candidates rejected by identity verification', () 
   assert.match(embed.toJSON().description, /Skipped 1 unverified candidate/u);
 });
 
-test('a compact card gains the elapsed line and nothing else', () => {
+test('a compact card speaks the elapsed line rather than labelling it', () => {
   // Compact chrome deliberately drops title, footer and timestamp. How
   // long the wait was is the one fact the rows above cannot carry, so it
   // is allowed back in alone rather than dragging the chrome with it.
@@ -126,11 +126,14 @@ test('a compact card gains the elapsed line and nothing else', () => {
   });
   const j = embed.toJSON();
 
-  assert.equal(j.footer.text, '⏱️ TOOK 4.2s');
+  assert.match(j.footer.text, /^⏱️ /u);
+  assert.match(j.footer.text, /4\.2s/u);
   assert.equal(j.title, undefined);
   assert.equal(j.timestamp, undefined);
-  // None of the full-chrome footer parts came along.
-  assert.doesNotMatch(j.footer.text, /SRC|CLEAR|FLAGGED/u);
+  // The uppercase HUD label belongs to the full footer where it has
+  // peers · alone under a sentence-case card it read as a fragment of a
+  // different card, which is what this whole change is about.
+  assert.doesNotMatch(j.footer.text, /TOOK|SRC|CLEAR|FLAGGED/u);
 });
 
 test('a compact card with no measurement keeps no footer at all', () => {
@@ -175,7 +178,32 @@ test('elapsed rounds to one decimal because the extra digits are noise', () => {
     return embed.toJSON().footer.text;
   };
 
-  assert.equal(seconds(4237), '⏱️ TOOK 4.2s');
-  assert.equal(seconds(4249), '⏱️ TOOK 4.2s');
-  assert.equal(seconds(340), '⏱️ TOOK 0.3s');
+  assert.match(seconds(4237), /\b4\.2s/u);
+  assert.match(seconds(4249), /\b4\.2s/u);
+  assert.match(seconds(340), /\b0\.3s/u);
+});
+
+test('the spoken line changes tone with how long the wait was', async () => {
+  // Same shape as the cleanup notice's volume buckets. One line for every
+  // duration would either over-apologise for a 3s read or shrug at 40s.
+  const { TRANSLATIONS } = await import('../bot/locales/index.js');
+  const pool = (key, secs) => TRANSLATIONS.en.dialogue.check.embed[key].variants
+    .map((line) => line.replace('{seconds}', secs));
+  const line = (ms) => buildListCheckEmbed({
+    results: [unlisted()], formattedLines: ['x'], limitedNamesCount: 1,
+    mode: 'auto', elapsedMs: ms,
+  }).embed.toJSON().footer.text;
+
+  // Sampled repeatedly because the pool picks at random · a single draw
+  // could pass while the bucket boundary is wrong.
+  for (let i = 0; i < 20; i += 1) {
+    assert.ok(pool('elapsedQuick', '3.2').includes(line(3200)), 'fast read');
+    assert.ok(pool('elapsedSteady', '12.0').includes(line(12000)), 'steady read');
+    assert.ok(pool('elapsedSlow', '30.2').includes(line(30200)), 'slow read');
+  }
+
+  // Boundaries: 6s is still quick, 20s is still steady.
+  assert.ok(pool('elapsedQuick', '6.0').includes(line(6000)));
+  assert.ok(pool('elapsedSteady', '20.0').includes(line(20000)));
+  assert.ok(pool('elapsedSlow', '20.1').includes(line(20100)));
 });
