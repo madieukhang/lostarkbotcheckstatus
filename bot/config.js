@@ -102,10 +102,12 @@ const geminiPrimaryTimeoutMs = parsePositiveIntEnv(
   'GEMINI_PRIMARY_TIMEOUT_MS',
   resolveDefaultGeminiPrimaryTimeoutMs(geminiModelWaitlistResolution.models[0]),
 );
+const geminiMaxOutputTokens = parsePositiveIntEnv('GEMINI_MAX_OUTPUT_TOKENS', 768);
 console.log(
   `[config] Gemini OCR active=${geminiModelWaitlistResolution.models.join(',')}`
   + ` waitlisted=${geminiModelWaitlistResolution.waitlisted.join(',') || 'none'}`
-  + ` primaryTimeout=${geminiPrimaryTimeoutMs}ms`,
+  + ` primaryTimeout=${geminiPrimaryTimeoutMs}ms`
+  + ` maxOutputTokens=${geminiMaxOutputTokens}`,
 );
 
 const config = {
@@ -160,7 +162,7 @@ const config = {
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
 
   /** Response ceiling for Gemini OCR, including visible output and thinking tokens. */
-  geminiMaxOutputTokens: parsePositiveIntEnv('GEMINI_MAX_OUTPUT_TOKENS', 768),
+  geminiMaxOutputTokens,
 
   /** Gemini model priority list for image parsing with recoverable-error failover */
   geminiModels: geminiModelWaitlistResolution.models,
