@@ -216,13 +216,13 @@ const en = {
   autoCheckWelcome: {
     title: '🎨 Hi everyone~ Artist is keeping an eye on this channel',
     description: [
-      'Drop a screenshot in here, or type `check NameOne NameTwo` / `check NameOne, NameTwo` - I read up to 8 character names and cross-check them against this server\'s lists.',
+      'Drop up to 3 screenshots in one message, or type `check NameOne NameTwo` / `check NameOne, NameTwo` - I read up to 8 character names and cross-check them against this server\'s lists.',
       '',
       'New here? The fields below walk through exactly what I do with a check and how to read the result.',
     ],
     howName: '🔍 What happens on a check',
     howValue: [
-      '1. I react with 🔍 and read up to 8 character names from the image or your text.',
+      '1. I post a status card immediately, react with 🔍, then read up to 3 images one by one (8 names total).',
       '2. Each name is matched against the blacklist, watchlist, whitelist, and trusted records.',
       '3. Unlisted names that look eligible get a **Quick Add** control - officers can file them in one click.',
     ],

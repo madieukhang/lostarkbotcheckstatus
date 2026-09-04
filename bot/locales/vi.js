@@ -51,13 +51,13 @@ const vi = {
   autoCheckWelcome: {
     title: '🎨 Chào các cậu~ Artist ngồi trông channel này nhé',
     description: [
-      'Cứ thả screenshot vào đây, hoặc gõ `check TênMột TênHai` / `check TênMột, TênHai` - tớ sẽ đọc tối đa 8 tên character rồi đối chiếu với các list của server này nha~',
+      'Cứ thả tối đa 3 screenshot trong một tin nhắn vào đây, hoặc gõ `check TênMột TênHai` / `check TênMột, TênHai` - tớ sẽ đọc tối đa 8 tên character rồi đối chiếu với các list của server này nha~',
       '',
       'Mới vào? Mấy field bên dưới nói rõ tớ làm gì với một lượt check và cách đọc kết quả.',
     ],
     howName: '🔍 Một lượt check diễn ra thế nào',
     howValue: [
-      '1. Tớ thả reaction 🔍 và đọc tối đa 8 tên character từ ảnh hoặc text của cậu.',
+      '1. Tớ hiện thẻ trạng thái ngay, thả reaction 🔍, rồi đọc lần lượt tối đa 3 ảnh (tổng tối đa 8 tên).',
       '2. Từng tên được đối chiếu với blacklist, watchlist, whitelist và trusted.',
       '3. Tên chưa nằm trong list nào mà đủ điều kiện sẽ hiện nút **Quick Add** - officer bấm một phát là lưu.',
     ],

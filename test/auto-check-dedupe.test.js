@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Collection } from 'discord.js';
 
 process.env.DISCORD_TOKEN = 'test';
 process.env.CHANNEL_ID = 'test';
@@ -13,6 +14,13 @@ const {
   parseAutoCheckText,
   resetAutoCheckDedupeForTest,
 } = await import('../bot/handlers/list/auto-check.js');
+
+function attachmentsOf(...attachments) {
+  return new Collection(attachments.map((attachment, index) => [
+    attachment.id || `attachment-${index + 1}`,
+    attachment,
+  ]));
+}
 
 test('auto-check text parser requires the exact check prefix', () => {
   assert.equal(parseAutoCheckText('abcxyz'), null);
@@ -135,9 +143,7 @@ test('auto-check hides unresolved text candidates instead of rendering or Quick 
     channelId: 'channel-1',
     guild: { id: 'guild-1' },
     author: { id: 'unverified-user', bot: false, tag: 'User#0003' },
-    attachments: {
-      filter: () => ({ size: 0, first: () => null }),
-    },
+    attachments: attachmentsOf(),
     channel: { name: 'loa-check' },
     reactions: { cache: { get: () => null } },
     react: async (emoji) => reactions.push(emoji),
@@ -190,9 +196,7 @@ test('auto-check message handler sends prefixed text through the shared list-che
     channelId: 'channel-1',
     guild: { id: 'guild-1' },
     author: { id: 'user-1', bot: false, tag: 'User#0001' },
-    attachments: {
-      filter: () => ({ size: 0, first: () => null }),
-    },
+    attachments: attachmentsOf(),
     channel: { name: 'loa-check' },
     reactions: { cache: { get: () => null } },
     react: async (emoji) => reactions.push(emoji),
@@ -215,6 +219,8 @@ test('auto-check message handler sends prefixed text through the shared list-che
 test('auto-check message handler keeps image OCR as the priority over a text caption', async () => {
   resetAutoCheckDedupeForTest();
   const checked = [];
+  const replies = [];
+  const edits = [];
   const inputSources = [];
   let extracted = 0;
   let extractionOptions = null;
@@ -227,6 +233,8 @@ test('auto-check message handler keeps image OCR as the priority over a text cap
     extractNamesFromImageFn: async (input, options) => {
       extracted += 1;
       assert.equal(input, image);
+      assert.equal(replies.length, 1, 'status card must exist before OCR starts');
+      assert.match(replies[0].embeds[0].toJSON().title, /reading 1\/1/i);
       extractionOptions = options;
       return ['FromImage'];
     },
@@ -245,13 +253,14 @@ test('auto-check message handler keeps image OCR as the priority over a text cap
     channelId: 'channel-1',
     guild: { id: 'guild-1' },
     author: { id: 'user-2', bot: false, tag: 'User#0002' },
-    attachments: {
-      filter: () => ({ size: 1, first: () => image }),
-    },
+    attachments: attachmentsOf(image),
     channel: { name: 'loa-check' },
     reactions: { cache: { get: () => null } },
     react: async () => {},
-    reply: async () => ({ edit: async () => {} }),
+    reply: async (payload) => {
+      replies.push(payload);
+      return { edit: async (editPayload) => edits.push(editPayload) };
+    },
   };
 
   await handler(message);
@@ -262,4 +271,191 @@ test('auto-check message handler keeps image OCR as the priority over a text cap
   assert.equal(extractionOptions?.suggestionContext?.cache, extractionOptions?.suggestionCache);
   assert.deepEqual(checked, [['FromImage']]);
   assert.deepEqual(inputSources, ['ocr']);
+  assert.equal(replies.length, 1);
+  assert.equal(edits.at(-1).embeds[0].title, 'image-check');
+});
+
+test('auto-check reads up to three attached images sequentially and deduplicates their names', async () => {
+  resetAutoCheckDedupeForTest();
+  const images = [1, 2, 3, 4].map((number) => ({
+    id: `batch-image-${number}`,
+    contentType: 'image/png',
+  }));
+  const extractedOrder = [];
+  const replies = [];
+  const edits = [];
+  const checked = [];
+  let activeExtractions = 0;
+  let maxActiveExtractions = 0;
+  const namesByImage = new Map([
+    ['batch-image-1', ['Alpha', 'Shared']],
+    ['batch-image-2', ['shared', 'Beta']],
+    ['batch-image-3', ['Gamma']],
+  ]);
+  const handler = createAutoCheckMessageHandler({
+    client: { user: { id: 'bot-user' } },
+    imageChecksEnabled: true,
+    isAutoCheckChannelFn: async () => true,
+    getGuildLanguageFn: async () => 'en',
+    extractNamesFromImageFn: async (image) => {
+      extractedOrder.push(image.id);
+      activeExtractions += 1;
+      maxActiveExtractions = Math.max(maxActiveExtractions, activeExtractions);
+      await new Promise((resolve) => setImmediate(resolve));
+      activeExtractions -= 1;
+      return namesByImage.get(image.id) || [];
+    },
+    checkNamesAgainstListsFn: async (names) => {
+      checked.push(names);
+      return names.map((name) => ({ name, blackEntry: { name } }));
+    },
+    formatCheckResultsFn: () => ['formatted'],
+    buildListCheckEmbedFn: () => ({ embed: { title: 'batch-check' } }),
+    buildAutoCheckEvidenceRowFn: () => null,
+  });
+  const message = {
+    id: 'batch-image-message',
+    content: '',
+    channelId: 'channel-1',
+    guild: { id: 'guild-1' },
+    author: { id: 'batch-user', bot: false, tag: 'BatchUser#0001' },
+    attachments: attachmentsOf(...images),
+    channel: { name: 'loa-check' },
+    reactions: { cache: { get: () => null } },
+    react: async () => {},
+    reply: async (payload) => {
+      replies.push(payload);
+      return { edit: async (editPayload) => edits.push(editPayload) };
+    },
+  };
+
+  await handler(message);
+
+  assert.deepEqual(extractedOrder, ['batch-image-1', 'batch-image-2', 'batch-image-3']);
+  assert.equal(maxActiveExtractions, 1);
+  assert.deepEqual(checked, [['Alpha', 'Shared', 'Beta', 'Gamma']]);
+  assert.equal(replies.length, 1);
+  assert.match(replies[0].embeds[0].toJSON().title, /reading 1\/3/i);
+  assert.match(replies[0].embeds[0].toJSON().description, /skipped \*\*1\*\* extra/i);
+  assert.equal(edits.at(-1).embeds[0].title, 'batch-check');
+});
+
+test('auto-check queues rapid image messages instead of dropping them to cooldown', async () => {
+  resetAutoCheckDedupeForTest();
+  let releaseFirstExtraction;
+  let markFirstExtractionStarted;
+  const firstExtractionGate = new Promise((resolve) => {
+    releaseFirstExtraction = resolve;
+  });
+  const firstExtractionStarted = new Promise((resolve) => {
+    markFirstExtractionStarted = resolve;
+  });
+  const extractedOrder = [];
+  const handler = createAutoCheckMessageHandler({
+    client: { user: { id: 'bot-user' } },
+    imageChecksEnabled: true,
+    isAutoCheckChannelFn: async () => true,
+    getGuildLanguageFn: async () => 'en',
+    extractNamesFromImageFn: async (image) => {
+      extractedOrder.push(image.id);
+      if (image.id === 'queued-image-1') {
+        markFirstExtractionStarted();
+        await firstExtractionGate;
+      }
+      return [image.id === 'queued-image-1' ? 'First' : 'Second'];
+    },
+    checkNamesAgainstListsFn: async (names) => names.map((name) => ({
+      name,
+      blackEntry: { name },
+    })),
+    formatCheckResultsFn: () => ['formatted'],
+    buildListCheckEmbedFn: ({ results }) => ({ embed: { title: results[0].name } }),
+    buildAutoCheckEvidenceRowFn: () => null,
+  });
+
+  function createQueuedMessage(number) {
+    const replies = [];
+    const edits = [];
+    return {
+      replies,
+      edits,
+      message: {
+        id: `queued-message-${number}`,
+        content: '',
+        channelId: 'channel-1',
+        guild: { id: 'guild-1' },
+        author: { id: 'same-user', bot: false, tag: 'QueueUser#0001' },
+        attachments: attachmentsOf({
+          id: `queued-image-${number}`,
+          contentType: 'image/png',
+        }),
+        channel: { name: 'loa-check' },
+        reactions: { cache: { get: () => null } },
+        react: async () => {},
+        reply: async (payload) => {
+          replies.push(payload);
+          return { edit: async (editPayload) => edits.push(editPayload) };
+        },
+      },
+    };
+  }
+
+  const first = createQueuedMessage(1);
+  const second = createQueuedMessage(2);
+  const firstRun = handler(first.message);
+  await firstExtractionStarted;
+  const secondRun = handler(second.message);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(extractedOrder, ['queued-image-1']);
+  assert.equal(second.replies.length, 1);
+  assert.match(second.replies[0].embeds[0].toJSON().title, /queued/i);
+  assert.match(second.replies[0].embeds[0].toJSON().title, /1 image request/i);
+
+  releaseFirstExtraction();
+  await Promise.all([firstRun, secondRun]);
+
+  assert.deepEqual(extractedOrder, ['queued-image-1', 'queued-image-2']);
+  assert.equal(first.edits.at(-1).embeds[0].title, 'First');
+  assert.equal(second.edits.at(-1).embeds[0].title, 'Second');
+});
+
+test('auto-check replaces the live status card when image processing fails', async () => {
+  resetAutoCheckDedupeForTest();
+  const replies = [];
+  const edits = [];
+  const reactions = [];
+  const handler = createAutoCheckMessageHandler({
+    client: { user: { id: 'bot-user' } },
+    imageChecksEnabled: true,
+    isAutoCheckChannelFn: async () => true,
+    getGuildLanguageFn: async () => 'en',
+    extractNamesFromImageFn: async () => {
+      assert.equal(replies.length, 1);
+      throw new Error('OCR timed out');
+    },
+    buildAutoCheckEvidenceRowFn: () => null,
+  });
+  const message = {
+    id: 'failed-image-message',
+    content: '',
+    channelId: 'channel-1',
+    guild: { id: 'guild-1' },
+    author: { id: 'failed-image-user', bot: false, tag: 'FailedUser#0001' },
+    attachments: attachmentsOf({ id: 'failed-image', contentType: 'image/png' }),
+    channel: { name: 'loa-check' },
+    reactions: { cache: { get: () => null } },
+    react: async (emoji) => reactions.push(emoji),
+    reply: async (payload) => {
+      replies.push(payload);
+      return { edit: async (editPayload) => edits.push(editPayload) };
+    },
+  };
+
+  await handler(message);
+
+  assert.equal(replies.length, 1, 'failure must reuse the existing status reply');
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].embeds[0].toJSON().title, /could not finish/i);
+  assert.deepEqual(reactions, ['🔍', '❌']);
 });

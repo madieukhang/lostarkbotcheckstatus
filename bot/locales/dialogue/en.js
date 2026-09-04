@@ -478,7 +478,7 @@ export default {
           'Read **{count}** {word} · cross-checking the lists now…',
           '**{count}** {word} out of the screenshot · checking…',
         ],
-    }, ignored: 'I skipped **{count}** extra {word} - I can only take {limit} at a time.', nameOne: 'name', nameMany: 'names',
+    }, imageQueued: 'Screenshot check queued · **{count}** image request(s) ahead…', imageProgress: 'Images received · reading **{current}/{count}**…', imageIgnored: 'Each check handles up to {limit} images, so I skipped **{count}** extra.', ignored: 'I skipped **{count}** extra {word} - I can only take {limit} at a time.', nameOne: 'name', nameMany: 'names',
     failed: { title: 'The check did not finish', description: 'I got the names off the image, but I could not finish checking them against the lists.' },
     autoFailed: { title: 'I could not finish that check', description: 'Something went wrong partway through this one. Post it again and I will have another go.' },
     embed: {

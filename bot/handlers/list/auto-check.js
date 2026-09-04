@@ -40,6 +40,13 @@ const processedMessages = new Map(); // messageId -> timestamp
 const inFlightMessages = new Set();
 const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
 const AUTO_CHECK_MAX_NAMES = 8;
+const AUTO_CHECK_MAX_IMAGES = 3;
+
+// Gemini OCR is intentionally serialized. A burst of two or three screenshots
+// should become visible queued work instead of concurrent requests that compete
+// for the same API quota and are more likely to fail with 429/503 responses.
+let imageRequestQueueTail = Promise.resolve();
+let queuedImageRequestCount = 0;
 
 /**
  * Parse an explicit auto-check text request. Bare names and words such as
@@ -133,6 +140,40 @@ export function resetAutoCheckDedupeForTest() {
   processedMessages.clear();
   inFlightMessages.clear();
   userCooldowns.clear();
+  imageRequestQueueTail = Promise.resolve();
+  queuedImageRequestCount = 0;
+}
+
+/**
+ * Run one screenshot request at a time while exposing how many requests are
+ * already ahead of the caller. A single request may contain up to three
+ * attachments; those are also read sequentially inside that queue slot.
+ *
+ * @template T
+ * @param {() => Promise<T>} task
+ * @param {(waitingAhead: number) => Promise<void>} [onQueued]
+ * @returns {Promise<T>}
+ */
+async function runQueuedImageRequest(task, onQueued) {
+  const waitingAhead = queuedImageRequestCount;
+  queuedImageRequestCount += 1;
+
+  const previous = imageRequestQueueTail.catch(() => {});
+  let releaseSlot;
+  const currentSlot = new Promise((resolve) => {
+    releaseSlot = resolve;
+  });
+  imageRequestQueueTail = previous.then(() => currentSlot);
+
+  try {
+    if (waitingAhead > 0) await onQueued?.(waitingAhead);
+    await previous;
+    return await task();
+  } finally {
+    queuedImageRequestCount -= 1;
+    releaseSlot();
+    if (queuedImageRequestCount === 0) imageRequestQueueTail = Promise.resolve();
+  }
 }
 
 /**
@@ -186,14 +227,19 @@ export function createAutoCheckMessageHandler({
   imageChecksEnabled = Boolean(config.geminiApiKey),
 } = {}) {
   function resolveRequest(message) {
-    const images = message.attachments.filter(
+    const imageAttachments = message.attachments.filter(
       (attachment) => attachment.contentType?.startsWith('image/')
     );
-    const image = images.first() || null;
-    const textRequest = image ? null : parseAutoCheckText(message.content);
-    if (!image && !textRequest) return null;
-    if (image && !imageChecksEnabled) return null;
-    return { image, textRequest };
+    const allImages = [...imageAttachments.values()];
+    const images = allImages.slice(0, AUTO_CHECK_MAX_IMAGES);
+    const textRequest = images.length > 0 ? null : parseAutoCheckText(message.content);
+    if (images.length === 0 && !textRequest) return null;
+    if (images.length > 0 && !imageChecksEnabled) return null;
+    return {
+      images,
+      textRequest,
+      ignoredImageCount: allImages.length - images.length,
+    };
   }
 
   async function removeSearchReaction(message) {
@@ -217,26 +263,60 @@ export function createAutoCheckMessageHandler({
     return true;
   }
 
-  async function resolveRequestNames(request, suggestionCache, suggestionContext) {
-    if (!request.image) return request.textRequest?.names || [];
-    return extractNamesFromImageFn(request.image, {
-      refineAmbiguousDiacritics: true,
-      suggestionCache,
-      suggestionContext,
+  async function setProgressMessage(message, requestUi, lines, lang) {
+    const payload = {
+      content: null,
+      embeds: [buildNoticeEmbed(lines.filter(Boolean).join('\n'), {
+        severity: AlertSeverity.INFO,
+        titleIcon: '⏳',
+        lang,
+      })],
+      components: [],
+    };
+    if (requestUi.progressMsg) {
+      await requestUi.progressMsg.edit(payload);
+      return requestUi.progressMsg;
+    }
+    requestUi.progressMsg = await message.reply(payload);
+    return requestUi.progressMsg;
+  }
+
+  function imageLimitLine(request, lang) {
+    if (!request.ignoredImageCount) return null;
+    return t('dialogue.check.imageIgnored', lang, {
+      count: request.ignoredImageCount,
+      limit: AUTO_CHECK_MAX_IMAGES,
     });
   }
 
-  async function rejectEmptyNames(message, textRequest, lang) {
-    if (textRequest) {
-      await message.reply({
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          ...t('dialogue.check.text.empty', lang),
-          lang,
-        })],
-      });
-    }
+  async function rejectEmptyNames(message, request, requestUi, lang) {
+    const alert = request.textRequest
+      ? t('dialogue.check.text.empty', lang)
+      : t('dialogue.check.noNames', lang);
+    const payload = {
+      content: null,
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        ...alert,
+        lang,
+      })],
+      components: [],
+    };
+    if (requestUi.progressMsg) await requestUi.progressMsg.edit(payload);
+    else await message.reply(payload);
     await removeSearchReaction(message);
+  }
+
+  function mergeUniqueNames(target, names, seen) {
+    for (const rawName of names) {
+      // OCR already returns display-ready names. Preserve that casing while
+      // using the canonical key only for cross-image deduplication.
+      const name = String(rawName ?? '').trim();
+      const key = normalizeNameKey(name);
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      target.push(name);
+    }
   }
 
   function buildAutoCheckComponents(results, lang) {
@@ -274,12 +354,9 @@ export function createAutoCheckMessageHandler({
     await message.react('⚠️').catch(() => {});
   }
 
-  async function processAutoCheckRequest(message, request, lang) {
-    // Wall clock from the moment the request is picked up · OCR runs
-    // before the progress message exists, so starting later would hide
-    // the slowest part of the wait.
-    const startedAt = Date.now();
-    const inputKind = request.image ? 'image' : 'text';
+  async function processAutoCheckRequest(message, request, requestUi, lang) {
+    const startedAt = requestUi.startedAt;
+    const inputKind = request.images.length > 0 ? 'image' : 'text';
     console.log(`[auto-check] ${inputKind} request from ${message.author.tag} in #${message.channel.name}, processing...`);
     await message.react('🔍').catch(() => {});
     if (await rejectInvalidTextRequest(message, request.textRequest, lang)) return;
@@ -287,31 +364,50 @@ export function createAutoCheckMessageHandler({
     const suggestionContext = createNameSuggestionContext({
       maxNetworkLookups: config.listcheckSuggestionLookupBudget,
     });
-    const names = await resolveRequestNames(request, suggestionContext.cache, suggestionContext);
+    const names = [];
+    if (request.images.length > 0) {
+      const seenNames = new Set();
+      for (const [index, image] of request.images.entries()) {
+        await setProgressMessage(message, requestUi, [
+          t('dialogue.check.imageProgress', lang, {
+            current: index + 1,
+            count: request.images.length,
+          }),
+          imageLimitLine(request, lang),
+        ], lang);
+        const extractedNames = await extractNamesFromImageFn(image, {
+          refineAmbiguousDiacritics: true,
+          suggestionCache: suggestionContext.cache,
+          suggestionContext,
+        });
+        mergeUniqueNames(names, extractedNames, seenNames);
+      }
+    } else {
+      mergeUniqueNames(names, request.textRequest?.names || [], new Set());
+    }
+
     if (names.length === 0) {
-      await rejectEmptyNames(message, request.textRequest, lang);
+      await rejectEmptyNames(message, request, requestUi, lang);
       return;
     }
 
     const limitedNames = names.slice(0, maxNames);
-    const progressMsg = await message.reply({
-      embeds: [buildNoticeEmbed(
-        `🔍 ${tPick(request.textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, {
-          count: limitedNames.length,
-          word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang),
-        })}`,
-        { severity: AlertSeverity.INFO, titleIcon: '🔍', lang }
-      )],
-    });
+    await setProgressMessage(message, requestUi, [
+      tPick(request.textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, {
+        count: limitedNames.length,
+        word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang),
+      }),
+      imageLimitLine(request, lang),
+    ], lang);
     const checkedResults = await checkNamesAgainstListsFn(limitedNames, {
       guildId: message.guild.id,
-      inputSource: request.image ? 'ocr' : 'text',
+      inputSource: request.images.length > 0 ? 'ocr' : 'text',
       suggestionCache: suggestionContext.cache,
       suggestionContext,
     });
     const { verified: results, unverified } = partitionListCheckResultsByVerification(checkedResults);
     if (results.length === 0) {
-      await rejectUnverifiedBatch(message, progressMsg, unverified.length, lang);
+      await rejectUnverifiedBatch(message, requestUi.progressMsg, unverified.length, lang);
       return;
     }
 
@@ -326,7 +422,7 @@ export function createAutoCheckMessageHandler({
       lang,
       elapsedMs: Date.now() - startedAt,
     });
-    await progressMsg.edit({
+    await requestUi.progressMsg.edit({
       content: null,
       embeds: [embed],
       components: buildAutoCheckComponents(results, lang),
@@ -343,6 +439,7 @@ export function createAutoCheckMessageHandler({
     if (!claimAutoCheckMessage(message.id)) return;
     let shouldRememberMessage = false;
     let lang = 'en';
+    const requestUi = { progressMsg: null, startedAt: Date.now() };
 
     try {
       // Check if this channel is configured for auto-check
@@ -351,25 +448,43 @@ export function createAutoCheckMessageHandler({
       shouldRememberMessage = true;
       lang = await getGuildLanguageFn(message.guild.id, { GuildConfigModel: GuildConfig });
 
-      // Per-user cooldown to prevent spam. The message claim above runs
-      // before this async channel lookup can race with duplicate
-      // MessageCreate deliveries or a duplicate listener in one process.
-      const lastCheck = userCooldowns.get(message.author.id) || 0;
-      if (Date.now() - lastCheck < COOLDOWN_MS) return;
-      userCooldowns.set(message.author.id, Date.now());
-      await processAutoCheckRequest(message, request, lang);
+      if (request.images.length > 0) {
+        await runQueuedImageRequest(
+          () => processAutoCheckRequest(message, request, requestUi, lang),
+          async (waitingAhead) => {
+            await setProgressMessage(message, requestUi, [
+              t('dialogue.check.imageQueued', lang, { count: waitingAhead }),
+              imageLimitLine(request, lang),
+            ], lang);
+          }
+        );
+      } else {
+        // Text-only checks remain rate-limited. Screenshot work is queued
+        // instead, so rapid image messages are never silently discarded.
+        const lastCheck = userCooldowns.get(message.author.id) || 0;
+        if (Date.now() - lastCheck < COOLDOWN_MS) return;
+        userCooldowns.set(message.author.id, Date.now());
+        await processAutoCheckRequest(message, request, requestUi, lang);
+      }
     } catch (err) {
       console.error('[auto-check] Error processing request:', err.message);
       await removeSearchReaction(message);
       await message.react('❌').catch(() => {});
-      await message.reply({
+      const errorPayload = {
+        content: null,
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           ...t('dialogue.check.autoFailed', lang),
           fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
           lang,
         })],
-      }).catch(() => {});
+        components: [],
+      };
+      if (requestUi.progressMsg) {
+        await requestUi.progressMsg.edit(errorPayload).catch(() => {});
+      } else {
+        await message.reply(errorPayload).catch(() => {});
+      }
     } finally {
       completeAutoCheckMessage(message.id, { processed: shouldRememberMessage });
     }

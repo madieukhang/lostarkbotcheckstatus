@@ -58,8 +58,11 @@ test('auto-check welcome presents Artist as the channel host and explains daily 
   assert.match(embed.description, /tớ/i);
   assert.match(embed.description, /check TênMột TênHai/u);
   assert.match(embed.description, /check TênMột, TênHai/u);
+  assert.match(embed.description, /tối đa 3 screenshot/iu);
   assert.doesNotMatch(embed.description, /LoaLogs/i);
   const fieldsText = embed.fields.map((field) => field.value).join('\n');
+  assert.match(fieldsText, /thẻ trạng thái/iu);
+  assert.match(fieldsText, /đọc lần lượt tối đa 3 ảnh/iu);
   assert.match(fieldsText, /00:00/);
   assert.match(fieldsText, /tin nhắn thường/i);
   assert.match(fieldsText, /5 phút/i);
