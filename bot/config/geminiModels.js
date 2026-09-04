@@ -10,8 +10,8 @@ export const DEFAULT_GEMINI_MODELS = Object.freeze([
 ]);
 
 // Keep slow or temporarily unhealthy models available in the catalog without
-// sending production OCR traffic to them. Clear GEMINI_MODEL_WAITLIST to
-// restore the full configured chain.
+// sending production OCR traffic to them. Set GEMINI_MODEL_WAITLIST to none
+// or off to restore the full configured chain.
 export const DEFAULT_GEMINI_MODEL_WAITLIST = Object.freeze([
   'gemini-3.8-flash',
 ]);
