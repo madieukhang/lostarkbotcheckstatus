@@ -9,6 +9,10 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Added
+- The check-result card says how long it took: **PHÂN TÍCH 4.2s** / **TOOK 4.2s** / **解析 4.2s**. OCR has always timed its own phases into console logs, but nothing reached the person watching the progress message. The clock is wall-time from the moment the request is picked up, which includes the OCR that runs before the progress message even appears. It is measured in the handlers rather than threaded out of the OCR service, so the figure is the wait someone actually sat through rather than a sum of internal phases.
+- Compact check cards get that one line and nothing else. Auto-check and image-driven slash checks deliberately drop title, footer and timestamp because the rows already carry status and counts; elapsed time is the one fact those rows cannot carry, so it comes back alone rather than restoring the whole chrome. Typed slash checks keep their full footer and slot the timing between the status kicker and the hint. A check with no measurement, or a clock that ran backwards, prints nothing.
+
 ### Changed
 - The three hand-rolled copies of the inline-row padding rule now call `padInlineRow` instead: `/la-list edit` success, the trust success card, and the evidence card. All three already behaved correctly, so nothing renders differently; the rule simply lives in one place now. `/la-status` keeps its own loop on purpose and says why in a comment - its padding is structural rather than cosmetic, forcing a row break before the per-server grid, so it has to run even for two badges where the shared helper would correctly leave them alone.
 

@@ -275,6 +275,10 @@ export function createAutoCheckMessageHandler({
   }
 
   async function processAutoCheckRequest(message, request, lang) {
+    // Wall clock from the moment the request is picked up · OCR runs
+    // before the progress message exists, so starting later would hide
+    // the slowest part of the wait.
+    const startedAt = Date.now();
     const inputKind = request.image ? 'image' : 'text';
     console.log(`[auto-check] ${inputKind} request from ${message.author.tag} in #${message.channel.name}, processing...`);
     await message.react('🔍').catch(() => {});
@@ -320,6 +324,7 @@ export function createAutoCheckMessageHandler({
       maxNames,
       mode: 'auto',
       lang,
+      elapsedMs: Date.now() - startedAt,
     });
     await progressMsg.edit({
       content: null,

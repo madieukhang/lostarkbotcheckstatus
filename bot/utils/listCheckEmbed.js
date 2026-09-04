@@ -128,13 +128,35 @@ function resolveCheckHintKey({ counts, flaggedCount, mode }) {
   return counts.notListed > 0 ? 'quickClean' : '';
 }
 
-function buildCheckFooter({ counts, flaggedCount, correctedResults, mode, lang }) {
+/**
+ * Wall-clock cost of the check, as the reader experienced it.
+ *
+ * OCR already times its own phases, but only into console logs. What a
+ * user waiting on the card wants is the single number from "I sent the
+ * image" to "the answer appeared" · one decimal, because a check that
+ * takes 4.2s and one that takes 4.24s are the same wait.
+ *
+ * @param {number|null} elapsedMs - measured by the caller, null to omit
+ * @param {string} lang - locale for the label
+ * @returns {string} the footer part, or '' when no measurement was passed
+ */
+function buildElapsedFooterPart(elapsedMs, lang) {
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return '';
+  return t('dialogue.check.embed.elapsed', lang, {
+    seconds: (elapsedMs / 1000).toFixed(1),
+  });
+}
+
+function buildCheckFooter({ counts, flaggedCount, correctedResults, mode, lang, elapsedMs }) {
   const statusKey = flaggedCount > 0 ? 'flagged' : 'clear';
   const correction = buildCorrectionFooterPart(correctedResults, lang);
   const hintKey = resolveCheckHintKey({ counts, flaggedCount, mode });
   return [
     `// ${t(`dialogue.check.embed.${statusKey}`, lang, { count: flaggedCount })}`,
     correction,
+    // Sits before the hint so the two operational facts (what was found,
+    // how long it took) stay together, ahead of the advice.
+    buildElapsedFooterPart(elapsedMs, lang),
     hintKey ? t(`dialogue.check.embed.${hintKey}`, lang) : '',
     t('dialogue.check.embed.source', lang),
   ].filter(Boolean);
@@ -167,6 +189,7 @@ export function buildListCheckEmbed({
   maxNames,
   mode = 'slash',
   lang = 'en',
+  elapsedMs = null,
 }) {
   // Per-category counts. Mirrors the priority logic in formatCheckResults
   // so the badge counts and the line-list categorisation never drift.
@@ -219,6 +242,7 @@ export function buildListCheckEmbed({
     correctedResults,
     mode,
     lang,
+    elapsedMs,
   });
 
   const embed = createArtistEmbed(lang)
@@ -230,7 +254,14 @@ export function buildListCheckEmbed({
   // already carry status and counts, so repeating a title, source footer, and
   // timestamp only adds visual noise. Image-driven slash checks stay compact
   // for the same reason; typed slash checks retain their command context.
-  if (!usesCompactChrome) {
+  if (usesCompactChrome) {
+    // The one exception to the compact rule: how long the wait was is the
+    // only fact the rows above cannot carry, and it is the thing someone
+    // staring at a progress message wants answered. It goes in alone, so
+    // the card gains a single grey line rather than the whole chrome back.
+    const elapsedPart = buildElapsedFooterPart(elapsedMs, lang);
+    if (elapsedPart) embed.setFooter({ text: elapsedPart });
+  } else {
     embed
       .setTitle(title)
       .setFooter({ text: footerParts.join(' · ') })

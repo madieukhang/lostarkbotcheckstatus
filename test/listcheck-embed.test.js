@@ -112,3 +112,70 @@ test('list-check card reports candidates rejected by identity verification', () 
 
   assert.match(embed.toJSON().description, /Skipped 1 unverified candidate/u);
 });
+
+test('a compact card gains the elapsed line and nothing else', () => {
+  // Compact chrome deliberately drops title, footer and timestamp. How
+  // long the wait was is the one fact the rows above cannot carry, so it
+  // is allowed back in alone rather than dragging the chrome with it.
+  const { embed } = buildListCheckEmbed({
+    results: [unlisted()],
+    formattedLines: ['x'],
+    limitedNamesCount: 1,
+    mode: 'auto',
+    elapsedMs: 4237,
+  });
+  const j = embed.toJSON();
+
+  assert.equal(j.footer.text, 'TOOK 4.2s');
+  assert.equal(j.title, undefined);
+  assert.equal(j.timestamp, undefined);
+  // None of the full-chrome footer parts came along.
+  assert.doesNotMatch(j.footer.text, /SRC|CLEAR|FLAGGED/u);
+});
+
+test('a compact card with no measurement keeps no footer at all', () => {
+  for (const elapsedMs of [null, undefined, 0, -12]) {
+    const { embed } = buildListCheckEmbed({
+      results: [unlisted()],
+      formattedLines: ['x'],
+      limitedNamesCount: 1,
+      mode: 'auto',
+      elapsedMs,
+    });
+    // A clock that went backwards must print nothing, not "-0.0s".
+    assert.equal(embed.toJSON().footer, undefined, String(elapsedMs));
+  }
+});
+
+test('the full footer puts elapsed between the status and the hint', () => {
+  const { embed } = buildListCheckEmbed({
+    results: [unlisted()],
+    formattedLines: ['x'],
+    limitedNamesCount: 1,
+    mode: 'slash',
+    textRequest: true,
+    elapsedMs: 1820,
+  });
+  const parts = embed.toJSON().footer.text.split(' · ');
+
+  assert.match(parts[0], /^\/\//u, 'status kicker stays first');
+  assert.ok(parts.includes('TOOK 1.8s'));
+  assert.ok(
+    parts.indexOf('TOOK 1.8s') < parts.findIndex((p) => p.startsWith('SRC')),
+    'elapsed sits ahead of the source citation'
+  );
+});
+
+test('elapsed rounds to one decimal because the extra digits are noise', () => {
+  const seconds = (ms) => {
+    const { embed } = buildListCheckEmbed({
+      results: [unlisted()], formattedLines: ['x'], limitedNamesCount: 1,
+      mode: 'auto', elapsedMs: ms,
+    });
+    return embed.toJSON().footer.text;
+  };
+
+  assert.equal(seconds(4237), 'TOOK 4.2s');
+  assert.equal(seconds(4249), 'TOOK 4.2s');
+  assert.equal(seconds(340), 'TOOK 0.3s');
+});

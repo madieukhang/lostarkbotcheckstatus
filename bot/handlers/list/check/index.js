@@ -167,6 +167,9 @@ function createAutoCheckEvidenceHandler({ client }) {
 
 export function createCheckHandlers({ client }) {
   async function handleListCheckCommand(interaction) {
+    // Started before the defer so the figure on the card matches the wait
+    // the user actually sat through.
+    const startedAt = Date.now();
     const image = interaction.options.getAttachment('image', true);
     let names;
     const suggestionContext = createNameSuggestionContext({
@@ -242,6 +245,7 @@ export function createCheckHandlers({ client }) {
         maxNames,
         mode: 'slash',
         lang,
+        elapsedMs: Date.now() - startedAt,
       });
 
       // Details dropdown · unlike /la-list view's image-only evidence row,
