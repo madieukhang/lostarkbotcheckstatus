@@ -13,7 +13,7 @@ import {
   applyGeminiModelWaitlist,
   DEFAULT_GEMINI_MODEL_WAITLIST,
   resolveDefaultGeminiPrimaryTimeoutMs,
-  resolveGeminiModels,
+  resolveGeminiModelProfile,
 } from './config/geminiModels.js';
 dotenv.config();
 
@@ -78,16 +78,29 @@ function parseRatioEnv(key, defaultValue) {
   return raw <= 1 ? raw : defaultValue;
 }
 
-const geminiModelResolution = resolveGeminiModels(
-  process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || '',
+const legacyGeminiModels = process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || '';
+const geminiModelResolution = resolveGeminiModelProfile(
+  process.env.GEMINI_DAILY_MODELS ?? legacyGeminiModels,
+  'daily',
 );
-if (geminiModelResolution.rejected.length > 0) {
+const geminiAnalysisResolution = resolveGeminiModelProfile(
+  process.env.GEMINI_ANALYSIS_MODELS ?? legacyGeminiModels,
+  'analysis',
+);
+const rejectedGeminiModels = [...new Set([
+  ...geminiModelResolution.rejected, ...geminiAnalysisResolution.rejected,
+])];
+if (rejectedGeminiModels.length > 0) {
   console.warn(
-    `[config] Ignoring non-3.x Gemini models: ${geminiModelResolution.rejected.join(', ')}`,
+    `[config] Ignoring non-3.x Gemini models: ${rejectedGeminiModels.join(', ')}`,
   );
 }
 const geminiModelWaitlistResolution = applyGeminiModelWaitlist(
   geminiModelResolution.models,
+  process.env.GEMINI_MODEL_WAITLIST ?? DEFAULT_GEMINI_MODEL_WAITLIST.join(','),
+);
+const geminiAnalysisWaitlistResolution = applyGeminiModelWaitlist(
+  geminiAnalysisResolution.models,
   process.env.GEMINI_MODEL_WAITLIST ?? DEFAULT_GEMINI_MODEL_WAITLIST.join(','),
 );
 if (geminiModelWaitlistResolution.rejected.length > 0) {
@@ -96,7 +109,7 @@ if (geminiModelWaitlistResolution.rejected.length > 0) {
   );
 }
 if (geminiModelWaitlistResolution.models.length === 0) {
-  throw new Error('[config] GEMINI_MODEL_WAITLIST excludes every configured Gemini model.');
+  throw new Error('[config] GEMINI_MODEL_WAITLIST excludes every daily Gemini model.');
 }
 const rawGeminiPrimaryTimeoutMs = parseInt(process.env.GEMINI_PRIMARY_TIMEOUT_MS, 10);
 const geminiPrimaryTimeoutOverridden = Number.isFinite(rawGeminiPrimaryTimeoutMs)
@@ -108,8 +121,9 @@ const geminiMaxOutputTokens = parsePositiveIntEnv('GEMINI_MAX_OUTPUT_TOKENS', 76
 const geminiFallbackReserveMs = parsePositiveIntEnv('GEMINI_FALLBACK_RESERVE_MS', 10_000);
 const geminiModelCooldownMs = parsePositiveIntEnv('GEMINI_MODEL_COOLDOWN_MS', 60_000);
 console.log(
-  `[config] Gemini OCR active=${geminiModelWaitlistResolution.models.join(',')}`
-  + ` waitlisted=${geminiModelWaitlistResolution.waitlisted.join(',') || 'none'}`
+  `[config] Gemini OCR daily=${geminiModelWaitlistResolution.models.join(',')}`
+  + ` analysis=${geminiAnalysisWaitlistResolution.models.join(',') || 'disabled'}`
+  + ` waitlisted=${[...geminiModelWaitlistResolution.waitlisted, ...geminiAnalysisWaitlistResolution.waitlisted].join(',') || 'none'}`
   + ` primaryTimeout=${geminiPrimaryTimeoutMs}ms`
   + ` fallbackReserve=${geminiFallbackReserveMs}ms`
   + ` modelCooldown=${geminiModelCooldownMs}ms`
@@ -170,11 +184,16 @@ const config = {
   /** Response ceiling for Gemini OCR, including visible output and thinking tokens. */
   geminiMaxOutputTokens,
 
-  /** Gemini model priority list for image parsing with recoverable-error failover */
+  /** Daily OCR stays within Flash-Lite, including recoverable-error failover. */
   geminiModels: geminiModelWaitlistResolution.models,
 
+  /** Explicit analysis requests use the separate Flash chain, including 3.8. */
+  geminiAnalysisModels: geminiAnalysisWaitlistResolution.models,
+
   /** Temporarily deferred Gemini models retained outside the active OCR chain. */
-  geminiWaitlistedModels: geminiModelWaitlistResolution.waitlisted,
+  geminiWaitlistedModels: [
+    ...geminiModelWaitlistResolution.waitlisted, ...geminiAnalysisWaitlistResolution.waitlisted,
+  ],
 
   /** Soft latency cap for the primary Gemini OCR model before failover. */
   geminiPrimaryTimeoutMs,

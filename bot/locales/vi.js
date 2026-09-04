@@ -95,6 +95,7 @@ const vi = {
     commandsName: '🧭 Các lệnh hữu ích',
     commandsValue: [
       '`/la-check image:<screenshot>` - kiểm tra ảnh thủ công',
+      '`/la-check-mode mode:daily|analysis` - đổi chế độ ảnh của riêng cậu; mặc định Daily',
       '`check <name>` - kiểm tra tên character ngay trong channel',
       '`/la-roster name:<character>` - xem roster + tiến độ',
       '`/la-search name:<character>` - tìm mờ Bible + bộ lọc',
@@ -182,6 +183,7 @@ const vi = {
           name: '🖼️ Check ảnh và text',
           lines: [
             '`/la-check image` - Trích tên từ ảnh chụp rồi check với tất cả list',
+            '`/la-check-mode mode:daily|analysis` - Lưu chế độ ảnh của cậu (mặc định Daily). Bỏ mode để xem; `/la-check mode:analysis` chỉ đổi cho một ảnh.',
             '`check abcxyz` trong auto-check channel - Check trực tiếp tên character đã gõ',
           ],
         },

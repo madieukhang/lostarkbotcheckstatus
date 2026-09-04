@@ -28,6 +28,12 @@
   qua `resolvePendingApprovalAccess` trước khi xóa yêu cầu.
 - Đọc `bot/config/geminiModels.js` và test tương ứng để biết model chain hiện tại;
   không sao chép một danh sách version vào tài liệu rồi coi đó là nguồn chuẩn.
+- OCR tách profile Daily/Analysis. Fallback và lượt sửa tên khó đọc phải giữ
+  profile đã chọn; cache phải phân biệt profile để không trả kết quả Daily cho
+  yêu cầu Analysis. Lỗi cooldown phải xét đúng nhóm model của request.
+- `list-check/preferences.js` lưu `UserPreference.ocrMode` theo người gửi; không
+  thay preference của cả kênh. Auto-check đọc một lần trước khi xếp hàng; mode
+  truyền trong `/la-check` chỉ ghi đè cho request đó, không ghi lại preference.
 - OCR retry/cache phải giữ phân biệt lỗi transient với kết quả hợp lệ, đồng thời
   giữ dữ liệu của những ảnh đã xử lý thành công trong batch nhiều ảnh.
 - Cache chỉ giữ kết quả mà caller cho phép. Thay đổi giới hạn động có hiệu lực ở

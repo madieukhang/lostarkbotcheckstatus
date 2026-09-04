@@ -95,6 +95,7 @@ const jp = {
     commandsName: '🧭 便利なコマンド',
     commandsValue: [
       '`/la-check image:<screenshot>` - 手動で画像を check',
+      '`/la-check-mode mode:daily|analysis` - 自分の画像モードを変更（既定は Daily）',
       '`check <name>` - この channel で character 名を直接 check',
       '`/la-roster name:<character>` - roster と進捗を確認',
       '`/la-search name:<character>` - Bible の fuzzy search と filter',
@@ -182,6 +183,7 @@ const jp = {
           name: '🖼️ Screenshot & Text Check',
           lines: [
             '`/la-check image` - スクリーンショットから名前を抽出し、すべての list と照合',
+            '`/la-check-mode mode:daily|analysis` - 自分のモードを保存（既定は Daily）。省略で確認、`/la-check mode:analysis` は1枚だけ変更。',
             '設定済み auto-check channel の `check abcxyz` - 入力した character 名を直接照合',
           ],
         },

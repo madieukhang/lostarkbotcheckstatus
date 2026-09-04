@@ -7,6 +7,7 @@ const userPreferenceSchema = new mongoose.Schema(
     discordGlobalName: { type: String, default: '' },
     discordDisplayName: { type: String, default: '' },
     language: { type: String, default: 'en' },
+    ocrMode: { type: String, enum: ['daily', 'analysis'], default: 'daily' },
   },
   {
     timestamps: true,

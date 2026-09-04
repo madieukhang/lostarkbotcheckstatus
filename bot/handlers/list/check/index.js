@@ -34,6 +34,7 @@ import {
 } from '../helpers.js';
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 import { buildCheckEntryDetailsEmbed } from './ui.js';
+import { getUserOcrMode } from '../../../services/list-check/preferences.js';
 
 function pickListEntryForDetails(result) {
   for (const [listType, entry] of [
@@ -165,12 +166,18 @@ function createAutoCheckEvidenceHandler({ client }) {
   };
 }
 
-export function createCheckHandlers({ client }) {
+/** Build screenshot command/details handlers with an injectable OCR boundary. */
+export function createCheckHandlers({
+  client,
+  extractNamesFromImageFn = extractNamesFromImage,
+  getUserOcrModeFn = getUserOcrMode,
+}) {
   async function handleListCheckCommand(interaction) {
     // Started before the defer so the figure on the card matches the wait
     // the user actually sat through.
     const startedAt = Date.now();
     const image = interaction.options.getAttachment('image', true);
+    const requestedMode = interaction.options.getString('mode');
     let names;
     const suggestionContext = createNameSuggestionContext({
       maxNetworkLookups: config.listcheckSuggestionLookupBudget,
@@ -181,7 +188,8 @@ export function createCheckHandlers({ client }) {
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     try {
-      names = await extractNamesFromImage(image, {
+      names = await extractNamesFromImageFn(image, {
+        mode: requestedMode || await getUserOcrModeFn(interaction.user.id),
         refineAmbiguousDiacritics: true,
         suggestionCache,
         suggestionContext,

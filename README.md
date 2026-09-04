@@ -20,6 +20,20 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 
 ## Commands
 
+Screenshot modes are saved per Discord user with `/la-check-mode mode:daily` or
+`/la-check-mode mode:analysis`. Omit the option to view the current setting; new
+users start in Daily. The setting applies to that user's automatic image uploads
+and `/la-check`; an explicit `/la-check image:<file> mode:analysis` overrides only
+that request. A multi-image message keeps one mode throughout its queued batch.
+
+Daily uses `gemini-3.1-flash-lite → gemini-3.5-flash-lite`. Analysis uses
+`gemini-3.8-flash → gemini-3.7-flash → gemini-3.6-flash → gemini-3.5-flash`.
+Neither fallback nor the optional diacritic correction pass crosses profiles.
+Cached results are separated by profile and model chain. Both profiles retain
+the bounded JSON OCR prompt, low thinking and existing timeout/cooldown policy.
+Rate limits are API calls per model/project, not a guaranteed image count: one
+image may need fallback or a correction pass. Settings do not create new quota.
+
 | Command | Description |
 |---|---|
 | `/la-status` | Live server status |
@@ -34,7 +48,8 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 | `/la-list trust action name [reason]` | Manage trusted list — `add` / `remove` (officer/senior only) |
 | `/la-list enrich name [deep_limit]` | Stronghold deep-scan an existing entry and append discovered alts. **Restricted to officers/seniors** (depends on the bot owner's residential-IP worker; ~10-15 min wall clock) |
 | `/la-list multiadd action [file]` | Bulk add via Excel template (≤ 30 rows). `action:template` downloads, `action:file` uploads |
-| `/la-check image` | OCR a screenshot → cross-check names against all lists |
+| `/la-check image [mode]` | OCR a screenshot → cross-check names against all lists; optional mode overrides the saved preference for this image |
+| `/la-check-mode [mode]` | Privately view or save your Daily/Analysis preference for screenshot uploads |
 | `check NameOne NameTwo` / `check NameOne, NameTwo` | In the configured auto-check channel, cross-check multiple typed names (space, comma, semicolon, or newline separated; max 8) |
 | `/la-help` | Show all commands |
 | `/la-setup config action:<action>` | All setup runs through one command (Manage Server). Actions below |
@@ -256,8 +271,10 @@ Copy `.env.example` to `.env` and fill in values.
 | `CHECK_INTERVAL` | `30` | Status check interval in seconds (min 10) |
 | `GEMINI_API_KEY` | — | Gemini API key for OCR |
 | `GEMINI_MAX_OUTPUT_TOKENS` | `768` | OCR response ceiling, including visible output and thinking tokens; configurable for repeatable A/B benchmarks |
-| `GEMINI_MODELS` | `gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Gemini 3.x-only priority catalog before the waitlist is applied; older generations are ignored |
-| `GEMINI_MODEL_WAITLIST` | `gemini-3.8-flash` | Comma-separated models temporarily excluded from OCR; set `none` or `off` to restore the full configured chain |
+| `GEMINI_DAILY_MODELS` | `gemini-3.1-flash-lite,gemini-3.5-flash-lite` | Daily OCR chain; only these two Lite models are accepted |
+| `GEMINI_ANALYSIS_MODELS` | `gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash` | Opt-in analysis chain; accepts these Flash models and never spills into Lite |
+| `GEMINI_MODELS` / `GEMINI_MODEL` | — | Legacy mixed catalog, partitioned when the matching profile override is absent; a missing group uses that profile's defaults. `GEMINI_MODELS` takes precedence over the singular alias |
+| `GEMINI_MODEL_WAITLIST` | `none` | Explicit exclusions apply to both profiles. Remove an old `gemini-3.8-flash` waitlist value to restore 3.8 in analysis. Excluding all daily models stops startup; excluding all analysis models disables that mode |
 | `GEMINI_PRIMARY_TIMEOUT_MS` | model-aware | Per-model cap for the preferred model; restored 3.8 defaults to 8s and the current 3.7 cap is 30s before the fallback reserve is applied |
 | `GEMINI_FALLBACK_RESERVE_MS` | `10000` | Time protected inside the shared 30s OCR deadline for another model after quick recoverable failures; after a true timeout, the next model receives the remainder |
 | `GEMINI_MODEL_COOLDOWN_MS` | `60000` | Process-local cooldown after recoverable 404/429/5xx, timeout, or network failure; later requests skip that model until it is eligible again |

@@ -145,7 +145,13 @@ const en = {
       description: 'Check names from screenshot against all lists',
       options: {
         image: 'Raid waiting room screenshot',
+        mode: 'Override your saved mode for this image; Analysis uses the Flash model quota',
       },
+      modes: { daily: 'Daily', analysis: 'Analysis' },
+    },
+    checkMode: {
+      description: 'View or change your default screenshot mode (Daily or Analysis)',
+      options: { mode: 'Choose a mode for your images; omit to view the current setting' },
     },
     help: {
       description: 'Show all available Lost Ark bot commands',
@@ -260,6 +266,7 @@ const en = {
     commandsName: '🧭 Useful commands',
     commandsValue: [
       '`/la-check image:<screenshot>` - run a check manually',
+      '`/la-check-mode mode:daily|analysis` - change your image mode; defaults to Daily',
       '`check <name>` - check a typed character name in this channel',
       '`/la-roster name:<character>` - inspect a roster + progression',
       '`/la-search name:<character>` - fuzzy Bible search + filters',
@@ -347,6 +354,7 @@ const en = {
           name: '🖼️ Screenshot & Text Check',
           lines: [
             '`/la-check image` - Check names from screenshot against all lists',
+            '`/la-check-mode mode:daily|analysis` - Save your image mode (default Daily). Omit mode to view it; `/la-check mode:analysis` overrides one image.',
             '`check abcxyz` in the configured auto-check channel - Check a typed character name',
           ],
         },

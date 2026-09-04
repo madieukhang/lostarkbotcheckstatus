@@ -9,11 +9,16 @@ process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
 const {
   claimAutoCheckMessage,
   completeAutoCheckMessage,
-  createAutoCheckMessageHandler,
+  createAutoCheckMessageHandler: createAutoCheckHandler,
   isQuickAddCandidate,
   parseAutoCheckText,
   resetAutoCheckDedupeForTest,
 } = await import('../bot/handlers/list/auto-check.js');
+
+const createAutoCheckMessageHandler = (options) => createAutoCheckHandler({
+  getUserOcrModeFn: async () => 'daily',
+  ...options,
+});
 
 function attachmentsOf(...attachments) {
   return new Collection(attachments.map((attachment, index) => [
@@ -292,12 +297,22 @@ test('auto-check reads up to three attached images sequentially and deduplicates
     ['batch-image-2', ['shared', 'Beta']],
     ['batch-image-3', ['Gamma']],
   ]);
+  let preferredMode = 'analysis';
+  let modeReads = 0;
+  const modes = [];
   const handler = createAutoCheckMessageHandler({
     client: { user: { id: 'bot-user' } },
     imageChecksEnabled: true,
     isAutoCheckChannelFn: async () => true,
     getGuildLanguageFn: async () => 'en',
-    extractNamesFromImageFn: async (image) => {
+    getUserOcrModeFn: async (id) => {
+      assert.equal(id, 'batch-user');
+      modeReads += 1;
+      return preferredMode;
+    },
+    extractNamesFromImageFn: async (image, options) => {
+      modes.push(options.mode);
+      preferredMode = 'daily';
       extractedOrder.push(image.id);
       activeExtractions += 1;
       maxActiveExtractions = Math.max(maxActiveExtractions, activeExtractions);
@@ -332,6 +347,8 @@ test('auto-check reads up to three attached images sequentially and deduplicates
   await handler(message);
 
   assert.deepEqual(extractedOrder, ['batch-image-1', 'batch-image-2', 'batch-image-3']);
+  assert.deepEqual(modes, ['analysis', 'analysis', 'analysis']);
+  assert.equal(modeReads, 1, 'one batch snapshots its sender mode before processing');
   assert.equal(maxActiveExtractions, 1);
   assert.deepEqual(checked, [['Alpha', 'Shared', 'Beta', 'Gamma']]);
   assert.equal(replies.length, 1);

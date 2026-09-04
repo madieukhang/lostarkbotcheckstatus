@@ -5,13 +5,15 @@ import {
   applyGeminiModelWaitlist,
   DEFAULT_GEMINI_MODEL_WAITLIST,
   DEFAULT_GEMINI_MODELS,
+  GEMINI_MODEL_PROFILES,
   isGemini3Model,
   resolveGeminiAttemptTimeoutMs,
   resolveDefaultGeminiPrimaryTimeoutMs,
   resolveGeminiModels,
+  resolveGeminiModelProfile,
 } from '../bot/config/geminiModels.js';
 
-test('default OCR fallback uses stable Gemini 3.x Flash models only', () => {
+test('OCR catalog retains every supported Gemini 3.x model', () => {
   assert.deepEqual(DEFAULT_GEMINI_MODELS, [
     'gemini-3.8-flash',
     'gemini-3.7-flash',
@@ -49,18 +51,45 @@ test('empty or entirely rejected env model lists fall back to the 3.x defaults',
   assert.equal(rejected.usedDefaults, true);
 });
 
-test('default waitlist defers 3.8 and promotes 3.7 without disturbing fallback order', () => {
+test('default waitlist restores 3.8 to the catalog without disturbing fallback order', () => {
   const resolution = applyGeminiModelWaitlist(
     DEFAULT_GEMINI_MODELS,
     DEFAULT_GEMINI_MODEL_WAITLIST.join(','),
   );
 
-  assert.deepEqual(resolution.models, DEFAULT_GEMINI_MODELS.slice(1));
-  assert.deepEqual(resolution.waitlisted, ['gemini-3.8-flash']);
+  assert.deepEqual(resolution.models, DEFAULT_GEMINI_MODELS);
+  assert.deepEqual(resolution.waitlisted, []);
   assert.deepEqual(resolution.rejected, []);
   assert.deepEqual(applyGeminiModelWaitlist(DEFAULT_GEMINI_MODELS, '').models, DEFAULT_GEMINI_MODELS);
   assert.deepEqual(applyGeminiModelWaitlist(DEFAULT_GEMINI_MODELS, 'none').models, DEFAULT_GEMINI_MODELS);
   assert.deepEqual(applyGeminiModelWaitlist(DEFAULT_GEMINI_MODELS, 'off').rejected, []);
+});
+
+test('daily and analysis have disjoint, complete default chains', () => {
+  assert.deepEqual(resolveGeminiModelProfile().models, [
+    'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite',
+  ]);
+  assert.deepEqual(resolveGeminiModelProfile('', 'analysis').models, [
+    'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash',
+  ]);
+  assert.deepEqual(
+    [...GEMINI_MODEL_PROFILES.daily, ...GEMINI_MODEL_PROFILES.analysis].sort(),
+    [...DEFAULT_GEMINI_MODELS].sort(),
+  );
+});
+
+test('legacy and profile overrides cannot cross the daily/analysis boundary', () => {
+  const mixed = 'gemini-3.5-flash-lite,gemini-3.7-flash,gemini-3.1-flash-lite,gemini-3.8-flash';
+  assert.deepEqual(resolveGeminiModelProfile(mixed).models, [
+    'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite',
+  ]);
+  assert.deepEqual(resolveGeminiModelProfile(mixed, 'analysis').models, [
+    'gemini-3.7-flash', 'gemini-3.8-flash',
+  ]);
+  assert.deepEqual(resolveGeminiModelProfile('gemini-3.8-flash').models, GEMINI_MODEL_PROFILES.daily);
+  assert.deepEqual(resolveGeminiModelProfile('gemini-3.1-flash-lite', 'analysis').models, GEMINI_MODEL_PROFILES.analysis);
+  assert.deepEqual(resolveGeminiModelProfile('gemini-2.5-flash').rejected, ['gemini-2.5-flash']);
+  assert.throws(() => resolveGeminiModelProfile('', 'unexpected'), /Unknown Gemini OCR profile/);
 });
 
 test('waitlist validation is case-insensitive and primary timeout follows the active model', () => {

@@ -356,6 +356,16 @@ function listCheckCommand(name) {
         .setName('image')
         .setDescription(commandText('check.options.image'))
         .setRequired(true)
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName('mode')
+        .setDescription(commandText('check.options.mode'))
+        .setRequired(false)
+        .addChoices(
+          { name: commandText('check.modes.daily'), value: 'daily' },
+          { name: commandText('check.modes.analysis'), value: 'analysis' },
+        )
     );
 }
 
@@ -374,6 +384,21 @@ function helpCommand(name) {
           value: language.code,
         })))
     );
+}
+
+function checkModeCommand(name) {
+  return new SlashCommandBuilder()
+    .setName(name)
+    .setDescription(commandText('checkMode.description'))
+    .setDMPermission(false)
+    .addStringOption((opt) => opt
+      .setName('mode')
+      .setDescription(commandText('checkMode.options.mode'))
+      .setRequired(false)
+      .addChoices(
+        { name: commandText('check.modes.daily'), value: 'daily' },
+        { name: commandText('check.modes.analysis'), value: 'analysis' },
+      ));
 }
 
 function languageSwitchCommand(name) {
@@ -480,6 +505,7 @@ const PUBLIC_COMMAND_DEFS = [
   ['la-search', searchCommand],
   ['la-evidence', evidenceCommand],
   ['la-check', listCheckCommand],
+  ['la-check-mode', checkModeCommand],
   ['la-help', helpCommand],
   ['la-language-switch', languageSwitchCommand],
   ['la-setup', setupCommand],

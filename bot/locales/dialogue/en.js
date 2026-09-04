@@ -453,6 +453,10 @@ export default {
     failed: { title: 'Removal failed', description: 'I could not remove the entry.' }, unknown: 'unknown',
   },
   check: {
+    modeSaved: { title: 'Screenshot mode saved', description: 'Your mode is **{mode}**. This applies to your uploads and `/la-check` when no mode is selected.', footer: 'Switch back with /la-check-mode mode:daily; a /la-check mode override affects one image only.' },
+    modeCurrent: { title: 'Your screenshot mode', description: 'Your mode is **{mode}**. New users start in Daily. This setting only changes how your own images are read.', footer: 'Use /la-check-mode mode:daily or mode:analysis to change it.' },
+    modeUnavailable: { title: 'Analysis is unavailable', description: 'The bot currently has no enabled Analysis models. Your saved mode was not changed.' },
+    modeProgress: 'Mode: **{mode}**',
     malformed: 'I could not make sense of that evidence pick. Run the check again and I will start fresh.',
     entryRemoved: { title: 'That one is gone now', description: 'Someone removed the list entry this evidence belonged to, so there is nothing left for me to show you.' },
     ocrFailed: { title: 'I could not read that image', description: 'I stared at this screenshot and could not pull a single character name out of it.', footer: 'A clearer shot of the raid waiting room usually does the trick.' },

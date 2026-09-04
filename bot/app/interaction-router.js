@@ -25,6 +25,7 @@ import { handleSetupCommand } from '../handlers/setup/guildSetup.js';
 import { handleSetupRemoteCommand } from '../handlers/setup/remote.js';
 import { handleStatsCommand } from '../handlers/meta/stats.js';
 import { handleHelpCommand, handleHelpSelect } from '../handlers/meta/help.js';
+import { createOcrModeCommandHandler } from '../handlers/list/check/mode.js';
 import {
   handleLanguageSwitchCommand,
   handleLanguageSwitchSelect,
@@ -290,6 +291,7 @@ export function createCommandRoutes({ systemHandlers, listHandlers }) {
       },
     },
     'la-check': listHandlers.handleListCheckCommand,
+    'la-check-mode': createOcrModeCommandHandler(),
     'la-stats': handleStatsCommand,
     'la-setup': handleSetupCommand,
     'la-remote': handleSetupRemoteCommand,

@@ -19,7 +19,8 @@ export default {
   },
   search: { description: 'Tìm tên character theo bộ lọc và đối chiếu các list', options: { name: 'Tên character cần tìm', minIlvl: 'Item level tối thiểu; mặc định 1700', maxIlvl: 'Item level tối đa', class: 'Lọc theo class' } },
   evidence: { description: 'Tra trực tiếp evidence của character trong list', options: { name: 'Tên character; autocomplete hiển thị entry từ mọi list', public: 'Đăng công khai trong channel; chỉ officer/senior, mặc định riêng tư' } },
-  check: { description: 'Đọc tên từ screenshot và kiểm tra với mọi list', options: { image: 'Screenshot phòng chờ raid' } },
+  check: { description: 'Đọc tên từ screenshot và kiểm tra với mọi list', options: { image: 'Screenshot phòng chờ raid', mode: 'Đổi chế độ riêng cho ảnh này; Phân tích sâu dùng quota nhóm Flash' }, modes: { daily: 'Daily', analysis: 'Phân tích sâu' } },
+  checkMode: { description: 'Xem hoặc đổi chế độ đọc ảnh mặc định của riêng cậu', options: { mode: 'Chọn Daily hoặc Phân tích sâu; để trống để xem chế độ hiện tại' } },
   help: { description: 'Xem toàn bộ command LoaLogs', options: { lang: 'Ngôn ngữ; mặc định theo preference đã lưu' } },
   languageSwitch: { description: 'Đổi ngôn ngữ LoaLogs dùng khi phản hồi cậu' },
   setup: {

@@ -1,5 +1,5 @@
-// Ordered newest-to-oldest: OCR walks this chain only when the current model
-// is unavailable, rate-limited, or returns an unusable response.
+// Full catalog; runtime requests select one profile instead of walking every
+// model for a routine screenshot.
 export const DEFAULT_GEMINI_MODELS = Object.freeze([
   'gemini-3.8-flash',
   'gemini-3.7-flash',
@@ -9,12 +9,14 @@ export const DEFAULT_GEMINI_MODELS = Object.freeze([
   'gemini-3.1-flash-lite',
 ]);
 
-// Keep slow or temporarily unhealthy models available in the catalog without
-// sending production OCR traffic to them. Set GEMINI_MODEL_WAITLIST to none
-// or off to restore the full configured chain.
-export const DEFAULT_GEMINI_MODEL_WAITLIST = Object.freeze([
-  'gemini-3.8-flash',
-]);
+export const GEMINI_MODEL_PROFILES = Object.freeze({
+  daily: Object.freeze(['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite']),
+  analysis: Object.freeze(DEFAULT_GEMINI_MODELS.filter((model) => !model.endsWith('-lite'))),
+});
+
+// Explicit operator waitlists still apply to both profiles. 3.8 is available
+// again for analysis, while daily traffic stays on the two Flash-Lite models.
+export const DEFAULT_GEMINI_MODEL_WAITLIST = Object.freeze([]);
 
 const DEFAULT_PRIMARY_TIMEOUT_MS_BY_MODEL = Object.freeze({
   'gemini-3.8-flash': 8_000,
@@ -53,6 +55,28 @@ export function resolveGeminiModels(rawValue = '') {
     models: models.length > 0 ? models : [...DEFAULT_GEMINI_MODELS],
     rejected,
     usedDefaults: models.length === 0,
+  };
+}
+
+/**
+ * Resolve one OCR profile, retaining the order of an explicit override.
+ * Legacy mixed catalogs are partitioned; a missing group uses its own defaults
+ * so an analysis-only legacy override cannot route daily traffic to Flash.
+ * @param {string} rawValue Optional comma-separated model override.
+ * @param {'daily'|'analysis'} profile Requested workload.
+ * @returns {{models: string[], rejected: string[], usedDefaults: boolean}}
+ */
+export function resolveGeminiModelProfile(rawValue = '', profile = 'daily') {
+  const defaults = GEMINI_MODEL_PROFILES[profile];
+  if (!defaults) throw new RangeError(`Unknown Gemini OCR profile: ${profile}`);
+  const resolution = resolveGeminiModels(rawValue);
+  const allowed = new Set(defaults);
+  const selected = resolution.models.filter((model) => allowed.has(model.toLowerCase()));
+  const usedDefaults = resolution.usedDefaults || selected.length === 0;
+  return {
+    models: usedDefaults ? [...defaults] : selected,
+    rejected: resolution.rejected,
+    usedDefaults,
   };
 }
 

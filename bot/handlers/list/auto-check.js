@@ -10,6 +10,7 @@
 
 import { ActionRowBuilder, Events, StringSelectMenuBuilder } from 'discord.js';
 import config from '../../config.js';
+import { getUserOcrMode } from '../../services/list-check/preferences.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import {
   extractNamesFromImage,
@@ -221,6 +222,7 @@ export function createAutoCheckMessageHandler({
   client,
   isAutoCheckChannelFn = isAutoCheckChannel,
   getGuildLanguageFn = getGuildLanguage,
+  getUserOcrModeFn = getUserOcrMode,
   extractNamesFromImageFn = extractNamesFromImage,
   checkNamesAgainstListsFn = checkNamesAgainstLists,
   formatCheckResultsFn = formatCheckResults,
@@ -407,6 +409,7 @@ export function createAutoCheckMessageHandler({
             current: index + 1,
             count: request.images.length,
           }),
+          t('dialogue.check.modeProgress', lang, { mode: t(`commands.check.modes.${request.mode}`, lang) }),
           imageLimitLine(request, lang),
         ], lang);
         try {
@@ -414,6 +417,7 @@ export function createAutoCheckMessageHandler({
           while (true) {
             try {
               extractedNames = await extractNamesFromImageFn(image, {
+                mode: request.mode,
                 refineAmbiguousDiacritics: true,
                 suggestionCache: suggestionContext.cache,
                 suggestionContext,
@@ -554,6 +558,9 @@ export function createAutoCheckMessageHandler({
       lang = await getGuildLanguageFn(message.guild.id, { GuildConfigModel: GuildConfig });
 
       if (request.images.length > 0) {
+        // Snapshot the sender's choice before queueing; one batch never changes
+        // models halfway through because the user toggled their preference.
+        request.mode = await getUserOcrModeFn(message.author.id);
         await runQueuedImageRequest(
           () => processAutoCheckRequest(message, request, requestUi, lang),
           async (waitingAhead) => {

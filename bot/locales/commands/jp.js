@@ -19,7 +19,8 @@ export default {
   },
   search: { description: 'Filter 付き character 検索と list 照合', options: { name: '検索する character 名', minIlvl: '最低 item level; 既定1700', maxIlvl: '最高 item level', class: 'Class filter' } },
   evidence: { description: 'List character の evidence を直接表示します', options: { name: 'Character 名; autocomplete は全 list entry を表示', public: 'Channel に public 投稿; officer/senior のみ、既定 private' } },
-  check: { description: 'Screenshot の名前を全 list と照合します', options: { image: 'Raid waiting-room screenshot' } },
+  check: { description: 'Screenshot の名前を全 list と照合します', options: { image: 'Raid waiting-room screenshot', mode: 'この画像だけ保存済みモードを変更。詳細分析は Flash モデルの利用枠を使用' }, modes: { daily: 'Daily', analysis: '詳細分析' } },
+  checkMode: { description: '自分の画像読み取りモードを確認・変更します', options: { mode: 'Daily または詳細分析を選択。省略すると現在の設定を確認します' } },
   help: { description: 'LoaLogs の全 command を表示します', options: { lang: '言語; 既定は保存 preference' } },
   languageSwitch: { description: 'LoaLogs があなたへ返す言語を変更します' },
   setup: {

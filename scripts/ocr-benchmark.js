@@ -49,6 +49,8 @@ const expectedPath = expectedArg
   : imagePath.replace(/\.[^.]+$/, '.expected.json');
 const runs = parsePositiveInt(readArg('runs'), 1, '--runs');
 const tokenCap = parsePositiveInt(readArg('tokens'), 768, '--tokens');
+const mode = readArg('mode') || 'daily';
+if (!['daily', 'analysis'].includes(mode)) throw new Error('--mode must be daily or analysis.');
 
 if (!fs.existsSync(imagePath)) {
   throw new Error(`Benchmark image not found: ${imagePath}`);
@@ -72,7 +74,7 @@ if (expectedNames !== null && !Array.isArray(expectedNames)) {
 }
 
 console.log(
-  `[benchmark] image=${imagePath} runs=${runs} maxOutputTokens=${config.geminiMaxOutputTokens}`
+  `[benchmark] image=${imagePath} mode=${mode} runs=${runs} maxOutputTokens=${config.geminiMaxOutputTokens}`
   + ` expected=${expectedNames ? expectedPath : 'none'}`,
 );
 
@@ -85,7 +87,7 @@ for (let run = 1; run <= runs; run += 1) {
       id: `ocr-benchmark-${run}`,
       url: imageUrl,
       contentType: mimeType,
-    });
+    }, { mode });
     const exact = expectedNames === null
       ? null
       : JSON.stringify(names) === JSON.stringify(expectedNames);

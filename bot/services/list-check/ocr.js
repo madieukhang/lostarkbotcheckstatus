@@ -191,7 +191,7 @@ function selectAvailableGeminiModels(models, now = Date.now()) {
   return { available, skipped };
 }
 
-function createGeminiFailureError(result) {
+function createGeminiFailureError(result, models) {
   const error = new Error(formatGeminiFailure(result));
   let retryAfterMs = Number(result?.retryAfterMs);
 
@@ -200,7 +200,7 @@ function createGeminiFailureError(result) {
   // thrown error so the batch coordinator can wait once instead of sending the
   // next attachment into a guaranteed zero-attempt failure.
   if (!Number.isFinite(retryAfterMs) || retryAfterMs <= 0) {
-    const { available, skipped } = selectAvailableGeminiModels(config.geminiModels);
+    const { available, skipped } = selectAvailableGeminiModels(models);
     if (available.length === 0 && skipped.length > 0) {
       retryAfterMs = Math.min(...skipped.map((item) => item.remainingMs));
     }
@@ -239,6 +239,7 @@ async function requestGeminiWithFallback({
   prompt,
   imageBase64,
   mimeType,
+  models: configuredModels,
   parseResponse,
   onModelStart = () => {},
   onModelElapsed = () => {},
@@ -252,7 +253,7 @@ async function requestGeminiWithFallback({
   if (Buffer.byteLength(requestBody, 'utf8') >= MAX_GEMINI_INLINE_REQUEST_BYTES) {
     throw new Error('Gemini inline request too large (must be under 20MB including encoding).');
   }
-  const { available: models, skipped } = selectAvailableGeminiModels(config.geminiModels);
+  const { available: models, skipped } = selectAvailableGeminiModels(configuredModels);
   for (const skippedModel of skipped) onModelSkipped(skippedModel);
 
   if (models.length === 0) {
@@ -474,11 +475,12 @@ async function findAmbiguousOcrChoices(
   return choices.filter(Boolean);
 }
 
-async function requestGeminiObject(prompt, imageBase64, mimeType) {
+async function requestGeminiObject(prompt, imageBase64, mimeType, models) {
   const result = await requestGeminiWithFallback({
     prompt,
     imageBase64,
     mimeType,
+    models,
     parseResponse: ({ text }) => {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return { retry: true, reason: 'non-JSON object' };
@@ -504,7 +506,7 @@ async function requestGeminiObject(prompt, imageBase64, mimeType) {
 
 async function refineAmbiguousOcrNames(
   names,
-  { imageBase64, mimeType, suggestionCache, suggestionContext } = {},
+  { imageBase64, mimeType, models, suggestionCache, suggestionContext } = {},
 ) {
   // Keep overflow names for the ignored-count UI, but avoid spending HTTP
   // calls on rows that cannot enter the bounded list-check pipeline.
@@ -530,7 +532,7 @@ async function refineAmbiguousOcrNames(
     choiceLines,
   ].join('\n');
 
-  const resolved = await requestGeminiObject(prompt, imageBase64, mimeType);
+  const resolved = await requestGeminiObject(prompt, imageBase64, mimeType, models);
   if (!resolved) return names;
 
   const allowed = new Map(choices.map((choice) => [choice.original, new Set(choice.candidates)]));
@@ -551,6 +553,7 @@ async function refineAmbiguousOcrNames(
  *
  * @param {object} image - Discord attachment or { url, contentType }
  * @param {object} [options]
+ * @param {'daily'|'analysis'} [options.mode='daily'] - isolated model chain for this request and its refinement pass
  * @param {boolean} [options.refineAmbiguousDiacritics=false] - second-pass OCR for names with multiple same-base Bible spellings
  * @param {Map} [options.suggestionCache] - request-local Bible search cache
  * @param {object} [options.suggestionContext] - request-wide Bible lookup budget and metrics
@@ -559,6 +562,7 @@ async function refineAmbiguousOcrNames(
 export async function extractNamesFromImage(image, options = {}) {
   const startedAt = Date.now();
   const timing = {
+    mode: options.mode ?? 'daily',
     cache: 'miss',
     status: 'error',
     model: 'none',
@@ -575,6 +579,12 @@ export async function extractNamesFromImage(image, options = {}) {
   };
 
   try {
+  const mode = timing.mode;
+  if (mode !== 'daily' && mode !== 'analysis') {
+    throw new RangeError(`Unknown OCR mode: ${mode}`);
+  }
+  const models = mode === 'analysis' ? config.geminiAnalysisModels : config.geminiModels;
+  if (models.length === 0) throw new Error(`No Gemini models are enabled for OCR mode: ${mode}`);
   if (!config.geminiApiKey) {
     throw new Error('GEMINI_API_KEY is not configured.');
   }
@@ -584,7 +594,10 @@ export async function extractNamesFromImage(image, options = {}) {
   }
 
   const refineAmbiguousDiacritics = options.refineAmbiguousDiacritics === true;
-  const cacheKey = image.url ? `${image.url}|refine:${refineAmbiguousDiacritics ? '1' : '0'}` : '';
+  // A deeper retry must not reuse a daily answer for the same attachment.
+  const cacheKey = image.url
+    ? `${image.url}|mode:${mode}|models:${models.join(',')}|refine:${refineAmbiguousDiacritics ? '1' : '0'}`
+    : '';
   const cachedNames = getCachedOcrNames(cacheKey);
   if (cachedNames !== undefined) {
     timing.cache = 'hit';
@@ -617,6 +630,7 @@ export async function extractNamesFromImage(image, options = {}) {
     prompt: GEMINI_PROMPT,
     imageBase64,
     mimeType,
+    models,
     onModelStart: (model) => {
       timing.model = model;
       timing.geminiAttempts += 1;
@@ -688,7 +702,7 @@ export async function extractNamesFromImage(image, options = {}) {
   });
 
   if (!geminiResult.ok) {
-    throw createGeminiFailureError(geminiResult);
+    throw createGeminiFailureError(geminiResult, models);
   }
 
   if (geminiResult.value.emptyResponse) {
@@ -703,6 +717,7 @@ export async function extractNamesFromImage(image, options = {}) {
       names = await refineAmbiguousOcrNames(names, {
         imageBase64,
         mimeType,
+        models,
         suggestionCache: options.suggestionCache,
         suggestionContext: options.suggestionContext,
       });
@@ -730,6 +745,7 @@ export async function extractNamesFromImage(image, options = {}) {
       `modelTimings=${timing.modelTimings.join(',') || 'none'}`,
       `refine=${timing.refineMs}ms`,
       `model=${timing.model}`,
+      `mode=${timing.mode}`,
       `names=${timing.names}`,
       `promptTokens=${timing.promptTokens}`,
       `outputTokens=${timing.outputTokens}`,
