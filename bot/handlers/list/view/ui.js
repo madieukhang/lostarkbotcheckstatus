@@ -21,7 +21,7 @@ import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
-import { BLANK_FIELD_VALUE, COLORS, ICONS, relativeTime } from '../../../utils/ui.js';
+import { BLANK_FIELD_VALUE, COLORS, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
 import { getListContext } from '../helpers.js';
@@ -376,14 +376,7 @@ function buildEvidenceInlineMeta(entry, snapshot, {
       ? { name: t('listView.evidence.server', lang), value: `\`${world}\``, inline: true }
       : null,
   ].filter(Boolean);
-  // Discord packs three inline fields per row and stretches a lone
-  // trailing field to full width · pad to a whole row so the grid keeps
-  // its columns whatever combination of optional fields showed up. Three
-  // or fewer already share one row evenly, so they are left alone.
-  while (inlineMeta.length > 3 && inlineMeta.length % 3 !== 0) {
-    inlineMeta.push({ name: '\u200b', value: '\u200b', inline: true });
-  }
-  return inlineMeta;
+  return padInlineRow(inlineMeta);
 }
 
 function buildEvidenceFields(entry, snapshot, {

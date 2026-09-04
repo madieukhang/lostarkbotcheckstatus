@@ -17,7 +17,7 @@ import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
-import { BLANK_FIELD_VALUE, COLORS, ICONS } from '../../utils/ui.js';
+import { BLANK_FIELD_VALUE, COLORS, ICONS, padInlineRow } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
 import { renderTrackedAltsField } from './trackedAltsRender.js';
 
@@ -125,18 +125,13 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   // Reason is prose and takes the full width · as an inline field it was
   // squeezed into a third of the card and wrapped after a few words.
   // Name and raid are short values and share the row above it.
-  const fields = [
+  const inlineFields = [
     { name: `👤 ${t('dialogue.listEdit.success.name', lang)}`, value: `[${entry.name}](${rosterLink})`, inline: true },
   ];
   if (entry.raid) {
-    fields.push({ name: `🗡️ ${t('dialogue.listEdit.success.raid', lang)}`, value: `\`${entry.raid}\``, inline: true });
+    inlineFields.push({ name: `🗡️ ${t('dialogue.listEdit.success.raid', lang)}`, value: `\`${entry.raid}\``, inline: true });
   }
-  // Only a card with more than one row needs padding · up to three
-  // inline fields share a single row evenly on their own. Same rule as
-  // padInlineRow in utils/ui.js.
-  if (fields.length > 3) {
-    while (fields.length % 3 !== 0) fields.push({ name: '\u200b', value: '\u200b', inline: true });
-  }
+  const fields = [...padInlineRow(inlineFields)];
   fields.push({
     name: `📝 ${t('dialogue.listEdit.success.reason', lang)}`,
     value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),

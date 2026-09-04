@@ -10,6 +10,9 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Changed
+- The three hand-rolled copies of the inline-row padding rule now call `padInlineRow` instead: `/la-list edit` success, the trust success card, and the evidence card. All three already behaved correctly, so nothing renders differently; the rule simply lives in one place now. `/la-status` keeps its own loop on purpose and says why in a comment - its padding is structural rather than cosmetic, forcing a row break before the per-server grid, so it has to run even for two badges where the shared helper would correctly leave them alone.
+
+### Changed
 - Every `/la-help` label carries an icon. The overview groups always had them, but both detail sections behind the dropdown were bare, so drilling into one felt like leaving the card family. The two section titles borrow the icon of the overview group they belong to (**📦** for multiadd, **👑** for syncimages), so the trail stays visible when you drill in, and two labels reuse vocabulary the bot already has rather than inventing more: **📎** is Evidence everywhere else, **⚠️** is the warning glyph. `📊` was deliberately not used for "template columns" despite fitting, because it means ilvl on every card.
 - `test/locale-invariants.test.js` asserts that every `name` and `title` under `help` opens with an icon, in all three locales.
 

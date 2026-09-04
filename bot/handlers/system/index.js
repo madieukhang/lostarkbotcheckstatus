@@ -125,6 +125,11 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
       // Pad the summary badges out to a whole row so the per-server grid
       // starts on a line of its own instead of inheriting leftover
       // columns from the counts above it.
+      //
+      // Deliberately NOT padInlineRow: that helper leaves a single row
+      // alone, which is right when the only goal is an even grid. Here
+      // the padding is structural · it forces the row break, so it has
+      // to run even when there are just two badges above.
       while (fields.length % 3 !== 0) fields.push({ name: '​', value: '​', inline: true });
 
       for (const [server, status] of sortedServers) {

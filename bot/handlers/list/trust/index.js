@@ -17,7 +17,7 @@ import {
 } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, replyAlert } from '../../../utils/interactionReplies.js';
-import { COLORS } from '../../../utils/ui.js';
+import { COLORS, padInlineRow } from '../../../utils/ui.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   renderTrackedAltsField,
@@ -125,13 +125,10 @@ async function persistTrustedRoster({ existing, name, reason, allCharacters, ros
 }
 
 function buildTrustSuccessFields({ existing, name, reason, allCharacters, rosterResult, interaction, lang }) {
-  const fields = [
+  const fields = [...padInlineRow([
     { name: `🧬 ${t('dialogue.trust.success.character', lang)}`, value: `[${name}](${rosterUrl(name)})`, inline: true },
     { name: `👤 ${t(`dialogue.trust.success.${existing ? 'refreshedBy' : 'addedBy'}`, lang)}`, value: interaction.user.tag, inline: true },
-  ];
-  // Two inline fields already split their row evenly, so padding them
-  // to thirds would only add a visible gap · see padInlineRow.
-  if (fields.length > 3) while (fields.length % 3 !== 0) fields.push({ name: '\u200b', value: '\u200b', inline: true });
+  ])];
   fields.push({
     name: `📝 ${t('dialogue.trust.success.reason', lang)}`,
     value: (reason || existing?.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
