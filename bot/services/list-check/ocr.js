@@ -171,7 +171,7 @@ async function requestGeminiWithFallback({
     const model = models[i];
     const hasFallback = i < models.length - 1;
     const primaryTimeoutMs = Math.min(
-      config.geminiPrimaryTimeoutMs || 12_000,
+      config.geminiPrimaryTimeoutMs || 8_000,
       GEMINI_REQUEST_TIMEOUT_MS,
     );
     // Give the preferred model a fair chance without letting one slow success

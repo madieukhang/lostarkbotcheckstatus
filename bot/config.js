@@ -137,7 +137,7 @@ const config = {
   geminiModels: geminiModelResolution.models,
 
   /** Soft latency cap for the primary Gemini OCR model before failover. */
-  geminiPrimaryTimeoutMs: parsePositiveIntEnv('GEMINI_PRIMARY_TIMEOUT_MS', 12_000),
+  geminiPrimaryTimeoutMs: parsePositiveIntEnv('GEMINI_PRIMARY_TIMEOUT_MS', 8_000),
 
   /**
    * Optional post-check Stronghold scan for flagged OCR names.
