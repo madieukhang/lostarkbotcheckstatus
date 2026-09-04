@@ -308,6 +308,9 @@ export function createViewHandlers({
             || config.seniorApproverIds.includes(componentInteraction.user.id);
           await replyEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, {
             includeAddedBy: isOfficer,
+            // The typed list view already told the user which collection they
+            // opened, so the detail card should spend this slot on new data.
+            includeList: false,
             lang,
             statMap,
           }));

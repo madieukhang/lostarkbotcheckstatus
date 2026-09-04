@@ -87,6 +87,25 @@ test('added by joins the inline grid instead of trailing the card', () => {
   assert.equal(inlineNames(embed).filter((n) => n !== ZWSP).length, 6);
 });
 
+test('list-view evidence can omit the list already established by its parent view', () => {
+  const statMap = statMapFromRosterCharacters([
+    { ...ROSTER[0], world: 'Thaemine' },
+    ...ROSTER.slice(1),
+  ]);
+  const embed = buildEvidenceEmbed(makeEntry(), 'https://x.test/e.png', {
+    lang: 'vi',
+    statMap,
+    includeAddedBy: true,
+    includeList: false,
+  });
+
+  assert.equal(inlineNames(embed).some((name) => name.includes('List')), false);
+  assert.deepEqual(
+    inlineNames(embed).filter((name) => name !== ZWSP),
+    ['🗡️ Raid', '⚔️ CP', '📊 ilvl', '🕐 Đã thêm', '👤 Người thêm', '🌍 Server'],
+  );
+});
+
 test('notice mode swaps the title bar for an Artist headline', () => {
   const embed = buildEvidenceEmbed(makeEntry(), '', {
     lang: 'vi',

@@ -313,6 +313,7 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  *   1. Title bar    - list-icon + entry name + bible-link via setURL
  *   2. Reason field - full reason text (1024 char cap)
  *   3. Inline meta  - Raid · List · CP · ilvl · Added · Added by · Server,
+ *                     with List omitted when the caller already establishes it
  *                     padded with zero-width spacers to whole 3-up rows
  *   4. Roster field - "Tracked alts" with linked names; falls back
  *                     to "(only this character)" if allCharacters is
@@ -328,7 +329,13 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  * why this reads as an upgrade on /la-roster and a no-op everywhere else
  * until those callers pass one too.
  */
-function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, lang, statMap }) {
+function buildEvidenceInlineMeta(entry, snapshot, {
+  includeAddedBy,
+  includeList,
+  headline,
+  lang,
+  statMap,
+}) {
   const itemLevel = Number(String(snapshot?.itemLevel ?? '').replace(/,/g, ''));
   const combatScore = String(snapshot?.combatScore || '').trim();
   const addedByDisplay = getAddedByDisplay(entry);
@@ -340,8 +347,9 @@ function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, la
     entry.raid
       ? { name: t('listView.evidence.raid', lang), value: `\`${entry.raid}\``, inline: true }
       : null,
-    // With a headline the list is already named in the sentence above.
-    !headline ? {
+    // With a headline, or when /la-list view already establishes the selected
+    // list before this detail opens, repeating the list adds no information.
+    includeList && !headline ? {
       name: t('listView.evidence.list', lang),
       value: getListTypeLabel(entry._listType, entry._label, lang),
       inline: true,
@@ -378,10 +386,22 @@ function buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, la
   return inlineMeta;
 }
 
-function buildEvidenceFields(entry, snapshot, { includeAddedBy, headline, lang, statMap }) {
+function buildEvidenceFields(entry, snapshot, {
+  includeAddedBy,
+  includeList,
+  headline,
+  lang,
+  statMap,
+}) {
   const fields = [
     { name: t('listView.evidence.reason', lang), value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
-    ...buildEvidenceInlineMeta(entry, snapshot, { includeAddedBy, headline, lang, statMap }),
+    ...buildEvidenceInlineMeta(entry, snapshot, {
+      includeAddedBy,
+      includeList,
+      headline,
+      lang,
+      statMap,
+    }),
   ];
 
   // Roster (allCharacters) field. Counts alts excluding the entry's own
@@ -459,6 +479,7 @@ function applyEvidenceMedia(embed, entry, displayUrl, { attachImage, lang }) {
 
 export function buildEvidenceEmbed(entry, displayUrl, {
   includeAddedBy = false,
+  includeList = true,
   lang = 'en',
   statMap = new Map(),
   headline = false,
@@ -468,6 +489,7 @@ export function buildEvidenceEmbed(entry, displayUrl, {
   const snapshot = statMap.get(normalizeNameKey(entry.name)) || null;
   const fields = buildEvidenceFields(entry, snapshot, {
     includeAddedBy,
+    includeList,
     headline,
     lang,
     statMap,

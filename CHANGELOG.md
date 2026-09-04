@@ -1,5 +1,7 @@
 # Changelog
 
+- The evidence card opened from `/la-list view` no longer repeats **List**. The parent view already establishes Blacklist, Whitelist, Watchlist, or Trusted before the user opens a character, while the shared evidence renderer keeps the field for independent surfaces that still need that context.
+
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates use the local calendar of each release.
 
 This changelog focuses on user-visible changes, important backend fixes, and structural milestones. Deep implementation notes belong in commit messages or internal review docs.
