@@ -690,17 +690,20 @@ test('extractNamesFromImage uses a Gemini 3-safe request while failing over reco
 test('extractNamesFromImage abandons a slow primary without exhausting the shared deadline', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;
+  const originalLog = console.log;
   const originalWarn = console.warn;
   const originalKey = config.geminiApiKey;
   const originalModels = [...config.geminiModels];
   const originalPrimaryTimeoutMs = config.geminiPrimaryTimeoutMs;
   const requestedModels = [];
   const requestSignals = [];
+  const logs = [];
   const warnings = [];
 
   config.geminiApiKey = 'fake-gemini-key';
   config.geminiModels = ['slow-primary-model', 'working-fallback-model'];
   config.geminiPrimaryTimeoutMs = 20;
+  console.log = (...args) => logs.push(args.join(' '));
   console.warn = (...args) => warnings.push(args.join(' '));
   globalThis.fetch = async (url, init = {}) => {
     const requestedUrl = String(url);
@@ -758,6 +761,12 @@ test('extractNamesFromImage abandons a slow primary without exhausting the share
     assert.equal(requestSignals[0]?.aborted, true, 'primary soft deadline should abort only its request');
     assert.equal(requestSignals[1]?.aborted, false, 'fallback should retain the shared deadline');
     assert.ok(
+      logs.some((message) => (
+        /modelTimings=slow-primary-model:\d+ms,working-fallback-model:\d+ms/.test(message)
+      )),
+      'OCR timing should preserve each model attempt instead of only the aggregate',
+    );
+    assert.ok(
       warnings.some((message) => (
         message.includes('slow-primary-model exceeded 20ms')
         && message.includes('trying fallback model')
@@ -765,6 +774,7 @@ test('extractNamesFromImage abandons a slow primary without exhausting the share
     );
   } finally {
     globalThis.fetch = originalFetch;
+    console.log = originalLog;
     console.warn = originalWarn;
     config.geminiApiKey = originalKey;
     config.geminiModels = originalModels;

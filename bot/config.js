@@ -9,7 +9,12 @@
 // - On Railway: .env doesn't exist in the container, so this is a no-op.
 //   Railway-injected vars in process.env are NEVER overridden by dotenv.
 import dotenv from 'dotenv';
-import { resolveGeminiModels } from './config/geminiModels.js';
+import {
+  applyGeminiModelWaitlist,
+  DEFAULT_GEMINI_MODEL_WAITLIST,
+  resolveDefaultGeminiPrimaryTimeoutMs,
+  resolveGeminiModels,
+} from './config/geminiModels.js';
 dotenv.config();
 
 /**
@@ -81,6 +86,27 @@ if (geminiModelResolution.rejected.length > 0) {
     `[config] Ignoring non-3.x Gemini models: ${geminiModelResolution.rejected.join(', ')}`,
   );
 }
+const geminiModelWaitlistResolution = applyGeminiModelWaitlist(
+  geminiModelResolution.models,
+  process.env.GEMINI_MODEL_WAITLIST ?? DEFAULT_GEMINI_MODEL_WAITLIST.join(','),
+);
+if (geminiModelWaitlistResolution.rejected.length > 0) {
+  console.warn(
+    `[config] Ignoring non-3.x Gemini waitlist entries: ${geminiModelWaitlistResolution.rejected.join(', ')}`,
+  );
+}
+if (geminiModelWaitlistResolution.models.length === 0) {
+  throw new Error('[config] GEMINI_MODEL_WAITLIST excludes every configured Gemini model.');
+}
+const geminiPrimaryTimeoutMs = parsePositiveIntEnv(
+  'GEMINI_PRIMARY_TIMEOUT_MS',
+  resolveDefaultGeminiPrimaryTimeoutMs(geminiModelWaitlistResolution.models[0]),
+);
+console.log(
+  `[config] Gemini OCR active=${geminiModelWaitlistResolution.models.join(',')}`
+  + ` waitlisted=${geminiModelWaitlistResolution.waitlisted.join(',') || 'none'}`
+  + ` primaryTimeout=${geminiPrimaryTimeoutMs}ms`,
+);
 
 const config = {
   /** Discord bot token */
@@ -134,10 +160,13 @@ const config = {
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
 
   /** Gemini model priority list for image parsing with recoverable-error failover */
-  geminiModels: geminiModelResolution.models,
+  geminiModels: geminiModelWaitlistResolution.models,
+
+  /** Temporarily deferred Gemini models retained outside the active OCR chain. */
+  geminiWaitlistedModels: geminiModelWaitlistResolution.waitlisted,
 
   /** Soft latency cap for the primary Gemini OCR model before failover. */
-  geminiPrimaryTimeoutMs: parsePositiveIntEnv('GEMINI_PRIMARY_TIMEOUT_MS', 8_000),
+  geminiPrimaryTimeoutMs,
 
   /**
    * Optional post-check Stronghold scan for flagged OCR names.

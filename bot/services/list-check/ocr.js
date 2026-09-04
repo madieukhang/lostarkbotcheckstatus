@@ -193,7 +193,7 @@ async function requestGeminiWithFallback({
         signal: modelSignal,
       });
     } catch (error) {
-      onModelElapsed(Date.now() - modelStartedAt);
+      onModelElapsed({ model, elapsedMs: Date.now() - modelStartedAt });
       failures.push(`${model}: ${error.name || error.message}`);
       if (requestSignal.aborted) {
         return { ok: false, type: 'network', model, error, failures };
@@ -208,7 +208,7 @@ async function requestGeminiWithFallback({
       }
       return { ok: false, type: 'network', model, error, failures };
     }
-    onModelElapsed(Date.now() - modelStartedAt);
+    onModelElapsed({ model, elapsedMs: Date.now() - modelStartedAt });
 
     if (!aiRes.ok) {
       const bodyText = await aiRes.text().catch(() => '');
@@ -418,6 +418,7 @@ export async function extractNamesFromImage(image, options = {}) {
     downloadMs: 0,
     geminiMs: 0,
     geminiAttempts: 0,
+    modelTimings: [],
     refineMs: 0,
     promptTokens: 0,
     outputTokens: 0,
@@ -472,8 +473,9 @@ export async function extractNamesFromImage(image, options = {}) {
       timing.model = model;
       timing.geminiAttempts += 1;
     },
-    onModelElapsed: (elapsedMs) => {
+    onModelElapsed: ({ model, elapsedMs }) => {
       timing.geminiMs += elapsedMs;
+      timing.modelTimings.push(`${model}:${elapsedMs}ms`);
     },
     onModelUsage: (usageMetadata = {}) => {
       const tokenFields = [
@@ -568,6 +570,7 @@ export async function extractNamesFromImage(image, options = {}) {
       `download=${timing.downloadMs}ms`,
       `gemini=${timing.geminiMs}ms`,
       `attempts=${timing.geminiAttempts}`,
+      `modelTimings=${timing.modelTimings.join(',') || 'none'}`,
       `refine=${timing.refineMs}ms`,
       `model=${timing.model}`,
       `names=${timing.names}`,
