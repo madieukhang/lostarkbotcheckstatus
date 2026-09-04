@@ -15,8 +15,13 @@ import {
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { connectDB } from '../../../db.js';
-import { rosterUrl } from '../../../utils/rosterLink.js';
-import { COLORS } from '../../../utils/ui.js';
+import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
+import RosterSnapshot from '../../../models/RosterSnapshot.js';
+import {
+  renderTrackedAltsField,
+  resolveRosterWorld,
+  statMapFromRosterCharacters,
+} from '../trackedAltsRender.js';
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
@@ -34,7 +39,7 @@ import {
   editEmbed,
   updateEmbed,
 } from '../../../utils/interactionReplies.js';
-import { getUserLanguage, t } from '../../../services/i18n/index.js';
+import { getUserLanguage, t, tPick } from '../../../services/i18n/index.js';
 import { getListContext } from '../helpers.js';
 
 const REMOVE_COLOR_BY_TYPE = {
@@ -80,6 +85,136 @@ const REMOVE_RESULT_PRESENTATIONS = [
 
 export function resolveRemoveResultPresentation(context) {
   return REMOVE_RESULT_PRESENTATIONS.find(({ matches }) => matches(context)).resolve(context);
+}
+
+/**
+ * Render N outcome envelopes as one result card.
+ *
+ * A removal cannot be undone, and once this card is sent nothing about
+ * the entry is left in the database. So the card is written as a receipt:
+ * it keeps the reason it just deleted, and it records who removed it and
+ * when, neither of which the old card carried at all.
+ *
+ * Color and title icon follow the strongest outcome present · any failure
+ * tints warning, otherwise the list icon when a single type was removed.
+ *
+ * @param {Array<{ok: boolean, entry: object, type: string, label: string, icon: string, reason?: string}>} outcomes
+ * @param {object} options
+ * @param {string} options.name - the character name that was searched
+ * @param {string} options.lang - locale for every label
+ * @param {Map<string, object>} [options.statMap] - roster snapshots, for
+ *   the alt rows' class icon, ilvl and CP
+ * @param {string} [options.world] - the entry's server, already resolved
+ * @param {string} [options.removedBy] - display name of whoever ran it
+ * @returns {import('discord.js').EmbedBuilder}
+ */
+export function buildRemoveResultCard(outcomes, {
+  name,
+  lang = 'en',
+  statMap = new Map(),
+  world = '',
+  removedBy = '',
+} = {}) {
+  const oks = outcomes.filter((o) => o.ok);
+  const fails = outcomes.filter((o) => !o.ok);
+  const { color, titleIcon, title } = resolveRemoveResultPresentation({ oks, fails, name, lang });
+
+  // A single removal gets its reason as a field of its own, at full width
+  // and untruncated. After this card the reason is gone, so an
+  // 80-character crop is a real loss · with two or more lists the
+  // per-line crop stays, because there is no one reason to lift out.
+  const soleRemoval = oks.length === 1 ? oks[0].entry : null;
+  const soleReason = String(soleRemoval?.reason || '').trim();
+
+  const sections = [];
+  if (oks.length > 0) {
+    const removedLines = oks.map((o) => {
+      const scopeTag = o.entry.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
+      const reason = !soleRemoval && o.entry.reason
+        ? ` *${(o.entry.reason || '').slice(0, 80)}${o.entry.reason.length > 80 ? '...' : ''}*`
+        : '';
+      return `${o.icon} **${o.label}**${scopeTag}${reason}`;
+    });
+    sections.push({
+      name: `✅ ${t('dialogue.remove.successSection', lang)}`,
+      value: removedLines.join('\n').slice(0, 1024),
+      inline: false,
+    });
+  }
+  if (fails.length > 0) {
+    const failLines = fails.map((o) => {
+      if (o.reason === 'legacy') {
+        return `⚠️ ${t('dialogue.remove.legacy', lang, { list: o.label })}`;
+      }
+      const owner = o.entry.addedByTag || o.entry.addedByUserId;
+      return `⛔ ${t('dialogue.remove.ownerOnly', lang, { list: o.label, owner })}`;
+    });
+    sections.push({
+      name: `🚫 ${t('dialogue.remove.failedSection', lang)}`,
+      value: failLines.join('\n').slice(0, 1024),
+      inline: false,
+    });
+  }
+
+  // Roster preview identifies the removal target. Scan all entries
+  // (successes and failures) for allCharacters; the first one with > 1
+  // char wins, since entries usually share the same roster. Rendered
+  // through the shared renderer so the rows carry a class icon, ilvl and
+  // CP like every other character list · they used to be bare links.
+  const sourceEntry = outcomes.find(
+    (o) => Array.isArray(o.entry.allCharacters) && o.entry.allCharacters.length > 1
+  )?.entry;
+  const altsField = sourceEntry
+    ? renderTrackedAltsField({
+      names: sourceEntry.allCharacters,
+      primaryName: sourceEntry.name,
+      statMap,
+      // The renderer appends its own "(N)", so the label must not carry one.
+      label: `🧬 ${t('dialogue.remove.trackedAlts', lang)}`,
+      overflowTemplate: t('dialogue.remove.more', lang),
+    })
+    : null;
+
+  const auditFields = padInlineRow([
+    removedBy ? {
+      name: `👤 ${t('dialogue.remove.removedBy', lang)}`,
+      value: removedBy,
+      inline: true,
+    } : null,
+    {
+      name: `🕐 ${t('dialogue.remove.removedAt', lang)}`,
+      value: relativeTime(new Date()),
+      inline: true,
+    },
+    world ? {
+      name: `🌍 ${t('dialogue.roster.server', lang)}`,
+      value: `\`${world}\``,
+      inline: true,
+    } : null,
+  ].filter(Boolean));
+
+  const fields = [
+    ...sections,
+    soleReason ? {
+      name: `📝 ${t('dialogue.remove.removedReason', lang)}`,
+      value: soleReason.slice(0, 1024),
+      inline: false,
+    } : null,
+    ...auditFields,
+    altsField,
+  ].filter(Boolean);
+
+  return createArtistEmbed(lang)
+    .setTitle(`${titleIcon} ${title}`)
+    .setDescription(tPick(`dialogue.remove.${soleReason ? 'line' : 'lineNoReason'}`, lang))
+    .addFields(fields)
+    .setColor(color)
+    .setFooter({
+      text: oks.length > 0
+        ? t('dialogue.remove.footerReadd', lang, { name })
+        : t('dialogue.remove.footerBlocked', lang),
+    })
+    .setTimestamp();
 }
 
 /**
@@ -136,6 +271,23 @@ export function createRemoveHandlers({ services }) {
         return;
       }
 
+      // Loaded before the delete, because afterwards the entry is gone and
+      // the card still has to describe what it removed. One query feeds
+      // both the alt rows (class icon + ilvl + CP) and the Server badge.
+      const snapshotNames = [...new Set(
+        found.flatMap(({ entry }) => [entry.name, ...(entry.allCharacters || [])]).filter(Boolean)
+      )];
+      let removeStatMap = new Map();
+      try {
+        const snapshots = await RosterSnapshot.find({ name: { $in: snapshotNames } })
+          .collation({ locale: 'en', strength: 2 })
+          .lean();
+        removeStatMap = statMapFromRosterCharacters(snapshots);
+      } catch (err) {
+        console.warn('[list] Snapshot lookup for remove card failed (non-fatal):', err.message);
+      }
+      const removedWorld = resolveRosterWorld(found[0].entry, removeStatMap);
+
       // removeOne returns a structured outcome envelope so the caller
       // can render it as an embed. The previous string-based return
       // produced plain content lines which lacked visual hierarchy
@@ -167,69 +319,13 @@ export function createRemoveHandlers({ services }) {
         return { ok: true, entry, type, label, icon };
       };
 
-      // Render N outcome envelopes as a single result embed. Color and
-      // title icon follow the strongest outcome present (any failure
-      // tints warning; otherwise the success-list-icon if just one
-      // type, else generic success).
-      const buildRemoveResultEmbed = (outcomes) => {
-        const oks = outcomes.filter((o) => o.ok);
-        const fails = outcomes.filter((o) => !o.ok);
-
-        const { color, titleIcon, title } = resolveRemoveResultPresentation({
-          oks,
-          fails,
-          name,
-          lang,
-        });
-
-        const sections = [];
-        if (oks.length > 0) {
-          const removedLines = oks.map((o) => {
-            const scopeTag = o.entry.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
-            const reason = o.entry.reason ? ` *${(o.entry.reason || '').slice(0, 80)}${o.entry.reason.length > 80 ? '...' : ''}*` : '';
-            return `${o.icon} **${o.label}**${scopeTag}${reason}`;
-          });
-          sections.push(`✅ **${t('dialogue.remove.successSection', lang)}**\n${removedLines.join('\n')}`);
-        }
-        if (fails.length > 0) {
-          const failLines = fails.map((o) => {
-            if (o.reason === 'legacy') {
-              return `⚠️ ${t('dialogue.remove.legacy', lang, { list: o.label })}`;
-            }
-            const owner = o.entry.addedByTag || o.entry.addedByUserId;
-            return `⛔ ${t('dialogue.remove.ownerOnly', lang, { list: o.label, owner })}`;
-          });
-          sections.push(`🚫 **${t('dialogue.remove.failedSection', lang)}**\n${failLines.join('\n')}`);
-        }
-
-        // Roster preview identifies the removal target. Scan all entries
-        // (successes and failures) for allCharacters; the first one
-        // with > 1 char wins (entries usually share the same roster).
-        const sourceEntry = (outcomes.find((o) => Array.isArray(o.entry.allCharacters) && o.entry.allCharacters.length > 1))?.entry;
-        if (sourceEntry) {
-          const sourceEntryKey = normalizeNameKey(sourceEntry.name);
-          const others = (sourceEntry.allCharacters || []).filter(
-            (name) => normalizeNameKey(name) !== sourceEntryKey
-          );
-          if (others.length > 0) {
-            const visible = others.slice(0, 6);
-            const linked = visible.map((n) => `[${n}](${rosterUrl(n)})`);
-            const tail = others.length > visible.length ? ` *${t('dialogue.remove.more', lang, { count: others.length - visible.length })}*` : '';
-            sections.push(`🧬 **${t('dialogue.remove.trackedAlts', lang, { count: others.length })}**\n${linked.join(', ')}${tail}`);
-          }
-        }
-
-        return createArtistEmbed(lang)
-          .setTitle(`${titleIcon} ${title}`)
-          .setDescription(sections.join('\n\n').slice(0, 4096))
-          .setColor(color)
-          .setFooter({
-            text: oks.length > 0
-              ? t('dialogue.remove.footerSuccess', lang)
-              : t('dialogue.remove.footerBlocked', lang),
-          })
-          .setTimestamp();
-      };
+      const buildRemoveResultEmbed = (outcomes) => buildRemoveResultCard(outcomes, {
+        name,
+        lang,
+        statMap: removeStatMap,
+        world: removedWorld,
+        removedBy: interaction.member?.displayName || interaction.user.username,
+      });
 
       // Single entry · remove directly, render as embed.
       if (found.length === 1) {

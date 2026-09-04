@@ -434,9 +434,20 @@ export default {
   remove: {
     notFound: { title: 'Nothing to remove', description: '**{name}** is not in any visible list.', footer: 'Use `/la-list view` to browse existing entries.' },
     titles: { blocked: 'Removal blocked · {name}', one: 'Removed from {list} · {name}', many: 'Removed from {count} lists · {name}', mixed: 'Mixed result · {name}' },
-    successSection: 'Successfully removed:', failedSection: 'Could not remove:',
+    line: { variants: [
+      'Removed. I copied the old reason below, in case you need it again.',
+      'Done, the entry is off the list. Its reason is kept right here.',
+      'Removed. Nothing about that entry is left in the database, so here is a copy.',
+    ] },
+    lineNoReason: { variants: [
+      'Removed. That entry carried no reason, so there is nothing to keep.',
+      'Done, the entry is off the list.',
+    ] },
+    removedReason: 'Reason of the removed entry', removedBy: 'Removed by', removedAt: 'Removed',
+    footerReadd: 'Need it back? `/la-list add name:{name}` and I will rebuild it.',
+    successSection: 'Successfully removed', failedSection: 'Could not remove',
     legacy: '**{list}**: this legacy entry has no owner metadata. Use `/la-list edit` to change it.', ownerOnly: '**{list}**: only **{owner}**, who added it, can remove this entry.',
-    trackedAlts: 'Tracked alts on this entry ({count}):', more: '+{count} more',
+    trackedAlts: 'Tracked alts on this entry', more: '+{count} more',
     footerSuccess: 'Use `/la-list view` to confirm the removal.', footerBlocked: 'Inspect it with `/la-list view`; use `/la-list edit` for legacy entries.',
     pickerTitle: 'Found · {name}', pickerDescription: '**{name}** is in {count} lists. Choose what to remove:', pickerFooter: 'Expires in 30 seconds · only you can use this picker.',
     failed: { title: 'Removal failed', description: 'I could not remove the entry.' }, unknown: 'unknown',

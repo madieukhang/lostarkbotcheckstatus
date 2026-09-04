@@ -9,6 +9,13 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Fixed
+- The `/la-list remove` card records **who removed an entry and when**. It carried neither, so a removal - the one action in the bot that cannot be undone - left no trace of who took it out, while the card that adds an entry has always shown "added by" and "time added".
+
+### Changed
+- The `/la-list remove` card is written as a receipt. Once it is sent, nothing about the entry is left in the database, so the reason it just deleted gets a full-width field of its own rather than an 80-character crop on a list line - Artist says outright that the copy is there in case it is needed again. Removing from two or more lists keeps the per-line crop, because there is no single reason to lift out. The alt rows go through the shared renderer, so they carry a class icon, ilvl and CP instead of being bare comma-separated links, and the footer offers `/la-list add` to rebuild rather than `/la-list view` to confirm.
+- `buildRemoveResultCard` is exported. It used to be a closure inside the command handler, which is why the card had no test coverage of its own.
+
 ### Changed
 - The `/la-list enrich` success card is now a record of the hunt rather than a line confirming a save. The count moves into the title as a delta (**Ainslinn · +3 alt mới**), the scan that produced it moves above the title into the embed author line (**Stronghold scan · Bullet Shell**), and what the scan cost becomes three badges - scanned, alts found, roster hidden. Artist speaks one line instead of a paragraph restating the title, drawn from a different `tPick` pool for one alt than for several. The footer answers the question that follows "+3": how many the entry tracks now.
 - `buildAlertEmbed` accepts an `author` line. It suits the context a result came out of, leaving the title free for the result; Discord renders no markdown there, so it takes plain text only.

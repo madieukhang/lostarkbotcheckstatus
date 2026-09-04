@@ -286,7 +286,18 @@ export default {
   },
   remove: {
     notFound: { title: '削除するものがありませんの', description: '**{name}** は表示可能な list にいませんわ。', footer: '`/la-list view` で既存 entry を確認できますの。' }, titles: { blocked: '削除できません · {name}', one: '{list} から削除 · {name}', many: '{count} lists から削除 · {name}', mixed: 'Mixed result · {name}' },
-    successSection: '削除成功:', failedSection: '削除できません:', legacy: '**{list}**: この legacy entry には owner metadata がありません。`/la-list edit` で変更してくださいませ。', ownerOnly: '**{list}**: 追加した **{owner}** だけが削除できますの。', trackedAlts: 'この entry の追跡 alt ({count}):', more: '+{count} 名',
+    line: { variants: [
+      '削除しましたわ。古い理由は下に控えておきましたの、また必要になるかもしれませんから。',
+      '完了ですわ。entry は list から消えました。理由はここに残しておきますの。',
+      '削除しましたわ。database にはもう何も残っていませんので、控えを下に置いておきますの。',
+    ] },
+    lineNoReason: { variants: [
+      '削除しましたわ。その entry には理由がなかったので、残すものがありませんの。',
+      '完了ですわ。entry は list から消えました。',
+    ] },
+    removedReason: '削除した entry の理由', removedBy: '削除者', removedAt: '削除日時',
+    footerReadd: 'また必要でしたら `/la-list add name:{name}` で作り直せますわ。',
+    successSection: '削除成功', failedSection: '削除できません', legacy: '**{list}**: この legacy entry には owner metadata がありません。`/la-list edit` で変更してくださいませ。', ownerOnly: '**{list}**: 追加した **{owner}** だけが削除できますの。', trackedAlts: 'この entry の追跡 alt', more: '+{count} 名',
     footerSuccess: '`/la-list view` で削除結果をご確認くださいませ。', footerBlocked: '`/la-list view` で確認し、legacy entry は `/la-list edit` で変更してくださいませ。', pickerTitle: '発見 · {name}', pickerDescription: '**{name}** は {count} lists にいます。削除対象を選んでくださいませ:', pickerFooter: '30秒で期限切れ · この picker はあなた専用ですの。', failed: { title: '削除に失敗しましたの', description: 'Entry を削除できませんでしたわ。' }, unknown: '不明',
   },
   check: {

@@ -311,7 +311,18 @@ export default {
   },
   remove: {
     notFound: { title: 'Không có gì để xóa', description: '**{name}** không nằm trong list nào cậu nhìn thấy.', footer: 'Dùng `/la-list view` để xem các entry hiện có nhé.' }, titles: { blocked: 'Không thể xóa · {name}', one: 'Đã xóa khỏi {list} · {name}', many: 'Đã xóa khỏi {count} list · {name}', mixed: 'Kết quả hỗn hợp · {name}' },
-    successSection: 'Đã xóa thành công:', failedSection: 'Không thể xóa:', legacy: '**{list}**: entry legacy này không có metadata chủ sở hữu. Dùng `/la-list edit` để chỉnh.', ownerOnly: '**{list}**: chỉ **{owner}**, người đã thêm entry, mới xóa được.', trackedAlts: 'Alt được track trong entry này ({count}):', more: '+{count} tên khác',
+    line: { variants: [
+      'Gỡ rồi nhé. Tớ chép lại lý do cũ ở dưới, phòng khi cậu cần nó lần nữa.',
+      'Xong, entry biến khỏi list rồi. Lý do cũ tớ giữ lại ngay dưới đây.',
+      'Đã gỡ. Sau tin này thì database không còn gì về entry đó, nên tớ để lại bản chép ở dưới.',
+    ] },
+    lineNoReason: { variants: [
+      'Gỡ rồi nhé. Entry đó không ghi lý do nên tớ chẳng có gì để giữ lại.',
+      'Xong, entry biến khỏi list rồi.',
+    ] },
+    removedReason: 'Lý do của entry vừa gỡ', removedBy: 'Người gỡ', removedAt: 'Gỡ lúc',
+    footerReadd: 'Cần lại thì `/la-list add name:{name}`, tớ dựng lại từ đầu.',
+    successSection: 'Đã xóa thành công', failedSection: 'Không thể xóa', legacy: '**{list}**: entry legacy này không có metadata chủ sở hữu. Dùng `/la-list edit` để chỉnh.', ownerOnly: '**{list}**: chỉ **{owner}**, người đã thêm entry, mới xóa được.', trackedAlts: 'Alt được track trong entry này', more: '+{count} tên khác',
     footerSuccess: 'Dùng `/la-list view` để xác nhận entry đã được xóa.', footerBlocked: 'Kiểm tra bằng `/la-list view`; dùng `/la-list edit` cho entry legacy.', pickerTitle: 'Đã tìm thấy · {name}', pickerDescription: '**{name}** nằm trong {count} list. Chọn mục cần xóa:', pickerFooter: 'Hết hạn sau 30 giây · chỉ cậu dùng được picker này.', failed: { title: 'Xóa thất bại', description: 'Tớ chưa xóa được entry.' }, unknown: 'không xác định',
   },
   check: {
