@@ -91,3 +91,23 @@ export function applyGeminiModelWaitlist(models, rawValue = '') {
 export function resolveDefaultGeminiPrimaryTimeoutMs(model) {
   return DEFAULT_PRIMARY_TIMEOUT_MS_BY_MODEL[String(model || '').toLowerCase()] || 15_000;
 }
+
+/**
+ * Bound one model attempt while preserving useful time for a fallback.
+ * If the shared request is already inside the reserve window, the current
+ * model receives the remainder instead of being aborted after a token delay.
+ */
+export function resolveGeminiAttemptTimeoutMs({
+  remainingMs,
+  modelTimeoutMs,
+  fallbackReserveMs,
+  hasFallback,
+}) {
+  const remaining = Math.max(1, Math.floor(Number(remainingMs) || 0));
+  const modelCap = Math.max(1, Math.floor(Number(modelTimeoutMs) || remaining));
+  const reserve = Math.max(0, Math.floor(Number(fallbackReserveMs) || 0));
+  const availableBeforeReserve = remaining - reserve;
+  const canPreserveFallback = hasFallback && reserve > 0 && availableBeforeReserve >= 1_000;
+
+  return Math.min(modelCap, canPreserveFallback ? availableBeforeReserve : remaining);
+}

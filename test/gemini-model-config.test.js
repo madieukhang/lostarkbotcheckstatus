@@ -6,6 +6,7 @@ import {
   DEFAULT_GEMINI_MODEL_WAITLIST,
   DEFAULT_GEMINI_MODELS,
   isGemini3Model,
+  resolveGeminiAttemptTimeoutMs,
   resolveDefaultGeminiPrimaryTimeoutMs,
   resolveGeminiModels,
 } from '../bot/config/geminiModels.js';
@@ -72,4 +73,25 @@ test('waitlist validation is case-insensitive and primary timeout follows the ac
   assert.deepEqual(resolution.rejected, ['gemini-2.5-flash']);
   assert.equal(resolveDefaultGeminiPrimaryTimeoutMs(resolution.models[0]), 30_000);
   assert.equal(resolveDefaultGeminiPrimaryTimeoutMs('gemini-3.8-flash'), 8_000);
+});
+
+test('attempt timeout preserves fallback time without starving the active model', () => {
+  assert.equal(resolveGeminiAttemptTimeoutMs({
+    remainingMs: 30_000,
+    modelTimeoutMs: 30_000,
+    fallbackReserveMs: 10_000,
+    hasFallback: true,
+  }), 20_000);
+  assert.equal(resolveGeminiAttemptTimeoutMs({
+    remainingMs: 9_000,
+    modelTimeoutMs: 30_000,
+    fallbackReserveMs: 10_000,
+    hasFallback: true,
+  }), 9_000);
+  assert.equal(resolveGeminiAttemptTimeoutMs({
+    remainingMs: 30_000,
+    modelTimeoutMs: 30_000,
+    fallbackReserveMs: 10_000,
+    hasFallback: false,
+  }), 30_000);
 });

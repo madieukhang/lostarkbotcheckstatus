@@ -250,7 +250,9 @@ Copy `.env.example` to `.env` and fill in values.
 | `GEMINI_MAX_OUTPUT_TOKENS` | `768` | OCR response ceiling, including visible output and thinking tokens; configurable for repeatable A/B benchmarks |
 | `GEMINI_MODELS` | `gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Gemini 3.x-only priority catalog before the waitlist is applied; older generations are ignored |
 | `GEMINI_MODEL_WAITLIST` | `gemini-3.8-flash` | Comma-separated models temporarily excluded from OCR; set `none` or `off` to restore the full configured chain |
-| `GEMINI_PRIMARY_TIMEOUT_MS` | model-aware | Optional soft-timeout override; the current 3.7 primary gets the full 30s budget, while restored 3.8 defaults to an 8s soft cap; quick recoverable failures still leave the shared remainder for fallbacks |
+| `GEMINI_PRIMARY_TIMEOUT_MS` | model-aware | Per-model cap for the preferred model; restored 3.8 defaults to 8s and the current 3.7 cap is 30s before the fallback reserve is applied |
+| `GEMINI_FALLBACK_RESERVE_MS` | `10000` | Time protected inside the shared 30s OCR deadline for another model; with the default chain, one slow model cannot consume the entire request |
+| `GEMINI_MODEL_COOLDOWN_MS` | `60000` | Process-local cooldown after recoverable 404/429/5xx, timeout, or network failure; later requests skip that model until it is eligible again |
 | `LISTCHECK_ALT_ENRICHMENT` | `false` | Run background Stronghold alt scan after OCR hits; keep off to avoid request spikes |
 | `LISTCHECK_ALT_ENRICHMENT_LIMIT` | `1` | Max flagged OCR names to enrich per screenshot when enrichment is enabled |
 | `LISTCHECK_ALT_ENRICHMENT_CANDIDATE_LIMIT` | `80` | Max guild candidates checked per OCR background alt scan |

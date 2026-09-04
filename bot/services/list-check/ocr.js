@@ -1,5 +1,9 @@
 import config from '../../config.js';
 import {
+  resolveDefaultGeminiPrimaryTimeoutMs,
+  resolveGeminiAttemptTimeoutMs,
+} from '../../config/geminiModels.js';
+import {
   isValidCharacterName,
   normalizeCharacterName,
   normalizeNameKey,
@@ -22,6 +26,7 @@ const GEMINI_GENERATION_CONFIG = Object.freeze({
   thinkingConfig: Object.freeze({ thinkingLevel: 'low' }),
 });
 const GEMINI_FAILOVER_HTTP_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
+const MAX_GEMINI_MODEL_COOLDOWN_MS = 5 * 60_000;
 const GEMINI_FAILOVER_BODY_HINTS = Object.freeze([
   'resource_exhausted',
   'quota',
@@ -37,8 +42,16 @@ const GEMINI_FAILURE_FORMATTERS = {
     `Gemini request failed on ${result.model} (HTTP ${result.status}) ${result.bodyText}`.trim(),
   'response:non-JSON response': () => 'Gemini did not return a JSON array.',
   'response:max output tokens': () => 'Gemini output was truncated at the token limit.',
+  cooldown: (result) => (
+    `All Gemini models are temporarily cooling down; retry in ${Math.ceil(result.retryAfterMs / 1000)}s.`
+  ),
   default: (result) => `All Gemini models failed: ${result.failures.join(' | ')}`,
 };
+
+// Process-local circuit breaker. Recoverable model failures should influence
+// the next Discord request, not force every user to knock on the same busy
+// endpoint again until the deployment restarts.
+const geminiModelCooldowns = new Map();
 
 function formatGeminiFailure(result) {
   const key = result.type === 'response'
@@ -144,6 +157,62 @@ function formatGeminiTokenUsage(usageMetadata) {
   return `, tokens: ${fields.map(([label, value]) => `${label}=${value}`).join(' ')}`;
 }
 
+function parseRetryAfterMs(value, now = Date.now()) {
+  const text = String(value || '').trim();
+  if (!text) return 0;
+
+  const seconds = Number(text);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds * 1000);
+
+  const retryAt = Date.parse(text);
+  return Number.isFinite(retryAt) ? Math.max(0, retryAt - now) : 0;
+}
+
+function selectAvailableGeminiModels(models, now = Date.now()) {
+  const available = [];
+  const skipped = [];
+
+  for (const model of models) {
+    const key = model.toLowerCase();
+    const state = geminiModelCooldowns.get(key);
+    if (!state || state.until <= now) {
+      if (state) geminiModelCooldowns.delete(key);
+      available.push(model);
+      continue;
+    }
+
+    skipped.push({
+      model,
+      reason: state.reason,
+      remainingMs: state.until - now,
+    });
+  }
+
+  return { available, skipped };
+}
+
+function coolDownGeminiModel(model, reason, retryAfterMs = 0, now = Date.now()) {
+  const configuredMs = Math.max(1, config.geminiModelCooldownMs || 60_000);
+  const cooldownMs = Math.min(
+    Math.max(configuredMs, retryAfterMs),
+    Math.max(configuredMs, MAX_GEMINI_MODEL_COOLDOWN_MS),
+  );
+  geminiModelCooldowns.set(model.toLowerCase(), {
+    reason,
+    until: now + cooldownMs,
+  });
+  return cooldownMs;
+}
+
+function restoreGeminiModel(model) {
+  geminiModelCooldowns.delete(model.toLowerCase());
+}
+
+/** Reset only adaptive model health; used by deterministic tests. */
+export function clearGeminiModelCooldowns() {
+  geminiModelCooldowns.clear();
+}
+
 async function requestGeminiWithFallback({
   prompt,
   imageBase64,
@@ -152,6 +221,7 @@ async function requestGeminiWithFallback({
   onModelStart = () => {},
   onModelElapsed = () => {},
   onModelUsage = () => {},
+  onModelSkipped = () => {},
   onRetry = () => {},
 }) {
   // Inline images can approach Gemini's request limit. Serialize once so each
@@ -160,25 +230,51 @@ async function requestGeminiWithFallback({
   if (Buffer.byteLength(requestBody, 'utf8') >= MAX_GEMINI_INLINE_REQUEST_BYTES) {
     throw new Error('Gemini inline request too large (must be under 20MB including encoding).');
   }
-  const models = config.geminiModels;
+  const { available: models, skipped } = selectAvailableGeminiModels(config.geminiModels);
+  for (const skippedModel of skipped) onModelSkipped(skippedModel);
+
+  if (models.length === 0) {
+    const retryAfterMs = Math.min(...skipped.map((item) => item.remainingMs));
+    return {
+      ok: false,
+      type: 'cooldown',
+      retryAfterMs,
+      failures: skipped.map((item) => `${item.model}: cooldown (${item.reason})`),
+    };
+  }
+
   const failures = [];
   // Failover models share one wall-clock budget. A hung primary must not get
   // a fresh 30 seconds for every fallback in the chain; quick 404/429/5xx
   // responses still leave almost the full budget for the next model.
   const requestSignal = AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS);
+  const requestDeadline = Date.now() + GEMINI_REQUEST_TIMEOUT_MS;
 
   for (let i = 0; i < models.length; i += 1) {
     const model = models[i];
     const hasFallback = i < models.length - 1;
-    const primaryTimeoutMs = Math.min(
-      config.geminiPrimaryTimeoutMs || 8_000,
-      GEMINI_REQUEST_TIMEOUT_MS,
-    );
-    // Give the preferred model a fair chance without letting one slow success
-    // consume most of the user-facing deadline. Later models retain the shared
-    // remainder; a single-model override still receives the full hard timeout.
-    const modelSignal = i === 0 && hasFallback && primaryTimeoutMs < GEMINI_REQUEST_TIMEOUT_MS
-      ? AbortSignal.any([requestSignal, AbortSignal.timeout(primaryTimeoutMs)])
+    const remainingMs = Math.max(0, requestDeadline - Date.now());
+    if (remainingMs === 0 || requestSignal.aborted) {
+      const error = requestSignal.reason || new DOMException('Gemini request timed out.', 'TimeoutError');
+      return { ok: false, type: 'network', model, error, failures };
+    }
+
+    const preferredModelTimeoutMs = config.geminiPrimaryTimeoutOverridden
+      ? config.geminiPrimaryTimeoutMs
+      : resolveDefaultGeminiPrimaryTimeoutMs(model);
+    const modelTimeoutMs = i === 0
+      ? Math.min(preferredModelTimeoutMs || 8_000, GEMINI_REQUEST_TIMEOUT_MS)
+      : remainingMs;
+    const attemptTimeoutMs = resolveGeminiAttemptTimeoutMs({
+      remainingMs,
+      modelTimeoutMs,
+      fallbackReserveMs: config.geminiFallbackReserveMs || 10_000,
+      hasFallback,
+    });
+    // Every non-final attempt can receive its own soft deadline. The shared
+    // signal remains the hard wall-clock cap for the entire fallback chain.
+    const modelSignal = attemptTimeoutMs < remainingMs
+      ? AbortSignal.any([requestSignal, AbortSignal.timeout(attemptTimeoutMs)])
       : requestSignal;
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
     const modelStartedAt = Date.now();
@@ -195,15 +291,19 @@ async function requestGeminiWithFallback({
     } catch (error) {
       onModelElapsed({ model, elapsedMs: Date.now() - modelStartedAt });
       failures.push(`${model}: ${error.name || error.message}`);
+      const cooldownMs = coolDownGeminiModel(
+        model,
+        modelSignal.aborted ? 'timeout' : 'network error',
+      );
       if (requestSignal.aborted) {
         return { ok: false, type: 'network', model, error, failures };
       }
       if (modelSignal.aborted && hasFallback) {
-        onRetry({ type: 'timeout', model, error, timeoutMs: primaryTimeoutMs });
+        onRetry({ type: 'timeout', model, error, timeoutMs: attemptTimeoutMs, cooldownMs });
         continue;
       }
       if (hasFallback) {
-        onRetry({ type: 'network', model, error });
+        onRetry({ type: 'network', model, error, cooldownMs });
         continue;
       }
       return { ok: false, type: 'network', model, error, failures };
@@ -213,9 +313,18 @@ async function requestGeminiWithFallback({
     if (!aiRes.ok) {
       const bodyText = await aiRes.text().catch(() => '');
       failures.push(`${model}: HTTP ${aiRes.status}`);
-      if (hasFallback && shouldFailoverGeminiModel(aiRes.status, bodyText)) {
-        onRetry({ type: 'http', model, status: aiRes.status, bodyText });
-        continue;
+      const recoverable = shouldFailoverGeminiModel(aiRes.status, bodyText);
+      if (recoverable) {
+        const retryAfterMs = parseRetryAfterMs(aiRes.headers.get('retry-after'));
+        const cooldownMs = coolDownGeminiModel(
+          model,
+          `HTTP ${aiRes.status}`,
+          retryAfterMs,
+        );
+        if (hasFallback) {
+          onRetry({ type: 'http', model, status: aiRes.status, bodyText, cooldownMs });
+          continue;
+        }
       }
       return {
         ok: false,
@@ -246,6 +355,7 @@ async function requestGeminiWithFallback({
       };
     }
 
+    restoreGeminiModel(model);
     return { ok: true, value: parsed?.value, model, failures };
   }
 
@@ -488,11 +598,20 @@ export async function extractNamesFromImage(image, options = {}) {
         if (Number.isFinite(value)) timing[field] += value;
       }
     },
-    onRetry: ({ type, model, status, timeoutMs }) => {
+    onModelSkipped: ({ model, reason, remainingMs }) => {
+      console.warn(
+        `[listcheck] Gemini ${model} cooling down after ${reason};`
+        + ` skipping for ${Math.ceil(remainingMs / 1000)}s.`,
+      );
+    },
+    onRetry: ({ type, model, status, timeoutMs, cooldownMs }) => {
+      const cooldown = Number.isFinite(cooldownMs)
+        ? ` Cooling it down for ${Math.ceil(cooldownMs / 1000)}s.`
+        : '';
       const retryMessages = {
-        network: `[listcheck] Gemini timeout/network error on ${model}, trying fallback model.`,
-        timeout: `[listcheck] Gemini primary ${model} exceeded ${timeoutMs}ms, trying fallback model.`,
-        http: `[listcheck] Gemini recoverable HTTP ${status} on ${model}, trying fallback model.`,
+        network: `[listcheck] Gemini timeout/network error on ${model}, trying fallback model.${cooldown}`,
+        timeout: `[listcheck] Gemini model ${model} exceeded ${timeoutMs}ms, trying fallback model.${cooldown}`,
+        http: `[listcheck] Gemini recoverable HTTP ${status} on ${model}, trying fallback model.${cooldown}`,
       };
       if (retryMessages[type]) console.warn(retryMessages[type]);
     },

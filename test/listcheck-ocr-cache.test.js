@@ -5,7 +5,10 @@ import config from '../bot/config.js';
 import {
   extractNamesFromImage,
 } from '../bot/services/list-check/service.js';
-import { clearOcrCache } from '../bot/services/list-check/ocr.js';
+import {
+  clearGeminiModelCooldowns,
+  clearOcrCache,
+} from '../bot/services/list-check/ocr.js';
 import { clearNameSuggestionCache } from '../bot/services/roster/search.js';
 
 test('extractNamesFromImage caches OCR results for repeated attachment URLs', async () => {
@@ -611,6 +614,7 @@ test('ambiguous-name refinement stops scheduling queued searches after its share
 
 test('extractNamesFromImage uses a Gemini 3-safe request while failing over recoverable errors', async () => {
   clearOcrCache();
+  clearGeminiModelCooldowns();
   const originalFetch = globalThis.fetch;
   const originalKey = config.geminiApiKey;
   const originalModels = [...config.geminiModels];
@@ -675,27 +679,30 @@ test('extractNamesFromImage uses a Gemini 3-safe request while failing over reco
         thinkingConfig: { thinkingLevel: 'low' },
       })),
     );
+    assert.ok(requestSignals.every((signal) => signal?.aborted === false));
     assert.ok(
-      requestSignals.every((signal) => signal === requestSignals[0]),
-      '3.7 primary and quick-error fallbacks should share one hard deadline',
+      new Set(requestSignals).size > 1,
+      'non-final attempts should have soft deadlines inside the shared hard deadline',
     );
-    assert.equal(requestSignals[0]?.aborted, false, 'shared hard deadline should remain live');
   } finally {
     globalThis.fetch = originalFetch;
     config.geminiApiKey = originalKey;
     config.geminiModels = originalModels;
+    clearGeminiModelCooldowns();
     clearOcrCache();
   }
 });
 
 test('extractNamesFromImage abandons a slow primary without exhausting the shared deadline', async () => {
   clearOcrCache();
+  clearGeminiModelCooldowns();
   const originalFetch = globalThis.fetch;
   const originalLog = console.log;
   const originalWarn = console.warn;
   const originalKey = config.geminiApiKey;
   const originalModels = [...config.geminiModels];
   const originalPrimaryTimeoutMs = config.geminiPrimaryTimeoutMs;
+  const originalPrimaryTimeoutOverridden = config.geminiPrimaryTimeoutOverridden;
   const requestedModels = [];
   const requestSignals = [];
   const logs = [];
@@ -704,6 +711,7 @@ test('extractNamesFromImage abandons a slow primary without exhausting the share
   config.geminiApiKey = 'fake-gemini-key';
   config.geminiModels = ['slow-primary-model', 'working-fallback-model'];
   config.geminiPrimaryTimeoutMs = 20;
+  config.geminiPrimaryTimeoutOverridden = true;
   console.log = (...args) => logs.push(args.join(' '));
   console.warn = (...args) => warnings.push(args.join(' '));
   globalThis.fetch = async (url, init = {}) => {
@@ -780,6 +788,159 @@ test('extractNamesFromImage abandons a slow primary without exhausting the share
     config.geminiApiKey = originalKey;
     config.geminiModels = originalModels;
     config.geminiPrimaryTimeoutMs = originalPrimaryTimeoutMs;
+    config.geminiPrimaryTimeoutOverridden = originalPrimaryTimeoutOverridden;
+    clearGeminiModelCooldowns();
+    clearOcrCache();
+  }
+});
+
+test('extractNamesFromImage skips a recoverably failed model until its cooldown expires', async () => {
+  clearOcrCache();
+  clearGeminiModelCooldowns();
+  const originalFetch = globalThis.fetch;
+  const originalNow = Date.now;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  const originalCooldownMs = config.geminiModelCooldownMs;
+  const requestedModels = [];
+  const warnings = [];
+  let busyCalls = 0;
+  let now = 1_000_000;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels = ['busy-model', 'healthy-model'];
+  config.geminiModelCooldownMs = 25;
+  Date.now = () => now;
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.startsWith('https://cdn.discordapp.com/cooldown-')) {
+      return new Response(new Uint8Array([40, 41, 42]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      const model = decodeURIComponent(requestedUrl.match(/models\/([^:]+):/)?.[1] || '');
+      requestedModels.push(model);
+      if (model === 'busy-model') {
+        busyCalls += 1;
+        if (busyCalls === 1) return new Response('high demand', { status: 503 });
+        return Response.json({
+          candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '["Recovered"]' }] } }],
+        });
+      }
+      return Response.json({
+        candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '["Healthy"]' }] } }],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const first = await extractNamesFromImage({
+      id: 'cooldown-first',
+      url: 'https://cdn.discordapp.com/cooldown-first.png',
+      contentType: 'image/png',
+    });
+    const second = await extractNamesFromImage({
+      id: 'cooldown-second',
+      url: 'https://cdn.discordapp.com/cooldown-second.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(first, ['Healthy']);
+    assert.deepEqual(second, ['Healthy']);
+    assert.deepEqual(requestedModels, ['busy-model', 'healthy-model', 'healthy-model']);
+    assert.ok(warnings.some((message) => (
+      message.includes('busy-model cooling down after HTTP 503')
+      && message.includes('skipping')
+    )));
+
+    now += 26;
+    const third = await extractNamesFromImage({
+      id: 'cooldown-third',
+      url: 'https://cdn.discordapp.com/cooldown-third.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(third, ['Recovered']);
+    assert.deepEqual(requestedModels, [
+      'busy-model',
+      'healthy-model',
+      'healthy-model',
+      'busy-model',
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    Date.now = originalNow;
+    console.warn = originalWarn;
+    config.geminiApiKey = originalKey;
+    config.geminiModels = originalModels;
+    config.geminiModelCooldownMs = originalCooldownMs;
+    clearGeminiModelCooldowns();
+    clearOcrCache();
+  }
+});
+
+test('extractNamesFromImage fails fast when every configured model is cooling down', async () => {
+  clearOcrCache();
+  clearGeminiModelCooldowns();
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  const originalCooldownMs = config.geminiModelCooldownMs;
+  let geminiCalls = 0;
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels = ['busy-a-model', 'busy-b-model'];
+  config.geminiModelCooldownMs = 1_000;
+  console.warn = () => {};
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.startsWith('https://cdn.discordapp.com/all-cooling-')) {
+      return new Response(new Uint8Array([43, 44, 45]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      geminiCalls += 1;
+      return new Response('high demand', { status: 503 });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    await assert.rejects(
+      () => extractNamesFromImage({
+        id: 'all-cooling-first',
+        url: 'https://cdn.discordapp.com/all-cooling-first.png',
+        contentType: 'image/png',
+      }),
+      /HTTP 503/,
+    );
+    await assert.rejects(
+      () => extractNamesFromImage({
+        id: 'all-cooling-second',
+        url: 'https://cdn.discordapp.com/all-cooling-second.png',
+        contentType: 'image/png',
+      }),
+      /temporarily cooling down/,
+    );
+    assert.equal(geminiCalls, 2, 'the second request must not hammer cooled-down models');
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    config.geminiApiKey = originalKey;
+    config.geminiModels = originalModels;
+    config.geminiModelCooldownMs = originalCooldownMs;
+    clearGeminiModelCooldowns();
     clearOcrCache();
   }
 });

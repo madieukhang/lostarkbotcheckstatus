@@ -98,15 +98,21 @@ if (geminiModelWaitlistResolution.rejected.length > 0) {
 if (geminiModelWaitlistResolution.models.length === 0) {
   throw new Error('[config] GEMINI_MODEL_WAITLIST excludes every configured Gemini model.');
 }
-const geminiPrimaryTimeoutMs = parsePositiveIntEnv(
-  'GEMINI_PRIMARY_TIMEOUT_MS',
-  resolveDefaultGeminiPrimaryTimeoutMs(geminiModelWaitlistResolution.models[0]),
-);
+const rawGeminiPrimaryTimeoutMs = parseInt(process.env.GEMINI_PRIMARY_TIMEOUT_MS, 10);
+const geminiPrimaryTimeoutOverridden = Number.isFinite(rawGeminiPrimaryTimeoutMs)
+  && rawGeminiPrimaryTimeoutMs > 0;
+const geminiPrimaryTimeoutMs = geminiPrimaryTimeoutOverridden
+  ? rawGeminiPrimaryTimeoutMs
+  : resolveDefaultGeminiPrimaryTimeoutMs(geminiModelWaitlistResolution.models[0]);
 const geminiMaxOutputTokens = parsePositiveIntEnv('GEMINI_MAX_OUTPUT_TOKENS', 768);
+const geminiFallbackReserveMs = parsePositiveIntEnv('GEMINI_FALLBACK_RESERVE_MS', 10_000);
+const geminiModelCooldownMs = parsePositiveIntEnv('GEMINI_MODEL_COOLDOWN_MS', 60_000);
 console.log(
   `[config] Gemini OCR active=${geminiModelWaitlistResolution.models.join(',')}`
   + ` waitlisted=${geminiModelWaitlistResolution.waitlisted.join(',') || 'none'}`
   + ` primaryTimeout=${geminiPrimaryTimeoutMs}ms`
+  + ` fallbackReserve=${geminiFallbackReserveMs}ms`
+  + ` modelCooldown=${geminiModelCooldownMs}ms`
   + ` maxOutputTokens=${geminiMaxOutputTokens}`,
 );
 
@@ -172,6 +178,15 @@ const config = {
 
   /** Soft latency cap for the primary Gemini OCR model before failover. */
   geminiPrimaryTimeoutMs,
+
+  /** Whether the primary cap is an explicit env override rather than a model default. */
+  geminiPrimaryTimeoutOverridden,
+
+  /** Portion of the shared OCR deadline protected for another model. */
+  geminiFallbackReserveMs,
+
+  /** Temporary model cooldown after a recoverable transport/API failure. */
+  geminiModelCooldownMs,
 
   /**
    * Optional post-check Stronghold scan for flagged OCR names.
