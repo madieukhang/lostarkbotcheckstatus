@@ -269,7 +269,10 @@ function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap) {
     },
     isRosterMatch ? {
       name: `🧬 ${t('dialogue.listAdd.duplicate.matchedName', lang)}`,
-      value: `[${existed.name}](${rosterUrl(existed.name)})`,
+      value: formatLinkedCharacter(
+        existed.name,
+        statMap.get(normalizeNameKey(existed.name)),
+      ),
       inline: true,
     } : null,
     existed.scope ? {
@@ -312,6 +315,22 @@ export function buildDuplicateListAddResult({
   const variant = isRosterMatch ? 'roster' : 'direct';
   const contentVariant = isRosterMatch ? 'contentRoster' : 'contentDirect';
   const values = { name, list: labelCap, matched: existed.name };
+  // The add flow already fetched this roster. Reuse its stat map so both
+  // identities in the duplicate sentence carry the same class-icon + Bible
+  // link vocabulary as every other list card, without another network call.
+  const descriptionValues = {
+    ...values,
+    name: formatLinkedCharacter(
+      name,
+      statMap.get(normalizeNameKey(name)),
+      { bold: false },
+    ),
+    matched: formatLinkedCharacter(
+      existed.name,
+      statMap.get(normalizeNameKey(existed.name)),
+      { bold: false },
+    ),
+  };
   const fields = appendDuplicateDetailFields(
     buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap),
     existed,
@@ -325,7 +344,7 @@ export function buildDuplicateListAddResult({
     embeds: [buildAlertEmbed({
       severity: AlertSeverity.WARNING,
       title: t('dialogue.listAdd.duplicate.title', lang, { list: labelCap }),
-      description: t(`dialogue.listAdd.duplicate.${variant}`, lang, values),
+      description: t(`dialogue.listAdd.duplicate.${variant}`, lang, descriptionValues),
       fields,
       footer: t('dialogue.listAdd.duplicate.footer', lang, { type }),
       timestamp: false,

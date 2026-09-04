@@ -61,31 +61,55 @@ test('duplicate roster result uses the freshly loaded roster Server in its full 
     raid: 'Kazeros Nor',
     allCharacters: ['Lungzhu', 'Zhaohang'],
   };
-  const result = buildDuplicateListAddResult({
-    existed,
-    name: 'Zhaohang',
-    labelCap: 'Blacklist',
-    type: 'black',
-    lang: 'en',
-    statMap: new Map([
-      ['zhaohang', { name: 'Zhaohang', world: 'Vairgrys' }],
-    ]),
-  });
-  const fields = result.embeds[0].toJSON().fields;
-  const metadataGrid = fields.slice(0, 6);
+  const oldPaladinEmoji = CLASS_EMOJI_MAP.Paladin;
+  const oldBardEmoji = CLASS_EMOJI_MAP.Bard;
+  CLASS_EMOJI_MAP.Paladin = '<:paladin:42>';
+  CLASS_EMOJI_MAP.Bard = '<:bard:43>';
 
-  assert.equal(metadataGrid.every((field) => field.inline), true);
-  assert.deepEqual(metadataGrid.map((field) => field.name), [
-    '🔍 Match type',
-    '🧬 Matched name',
-    '🌐 Scope',
-    '👤 Added by',
-    '🕐 Time added',
-    '🌍 Server',
-  ]);
-  assert.equal(metadataGrid[5].value, '`Vairgrys`');
-  assert.equal(fields[6].inline, false, 'reason starts the detail section after the grid');
-  assert.equal(fields[7].name, '🗡️ Raid');
+  try {
+    const result = buildDuplicateListAddResult({
+      existed,
+      name: 'Zhaohang',
+      labelCap: 'Blacklist',
+      type: 'black',
+      lang: 'en',
+      statMap: new Map([
+        ['zhaohang', { name: 'Zhaohang', className: 'Paladin', world: 'Vairgrys' }],
+        ['lungzhu', { name: 'Lungzhu', className: 'Bard', world: 'Vairgrys' }],
+      ]),
+    });
+    const embed = result.embeds[0].toJSON();
+    const fields = embed.fields;
+    const metadataGrid = fields.slice(0, 6);
+
+    assert.match(
+      embed.description,
+      /<:paladin:42> \[Zhaohang\]\(https:\/\/lostark\.bible\/character\/NA\/Zhaohang\/roster\)/u,
+    );
+    assert.match(
+      embed.description,
+      /<:bard:43> \[Lungzhu\]\(https:\/\/lostark\.bible\/character\/NA\/Lungzhu\/roster\)/u,
+    );
+    assert.equal(metadataGrid.every((field) => field.inline), true);
+    assert.deepEqual(metadataGrid.map((field) => field.name), [
+      '🔍 Match type',
+      '🧬 Matched name',
+      '🌐 Scope',
+      '👤 Added by',
+      '🕐 Time added',
+      '🌍 Server',
+    ]);
+    assert.equal(
+      metadataGrid[1].value,
+      '<:bard:43> **[Lungzhu](https://lostark.bible/character/NA/Lungzhu/roster)**',
+    );
+    assert.equal(metadataGrid[5].value, '`Vairgrys`');
+    assert.equal(fields[6].inline, false, 'reason starts the detail section after the grid');
+    assert.equal(fields[7].name, '🗡️ Raid');
+  } finally {
+    CLASS_EMOJI_MAP.Paladin = oldPaladinEmoji;
+    CLASS_EMOJI_MAP.Bard = oldBardEmoji;
+  }
 });
 
 test('duplicate audit row starts after match metadata and keeps Time added in column two', () => {

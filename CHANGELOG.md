@@ -1,5 +1,6 @@
 # Changelog
 
+- The `/la-list add` duplicate warning now renders both the submitted character and the roster-matched character with their class icon and clickable Lost Ark Bible link. It reuses the roster stat map already loaded for duplicate detection, so the richer card adds no network request.
 - The evidence card opened from `/la-list view` no longer repeats **List**. The parent view already establishes Blacklist, Whitelist, Watchlist, or Trusted before the user opens a character, while the shared evidence renderer keeps the field for independent surfaces that still need that context.
 
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/). Dates use the local calendar of each release.
