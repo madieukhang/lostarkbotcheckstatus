@@ -51,13 +51,13 @@ const jp = {
   autoCheckWelcome: {
     title: '🎨 皆さん、こんにちは～ この channel は Artist が見ておりますわ',
     description: [
-      '1つの message に最大3枚の screenshot を投げるか、`check NameOne NameTwo` / `check NameOne, NameTwo` と入力してくださいませ - 最大8名の character 名を読み取り、この server の list と照らし合わせますわ。',
+      '1つの message に最大3枚の screenshot を投げるか、`check NameOne NameTwo` / `check NameOne, NameTwo` と入力してくださいませ - 画像1枚につき最大8名の character 名を読み取り、この server の list と照らし合わせますわ。',
       '',
       '初めての方は、下の field で check の流れと結果の読み方をご確認くださいませ。',
     ],
     howName: '🔍 Check の流れ',
     howValue: [
-      '1. すぐに status card と 🔍 reaction を出し、最大3枚の画像を順番に読み取りますわ（合計8名まで）。',
+      '1. すぐに status card と 🔍 reaction を出し、最大3枚の画像を順番に読み取りますわ（1枚8名、合計24名まで）。',
       '2. 各名前を blacklist、watchlist、whitelist、trusted record と照合いたしますの。',
       '3. List 未登録で条件を満たす名前には **Quick Add** が表示され、officer が一発で登録できますわ。',
     ],

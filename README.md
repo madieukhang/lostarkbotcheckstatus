@@ -8,7 +8,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 - **Roster lookup** — `/la-roster` scrapes `lostark.bible`, tracks iLvl progression, cross-checks every list; `deep:true` runs Stronghold alt detection
 - **List management** — blacklist / whitelist / watchlist (`⛔` / `✅` / `⚠️`), global or server-scoped, trusted users protected from any list
 - **Bulk add** — `/la-list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast
-- **Screenshot OCR** — `/la-check` or drop in an auto-check channel, Gemini extracts ≤ 8 names and cross-checks; corrected names are re-matched against their final canonical/roster identities and the card shows the `OCR → resolved name → list entry` path
+- **Screenshot OCR** — `/la-check` extracts ≤ 8 names from one image; auto-check accepts up to 3 images and scales to 8 names each (24 total). Corrected names are re-matched against their final canonical/roster identities and the card shows the `OCR → resolved name → list entry` path
 - **Text checks** — in an auto-check channel, `check NameOne NameTwo` and `check NameOne, NameTwo` both cross-check up to 8 names in one request; listed hits open a broadcast-style detail card with cached ilvl/CP, attribution, tracked alts, and inline evidence
 - **Quick Add** — after auto-check, dropdown adds unflagged names straight to blacklist/watchlist via modal
 - **Approval flow** — members submit, officers instant-approve; senior approver always receives the DM
@@ -256,7 +256,7 @@ Copy `.env.example` to `.env` and fill in values.
 | `LISTCHECK_ALT_ENRICHMENT` | `false` | Run background Stronghold alt scan after OCR hits; keep off to avoid request spikes |
 | `LISTCHECK_ALT_ENRICHMENT_LIMIT` | `1` | Max flagged OCR names to enrich per screenshot when enrichment is enabled |
 | `LISTCHECK_ALT_ENRICHMENT_CANDIDATE_LIMIT` | `80` | Max guild candidates checked per OCR background alt scan |
-| `LISTCHECK_MAX_NAMES` | `8` | Max OCR names checked from one image |
+| `LISTCHECK_MAX_NAMES` | `8` | Max OCR names checked per image; auto-check scales this across up to 3 attachments with a hard cap of 24 names |
 | `LISTCHECK_ROSTER_LOOKUP_CONCURRENCY` | `3` | Parallel direct roster lookups during `/la-check` |
 | `LISTCHECK_ROSTER_LOOKUP_START_SPACING_MS` | `150` | Start spacing between `/la-check` roster lookups |
 | `LISTCHECK_ROSTER_LOOKUP_TIMEOUT_MS` | `6000` | Timeout for each direct `/la-check` roster/suggestion lookup |

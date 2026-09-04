@@ -39,7 +39,8 @@ const COOLDOWN_MS = 10_000; // 10 seconds between checks per user
 const processedMessages = new Map(); // messageId -> timestamp
 const inFlightMessages = new Set();
 const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
-const AUTO_CHECK_MAX_NAMES = 8;
+const AUTO_CHECK_MAX_NAMES_PER_IMAGE = 8;
+const AUTO_CHECK_MAX_BATCH_NAMES = 24;
 const AUTO_CHECK_MAX_IMAGES = 3;
 
 // Gemini OCR is intentionally serialized. A burst of two or three screenshots
@@ -223,7 +224,7 @@ export function createAutoCheckMessageHandler({
   formatCheckResultsFn = formatCheckResults,
   buildListCheckEmbedFn = buildListCheckEmbed,
   buildAutoCheckEvidenceRowFn = buildAutoCheckEvidenceRow,
-  maxNames = AUTO_CHECK_MAX_NAMES,
+  maxNames = config.listcheckMaxNames || AUTO_CHECK_MAX_NAMES_PER_IMAGE,
   imageChecksEnabled = Boolean(config.geminiApiKey),
 } = {}) {
   function resolveRequest(message) {
@@ -440,7 +441,10 @@ export function createAutoCheckMessageHandler({
       return;
     }
 
-    const limitedNames = names.slice(0, maxNames);
+    const effectiveMaxNames = request.images.length > 0
+      ? Math.min(maxNames * request.images.length, AUTO_CHECK_MAX_BATCH_NAMES)
+      : maxNames;
+    const limitedNames = names.slice(0, effectiveMaxNames);
     await setProgressMessage(message, requestUi, [
       tPick(request.textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, {
         count: limitedNames.length,
@@ -473,7 +477,7 @@ export function createAutoCheckMessageHandler({
       limitedNamesCount: limitedNames.length,
       ignoredCount: names.length - limitedNames.length,
       unverifiedCount: unverified.length,
-      maxNames,
+      maxNames: effectiveMaxNames,
       mode: 'auto',
       lang,
       elapsedMs: Date.now() - startedAt,

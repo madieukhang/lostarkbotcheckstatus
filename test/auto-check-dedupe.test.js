@@ -340,6 +340,58 @@ test('auto-check reads up to three attached images sequentially and deduplicates
   assert.equal(edits.at(-1).embeds[0].title, 'batch-check');
 });
 
+test('auto-check scales the name cap across multiple attached images', async () => {
+  resetAutoCheckDedupeForTest();
+  const firstParty = [
+    'Alphaone', 'Alphatwo', 'Alphathree', 'Alphafour',
+    'Alphafive', 'Alphasix', 'Alphaseven', 'Alphaeight',
+  ];
+  const secondParty = ['Betaone', 'Betatwo', 'Betathree', 'Betafour', 'Betafive'];
+  const checked = [];
+  let renderOptions = null;
+  const handler = createAutoCheckMessageHandler({
+    client: { user: { id: 'bot-user' } },
+    imageChecksEnabled: true,
+    isAutoCheckChannelFn: async () => true,
+    getGuildLanguageFn: async () => 'en',
+    extractNamesFromImageFn: async (image) => (
+      image.id === 'scaled-image-1' ? firstParty : secondParty
+    ),
+    checkNamesAgainstListsFn: async (names) => {
+      checked.push(names);
+      return names.map((name) => ({ name, blackEntry: { name } }));
+    },
+    formatCheckResultsFn: () => ['formatted'],
+    buildListCheckEmbedFn: (options) => {
+      renderOptions = options;
+      return { embed: { title: 'scaled-check' } };
+    },
+    buildAutoCheckEvidenceRowFn: () => null,
+  });
+  const message = {
+    id: 'scaled-image-message',
+    content: '',
+    channelId: 'channel-1',
+    guild: { id: 'guild-1' },
+    author: { id: 'scaled-user', bot: false, tag: 'ScaledUser#0001' },
+    attachments: attachmentsOf(
+      { id: 'scaled-image-1', contentType: 'image/png' },
+      { id: 'scaled-image-2', contentType: 'image/png' },
+    ),
+    channel: { name: 'loa-check' },
+    reactions: { cache: { get: () => null } },
+    react: async () => {},
+    reply: async () => ({ edit: async () => {} }),
+  };
+
+  await handler(message);
+
+  assert.deepEqual(checked, [[...firstParty, ...secondParty]]);
+  assert.equal(renderOptions.limitedNamesCount, 13);
+  assert.equal(renderOptions.ignoredCount, 0);
+  assert.equal(renderOptions.maxNames, 16);
+});
+
 test('auto-check queues rapid image messages instead of dropping them to cooldown', async () => {
   resetAutoCheckDedupeForTest();
   let releaseFirstExtraction;
