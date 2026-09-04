@@ -142,7 +142,7 @@ const vi = {
 
   help: {
     overview: {
-      title: 'Lost Ark Check - Help (VI)',
+      title: '📖 Lost Ark Check - Help (VI)',
       footer: 'Đổi ngôn ngữ: /la-language-switch (cố định) - /la-help lang:en (xem 1 lần)',
       intro: 'Tất cả lệnh bot dùng prefix `/la-` để Discord gom vào nhóm `/la` autocomplete.',
       groups: [
@@ -233,12 +233,12 @@ const vi = {
     },
     sections: {
       multiadd: {
-        title: '/la-list multiadd - Bulk Add qua Excel',
+        title: '📦 /la-list multiadd - Bulk Add qua Excel',
         description: 'Thêm **tối đa 30 entries** cùng lúc vào blacklist/whitelist/watchlist bằng một file Excel, thay vì chạy `/la-list add` từng dòng.',
         footer: 'Chi tiết multiadd - dùng dropdown để chuyển section',
         fields: [
           {
-            name: 'Cách dùng (4 bước)',
+            name: '📋 Cách dùng (4 bước)',
             value: [
               '**1.** `/la-list multiadd action:template` -> Bot gửi file template trắng',
               '**2.** Mở bằng Excel, xoá dòng ví dụ màu vàng, điền tối đa 30 dòng',
@@ -247,7 +247,7 @@ const vi = {
             ],
           },
           {
-            name: 'Các cột trong template',
+            name: '🗂️ Các cột trong template',
             value: [
               '**Bắt buộc:** `name`, `type`, `reason`',
               '**Tuỳ chọn:** `raid`, `logs`, `image`, `scope`',
@@ -257,7 +257,7 @@ const vi = {
             ],
           },
           {
-            name: 'Quyền & flow duyệt',
+            name: '🛡️ Quyền & flow duyệt',
             value: [
               '**Officer / Senior** -> batch chạy ngay sau Confirm, có progress update',
               '**Member thường** -> batch gửi cho **Senior bằng một DM** (không spam từng row)',
@@ -267,7 +267,7 @@ const vi = {
             ],
           },
           {
-            name: 'Giới hạn & luật',
+            name: '⚖️ Giới hạn & luật',
             value: [
               '- Tối đa **30 rows** mỗi file',
               '- File size <= **1 MB**, chỉ `.xlsx`',
@@ -278,7 +278,7 @@ const vi = {
             ],
           },
           {
-            name: 'Case đặc biệt',
+            name: '🧩 Case đặc biệt',
             value: [
               '- **Tên đã có trong list** -> `Skipped` với reason `"duplicate (already in list)"`',
               '- **Tên không tồn tại** (no roster) -> `Skipped` với reason `"No roster found for..."`',
@@ -289,18 +289,18 @@ const vi = {
             ],
           },
           {
-            name: 'Ảnh evidence',
+            name: '📎 Ảnh evidence',
             value: 'Excel không hỗ trợ embedded image. Upload screenshot lên Discord trước, right-click -> Copy Link, rồi paste URL vào cột `image`.',
           },
         ],
       },
       syncimages: {
-        title: '/la-remote action:syncimages - Migrate ảnh legacy',
+        title: '👑 /la-remote action:syncimages - Migrate ảnh legacy',
         description: 'One-shot migration cho **entry cũ** đang lưu evidence bằng URL trực tiếp. Bot tải lại từng ảnh và re-upload vào evidence channel để URL không expire nữa.',
         footer: 'Owner-only - migrate ảnh legacy theo kiểu race-safe',
         fields: [
           {
-            name: 'Prerequisites',
+            name: '📌 Prerequisites',
             value: [
               '**1.** Đã set `/la-remote action:evidencechannel channel:#...`',
               '**2.** Bot có quyền `Send Messages` + `Attach Files` trong channel đó',
@@ -308,7 +308,7 @@ const vi = {
             ],
           },
           {
-            name: 'Flow mỗi entry (khoảng 1.2-1.5s)',
+            name: '🔄 Flow mỗi entry (khoảng 1.2-1.5s)',
             value: [
               '**1.** Detect host URL: Discord CDN hay external (Imgur, v.v.)',
               '**2.** Discord URL -> gọi `attachments/refresh-urls` lấy chữ ký mới',
@@ -318,7 +318,7 @@ const vi = {
             ],
           },
           {
-            name: 'Side effect (đọc trước khi chạy)',
+            name: '⚠️ Side effect (đọc trước khi chạy)',
             value: [
               '- Evidence channel sẽ nhận **1 message mới mỗi entry** trong vài phút',
               '- 100 entries -> khoảng 2-3 phút runtime + 100 messages trong channel',
@@ -327,7 +327,7 @@ const vi = {
             ],
           },
           {
-            name: 'Result counters',
+            name: '🔢 Result counters',
             value: [
               '**Synced** - migrate thành công, có rehost refs mới',
               '**Skipped (dead URLs)** - file gốc bị xoá, không recover được',
@@ -336,7 +336,7 @@ const vi = {
             ],
           },
           {
-            name: 'Troubleshooting',
+            name: '🔧 Troubleshooting',
             value: [
               '- `Failed > 0` -> check Railway logs, có thể retry sau',
               '- `Skipped (dead)` -> entry không recover được; cân nhắc remove + add lại',

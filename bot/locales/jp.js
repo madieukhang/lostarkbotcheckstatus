@@ -142,7 +142,7 @@ const jp = {
 
   help: {
     overview: {
-      title: 'Lost Ark Check - Help (JP)',
+      title: '📖 Lost Ark Check - Help (JP)',
       footer: '言語変更: /la-language-switch (保存) - /la-help lang:en (一度だけ)',
       intro: 'すべての bot コマンドは `/la-` prefix を使うので、Discord の autocomplete では `/la` の下にまとまります。',
       groups: [
@@ -233,12 +233,12 @@ const jp = {
     },
     sections: {
       multiadd: {
-        title: '/la-list multiadd - Excel Bulk Add',
+        title: '📦 /la-list multiadd - Excel Bulk Add',
         description: '一つの Excel file で blacklist/whitelist/watchlist に **最大30 entries** をまとめて追加できます。`/la-list add` を一件ずつ打つ必要はありませんわ。',
         footer: 'Multiadd 詳細 - dropdown で section を切り替え',
         fields: [
           {
-            name: '使い方 (4 steps)',
+            name: '📋 使い方 (4 steps)',
             value: [
               '**1.** `/la-list multiadd action:template` -> bot が空 template を送信',
               '**2.** Excel で開き、黄色い例 row を削除し、最大30 row を入力',
@@ -247,7 +247,7 @@ const jp = {
             ],
           },
           {
-            name: 'Template columns',
+            name: '🗂️ Template columns',
             value: [
               '**Required:** `name`, `type`, `reason`',
               '**Optional:** `raid`, `logs`, `image`, `scope`',
@@ -257,7 +257,7 @@ const jp = {
             ],
           },
           {
-            name: 'Permission & approval flow',
+            name: '🛡️ Permission & approval flow',
             value: [
               '**Officer / Senior** -> Confirm 後すぐ batch 実行、progress update あり',
               '**Regular member** -> batch は **Senior に 1 DM** で送信 (row ごとの spam なし)',
@@ -267,7 +267,7 @@ const jp = {
             ],
           },
           {
-            name: 'Limits & rules',
+            name: '⚖️ Limits & rules',
             value: [
               '- 1 file 最大 **30 rows**',
               '- File size <= **1 MB**、`.xlsx` のみ',
@@ -278,7 +278,7 @@ const jp = {
             ],
           },
           {
-            name: 'Edge cases',
+            name: '🧩 Edge cases',
             value: [
               '- **Name already in list** -> `Skipped` with reason `"duplicate (already in list)"`',
               '- **Name does not exist** (no roster) -> `Skipped` with reason `"No roster found for..."`',
@@ -289,18 +289,18 @@ const jp = {
             ],
           },
           {
-            name: 'Evidence images',
+            name: '📎 Evidence images',
             value: 'Excel は embedded image を扱いません。先に screenshot を Discord に upload し、right-click -> Copy Link して `image` column に貼ってくださいませ。',
           },
         ],
       },
       syncimages: {
-        title: '/la-remote action:syncimages - Legacy Image Migration',
+        title: '👑 /la-remote action:syncimages - Legacy Image Migration',
         description: '直接 URL として保存されている **legacy entries** の evidence を一括 migration します。Bot が各 image を再 download し、evidence channel に re-upload するので URL が expire しません。',
         footer: 'Owner-only - race-safe legacy image migration',
         fields: [
           {
-            name: 'Prerequisites',
+            name: '📌 Prerequisites',
             value: [
               '**1.** `/la-remote action:evidencechannel channel:#...` が設定済み',
               '**2.** Bot にその channel の `Send Messages` + `Attach Files` 権限がある',
@@ -308,7 +308,7 @@ const jp = {
             ],
           },
           {
-            name: 'Flow per entry (about 1.2-1.5s each)',
+            name: '🔄 Flow per entry (about 1.2-1.5s each)',
             value: [
               '**1.** URL host を判定: Discord CDN vs external (Imgur, etc.)',
               '**2.** Discord URL -> `attachments/refresh-urls` で fresh signature を取得',
@@ -318,7 +318,7 @@ const jp = {
             ],
           },
           {
-            name: 'Side effects (read before running)',
+            name: '⚠️ Side effects (read before running)',
             value: [
               '- Evidence channel に **1 entry につき 1 message** が数分内に投稿されます',
               '- 100 entries -> 約2-3分 runtime + 100 messages',
@@ -327,7 +327,7 @@ const jp = {
             ],
           },
           {
-            name: 'Result counters',
+            name: '🔢 Result counters',
             value: [
               '**Synced** - migration 成功、新しい rehost refs あり',
               '**Skipped (dead URLs)** - original file deleted, cannot recover',
@@ -336,7 +336,7 @@ const jp = {
             ],
           },
           {
-            name: 'Troubleshooting',
+            name: '🔧 Troubleshooting',
             value: [
               '- `Failed > 0` -> Railway logs を確認、後で retry 可能',
               '- `Skipped (dead)` -> recover 不可; remove + add again を検討',

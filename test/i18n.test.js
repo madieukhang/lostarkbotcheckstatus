@@ -74,7 +74,7 @@ test('t resolves nested strings, arrays, objects, and fallback keys', () => {
   ]);
   assert.equal(
     t('help.sections.multiadd.fields.0').name,
-    'How to use (4 steps)'
+    '📋 How to use (4 steps)'
   );
   assert.equal(t('missing.key'), 'missing.key');
 });

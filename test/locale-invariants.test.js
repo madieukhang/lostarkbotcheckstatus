@@ -134,3 +134,33 @@ test('locale copy contains no em-dash', () => {
   }
   assert.deepEqual(offenders, []);
 });
+
+test('every /la-help label opens with an icon', () => {
+  // The overview groups have carried icons since they were written; the
+  // two detail sections did not, which made drilling into a section feel
+  // like leaving the card family. Labels are what the reader scans, so
+  // this guards the whole namespace rather than the two sections that
+  // happened to be bare.
+  const offenders = [];
+  const leadingIcon = /^\p{Extended_Pictographic}/u;
+
+  const walk = (node, path, lang) => {
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => walk(item, `${path}[${index}]`, lang));
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if (typeof value === 'string') {
+        if ((key === 'name' || key === 'title') && !leadingIcon.test(value)) {
+          offenders.push(`${lang}:${path}.${key}`);
+        }
+        continue;
+      }
+      walk(value, `${path}.${key}`, lang);
+    }
+  };
+
+  for (const lang of LANGS) walk(TRANSLATIONS[lang]?.help, 'help', lang);
+  assert.deepEqual(offenders, []);
+});

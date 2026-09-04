@@ -307,7 +307,7 @@ const en = {
 
   help: {
     overview: {
-      title: 'Lost Ark Check - Help (EN)',
+      title: '📖 Lost Ark Check - Help (EN)',
       footer: 'Switch language: /la-language-switch (persistent) - /la-help lang:vi (one-off)',
       intro: 'All bot commands use the `/la-` prefix so Discord groups them under `/la` autocomplete.',
       groups: [
@@ -398,12 +398,12 @@ const en = {
     },
     sections: {
       multiadd: {
-        title: '/la-list multiadd - Bulk Add via Excel',
+        title: '📦 /la-list multiadd - Bulk Add via Excel',
         description: 'Add **up to 30 entries** at once to blacklist/whitelist/watchlist via a single Excel file, instead of running `/la-list add` one at a time.',
         footer: 'Multiadd detail - pick the dropdown to switch sections',
         fields: [
           {
-            name: 'How to use (4 steps)',
+            name: '📋 How to use (4 steps)',
             value: [
               '**1.** `/la-list multiadd action:template` -> Bot sends a blank template file',
               '**2.** Open in Excel, delete the yellow example row, fill in up to 30 rows',
@@ -412,7 +412,7 @@ const en = {
             ],
           },
           {
-            name: 'Template columns',
+            name: '🗂️ Template columns',
             value: [
               '**Required:** `name`, `type`, `reason`',
               '**Optional:** `raid`, `logs`, `image`, `scope`',
@@ -422,7 +422,7 @@ const en = {
             ],
           },
           {
-            name: 'Permission & approval flow',
+            name: '🛡️ Permission & approval flow',
             value: [
               '**Officer / Senior** -> batch runs immediately after Confirm, with progress updates',
               '**Regular member** -> batch sent to **Senior as ONE DM** (no spam per row)',
@@ -432,7 +432,7 @@ const en = {
             ],
           },
           {
-            name: 'Limits & rules',
+            name: '⚖️ Limits & rules',
             value: [
               '- Max **30 rows** per file',
               '- File size <= **1 MB**, `.xlsx` only',
@@ -443,7 +443,7 @@ const en = {
             ],
           },
           {
-            name: 'Edge cases',
+            name: '🧩 Edge cases',
             value: [
               '- **Name already in list** -> `Skipped` with reason `"duplicate (already in list)"`',
               '- **Name does not exist** (no roster) -> `Skipped` with reason `"No roster found for..."`',
@@ -454,18 +454,18 @@ const en = {
             ],
           },
           {
-            name: 'Evidence images',
+            name: '📎 Evidence images',
             value: "Excel does not support embedded images. Upload the screenshot to Discord first, right-click -> Copy Link, then paste the URL into the `image` column.",
           },
         ],
       },
       syncimages: {
-        title: '/la-remote action:syncimages - Legacy Image Migration',
+        title: '👑 /la-remote action:syncimages - Legacy Image Migration',
         description: 'One-shot migration for **legacy entries** whose evidence is stored as a direct URL (created before the rehost flow). Bot re-downloads each image and re-uploads it to the evidence channel so the URL does not expire again.',
         footer: 'Owner-only - race-safe legacy image migration',
         fields: [
           {
-            name: 'Prerequisites',
+            name: '📌 Prerequisites',
             value: [
               '**1.** `/la-remote action:evidencechannel channel:#...` already set',
               '**2.** Bot has `Send Messages` + `Attach Files` permission in that channel',
@@ -473,7 +473,7 @@ const en = {
             ],
           },
           {
-            name: 'Flow per entry (about 1.2-1.5s each)',
+            name: '🔄 Flow per entry (about 1.2-1.5s each)',
             value: [
               '**1.** Detect URL host: Discord CDN vs external (Imgur, etc.)',
               '**2.** Discord URL -> call `attachments/refresh-urls` for a fresh signature',
@@ -483,7 +483,7 @@ const en = {
             ],
           },
           {
-            name: 'Side effects (read before running)',
+            name: '⚠️ Side effects (read before running)',
             value: [
               '- Evidence channel will receive **1 new message per entry** within minutes',
               '- 100 entries -> about 2-3 min runtime + 100 messages flooding the channel',
@@ -492,7 +492,7 @@ const en = {
             ],
           },
           {
-            name: 'Result counters',
+            name: '🔢 Result counters',
             value: [
               '**Synced** - entry migrated successfully, has new rehost refs',
               '**Skipped (dead URLs)** - original file deleted, cannot recover',
@@ -501,7 +501,7 @@ const en = {
             ],
           },
           {
-            name: 'Troubleshooting',
+            name: '🔧 Troubleshooting',
             value: [
               '- `Failed > 0` -> check Railway logs, can retry later',
               '- `Skipped (dead)` -> entries are unrecoverable; consider remove + re-add',
