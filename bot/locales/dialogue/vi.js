@@ -362,7 +362,22 @@ export default {
     internalType: { title: 'Không nhận ra loại list', description: 'Session chứa list type không xác định `{type}`.', footer: 'Entry chưa bị thay đổi. Báo lại cho officer giúp tớ nhé.' }, nothing: { title: 'Không có gì mới để lưu', description: 'Không phát hiện alt mới nên entry được giữ nguyên.', footer: 'Chạy lại `/la-list enrich` sau nếu Bible đã hạ nhiệt nhé.' }, cancelled: 'Đã hủy · entry không thay đổi.', cooldown: 'Chờ {seconds}s trước khi enrich lại **{name}** nhé.', continueCooldown: 'Chờ {seconds}s trước khi tiếp tục scan **{name}** nhé.',
     scanFinished: { title: 'Scan đã kết thúc rồi', description: 'Scan đã hoàn tất hoặc bị hủy. Chạy lại command nếu muốn lượt mới.' }, stopRestricted: { title: 'Cậu không thể dừng scan này', description: 'Chỉ người bắt đầu hoặc officer/senior mới dừng được.' }, alreadyStopping: 'Đang dừng rồi…', stopSent: { title: 'Đã gửi tín hiệu dừng', description: 'Worker sẽ dừng sau khi hoàn tất candidate hiện tại.' },
     summary: 'Tớ đã quét **{guild}** để tìm Stronghold khớp **{name}**{resumed}.', resumed: ' (tiếp từ lượt trước)', noAlts: 'Chưa có alt nào khớp Stronghold đích.', allKnown: 'Cả {count} alt phát hiện được đều đã có trong entry {list}.', newAlts: '**{newCount}** / {total} alt phát hiện được chưa có trong entry {list}. Xác nhận để thêm chúng.',
-    success: { title: 'Đã lưu · {name}', appended: 'Tớ đã thêm **{count} alt mới** vào entry **{list}**.', source: 'Nguồn: Stronghold scan trong **{guild}**', hidden: 'Roster đang ẩn nên các tên được khớp bằng fingerprint Stronghold.', newlyTracked: 'Character mới được track:', tip: 'Mẹo: `/la-list view type:{type}` để xem toàn bộ list.', footer: 'Enrich hoàn tất', unknown: 'Không rõ' },
+    success: {
+      title: '{name} · +{count} alt mới', scanAuthor: 'Stronghold scan · {guild}',
+      lineOne: { variants: [
+        'Một cái tên nữa lộ ra. Chung Stronghold thì khó giấu lắm~',
+        'Lòi ra thêm một đứa. Tớ ghi vào entry rồi nhé.',
+        'Thêm được một. Ít nhưng chắc, tớ đối chiếu kỹ rồi.',
+      ] },
+      lineMany: { variants: [
+        '**{count}** cái tên nữa lộ ra. Chung Stronghold thì khó giấu lắm~',
+        'Túm được **{count}** đứa cùng lúc. Cùng một Stronghold cả đấy.',
+        'Thêm **{count}** cái tên vào entry. Lần này thu hoạch khá đấy chứ~',
+      ] },
+      newlyTracked: 'Character mới được track', scanned: 'Đã quét', discovered: 'Alt phát hiện', rosterState: 'Roster', hiddenValue: 'Ẩn',
+      footer: 'Entry giờ track {total} character · /la-list view type:{type} để xem hết',
+      appended: 'Tớ đã thêm **{count} alt mới** vào entry **{list}**.', source: 'Nguồn: Stronghold scan trong **{guild}**', hidden: 'Roster đang ẩn nên các tên được khớp bằng fingerprint Stronghold.', tip: 'Mẹo: `/la-list view type:{type}` để xem toàn bộ list.', unknown: 'Không rõ',
+    },
   },
   trustedBlock: {
     title: 'Trusted user · Đã chặn', direct: '**{name}** là trusted user nên không thể thêm vào list nào.', via: '**{name}** chung roster với trusted user **{via}** nên không thể thêm vào list nào.', name: 'Tên', reason: 'Lý do trust',

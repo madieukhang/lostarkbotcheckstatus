@@ -528,7 +528,22 @@ export default {
     stopRestricted: { title: 'You cannot stop this scan', description: 'Only the person who started it, or an officer/senior, can stop it.' },
     alreadyStopping: 'Already stopping…', stopSent: { title: 'Stop signal sent', description: 'The worker will stop after its current candidate fetch finishes.' },
     summary: 'I scanned **{guild}** for Stronghold matches with **{name}**{resumed}.', resumed: ' (resumed from the previous pass)', noAlts: 'No alts match the target Stronghold yet.', allKnown: 'All {count} discovered alts are already on this {list} entry.', newAlts: '**{newCount}** of {total} discovered alts are not on this {list} entry yet. Confirm to append them.',
-    success: { title: 'Saved · {name}', appended: 'I appended **{count} new alts** to the **{list}** entry.', source: 'Source: Stronghold scan in **{guild}**', hidden: 'The roster was hidden, so matches came from the Stronghold fingerprint.', newlyTracked: 'Newly tracked characters:', tip: 'Tip: `/la-list view type:{type}` shows the full list.', footer: 'Enrich complete', unknown: 'Unknown' },
+    success: {
+      title: '{name} · +{count} new alts', scanAuthor: 'Stronghold scan · {guild}',
+      lineOne: { variants: [
+        'One more name surfaced. Sharing a Stronghold is hard to hide.',
+        'Found one hiding in there. Written into the entry now.',
+        'Just the one, but it checks out. I matched it carefully.',
+      ] },
+      lineMany: { variants: [
+        '**{count}** more names surfaced. Sharing a Stronghold is hard to hide.',
+        'Caught **{count}** of them at once, all on the same Stronghold.',
+        'Added **{count}** names to the entry. A good haul this time.',
+      ] },
+      newlyTracked: 'Newly tracked', scanned: 'Scanned', discovered: 'Alts found', rosterState: 'Roster', hiddenValue: 'Hidden',
+      footer: 'Entry now tracks {total} characters · /la-list view type:{type} for the full list',
+      appended: 'I appended **{count} new alts** to the **{list}** entry.', source: 'Source: Stronghold scan in **{guild}**', hidden: 'The roster was hidden, so matches came from the Stronghold fingerprint.', tip: 'Tip: `/la-list view type:{type}` shows the full list.', unknown: 'Unknown',
+    },
   },
   trustedBlock: {
     title: 'Trusted user · Blocked',

@@ -337,7 +337,22 @@ export default {
     internalType: { title: 'List type が不明ですの', description: 'Session に unknown list type `{type}` がありますわ。', footer: 'Entry は変更されていません。Officer に報告してくださいませ。' }, nothing: { title: '保存する新しい alt がありませんの', description: '新しい alt が見つからなかったので entry は変更していませんわ。', footer: 'Bible が落ち着いたら `/la-list enrich` を再実行できますの。' }, cancelled: 'キャンセル済み · entry は変更していませんわ。', cooldown: '**{name}** を再 enrich する前に {seconds}s お待ちくださいませ。', continueCooldown: '**{name}** の scan 続行前に {seconds}s お待ちくださいませ。',
     scanFinished: { title: 'Scan はすでに終了していますの', description: '完了またはキャンセル済みです。新しい scan は command を再実行してくださいませ。' }, stopRestricted: { title: 'この scan は停止できませんの', description: '開始者または officer/senior だけが停止できますわ。' }, alreadyStopping: 'すでに停止中ですの…', stopSent: { title: '停止 signal を送りましたわ', description: 'Worker は現在の candidate fetch 完了後に停止しますの。' },
     summary: '**{guild}** で **{name}** と一致する Stronghold を scan しましたわ{resumed}。', resumed: ' (前の pass から再開)', noAlts: 'Target Stronghold と一致する alt はまだありませんの。', allKnown: '発見した {count} alt はすべて {list} entry にありますわ。', newAlts: '発見した {total} alt のうち **{newCount}** は {list} entry にまだありません。Confirm で追加しますの。',
-    success: { title: '保存しましたわ · {name}', appended: '**{count} new alts** を **{list}** entry に追加しましたの。', source: 'Source: **{guild}** の Stronghold scan', hidden: 'Roster hidden のため Stronghold fingerprint で照合しましたわ。', newlyTracked: '新しく track する characters:', tip: 'Tip: `/la-list view type:{type}` で full list を確認できますの。', footer: 'Enrich 完了', unknown: 'Unknown' },
+    success: {
+      title: '{name} · +{count} alt', scanAuthor: 'Stronghold scan · {guild}',
+      lineOne: { variants: [
+        'もう一人みつかりましたわ。Stronghold が同じだと隠せませんの。',
+        '一人だけ隠れていましたわね。entry に書き込みましたの。',
+        '一人だけですけれど、しっかり照合しましたわ。',
+      ] },
+      lineMany: { variants: [
+        'あと **{count}** 人みつかりましたわ。Stronghold が同じだと隠せませんの。',
+        '同じ Stronghold から **{count}** 人まとめて捕まえましたわ。',
+        'entry に **{count}** 人追加しましたの。今回は収穫ですわね~',
+      ] },
+      newlyTracked: '新しく track', scanned: 'scan 済み', discovered: '発見した alt', rosterState: 'Roster', hiddenValue: '非公開',
+      footer: 'entry は現在 {total} character を track · /la-list view type:{type} で全部見られますの',
+      appended: '**{count} new alts** を **{list}** entry に追加しましたの。', source: 'Source: **{guild}** の Stronghold scan', hidden: 'Roster hidden のため Stronghold fingerprint で照合しましたわ。', tip: 'Tip: `/la-list view type:{type}` で full list を確認できますの。', unknown: 'Unknown',
+    },
   },
   trustedBlock: {
     title: 'Trusted user · ブロック', direct: '**{name}** は trusted user なので、どの list にも追加できませんの。', via: '**{name}** は trusted user **{via}** と同じ roster なので、どの list にも追加できませんわ。', name: '名前', reason: 'Trust 理由',

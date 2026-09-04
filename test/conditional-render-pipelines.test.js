@@ -100,18 +100,56 @@ test('duplicate lookup strategy prefers id and keeps the blacklist fallback scop
   assert.deepEqual(fallbackCollation, { locale: 'en', strength: 2 });
 });
 
-test('enrich success section pipeline retains optional source, hidden, and alt blocks', () => {
+test('enrich success card puts the scan above the title and the delta in it', () => {
   const embed = buildEnrichSuccessEmbed({
     type: 'black',
     entryName: 'Ainslinn',
     targetIsHidden: true,
+    scanStats: { guildName: 'AinsGuild', scanned: 48, totalAlts: 5 },
+    newAlts: [
+      { name: 'Ainsalt', classId: 'bard', itemLevel: 1750 },
+      { name: 'Ainsalt2', classId: 'paladin', itemLevel: 1740 },
+    ],
+  }, { matchedCount: 1, modifiedCount: 1 }, 'en', { trackedTotal: 9 }).toJSON();
+
+  // How the alts were found sits above the title; the title carries the
+  // result, which is the delta.
+  assert.equal(embed.author.name, 'Stronghold scan · AinsGuild');
+  assert.match(embed.title, /Ainslinn · \+2 new alts/u);
+
+  // The cost of the scan is three badges, not a sentence.
+  const inline = embed.fields.filter((f) => f.inline);
+  assert.deepEqual(inline.map((f) => [f.name, f.value]), [
+    ['📊 Scanned', '`48`'],
+    ['🎯 Alts found', '`5`'],
+    ['🔒 Roster', '`Hidden`'],
+  ]);
+  assert.equal(inline.length % 3, 0, 'three badges fill one whole row');
+
+  const altField = embed.fields.find((f) => !f.inline);
+  assert.match(altField.name, /Newly tracked \(2\)/u);
+  assert.match(altField.value, /Ainsalt/u);
+
+  // The footer answers what someone asks right after "+2": how many now?
+  assert.match(embed.footer.text, /9 characters/u);
+});
+
+test('enrich success card drops the scan badges it has no numbers for', () => {
+  const embed = buildEnrichSuccessEmbed({
+    type: 'black',
+    entryName: 'Ainslinn',
+    targetIsHidden: false,
     scanStats: { guildName: 'AinsGuild' },
     newAlts: [{ name: 'Ainsalt', classId: 'bard', itemLevel: 1750 }],
-  }, { matchedCount: 1, modifiedCount: 1 }, 'en').toJSON();
+  }, {}, 'en').toJSON();
 
-  assert.match(embed.description, /AinsGuild/);
-  assert.match(embed.description, /hidden/i);
-  assert.match(embed.description, /Ainsalt/);
+  // A visible roster with no counters leaves nothing to badge, and the
+  // card must not render empty slots to fill a row.
+  assert.equal(embed.fields.filter((f) => f.inline).length, 0);
+  // One alt gets its own phrasing pool rather than the plural line.
+  assert.doesNotMatch(embed.description, /\*\*1\*\*/u);
+  // With no read-back total the footer falls back to what was just added.
+  assert.match(embed.footer.text, /1 characters/u);
 });
 
 test('deep scan metric table keeps optional metrics in display order', () => {

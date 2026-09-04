@@ -16,11 +16,11 @@
 
 import { LIST_LABELS } from './data.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { ICONS } from '../../../utils/ui.js';
+import { ICONS, padInlineRow } from '../../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../../utils/scanProgressEmbed.js';
 import { getClassName } from '../../../models/Class.js';
 import { formatAltLine } from '../trackedAltsRender.js';
-import { t } from '../../../services/i18n/index.js';
+import { t, tPick } from '../../../services/i18n/index.js';
 
 /**
  * Enrich-flavoured wrapper around `buildScanProgressEmbed`. Carries the
@@ -63,8 +63,9 @@ export function buildEnrichProgressEmbed({ entry, foundType, meta, progress, lan
  *
  *   💡 Tip: /la-list view <type> to browse the full list.
  */
-export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en') {
+export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en', { trackedTotal = 0 } = {}) {
   const ctx = LIST_LABELS[session.type];
+  const newCount = session.newAlts.length;
 
   // Rendered through the shared alt-row formatter rather than a local
   // copy · this card used to hand-roll the same line and so missed every
@@ -79,22 +80,34 @@ export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en') {
     })
     .join('\n');
 
-  const contextLines = [
-    session.scanStats?.guildName
-      ? `📍 ${t('dialogue.enrich.success.source', lang, { guild: session.scanStats.guildName })}`
-      : '',
-    session.targetIsHidden
-      ? `${ICONS.locked} ${t('dialogue.enrich.success.hidden', lang)}`
-      : '',
-  ].filter(Boolean);
+  // What the scan cost, as three badges rather than a sentence. Reading
+  // "48 quét · 5 tìm được" is what makes the count in the title credible;
+  // buried in prose it was just decoration.
+  const inlineFields = padInlineRow([
+    session.scanStats?.scanned > 0 ? {
+      name: `📊 ${t('dialogue.enrich.success.scanned', lang)}`,
+      value: `\`${session.scanStats.scanned}\``,
+      inline: true,
+    } : null,
+    session.scanStats?.totalAlts > 0 ? {
+      name: `🎯 ${t('dialogue.enrich.success.discovered', lang)}`,
+      value: `\`${session.scanStats.totalAlts}\``,
+      inline: true,
+    } : null,
+    session.targetIsHidden ? {
+      name: `${ICONS.locked} ${t('dialogue.enrich.success.rosterState', lang)}`,
+      value: `\`${t('dialogue.enrich.success.hiddenValue', lang)}\``,
+      inline: true,
+    } : null,
+  ].filter(Boolean));
 
-  // Sections are declared in display order and empty optional blocks drop out
-  // in one place, instead of mutating the array through several adjacent ifs.
-  const sections = [
-    `${ICONS.fox || '✨'} ${t('dialogue.enrich.success.appended', lang, { count: session.newAlts.length, list: t(`dialogue.broadcast.list.${session.type}`, lang) })}`,
-    contextLines.join('\n'),
-    altLines ? `**🆕 ${t('dialogue.enrich.success.newlyTracked', lang)}**\n${altLines}` : '',
-    `💡 ${t('dialogue.enrich.success.tip', lang, { type: session.type })}`,
+  const fields = [
+    altLines ? {
+      name: `🆕 ${t('dialogue.enrich.success.newlyTracked', lang)} (${newCount})`,
+      value: altLines.slice(0, 1024),
+      inline: false,
+    } : null,
+    ...inlineFields,
   ].filter(Boolean);
 
   // Server-side trace for cases where confirmation appears not to persist.
@@ -111,9 +124,28 @@ export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en') {
     severity: AlertSeverity.SUCCESS,
     titleIcon: ctx.icon,
     color: ctx.color,
-    title: t('dialogue.enrich.success.title', lang, { name: session.entryName }),
-    description: sections.join('\n\n'),
-    footer: t('dialogue.enrich.success.footer', lang),
+    // How the alts were found belongs above the title, not inside it ·
+    // the title is for the result, and the result is the delta.
+    author: session.scanStats?.guildName
+      ? t('dialogue.enrich.success.scanAuthor', lang, { guild: session.scanStats.guildName })
+      : undefined,
+    title: t('dialogue.enrich.success.title', lang, {
+      name: session.entryName,
+      count: newCount,
+    }),
+    // One spoken line instead of a paragraph restating the title. The
+    // pool differs by haul size because finding one alt and finding
+    // twelve are not the same piece of news.
+    description: tPick(
+      `dialogue.enrich.success.${newCount === 1 ? 'lineOne' : 'lineMany'}`,
+      lang,
+      { count: newCount },
+    ),
+    fields,
+    footer: t('dialogue.enrich.success.footer', lang, {
+      total: trackedTotal || newCount,
+      type: session.type,
+    }),
     lang,
   });
 }

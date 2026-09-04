@@ -10,6 +10,11 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Changed
+- The `/la-list enrich` success card is now a record of the hunt rather than a line confirming a save. The count moves into the title as a delta (**Ainslinn · +3 alt mới**), the scan that produced it moves above the title into the embed author line (**Stronghold scan · Bullet Shell**), and what the scan cost becomes three badges - scanned, alts found, roster hidden. Artist speaks one line instead of a paragraph restating the title, drawn from a different `tPick` pool for one alt than for several. The footer answers the question that follows "+3": how many the entry tracks now.
+- `buildAlertEmbed` accepts an `author` line. It suits the context a result came out of, leaving the title free for the result; Discord renders no markdown there, so it takes plain text only.
+- The enrich confirm handler reads the updated entry back once and shares it between the broadcast and the success card. It used to fetch only when a broadcast was wired up, which is why the card could never state a running total.
+
+### Changed
 - The `/la-list add` "already in the list" card is built around the decision the officer actually has to make. It now shows **📝 Lý do đang lưu** and **✏️ Lý do cậu vừa gõ** as a pair of full-width blocks at the top, so they can see at a glance whether their information adds anything and therefore whether to go run `/la-list edit`. Previously the card showed only the stored reason, and comparing meant scrolling back to their own command.
 - That card's opening sentence follows the `/la-check` headline: "X chung roster với Y, và người này đã nằm trong Blacklist rồi", both names carrying their class icon and Bible link. It closes by saying nothing was saved, which the old wording left implicit.
 - **🔍 Kiểu trùng** is gone from that card and **🌍 Server** takes its slot. The opening sentence already says whether this was the same name or a roster alt, so the field only restated it in other words. Raid moves up into the grid, which lands it on exactly six inline fields and two whole rows; it used to trail after the full-width reason on its own, where Discord stretched it across the card.

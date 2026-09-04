@@ -892,8 +892,15 @@ export function createEnrichHandlers({ services }) {
     // rosterCharacters so the "🆕 New alts" field shows class icon + ilvl even
     // when those alts aren't in RosterSnapshot yet. Best-effort: a channel
     // failure must not break the Confirm reply, so it's fire-and-forget.
+    // Read back once and use it for both the broadcast and the success
+    // card's running total · it used to be fetched only when a broadcast
+    // was wired up, so the card had no way to say what the entry tracks now.
+    const enrichedEntry = await Model.findById(session.entryId).lean().catch(() => null);
+    const trackedTotal = Array.isArray(enrichedEntry?.allCharacters)
+      ? enrichedEntry.allCharacters.length
+      : 0;
+
     if (typeof broadcastListChange === 'function') {
-      const enrichedEntry = await Model.findById(session.entryId).lean().catch(() => null);
       if (enrichedEntry) {
         broadcastListChange(
           'enriched',
@@ -910,7 +917,7 @@ export function createEnrichHandlers({ services }) {
 
     clearEnrichSession(sessionId);
 
-    await editEmbed(interaction, buildEnrichSuccessEmbed(session, updateResult, lang), {
+    await editEmbed(interaction, buildEnrichSuccessEmbed(session, updateResult, lang, { trackedTotal }), {
       content: '',
       components: [],
     });

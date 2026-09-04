@@ -70,6 +70,10 @@ const SEVERITY_CONFIG = Object.freeze({
  * @param {number} [options.color] - Override the severity color.
  *   Use when the embed sits inside a list-type context (blacklist/whitelist/
  *   watchlist) and the entry color carries more meaning than severity.
+ * @param {string} [options.author] - Small line above the title. Use it for
+ *   the context a result came out of (which scan, which guild) so the title
+ *   is free to carry the result itself. Discord renders no markdown here,
+ *   so pass plain text · code marks would show as literal backticks.
  * @returns {EmbedBuilder}
  */
 export function buildAlertEmbed({
@@ -81,6 +85,7 @@ export function buildAlertEmbed({
   timestamp = true,
   titleIcon,
   color,
+  author,
   lang = 'en',
 }) {
   const config = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.info;
@@ -95,6 +100,7 @@ export function buildAlertEmbed({
       && String(field.value).trim() !== ''
   );
   const mutations = [
+    { enabled: Boolean(author), apply: () => embed.setAuthor({ name: String(author).slice(0, 256) }) },
     { enabled: Boolean(title), apply: () => embed.setTitle(finalIcon ? `${finalIcon}  ${title}` : title) },
     { enabled: Boolean(description), apply: () => embed.setDescription(description) },
     { enabled: cleanFields.length > 0, apply: () => embed.addFields(cleanFields) },
