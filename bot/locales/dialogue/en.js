@@ -323,6 +323,8 @@ export default {
     },
     public: {
       rejected: '<@{user}> Your list {action} request for **{name}** was rejected by an officer.',
+      duplicate: '<@{user}> Your list {action} request for **{name}** was not applied.\n**Reason:** A matching entry already exists. An officer chose to keep the existing entry.',
+      failed: '<@{user}> The bot could not complete your list {action} request for **{name}** after officer approval.\nPlease ask an officer to check before submitting it again.',
       approved: '<@{user}> Your list {action} request for **{name}** was approved.',
       add: 'add', edit: 'edit',
     },

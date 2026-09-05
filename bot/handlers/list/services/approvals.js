@@ -4,7 +4,7 @@
  * edit, multiadd, and quickadd. Fans out the approval request to
  * every assigned approver, tracks the message IDs so a decision in
  * one DM mirrors to the others (syncApproverDmMessages), and posts
- * the requester-DM with the final decision.
+ * the final decision in the requester's origin channel.
  */
 
 import {
@@ -251,6 +251,13 @@ export function createApprovalServices({
     );
   }
 
+  /**
+   * Reply in the origin channel's language, preserving duplicate and save-failure
+   * outcomes. An officer's approval alone does not mean the write succeeded.
+   * @param {object} payload Pending request and origin-message references.
+   * @param {{ok?: boolean, isDuplicate?: boolean}|null} result Execution outcome.
+   * @param {boolean} rejected Whether the officer declined to apply the request.
+   */
   async function notifyRequesterAboutDecision(payload, result, rejected = false) {
     try {
       const guild = await client.guilds.fetch(payload.guildId);
@@ -260,11 +267,20 @@ export function createApprovalServices({
 
       const lang = await getGuildLanguageFn(guild.id, { GuildConfigModel });
       const actionLabel = t(`dialogue.approval.public.${payload.action === 'edit' ? 'edit' : 'add'}`, lang);
-      const decisionContent = `${rejected ? '❌' : '✅'} ${t(`dialogue.approval.public.${rejected ? 'rejected' : 'approved'}`, lang, {
+      const decision = rejected
+        ? (result?.isDuplicate ? 'duplicate' : 'rejected')
+        : (result?.ok === false ? 'failed' : 'approved');
+      const severity = {
+        approved: AlertSeverity.SUCCESS,
+        rejected: AlertSeverity.ERROR,
+        duplicate: AlertSeverity.WARNING,
+        failed: AlertSeverity.WARNING,
+      }[decision];
+      const decisionContent = t(`dialogue.approval.public.${decision}`, lang, {
         user: payload.requestedByUserId,
         action: actionLabel,
         name: payload.name,
-      })}`;
+      });
 
       const decisionPayload = {
         // Keep only the ping outside the card; all readable copy belongs to
@@ -274,7 +290,7 @@ export function createApprovalServices({
         embeds: [buildNoticeEmbed(
           decisionContent.replace(`<@${payload.requestedByUserId}>`, '').trim(),
           {
-            severity: rejected ? AlertSeverity.ERROR : AlertSeverity.SUCCESS,
+            severity,
             lang,
           }
         )],

@@ -58,7 +58,7 @@ export async function findDuplicateEntry(model, payload) {
  * @param {object} deps
  * @param {Function} deps.syncApproverDmMessages - approver DM sync
  * @param {Function} deps.broadcastListChange - guild broadcast
- * @param {Function} deps.notifyRequesterAboutDecision - requester DM
+ * @param {Function} deps.notifyRequesterAboutDecision - origin-channel decision notice
  * @returns {Function} handleListAddOverwriteButton(interaction)
  */
 export function createListAddOverwriteButtonHandler({
@@ -95,7 +95,7 @@ export function createListAddOverwriteButtonHandler({
     });
 
     if (!isOverwrite) {
-      // Keep existing · just clean up
+      // Keep the existing entry and explain the duplicate to the requester.
       const buildKeptPayload = (targetLang) => ({
         content: null,
         embeds: [buildNoticeEmbed(
@@ -106,7 +106,7 @@ export function createListAddOverwriteButtonHandler({
       });
       await updateApprovers(buildKeptPayload);
 
-      await notifyRequesterAboutDecision(payload, null, true);
+      await notifyRequesterAboutDecision(payload, { ok: false, isDuplicate: true }, true);
       return;
     }
 

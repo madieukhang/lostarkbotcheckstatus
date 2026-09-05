@@ -26,12 +26,12 @@ test('keep-existing rejects an unassigned user without consuming the approver re
   const edits = [];
   const replies = [];
   const synced = [];
-  let notifications = 0;
+  const notifications = [];
   let deferred = 0;
   const handler = createListAddOverwriteButtonHandler({
     syncApproverDmMessages: async (_payload, build) => synced.push(build('jp')),
     broadcastListChange: async () => assert.fail('Keep-existing must not broadcast a mutation'),
-    notifyRequesterAboutDecision: async () => { notifications += 1; },
+    notifyRequesterAboutDecision: async (...args) => { notifications.push(args); },
   });
   const interaction = {
     customId: 'listadd_keep:approval-1',
@@ -48,13 +48,18 @@ test('keep-existing rejects an unassigned user without consuming the approver re
   assert.equal(replies.length, 2);
   assert.equal(deferred, 0);
   assert.equal(edits.length, 0);
-  assert.equal(notifications, 0);
+  assert.equal(notifications.length, 0);
 
   await handler({ ...interaction, user: { id: 'approver' } });
   assert.equal(pending, null);
   assert.equal(deferred, 1);
-  assert.equal(notifications, 1);
+  assert.equal(notifications.length, 1);
+  assert.deepEqual(notifications[0][1], { ok: false, isDuplicate: true });
+  assert.equal(notifications[0][2], true);
   assert.deepEqual(filters.map(filter => filter.approverIds), ['outsider', 'outsider', 'approver']);
   assert.deepEqual(edits[0].components[0].toJSON(), buildApprovalResultRow('Kept Existing', 'en').toJSON());
   assert.deepEqual(synced[0].components[0].toJSON(), buildApprovalResultRow('Kept Existing', 'jp').toJSON());
+
+  await handler({ ...interaction, user: { id: 'approver' } });
+  assert.equal(notifications.length, 1, 'an already consumed request must not notify twice');
 });

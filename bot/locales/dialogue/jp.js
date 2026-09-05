@@ -216,6 +216,8 @@ export default {
     bulk: { title: '一括追加の承認 · {count} rows', outcome: '内訳: {breakdown}', reviewing: '**{count}** entries を確認中ですの。', local: 'サーバー内', more: '...ほか {count} rows' },
     public: {
       rejected: '<@{user}> **{name}** の {action}申請は officer に却下されましたの。',
+      duplicate: '<@{user}> **{name}** の {action}申請は反映されませんでしたの。\n**理由:** 既存の entry と重複しているため、officer が既存の entry を残すことを選びましたわ。',
+      failed: '<@{user}> Officer の承認後、**{name}** の {action}申請の処理を完了できませんでしたの。\n再申請する前に officer に確認をお願いしてくださいませ。',
       approved: '<@{user}> **{name}** の {action}申請が承認されましたわ。',
       add: '追加', edit: '編集',
     },

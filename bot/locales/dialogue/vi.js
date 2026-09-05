@@ -241,6 +241,8 @@ export default {
     bulk: { title: 'Duyệt thêm hàng loạt · {count} dòng', outcome: 'Phân loại: {breakdown}', reviewing: 'Đang duyệt **{count}** entry.', local: 'nội bộ', more: '... và {count} dòng khác' },
     public: {
       rejected: '<@{user}> Yêu cầu {action} **{name}** của cậu đã bị officer từ chối.',
+      duplicate: '<@{user}> Yêu cầu {action} **{name}** của cậu không được áp dụng.\n**Lý do:** Trùng với entry đã có trong danh sách. Officer đã chọn giữ entry hiện tại.',
+      failed: '<@{user}> Bot chưa thể hoàn tất yêu cầu {action} **{name}** dù officer đã duyệt.\nNhờ officer kiểm tra lại trước khi gửi lại nhé.',
       approved: '<@{user}> Yêu cầu {action} **{name}** của cậu đã được duyệt.',
       add: 'thêm', edit: 'chỉnh sửa',
     },
