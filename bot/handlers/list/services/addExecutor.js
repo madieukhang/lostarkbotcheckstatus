@@ -41,6 +41,7 @@ import {
   getListContext,
   buildTrustedBlockEmbed,
 } from '../helpers.js';
+import { buildDuplicateReasonFields } from '../duplicate-ui.js';
 
 export function buildHiddenRosterGuidance(entryName, guildName, lang = 'en') {
   const hasGuild = Boolean(String(guildName || '').trim());
@@ -260,40 +261,6 @@ function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap) {
     },
   ].filter(Boolean);
   return padInlineRow(inlineFields);
-}
-
-/**
- * The pair of full-width reason blocks that open the card.
- *
- * This is what the card exists for. The officer has just typed a reason
- * believing they were recording something new; setting it directly under
- * the stored one lets them see at a glance whether it adds anything, and
- * therefore whether to go run `/la-list edit`. Without it they have to
- * scroll back to their own command to compare.
- *
- * @param {object} existed - the entry already in the list
- * @param {string} typedReason - the reason from this add attempt
- * @param {string} lang - locale for both labels
- * @returns {Array<object>} one or two full-width fields
- */
-function buildDuplicateReasonFields(existed, typedReason, lang) {
-  const fallback = t('dialogue.broadcast.notAvailable', lang);
-  const typed = String(typedReason || '').trim();
-  return [
-    {
-      name: `📝 ${t('dialogue.listAdd.duplicate.storedReason', lang)}`,
-      value: (existed.reason || fallback).slice(0, 1024),
-      inline: false,
-    },
-    // Rendered whenever the attempt carried one, even when it matches the
-    // stored reason word for word · two identical lines say "yours adds
-    // nothing" more plainly than a field that quietly disappears.
-    typed ? {
-      name: `✏️ ${t('dialogue.listAdd.duplicate.typedReason', lang)}`,
-      value: typed.slice(0, 1024),
-      inline: false,
-    } : null,
-  ].filter(Boolean);
 }
 
 export function buildDuplicateListAddResult({

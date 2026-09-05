@@ -12,12 +12,10 @@ import {
   ButtonBuilder,
   ButtonStyle,
 } from 'discord.js';
-import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferUpdate, replyAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
@@ -31,6 +29,7 @@ import {
 } from '../services/pendingApprovalAccess.js';
 import { handleApprovedEditRequest } from './editApproval.js';
 import { createApprovalMessageUpdater } from '../services/approvals.js';
+import { buildDuplicateApprovalEmbed } from '../duplicate-ui.js';
 
 /**
  * Build the Approve / Reject / Edit button handler for /la-list add.
@@ -40,7 +39,7 @@ import { createApprovalMessageUpdater } from '../services/approvals.js';
  *   every approver DM so the same decision view stays in sync
  * @param {Function} deps.executeListAddToDatabase - shared add executor
  * @param {Function} deps.broadcastListChange - guild-broadcast notifier
- * @param {Function} deps.notifyRequesterAboutDecision - DM the requester
+ * @param {Function} deps.notifyRequesterAboutDecision - notify the origin channel
  *   with the final outcome (approved / rejected / edited)
  * @returns {Function} handleListAddApprovalButton(interaction)
  */
@@ -133,42 +132,20 @@ export function createListAddApprovalButtonHandler({
       // Duplicate found · show comparison and overwrite option
       if (!result.ok && result.isDuplicate) {
         const existing = result.existingEntry;
-        // Save duplicate entry _id for scope-safe deletion during overwrite
+        // Keep the matched ID for the scope-preserving in-place overwrite.
         await PendingApproval.updateOne(
           { requestId },
           { $set: { duplicateEntryId: String(existing._id) } }
         );
 
         const buildDuplicatePayload = (targetLang) => {
-          const scopeKey = (scope) => scope === 'server' ? 'local' : 'global';
-          const scopeTag = (scope) => ` [${t(`dialogue.approval.scopeTag.${scopeKey(scope)}`, targetLang)}]`;
-          const fallback = t('dialogue.broadcast.notAvailable', targetLang);
-          const compareEmbed = createArtistEmbed(targetLang)
-            .setTitle(`⚠️ ${t('dialogue.approval.flow.duplicateTitle', targetLang)}`)
-            .setDescription(t('dialogue.approval.flow.duplicatePrompt', targetLang, {
-              name: payload.name,
-              list: t(`dialogue.broadcast.list.${payload.type}`, targetLang),
-            }))
-            .addFields(
-              {
-                name: `📌 ${t('dialogue.approval.flow.existingEntry', targetLang)}${scopeTag(existing.scope)}`,
-                value: `**${existing.name}**\n${t('dialogue.approval.flow.compareReason', targetLang)}: ${existing.reason || fallback}\n${t('dialogue.approval.flow.compareRaid', targetLang)}: ${existing.raid || fallback}\n${t('dialogue.approval.flow.compareAdded', targetLang)}: <t:${Math.floor(new Date(existing.addedAt || 0).getTime() / 1000)}:R>`,
-                inline: true,
-              },
-              {
-                name: `🆕 ${t('dialogue.approval.flow.newRequest', targetLang)}${scopeTag(payload.scope)}`,
-                value: `**${payload.name}**\n${t('dialogue.approval.flow.compareReason', targetLang)}: ${payload.reason || fallback}\n${t('dialogue.approval.flow.compareRaid', targetLang)}: ${payload.raid || fallback}\n${t('dialogue.approval.flow.compareBy', targetLang)}: ${payload.requestedByDisplayName || t('dialogue.common.unknown', targetLang)}`,
-                inline: true,
-              },
-            )
-            .setColor(COLORS.warning);
           const overwriteRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`listadd_overwrite:${requestId}`).setLabel(t('common.actions.overwrite', targetLang)).setStyle(ButtonStyle.Danger),
             new ButtonBuilder().setCustomId(`listadd_keep:${requestId}`).setLabel(t('common.actions.keepExisting', targetLang)).setStyle(ButtonStyle.Secondary),
           );
           return {
             content: null,
-            embeds: [compareEmbed],
+            embeds: [buildDuplicateApprovalEmbed(existing, payload, targetLang)],
             components: [overwriteRow],
           };
         };
