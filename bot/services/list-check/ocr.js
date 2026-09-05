@@ -77,21 +77,7 @@ const ocrCache = createLruTtlCache({
   cloneValue: (names) => [...names],
 });
 
-function getCachedOcrNames(cacheKey) {
-  return ocrCache.get(cacheKey);
-}
-
-function setCachedOcrNames(cacheKey, names) {
-  if (!Array.isArray(names)) return;
-  ocrCache.set(cacheKey, names);
-}
-
-/**
- * Drop every cached OCR result. Wired into the test suite so successive
- * tests start from a clean slate; production code never calls this · the
- * cache TTLs + LRU eviction handle steady-state churn.
- * @returns {void}
- */
+/** Clear OCR results between tests; runtime eviction uses TTL and LRU. */
 export function clearOcrCache() {
   ocrCache.clear();
 }
@@ -191,7 +177,13 @@ function selectAvailableGeminiModels(models, now = Date.now()) {
     });
   }
 
-  return { available, skipped };
+  const failure = available.length === 0 ? {
+    ok: false,
+    type: 'cooldown',
+    retryAfterMs: Math.min(...skipped.map((item) => item.remainingMs)),
+    failures: skipped.map((item) => `${item.model}: cooldown (${item.reason})`),
+  } : null;
+  return { available, skipped, failure };
 }
 
 function createGeminiFailureError(result, models) {
@@ -250,25 +242,17 @@ async function requestGeminiWithFallback({
   onModelSkipped = () => {},
   onRetry = () => {},
 }) {
+  // Recheck after downloading: another image can trip the breaker meanwhile.
+  const { available: models, skipped, failure } = selectAvailableGeminiModels(configuredModels);
+  for (const skippedModel of skipped) onModelSkipped(skippedModel);
+  if (failure) return failure;
+
   // Inline images can approach Gemini's request limit. Serialize once so each
   // model fallback reuses the same large string instead of reallocating it.
   const requestBody = JSON.stringify(createGeminiRequestBody(prompt, imageBase64, mimeType));
   if (Buffer.byteLength(requestBody, 'utf8') >= MAX_GEMINI_INLINE_REQUEST_BYTES) {
     throw new Error('Gemini inline request too large (must be under 20MB including encoding).');
   }
-  const { available: models, skipped } = selectAvailableGeminiModels(configuredModels);
-  for (const skippedModel of skipped) onModelSkipped(skippedModel);
-
-  if (models.length === 0) {
-    const retryAfterMs = Math.min(...skipped.map((item) => item.remainingMs));
-    return {
-      ok: false,
-      type: 'cooldown',
-      retryAfterMs,
-      failures: skipped.map((item) => `${item.model}: cooldown (${item.reason})`),
-    };
-  }
-
   const failures = [];
   // Failover models share one wall-clock budget. A hung primary must not get
   // a fresh 30 seconds for every fallback in the chain; quick 404/429/5xx
@@ -603,7 +587,7 @@ export async function extractNamesFromImage(image, options = {}) {
   const cacheKey = image.url
     ? `${image.url}|mode:${mode}|models:${models.join(',')}|refine:${refineAmbiguousDiacritics ? '1' : '0'}`
     : '';
-  const cachedNames = getCachedOcrNames(cacheKey);
+  const cachedNames = ocrCache.get(cacheKey);
   if (cachedNames !== undefined) {
     timing.cache = 'hit';
     timing.status = 'ok';
@@ -619,6 +603,11 @@ export async function extractNamesFromImage(image, options = {}) {
     timing.names = names.length;
     return names.slice();
   }
+  // Cached and in-flight answers remain usable; only new work needs a healthy
+  // model. Reject before downloading or encoding an image that cannot run.
+  const { failure } = selectAvailableGeminiModels(models);
+  if (failure) throw createGeminiFailureError(failure, models);
+
   if (cacheKey) {
     ownedFlight = {};
     ownedFlight.promise = new Promise((resolve, reject) => Object.assign(ownedFlight, { resolve, reject }));
@@ -752,7 +741,7 @@ export async function extractNamesFromImage(image, options = {}) {
     // Mongo/enrichment/render work for one character.
     names = filterAndDeduplicateNames(names);
   }
-  setCachedOcrNames(cacheKey, names);
+  ocrCache.set(cacheKey, names);
   timing.status = 'ok';
   timing.names = names.length;
   ownedFlight?.resolve(names.slice());

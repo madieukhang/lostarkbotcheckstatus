@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import config from '../bot/config.js';
+import { GEMINI_MODEL_PROFILES } from '../bot/config/geminiModels.js';
 import { extractNamesFromImage, clearOcrCache, clearGeminiModelCooldowns } from '../bot/services/list-check/ocr.js';
 
 const image = { url: 'https://cdn.discordapp.com/concurrent.png', contentType: 'image/png' };
@@ -34,6 +35,50 @@ test('concurrent OCR of the same image shares download and Gemini work but retur
   results[0].push('Changed');
   assert.deepEqual(results[1], ['Alice']);
 });
+
+for (const mode of ['daily', 'analysis']) {
+  test(`${mode} cooldown skips downloads, keeps cached answers and recovers after expiry`, async t => {
+    setup(t);
+    const original = { geminiModels: config.geminiModels, geminiAnalysisModels: config.geminiAnalysisModels };
+    Object.assign(config, { geminiModels: GEMINI_MODEL_PROFILES.daily, geminiAnalysisModels: GEMINI_MODEL_PROFILES.analysis });
+    t.after(() => Object.assign(config, original));
+    let now = Date.now();
+    t.mock.method(Date, 'now', () => now);
+    let busy = false;
+    const downloads = [];
+    const calls = [];
+    t.mock.method(globalThis, 'fetch', async url => {
+      if (String(url).startsWith('https://cdn.discordapp.com/')) {
+        downloads.push(url);
+        return imageResponse();
+      }
+      const model = new URL(url).pathname.split('/models/')[1].split(':')[0];
+      calls.push(model);
+      return busy && GEMINI_MODEL_PROFILES[mode].includes(model)
+        ? new Response('temporarily unavailable', { status: calls.length % 2 ? 429 : 503 })
+        : namesResponse();
+    });
+    assert.deepEqual(await extractNamesFromImage(image, { mode }), ['Alice']);
+    busy = true;
+    const uncached = { ...image, url: 'https://cdn.discordapp.com/uncached.png' };
+    await assert.rejects(extractNamesFromImage(uncached, { mode }), { code: 'GEMINI_MODELS_COOLING_DOWN' });
+    const attempts = calls.length;
+    const error = await extractNamesFromImage(uncached, { mode }).catch(error => error);
+    assert.equal(error.code, 'GEMINI_MODELS_COOLING_DOWN');
+    assert.ok(error.retryAfterMs > 0);
+    assert.equal(downloads.length, 2, 'a known unavailable profile must fail before downloading again');
+    assert.equal(calls.length, attempts);
+    assert.deepEqual(await extractNamesFromImage(image, { mode }), ['Alice']);
+    assert.equal(downloads.length, 2, 'cached results remain usable during cooldown');
+    const otherMode = mode === 'daily' ? 'analysis' : 'daily';
+    assert.deepEqual(await extractNamesFromImage(uncached, { mode: otherMode }), ['Alice']);
+    assert.equal(calls.at(-1), GEMINI_MODEL_PROFILES[otherMode][0]);
+    now += error.retryAfterMs + 1;
+    busy = false;
+    assert.deepEqual(await extractNamesFromImage(uncached, { mode }), ['Alice']);
+    assert.equal(downloads.length, 4);
+  });
+}
 
 test('in-flight OCR keeps Daily, Analysis and refinement requests separate', async t => {
   setup(t);
