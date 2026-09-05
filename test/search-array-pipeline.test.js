@@ -40,3 +40,15 @@ test('search collects only missing matched-entry snapshots with canonical dedupe
 
   assert.deepEqual(names, ['Zoë', 'Another']);
 });
+
+test('search batches class snapshots only for the related names visible on the card', () => {
+  const entry = {
+    name: 'Main',
+    allCharacters: ['Searched', 'Main', 'Zoë', 'Zoe\u0308', 'Knownalt', 'Thirdalt', 'Hiddenalt'],
+  };
+  const missing = collectMissingSearchSnapshotNames({
+    black: new Map([['searched', entry]]),
+    white: new Map(), watch: new Map(), trusted: new Map(),
+  }, ['Searched'], new Map([['knownalt', { name: 'Knownalt', classId: 'bard' }]]));
+  assert.deepEqual(missing, ['Main', 'Zoë', 'Thirdalt']);
+});

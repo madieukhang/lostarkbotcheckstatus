@@ -297,6 +297,7 @@ export default {
     failed: { title: 'Chưa tải được list', description: 'Tớ chưa mở được trang list này.' }, session: { title: 'Đây không phải list view của cậu', description: 'Chỉ người mở view này mới điều hướng được.' },
   },
   search: {
+    moreResults: '… Còn {count} kết quả. Cậu thu hẹp tên hoặc bộ lọc để xem tiếp nhé.',
     bibleUnavailable: { title: 'Bible đang không phản hồi', description: 'lostark.bible chưa trả lời lần này. Cậu thử lại sau nhé.' }, noResults: { title: 'Không có character khớp', description: 'Tớ không tìm thấy character nào khớp **{name}**.' },
     noFilteredResults: { title: 'Không có kết quả hợp bộ lọc', description: 'Không còn kết quả **{name}** nào sau khi áp dụng bộ lọc.', filters: 'Bộ lọc' }, failed: { title: 'Tìm kiếm thất bại', description: 'Tớ chưa hoàn tất được lượt tìm tên.' },
     title: 'Tìm kiếm · "{name}"', via: 'via {name} · ', noReason: 'chưa có lý do', notListed: 'chưa có trong DB list', matchOne: 'kết quả', matchMany: 'kết quả', footer: 'Bộ lọc: {filters}',

@@ -272,6 +272,7 @@ export default {
     failed: { title: 'List を読み込めませんでしたの', description: 'この list view を開けませんでしたわ。' }, session: { title: 'あなたの list view ではありませんの', description: 'この view を開いた人だけが操作できますわ。' },
   },
   search: {
+    moreResults: '… ほかに {count} 件あります。名前や条件を絞り込んでご確認くださいませ。',
     bibleUnavailable: { title: 'Bible が応答しませんの', description: 'lostark.bible が今回は応答しませんでした。後でもう一度お試しくださいませ。' }, noResults: { title: '一致 character がありませんの', description: '**{name}** に一致する character を見つけられませんでしたわ。' },
     noFilteredResults: { title: 'Filter に合う結果がありませんの', description: 'Filter 適用後、**{name}** の結果はありませんでしたわ。', filters: 'Filters' }, failed: { title: '検索に失敗しましたの', description: '名前検索を完了できませんでしたわ。' },
     title: '検索 · "{name}"', via: '{name} 経由 · ', noReason: '理由なし', notListed: 'list DB 未登録',  matchOne: 'match', matchMany: 'matches', footer: 'Filters: {filters}',

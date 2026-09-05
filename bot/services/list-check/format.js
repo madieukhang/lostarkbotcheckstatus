@@ -175,14 +175,14 @@ function formatResultName(item, emphasizeName) {
   return `**${linkName(item.name) || item.name}**`;
 }
 
-function formatStandardResult(item, state, classPrefix, statSuffix, branches, lang) {
+function formatStandardResult(item, state, classPrefix, statSuffix, branches, lang, linkUnlisted) {
   const isListHit = Boolean(state.entryKey);
   const scopeTag = state.entryKey === 'blackEntry' && item.blackEntry?.scope === 'server'
     ? ` (${t('dialogue.check.format.local', lang)})`
     : '';
   const trustedTag = isListHit && item.trustedEntry ? ' 🛡️' : '';
   return {
-    line: `${state.icon} ${classPrefix}${formatResultName(item, isListHit)}${scopeTag}${trustedTag}${statSuffix}${formatBranchBlock(branches)}`,
+    line: `${state.icon} ${classPrefix}${formatResultName(item, isListHit || linkUnlisted)}${scopeTag}${trustedTag}${statSuffix}${formatBranchBlock(branches)}`,
     priority: state.priority,
   };
 }
@@ -203,17 +203,21 @@ function formatTrustedResult(item, state, classPrefix, statSuffix, branches, lan
 }
 
 /**
- * Build the per-character line for an OCR check result.
+ * Build one character row without grouping or changing the caller's order.
  *
  * Layout:
  *   [status-icon] [class-icon] **Name** · `ilvl` · `nnn CP`
- *      ↳ via Other · reason · [raid]            (only when flagged)
+ *      ↳ reason · [raid]                        (when reported)
+ *      ↳ via Other                             (for an indirect match)
  *      ↳ via Other · trusted                    (only when trusted via roster)
  *      ↳ alts: A, B, C +N more                  (when alts are known)
  *
+ * @param {object} item - List-check-shaped character and matched entries.
+ * @param {string} [lang='en']
+ * @param {{linkUnlisted?: boolean}} [options] - Search links every returned character.
  * @returns {{ line: string, priority: number }}
  */
-function formatResultLine(item, lang = 'en') {
+export function formatResultLine(item, lang = 'en', { linkUnlisted = false } = {}) {
   const state = resolveResultState(item);
   const classPrefix = getClassPrefix(item);
   const statSuffix = getStatSuffix(item);
@@ -221,7 +225,7 @@ function formatResultLine(item, lang = 'en') {
 
   return state.trustedOnly
     ? formatTrustedResult(item, state, classPrefix, statSuffix, branches, lang)
-    : formatStandardResult(item, state, classPrefix, statSuffix, branches, lang);
+    : formatStandardResult(item, state, classPrefix, statSuffix, branches, lang, linkUnlisted);
 }
 
 /**

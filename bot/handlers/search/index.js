@@ -24,6 +24,7 @@ import {
   getFlaggedResultsWithImages,
 } from './evidence.js';
 import { buildSearchResultEmbed } from './ui.js';
+import { LIST_CHECK_ALT_PREVIEW_LIMIT, pickAltsForDisplay } from '../../services/list-check/format.js';
 
 export function filterSearchSuggestions(suggestions, { minIlvl, maxIlvl, classFilter }) {
   const filtered = [];
@@ -42,14 +43,24 @@ export function filterSearchSuggestions(suggestions, { minIlvl, maxIlvl, classFi
   return filtered;
 }
 
+/** Collect missing class snapshots for matched entries and the visible alt preview. */
 export function collectMissingSearchSnapshotNames(maps, names, snapshotMap) {
   const missing = new Map();
   for (const rawName of names) {
     const resultKey = normalizeNameKey(rawName);
-    for (const map of [maps.black, maps.white, maps.watch]) {
-      const entry = map.get(resultKey);
-      if (!entry) continue;
-      const name = String(entry?.name || '').trim().normalize('NFC');
+    const item = {
+      name: rawName,
+      blackEntry: maps.black?.get(resultKey),
+      whiteEntry: maps.white?.get(resultKey),
+      watchEntry: maps.watch?.get(resultKey),
+      trustedEntry: maps.trusted?.get(resultKey),
+    };
+    const relatedNames = [
+      ...[item.blackEntry, item.whiteEntry, item.watchEntry, item.trustedEntry].map(entry => entry?.name),
+      ...pickAltsForDisplay(item).slice(0, LIST_CHECK_ALT_PREVIEW_LIMIT),
+    ];
+    for (const relatedName of relatedNames) {
+      const name = String(relatedName || '').trim().normalize('NFC');
       const key = normalizeNameKey(name);
       if (key && !snapshotMap.has(key) && !missing.has(key)) missing.set(key, name);
     }
@@ -136,9 +147,8 @@ export async function handleSearchCommand(interaction) {
     // already carry name/cls/itemLevel but no CP, so the snapshot is
     // strictly additive when present.
     const snapshotMap = buildNameKeyMap(allSnapshots);
-    // A roster match names an entry the search term did not, and that
-    // name gets rendered too · without its snapshot it would show as
-    // bare text beside rows that carry a class icon and a roster link.
+    // Load class metadata for via/visible alt names in one DB batch; decorating
+    // a search card must not launch extra Bible calls for each related name.
     const viaNames = collectMissingSearchSnapshotNames(lookup.maps, allNames, snapshotMap);
     if (viaNames.length > 0) {
       try {

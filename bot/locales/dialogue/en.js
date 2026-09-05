@@ -410,6 +410,7 @@ export default {
     session: { title: 'This is not your list view', description: 'Only the person who opened this view can navigate it.' },
   },
   search: {
+    moreResults: '… {count} more results. Narrow the name or filters to see them.',
     bibleUnavailable: { title: 'Bible is unavailable', description: 'lostark.bible did not answer this time. Please try again later.' },
     noResults: { title: 'No matching characters', description: 'I could not find a character matching **{name}**.' },
     noFilteredResults: { title: 'No results match those filters', description: 'I found no **{name}** matches after applying these filters.', filters: 'Filters' },

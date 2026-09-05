@@ -1,57 +1,57 @@
 import { createArtistEmbed } from '../../utils/artistVoice.js';
 
-import { getClassName, getClassEmoji } from '../../models/Class.js';
-import { rosterUrl } from '../../utils/rosterLink.js';
-import { formatLinkedCharacter } from '../list/trackedAltsRender.js';
+import { getClassName } from '../../models/Class.js';
+import { formatResultLine } from '../../services/list-check/format.js';
 import { COLORS } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
 import { hasDatabaseListMatch } from '../../services/list-check/verification.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { pickEvidenceEntry } from './evidence.js';
 
+function buildSearchDescription(lines, breakdown, lang) {
+  // The richer rows contain several roster links. Fit complete rows instead
+  // of cutting through Markdown or silently showing half of the last match.
+  for (let visible = lines.length; visible >= 0; visible -= 1) {
+    const omitted = lines.length - visible;
+    const description = [
+      breakdown,
+      lines.slice(0, visible).join('\n\n'),
+      omitted ? `*${t('dialogue.search.moreResults', lang, { count: omitted })}*` : '',
+    ].filter(Boolean).join('\n\n');
+    if (description.length <= 4096) return description;
+  }
+  return '';
+}
+
+/**
+ * Render search matches with the check-card row layout while retaining search
+ * ranking, result counts, filters and evidence markers.
+ * @param {object} options - Search results, locale, filters and cached snapshots.
+ * @returns {import('discord.js').EmbedBuilder}
+ */
 export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang = 'en', snapshotMap = new Map() }) {
+  const relatedClasses = Object.fromEntries([...snapshotMap].map(([key, snapshot]) => [
+    normalizeNameKey(key),
+    snapshot?.className || (snapshot?.classId ? getClassName(snapshot.classId) : ''),
+  ]));
   const lines = results.map((result, index) => {
-    const resultKey = normalizeNameKey(result.name);
-    const cls = getClassName(result.cls);
-    const classPrefix = getClassEmoji(cls) || cls;
-    const ilvl = Number(result.itemLevel || 0).toFixed(2);
-    // CP comes through from the snapshot enrichment that search/index
-    // attaches when available; falsy when the name has never been
-    // queried via /la-roster (graceful skip · the row still carries
-    // class icon + ilvl).
-    const cpSuffix = result.combatScore ? ` · \`${result.combatScore} CP\`` : '';
-    const hasImage = Boolean(pickEvidenceEntry(result));
-
-    const statusIcons = [
-      result.black ? '⛔' : '',
-      result.white ? '✅' : '',
-      result.watch ? '⚠️' : '',
-      result.trusted ? '🛡️' : '',
-    ].filter(Boolean).join('');
-    const icon = statusIcons ? `${statusIcons} ` : '';
-
-    const link = `[${result.name}](${rosterUrl(result.name)})`;
-    // Class icon (or text fallback) sits BEFORE the name, after the list-
-    // status icon. Pattern matches the rest of the v0.5.67 vocabulary.
-    let line = `**${index + 1}.** ${icon}${classPrefix} ${link} · \`${ilvl}\`${cpSuffix}${hasImage ? ' · 📎' : ''}`;
-
-    for (const entry of [result.black, result.white, result.watch]) {
-      if (!entry) continue;
-      const entryKey = normalizeNameKey(entry.name);
-      const isRosterMatch = entryKey !== resultKey;
-      // The matched entry is a character in its own right · render it the
-      // way every other character on this card is rendered instead of as
-      // bare bold text.
-      const via = isRosterMatch
-        ? t('dialogue.search.via', lang, {
-          name: formatLinkedCharacter(entry.name, snapshotMap.get(entryKey)),
-        })
-        : '';
-      const raidSuffix = entry.raid ? ` \`${entry.raid}\`` : '';
-      line += `\n    ↳ ${via}*${entry.reason || t('dialogue.search.noReason', lang)}*${raidSuffix}`;
-    }
-
-    return line;
+    // Format individually: OCR may merge same-roster characters and sort by
+    // severity, but each search match must remain independently reachable.
+    const { line } = formatResultLine({
+      name: result.name,
+      blackEntry: result.black,
+      whiteEntry: result.white,
+      watchEntry: result.watch,
+      trustedEntry: result.trusted,
+      snapClassName: getClassName(result.cls),
+      snapItemLevel: Number(result.itemLevel || 0),
+      snapCombatScore: result.combatScore,
+      relatedClasses,
+    }, lang, { linkUnlisted: true });
+    const [headline, ...branches] = line.split('\n');
+    const number = results.length > 1 ? `**${index + 1}.** ` : '';
+    const evidence = pickEvidenceEntry(result) ? ' · 📎' : '';
+    return [`${number}${headline}${evidence}`, ...branches].join('\n');
   });
 
   const blackCount = results.filter((result) => result.black).length;
@@ -62,7 +62,7 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
   const hasBlack = blackCount > 0;
   const hasWatch = watchCount > 0;
   const hasWhite = whiteCount > 0;
-  const color = hasBlack ? COLORS.danger : hasWatch ? COLORS.warning : hasWhite ? COLORS.success : COLORS.info;
+  const color = hasBlack ? COLORS.danger : hasWatch ? COLORS.warning : hasWhite || trustedCount > 0 ? COLORS.success : COLORS.info;
 
   const filterParts = [
     `ilvl ≥ ${minIlvl}`,
@@ -81,16 +81,18 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
   ].filter(Boolean);
   const matchWord = t(`dialogue.search.${results.length === 1 ? 'matchOne' : 'matchMany'}`, lang);
 
-  // The count lives in the title, the way every other list card carries
+  // The count lives in the compact heading, the way every other list card carries
   // its total. The breakdown line only earns its space once there is
   // more than one result · with a single hit it restates the icon
   // sitting on the row right below it.
-  const description = results.length > 1 && breakdown.length > 0
-    ? `${breakdown.join(' · ')}\n\n${lines.join('\n')}`.slice(0, 4096)
-    : lines.join('\n').slice(0, 4096);
+  const description = buildSearchDescription(
+    lines,
+    results.length > 1 ? breakdown.join(' · ') : '',
+    lang,
+  );
 
   return createArtistEmbed(lang)
-    .setTitle(`🔍 ${t('dialogue.search.title', lang, { name })} · ${results.length} ${matchWord}`)
+    .setAuthor({ name: `🔍 ${t('dialogue.search.title', lang, { name })} · ${results.length} ${matchWord}` })
     .setDescription(description)
     .setColor(color)
     .setFooter({
