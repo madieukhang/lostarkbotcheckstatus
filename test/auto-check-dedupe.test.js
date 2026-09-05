@@ -479,6 +479,10 @@ test('auto-check scales the name cap across multiple attached images', async () 
 
 test('auto-check queues rapid image messages instead of dropping them to cooldown', async () => {
   resetAutoCheckDedupeForTest();
+  let releaseFirstCheck;
+  let markFirstCheckStarted;
+  const firstCheckGate = new Promise(resolve => { releaseFirstCheck = resolve; });
+  const firstCheckStarted = new Promise(resolve => { markFirstCheckStarted = resolve; });
   let releaseFirstExtraction;
   let markFirstExtractionStarted;
   const firstExtractionGate = new Promise((resolve) => {
@@ -501,10 +505,13 @@ test('auto-check queues rapid image messages instead of dropping them to cooldow
       }
       return [image.id === 'queued-image-1' ? 'First' : 'Second'];
     },
-    checkNamesAgainstListsFn: async (names) => names.map((name) => ({
-      name,
-      blackEntry: { name },
-    })),
+    checkNamesAgainstListsFn: async (names) => {
+      if (names[0] === 'First') {
+        markFirstCheckStarted();
+        await firstCheckGate;
+      }
+      return names.map(name => ({ name, blackEntry: { name } }));
+    },
     formatCheckResultsFn: () => ['formatted'],
     buildListCheckEmbedFn: ({ results }) => ({ embed: { title: results[0].name } }),
     buildAutoCheckEvidenceRowFn: () => null,
@@ -550,6 +557,14 @@ test('auto-check queues rapid image messages instead of dropping them to cooldow
   assert.match(second.replies[0].embeds[0].toJSON().title, /1 image request/i);
 
   releaseFirstExtraction();
+  await firstCheckStarted;
+  await new Promise(resolve => setImmediate(resolve));
+  try {
+    assert.deepEqual(extractedOrder, ['queued-image-1', 'queued-image-2'],
+      'The next OCR must start while the first request is still checking lists');
+  } finally {
+    releaseFirstCheck();
+  }
   await Promise.all([firstRun, secondRun]);
 
   assert.deepEqual(extractedOrder, ['queued-image-1', 'queued-image-2']);

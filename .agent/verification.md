@@ -16,7 +16,7 @@ Không thay test này bằng database thật.
 | Thay đổi | Test liên quan |
 | --- | --- |
 | Cache/metadata | `node --test test/lru-ttl-cache.test.js test/meta-cache.test.js test/roster-url.test.js` |
-| OCR/model chain | `node --test test/gemini-model-config.test.js test/ocr-profiles.test.js test/ocr-preferences.test.js test/listcheck-ocr-cache.test.js test/auto-check-dedupe.test.js` |
+| OCR/model chain | `node --test test/gemini-model-config.test.js test/ocr-profiles.test.js test/ocr-preferences.test.js test/ocr-inflight.test.js test/listcheck-ocr-cache.test.js test/auto-check-dedupe.test.js` |
 | List approval/scope | `node --test test/scope-query.test.js test/pending-approval-access.test.js test/list-mutation-flow.test.js test/list-overwrite-approval.test.js test/approval-locale-boundary.test.js` |
 | Worker/monitor | `node --test test/scrape-worker.test.js test/worker-heartbeat.test.js test/monitor.test.js` |
 

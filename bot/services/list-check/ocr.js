@@ -52,6 +52,9 @@ const GEMINI_FAILURE_FORMATTERS = {
 // the next Discord request, not force every user to knock on the same busy
 // endpoint again until the deployment restarts.
 const geminiModelCooldowns = new Map();
+// Share only identical OCR work; list permissions and downstream lookups stay
+// request-local. Failures leave no entry, so a subsequent request can retry.
+const ocrInFlight = new Map();
 
 function formatGeminiFailure(result) {
   const key = result.type === 'response'
@@ -561,6 +564,8 @@ async function refineAmbiguousOcrNames(
  */
 export async function extractNamesFromImage(image, options = {}) {
   const startedAt = Date.now();
+  let ownedFlight;
+  let flightKey;
   const timing = {
     mode: options.mode ?? 'daily',
     cache: 'miss',
@@ -604,6 +609,23 @@ export async function extractNamesFromImage(image, options = {}) {
     timing.status = 'ok';
     timing.names = cachedNames.length;
     return cachedNames;
+  }
+
+  const pending = ocrInFlight.get(cacheKey);
+  if (pending) {
+    timing.cache = 'in-flight';
+    const names = await pending.promise;
+    timing.status = 'ok';
+    timing.names = names.length;
+    return names.slice();
+  }
+  if (cacheKey) {
+    ownedFlight = {};
+    ownedFlight.promise = new Promise((resolve, reject) => Object.assign(ownedFlight, { resolve, reject }));
+    // The owner already propagates errors; the shared promise may have no waiters.
+    ownedFlight.promise.catch(() => {});
+    flightKey = cacheKey;
+    ocrInFlight.set(flightKey, ownedFlight);
   }
 
   const downloadStartedAt = Date.now();
@@ -707,6 +729,7 @@ export async function extractNamesFromImage(image, options = {}) {
 
   if (geminiResult.value.emptyResponse) {
     timing.status = 'ok';
+    ownedFlight?.resolve([]);
     return [];
   }
 
@@ -732,8 +755,13 @@ export async function extractNamesFromImage(image, options = {}) {
   setCachedOcrNames(cacheKey, names);
   timing.status = 'ok';
   timing.names = names.length;
+  ownedFlight?.resolve(names.slice());
   return names;
+  } catch (error) {
+    ownedFlight?.reject(error);
+    throw error;
   } finally {
+    if (ownedFlight && ocrInFlight.get(flightKey) === ownedFlight) ocrInFlight.delete(flightKey);
     const lookupStats = options.suggestionContext?.stats || {};
     console.log([
       `[listcheck] OCR timing total=${Date.now() - startedAt}ms`,

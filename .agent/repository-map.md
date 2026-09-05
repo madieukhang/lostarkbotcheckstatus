@@ -36,6 +36,9 @@
   truyền trong `/la-check` chỉ ghi đè cho request đó, không ghi lại preference.
 - OCR retry/cache phải giữ phân biệt lỗi transient với kết quả hợp lệ, đồng thời
   giữ dữ liệu của những ảnh đã xử lý thành công trong batch nhiều ảnh.
+- Hàng đợi auto-check chỉ giữ batch trong giai đoạn OCR; tra list/roster và render
+  chạy sau khi nhả slot. OCR trùng URL/profile/model/refinement đang chạy được
+  gộp; mỗi caller nhận mảng riêng và lỗi luôn nhả entry để lần sau thử lại.
 - Cache chỉ giữ kết quả mà caller cho phép. Thay đổi giới hạn động có hiệu lực ở
   lần ghi tiếp theo; cập nhật cùng key không tự chiếm thêm một slot.
 - `bot/utils/scope.js` cùng list services giữ ranh giới guild/global và approval.

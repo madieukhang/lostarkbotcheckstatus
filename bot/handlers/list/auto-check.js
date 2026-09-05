@@ -149,9 +149,8 @@ export function resetAutoCheckDedupeForTest() {
 }
 
 /**
- * Run one screenshot request at a time while exposing how many requests are
- * already ahead of the caller. A single request may contain up to three
- * attachments; those are also read sequentially inside that queue slot.
+ * Serialize each batch's OCR work, then release the slot before list/roster
+ * lookups and final rendering. A batch may contain up to three attachments.
  *
  * @template T
  * @param {() => Promise<T>} task
@@ -402,76 +401,83 @@ export function createAutoCheckMessageHandler({
     const failedImages = [];
     let cooldownRetryUsed = false;
     if (request.images.length > 0) {
-      const seenNames = new Set();
-      for (const [index, image] of request.images.entries()) {
+      await runQueuedImageRequest(async () => {
+        const seenNames = new Set();
+        for (const [index, image] of request.images.entries()) {
+          await setProgressMessage(message, requestUi, [
+            t('dialogue.check.imageProgress', lang, {
+              current: index + 1,
+              count: request.images.length,
+            }),
+            t('dialogue.check.modeProgress', lang, { mode: t(`commands.check.modes.${request.mode}`, lang) }),
+            imageLimitLine(request, lang),
+          ], lang);
+          try {
+            let extractedNames;
+            while (true) {
+              try {
+                extractedNames = await extractNamesFromImageFn(image, {
+                  mode: request.mode,
+                  refineAmbiguousDiacritics: true,
+                  suggestionCache: suggestionContext.cache,
+                  suggestionContext,
+                });
+                break;
+              } catch (error) {
+                const retryAfterMs = Number(error?.retryAfterMs);
+                const canWaitAndRetry = (
+                  !cooldownRetryUsed
+                  && error?.code === 'GEMINI_MODELS_COOLING_DOWN'
+                  && Number.isFinite(retryAfterMs)
+                  && retryAfterMs > 0
+                  && retryAfterMs <= AUTO_CHECK_MAX_COOLDOWN_RETRY_AFTER_MS
+                );
+                if (!canWaitAndRetry) throw error;
+
+                cooldownRetryUsed = true;
+                const waitMs = Math.ceil(retryAfterMs) + AUTO_CHECK_COOLDOWN_WAIT_BUFFER_MS;
+                const retrySeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+                console.warn(
+                  `[auto-check] all Gemini models cooling down; retrying image`
+                  + ` ${index + 1}/${request.images.length} in ${retrySeconds}s.`,
+                );
+                await setProgressMessage(message, requestUi, [
+                  t('dialogue.check.imageCooldownWait', lang, {
+                    current: index + 1,
+                    count: request.images.length,
+                    seconds: retrySeconds,
+                  }),
+                  imageLimitLine(request, lang),
+                ], lang);
+                await waitFn(waitMs);
+                await setProgressMessage(message, requestUi, [
+                  t('dialogue.check.imageProgress', lang, {
+                    current: index + 1,
+                    count: request.images.length,
+                  }),
+                  imageLimitLine(request, lang),
+                ], lang);
+              }
+            }
+            mergeUniqueNames(names, extractedNames, seenNames);
+          } catch (error) {
+            failedImages.push({ index: index + 1, error });
+            console.warn(
+              `[auto-check] OCR image ${index + 1}/${request.images.length} failed:`
+              + ` ${error?.message || String(error)}; continuing batch.`,
+            );
+          }
+        }
+        console.log(
+          `[auto-check] image batch OCR complete attachments=${request.images.length}`
+          + ` failed=${failedImages.length} names=${names.length}.`,
+        );
+      }, async (waitingAhead) => {
         await setProgressMessage(message, requestUi, [
-          t('dialogue.check.imageProgress', lang, {
-            current: index + 1,
-            count: request.images.length,
-          }),
-          t('dialogue.check.modeProgress', lang, { mode: t(`commands.check.modes.${request.mode}`, lang) }),
+          t('dialogue.check.imageQueued', lang, { count: waitingAhead }),
           imageLimitLine(request, lang),
         ], lang);
-        try {
-          let extractedNames;
-          while (true) {
-            try {
-              extractedNames = await extractNamesFromImageFn(image, {
-                mode: request.mode,
-                refineAmbiguousDiacritics: true,
-                suggestionCache: suggestionContext.cache,
-                suggestionContext,
-              });
-              break;
-            } catch (error) {
-              const retryAfterMs = Number(error?.retryAfterMs);
-              const canWaitAndRetry = (
-                !cooldownRetryUsed
-                && error?.code === 'GEMINI_MODELS_COOLING_DOWN'
-                && Number.isFinite(retryAfterMs)
-                && retryAfterMs > 0
-                && retryAfterMs <= AUTO_CHECK_MAX_COOLDOWN_RETRY_AFTER_MS
-              );
-              if (!canWaitAndRetry) throw error;
-
-              cooldownRetryUsed = true;
-              const waitMs = Math.ceil(retryAfterMs) + AUTO_CHECK_COOLDOWN_WAIT_BUFFER_MS;
-              const retrySeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
-              console.warn(
-                `[auto-check] all Gemini models cooling down; retrying image`
-                + ` ${index + 1}/${request.images.length} in ${retrySeconds}s.`,
-              );
-              await setProgressMessage(message, requestUi, [
-                t('dialogue.check.imageCooldownWait', lang, {
-                  current: index + 1,
-                  count: request.images.length,
-                  seconds: retrySeconds,
-                }),
-                imageLimitLine(request, lang),
-              ], lang);
-              await waitFn(waitMs);
-              await setProgressMessage(message, requestUi, [
-                t('dialogue.check.imageProgress', lang, {
-                  current: index + 1,
-                  count: request.images.length,
-                }),
-                imageLimitLine(request, lang),
-              ], lang);
-            }
-          }
-          mergeUniqueNames(names, extractedNames, seenNames);
-        } catch (error) {
-          failedImages.push({ index: index + 1, error });
-          console.warn(
-            `[auto-check] OCR image ${index + 1}/${request.images.length} failed:`
-            + ` ${error?.message || String(error)}; continuing batch.`,
-          );
-        }
-      }
-      console.log(
-        `[auto-check] image batch OCR complete attachments=${request.images.length}`
-        + ` failed=${failedImages.length} names=${names.length}.`,
-      );
+      });
     } else {
       mergeUniqueNames(names, request.textRequest?.names || [], new Set());
     }
@@ -555,29 +561,24 @@ export function createAutoCheckMessageHandler({
       const isActive = await isAutoCheckChannelFn(message.channelId, message.guild.id);
       if (!isActive) return;
       shouldRememberMessage = true;
-      lang = await getGuildLanguageFn(message.guild.id, { GuildConfigModel: GuildConfig });
+      const [resolvedLang, ocrMode] = await Promise.all([
+        getGuildLanguageFn(message.guild.id, { GuildConfigModel: GuildConfig }),
+        request.images.length > 0 ? getUserOcrModeFn(message.author.id) : null,
+      ]);
+      lang = resolvedLang;
 
       if (request.images.length > 0) {
         // Snapshot the sender's choice before queueing; one batch never changes
         // models halfway through because the user toggled their preference.
-        request.mode = await getUserOcrModeFn(message.author.id);
-        await runQueuedImageRequest(
-          () => processAutoCheckRequest(message, request, requestUi, lang),
-          async (waitingAhead) => {
-            await setProgressMessage(message, requestUi, [
-              t('dialogue.check.imageQueued', lang, { count: waitingAhead }),
-              imageLimitLine(request, lang),
-            ], lang);
-          }
-        );
+        request.mode = ocrMode;
       } else {
         // Text-only checks remain rate-limited. Screenshot work is queued
         // instead, so rapid image messages are never silently discarded.
         const lastCheck = userCooldowns.get(message.author.id) || 0;
         if (Date.now() - lastCheck < COOLDOWN_MS) return;
         userCooldowns.set(message.author.id, Date.now());
-        await processAutoCheckRequest(message, request, requestUi, lang);
       }
+      await processAutoCheckRequest(message, request, requestUi, lang);
     } catch (err) {
       console.error('[auto-check] Error processing request:', err.message);
       await removeSearchReaction(message);
