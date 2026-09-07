@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  diffScraperApiUsage,
   getCurrentScraperApiUsageScopeSnapshot,
   getScraperApiUsageSnapshot,
   recordScraperApiRequest,
@@ -12,7 +11,6 @@ import {
 
 test('scraper api usage tracks success, http failures, network errors, and per-key counts', () => {
   resetScraperApiUsageForTests();
-  const start = getScraperApiUsageSnapshot();
 
   recordScraperApiRequest({ keyIndex: 0, status: 200, ok: true });
   recordScraperApiRequest({ keyIndex: 1, status: 429, ok: false });
@@ -51,13 +49,6 @@ test('scraper api usage tracks success, http failures, network errors, and per-k
     ],
   );
 
-  const delta = diffScraperApiUsage(start);
-  assert.deepEqual(delta, {
-    totalRequests: 3,
-    successResponses: 1,
-    failedResponses: 2,
-    networkErrors: 1,
-  });
 });
 
 test('scoped scraper api usage isolates concurrent async work', async () => {
@@ -92,4 +83,31 @@ test('scoped scraper api usage isolates concurrent async work', async () => {
   assert.equal(processSnapshot.totalRequests, 3);
   assert.equal(processSnapshot.successResponses, 1);
   assert.equal(processSnapshot.failedResponses, 2);
+});
+
+test('usage snapshots and nested scopes retain independent counters', () => {
+  resetScraperApiUsageForTests();
+  const empty = getCurrentScraperApiUsageScopeSnapshot();
+  empty.totalRequests = 99;
+  assert.equal(getCurrentScraperApiUsageScopeSnapshot().totalRequests, 0);
+
+  runWithScraperApiUsageScope(() => {
+    recordScraperApiRequest({ keyIndex: 0, status: 200, ok: true });
+    const before = getCurrentScraperApiUsageScopeSnapshot();
+    before.totalRequests = 99;
+    runWithScraperApiUsageScope(() => {
+      assert.equal(getCurrentScraperApiUsageScopeSnapshot().totalRequests, 0);
+      recordScraperApiRequest({ keyIndex: 0, status: 429 });
+      assert.equal(getCurrentScraperApiUsageScopeSnapshot().failedResponses, 1);
+    });
+    assert.equal(getCurrentScraperApiUsageScopeSnapshot().totalRequests, 1);
+    assert.equal(getCurrentScraperApiUsageScopeSnapshot().failedResponses, 0);
+  });
+
+  const snapshot = getScraperApiUsageSnapshot();
+  snapshot.totalRequests = 99;
+  assert.equal(getScraperApiUsageSnapshot().totalRequests, 2);
+  resetScraperApiUsageForTests();
+  assert.equal(getScraperApiUsageSnapshot().totalRequests, 0);
+  assert.deepEqual(getScraperApiUsageSnapshot().keyCounts, []);
 });

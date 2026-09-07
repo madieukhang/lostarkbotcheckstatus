@@ -32,9 +32,18 @@ const RAID_CATALOG = [
   },
 ];
 
+const RAID_VALUE_BY_LABEL = new Map();
+for (const raid of RAID_CATALOG) {
+  for (const label of [raid.value, raid.choiceName]) {
+    if (!label) continue;
+    const key = label.toLocaleLowerCase();
+    if (!RAID_VALUE_BY_LABEL.has(key)) RAID_VALUE_BY_LABEL.set(key, raid.value);
+  }
+}
+
 /**
  * Every canonical value that may already exist in storage. This intentionally
- * includes retired/expired raids; use getRaidChoices() for new selections.
+ * includes retired/expired raids; use getRaidAutocompleteChoices() for new selections.
  */
 export const RAIDS = RAID_CATALOG.map(({ value }) => value);
 
@@ -46,18 +55,6 @@ function isRaidSelectable(raid, now) {
 
 function getSelectableRaids({ now = new Date() } = {}) {
   return RAID_CATALOG.filter((raid) => isRaidSelectable(raid, now));
-}
-
-/**
- * Build Discord string option choices from the raid list.
- * @param {{now?: Date|string|number}} [options]
- * @returns {Array<{name: string, value: string}>}
- */
-export function getRaidChoices(options = {}) {
-  return getSelectableRaids(options).map((raid) => ({
-    name: raid.choiceName || raid.value,
-    value: raid.value,
-  }));
 }
 
 /**
@@ -89,10 +86,7 @@ export function getRaidAutocompleteChoices(
     raid.value.toLocaleLowerCase().includes(needle)
     || raid.choiceName?.toLocaleLowerCase().includes(needle)
   ));
-  const hasCanonicalMatch = RAID_CATALOG.some((raid) => (
-    raid.value.toLocaleLowerCase() === needle
-    || raid.choiceName?.toLocaleLowerCase() === needle
-  ));
+  const hasCanonicalMatch = RAID_VALUE_BY_LABEL.has(needle);
   const choices = [];
 
   if (allowCustom && input && !hasCanonicalMatch) {
@@ -124,11 +118,8 @@ export function resolveRaidLabel(value = '', { allowCustom = false } = {}) {
   const input = String(value ?? '').trim();
   if (!input) return '';
 
-  const canonical = RAID_CATALOG.find((raid) => (
-    raid.value.toLocaleLowerCase() === input.toLocaleLowerCase()
-    || raid.choiceName?.toLocaleLowerCase() === input.toLocaleLowerCase()
-  ));
-  if (canonical) return canonical.value;
+  const canonical = RAID_VALUE_BY_LABEL.get(input.toLocaleLowerCase());
+  if (canonical) return canonical;
 
   return allowCustom ? input : null;
 }

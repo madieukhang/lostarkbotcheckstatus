@@ -9,7 +9,6 @@ import { buildCommands } from '../bot/commands/index.js';
 import { buildMultiaddTemplate } from '../bot/services/multiadd/template.js';
 import {
   getRaidAutocompleteChoices,
-  getRaidChoices,
   getSelectableRaidValues,
   resolveListAddRaidLabel,
   resolveRaidLabel,
@@ -39,7 +38,7 @@ test('Guardian Raid is a canonical option for blacklist add and edit flows', () 
   const choice = { name: 'Guardian Raid', value: 'Guardian Raid' };
 
   assert.deepEqual(
-    getRaidChoices().find(({ value }) => value === 'Guardian Raid'),
+    getRaidAutocompleteChoices('').find(({ value }) => value === 'Guardian Raid'),
     choice,
   );
   assert.deepEqual(getRaidAutocompleteChoices('guardian'), [choice]);
@@ -53,14 +52,14 @@ test('limited Brel choice uses a durable value and expires at Vietnam midnight',
   const atCutoff = { now: '2026-09-01T17:00:00.000Z' };
 
   assert.deepEqual(
-    getRaidChoices(beforeCutoff).find(({ value }) => value === 'Brel Extreme (Limited)'),
+    getRaidAutocompleteChoices('', beforeCutoff).find(({ value }) => value === 'Brel Extreme (Limited)'),
     {
       name: 'Brel Extreme (Limited Time) Choose',
       value: 'Brel Extreme (Limited)',
     },
   );
   assert.equal(
-    getRaidChoices(atCutoff).some(({ value }) => value === 'Brel Extreme (Limited)'),
+    getRaidAutocompleteChoices('', atCutoff).some(({ value }) => value === 'Brel Extreme (Limited)'),
     false,
   );
   assert.equal(
@@ -70,7 +69,7 @@ test('limited Brel choice uses a durable value and expires at Vietnam midnight',
 });
 
 test('Mordum is hidden from new choices while historical raid values still normalize', () => {
-  assert.equal(getRaidChoices().some(({ value }) => value === 'Mordum Hard'), false);
+  assert.equal(getRaidAutocompleteChoices('').some(({ value }) => value === 'Mordum Hard'), false);
   assert.deepEqual(getRaidAutocompleteChoices('Mordum'), []);
   assert.equal(resolveRaidLabel('Mordum Hard'), 'Mordum Hard');
   assert.equal(

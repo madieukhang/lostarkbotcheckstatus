@@ -3,34 +3,19 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 const startedAt = Date.now();
 const usageScope = new AsyncLocalStorage();
 
-function createSummary() {
-  return {
-    totalRequests: 0,
-    successResponses: 0,
-    failedResponses: 0,
-    networkErrors: 0,
-    lastRequestAt: null,
-    lastStatus: null,
-    lastError: '',
-  };
-}
+const EMPTY_SUMMARY = Object.freeze({
+  totalRequests: 0,
+  successResponses: 0,
+  failedResponses: 0,
+  networkErrors: 0,
+  lastRequestAt: null,
+  lastStatus: null,
+  lastError: '',
+});
 
-const totals = createSummary();
-
+const totals = { ...EMPTY_SUMMARY };
 const statusCounts = new Map();
 const keyCounts = new Map();
-
-function cloneSummary(summary = createSummary()) {
-  return {
-    totalRequests: summary.totalRequests,
-    successResponses: summary.successResponses,
-    failedResponses: summary.failedResponses,
-    networkErrors: summary.networkErrors,
-    lastRequestAt: summary.lastRequestAt,
-    lastStatus: summary.lastStatus,
-    lastError: summary.lastError,
-  };
-}
 
 function recordSummary(summary, { status, ok, error } = {}) {
   const isNetworkError = Boolean(error);
@@ -53,16 +38,6 @@ function recordSummary(summary, { status, ok, error } = {}) {
     summary.failedResponses += 1;
   }
 }
-
-const EMPTY_SUMMARY = Object.freeze({
-  totalRequests: 0,
-  successResponses: 0,
-  failedResponses: 0,
-  networkErrors: 0,
-  lastRequestAt: null,
-  lastStatus: null,
-  lastError: '',
-});
 
 function ensureKeyStats(keyIndex) {
   const keyNumber = Number.isFinite(keyIndex) ? keyIndex + 1 : 0;
@@ -113,43 +88,22 @@ export function recordScraperApiRequest({ keyIndex, status, ok = false, error } 
 export function getScraperApiUsageSnapshot() {
   return {
     startedAt,
-    totalRequests: totals.totalRequests,
-    successResponses: totals.successResponses,
-    failedResponses: totals.failedResponses,
-    networkErrors: totals.networkErrors,
-    lastRequestAt: totals.lastRequestAt,
-    lastStatus: totals.lastStatus,
-    lastError: totals.lastError,
+    ...totals,
     statusCounts: Object.fromEntries(statusCounts.entries()),
     keyCounts: [...keyCounts.values()].sort((a, b) => a.keyNumber - b.keyNumber),
   };
 }
 
-export function diffScraperApiUsage(start, end = getScraperApiUsageSnapshot()) {
-  return {
-    totalRequests: end.totalRequests - (start?.totalRequests || 0),
-    successResponses: end.successResponses - (start?.successResponses || 0),
-    failedResponses: end.failedResponses - (start?.failedResponses || 0),
-    networkErrors: end.networkErrors - (start?.networkErrors || 0),
-  };
-}
-
 export function runWithScraperApiUsageScope(fn) {
-  return usageScope.run(createSummary(), fn);
+  return usageScope.run({ ...EMPTY_SUMMARY }, fn);
 }
 
 export function getCurrentScraperApiUsageScopeSnapshot() {
-  return cloneSummary(usageScope.getStore() || EMPTY_SUMMARY);
+  return { ...(usageScope.getStore() || EMPTY_SUMMARY) };
 }
 
 export function resetScraperApiUsageForTests() {
-  totals.totalRequests = 0;
-  totals.successResponses = 0;
-  totals.failedResponses = 0;
-  totals.networkErrors = 0;
-  totals.lastRequestAt = null;
-  totals.lastStatus = null;
-  totals.lastError = '';
+  Object.assign(totals, EMPTY_SUMMARY);
   statusCounts.clear();
   keyCounts.clear();
 }

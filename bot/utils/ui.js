@@ -125,49 +125,6 @@ export function relativeTime(when) {
 }
 
 /**
- * Discord native short-form absolute timestamp (`<t:UNIX:f>`). Renders
- * in the viewer's locale + timezone. Same robustness as relativeTime.
- *
- * @param {Date|number|string} when
- * @returns {string}
- */
-export function absoluteTime(when) {
-  if (!when) return '';
-  const ts = typeof when === 'number' ? when : new Date(when).getTime();
-  if (Number.isNaN(ts)) return '';
-  return `<t:${Math.floor(ts / 1000)}:f>`;
-}
-
-/**
- * Build the canonical "Session Nm · only-you" footer line used by
- * ephemeral-with-buttons confirm dialogs (enrich, edit picker, etc.).
- * Centralised so the cap reads identical across handlers.
- *
- * Voice is English to match the rest of LoaLogs' user-facing copy;
- * sister bot RaidManage is VN-first and uses its own copy of this
- * helper rather than this one.
- *
- * @param {number} minutes - TTL of the session in minutes.
- * @param {string} [ownerNote='only you can act']
- * @returns {string}
- */
-export function buildSessionFooter(minutes, ownerNote = 'only you can act') {
-  return `Session ${minutes}m · ${ownerNote}`;
-}
-
-/**
- * Stack multiple cooldown/freshness lines onto separate rows for the
- * "two-line freshness" pattern used in RaidManage's raid-status view.
- * Drops empty/falsy entries so callers can pass conditional values.
- *
- * @param  {...string} lines
- * @returns {string}
- */
-export function buildCooldownLines(...lines) {
-  return lines.filter(Boolean).join('\n');
-}
-
-/**
  * Build a text-based progress bar of the form `█████░░░░░░░░░░░░░░░`.
  * Used in the long-running scan progress embeds (`/la-list enrich`,
  * `/la-roster deep:true`) so officers can see the worker is alive
