@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pickEvidenceEntry } from '../bot/handlers/search/evidence.js';
+import { pickEvidenceEntry, pickSearchDetailEntry } from '../bot/handlers/search/evidence.js';
 import { buildSearchResultEmbed } from '../bot/handlers/search/ui.js';
 import { CLASS_EMOJI_MAP } from '../bot/models/Class.js';
 import { t } from '../bot/services/i18n/index.js';
@@ -47,7 +47,7 @@ test('search summary counts names absent from the list database without double s
   assert.doesNotMatch(description, /\bclean\b/i);
 });
 
-test('search evidence picker skips earlier list entries without images', () => {
+test('search details select the highest-severity report without requiring an image', () => {
   const watchEntry = { name: 'Ainslinn', reason: 'watch', imageMessageId: '123' };
   const result = {
     name: 'Ainslinn',
@@ -56,10 +56,12 @@ test('search evidence picker skips earlier list entries without images', () => {
     watch: watchEntry,
   };
 
-  assert.equal(pickEvidenceEntry(result), watchEntry);
+  assert.deepEqual(pickSearchDetailEntry(result), { entry: result.black, listType: 'black' });
+  assert.equal(pickEvidenceEntry(result), null);
+  assert.equal(pickEvidenceEntry({ watch: watchEntry }), watchEntry);
 });
 
-test('search result row shows evidence marker when later flagged entry has image', () => {
+test('search does not promise an image belonging to a different, lower-priority report', () => {
   const embed = buildSearchResultEmbed({
     name: 'Ains',
     minIlvl: 1700,
@@ -76,7 +78,7 @@ test('search result row shows evidence marker when later flagged entry has image
     }],
   });
 
-  assert.match(embed.toJSON().description, /📎/u);
+  assert.doesNotMatch(embed.toJSON().description, /📎/u);
 });
 
 test('search treats composed and decomposed names as the same direct list hit', () => {
@@ -126,7 +128,7 @@ test('search uses the check-card name, report, via and alt hierarchy in every lo
     assert.ok(lines[3].includes(CLASS_EMOJI_MAP.Paladin || 'Paladin'));
     assert.ok(json.author.name.includes('Searchalt'));
     assert.equal(json.title, undefined);
-    assert.ok(json.footer.text.includes('1700'));
+    assert.equal(json.footer, undefined, 'filtering stays active without a filter footer');
   }
 });
 

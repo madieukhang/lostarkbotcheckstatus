@@ -9,6 +9,13 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Fixed
+- Visible `/la-roster` results now check watchlist entries, including roster aliases, and show the shared warning card even when no evidence image is attached. Cards follow blacklist, watchlist, then whitelist priority; trusted status remains visible.
+- `/la-search` offers report details for blacklist, watchlist and whitelist hits without requiring an image. Details reuse the check card, reload the current entry with blacklist scope checks, and preserve the recorded primary character when the searched name is an alt.
+
+### Changed
+- Removed the filter footer from search result cards. The existing item-level and class filters still apply.
+
 ### Added
 - Screenshot OCR now has per-user Daily and Analysis modes. `/la-check-mode` views or saves the default; `/la-check ... mode:analysis` overrides one request. Daily uses only Gemini 3.1/3.5 Flash-Lite, while Analysis restores 3.8 Flash ahead of 3.7/3.6/3.5 Flash. Model failover, correction passes, and cached results stay within the selected profile so routine uploads cannot consume Analysis quota automatically.
 - The check-result card says how long it took: **⏱️ PHÂN TÍCH 4.2s** / **⏱️ TOOK 4.2s** / **⏱️ 解析 4.2s**. The stopwatch is deliberate rather than the clock face the cards use for "added at": 🕐 marks a moment, ⏱️ marks a duration, and ⏳ was already taken by waiting states. OCR has always timed its own phases into console logs, but nothing reached the person watching the progress message. The clock is wall-time from the moment the request is picked up, which includes the OCR that runs before the progress message even appears. It is measured in the handlers rather than threaded out of the OCR service, so the figure is the wait someone actually sat through rather than a sum of internal phases.

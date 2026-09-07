@@ -25,11 +25,11 @@ function buildSearchDescription(lines, breakdown, lang) {
 
 /**
  * Render search matches with the check-card row layout while retaining search
- * ranking, result counts, filters and evidence markers.
- * @param {object} options - Search results, locale, filters and cached snapshots.
+ * ranking, result counts and evidence markers. Filtering belongs to the handler.
+ * @param {object} options - Search results, locale and cached snapshots.
  * @returns {import('discord.js').EmbedBuilder}
  */
-export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang = 'en', snapshotMap = new Map() }) {
+export function buildSearchResultEmbed({ name, results, lang = 'en', snapshotMap = new Map() }) {
   const relatedClasses = Object.fromEntries([...snapshotMap].map(([key, snapshot]) => [
     normalizeNameKey(key),
     snapshot?.className || (snapshot?.classId ? getClassName(snapshot.classId) : ''),
@@ -64,12 +64,6 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
   const hasWhite = whiteCount > 0;
   const color = hasBlack ? COLORS.danger : hasWatch ? COLORS.warning : hasWhite || trustedCount > 0 ? COLORS.success : COLORS.info;
 
-  const filterParts = [
-    `ilvl ≥ ${minIlvl}`,
-    maxIlvl !== null ? `ilvl ≤ ${maxIlvl}` : '',
-    classFilter ? getClassName(classFilter) : '',
-  ].filter(Boolean);
-
   const breakdown = [
     hasBlack ? `⛔ **${blackCount}**` : '',
     hasWatch ? `⚠️ **${watchCount}**` : '',
@@ -94,8 +88,5 @@ export function buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classF
   return createArtistEmbed(lang)
     .setAuthor({ name: `🔍 ${t('dialogue.search.title', lang, { name })} · ${results.length} ${matchWord}` })
     .setDescription(description)
-    .setColor(color)
-    .setFooter({
-      text: t('dialogue.search.footer', lang, { filters: filterParts.join(' · ') }),
-    });
+    .setColor(color);
 }

@@ -7,6 +7,8 @@ process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const {
   buildVisibleRosterLines,
+  buildVisibleRosterPresentation,
+  loadVisibleRosterMatches,
   formatItemLevelDelta,
   formatVisibleRosterLine,
   rosterCardColor,
@@ -125,10 +127,83 @@ test('/la-roster hidden hits carry class, ilvl and a badged raid', () => {
 });
 
 test('/la-roster card color keeps blacklist-first outcome priority', () => {
-  assert.equal(rosterCardColor({ blacklist: {}, whitelist: {}, trusted: {} }), 0xed4245);
+  assert.equal(rosterCardColor({ blacklist: {}, watchlist: {}, whitelist: {}, trusted: {} }), 0xed4245);
+  assert.equal(rosterCardColor({ watchlist: {}, whitelist: {}, trusted: {} }), 0xfee75c);
   assert.equal(rosterCardColor({ blacklist: null, whitelist: {}, trusted: {} }), 0x57f287);
   assert.equal(rosterCardColor({ blacklist: null, whitelist: null, trusted: {} }), 0x57d6a1);
   assert.equal(rosterCardColor({ blacklist: null, whitelist: null, trusted: null }), 0x5865f2);
+});
+
+test('/la-roster checks watchlist roster aliases alongside the existing list lookups', async () => {
+  const watchlist = { name: 'Burgerxúcxích', reason: 'vua ngủ gật', allCharacters: ['Hailúa'] };
+  const modelQueries = [];
+  const readModel = (value) => ({
+    findOne(query) {
+      modelQueries.push(query);
+      return {
+        collation(options) {
+          assert.deepEqual(options, { locale: 'en', strength: 2 });
+          return this;
+        },
+        lean: async () => value,
+      };
+    },
+  });
+  const matches = await loadVisibleRosterMatches([
+    { name: 'Hailúa', itemLevel: '1,730' },
+    { name: 'Lowalt', itemLevel: '1699' },
+  ], 'guild-1', {
+    checkBlacklist: async (names, options) => {
+      assert.deepEqual(names, ['Hailúa']);
+      assert.deepEqual(options, { guildId: 'guild-1' });
+      return null;
+    },
+    checkWhitelist: async (names) => { assert.deepEqual(names, ['Hailúa']); return null; },
+    WatchlistModel: readModel(watchlist),
+    TrustedUserModel: readModel(null),
+  });
+  assert.equal(matches.watchlist, watchlist);
+  assert.deepEqual(modelQueries, Array(2).fill({
+    $or: [{ name: { $in: ['Hailúa'] } }, { allCharacters: { $in: ['Hailúa'] } }],
+  }));
+});
+
+test('/la-roster shows the watchlist headline and reason without an image in every locale', () => {
+  for (const lang of ['vi', 'en', 'jp']) {
+    const { embed, embeds, evidenceRows } = buildVisibleRosterPresentation({
+      name: 'Hailúa', lang, world: 'Thaemine', previousSnapshots: new Map(),
+      characters: [
+        { name: 'Hailúa', className: 'Souleater', itemLevel: '1730', combatScore: '≈4165.08', world: 'Thaemine' },
+        { name: 'Burgerxúcxích', className: 'Breaker', itemLevel: '1730', combatScore: '≈4112.08', world: 'Thaemine' },
+      ],
+      matches: { watchlist: { name: 'Burgerxúcxích', reason: 'vua ngủ gật', allCharacters: ['Hailúa', 'Burgerxúcxích'] } },
+    });
+    assert.equal(embed.toJSON().color, 0xfee75c);
+    assert.equal(embeds.length, 2);
+    assert.equal(embeds[1], embed, 'the existing roster remains below the warning');
+    const warning = embeds[0].toJSON();
+    assert.equal(warning.color, 0xfee75c);
+    assert.match(warning.description, /Hailúa/u);
+    assert.match(warning.description, /Burgerxúcxích/u);
+    assert.ok(warning.fields.some(field => field.value === 'vua ngủ gật'));
+    assert.equal(warning.image, undefined);
+    assert.equal(evidenceRows.length, 0);
+  }
+});
+
+test('/la-roster orders reported cards by severity and keeps trusted status', () => {
+  const presentation = buildVisibleRosterPresentation({
+    name: 'Listed', lang: 'en', previousSnapshots: new Map(),
+    characters: [{ name: 'Listed', className: 'Bard', itemLevel: '1730', combatScore: '3000' }],
+    matches: {
+      blacklist: { name: 'Listed', reason: 'black report' },
+      watchlist: { name: 'Listed', reason: 'watch report' },
+      whitelist: { name: 'Listed', reason: 'white report' },
+      trusted: { name: 'Listed', reason: 'trusted report' },
+    },
+  });
+  assert.deepEqual(presentation.embeds.map(embed => embed.toJSON().color), [0xed4245, 0xfee75c, 0x57f287, 0xed4245]);
+  assert.match(presentation.embed.toJSON().description, /trusted report/u);
 });
 
 test('roster scan completion outcome is shared across terminal entry points', () => {

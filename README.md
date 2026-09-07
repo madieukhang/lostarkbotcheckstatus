@@ -39,7 +39,7 @@ image may need fallback or a correction pass. Settings do not create new quota.
 | `/la-status` | Live server status |
 | `/la-reset` | Reset the stored server status state |
 | `/la-roster name [deep] [deep_limit]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan and is **restricted to officers/seniors** (it depends on the bot owner's residential-IP worker). Plain `/la-roster name` without the deep flag is open to everyone |
-| `/la-search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists |
+| `/la-search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists, and open blacklist/watchlist/whitelist details even without an evidence image |
 | `/la-evidence name [public]` | Direct evidence lookup for a single listed name. Autocomplete unions blacklist/whitelist/watchlist; bypasses `/la-list view` paging. Ephemeral by default; `public:true` is officer/senior only |
 | `/la-list add type name reason [raid] [logs] [image] [scope]` | Add to blacklist/whitelist/watchlist. `scope`: `global` / `server` (blacklist only) |
 | `/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` | Edit existing entry (owner/officer instant, members via approval). `additional_names` appends alts manually for hidden-roster + no-guild edge case |
@@ -177,7 +177,7 @@ LostArk_LoaLogs/
 |   |   |-- system/                # /la-status, /la-reset
 |   |   |-- meta/                  # /la-help, /la-stats
 |   |   |-- setup/                 # /la-setup, /la-remote, image migration
-|   |   |-- search/                # /la-search command + evidence UI
+|   |   |-- search/                # /la-search command + report details UI
 |   |   |-- roster/                # /la-roster visible/hidden/deep scan flows
 |   |   `-- list/                  # /la-list, /la-check, quick add, multiadd, enrich
 |   |       |-- index.js           # List command family factory wiring

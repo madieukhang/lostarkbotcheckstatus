@@ -14,6 +14,7 @@ import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { deferReply, replyAlert, replyEmbed } from '../../utils/interactionReplies.js';
 import TrustedUser from '../../models/TrustedUser.js';
+import Watchlist from '../../models/Watchlist.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import UserPreference from '../../models/UserPreference.js';
 import {
@@ -137,23 +138,34 @@ function buildRosterDescription(characters, previousSnapshots, lang, world = '')
   return `${header}\n\n${description}`.slice(0, 4096);
 }
 
-async function loadVisibleRosterMatches(characters, guildId) {
+/** Load visible-roster list matches without fetching additional Bible pages. */
+export async function loadVisibleRosterMatches(characters, guildId, {
+  checkBlacklist = handleRosterBlackListCheck,
+  checkWhitelist = handleRosterWhiteListCheck,
+  WatchlistModel = Watchlist,
+  TrustedUserModel = TrustedUser,
+} = {}) {
   const checkNames = characters
     .filter((character) => parseItemLevel(character.itemLevel) >= 1700)
     .map((character) => character.name);
-  const [blacklist, whitelist, trusted] = await Promise.all([
-    handleRosterBlackListCheck(checkNames, { guildId }),
-    handleRosterWhiteListCheck(checkNames),
-    TrustedUser.findOne(buildNameRosterQuery(checkNames))
+  const [blacklist, whitelist, watchlist, trusted] = await Promise.all([
+    checkBlacklist(checkNames, { guildId }),
+    checkWhitelist(checkNames),
+    WatchlistModel.findOne(buildNameRosterQuery(checkNames))
+      .collation({ locale: 'en', strength: 2 })
+      .lean(),
+    TrustedUserModel.findOne(buildNameRosterQuery(checkNames))
       .collation({ locale: 'en', strength: 2 })
       .lean(),
   ]);
-  return { blacklist, whitelist, trusted };
+  return { blacklist, whitelist, watchlist, trusted };
 }
 
+/** Use the highest-severity roster match for the card's status color. */
 export function rosterCardColor(matches) {
   const rules = [
     { matches: () => matches.blacklist, color: COLORS.danger },
+    { matches: () => matches.watchlist, color: COLORS.warning },
     { matches: () => matches.whitelist, color: COLORS.success },
     { matches: () => matches.trusted, color: COLORS.trustedSoft },
     { matches: () => true, color: COLORS.info },
@@ -162,23 +174,33 @@ export function rosterCardColor(matches) {
 }
 
 function prependEvidenceCards({ embeds, rows, matches, statMap, name, lang }) {
-  for (const [listType, entry] of [['black', matches.blacklist], ['white', matches.whitelist]]) {
+  const evidenceCards = [];
+  const evidenceRows = [];
+  for (const [listType, entry] of [
+    ['black', matches.blacklist],
+    ['watch', matches.watchlist],
+    ['white', matches.whitelist],
+  ]) {
     if (!entry) continue;
-    embeds.unshift(buildEvidenceEmbed(decorateListEntry(entry, listType), '', {
+    evidenceCards.push(buildEvidenceEmbed(decorateListEntry(entry, listType), '', {
       lang,
       statMap,
       headline: true,
       attachImage: false,
       viaName: name,
     }));
-    rows.unshift(...buildBroadcastEvidenceComponents(entry, {
+    evidenceRows.push(...buildBroadcastEvidenceComponents(entry, {
       legacyUrl: entry.imageUrl,
       lang,
     }));
   }
+  // Keep the highest-severity card first, just like the check/search result.
+  embeds.unshift(...evidenceCards);
+  rows.unshift(...evidenceRows);
 }
 
-function buildVisibleRosterPresentation({ characters, previousSnapshots, matches, name, lang, world = '' }) {
+/** Render list warnings ahead of the visible roster using the shared headline card. */
+export function buildVisibleRosterPresentation({ characters, previousSnapshots, matches, name, lang, world = '' }) {
   const fullDescription = buildRosterDescription(characters, previousSnapshots, lang, world);
   const embed = createArtistEmbed(lang)
     .setTitle(`🛡️ ${t('dialogue.roster.title', lang, {

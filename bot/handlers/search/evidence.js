@@ -4,58 +4,61 @@ import {
   ComponentType,
 } from 'discord.js';
 
-import { COLORS, ICONS } from '../../utils/ui.js';
+import config from '../../config.js';
+import { ICONS } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
-import { editPayload, replyAlert, replyEmbed, replyNotice } from '../../utils/interactionReplies.js';
+import { deferReply, editAlert, editEmbed, editNotice, editPayload, replyAlert } from '../../utils/interactionReplies.js';
+import { buildScopedListQuery } from '../../utils/scope.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
-import { buildEvidenceEmbed } from '../list/view/ui.js';
+import { decorateListEntry, getListContext } from '../list/helpers.js';
+import { loadCheckDetailStatMap } from '../list/check/index.js';
+import { buildCheckEntryDetailsEmbed } from '../list/check/ui.js';
 
 /** Detect whether an entry has any image evidence (rehosted OR legacy). */
 function entryHasImage(entry) {
   return Boolean(entry?.imageMessageId || entry?.imageUrl);
 }
 
+/** Show an attachment marker only for the report opened by the details menu. */
 export function pickEvidenceEntry(result) {
-  return ['black', 'white', 'watch']
-    .map((type) => result?.[type])
-    .find(entryHasImage) || null;
+  const entry = pickSearchDetailEntry(result)?.entry;
+  return entryHasImage(entry) ? entry : null;
 }
 
-function getEvidenceStyle(result, entry) {
-  const styles = {
-    black: { emoji: '⛔', label: 'blacklist', color: COLORS.danger, type: 'black' },
-    white: { emoji: '✅', label: 'whitelist', color: COLORS.success, type: 'white' },
-    watch: { emoji: '⚠️', label: 'watchlist', color: COLORS.warning, type: 'watch' },
-  };
-  const type = ['black', 'white'].find((candidate) => entry === result?.[candidate]) || 'watch';
-  return styles[type];
+/** Select the report shown by the result's severity icon, regardless of images. */
+export function pickSearchDetailEntry(result) {
+  for (const listType of ['black', 'watch', 'white']) {
+    if (result?.[listType]) return { entry: result[listType], listType };
+  }
+  return null;
 }
 
-export function getFlaggedResultsWithImages(results) {
-  return results
-    .map((result, index) => ({ result, index }))
-    .filter(({ result }) => pickEvidenceEntry(result));
+/** Retain search order and separate aliases while collecting report details. */
+export function getSearchDetailResults(results) {
+  return results.flatMap((result, index) => {
+    const detail = pickSearchDetailEntry(result);
+    return detail ? [{ result, index, ...detail }] : [];
+  });
 }
 
-export function buildSearchEvidenceComponents(flaggedWithImages, lang = 'en') {
-  if (flaggedWithImages.length === 0) return [];
+/** Build the same no-image-required details menu offered by text/image checks. */
+export function buildSearchDetailComponents(detailResults, lang = 'en') {
+  if (detailResults.length === 0) return [];
 
   return [
     new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId('search_evidence')
-        .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.evidencePlaceholder', lang)}`)
+        .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.detailsPlaceholder', lang)}`)
         .addOptions(
-          flaggedWithImages.slice(0, 25).map(({ result, index }) => {
-            const evidenceEntry = pickEvidenceEntry(result);
-            const style = getEvidenceStyle(result, evidenceEntry);
+          detailResults.slice(0, 25).map(({ result, index, entry, listType }) => {
             return {
-              label: result.name,
-              description: (evidenceEntry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),
+              label: result.name.slice(0, 100),
+              description: (entry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),
               value: String(index),
-              emoji: style.emoji,
+              emoji: getListContext(listType).icon,
             };
           })
         )
@@ -63,18 +66,29 @@ export function buildSearchEvidenceComponents(flaggedWithImages, lang = 'en') {
   ];
 }
 
-export async function attachSearchEvidenceCollector({ interaction, results, flaggedWithImages, lang = 'en' }) {
-  if (flaggedWithImages.length === 0) return;
+/** Reload the selected entry and recheck blacklist visibility at click time. */
+export async function loadSearchDetailEntry({ entry, listType }, guildId, {
+  getContext = getListContext,
+} = {}) {
+  if (!entry?._id) return null;
+  return getContext(listType).model.findOne(
+    buildScopedListQuery(listType, { _id: entry._id }, guildId)
+  ).lean();
+}
 
-  const reply = await interaction.fetchReply();
-  const collector = reply.createMessageComponentCollector({
-    componentType: ComponentType.StringSelect,
-    time: 300000,
-  });
-
-  collector.on('collect', async (sel) => {
+/** Create an owner-only detail interaction with injectable read-only I/O. */
+export function createSearchDetailSelectHandler({
+  interaction,
+  detailResults,
+  lang = 'en',
+  loadEntry = loadSearchDetailEntry,
+  loadStatMap = loadCheckDetailStatMap,
+  resolveImageUrl = resolveDisplayImageUrl,
+  getLanguage = getUserLanguage,
+}) {
+  return async (sel) => {
     if (sel.user.id !== interaction.user.id) {
-      const clickerLang = await getUserLanguage(sel.user.id, { UserPreferenceModel: UserPreference });
+      const clickerLang = await getLanguage(sel.user.id, { UserPreferenceModel: UserPreference });
       await replyAlert(sel, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.search.session', clickerLang),
@@ -83,49 +97,63 @@ export async function attachSearchEvidenceCollector({ interaction, results, flag
       return;
     }
 
-    const idx = parseInt(sel.values[0]);
-    const result = results[idx];
-    const entry = pickEvidenceEntry(result);
-
-    if (!entryHasImage(entry)) {
-      await replyNotice(sel, t('listView.evidence.noImage', lang), {
+    // Acknowledge before reading Mongo or resolving an attachment URL. The
+    // legacy numeric value still addresses the original search result order.
+    await deferReply(sel, { ephemeral: true });
+    const detail = detailResults.find(({ index }) => String(index) === sel.values?.[0]);
+    if (!detail) {
+      await editNotice(sel, t('dialogue.check.malformed', lang), {
         severity: AlertSeverity.WARNING,
         lang,
       });
       return;
     }
 
-    // Resolve fresh URL: rehosted entries get a freshly-signed URL via the
-    // evidence channel; legacy entries fall back to their stored URL (which
-    // may already have expired).
-    const displayUrl = await resolveDisplayImageUrl(entry, interaction.client);
-    if (!displayUrl) {
-      await replyAlert(sel, {
+    try {
+      const entry = await loadEntry(detail, interaction.guild?.id || interaction.guildId || '');
+      if (!entry) {
+        await editAlert(sel, {
+          severity: AlertSeverity.WARNING,
+          ...t('dialogue.check.entryRemoved', lang),
+          lang,
+        });
+        return;
+      }
+
+      const [displayUrl, statMap] = await Promise.all([
+        entryHasImage(entry) ? resolveImageUrl(entry, interaction.client) : '',
+        loadStatMap(entry),
+      ]);
+      const includeAddedBy = config.officerApproverIds.includes(sel.user.id)
+        || config.seniorApproverIds.includes(sel.user.id);
+      // Preserve the stored primary name: the selected result may be its alt.
+      // An absent/expired image must never hide the report's text and roster.
+      await editEmbed(sel, buildCheckEntryDetailsEmbed(decorateListEntry(entry, detail.listType), {
+        displayUrl,
+        statMap,
+        includeAddedBy,
+        lang,
+      }));
+    } catch (err) {
+      console.warn('[search] Detail lookup failed:', err.message);
+      await editAlert(sel, {
         severity: AlertSeverity.WARNING,
-        ...t('dialogue.search.evidenceUnavailable', lang),
+        ...t('dialogue.search.failed', lang),
         lang,
       });
-      return;
     }
+  };
+}
 
-    // Decorate the entry with the visual tokens that buildEvidenceEmbed
-    // expects (it shares those tokens with /la-list view's renderer).
-    // The search-result envelope holds the raw Mongoose doc on `entry`,
-    // so the search-result name (which may match via roster, not entry
-    // name) is layered on top so the title reads as the searched name.
-    const style = getEvidenceStyle(result, entry);
-    const decoratedEntry = {
-      ...entry,
-      name: result.name,
-      _listType: style.type,
-      _icon: style.emoji,
-      _label: style.label,
-      _color: style.color,
-    };
-    const evidenceEmbed = buildEvidenceEmbed(decoratedEntry, displayUrl, { lang });
-    await replyEmbed(sel, evidenceEmbed);
+/** Attach the per-search details session without changing the parent result card. */
+export async function attachSearchDetailCollector({ interaction, detailResults, lang = 'en' }) {
+  if (detailResults.length === 0) return;
+  const reply = await interaction.fetchReply();
+  const collector = reply.createMessageComponentCollector({
+    componentType: ComponentType.StringSelect,
+    time: 300000,
   });
-
+  collector.on('collect', createSearchDetailSelectHandler({ interaction, detailResults, lang }));
   collector.on('end', async () => {
     await editPayload(interaction, { components: [] }).catch(() => {});
   });

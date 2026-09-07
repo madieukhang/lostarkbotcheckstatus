@@ -19,9 +19,9 @@ import {
   normalizeNameKey,
 } from '../../utils/names.js';
 import {
-  attachSearchEvidenceCollector,
-  buildSearchEvidenceComponents,
-  getFlaggedResultsWithImages,
+  attachSearchDetailCollector,
+  buildSearchDetailComponents,
+  getSearchDetailResults,
 } from './evidence.js';
 import { buildSearchResultEmbed } from './ui.js';
 import { LIST_CHECK_ALT_PREVIEW_LIMIT, pickAltsForDisplay } from '../../services/list-check/format.js';
@@ -181,14 +181,14 @@ export async function handleSearchCommand(interaction) {
     });
     resultCount = results.length;
 
-    const embed = buildSearchResultEmbed({ name, results, minIlvl, maxIlvl, classFilter, lang, snapshotMap });
+    const embed = buildSearchResultEmbed({ name, results, lang, snapshotMap });
 
-    // Build evidence dropdown for flagged entries with images (rehosted OR legacy)
-    const flaggedWithImages = getFlaggedResultsWithImages(results);
-    const components = buildSearchEvidenceComponents(flaggedWithImages, lang);
+    // Every reported list hit has details, even when no evidence image exists.
+    const detailResults = getSearchDetailResults(results);
+    const components = buildSearchDetailComponents(detailResults, lang);
 
     await editEmbed(interaction, embed, { components });
-    await attachSearchEvidenceCollector({ interaction, results, flaggedWithImages, lang });
+    await attachSearchDetailCollector({ interaction, detailResults, lang });
     status = 'ok';
   } catch (err) {
     console.error('[search] ❌ Search failed:', err.message);
