@@ -185,16 +185,22 @@ export function createCheckHandlers({
     const suggestionCache = suggestionContext.cache;
 
     await deferReply(interaction);
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+    const languagePromise = getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+    let lang;
 
     try {
-      names = await extractNamesFromImageFn(image, {
-        mode: requestedMode || await getUserOcrModeFn(interaction.user.id),
-        refineAmbiguousDiacritics: true,
-        suggestionCache,
-        suggestionContext,
-      });
+      [lang, names] = await Promise.all([
+        languagePromise,
+        Promise.resolve(requestedMode || getUserOcrModeFn(interaction.user.id))
+          .then(mode => extractNamesFromImageFn(image, {
+            mode,
+            refineAmbiguousDiacritics: true,
+            suggestionCache,
+            suggestionContext,
+          })),
+      ]);
     } catch (err) {
+      lang = await languagePromise;
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.ocrFailed', lang),

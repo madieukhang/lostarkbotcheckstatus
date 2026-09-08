@@ -82,12 +82,18 @@ export async function handleSearchCommand(interaction) {
   const classFilter = resolveClassId(interaction.options.getString('class'));
 
   await deferReply(interaction);
-  const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+  let lang;
+  const languagePromise = getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   try {
     const bibleStartedAt = Date.now();
-    let suggestions = await fetchNameSuggestions(name, { suggestionContext });
-    bibleMs = Date.now() - bibleStartedAt;
+    const [resolvedLang, initialSuggestions] = await Promise.all([
+      languagePromise,
+      fetchNameSuggestions(name, { suggestionContext })
+        .finally(() => { bibleMs = Date.now() - bibleStartedAt; }),
+    ]);
+    lang = resolvedLang;
+    let suggestions = initialSuggestions;
 
     if (suggestions === null) {
       status = 'bible-unavailable';
@@ -191,6 +197,7 @@ export async function handleSearchCommand(interaction) {
     await attachSearchDetailCollector({ interaction, detailResults, lang });
     status = 'ok';
   } catch (err) {
+    lang = await languagePromise;
     console.error('[search] ❌ Search failed:', err.message);
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,

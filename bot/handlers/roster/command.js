@@ -105,7 +105,6 @@ async function fetchRosterCharacters(name, deep) {
 }
 
 async function loadPreviousSnapshotMap(characters) {
-  await connectDB();
   const snapshots = await RosterSnapshot.find({
     name: { $in: characters.map((character) => character.name) },
   })
@@ -250,12 +249,18 @@ function notifyVisibleDeepCompletion({ interaction, replyEditor, visibleDeep, na
 }
 
 async function handleVisibleRosterResult({ interaction, replyEditor, name, deep, deepOptions, characters, lang, world = '' }) {
-  const previousSnapshots = await loadPreviousSnapshotMap(characters);
-  // Records already carry the server · fetchRosterCharacters stamps it.
-  upsertRosterSnapshots(characters, name)
-    .catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
-
-  const matches = await loadVisibleRosterMatches(characters, interaction.guild?.id);
+  await connectDB();
+  const previousSnapshotsPromise = loadPreviousSnapshotMap(characters).then(previousSnapshots => {
+    // Capture old stats before writing; list lookup failure must not prevent
+    // a successful roster fetch from refreshing its snapshots.
+    upsertRosterSnapshots(characters, name)
+      .catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
+    return previousSnapshots;
+  });
+  const [previousSnapshots, matches] = await Promise.all([
+    previousSnapshotsPromise,
+    loadVisibleRosterMatches(characters, interaction.guild?.id),
+  ]);
   const presentation = buildVisibleRosterPresentation({
     characters,
     previousSnapshots,
@@ -298,12 +303,12 @@ export async function handleRosterCommand(interaction) {
   const name = normalizeCharacterName(raw);
   const deep = interaction.options.getBoolean('deep') ?? false;
   const deepLimit = interaction.options.getInteger('deep_limit');
-  const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   // Hard gate: deep scans hit the bot owner's residential-IP worker.
   // Plain /la-roster (no deep) stays open to everyone since it only
   // does a single-page roster fetch with no fan-out.
   if (deep && !isPrivilegedStrongholdScanUser(interaction.user.id)) {
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     await replyAlert(interaction, {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.roster.deepRestricted', lang),
@@ -324,6 +329,7 @@ export async function handleRosterCommand(interaction) {
 
   const scanReservation = deep ? reserveStrongholdScanForInteraction(interaction, `/la-roster deep ${name}`) : null;
   if (scanReservation && !scanReservation.ok) {
+    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     await replyEmbed(interaction, buildStrongholdScanLimitEmbed(scanReservation.active, lang));
     return;
   }
@@ -333,9 +339,15 @@ export async function handleRosterCommand(interaction) {
     throw err;
   });
   const replyEditor = createLongRunningReplyEditor(interaction);
+  let lang;
+  const languagePromise = getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   try {
-    const { characters, world } = await fetchRosterCharacters(name, deep);
+    const [resolvedLang, { characters, world }] = await Promise.all([
+      languagePromise,
+      fetchRosterCharacters(name, deep),
+    ]);
+    lang = resolvedLang;
 
     if (characters.length === 0) {
       await handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions });
@@ -352,6 +364,7 @@ export async function handleRosterCommand(interaction) {
       world,
     });
   } catch (err) {
+    lang = await languagePromise;
     await replyEditor.edit({
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
