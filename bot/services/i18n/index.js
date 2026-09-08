@@ -8,6 +8,8 @@ const SUPPORTED_CODES = new Set(SUPPORTED_LANGUAGES.map((entry) => entry.code));
 const KNOWN_LOCALE_CODES = new Set(Object.keys(TRANSLATIONS));
 const userLanguageCache = new Map();
 const guildLanguageCache = new Map();
+const userLanguageLoads = new Map();
+const guildLanguageLoads = new Map();
 
 export function normalizeLanguage(value) {
   const code = typeof value === 'string' ? value.toLowerCase() : '';
@@ -113,23 +115,45 @@ function buildUserPreferenceSet(user, language) {
   ].filter(([, value]) => Boolean(value)));
 }
 
-async function getStoredLanguage(id, { cache, Model, idField }) {
+async function getStoredLanguage(id, { cache, pending, Model, idField }) {
   const cached = id ? cache.get(id) : undefined;
   if (!id || cached || !Model) return cached || DEFAULT_LANGUAGE;
 
-  try {
-    const doc = await Model.findOne({ [idField]: id }, { language: 1 }).lean();
-    const lang = normalizeLanguage(doc?.language);
-    cache.set(id, lang);
-    return lang;
-  } catch {
-    return DEFAULT_LANGUAGE;
+  let loads = pending.get(id);
+  if (!loads) {
+    loads = new Map();
+    pending.set(id, loads);
   }
+  if (loads.has(Model)) return loads.get(Model).promise;
+
+  const request = { promise: null, replacement: null };
+  request.promise = Promise.resolve()
+    .then(() => Model.findOne({ [idField]: id }, { language: 1 }).lean())
+    .then((doc) => {
+      const lang = request.replacement || normalizeLanguage(doc?.language);
+      // A cache clear detaches old reads; a saved preference supersedes them.
+      if (pending.get(id) === loads) cache.set(id, lang);
+      return lang;
+    })
+    .catch(() => request.replacement || DEFAULT_LANGUAGE)
+    .finally(() => {
+      loads.delete(Model);
+      if (loads.size === 0 && pending.get(id) === loads) pending.delete(id);
+    });
+  loads.set(Model, request);
+  return request.promise;
 }
 
+function publishLanguage(id, lang, cache, pending) {
+  cache.set(id, lang);
+  for (const request of pending.get(id)?.values() || []) request.replacement = lang;
+}
+
+/** Share overlapping locale reads; successful writes take precedence over older reads. */
 export async function getUserLanguage(discordId, { UserPreferenceModel } = {}) {
   return getStoredLanguage(discordId, {
     cache: userLanguageCache,
+    pending: userLanguageLoads,
     Model: UserPreferenceModel,
     idField: 'discordId',
   });
@@ -152,17 +176,20 @@ export async function setUserLanguage(discordId, lang, { UserPreferenceModel, us
     );
   }
 
-  userLanguageCache.set(discordId, code);
+  publishLanguage(discordId, code, userLanguageCache, userLanguageLoads);
   return code;
 }
 
 export function clearUserLanguageCache() {
   userLanguageCache.clear();
+  userLanguageLoads.clear();
 }
 
+/** Share only reads for the same guild and model; read failures remain retryable. */
 export async function getGuildLanguage(guildId, { GuildConfigModel } = {}) {
   return getStoredLanguage(guildId, {
     cache: guildLanguageCache,
+    pending: guildLanguageLoads,
     Model: GuildConfigModel,
     idField: 'guildId',
   });
@@ -180,10 +207,11 @@ export async function setGuildLanguage(guildId, lang, { GuildConfigModel } = {})
     );
   }
 
-  guildLanguageCache.set(guildId, code);
+  publishLanguage(guildId, code, guildLanguageCache, guildLanguageLoads);
   return code;
 }
 
 export function clearGuildLanguageCache() {
   guildLanguageCache.clear();
+  guildLanguageLoads.clear();
 }
