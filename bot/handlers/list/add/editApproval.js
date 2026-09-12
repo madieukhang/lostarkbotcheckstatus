@@ -8,13 +8,12 @@
  */
 
 import PendingApproval from '../../../models/PendingApproval.js';
-import TrustedUser from '../../../models/TrustedUser.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
-import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { normalizeNameList } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
+import { findTrustedEditConflict } from '../edit/trustedGuard.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -116,20 +115,7 @@ async function rejectBlockedTypeChange({
     return true;
   }
 
-  const trustedNow = await TrustedUser.findOne(buildNameRosterQuery([
-    existingEntry.name,
-    ...(existingEntry.allCharacters || []),
-  ])).collation({ locale: 'en', strength: 2 }).lean();
-  if (!trustedNow) return false;
-
-  await closeApprovalWithAlert({
-    interaction,
-    requestId,
-    embed: buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason, { lang }),
-    status: 'Blocked',
-    lang,
-  });
-  return true;
+  return false;
 }
 
 async function applyApprovedTypeChange(args) {
@@ -306,6 +292,19 @@ export async function handleApprovedEditRequest({
 
   const args = { interaction, payload, requestId, existingEntry, oldModel, newModel, lang };
   const isTypeChange = payload.currentType && payload.currentType !== payload.type;
+  const isScopeChange = payload.type === 'black' && payload.scope
+    && payload.scope !== (existingEntry.scope || 'global');
+  if (isTypeChange || isScopeChange || payload.additionalNames?.length > 0) {
+    // Trusted membership may have changed while the request was waiting.
+    const trustedNow = await findTrustedEditConflict(existingEntry, payload.additionalNames || []);
+    if (trustedNow) {
+      await closeApprovalWithAlert({
+        interaction, requestId, lang, status: 'Blocked',
+        embed: buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason, { lang }),
+      });
+      return;
+    }
+  }
   const applied = isTypeChange
     ? await applyApprovedTypeChange(args)
     : await applyApprovedInPlaceUpdate(args);

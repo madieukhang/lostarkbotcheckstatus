@@ -9,14 +9,14 @@ import { AlertSeverity, buildNoticeEmbed } from '../../../utils/alertEmbed.js';
 import {
   editPayload,
   replyAlert,
-  updateAlert,
-  updateEmbed,
-  updateNotice,
+  followUpAlert,
+  editEmbed,
+  editNotice,
 } from '../../../utils/interactionReplies.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   PENDING_APPROVAL_ACCESS,
-  resolvePendingApprovalAccess,
+  acknowledgeAndConsumeApproval,
 } from '../services/pendingApprovalAccess.js';
 
 export async function notifyMultiaddRequester({
@@ -88,32 +88,22 @@ export function createMultiaddApprovalButtonHandler(deps) {
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     await connectDB();
 
-    const approvalAccess = await resolvePendingApprovalAccess({
+    const approvalAccess = await acknowledgeAndConsumeApproval({
+      interaction,
       PendingApprovalModel: PendingApproval,
       requestId,
       approverId: interaction.user.id,
       filters: { action: 'bulk' },
-      consume: true,
     });
     const { payload } = approvalAccess;
 
     if (!payload) {
-      if (approvalAccess.status === PENDING_APPROVAL_ACCESS.notAuthorized) {
-        await replyAlert(interaction, {
-          severity: AlertSeverity.ERROR,
-          ...t('dialogue.approval.flow.notAuthorized', lang),
-          lang,
-        });
-      } else {
-        await updateAlert(interaction, {
-          severity: AlertSeverity.WARNING,
-          ...t('dialogue.approval.flow.expired', lang),
-          lang,
-        }, {
-          content: '',
-          components: [],
-        }).catch(() => {});
-      }
+      const notAuthorized = approvalAccess.status === PENDING_APPROVAL_ACCESS.notAuthorized;
+      await (approvalAccess.acknowledged ? followUpAlert : replyAlert)(interaction, {
+        severity: notAuthorized ? AlertSeverity.ERROR : AlertSeverity.WARNING,
+        ...t(`dialogue.approval.flow.${notAuthorized ? 'notAuthorized' : 'expired'}`, lang),
+        lang,
+      });
       return;
     }
 
@@ -146,7 +136,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
         .setTimestamp();
       const rejectEmbed = buildRejectEmbed(lang);
 
-      await updateEmbed(interaction, rejectEmbed, {
+      await editEmbed(interaction, rejectEmbed, {
         components: [],
       }).catch(() => {});
 
@@ -169,7 +159,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
 
     if (prefix !== 'multiaddapprove_approve') return;
 
-    await updateNotice(interaction, t('dialogue.multiadd.approval.processing', lang, {
+    await editNotice(interaction, t('dialogue.multiadd.approval.processing', lang, {
       count: payload.bulkRows.length,
     }), {
       severity: AlertSeverity.INFO,

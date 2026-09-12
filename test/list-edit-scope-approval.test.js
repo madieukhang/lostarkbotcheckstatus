@@ -7,6 +7,7 @@ import Watchlist from '../bot/models/Watchlist.js';
 import GuildConfig from '../bot/models/GuildConfig.js';
 import UserPreference from '../bot/models/UserPreference.js';
 import PendingApproval from '../bot/models/PendingApproval.js';
+import TrustedUser from '../bot/models/TrustedUser.js';
 import { disconnectDB } from '../bot/db.js';
 import { clearUserLanguageCache } from '../bot/services/i18n/index.js';
 import { invalidateGuildConfig } from '../bot/utils/scope.js';
@@ -36,6 +37,7 @@ for (const delivered of [true, false]) {
     t.mock.method(Blacklist, 'findOne', nullQuery);
     t.mock.method(Whitelist, 'findOne', nullQuery);
     t.mock.method(Watchlist, 'findOne', nullQuery);
+    t.mock.method(TrustedUser, 'findOne', nullQuery);
     t.mock.method(Blacklist, 'updateOne', () => assert.fail('Pending edit must not update the entry'));
     const saved = [];
     t.mock.method(PendingApproval, 'create', async payload => { saved.push(payload); });
@@ -90,6 +92,7 @@ test('approval promotes scope and appends requested alts without replacing newer
   };
   const events = [];
   t.mock.method(Blacklist, 'findById', async () => entry);
+  t.mock.method(TrustedUser, 'findOne', () => ({ collation() { return this; }, lean: async () => null }));
   t.mock.method(Blacklist, 'updateOne', async (_filter, update) => {
     events.push('write');
     assert.deepEqual(update, {

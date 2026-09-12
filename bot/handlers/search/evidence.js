@@ -9,6 +9,7 @@ import { ICONS } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, editNotice, editPayload, replyAlert } from '../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../utils/scope.js';
+import { resetSelectMenu } from '../../utils/selectMenu.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
@@ -53,7 +54,7 @@ export function buildSearchDetailComponents(detailResults, lang = 'en') {
         .setCustomId('search_evidence')
         .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.detailsPlaceholder', lang)}`)
         .addOptions(
-          detailResults.slice(0, 25).map(({ result, index, entry, listType }) => {
+          detailResults.slice(0, 24).map(({ result, index, entry, listType }) => {
             return {
               label: result.name.slice(0, 100),
               description: (entry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),
@@ -62,6 +63,7 @@ export function buildSearchDetailComponents(detailResults, lang = 'en') {
             };
           })
         )
+        .addOptions({ label: t('listView.navigation.selectNone', lang), value: 'none', emoji: '↩️' })
     ),
   ];
 }
@@ -94,6 +96,11 @@ export function createSearchDetailSelectHandler({
         ...t('dialogue.search.session', clickerLang),
         lang: clickerLang,
       });
+      return;
+    }
+
+    if (sel.values?.[0] === 'none') {
+      await resetSelectMenu(sel, 'search_evidence');
       return;
     }
 

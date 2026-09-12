@@ -1,12 +1,52 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MessageFlags } from 'discord.js';
+import Blacklist from '../bot/models/Blacklist.js';
+import { buildScopedListQuery } from '../bot/utils/scope.js';
 
 import {
   buildBlacklistViewQuery,
   createViewHandlers,
   loadListEntries,
 } from '../bot/handlers/list/view/index.js';
+
+for (const revoked of [true, false]) {
+  test(`list-view evidence rechecks scope after refresh (revoked=${revoked})`, async t => {
+    const original = { _id: 'a'.repeat(24), name: 'Original', reason: 'Initial report', imageUrl: 'https://example.test/image.png', _listType: 'black', _icon: '⛔', _color: 0xed4245 };
+    const other = { ...original, _id: 'b'.repeat(24), name: 'Different', reason: 'Wrong row' };
+    let rows = [original];
+    let collect;
+    let imageReads = 0;
+    let acknowledged = false;
+    let detailReply;
+    const handler = createViewHandlers({
+      client: {}, connectDatabase: async () => {}, getLanguage: async () => 'en',
+      loadStatMap: async () => new Map(), loadEntries: async () => rows,
+      resolveImageUrl: async entry => { imageReads += 1; return entry.imageUrl; },
+    }).handleListViewCommand;
+    await handler({
+      user: { id: 'viewer' }, guild: { id: 'guild' }, options: { getString: key => key === 'type' ? 'black' : null },
+      deferReply: async () => {}, editReply: async () => ({
+        createMessageComponentCollector: () => ({ on: (event, callback) => { if (event === 'collect') collect = callback; } }),
+      }),
+    });
+    rows = [other, original];
+    await collect({ customId: 'listview_refresh', user: { id: 'viewer' }, deferUpdate: async () => {} });
+    t.mock.method(Blacklist, 'findOne', query => {
+      assert.equal(acknowledged, true, 'Discord must be acknowledged before evidence I/O');
+      assert.deepEqual(query, buildScopedListQuery('black', { _id: original._id }, 'guild'));
+      return { lean: async () => revoked ? null : { ...original, reason: 'Current report' } };
+    });
+    await collect({
+      customId: 'listview_evidence', user: { id: 'viewer' }, values: [`black:${original._id}`],
+      deferReply: async () => { acknowledged = true; }, editReply: async payload => { detailReply = payload; },
+    });
+    assert.equal(imageReads, revoked ? 0 : 1);
+    const detail = JSON.stringify(detailReply.embeds[0].toJSON());
+    assert.doesNotMatch(detail, /Wrong row|Initial report/);
+    if (!revoked) assert.match(detail, /Current report/);
+  });
+}
 
 test('blacklist view scope query uses the first matching policy rule', () => {
   assert.deepEqual(
@@ -25,6 +65,41 @@ test('blacklist view scope query uses the first matching policy rule', () => {
     buildBlacklistViewQuery({ isOwnerGuild: false, scopeFilter: 'server', viewGuildId: 'g1' }),
     { scope: 'server', guildId: 'g1' }
   );
+});
+
+test('list-view reset is owner-only and leaves the result card intact', async () => {
+  let collect;
+  let parentPayload;
+  let reads = 0;
+  const handler = createViewHandlers({
+    client: {}, connectDatabase: async () => {}, getLanguage: async () => 'en', loadStatMap: async () => new Map(),
+    loadEntries: async () => {
+      reads += 1;
+      return [{ _id: 'a'.repeat(24), name: 'Onlychar', reason: 'Report', imageUrl: 'https://example.test/evidence.png', _listType: 'black', _icon: '⛔', _color: 0xed4245 }];
+    },
+  }).handleListViewCommand;
+  await handler({
+    user: { id: 'owner' }, guild: { id: 'guild' }, options: { getString: key => key === 'type' ? 'black' : null },
+    deferReply: async () => {},
+    editReply: async payload => {
+      parentPayload = payload;
+      return { createMessageComponentCollector: () => ({ on: (event, callback) => { if (event === 'collect') collect = callback; } }) };
+    },
+  });
+  let reset;
+  await collect({
+    customId: 'listview_evidence', user: { id: 'owner' }, values: ['none'],
+    message: { components: parentPayload.components }, update: async payload => { reset = payload; },
+  });
+  assert.deepEqual(Object.keys(reset), ['components']);
+  assert.equal(reads, 1);
+  assert.deepEqual(reset.components[0], parentPayload.components[0].toJSON());
+  let denied = false;
+  await collect({
+    customId: 'listview_evidence', user: { id: 'outsider' }, values: ['none'],
+    reply: async () => { denied = true; }, update: () => assert.fail('Other users must not reset the session'),
+  });
+  assert.equal(denied, true);
 });
 
 test('/la-list view acknowledges before rejecting DM usage with an ephemeral alert', async () => {

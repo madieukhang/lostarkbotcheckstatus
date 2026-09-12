@@ -20,6 +20,12 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 
 ## Commands
 
+Trusted protection also applies when appending alts through manual edits or enrichment,
+and is checked again when an edit or duplicate overwrite is approved. Each pending
+approval accepts one decision, including when several approvers click at once.
+Evidence menus recheck the entry's current guild visibility before opening its detail
+card; **Select none** resets the selection so the same report can be opened again.
+
 Screenshot modes are saved per Discord user with `/la-check-mode mode:daily` or
 `/la-check-mode mode:analysis`. Omit the option to view the current setting; new
 users start in Daily. The setting applies to that user's automatic image uploads

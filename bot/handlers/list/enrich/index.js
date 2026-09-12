@@ -57,7 +57,8 @@ import {
   buildScanResultEmbed,
   buildScanResultButtons,
 } from '../../../utils/scanResultEmbed.js';
-import { isOfficerOrSenior } from '../helpers.js';
+import { buildTrustedBlockEmbed, isOfficerOrSenior } from '../helpers.js';
+import { findTrustedEditConflict } from '../edit/trustedGuard.js';
 import {
   findEntryByName,
   LIST_LABELS,
@@ -870,6 +871,27 @@ export function createEnrichHandlers({ services }) {
         ...t('dialogue.enrich.nothing', lang),
         lang,
       }, { components: [] });
+      clearEnrichSession(sessionId);
+      return;
+    }
+
+    const currentEntry = await Model.findById(session.entryId).lean();
+    if (!currentEntry) {
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.enrich.noEntry', lang, { name: session.entryName }),
+        lang,
+      }, { components: [] });
+      clearEnrichSession(sessionId);
+      return;
+    }
+    // Confirm can arrive minutes after discovery; enforce the same Trusted
+    // roster boundary as manual edits using the current protected names.
+    const trusted = await findTrustedEditConflict(currentEntry, altNames);
+    if (trusted) {
+      await editEmbed(interaction, buildTrustedBlockEmbed(currentEntry.name, trusted.reason, {
+        via: trusted.name, lang,
+      }), { components: [] });
       clearEnrichSession(sessionId);
       return;
     }

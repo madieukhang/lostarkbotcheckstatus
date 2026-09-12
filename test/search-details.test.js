@@ -33,9 +33,10 @@ test('search details include every report type without images and keep each sear
     const select = row.toJSON().components[0];
     assert.equal(select.custom_id, 'search_evidence');
     assert.ok(select.placeholder.includes(t('listView.navigation.detailsPlaceholder', lang)));
-    assert.deepEqual(select.options.map(option => option.value), ['1', '2', '3', '4']);
-    assert.deepEqual(select.options.map(option => option.label), ['Black', 'Hailúa', 'Otheralt', 'White']);
-    assert.deepEqual(select.options.map(option => option.emoji.name), ['⛔', '⚠️', '⚠️', '✅']);
+    assert.deepEqual(select.options.map(option => option.value), ['1', '2', '3', '4', 'none']);
+    assert.deepEqual(select.options.slice(0, -1).map(option => option.label), ['Black', 'Hailúa', 'Otheralt', 'White']);
+    assert.deepEqual(select.options.slice(0, -1).map(option => option.emoji.name), ['⛔', '⚠️', '⚠️', '✅']);
+    assert.equal(select.options.at(-1).label, t('listView.navigation.selectNone', lang));
   }
   assert.deepEqual(buildSearchDetailComponents([]), []);
 });
@@ -75,6 +76,30 @@ function makeHandler(overrides = {}) {
     ...overrides,
   });
 }
+
+test('search reset preserves other controls, performs no reads and permits selecting the same report again', async () => {
+  let reads = 0;
+  const handler = makeHandler({ loadEntry: async () => { reads += 1; return entry; } });
+  const rows = buildSearchDetailComponents(getSearchDetailResults([{ name: 'Hailúa', watch: entry }]), 'vi');
+  const otherRow = { type: 1, components: [{ type: 2, custom_id: 'unrelated', label: 'Keep', style: 2 }] };
+  let reset;
+  await handler({
+    user: { id: 'owner' }, values: ['none'], message: { components: [...rows, otherRow] },
+    update: async payload => { reset = payload; },
+  });
+  assert.equal(reads, 0);
+  assert.deepEqual(reset.components.at(-1), otherRow);
+  assert.ok(reset.components[0].components[0].options.every(option => !option.default));
+  await handler(makeInteraction());
+  assert.equal(reads, 1);
+});
+
+test('search reserves one reset option within the Discord limit', () => {
+  const details = Array.from({ length: 30 }, (_, index) => ({ index, entry, listType: 'black', result: { name: `Char${index}` } }));
+  const select = buildSearchDetailComponents(details)[0].toJSON().components[0];
+  assert.equal(select.options.length, 25);
+  assert.equal(select.options.at(-1).value, 'none');
+});
 
 test('search detail opens a fresh report without an image and preserves its primary name', async () => {
   const selected = makeInteraction();

@@ -18,14 +18,14 @@ import {
   editComponents,
   editEmbed,
   replyAlert,
-  replyEmbed,
 } from '../../../utils/interactionReplies.js';
 import {
   getCachedUserLanguage,
   getUserLanguage,
   t,
 } from '../../../services/i18n/index.js';
-import { getListContext } from '../helpers.js';
+import { decorateListEntry, getListContext, parseListEntryRef } from '../helpers.js';
+import { buildScopedListQuery } from '../../../utils/scope.js';
 import {
   buildEvidenceEmbed,
   buildExpiredComponents,
@@ -34,8 +34,19 @@ import {
   buildTrustedListEmbed,
 } from './ui.js';
 import { loadListViewStatMap } from './pageData.js';
+import { resetSelectMenu } from '../../../utils/selectMenu.js';
 
 const ITEMS_PER_PAGE = 8;
+
+/** Reload the selected evidence under current guild visibility before resolving its image. */
+export async function loadListViewEvidenceEntry(ref, guildId) {
+  const parsed = parseListEntryRef(ref);
+  if (!parsed) return null;
+  const entry = await getListContext(parsed.listType).model.findOne(
+    buildScopedListQuery(parsed.listType, { _id: parsed.id }, guildId)
+  ).lean();
+  return entry ? decorateListEntry(entry, parsed.listType) : null;
+}
 
 function resolveTypes(type, scopeFilter) {
   if (scopeFilter && type === 'all') return ['black'];
@@ -123,6 +134,8 @@ export function createViewHandlers({
   loadEntries = loadListEntries,
   getLanguage = getUserLanguage,
   loadStatMap = loadListViewStatMap,
+  loadEvidenceEntry = loadListViewEvidenceEntry,
+  resolveImageUrl = resolveDisplayImageUrl,
   now = Date.now,
 } = {}) {
   async function handleListViewCommand(interaction) {
@@ -295,25 +308,46 @@ export function createViewHandlers({
         }
 
         if (componentInteraction.customId === 'listview_evidence') {
-          const index = parseInt(componentInteraction.values[0], 10);
-          const entry = allEntries[index];
-          // An entry without a screenshot still has a reason, a raid and
-          // its tracked alts · the card renders those and says the
-          // evidence is missing, which the old early return replaced
-          // with a bare "no image" notice and nothing else.
-          const displayUrl = entry?.imageMessageId || entry?.imageUrl
-            ? await resolveDisplayImageUrl(entry, client)
-            : '';
-          const isOfficer = config.officerApproverIds.includes(componentInteraction.user.id)
-            || config.seniorApproverIds.includes(componentInteraction.user.id);
-          await replyEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, {
-            includeAddedBy: isOfficer,
-            // The typed list view already told the user which collection they
-            // opened, so the detail card should spend this slot on new data.
-            includeList: false,
-            lang,
-            statMap,
-          }));
+          if (componentInteraction.values?.[0] === 'none') {
+            await resetSelectMenu(componentInteraction, 'listview_evidence');
+            return;
+          }
+          await deferReply(componentInteraction, { ephemeral: true });
+          try {
+            const entry = await loadEvidenceEntry(componentInteraction.values?.[0], viewGuildId);
+            if (!entry) {
+              await editAlert(componentInteraction, {
+                severity: AlertSeverity.WARNING,
+                ...t('dialogue.check.entryRemoved', lang),
+                lang,
+              });
+              return;
+            }
+            // An entry without a screenshot still has a reason, a raid and
+            // its tracked alts · the card renders those and says the
+            // evidence is missing, which the old early return replaced
+            // with a bare "no image" notice and nothing else.
+            const displayUrl = entry?.imageMessageId || entry?.imageUrl
+              ? await resolveImageUrl(entry, client)
+              : '';
+            const isOfficer = config.officerApproverIds.includes(componentInteraction.user.id)
+              || config.seniorApproverIds.includes(componentInteraction.user.id);
+            await editEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, {
+              includeAddedBy: isOfficer,
+              // The typed list view already told the user which collection they
+              // opened, so the detail card should spend this slot on new data.
+              includeList: false,
+              lang,
+              statMap,
+            }));
+          } catch (err) {
+            console.warn('[list-view] Evidence lookup failed:', err.message);
+            await editAlert(componentInteraction, {
+              severity: AlertSeverity.WARNING,
+              ...t('dialogue.listView.failed', lang),
+              lang,
+            });
+          }
         }
       });
 

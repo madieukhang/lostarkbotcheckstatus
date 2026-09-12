@@ -36,9 +36,13 @@ async function renderDuplicate(t, { lang = 'en', direct = false, long = false, l
     assert.equal(query.approverIds, 'approver');
     return payload;
   } }));
-  t.mock.method(PendingApproval, 'updateOne', async (query, update) => {
-    assert.equal(query.requestId, payload.requestId);
-    storedDuplicateId = update.$set.duplicateEntryId;
+  t.mock.method(PendingApproval, 'findOneAndDelete', query => ({ lean: async () => {
+    assert.equal(query.approverIds, 'approver');
+    return payload;
+  } }));
+  t.mock.method(PendingApproval, 'create', async restored => {
+    assert.equal(restored.requestId, payload.requestId);
+    storedDuplicateId = restored.duplicateEntryId;
   });
   t.mock.method(PendingApproval, 'deleteOne', () => assert.fail('A duplicate must remain pending until keep/overwrite'));
   const edits = [];

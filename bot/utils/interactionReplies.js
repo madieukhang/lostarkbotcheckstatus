@@ -68,6 +68,11 @@ export function replyAlert(interaction, alertOptions, extras = {}) {
   return replyEmbed(interaction, buildAlertEmbed(alertOptions), extras);
 }
 
+/** Send a private notice after a component acknowledgement without replacing its card. */
+export function followUpAlert(interaction, alertOptions, extras = {}) {
+  return interaction.followUp({ flags: MessageFlags.Ephemeral, embeds: [buildAlertEmbed(alertOptions)], ...extras });
+}
+
 export function editAlert(interaction, alertOptions, extras = {}) {
   return editEmbed(interaction, buildAlertEmbed(alertOptions), extras);
 }

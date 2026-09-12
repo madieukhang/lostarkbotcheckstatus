@@ -10,7 +10,6 @@ import { connectDB } from '../../../db.js';
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
-import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import {
   normalizeCharacterName,
@@ -37,6 +36,7 @@ import {
 } from '../helpers.js';
 import { applyListEditNow } from './applyNow.js';
 import { sendListEditApprovalRequest } from './approvalRequest.js';
+import { findTrustedEditConflict } from './trustedGuard.js';
 import {
   buildListEditPlan,
   buildScopeConflictQuery,
@@ -88,14 +88,6 @@ async function findScopeConflict({
     targetScope,
     guildId,
   })).collation(collation).lean();
-}
-
-async function findTrustedTypeChange(existing, isTypeChange, collation) {
-  if (!isTypeChange) return null;
-  return TrustedUser.findOne(buildNameRosterQuery([
-    existing.name,
-    ...(existing.allCharacters || []),
-  ])).collation(collation).lean();
 }
 
 async function rejectInvalidListEditInput({
@@ -191,11 +183,11 @@ async function rejectInvalidListEditState({
     return true;
   }
 
-  const trustedCheck = await findTrustedTypeChange(
-    existing,
-    plan.isTypeChange,
-    collation
-  );
+  const needsTrustedCheck = plan.isTypeChange || plan.isScopeChange
+    || plan.additionalNamesParsed.added.length > 0;
+  const trustedCheck = needsTrustedCheck
+    ? await findTrustedEditConflict(existing, plan.additionalNamesParsed.added)
+    : null;
   if (!trustedCheck) return false;
 
   const isSelf = normalizeNameKey(trustedCheck.name) === normalizeNameKey(existing.name);

@@ -18,6 +18,7 @@ const getListContext = () => ({
 
 function buildEntry(overrides = {}) {
   return {
+    _id: 'a'.repeat(24), _listType: 'black',
     name: 'Testchar',
     reason: 'evidence attached',
     addedAt: new Date('2026-05-22T00:00:00Z'),
@@ -178,12 +179,12 @@ test('/la-list view shows list markers only where rows from different lists are 
   assert.doesNotMatch(trustedDescription, /🛡️/u);
 });
 
-test('/la-list view evidence values keep their absolute index without page scans', () => {
+test('/la-list view evidence values keep stable record references across refreshes', () => {
   const allEntries = [
     buildEntry({ name: 'No image', imageMessageId: null }),
     buildEntry({ name: 'First image', imageUrl: 'https://cdn.example/first.png' }),
     buildEntry({ name: 'No image 2', imageMessageId: null }),
-    buildEntry({ name: 'Second image', imageMessageId: 'message-2' }),
+    buildEntry({ name: 'Second image', imageMessageId: 'message-2', _id: 'b'.repeat(24) }),
   ];
   const rows = buildListViewComponents({
     allEntries,
@@ -194,5 +195,5 @@ test('/la-list view evidence values keep their absolute index without page scans
   });
 
   const options = rows[1].toJSON().components[0].options;
-  assert.deepEqual(options.map((option) => option.value), ['1', '3']);
+  assert.deepEqual(options.map((option) => option.value), [`black:${'a'.repeat(24)}`, `black:${'b'.repeat(24)}`, 'none']);
 });

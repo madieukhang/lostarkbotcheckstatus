@@ -35,6 +35,8 @@ import {
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 import { buildCheckEntryDetailsEmbed } from './ui.js';
 import { getUserOcrMode } from '../../../services/list-check/preferences.js';
+import { buildScopedListQuery } from '../../../utils/scope.js';
+import { resetSelectMenu } from '../../../utils/selectMenu.js';
 
 function pickListEntryForDetails(result) {
   for (const [listType, entry] of [
@@ -129,18 +131,7 @@ function createAutoCheckEvidenceHandler({ client }) {
   return async function handleAutoCheckEvidenceSelect(interaction) {
     const raw = interaction.values?.[0] || '';
     if (raw === 'none') {
-      // Re-render the menu to clear Discord's selected value without creating
-      // another private detail reply or changing the public result card.
-      const components = interaction.message.components.map(row => {
-        const data = row.toJSON?.() || row;
-        return {
-          ...data,
-          components: data.components.map(component => component.custom_id === 'autocheck_evidence'
-            ? { ...component, options: component.options.map(option => ({ ...option, default: false })) }
-            : component),
-        };
-      });
-      await interaction.update({ components });
+      await resetSelectMenu(interaction, 'autocheck_evidence');
       return;
     }
     const parsed = parseListEntryRef(raw);
@@ -157,7 +148,11 @@ function createAutoCheckEvidenceHandler({ client }) {
 
     await connectDB();
     const ctx = getListContext(parsed.listType);
-    const entry = await ctx.model.findOne({ _id: parsed.id }).lean();
+    const entry = await ctx.model.findOne(buildScopedListQuery(
+      parsed.listType,
+      { _id: parsed.id },
+      interaction.guild?.id || interaction.guildId || '',
+    )).lean();
 
     if (!entry) {
       await editAlert(interaction, {

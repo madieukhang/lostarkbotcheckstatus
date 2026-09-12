@@ -15,15 +15,17 @@ import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { deferUpdate, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
+import { editPayload, replyAlert, followUpAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   getListContext,
   buildApprovalResultRow,
+  buildTrustedBlockEmbed,
 } from '../helpers.js';
+import { findTrustedEditConflict } from '../edit/trustedGuard.js';
 import {
   PENDING_APPROVAL_ACCESS,
-  resolvePendingApprovalAccess,
+  acknowledgeAndConsumeApproval,
 } from '../services/pendingApprovalAccess.js';
 import { createApprovalMessageUpdater } from '../services/approvals.js';
 
@@ -65,6 +67,7 @@ export function createListAddOverwriteButtonHandler({
   syncApproverDmMessages,
   broadcastListChange,
   notifyRequesterAboutDecision,
+  buildRosterCharactersFn = buildRosterCharacters,
 }) {
   async function handleListAddOverwriteButton(interaction) {
     const [, requestId] = interaction.customId.split(':');
@@ -72,16 +75,16 @@ export function createListAddOverwriteButtonHandler({
 
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-    const { payload, status } = await resolvePendingApprovalAccess({
+    const { payload, status, acknowledged } = await acknowledgeAndConsumeApproval({
+      interaction,
       PendingApprovalModel: PendingApproval,
       requestId,
       approverId: interaction.user.id,
-      consume: true,
     });
 
     if (!payload) {
       const notAuthorized = status === PENDING_APPROVAL_ACCESS.notAuthorized;
-      await replyAlert(interaction, {
+      await (acknowledged ? followUpAlert : replyAlert)(interaction, {
         severity: notAuthorized ? AlertSeverity.ERROR : AlertSeverity.WARNING,
         ...t(`dialogue.approval.flow.${notAuthorized ? 'notAuthorized' : 'expired'}`, lang),
         lang,
@@ -89,7 +92,6 @@ export function createListAddOverwriteButtonHandler({
       return;
     }
 
-    await deferUpdate(interaction);
     const updateApprovers = createApprovalMessageUpdater({
       interaction, payload, lang, syncApproverDmMessages,
     });
@@ -133,9 +135,22 @@ export function createListAddOverwriteButtonHandler({
 
       // Update in-place: overwrite fields + refresh roster for new canonical name
       const newName = normalizeCharacterName(payload.name);
-      const rosterResult = await buildRosterCharacters(newName, {
+      const rosterResult = await buildRosterCharactersFn(newName, {
         hiddenRosterFallback: true,
       }).catch(() => null);
+
+      const proposedNames = rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0
+        ? rosterResult.allCharacters : dupeEntry.allCharacters || [];
+      const trustedNow = await findTrustedEditConflict({ name: newName, allCharacters: proposedNames });
+      if (trustedNow) {
+        await updateApprovers(targetLang => ({
+          content: null,
+          embeds: [buildTrustedBlockEmbed(newName, trustedNow.reason, { lang: targetLang })],
+          components: [buildApprovalResultRow('Blocked', targetLang)],
+        }));
+        await notifyRequesterAboutDecision(payload, { ok: false }, false);
+        return;
+      }
 
       dupeEntry.name = newName;
       // Only update roster if fetch succeeded · preserve old snapshot on failure

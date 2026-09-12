@@ -274,15 +274,9 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
 
   const start = page * itemsPerPage;
   const pageEntries = allEntries.slice(start, start + itemsPerPage);
-  // Capture the absolute index during the page pass. Besides avoiding an
-  // indexOf rescan per evidence row, this remains correct when entries share
-  // object values or the visible page is a slice of a filtered collection.
-  const withImages = [];
-  for (const [offset, entry] of pageEntries.entries()) {
-    if (entry.imageUrl || entry.imageMessageId) {
-      withImages.push({ entry, absoluteIndex: start + offset });
-    }
-  }
+  // Stable references preserve the selected report if a refresh reorders rows
+  // before Discord delivers an already-issued evidence interaction.
+  const withImages = pageEntries.filter(entry => entry.imageUrl || entry.imageMessageId);
 
   if (withImages.length > 0) {
     rows.push(
@@ -291,13 +285,14 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
           .setCustomId('listview_evidence')
           .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.evidencePlaceholder', lang)}`)
           .addOptions(
-            withImages.slice(0, 25).map(({ entry, absoluteIndex }) => ({
+            withImages.slice(0, 24).map(entry => ({
               label: entry.name,
               description: (entry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),
-              value: String(absoluteIndex),
+              value: `${entry._listType}:${entry._id}`,
               emoji: entry._icon,
             }))
           )
+          .addOptions({ label: t('listView.navigation.selectNone', lang), value: 'none', emoji: '↩️' })
       )
     );
   }

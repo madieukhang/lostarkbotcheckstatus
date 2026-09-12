@@ -13,6 +13,10 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Fixed
+- Trusted protection now checks the complete proposed roster for manual alt edits, pending edit approvals, duplicate overwrites, and enrichment confirmation.
+- Approval decisions are claimed atomically, so simultaneous Approve/Reject clicks cannot both execute. A failed Discord acknowledgement leaves the request available for retry.
+- Old check and list-view evidence menus recheck current guild visibility before opening a report. List-view evidence uses stable record IDs across refreshes and acknowledges before loading attachments.
+- Search and list-view evidence menus include **Select none**, allowing the same result to be selected again while preserving the parent card.
 - Visible `/la-roster` results now check watchlist entries, including roster aliases, and show the shared warning card even when no evidence image is attached. Cards follow blacklist, watchlist, then whitelist priority; trusted status remains visible.
 - `/la-search` offers report details for blacklist, watchlist and whitelist hits without requiring an image. Details reuse the check card, reload the current entry with blacklist scope checks, and preserve the recorded primary character when the searched name is an alt.
 

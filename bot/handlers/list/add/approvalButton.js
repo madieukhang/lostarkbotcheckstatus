@@ -17,7 +17,7 @@ import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { deferUpdate, replyAlert } from '../../../utils/interactionReplies.js';
+import { replyAlert, followUpAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   buildApprovalResultRow,
@@ -25,7 +25,7 @@ import {
 } from '../helpers.js';
 import {
   PENDING_APPROVAL_ACCESS,
-  resolvePendingApprovalAccess,
+  acknowledgeAndConsumeApproval,
 } from '../services/pendingApprovalAccess.js';
 import { handleApprovedEditRequest } from './editApproval.js';
 import { createApprovalMessageUpdater } from '../services/approvals.js';
@@ -57,8 +57,8 @@ export function createListAddApprovalButtonHandler({
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
-    // Find but don't delete yet · need to keep for duplicate overwrite flow
-    const approvalAccess = await resolvePendingApprovalAccess({
+    const approvalAccess = await acknowledgeAndConsumeApproval({
+      interaction,
       PendingApprovalModel: PendingApproval,
       requestId,
       approverId: interaction.user.id,
@@ -68,7 +68,7 @@ export function createListAddApprovalButtonHandler({
     if (!payload) {
       const notAuthorized =
         approvalAccess.status === PENDING_APPROVAL_ACCESS.notAuthorized;
-      await replyAlert(interaction, {
+      await (approvalAccess.acknowledged ? followUpAlert : replyAlert)(interaction, {
         severity: notAuthorized ? AlertSeverity.ERROR : AlertSeverity.WARNING,
         ...t(`dialogue.approval.flow.${notAuthorized ? 'notAuthorized' : 'expired'}`, lang),
         lang,
@@ -81,9 +81,6 @@ export function createListAddApprovalButtonHandler({
       interaction, payload, lang, syncApproverDmMessages,
     });
 
-    // Acknowledge immediately, then show processing state to avoid 3s timeout issues.
-    await deferUpdate(interaction);
-
     const buildProcessingPayload = (targetLang) => ({
       content: null,
       embeds: [buildNoticeEmbed(
@@ -92,7 +89,13 @@ export function createListAddApprovalButtonHandler({
       )],
       components: [buildApprovalProcessingRow(action, targetLang)],
     });
-    await updateApprovers(buildProcessingPayload);
+    try {
+      await updateApprovers(buildProcessingPayload);
+    } catch (err) {
+      // No decision has run yet. Keep the request retryable if rendering fails.
+      await PendingApproval.create(payload);
+      throw err;
+    }
 
     if (!isApproveAction) {
       await PendingApproval.deleteOne({ requestId });
@@ -132,11 +135,8 @@ export function createListAddApprovalButtonHandler({
       // Duplicate found · show comparison and overwrite option
       if (!result.ok && result.isDuplicate) {
         const existing = result.existingEntry;
-        // Keep the matched ID for the scope-preserving in-place overwrite.
-        await PendingApproval.updateOne(
-          { requestId },
-          { $set: { duplicateEntryId: String(existing._id) } }
-        );
+        // Only the winning decision can restore the request for keep/overwrite.
+        await PendingApproval.create({ ...payload, duplicateEntryId: String(existing._id) });
 
         const buildDuplicatePayload = (targetLang) => {
           const overwriteRow = new ActionRowBuilder().addComponents(

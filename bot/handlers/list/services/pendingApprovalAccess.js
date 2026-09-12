@@ -45,3 +45,14 @@ export async function resolvePendingApprovalAccess({
     payload: null,
   };
 }
+
+/** Acknowledge an authorized click before atomically taking the request for one decision. */
+export async function acknowledgeAndConsumeApproval({ interaction, ...options }) {
+  const access = await resolvePendingApprovalAccess({ ...options, consume: false });
+  if (!access.payload) return { ...access, acknowledged: false };
+  await interaction.deferUpdate();
+  return {
+    ...await resolvePendingApprovalAccess({ ...options, consume: true }),
+    acknowledged: true,
+  };
+}
