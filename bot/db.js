@@ -9,30 +9,44 @@ import mongoose from 'mongoose';
 import config from './config.js';
 
 let connected = false;
+let connectionPromise = null;
+let listenersAttached = false;
 
 /**
  * Connect to MongoDB if not already connected.
- * Safe to call multiple times – subsequent calls are no-ops.
+ * Overlapping callers share one attempt; failed attempts remain retryable.
  */
 export async function connectDB() {
+  if (connectionPromise) return connectionPromise;
   if (connected) return;
+  connectionPromise = Promise.resolve().then(openConnection).finally(() => {
+    connectionPromise = null;
+  });
+  return connectionPromise;
+}
+
+async function openConnection() {
   await mongoose.connect(config.mongoUri);
   connected = true;
 
   const { host, port, name } = mongoose.connection;
   console.log(`[db] ✅ Connected to MongoDB · host: ${host}:${port}, database: ${name}`);
 
-  mongoose.connection.on('disconnected', () => {
-    connected = false;
-    console.warn('[db] ⚠️  MongoDB disconnected');
-  });
+  if (!listenersAttached) {
+    listenersAttached = true;
+    mongoose.connection.on('disconnected', () => {
+      connected = false;
+      console.warn('[db] ⚠️  MongoDB disconnected');
+    });
 
-  mongoose.connection.on('error', (err) => {
-    console.error('[db] ❌ MongoDB error:', err.message);
-  });
+    mongoose.connection.on('error', (err) => {
+      console.error('[db] ❌ MongoDB error:', err.message);
+    });
+  }
 }
 
 export async function disconnectDB() {
+  if (connectionPromise) await connectionPromise.catch(() => {});
   if (mongoose.connection.readyState === 0) {
     connected = false;
     return;

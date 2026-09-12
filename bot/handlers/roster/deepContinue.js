@@ -63,7 +63,7 @@ function countContinuationCandidates(session) {
   )).length;
 }
 
-async function runContinuationPass({ interaction, replyEditor, session, reservation, primaryEmbed, lang }) {
+async function runContinuationPass({ interaction, replyEditor, session, primaryEmbed, lang }) {
   const activeScan = createRosterScanRuntime({
     interaction,
     replyEditor,
@@ -73,20 +73,20 @@ async function runContinuationPass({ interaction, replyEditor, session, reservat
     label: `${session.targetName} (roster deep · resume)`,
     lang,
   });
-  const eligible = countContinuationCandidates(session);
-  const passLimit = session.cap || eligible;
-  await replyEditor.edit(activeScan.buildInitialPayload({
-    title: t('dialogue.scan.resuming', lang, { name: session.targetName }),
-    subtitle: `${t('dialogue.scan.guildMembers', lang, {
-      guild: session.meta.guildName,
-      count: session.guildMembers.length,
-    })} · ${t('dialogue.scan.continuePass', lang)}`,
-    totalCandidates: Math.min(eligible, passLimit),
-    content: null,
-    leadingEmbeds: [primaryEmbed],
-  })).catch(() => {});
-
   try {
+    const eligible = countContinuationCandidates(session);
+    const passLimit = session.cap || eligible;
+    await replyEditor.edit(activeScan.buildInitialPayload({
+      title: t('dialogue.scan.resuming', lang, { name: session.targetName }),
+      subtitle: `${t('dialogue.scan.guildMembers', lang, {
+        guild: session.meta.guildName,
+        count: session.guildMembers.length,
+      })} · ${t('dialogue.scan.continuePass', lang)}`,
+      totalCandidates: Math.min(eligible, passLimit),
+      content: null,
+      leadingEmbeds: [primaryEmbed],
+    })).catch(() => {});
+
     const result = await detectAltsViaStronghold(session.targetName, {
       targetMeta: session.meta,
       guildMembers: session.guildMembers,
@@ -101,10 +101,8 @@ async function runContinuationPass({ interaction, replyEditor, session, reservat
   } catch (error) {
     return { result: null, error };
   } finally {
-    session.inProgress = false;
     refreshRosterDeepSession(session);
     activeScan.close();
-    reservation.release();
   }
 }
 
@@ -217,58 +215,46 @@ export async function handleRosterDeepContinueButton(interaction) {
     return;
   }
 
-  await deferUpdate(interaction).catch((err) => {
-    scanReservation.release();
-    throw err;
-  });
-  const replyEditor = createLongRunningReplyEditor(interaction);
+  // Reserve this session before acknowledgement, even for officers allowed to
+  // run different scans in parallel. Keep it reserved through the final edit.
   session.inProgress = true;
-  refreshRosterDeepSession(session);
-  const primaryEmbed = EmbedBuilder.from(session.primaryEmbedJSON);
-  const scan = await runContinuationPass({
-    interaction,
-    replyEditor,
-    session,
-    reservation: scanReservation,
-    primaryEmbed,
-    lang,
-  });
-  if (scan.error) {
-    await replyEditor.edit({
-      content: null,
-      embeds: [
-        primaryEmbed,
-        buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
-          ...t('dialogue.scan.stopped', lang, {
-            name: session.targetName,
-            reason: scan.error.message || t('dialogue.scan.unexpectedError', lang),
+  try {
+    await deferUpdate(interaction);
+    const replyEditor = createLongRunningReplyEditor(interaction);
+    refreshRosterDeepSession(session);
+    const primaryEmbed = EmbedBuilder.from(session.primaryEmbedJSON);
+    const scan = await runContinuationPass({ interaction, replyEditor, session, primaryEmbed, lang });
+    if (scan.error) {
+      await replyEditor.edit({
+        content: null,
+        embeds: [
+          primaryEmbed,
+          buildAlertEmbed({
+            severity: AlertSeverity.ERROR,
+            ...t('dialogue.scan.stopped', lang, {
+              name: session.targetName,
+              reason: scan.error.message || t('dialogue.scan.unexpectedError', lang),
+            }),
+            footer: t('dialogue.scan.stopped.retry', lang),
+            lang,
           }),
-          footer: t('dialogue.scan.stopped.retry', lang),
-          lang,
-        }),
-      ],
-      components: [],
-    }).catch(() => {});
-    return;
+        ],
+        components: [],
+      }).catch(() => {});
+      return;
+    }
+    if (!scan.result) {
+      await replyEditor.edit({ content: null, embeds: [primaryEmbed], components: [] }).catch(() => {});
+      return;
+    }
+    const cumulativeResult = mergeContinuationScanResult(session, scan.result);
+    const rendered = buildContinuationPayload(session, cumulativeResult, primaryEmbed, lang);
+    await replyEditor.edit(rendered.payload);
+    notifyContinuationCompletion({
+      interaction, replyEditor, session, result: cumulativeResult, hasRemaining: rendered.hasRemaining, lang,
+    });
+  } finally {
+    session.inProgress = false;
+    scanReservation.release();
   }
-  if (!scan.result) {
-    await replyEditor.edit({
-      content: null,
-      embeds: [primaryEmbed],
-      components: [],
-    }).catch(() => {});
-    return;
-  }
-  const cumulativeResult = mergeContinuationScanResult(session, scan.result);
-  const rendered = buildContinuationPayload(session, cumulativeResult, primaryEmbed, lang);
-  await replyEditor.edit(rendered.payload);
-  notifyContinuationCompletion({
-    interaction,
-    replyEditor,
-    session,
-    result: cumulativeResult,
-    hasRemaining: rendered.hasRemaining,
-    lang,
-  });
 }

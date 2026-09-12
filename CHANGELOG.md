@@ -13,6 +13,8 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Fixed
+- Concurrent MongoDB callers share one connection attempt, and reconnects no longer accumulate event listeners.
+- Continue-scan claims its session before Discord acknowledgement, preventing duplicate passes even for officers with parallel-scan access. Failed setup releases the session for retry.
 - Approval requests now remain stored while a renewable lease protects the chosen decision. Interrupted or transiently failed work can be retried from the same button; stale attempts cannot finalize a newer attempt or reverse a decision that may already have written data.
 - Cross-list edits create the destination and remove the source in one MongoDB transaction. A failed step rolls back both changes, and retained entry IDs let pending approvals recognize a move already committed before an interruption.
 - An approved list move keeps a newly submitted image URL when rehosting falls back to that URL, instead of silently reusing the old evidence image.
