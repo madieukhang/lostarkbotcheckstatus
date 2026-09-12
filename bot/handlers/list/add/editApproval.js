@@ -13,6 +13,7 @@ import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
+import { normalizeNameList } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import {
   getListContext,
@@ -69,7 +70,10 @@ export function buildApprovalMoveData(payload, existingEntry) {
     raid: payload.raid || existingEntry.raid,
     logsUrl: payload.logsUrl || existingEntry.logsUrl,
     ...resolveApprovalMoveImageFields(payload, existingEntry),
-    allCharacters: existingEntry.allCharacters || [],
+    allCharacters: normalizeNameList([
+      ...(existingEntry.allCharacters || []),
+      ...(payload.additionalNames || []),
+    ]),
     enrichmentSource: existingEntry.enrichmentSource ?? null,
     enrichedAt: existingEntry.enrichedAt ?? null,
     addedByUserId: existingEntry.addedByUserId,
@@ -186,11 +190,17 @@ export function buildApprovalUpdateFields(payload, existingEntry) {
 
 async function applyApprovedInPlaceUpdate(args) {
   const updateFields = buildApprovalUpdateFields(args.payload, args.existingEntry);
-  if (Object.keys(updateFields).length === 0) return true;
+  const additionalNames = normalizeNameList(args.payload.additionalNames || []);
+  if (Object.keys(updateFields).length === 0 && additionalNames.length === 0) return true;
   try {
     await args.oldModel.updateOne(
       { _id: args.existingEntry._id },
-      { $set: updateFields }
+      {
+        $set: updateFields,
+        ...(additionalNames.length > 0
+          ? { $addToSet: { allCharacters: { $each: additionalNames } } }
+          : {}),
+      }
     );
     return true;
   } catch (err) {
@@ -212,6 +222,10 @@ function broadcastApprovedEdit({ payload, existingEntry, broadcastListChange }) 
     reason: payload.reason || existingEntry.reason,
     raid: payload.raid || existingEntry.raid,
     scope,
+    allCharacters: normalizeNameList([
+      ...(existingEntry.allCharacters || []),
+      ...(payload.additionalNames || []),
+    ]),
   }, {
     type: payload.type,
     guildId: payload.guildId,

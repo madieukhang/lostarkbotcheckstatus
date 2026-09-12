@@ -229,6 +229,8 @@ async function dispatchListEdit({
   const applyImmediately = shouldApplyListEditImmediately({
     isOwner,
     isApprover: isRequesterAutoApprover(interaction.user.id),
+    currentType,
+    currentScope: plan.existingObject.scope || 'global',
     targetType: plan.targetType,
     targetScope: plan.targetScope,
   });
@@ -273,6 +275,8 @@ async function dispatchListEdit({
     newImageRehost,
     newScope: input.newScope,
     editGuildDefaultScope,
+    targetScope: plan.targetScope,
+    additionalNames: plan.additionalNamesParsed.added,
     changes: plan.changes,
     lang,
   });

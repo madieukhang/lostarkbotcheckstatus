@@ -79,7 +79,7 @@ export function buildAutoCheckEvidenceRow(results, lang = 'en') {
       .setCustomId('autocheck_evidence')
       .setPlaceholder(`${ICONS.evidence} ${t('listView.navigation.detailsPlaceholder', lang)}`)
       .addOptions(
-        candidates.slice(0, 25).map(({ result, entry, listType }) => {
+        candidates.slice(0, 24).map(({ result, entry, listType }) => {
           const ctx = getListContext(listType);
           const label = didListCheckNameChange(result)
             ? `${result.inputName} → ${result.name}`
@@ -92,6 +92,11 @@ export function buildAutoCheckEvidenceRow(results, lang = 'en') {
           };
         })
       )
+      .addOptions({
+        label: t('listView.navigation.selectNone', lang),
+        value: 'none',
+        emoji: '↩️',
+      })
   );
 }
 
@@ -123,6 +128,21 @@ export async function loadCheckDetailStatMap(entry, {
 function createAutoCheckEvidenceHandler({ client }) {
   return async function handleAutoCheckEvidenceSelect(interaction) {
     const raw = interaction.values?.[0] || '';
+    if (raw === 'none') {
+      // Re-render the menu to clear Discord's selected value without creating
+      // another private detail reply or changing the public result card.
+      const components = interaction.message.components.map(row => {
+        const data = row.toJSON?.() || row;
+        return {
+          ...data,
+          components: data.components.map(component => component.custom_id === 'autocheck_evidence'
+            ? { ...component, options: component.options.map(option => ({ ...option, default: false })) }
+            : component),
+        };
+      });
+      await interaction.update({ components });
+      return;
+    }
     const parsed = parseListEntryRef(raw);
     await deferReply(interaction, { ephemeral: true });
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });

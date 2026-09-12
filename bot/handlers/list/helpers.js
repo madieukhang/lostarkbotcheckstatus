@@ -235,7 +235,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   // No statMap supplied · the approval-DM doesn't run a snapshot lookup,
   // so rows degrade to plain `[name](link)` rather than class+ilvl+CP.
   const altsField = renderTrackedAltsField({
-    names: payload.allCharacters,
+    names: [...(payload.allCharacters || []), ...(payload.additionalNames || [])],
     primaryName: payload.name,
     label: `🧬 ${t('dialogue.approval.fields.trackedAlts', lang)}`,
     overflowTemplate: t('dialogue.broadcast.more', lang),

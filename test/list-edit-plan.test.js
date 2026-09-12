@@ -93,3 +93,31 @@ test('scope-conflict query preserves the global and server uniqueness boundaries
     _id: { $ne: existing._id },
   });
 });
+
+test('entry ownership cannot bypass approval when promoting server blacklist to global', () => {
+  for (const isOwner of [false, true]) {
+    assert.equal(shouldApplyListEditImmediately({
+      isOwner, isApprover: false, currentType: 'black', currentScope: 'server',
+      targetType: 'black', targetScope: 'global',
+    }), false);
+  }
+  assert.equal(shouldApplyListEditImmediately({
+    isOwner: true, isApprover: true, currentType: 'black', currentScope: 'server',
+    targetType: 'black', targetScope: 'global',
+  }), true);
+});
+
+test('owner edits retain direct access without allowing global blacklist through a list move', () => {
+  for (const currentType of ['white', 'watch']) {
+    assert.equal(shouldApplyListEditImmediately({
+      isOwner: true, isApprover: false, currentType, currentScope: 'global',
+      targetType: 'black', targetScope: 'global',
+    }), false);
+  }
+  for (const currentScope of ['server', 'global']) {
+    assert.equal(shouldApplyListEditImmediately({
+      isOwner: true, isApprover: false, currentType: 'black', currentScope,
+      targetType: 'black', targetScope: currentScope,
+    }), true);
+  }
+});

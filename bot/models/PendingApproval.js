@@ -49,6 +49,9 @@ const pendingApprovalSchema = new mongoose.Schema({
   /** For edit actions: the original list type before edit */
   currentType: { type: String, default: '' },
 
+  /** Names appended by a list edit after approval; keep them separate from existing alts. */
+  additionalNames: { type: [String], default: [] },
+
   /** For overwrite flow: _id of the duplicate entry to delete */
   duplicateEntryId: { type: String, default: '' },
 

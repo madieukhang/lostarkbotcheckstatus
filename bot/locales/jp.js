@@ -374,6 +374,7 @@ const jp = {
     navigation: {
       evidencePlaceholder: 'evidence を見る...',
       detailsPlaceholder: 'List 登録名の詳細を見る...',
+      selectNone: '選択を解除',
       refresh: '更新',
       expired: '期限切れ · /la-list view を再実行',
       noReason: 'No reason',

@@ -42,7 +42,7 @@ image may need fallback or a correction pass. Settings do not create new quota.
 | `/la-search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists, and open blacklist/watchlist/whitelist details even without an evidence image |
 | `/la-evidence name [public]` | Direct evidence lookup for a single listed name. Autocomplete unions blacklist/whitelist/watchlist; bypasses `/la-list view` paging. Ephemeral by default; `public:true` is officer/senior only |
 | `/la-list add type name reason [raid] [logs] [image] [scope]` | Add to blacklist/whitelist/watchlist. `scope`: `global` / `server` (blacklist only) |
-| `/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` | Edit existing entry (owner/officer instant, members via approval). `additional_names` appends alts manually for hidden-roster + no-guild edge case |
+| `/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` | Edit existing entry. Owners can edit existing metadata, but server-to-global promotion and moves into global blacklist require approval unless the requester has auto-approval rights. `additional_names` appends alts manually for hidden-roster + no-guild cases and stays pending with any edit that requires approval. |
 | `/la-list remove name` | Remove an entry (ownership check) |
 | `/la-list view type [scope]` | View entries. `scope`: `all` / `global` / `server` |
 | `/la-list trust action name [reason]` | Manage trusted list — `add` / `remove` (officer/senior only) |

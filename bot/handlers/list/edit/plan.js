@@ -157,12 +157,20 @@ export function buildScopeConflictQuery({ existing, targetScope, guildId }) {
   };
 }
 
+/** Route scope expansion and new global blacklist entries through approval, even for owners. */
 export function shouldApplyListEditImmediately({
   isOwner,
   isApprover,
+  currentType,
+  currentScope,
   targetType,
   targetScope,
 }) {
+  const needsGlobalApproval = targetScope === 'global' && (
+    (currentType === 'black' && currentScope === 'server')
+    || (targetType === 'black' && currentType !== 'black')
+  );
+  if (needsGlobalApproval) return Boolean(isApprover);
   return Boolean(
     isOwner
     || isApprover

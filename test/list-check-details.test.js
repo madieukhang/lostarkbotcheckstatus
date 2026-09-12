@@ -7,6 +7,7 @@ process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const {
   buildAutoCheckEvidenceRow,
+  createCheckHandlers,
   loadCheckDetailStatMap,
 } = await import('../bot/handlers/list/check/index.js');
 const { buildCheckEntryDetailsEmbed } = await import('../bot/handlers/list/check/ui.js');
@@ -32,7 +33,7 @@ test('check details dropdown includes a blacklist entry without an evidence imag
 
   const select = row.toJSON().components[0];
   assert.match(select.placeholder, /Xem chi tiết/u);
-  assert.equal(select.options.length, 1);
+  assert.equal(select.options.length, 2);
   assert.equal(select.options[0].label, 'Checkedalt');
   assert.equal(select.options[0].value, `black:${blackId}`);
 });
@@ -50,7 +51,7 @@ test('check details dropdown de-duplicates multiple checked alts from one entry'
   ], 'en');
 
   const select = row.toJSON().components[0];
-  assert.equal(select.options.length, 1);
+  assert.equal(select.options.length, 2);
   assert.equal(select.options[0].value, `black:${blackId}`);
 });
 
@@ -68,6 +69,40 @@ test('check details dropdown keeps the screenshot name visible after canonical c
 
   const select = row.toJSON().components[0];
   assert.equal(select.options[0].label, 'Altchxr → Altchar');
+});
+
+test('check details reserves a reset option within the Discord 25-option limit', () => {
+  const results = Array.from({ length: 30 }, (_, i) => ({
+    name: `Character${i}`,
+    blackEntry: { _id: String(i).padStart(24, '0'), reason: 'Report' },
+  }));
+  for (const lang of ['en', 'vi', 'jp']) {
+    const select = buildAutoCheckEvidenceRow(results, lang).toJSON().components[0];
+    assert.equal(select.options.length, 25);
+    assert.equal(select.options.at(-1).value, 'none');
+    assert.ok(!select.options.at(-1).label.includes('listView.'));
+  }
+  assert.equal(buildAutoCheckEvidenceRow([]), null);
+});
+
+test('Select none resets only the details menu without a DB read or extra reply', async () => {
+  const row = buildAutoCheckEvidenceRow([{
+    name: 'Character', blackEntry: { _id: 'a'.repeat(24), reason: 'Report' },
+  }]).toJSON();
+  row.components[0].options[0].default = true;
+  const otherRow = { type: 1, components: [{ type: 2, style: 2, custom_id: 'keep', label: 'Keep' }] };
+  let updated;
+  const handler = createCheckHandlers({ client: {} }).handleAutoCheckEvidenceSelect;
+  await handler({
+    values: ['none'],
+    message: { components: [row, otherRow] },
+    update: async payload => { updated = payload; },
+    deferReply: () => assert.fail('Reset must acknowledge the original menu only'),
+  });
+  assert.deepEqual(Object.keys(updated), ['components']);
+  const rows = updated.components.map(value => value.toJSON?.() || value);
+  assert.ok(rows[0].components[0].options.every(option => !option.default));
+  assert.deepEqual(rows[1], otherRow);
 });
 
 test('check detail snapshot loader stays DB-only and includes primary plus tracked alts', async () => {

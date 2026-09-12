@@ -42,6 +42,8 @@ export async function sendListEditApprovalRequest({
   newImageRehost,
   newScope,
   editGuildDefaultScope,
+  targetScope,
+  additionalNames = [],
   changes,
   lang = 'en',
 }) {
@@ -69,11 +71,10 @@ export async function sendListEditApprovalRequest({
     reason: newReason || existing.reason,
     raid: newRaid || existing.raid,
     logsUrl: newLogs || existing.logsUrl || '',
+    additionalNames,
     ...editImageFields,
-    // Scope priority: explicit user option → existing entry's scope → guild default.
-    // The approval handler at line ~1206 (cross-list move) and ~1230 (in-place)
-    // both honor payload.scope when persisting the edit.
-    scope: newScope || existingObj.scope || editGuildDefaultScope,
+    // Persist the scope that approval routing evaluated, including list moves.
+    scope: targetScope || newScope || existingObj.scope || editGuildDefaultScope,
   });
 
   const sent = await sendListAddApprovalToApprovers(interaction.guild, payload, {
