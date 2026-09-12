@@ -386,3 +386,11 @@ export function buildApprovalProcessingRow(action, lang = 'en') {
       .setDisabled(true)
   );
 }
+
+/** Keep the chosen action reachable after a restart or transient failure. */
+export function buildApprovalRetryRow(action, requestId, lang = 'en') {
+  return new ActionRowBuilder().addComponents(new ButtonBuilder()
+    .setCustomId(`${action}:${requestId}`)
+    .setLabel(t('dialogue.approval.flow.retry', lang))
+    .setStyle(ButtonStyle.Secondary));
+}

@@ -14,6 +14,7 @@ import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { t } from '../../../services/i18n/index.js';
+import { moveListEntry } from '../services/moveEntry.js';
 import {
   getListContext,
   buildListEditSuccessEmbed,
@@ -180,9 +181,10 @@ async function applyTypeChange(args) {
     return false;
   }
 
-  // Create first, then delete old: a failed create must preserve the source.
-  const movedEntry = await newModel.create(buildMovedEntryData(args));
-  await oldModel.deleteOne({ _id: args.existing._id });
+  const movedEntry = await moveListEntry({
+    oldModel, newModel, existing: args.existing,
+    buildData: source => buildMovedEntryData({ ...args, existing: source }),
+  });
   await renderEditSuccess({
     interaction: args.interaction,
     client: args.client,

@@ -20,12 +20,14 @@ import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   getListContext,
   buildApprovalResultRow,
+  buildApprovalRetryRow,
   buildTrustedBlockEmbed,
 } from '../helpers.js';
 import { findTrustedEditConflict } from '../edit/trustedGuard.js';
 import {
   PENDING_APPROVAL_ACCESS,
-  acknowledgeAndConsumeApproval,
+  acknowledgeAndClaimApproval,
+  runClaimedApproval,
 } from '../services/pendingApprovalAccess.js';
 import { createApprovalMessageUpdater } from '../services/approvals.js';
 
@@ -75,7 +77,7 @@ export function createListAddOverwriteButtonHandler({
 
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-    const { payload, status, acknowledged } = await acknowledgeAndConsumeApproval({
+    const { payload, claim, status, acknowledged } = await acknowledgeAndClaimApproval({
       interaction,
       PendingApprovalModel: PendingApproval,
       requestId,
@@ -86,142 +88,157 @@ export function createListAddOverwriteButtonHandler({
       const notAuthorized = status === PENDING_APPROVAL_ACCESS.notAuthorized;
       await (acknowledged ? followUpAlert : replyAlert)(interaction, {
         severity: notAuthorized ? AlertSeverity.ERROR : AlertSeverity.WARNING,
-        ...t(`dialogue.approval.flow.${notAuthorized ? 'notAuthorized' : 'expired'}`, lang),
+        ...t(`dialogue.approval.flow.${status === PENDING_APPROVAL_ACCESS.processing ? 'processing' : notAuthorized ? 'notAuthorized' : 'expired'}`, lang),
         lang,
       });
       return;
     }
 
-    const updateApprovers = createApprovalMessageUpdater({
-      interaction, payload, lang, syncApproverDmMessages,
-    });
-
-    if (!isOverwrite) {
-      // Keep the existing entry and explain the duplicate to the requester.
-      const buildKeptPayload = (targetLang) => ({
-        content: null,
-        embeds: [buildNoticeEmbed(
-          t('dialogue.approval.flow.keptExisting', targetLang, { name: payload.name }),
-          { severity: AlertSeverity.SUCCESS, lang: targetLang }
-        )],
-        components: [buildApprovalResultRow('Kept Existing', targetLang)],
+    return runClaimedApproval(claim, async () => {
+      const updateApprovers = createApprovalMessageUpdater({
+        interaction, payload, lang, syncApproverDmMessages,
       });
-      await updateApprovers(buildKeptPayload);
 
-      await notifyRequesterAboutDecision(payload, { ok: false, isDuplicate: true }, true);
-      return;
-    }
+      if (!isOverwrite) {
+        await claim.complete();
+        // Keep the existing entry and explain the duplicate to the requester.
+        const buildKeptPayload = (targetLang) => ({
+          content: null,
+          embeds: [buildNoticeEmbed(
+            t('dialogue.approval.flow.keptExisting', targetLang, { name: payload.name }),
+            { severity: AlertSeverity.SUCCESS, lang: targetLang }
+          )],
+          components: [buildApprovalResultRow('Kept Existing', targetLang)],
+        });
+        await updateApprovers(buildKeptPayload);
 
-    // Overwrite: update existing entry in-place (safe · no delete-then-add risk)
-    try {
-      const { model } = getListContext(payload.type);
+        await notifyRequesterAboutDecision(payload, { ok: false, isDuplicate: true }, true);
+        return;
+      }
 
-      // Prefer the stored duplicate id, then fall back to a scope-aware name
-      // lookup when an older pending approval does not carry that id.
-      const dupeEntry = await findDuplicateEntry(model, payload);
+      // Overwrite: update existing entry in-place (safe · no delete-then-add risk)
+      try {
+        const { model } = getListContext(payload.type);
 
-      if (!dupeEntry) {
+        // Prefer the stored duplicate id, then fall back to a scope-aware name
+        // lookup when an older pending approval does not carry that id.
+        const dupeEntry = await findDuplicateEntry(model, payload);
+
+        if (!dupeEntry) {
+          await claim.complete();
+          await editPayload(interaction, {
+            content: '',
+            embeds: [buildAlertEmbed({
+              severity: AlertSeverity.WARNING,
+              ...t('dialogue.approval.flow.originalMissing', lang),
+              lang,
+            })],
+            components: [buildApprovalResultRow('Failed', lang)],
+          });
+          return;
+        }
+
+        // Update in-place: overwrite fields + refresh roster for new canonical name
+        const newName = normalizeCharacterName(payload.name);
+        const rosterResult = await buildRosterCharactersFn(newName, {
+          hiddenRosterFallback: true,
+        }).catch(() => null);
+
+        const proposedNames = rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0
+          ? rosterResult.allCharacters : dupeEntry.allCharacters || [];
+        const trustedNow = await findTrustedEditConflict({ name: newName, allCharacters: proposedNames });
+        if (trustedNow) {
+          await claim.complete();
+          await updateApprovers(targetLang => ({
+            content: null,
+            embeds: [buildTrustedBlockEmbed(newName, trustedNow.reason, { lang: targetLang })],
+            components: [buildApprovalResultRow('Blocked', targetLang)],
+          }));
+          await notifyRequesterAboutDecision(payload, { ok: false }, false);
+          return;
+        }
+
+        dupeEntry.name = newName;
+        // Only update roster if fetch succeeded · preserve old snapshot on failure
+        if (rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0) {
+          dupeEntry.allCharacters = rosterResult.allCharacters;
+          // Refresh stamped the alt list from a bible scrape just now, so
+          // record source + timestamp. Without this the stale-loop would
+          // misread the entry as legacy/null even though it was just refreshed.
+          dupeEntry.enrichmentSource = 'bible';
+          dupeEntry.enrichedAt = new Date();
+        }
+        dupeEntry.reason = payload.reason || dupeEntry.reason;
+        dupeEntry.raid = payload.raid || dupeEntry.raid;
+        dupeEntry.logsUrl = payload.logsUrl || dupeEntry.logsUrl;
+        // Image overwrite: prefer new rehost refs, fall back to new legacy URL,
+        // else preserve existing entry's image fields entirely.
+        if (payload.imageMessageId) {
+          dupeEntry.imageUrl = '';
+          dupeEntry.imageMessageId = payload.imageMessageId;
+          dupeEntry.imageChannelId = payload.imageChannelId || '';
+        } else if (payload.imageUrl) {
+          dupeEntry.imageUrl = payload.imageUrl;
+          dupeEntry.imageMessageId = '';
+          dupeEntry.imageChannelId = '';
+        }
+        // Preserve existing scope · overwrite should not change global↔server
+        // (scope is a structural property, not metadata)
+        dupeEntry.addedByUserId = payload.requestedByUserId;
+        dupeEntry.addedByTag = payload.requestedByTag;
+        dupeEntry.addedByName = payload.requestedByName;
+        dupeEntry.addedByDisplayName = payload.requestedByDisplayName;
+        dupeEntry.addedAt = new Date();
+        await claim.assertOwned();
+        await dupeEntry.save();
+        await claim.complete();
+
+        console.log(`[list] Overwrite: updated ${payload.type} entry for ${dupeEntry.name} in-place`);
+
+        const buildOverwrittenPayload = (targetLang) => ({
+          content: null,
+          embeds: [buildNoticeEmbed(
+            t('dialogue.approval.flow.overwritten', targetLang, { user: interaction.user.tag }),
+            { severity: AlertSeverity.SUCCESS, lang: targetLang }
+          )],
+          components: [buildApprovalResultRow('Overwritten', targetLang)],
+        });
+        await updateApprovers(buildOverwrittenPayload);
+
+        // Broadcast overwrite: global to all, server-scoped to owner only
+        broadcastListChange('edited', dupeEntry, {
+          type: payload.type,
+          guildId: payload.guildId,
+          requestedByDisplayName: payload.requestedByDisplayName,
+          requestedByTag: payload.requestedByTag,
+        }, {
+          onlyOwner: dupeEntry.scope === 'server',
+          rosterCharacters: rosterResult?.rosterCharacters || [],
+        }).catch(() => {});
+
+        await notifyRequesterAboutDecision(payload, { ok: true }, false);
+      } catch (err) {
+        if (claim.completed) {
+          console.warn('[approval] Overwrite completed but its final notification failed:', err.message);
+          return;
+        }
+        if (claim.lost) {
+          await followUpAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.processing', lang), lang });
+          return;
+        }
+        console.error('[list] Overwrite failed:', err.message);
         await editPayload(interaction, {
           content: '',
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
-            ...t('dialogue.approval.flow.originalMissing', lang),
+            ...t('dialogue.approval.flow.retryFailed', lang),
+            fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
             lang,
           })],
-          components: [buildApprovalResultRow('Failed', lang)],
+          components: [buildApprovalRetryRow('listadd_overwrite', requestId, lang)],
         });
-        return;
       }
-
-      // Update in-place: overwrite fields + refresh roster for new canonical name
-      const newName = normalizeCharacterName(payload.name);
-      const rosterResult = await buildRosterCharactersFn(newName, {
-        hiddenRosterFallback: true,
-      }).catch(() => null);
-
-      const proposedNames = rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0
-        ? rosterResult.allCharacters : dupeEntry.allCharacters || [];
-      const trustedNow = await findTrustedEditConflict({ name: newName, allCharacters: proposedNames });
-      if (trustedNow) {
-        await updateApprovers(targetLang => ({
-          content: null,
-          embeds: [buildTrustedBlockEmbed(newName, trustedNow.reason, { lang: targetLang })],
-          components: [buildApprovalResultRow('Blocked', targetLang)],
-        }));
-        await notifyRequesterAboutDecision(payload, { ok: false }, false);
-        return;
-      }
-
-      dupeEntry.name = newName;
-      // Only update roster if fetch succeeded · preserve old snapshot on failure
-      if (rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0) {
-        dupeEntry.allCharacters = rosterResult.allCharacters;
-        // Refresh stamped the alt list from a bible scrape just now, so
-        // record source + timestamp. Without this the stale-loop would
-        // misread the entry as legacy/null even though it was just refreshed.
-        dupeEntry.enrichmentSource = 'bible';
-        dupeEntry.enrichedAt = new Date();
-      }
-      dupeEntry.reason = payload.reason || dupeEntry.reason;
-      dupeEntry.raid = payload.raid || dupeEntry.raid;
-      dupeEntry.logsUrl = payload.logsUrl || dupeEntry.logsUrl;
-      // Image overwrite: prefer new rehost refs, fall back to new legacy URL,
-      // else preserve existing entry's image fields entirely.
-      if (payload.imageMessageId) {
-        dupeEntry.imageUrl = '';
-        dupeEntry.imageMessageId = payload.imageMessageId;
-        dupeEntry.imageChannelId = payload.imageChannelId || '';
-      } else if (payload.imageUrl) {
-        dupeEntry.imageUrl = payload.imageUrl;
-        dupeEntry.imageMessageId = '';
-        dupeEntry.imageChannelId = '';
-      }
-      // Preserve existing scope · overwrite should not change global↔server
-      // (scope is a structural property, not metadata)
-      dupeEntry.addedByUserId = payload.requestedByUserId;
-      dupeEntry.addedByTag = payload.requestedByTag;
-      dupeEntry.addedByName = payload.requestedByName;
-      dupeEntry.addedByDisplayName = payload.requestedByDisplayName;
-      dupeEntry.addedAt = new Date();
-      await dupeEntry.save();
-
-      console.log(`[list] Overwrite: updated ${payload.type} entry for ${dupeEntry.name} in-place`);
-
-      const buildOverwrittenPayload = (targetLang) => ({
-        content: null,
-        embeds: [buildNoticeEmbed(
-          t('dialogue.approval.flow.overwritten', targetLang, { user: interaction.user.tag }),
-          { severity: AlertSeverity.SUCCESS, lang: targetLang }
-        )],
-        components: [buildApprovalResultRow('Overwritten', targetLang)],
-      });
-      await updateApprovers(buildOverwrittenPayload);
-
-      // Broadcast overwrite: global to all, server-scoped to owner only
-      broadcastListChange('edited', dupeEntry, {
-        type: payload.type,
-        guildId: payload.guildId,
-        requestedByDisplayName: payload.requestedByDisplayName,
-        requestedByTag: payload.requestedByTag,
-      }, {
-        onlyOwner: dupeEntry.scope === 'server',
-        rosterCharacters: rosterResult?.rosterCharacters || [],
-      }).catch(() => {});
-
-      await notifyRequesterAboutDecision(payload, { ok: true }, false);
-    } catch (err) {
-      console.error('[list] Overwrite failed:', err.message);
-      await editPayload(interaction, {
-        content: '',
-        embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
-          ...t('dialogue.approval.flow.overwriteFailed', lang),
-          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-          lang,
-        })],
-        components: [buildApprovalResultRow('Failed', lang)],
-      });
-    }
+    });
   }
 
   return handleListAddOverwriteButton;

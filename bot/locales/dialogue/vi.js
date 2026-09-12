@@ -247,6 +247,9 @@ export default {
       add: 'thêm', edit: 'chỉnh sửa',
     },
     flow: {
+      retry: 'Thử lại quyết định này',
+      processing: { title: 'Yêu cầu đang được xử lý', description: 'Một lượt xử lý đã nhận yêu cầu này. Nếu lượt đó bị gián đoạn, chờ vài phút rồi thử lại đúng quyết định đã chọn nhé.' },
+      retryFailed: { title: 'Chưa thể hoàn tất quyết định', description: 'Yêu cầu vẫn được giữ. Bấm thử lại để tiếp tục; những thay đổi đã lưu sẽ được kiểm tra lại.' },
       notAuthorized: { title: 'Yêu cầu này không được giao cho cậu', description: 'Cậu không nằm trong danh sách approver của yêu cầu này.' },
       evidenceNotAuthorized: { title: 'Yêu cầu này không được giao cho cậu', description: 'Chỉ approver được chỉ định mới mở được bằng chứng.' },
       expired: { title: 'Yêu cầu đã hết hạn', description: 'Yêu cầu đã được xử lý hoặc cửa sổ duyệt đã đóng.' },

@@ -14,6 +14,7 @@ import { buildScopedListQuery } from '../../../utils/scope.js';
 import { normalizeNameList } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import { findTrustedEditConflict } from '../edit/trustedGuard.js';
+import { moveListEntry } from '../services/moveEntry.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -34,8 +35,9 @@ async function closeApprovalWithAlert({
   embed,
   status = 'Failed',
   lang,
+  completeApproval = () => PendingApproval.deleteOne({ requestId }),
 }) {
-  await PendingApproval.deleteOne({ requestId });
+  await completeApproval();
   await editPayload(interaction, buildApprovalAlertPayload({ embed, status, lang }));
 }
 
@@ -48,6 +50,9 @@ function buildLocalizedAlert(key, lang, values = {}) {
 }
 
 export function resolveApprovalMoveImageFields(payload, existingEntry) {
+  if (payload.imageUrl && !payload.imageMessageId) {
+    return { imageUrl: payload.imageUrl, imageMessageId: '', imageChannelId: '' };
+  }
   const imageMessageId = payload.imageMessageId || existingEntry.imageMessageId || '';
   return {
     imageUrl: imageMessageId ? '' : (payload.imageUrl || existingEntry.imageUrl || ''),
@@ -90,6 +95,7 @@ async function rejectBlockedTypeChange({
   existingEntry,
   newModel,
   lang,
+  completeApproval,
 }) {
   const nameMatch = {
     $or: [{ name: existingEntry.name }, { allCharacters: existingEntry.name }],
@@ -105,6 +111,7 @@ async function rejectBlockedTypeChange({
     await closeApprovalWithAlert({
       interaction,
       requestId,
+      completeApproval,
       embed: buildLocalizedAlert(
         'dialogue.listEdit.moveBlocked',
         lang,
@@ -120,8 +127,10 @@ async function rejectBlockedTypeChange({
 
 async function applyApprovedTypeChange(args) {
   if (await rejectBlockedTypeChange(args)) return false;
-  await args.newModel.create(buildApprovalMoveData(args.payload, args.existingEntry));
-  await args.oldModel.deleteOne({ _id: args.existingEntry._id });
+  await moveListEntry({
+    oldModel: args.oldModel, newModel: args.newModel, existing: args.existingEntry,
+    buildData: source => buildApprovalMoveData(args.payload, source), beforeWrite: args.beforeWrite,
+  });
   return true;
 }
 
@@ -179,6 +188,7 @@ async function applyApprovedInPlaceUpdate(args) {
   const additionalNames = normalizeNameList(args.payload.additionalNames || []);
   if (Object.keys(updateFields).length === 0 && additionalNames.length === 0) return true;
   try {
+    await args.beforeWrite();
     await args.oldModel.updateOne(
       { _id: args.existingEntry._id },
       {
@@ -194,6 +204,7 @@ async function applyApprovedInPlaceUpdate(args) {
     await closeApprovalWithAlert({
       interaction: args.interaction,
       requestId: args.requestId,
+      completeApproval: args.completeApproval,
       embed: buildLocalizedAlert('dialogue.listEdit.scopeRaced', args.lang),
       lang: args.lang,
     });
@@ -238,8 +249,9 @@ async function finishApprovedEdit({
   syncApproverDmMessages,
   notifyRequesterAboutDecision,
   lang,
+  completeApproval = () => PendingApproval.deleteOne({ requestId }),
 }) {
-  await PendingApproval.deleteOne({ requestId });
+  await completeApproval();
   await editPayload(interaction, buildApprovedPayload(interaction, lang));
   await syncApproverDmMessages(
     payload,
@@ -276,21 +288,34 @@ export async function handleApprovedEditRequest({
   broadcastListChange,
   notifyRequesterAboutDecision,
   lang = 'en',
+  completeApproval = () => PendingApproval.deleteOne({ requestId }),
+  beforeWrite = async () => {},
 }) {
   const { model: oldModel } = getListContext(payload.currentType || payload.type);
   const { model: newModel } = getListContext(payload.type);
   const existingEntry = await oldModel.findById(payload.existingEntryId);
   if (!existingEntry) {
+    const moved = payload.currentType && payload.currentType !== payload.type
+      ? await newModel.findById(payload.existingEntryId)
+      : null;
+    if (moved && moved.name === payload.name) {
+      await finishApprovedEdit({
+        interaction, payload, requestId, syncApproverDmMessages,
+        notifyRequesterAboutDecision, lang, completeApproval,
+      });
+      return;
+    }
     await closeApprovalWithAlert({
       interaction,
       requestId,
+      completeApproval,
       embed: buildLocalizedAlert('dialogue.listEdit.originalMissing', lang),
       lang,
     });
     return;
   }
 
-  const args = { interaction, payload, requestId, existingEntry, oldModel, newModel, lang };
+  const args = { interaction, payload, requestId, existingEntry, oldModel, newModel, lang, completeApproval, beforeWrite };
   const isTypeChange = payload.currentType && payload.currentType !== payload.type;
   const isScopeChange = payload.type === 'black' && payload.scope
     && payload.scope !== (existingEntry.scope || 'global');
@@ -299,7 +324,7 @@ export async function handleApprovedEditRequest({
     const trustedNow = await findTrustedEditConflict(existingEntry, payload.additionalNames || []);
     if (trustedNow) {
       await closeApprovalWithAlert({
-        interaction, requestId, lang, status: 'Blocked',
+        interaction, requestId, lang, status: 'Blocked', completeApproval,
         embed: buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason, { lang }),
       });
       return;
@@ -315,6 +340,7 @@ export async function handleApprovedEditRequest({
     interaction,
     payload,
     requestId,
+    completeApproval,
     syncApproverDmMessages,
     notifyRequesterAboutDecision,
     lang,

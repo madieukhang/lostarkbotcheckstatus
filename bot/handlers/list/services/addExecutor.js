@@ -602,7 +602,7 @@ async function buildSuccessfulAddResult({
  *   call site between auto-approve + approval-button paths).
  */
 export function createListAddExecutor({ client, broadcastListChange }) {
-  async function executeListAddToDatabase(payload) {
+  async function executeListAddToDatabase(payload, { beforeWrite = async () => {} } = {}) {
     const lang = payload.lang || 'en';
     const { model, color, icon } = getListContext(payload.type);
     const labelCap = t(`dialogue.broadcast.list.${payload.type}`, lang);
@@ -661,6 +661,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       });
     }
 
+    await beforeWrite();
     const entry = await model.create(buildListEntryCreateData({
       payload,
       name,

@@ -23,6 +23,10 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 Trusted protection also applies when appending alts through manual edits or enrichment,
 and is checked again when an edit or duplicate overwrite is approved. Each pending
 approval accepts one decision, including when several approvers click at once.
+The request stays saved during processing. **Retry this decision** resumes interrupted
+work once its processing lease expires; it cannot reverse a decision already started.
+Cross-list moves use MongoDB transactions and require a replica set or sharded cluster,
+so a failed move cannot leave a second list copy or delete its source halfway through.
 Evidence menus recheck the entry's current guild visibility before opening its detail
 card; **Select none** resets the selection so the same report can be opened again.
 
@@ -253,7 +257,7 @@ Server monitor runs out-of-band: `bot/monitor/monitor.js` polls `bot/monitor/ser
 ## Requirements
 
 - Node.js ≥ 20.19.0
-- MongoDB (Atlas or self-hosted)
+- MongoDB (Atlas or a self-hosted replica set/sharded cluster)
 - Discord bot token + channel ID
 - Gemini API key (optional — only needed for `/la-check` + auto-check)
 - Discord Privileged Intent: **Message Content Intent** (needed for auto-check)

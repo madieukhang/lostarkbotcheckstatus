@@ -16,6 +16,14 @@ const {
   buildApprovalUpdateFields,
   resolveApprovalMoveImageFields,
 } = await import('../bot/handlers/list/add/editApproval.js');
+
+test('an approved move retains the newly submitted image when rehosting fell back to a URL', () => {
+  const fields = resolveApprovalMoveImageFields(
+    { imageUrl: 'https://cdn.example/new.png', imageMessageId: '', imageChannelId: '' },
+    { imageUrl: '', imageMessageId: 'old-message', imageChannelId: 'old-channel' },
+  );
+  assert.deepEqual(fields, { imageUrl: 'https://cdn.example/new.png', imageMessageId: '', imageChannelId: '' });
+});
 const {
   buildListEntryCreateData,
 } = await import('../bot/handlers/list/services/addExecutor.js');

@@ -329,6 +329,9 @@ export default {
       add: 'add', edit: 'edit',
     },
     flow: {
+      retry: 'Retry this decision',
+      processing: { title: 'A decision is already in progress', description: 'Another attempt is processing this request. If it was interrupted, wait a few minutes and retry the same decision.' },
+      retryFailed: { title: 'Decision could not finish', description: 'The request is still saved. Retry this decision to continue; changes already saved will be checked again.' },
       notAuthorized: { title: 'This request is not assigned to you', description: 'You are not on the approver list for this request.' },
       evidenceNotAuthorized: { title: 'This request is not assigned to you', description: 'Only assigned approvers can open its evidence.' },
       expired: { title: 'This request has expired', description: 'It was already processed or its approval window has closed.' },

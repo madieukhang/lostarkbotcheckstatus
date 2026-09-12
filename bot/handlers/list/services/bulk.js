@@ -110,14 +110,15 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     results.skipped.push({ name: row.name, reason: reason.slice(0, 80) });
   }
 
-  async function executeBulkRow(row, meta, defaultScope, results) {
+  async function executeBulkRow(row, meta, defaultScope, results, beforeWrite) {
     const scope = row.type === 'black' ? (row.scope || defaultScope) : 'global';
     const rehost = await resolveBulkRowImage(row, meta, results);
     const payload = buildBulkRowPayload(row, meta, scope, rehost);
     try {
-      const result = await executeListAddToDatabase(payload);
+      const result = await executeListAddToDatabase(payload, { beforeWrite });
       recordBulkRowResult(results, row, scope, result);
     } catch (err) {
+      if (err.code === 'APPROVAL_LEASE_LOST') throw err;
       console.error(`[multiadd] Row ${row.rowNum} "${row.name}" failed:`, err);
       results.failed.push({ name: row.name, error: err.message || 'unknown error' });
     }
@@ -130,13 +131,14 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     } catch { /* progress errors should not stop the batch */ }
   }
 
-  async function executeBulkMultiadd(rows, meta, onProgress = null) {
+  async function executeBulkMultiadd(rows, meta, onProgress = null, { beforeWrite = async () => {} } = {}) {
     const results = { added: [], skipped: [], failed: [], rehostWarnings: [] };
     const guildDefaultScope = await resolveGuildDefaultScope(meta.guildId);
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      await executeBulkRow(row, meta, guildDefaultScope, results);
+      await beforeWrite();
+      await executeBulkRow(row, meta, guildDefaultScope, results, beforeWrite);
       await reportBulkProgress(onProgress, i + 1, rows.length);
       if (i < rows.length - 1) await sleep(200);
     }

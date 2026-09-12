@@ -9,25 +9,14 @@ import { disconnectDB } from '../bot/db.js';
 import { clearUserLanguageCache } from '../bot/services/i18n/index.js';
 import { buildApprovalResultRow } from '../bot/handlers/list/helpers.js';
 import { createListAddOverwriteButtonHandler } from '../bot/handlers/list/add/overwriteButton.js';
+import { mockPendingApprovalModel } from './helpers/pending-approval-model.js';
 
 test('keep-existing rejects an unassigned user without consuming the approver request', async (t) => {
   t.mock.method(mongoose, 'connect', async () => mongoose);
   t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
   clearUserLanguageCache();
   t.after(async () => { clearUserLanguageCache(); await disconnectDB(); });
-  let pending = { requestId: 'approval-1', name: 'Artist', approverIds: ['approver'] };
-  const filters = [];
-  t.mock.method(PendingApproval, 'findOne', filter => ({ lean: async () =>
-    pending?.approverIds.includes(filter.approverIds) ? { ...pending } : null,
-  }));
-  t.mock.method(PendingApproval, 'findOneAndDelete', (filter) => ({ lean: async () => {
-    filters.push(filter);
-    if (!pending || (filter.approverIds && !pending.approverIds.includes(filter.approverIds))) return null;
-    const result = pending;
-    pending = null;
-    return result;
-  } }));
-  t.mock.method(PendingApproval, 'exists', async () => Boolean(pending));
+  const pending = mockPendingApprovalModel(t, PendingApproval, { requestId: 'approval-1', name: 'Artist', approverIds: ['approver'] });
   const edits = [];
   const replies = [];
   const synced = [];
@@ -49,19 +38,19 @@ test('keep-existing rejects an unassigned user without consuming the approver re
 
   await handler(interaction);
   await handler({ ...interaction, customId: 'listadd_overwrite:approval-1' });
-  assert.ok(pending, 'An unassigned click must leave the pending approval intact');
+  assert.ok(pending.get(), 'An unassigned click must leave the pending approval intact');
   assert.equal(replies.length, 2);
   assert.equal(deferred, 0);
   assert.equal(edits.length, 0);
   assert.equal(notifications.length, 0);
 
   await handler({ ...interaction, user: { id: 'approver' } });
-  assert.equal(pending, null);
+  assert.equal(pending.get(), null);
   assert.equal(deferred, 1);
   assert.equal(notifications.length, 1);
   assert.deepEqual(notifications[0][1], { ok: false, isDuplicate: true });
   assert.equal(notifications[0][2], true);
-  assert.deepEqual(filters.map(filter => filter.approverIds), ['approver']);
+  assert.deepEqual(pending.calls.claims.map(filter => filter.approverIds), ['approver']);
   assert.deepEqual(edits[0].components[0].toJSON(), buildApprovalResultRow('Kept Existing', 'en').toJSON());
   assert.deepEqual(synced[0].components[0].toJSON(), buildApprovalResultRow('Kept Existing', 'jp').toJSON());
 
@@ -79,8 +68,7 @@ for (const protectedAlt of [true, false]) {
       requestId: 'pending', name: 'Newmain', type: 'black', duplicateEntryId: 'original',
       approverIds: ['officer'], scope: 'global',
     };
-    t.mock.method(PendingApproval, 'findOne', () => ({ lean: async () => payload }));
-    t.mock.method(PendingApproval, 'findOneAndDelete', () => ({ lean: async () => payload }));
+    mockPendingApprovalModel(t, PendingApproval, payload);
     let saves = 0;
     let broadcasts = 0;
     const original = { name: 'Original', allCharacters: ['Originalalt'], scope: 'server', guildId: 'original-guild', save: async () => { saves += 1; } };

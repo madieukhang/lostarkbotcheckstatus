@@ -10,26 +10,16 @@ import { createListAddOverwriteButtonHandler } from '../bot/handlers/list/add/ov
 import { createMultiaddApprovalButtonHandler } from '../bot/handlers/list/multiadd/approvalButton.js';
 import { clearUserLanguageCache } from '../bot/services/i18n/index.js';
 import { disconnectDB } from '../bot/db.js';
+import { mockPendingApprovalModel } from './helpers/pending-approval-model.js';
 
 function stubPending(t, overrides = {}) {
   t.mock.method(mongoose, 'connect', async () => mongoose);
   t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
   clearUserLanguageCache();
   t.after(async () => { clearUserLanguageCache(); await disconnectDB(); });
-  let pending = { requestId: 'race', name: 'Char', type: 'black', approverIds: ['a', 'b'], ...overrides };
-  t.mock.method(PendingApproval, 'findOne', filter => ({ lean: async () =>
-    pending?.approverIds.includes(filter.approverIds) ? { ...pending } : null,
-  }));
-  t.mock.method(PendingApproval, 'findOneAndDelete', filter => ({ lean: async () => {
-    if (!pending?.approverIds.includes(filter.approverIds)) return null;
-    const payload = pending;
-    pending = null;
-    return payload;
-  } }));
-  t.mock.method(PendingApproval, 'exists', async () => Boolean(pending));
-  t.mock.method(PendingApproval, 'deleteOne', async () => { pending = null; });
-  t.mock.method(PendingApproval, 'create', async payload => { assert.equal(pending, null); pending = payload; return payload; });
-  return () => pending;
+  return mockPendingApprovalModel(t, PendingApproval, {
+    requestId: 'race', name: 'Char', type: 'black', approverIds: ['a', 'b'], ...overrides,
+  }).get;
 }
 
 for (const secondAction of ['reject', 'approve']) {
@@ -112,4 +102,40 @@ test('bulk approval acknowledges once, executes, and edits its final card', asyn
   });
   assert.equal(getPending(), null);
   assert.deepEqual(events, ['ack', 'edit', 'write', 'broadcast', 'edit', 'dm-sync', 'notify']);
+});
+
+test('a transient single-approval failure retains a working retry button and completes on retry', async t => {
+  const getPending = stubPending(t);
+  let fail = true;
+  let executions = 0;
+  const edits = [];
+  const decisions = [];
+  const handler = createListAddApprovalButtonHandler({
+    executeListAddToDatabase: async (_payload, { beforeWrite }) => {
+      await beforeWrite();
+      executions += 1;
+      if (fail) throw new Error('Transient storage failure');
+      return { ok: true };
+    },
+    syncApproverDmMessages: async () => {},
+    notifyRequesterAboutDecision: async (_payload, result) => decisions.push(result),
+  });
+  const click = {
+    customId: 'listadd_approve:race', user: { id: 'a' }, message: { id: 'dm' },
+    deferUpdate: async () => {}, editReply: async value => edits.push(value), followUp: async () => {},
+  };
+  await handler(click);
+  assert.ok(getPending());
+  assert.equal(getPending().processingToken, undefined);
+  const retry = edits.at(-1).components[0].toJSON().components[0];
+  assert.equal(retry.custom_id, click.customId);
+  assert.notEqual(retry.disabled, true);
+  await handler({ ...click, customId: 'listadd_reject:race' });
+  assert.equal(executions, 1, 'a started approval cannot be reversed after an uncertain write');
+  assert.deepEqual(decisions, []);
+  fail = false;
+  await handler(click);
+  assert.equal(getPending(), null);
+  assert.equal(executions, 2);
+  assert.deepEqual(decisions, [{ ok: true }]);
 });

@@ -222,6 +222,9 @@ export default {
       add: '追加', edit: '編集',
     },
     flow: {
+      retry: 'この判断を再試行',
+      processing: { title: 'すでに処理中です', description: 'この申請は別の処理が受け付けています。中断した場合は数分待って、同じ判断を再試行してください。' },
+      retryFailed: { title: '処理を完了できませんでした', description: '申請は保存されています。同じ判断を再試行すると、保存済みの変更を再確認して続行します。' },
       notAuthorized: { title: 'この申請はあなたの担当ではありませんの', description: 'この申請の approver list に入っていませんわ。' },
       evidenceNotAuthorized: { title: 'この申請はあなたの担当ではありませんの', description: '指定された approver だけが evidence を開けますの。' },
       expired: { title: '申請の期限が切れましたの', description: 'すでに処理済みか、承認時間が終了していますわ。' },

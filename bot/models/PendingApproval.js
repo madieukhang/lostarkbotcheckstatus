@@ -43,6 +43,12 @@ const pendingApprovalSchema = new mongoose.Schema({
   /** Action type: 'add' (single), 'edit' (single), or 'bulk' (multiadd batch) */
   action: { type: String, enum: ['add', 'edit', 'bulk'], default: 'add' },
 
+  // Keep an interrupted decision recoverable without letting another action
+  // reverse it after some of its writes may already have completed.
+  processingAction: { type: String, default: '' },
+  processingToken: { type: String, default: '' },
+  processingUntil: { type: Date, default: null },
+
   /** For edit actions: _id of the entry being edited */
   existingEntryId: { type: String, default: '' },
 

@@ -7,6 +7,7 @@ import { disconnectDB } from '../bot/db.js';
 import { clearUserLanguageCache, t as translate } from '../bot/services/i18n/index.js';
 import { createListAddApprovalButtonHandler } from '../bot/handlers/list/add/approvalButton.js';
 import { COLORS } from '../bot/utils/ui.js';
+import { mockPendingApprovalModel } from './helpers/pending-approval-model.js';
 
 async function renderDuplicate(t, { lang = 'en', direct = false, long = false, legacy = false } = {}) {
   t.mock.method(mongoose, 'connect', async () => mongoose);
@@ -31,19 +32,7 @@ async function renderDuplicate(t, { lang = 'en', direct = false, long = false, l
     payload.reason = '   ';
     payload.raid = '';
   }
-  let storedDuplicateId;
-  t.mock.method(PendingApproval, 'findOne', query => ({ lean: async () => {
-    assert.equal(query.approverIds, 'approver');
-    return payload;
-  } }));
-  t.mock.method(PendingApproval, 'findOneAndDelete', query => ({ lean: async () => {
-    assert.equal(query.approverIds, 'approver');
-    return payload;
-  } }));
-  t.mock.method(PendingApproval, 'create', async restored => {
-    assert.equal(restored.requestId, payload.requestId);
-    storedDuplicateId = restored.duplicateEntryId;
-  });
+  const pending = mockPendingApprovalModel(t, PendingApproval, { ...payload, approverIds: ['approver'] });
   t.mock.method(PendingApproval, 'deleteOne', () => assert.fail('A duplicate must remain pending until keep/overwrite'));
   const edits = [];
   const synced = [];
@@ -64,7 +53,8 @@ async function renderDuplicate(t, { lang = 'en', direct = false, long = false, l
     editReply: async value => edits.push(value),
   });
   assert.equal(executions, 1);
-  assert.equal(storedDuplicateId, existing._id);
+  assert.equal(pending.get().duplicateEntryId, existing._id);
+  assert.equal(pending.get().processingAction, undefined);
   return { card: edits.at(-1), peerCard: synced.at(-1), existing, payload };
 }
 
