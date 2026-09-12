@@ -19,13 +19,8 @@ import {
   fetchCharacterMeta,
   fetchGuildMembers,
 } from '../../services/roster/index.js';
-import {
-  buildScanResultEmbed,
-  buildScanResultButtons,
-} from '../../utils/scanResultEmbed.js';
-import { createRosterContinuationSession } from '../../utils/rosterDeepSession.js';
-import { rosterUrl } from '../../utils/rosterLink.js';
 import { createRosterScanRuntime } from './progress.js';
+import { buildRosterDeepScanResult } from './deepResult.js';
 
 /**
  * Run the Stronghold deep-scan branch on a visible /la-roster query.
@@ -39,7 +34,7 @@ import { createRosterScanRuntime } from './progress.js';
  * @param {import('discord.js').EmbedBuilder} args.embed - the base
  *   embed the caller already started (visible-roster card); this
  *   function appends the deep-scan section.
- * @returns {Promise<void>}
+ * @returns {Promise<object>} Result card, continuation controls, and scan context.
  */
 export async function runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed }) {
     await connectDB();
@@ -122,56 +117,21 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
         visibleDeepMeta = visMeta;
         visibleDeepGuildMembers = visGuildMembers;
 
-        // Render the deep-scan result as a separate embed so a Continue resume
-        // can re-edit it without rebuilding the visible roster card. The
-        // deep:true option explicitly requests a visible alt list.
-        if (altResult && visMeta?.guildName) {
-          const profileUrl = rosterUrl(name);
-          const { embed: scanEmbed, state } = buildScanResultEmbed({
-            target: { name, isHidden: false, guildName: visMeta.guildName, profileUrl },
-            result: altResult,
-            kind: 'roster-visible',
-            summaryLine: t('dialogue.enrich.summary', lang, { guild: visMeta.guildName, name, resumed: '' }),
-            lang,
-          });
-          deepScanResultEmbed = scanEmbed;
-
-          if (state.hasRemaining && hasGuildContext) {
-            const session = createRosterContinuationSession({
-              callerId: interaction.user.id,
-              targetName: name,
-              isHidden: false,
-              meta: visMeta,
-              guildMembers: visGuildMembers,
-              altResult,
-              cap: deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit,
-              // primaryEmbedJSON is captured after editReply below. Store the
-              // working embed snapshot here so Continue can re-render the same
-              // card without re-scraping the visible roster page.
-              primaryEmbedJSON: embed.toJSON(),
-            });
-            const buttonRow = buildScanResultButtons({
-              kind: 'roster',
-              sessionId: session.sessionId,
-              hasAlts: (altResult.alts || []).length > 0,
-              hasRemaining: true,
-              lang,
-            });
-            if (buttonRow) deepScanComponents.push(buttonRow);
-          }
-        } else if (altResult) {
-          // No guild context (visible roster but no guild on Bible). Render
-          // the available scan result without a Continue button because no
-          // guild-member list exists for a resumed pass.
-          const { embed: scanEmbed } = buildScanResultEmbed({
-            target: { name, isHidden: false, guildName: visMeta?.guildName, profileUrl: rosterUrl(name) },
-            result: altResult,
-            kind: 'roster-visible',
-            summaryLine: t('dialogue.enrich.noGuild.description', lang, { name }),
-            lang,
-          });
-          deepScanResultEmbed = scanEmbed;
-        }
+        // A visible scan without guild members can render but cannot resume.
+        const rendered = buildRosterDeepScanResult({
+          callerId: interaction.user.id,
+          name,
+          isHidden: false,
+          meta: visMeta,
+          guildMembers: visGuildMembers,
+          altResult,
+          cap: deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit,
+          primaryEmbed: embed,
+          canContinue: Boolean(hasGuildContext),
+          lang,
+        });
+        deepScanResultEmbed = rendered.embed;
+        deepScanComponents.push(...rendered.components);
       } catch (err) {
         deepScanResultEmbed = createArtistEmbed(lang)
           .setTitle(`❌ ${t('dialogue.scan.failed.title', lang, { name })}`)

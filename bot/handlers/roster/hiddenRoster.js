@@ -32,15 +32,11 @@ import {
   fetchNameSuggestions,
   formatSuggestionLines,
 } from '../../services/roster/index.js';
-import {
-  buildScanResultEmbed,
-  buildScanResultButtons,
-} from '../../utils/scanResultEmbed.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
-import { createRosterContinuationSession } from '../../utils/rosterDeepSession.js';
-import { rosterUrl, profileUrl as bibleProfileUrl } from '../../utils/rosterLink.js';
+import { profileUrl as bibleProfileUrl } from '../../utils/rosterLink.js';
 import { createRosterScanRuntime, formatDeepScanStats } from './progress.js';
 import { resolveRosterScanOutcome } from './completion.js';
+import { buildRosterDeepScanResult } from './deepResult.js';
 
 async function loadGuildListHits(guildMembers, guildId) {
   const memberNames = guildMembers.map((member) => member.name);
@@ -232,35 +228,19 @@ function buildHiddenReply({ interaction, name, meta, guildMembers, deepOptions, 
   }
   if (!altResult) return { embeds, components };
 
-  const { embed: scanEmbed, state } = buildScanResultEmbed({
-    target: { name, isHidden: true, guildName: meta.guildName, profileUrl: rosterUrl(name) },
-    result: altResult,
-    kind: 'roster-hidden',
-    summaryLine: t('dialogue.enrich.summary', lang, { guild: meta.guildName, name, resumed: '' }),
-    lang,
-  });
-  embeds.push(scanEmbed);
-  if (!state.hasRemaining) return { embeds, components };
-
-  const session = createRosterContinuationSession({
+  const result = buildRosterDeepScanResult({
     callerId: interaction.user.id,
-    targetName: name,
+    name,
     isHidden: true,
     meta,
     guildMembers,
     altResult,
     cap: deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit,
-    primaryEmbedJSON: primaryEmbed.toJSON(),
-  });
-  const buttonRow = buildScanResultButtons({
-    kind: 'roster',
-    sessionId: session.sessionId,
-    hasAlts: (altResult.alts || []).length > 0,
-    hasRemaining: true,
+    primaryEmbed,
     lang,
   });
-  if (buttonRow) components.push(buttonRow);
-  return { embeds, components };
+  embeds.push(result.embed);
+  return { embeds, components: result.components };
 }
 
 function notifyHiddenScanCompletion({ interaction, replyEditor, name, meta, altResult, lang }) {

@@ -36,10 +36,6 @@ const sessionStore = createExpiringSessionStore({ ttlMs: SESSION_TTL_MS });
  * @property {NodeJS.Timeout} expireTimer
  */
 
-function createRosterDeepSession(payload) {
-  return sessionStore.create(payload);
-}
-
 export function buildRosterContinuationSessionPayload({
   callerId,
   targetName,
@@ -70,7 +66,7 @@ export function buildRosterContinuationSessionPayload({
 }
 
 export function createRosterContinuationSession(options) {
-  return createRosterDeepSession(buildRosterContinuationSessionPayload(options));
+  return sessionStore.create(buildRosterContinuationSessionPayload(options));
 }
 
 export function getRosterDeepSession(sessionId) {
