@@ -370,23 +370,6 @@ export function buildApprovalResultRow(actionLabel, lang = 'en') {
   );
 }
 
-export function buildApprovalProcessingRow(action, lang = 'en') {
-  const isApprove = action === 'listadd_approve';
-
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('listadd_processing_approve')
-      .setLabel(t(isApprove ? 'common.actions.approving' : 'common.actions.approve', lang))
-      .setStyle(ButtonStyle.Success)
-      .setDisabled(true),
-    new ButtonBuilder()
-      .setCustomId('listadd_processing_reject')
-      .setLabel(t(!isApprove ? 'common.actions.rejecting' : 'common.actions.reject', lang))
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(true)
-  );
-}
-
 /** Keep the chosen action reachable after a restart or transient failure. */
 export function buildApprovalRetryRow(action, requestId, lang = 'en') {
   return new ActionRowBuilder().addComponents(new ButtonBuilder()

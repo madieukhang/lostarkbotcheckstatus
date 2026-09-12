@@ -19,7 +19,6 @@ export async function resolvePendingApprovalAccess({
   requestId,
   approverId,
   filters = {},
-  consume = false,
 }) {
   if (!PendingApprovalModel) {
     throw new TypeError('resolvePendingApprovalAccess requires PendingApprovalModel');
@@ -30,10 +29,7 @@ export async function resolvePendingApprovalAccess({
     ...requestFilter,
     approverIds: approverId,
   };
-  const query = consume
-    ? PendingApprovalModel.findOneAndDelete(authorizedFilter)
-    : PendingApprovalModel.findOne(authorizedFilter);
-  const payload = await query.lean();
+  const payload = await PendingApprovalModel.findOne(authorizedFilter).lean();
 
   if (payload) {
     return {
@@ -55,7 +51,7 @@ export async function resolvePendingApprovalAccess({
 export async function acknowledgeAndClaimApproval({
   interaction, now = Date.now, leaseMs = APPROVAL_LEASE_MS, renewIntervalMs = 60_000, ...options
 }) {
-  const access = await resolvePendingApprovalAccess({ ...options, consume: false });
+  const access = await resolvePendingApprovalAccess(options);
   if (!access.payload) return { ...access, acknowledged: false };
   await interaction.deferUpdate();
   const { PendingApprovalModel, requestId, approverId, filters = {} } = options;
@@ -69,7 +65,7 @@ export async function acknowledgeAndClaimApproval({
     processingAction: action, processingToken: token, processingUntil: new Date(now() + leaseMs),
   } }, { new: true }).lean();
   if (!payload) {
-    const current = await resolvePendingApprovalAccess({ ...options, consume: false });
+    const current = await resolvePendingApprovalAccess(options);
     return { ...current, payload: null, acknowledged: true,
       status: current.payload ? PENDING_APPROVAL_ACCESS.processing : current.status };
   }

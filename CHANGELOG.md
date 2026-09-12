@@ -24,6 +24,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `/la-search` offers report details for blacklist, watchlist and whitelist hits without requiring an image. Details reuse the check card, reload the current entry with blacklist scope checks, and preserve the recorded primary character when the searched name is an alt.
 
 ### Changed
+- Single, overwrite, and bulk approvals now share their access and lease lifecycle. Removed the obsolete consume-on-read path and unused processing-button builder while retaining the durable retry flow.
 - Removed the filter footer from search result cards. The existing item-level and class filters still apply.
 
 ### Added

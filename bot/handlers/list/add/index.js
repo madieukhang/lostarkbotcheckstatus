@@ -44,7 +44,6 @@ export function createAddHandlers({ client, services }) {
       executeListAddToDatabase,
     }),
     handleListAddApprovalButton: createListAddApprovalButtonHandler({
-      client,
       syncApproverDmMessages,
       executeListAddToDatabase,
       broadcastListChange,

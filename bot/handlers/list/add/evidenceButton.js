@@ -16,9 +16,9 @@ import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
 import { decorateListEntry } from '../helpers.js';
 import {
-  PENDING_APPROVAL_ACCESS,
   resolvePendingApprovalAccess,
 } from '../services/pendingApprovalAccess.js';
+import { buildApprovalAccessAlert } from '../services/approvalInteraction.js';
 
 /**
  * Build the "View evidence" button handler attached to approval DM cards.
@@ -45,16 +45,7 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     const { payload } = approvalAccess;
 
     if (!payload) {
-      const notAuthorized =
-        approvalAccess.status === PENDING_APPROVAL_ACCESS.notAuthorized;
-      await editAlert(interaction, {
-        severity: notAuthorized ? AlertSeverity.ERROR : AlertSeverity.WARNING,
-        ...t(
-          `dialogue.approval.flow.${notAuthorized ? 'evidenceNotAuthorized' : 'expired'}`,
-          lang
-        ),
-        lang,
-      });
+      await editAlert(interaction, buildApprovalAccessAlert(approvalAccess.status, lang, { evidence: true }));
       return;
     }
 

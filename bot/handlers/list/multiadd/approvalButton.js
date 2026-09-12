@@ -1,25 +1,16 @@
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
-import { connectDB } from '../../../db.js';
-import PendingApproval from '../../../models/PendingApproval.js';
 import GuildConfig from '../../../models/GuildConfig.js';
-import UserPreference from '../../../models/UserPreference.js';
 import { COLORS } from '../../../utils/ui.js';
 import { AlertSeverity, buildNoticeEmbed } from '../../../utils/alertEmbed.js';
 import {
   editPayload,
-  replyAlert,
-  followUpAlert,
   editEmbed,
   editNotice,
 } from '../../../utils/interactionReplies.js';
-import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
+import { getGuildLanguage, t } from '../../../services/i18n/index.js';
 import { buildApprovalRetryRow } from '../helpers.js';
-import {
-  PENDING_APPROVAL_ACCESS,
-  acknowledgeAndClaimApproval,
-  runClaimedApproval,
-} from '../services/pendingApprovalAccess.js';
+import { createApprovalDecisionHandler, handleApprovalClaimError } from '../services/approvalInteraction.js';
 
 export async function notifyMultiaddRequester({
   client,
@@ -85,156 +76,124 @@ export function createMultiaddApprovalButtonHandler(deps) {
     buildBulkSummaryEmbed,
   } = deps;
 
-  return async function handleMultiaddApprovalButton(interaction) {
-    const [prefix, requestId] = interaction.customId.split(':');
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-    await connectDB();
+  return createApprovalDecisionHandler(async ({ interaction, action: prefix, requestId, lang, payload, claim }) => {
+    try {
+      const meta = {
+        guildId: payload.guildId,
+        channelId: payload.channelId,
+        requesterId: payload.requestedByUserId,
+        requesterTag: payload.requestedByTag,
+        requesterName: payload.requestedByName,
+        requesterDisplayName: payload.requestedByDisplayName,
+      };
 
-    const approvalAccess = await acknowledgeAndClaimApproval({
-      interaction,
-      PendingApprovalModel: PendingApproval,
-      requestId,
-      approverId: interaction.user.id,
-      filters: { action: 'bulk' },
-    });
-    const { payload, claim } = approvalAccess;
-
-    if (!payload) {
-      const notAuthorized = approvalAccess.status === PENDING_APPROVAL_ACCESS.notAuthorized;
-      await (approvalAccess.acknowledged ? followUpAlert : replyAlert)(interaction, {
-        severity: notAuthorized ? AlertSeverity.ERROR : AlertSeverity.WARNING,
-        ...t(`dialogue.approval.flow.${approvalAccess.status === PENDING_APPROVAL_ACCESS.processing ? 'processing' : notAuthorized ? 'notAuthorized' : 'expired'}`, lang),
-        lang,
-      });
-      return;
-    }
-
-    return runClaimedApproval(claim, async () => {
-      try {
-        const meta = {
-          guildId: payload.guildId,
-          channelId: payload.channelId,
-          requesterId: payload.requestedByUserId,
-          requesterTag: payload.requestedByTag,
-          requesterName: payload.requestedByName,
-          requesterDisplayName: payload.requestedByDisplayName,
-        };
-
-        if (prefix === 'multiaddapprove_reject') {
-          await claim.complete();
-          // Count per-list-type so the reject card carries the same
-          // breakdown shape the approval card does. Gives the requester
-          // (and any other approver scrolling DMs) one-glance context for
-          // what was thrown out.
-          const breakdown = buildRejectBreakdown(payload.bulkRows);
-
-          const buildRejectEmbed = (targetLang) => createArtistEmbed(targetLang)
-            .setTitle(`✖️ ${t('dialogue.multiadd.approval.rejectedTitle', targetLang, { count: payload.bulkRows.length })}`)
-            .setDescription(t('dialogue.multiadd.approval.rejectedDescription', targetLang, { user: interaction.user.id }))
-            .setColor(COLORS.danger)
-            .addFields(
-              { name: `👤 ${t('dialogue.approval.fields.requestedBy', targetLang)}`, value: `${payload.requestedByDisplayName || payload.requestedByTag || t('dialogue.common.unknown', targetLang)} (<@${payload.requestedByUserId}>)`, inline: false },
-              { name: `📊 ${t('dialogue.multiadd.approval.rowsDiscarded', targetLang)}`, value: breakdown.length > 0 ? breakdown.join(' · ') : `**${payload.bulkRows.length}**`, inline: true },
-              { name: `🆔 ${t('dialogue.approval.fields.requestId', targetLang)}`, value: `\`${payload.requestId.slice(0, 8)}\``, inline: true },
-            )
-            .setFooter({ text: `🛡️ ${t('dialogue.multiadd.approval.rejectedFooter', targetLang)}` })
-            .setTimestamp();
-          const rejectEmbed = buildRejectEmbed(lang);
-
-          await editEmbed(interaction, rejectEmbed, {
-            components: [],
-          }).catch(() => {});
-
-          await syncApproverDmMessages(
-            payload,
-            (targetLang) => ({ embeds: [buildRejectEmbed(targetLang)], components: [] }),
-            { excludeMessageId: interaction.message?.id || '' }
-          ).catch((err) => console.warn('[multiadd] DM sync failed:', err.message));
-
-          await notifyMultiaddRequester({
-            client,
-            payload,
-            copyKey: 'dialogue.multiadd.approval.publicRejected',
-            copyValues: { count: payload.bulkRows.length },
-            severity: AlertSeverity.ERROR,
-            failureLabel: '[multiadd] Failed to notify requester of rejection:',
-          });
-          return;
-        }
-
-        if (prefix !== 'multiaddapprove_approve') return;
-
-        await editNotice(interaction, t('dialogue.multiadd.approval.processing', lang, {
-          count: payload.bulkRows.length,
-        }), {
-          severity: AlertSeverity.INFO,
-          titleIcon: '⏳',
-          lang,
-          components: [buildApprovalRetryRow(prefix, requestId, lang)],
-        }).catch(() => {});
-
-        const rows = payload.bulkRows.map((row) => ({
-          name: row.name,
-          type: row.type,
-          reason: row.reason,
-          raid: row.raid || '',
-          logs: row.logsUrl || '',
-          image: row.imageUrl || '',
-          imageMessageId: row.imageMessageId || '',
-          imageChannelId: row.imageChannelId || '',
-          scope: row.scope || '',
-          rowNum: 0,
-        }));
-
-        const results = await executeBulkMultiadd(rows, meta, null, { beforeWrite: () => claim.assertOwned() });
+      if (prefix === 'multiaddapprove_reject') {
         await claim.complete();
+        // Count per-list-type so the reject card carries the same
+        // breakdown shape the approval card does. Gives the requester
+        // (and any other approver scrolling DMs) one-glance context for
+        // what was thrown out.
+        const breakdown = buildRejectBreakdown(payload.bulkRows);
 
-        broadcastBulkAdd(results.added, {
-          guildId: payload.guildId,
-          requestedByDisplayName: payload.requestedByDisplayName,
-        }).catch((err) => console.warn('[multiadd] Bulk broadcast failed:', err.message));
+        const buildRejectEmbed = (targetLang) => createArtistEmbed(targetLang)
+          .setTitle(`✖️ ${t('dialogue.multiadd.approval.rejectedTitle', targetLang, { count: payload.bulkRows.length })}`)
+          .setDescription(t('dialogue.multiadd.approval.rejectedDescription', targetLang, { user: interaction.user.id }))
+          .setColor(COLORS.danger)
+          .addFields(
+            { name: `👤 ${t('dialogue.approval.fields.requestedBy', targetLang)}`, value: `${payload.requestedByDisplayName || payload.requestedByTag || t('dialogue.common.unknown', targetLang)} (<@${payload.requestedByUserId}>)`, inline: false },
+            { name: `📊 ${t('dialogue.multiadd.approval.rowsDiscarded', targetLang)}`, value: breakdown.length > 0 ? breakdown.join(' · ') : `**${payload.bulkRows.length}**`, inline: true },
+            { name: `🆔 ${t('dialogue.approval.fields.requestId', targetLang)}`, value: `\`${payload.requestId.slice(0, 8)}\``, inline: true },
+          )
+          .setFooter({ text: `🛡️ ${t('dialogue.multiadd.approval.rejectedFooter', targetLang)}` })
+          .setTimestamp();
+        const rejectEmbed = buildRejectEmbed(lang);
 
-        const buildApprovedSummary = (targetLang) => {
-          const embed = buildBulkSummaryEmbed(results, meta, targetLang);
-          embed.addFields({ name: `👤 ${t('dialogue.multiadd.approval.approvedBy', targetLang)}`, value: `<@${interaction.user.id}>`, inline: false });
-          return embed;
-        };
-        const summaryEmbed = buildApprovedSummary(lang);
-
-        await editPayload(interaction, {
-          content: null,
-          embeds: [summaryEmbed],
+        await editEmbed(interaction, rejectEmbed, {
           components: [],
         }).catch(() => {});
 
         await syncApproverDmMessages(
           payload,
-          (targetLang) => ({ embeds: [buildApprovedSummary(targetLang)], components: [] }),
+          (targetLang) => ({ embeds: [buildRejectEmbed(targetLang)], components: [] }),
           { excludeMessageId: interaction.message?.id || '' }
         ).catch((err) => console.warn('[multiadd] DM sync failed:', err.message));
 
         await notifyMultiaddRequester({
           client,
           payload,
-          copyKey: 'dialogue.multiadd.approval.publicApproved',
-          severity: AlertSeverity.SUCCESS,
-          buildExtraEmbeds: (guildLang) => [buildApprovedSummary(guildLang)],
-          failureLabel: '[multiadd] Failed to notify requester of approval:',
+          copyKey: 'dialogue.multiadd.approval.publicRejected',
+          copyValues: { count: payload.bulkRows.length },
+          severity: AlertSeverity.ERROR,
+          failureLabel: '[multiadd] Failed to notify requester of rejection:',
         });
-      } catch (err) {
-        if (claim.completed) {
-          console.warn('[approval] Bulk decision completed but its final notification failed:', err.message);
-          return;
-        }
-        if (claim.lost) {
-          await followUpAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.processing', lang), lang });
-          return;
-        }
-        await editNotice(interaction, t('dialogue.approval.flow.retryFailed.description', lang), {
-          severity: AlertSeverity.WARNING, lang,
-          components: [buildApprovalRetryRow(prefix, requestId, lang)],
-        });
+        return;
       }
-    });
-  };
+
+      if (prefix !== 'multiaddapprove_approve') return;
+
+      await editNotice(interaction, t('dialogue.multiadd.approval.processing', lang, {
+        count: payload.bulkRows.length,
+      }), {
+        severity: AlertSeverity.INFO,
+        titleIcon: '⏳',
+        lang,
+        components: [buildApprovalRetryRow(prefix, requestId, lang)],
+      }).catch(() => {});
+
+      const rows = payload.bulkRows.map((row) => ({
+        name: row.name,
+        type: row.type,
+        reason: row.reason,
+        raid: row.raid || '',
+        logs: row.logsUrl || '',
+        image: row.imageUrl || '',
+        imageMessageId: row.imageMessageId || '',
+        imageChannelId: row.imageChannelId || '',
+        scope: row.scope || '',
+        rowNum: 0,
+      }));
+
+      const results = await executeBulkMultiadd(rows, meta, null, { beforeWrite: () => claim.assertOwned() });
+      await claim.complete();
+
+      broadcastBulkAdd(results.added, {
+        guildId: payload.guildId,
+        requestedByDisplayName: payload.requestedByDisplayName,
+      }).catch((err) => console.warn('[multiadd] Bulk broadcast failed:', err.message));
+
+      const buildApprovedSummary = (targetLang) => {
+        const embed = buildBulkSummaryEmbed(results, meta, targetLang);
+        embed.addFields({ name: `👤 ${t('dialogue.multiadd.approval.approvedBy', targetLang)}`, value: `<@${interaction.user.id}>`, inline: false });
+        return embed;
+      };
+      const summaryEmbed = buildApprovedSummary(lang);
+
+      await editPayload(interaction, {
+        content: null,
+        embeds: [summaryEmbed],
+        components: [],
+      }).catch(() => {});
+
+      await syncApproverDmMessages(
+        payload,
+        (targetLang) => ({ embeds: [buildApprovedSummary(targetLang)], components: [] }),
+        { excludeMessageId: interaction.message?.id || '' }
+      ).catch((err) => console.warn('[multiadd] DM sync failed:', err.message));
+
+      await notifyMultiaddRequester({
+        client,
+        payload,
+        copyKey: 'dialogue.multiadd.approval.publicApproved',
+        severity: AlertSeverity.SUCCESS,
+        buildExtraEmbeds: (guildLang) => [buildApprovedSummary(guildLang)],
+        failureLabel: '[multiadd] Failed to notify requester of approval:',
+      });
+    } catch (err) {
+      if (await handleApprovalClaimError({ claim, interaction, error: err, lang, label: 'Bulk decision' })) return;
+      await editNotice(interaction, t('dialogue.approval.flow.retryFailed.description', lang), {
+        severity: AlertSeverity.WARNING, lang,
+        components: [buildApprovalRetryRow(prefix, requestId, lang)],
+      });
+    }
+  }, { filters: { action: 'bulk' } });
 }

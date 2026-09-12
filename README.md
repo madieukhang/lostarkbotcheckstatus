@@ -232,6 +232,10 @@ Five compose principles:
 4. **Utilities stay pure where possible.** Cross-feature formatting/session helpers live under `utils/`; OCR/name cleanup is centralized in `utils/names.js` so slash check, auto-check, and list edits normalize the same way.
 5. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` export `create*({ client, ... })` factories. `app/interaction-router.js` builds those closures once and routes slash commands, buttons, modals, selects, and autocomplete through them.
 
+Single, overwrite, and bulk approval buttons share authentication, acknowledgement,
+and lease cleanup in `handlers/list/services/approvalInteraction.js`. Their decision
+handlers retain the operation-specific writes, retry cards, and notifications.
+
 For maintenance, start with [AGENTS.md](AGENTS.md) and the
 [repository guide](.agent/README.md). Keep development tools in `scripts/` and
 temporary agent notes in `.agent/local/` (gitignored). Docker excludes these
