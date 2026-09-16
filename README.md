@@ -168,8 +168,6 @@ Sample blacklist document:
 LostArk_LoaLogs/
 |-- bot.js                         # Minimal Discord client entrypoint
 |-- loa-worker.js                  # Bible worker process entrypoint
-|-- AGENTS.md                      # Repository instructions for coding agents
-|-- .agent/                        # Repository map + verification workflow
 |
 |-- bot/
 |   |-- app/                       # Startup, slash registration, interaction router
@@ -236,9 +234,8 @@ Single, overwrite, and bulk approval buttons share authentication, acknowledgeme
 and lease cleanup in `handlers/list/services/approvalInteraction.js`. Their decision
 handlers retain the operation-specific writes, retry cards, and notifications.
 
-For maintenance, start with [AGENTS.md](AGENTS.md) and the
-[repository guide](.agent/README.md). Keep development tools in `scripts/` and
-temporary agent notes in `.agent/local/` (gitignored). Docker excludes these
+For maintenance, see `.claude/repository-map.md` and `.claude/verification.md`
+(local, gitignored). Keep development tools in `scripts/`. Docker excludes these
 development files while keeping the bot, worker, and runtime assets.
 
 Interaction flow:
