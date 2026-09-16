@@ -439,6 +439,7 @@ export default {
     deliveryFailed: { title: 'I could not pass that on', fallback: 'The approval request did not reach anyone. Try again in a moment.' },
     sent: { title: 'Sent it off for approval', description: '**{name}** is queued for the **{list}** - just waiting on someone to approve it.' },
     failed: { title: 'That quick add did not go through', description: 'Something went wrong while I was filing that one. Give it another try.' },
+    invalidType: { title: 'That is not a list type', description: 'I read `{type}`. Quick add takes `black`, `white` or `watch`.' },
   },
   remove: {
     notFound: { title: 'Nothing to remove', description: '**{name}** is not in any visible list.', footer: 'Use `/la-list view` to browse existing entries.' },

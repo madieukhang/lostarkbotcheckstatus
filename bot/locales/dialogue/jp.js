@@ -291,7 +291,7 @@ export default {
     publicRestricted: { title: 'Public evidence は制限されていますの', description: 'Evidence を public 投稿できるのは officer / senior だけなので、この view は private にしましたわ。' }, failed: { title: 'Evidence 検索に失敗しましたの', description: 'Evidence record を読み込めませんでしたわ。' },
   },
   quickAdd: {
-    deliveryFailed: { title: 'そちらをお渡しできませんでしたの', fallback: '承認のお願いがどなたにも届きませんでしたわ。少し経ってからもう一度お試しくださいませ。' }, sent: { title: '承認へ送っておきましたわ', description: '**{name}** を **{list}** へ、とお伝えしてありますの。あとはどなたかが頷いてくださるのを待つだけですわ〜' }, failed: { title: 'その quick add は通りませんでしたの', description: 'お預かりして書き留めている途中で、どこかに引っかかってしまいましたの。もう一度お試しくださいませ。' },
+    deliveryFailed: { title: 'そちらをお渡しできませんでしたの', fallback: '承認のお願いがどなたにも届きませんでしたわ。少し経ってからもう一度お試しくださいませ。' }, sent: { title: '承認へ送っておきましたわ', description: '**{name}** を **{list}** へ、とお伝えしてありますの。あとはどなたかが頷いてくださるのを待つだけですわ〜' }, failed: { title: 'その quick add は通りませんでしたの', description: 'お預かりして書き留めている途中で、どこかに引っかかってしまいましたの。もう一度お試しくださいませ。' }, invalidType: { title: 'それは list の種類ではありませんの', description: '`{type}` と読めましたわ。quick add は `black`、`white`、`watch` のどれかでお願いしますの。' },
   },
   remove: {
     notFound: { title: '削除するものがありませんの', description: '**{name}** は表示可能な list にいませんわ。', footer: '`/la-list view` で既存 entry を確認できますの。' }, titles: { blocked: '削除できません · {name}', one: '{list} から削除 · {name}', many: '{count} lists から削除 · {name}', mixed: 'Mixed result · {name}' },

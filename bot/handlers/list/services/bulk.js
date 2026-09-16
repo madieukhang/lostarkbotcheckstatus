@@ -106,7 +106,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
       return;
     }
     const firstLine = (result.content || 'unknown error').split('\n')[0];
-    const reason = firstLine.replace(/\*\*/g, '').replace(/[⚠️❌🛡️⛔✅]/g, '').trim();
+    const reason = firstLine.replace(/\*\*/g, '').replace(/[⚠️❌🛡️⛔✅]/gu, '').trim();
     results.skipped.push({ name: row.name, reason: reason.slice(0, 80) });
   }
 

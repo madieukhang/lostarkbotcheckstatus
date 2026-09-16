@@ -83,16 +83,22 @@ export function createQuickAddHandlers({ services }) {
 
   async function handleQuickAddModal(interaction) {
     const name = interaction.customId.split(':')[1];
-    let type = interaction.fields.getTextInputValue('quickadd_type').trim().toLowerCase();
+    const type = interaction.fields.getTextInputValue('quickadd_type').trim().toLowerCase();
     const reason = interaction.fields.getTextInputValue('quickadd_reason').trim();
     const raid = interaction.fields.getTextInputValue('quickadd_raid')?.trim() || '';
-
-    // Validate type
-    if (!['black', 'white', 'watch'].includes(type)) type = 'black';
 
     await deferEphemeralReply(interaction);
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+
+    if (!['black', 'white', 'watch'].includes(type)) {
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.quickAdd.invalidType', lang, { type }),
+        lang,
+      });
+      return;
+    }
 
     if (!reason) {
       await editAlert(interaction, {

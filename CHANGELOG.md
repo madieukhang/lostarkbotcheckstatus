@@ -13,6 +13,8 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Fixed
+- Quick Add rejects a typed list type other than `black`, `white` or `watch` with an error. Unknown values used to fall back to blacklist, so a typo such as `watchlist` filed the name for the blacklist.
+- Bulk-add skip reasons strip status icons without splitting other emoji. No current skip message contains emoji, so this closes a latent defect rather than a visible one.
 - Concurrent MongoDB callers share one connection attempt, and reconnects no longer accumulate event listeners.
 - Continue-scan claims its session before Discord acknowledgement, preventing duplicate passes even for officers with parallel-scan access. Failed setup releases the session for retry.
 - Approval requests now remain stored while a renewable lease protects the chosen decision. Interrupted or transiently failed work can be retried from the same button; stale attempts cannot finalize a newer attempt or reverse a decision that may already have written data.

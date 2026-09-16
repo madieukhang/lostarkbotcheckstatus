@@ -316,7 +316,7 @@ export default {
     publicRestricted: { title: 'Evidence public được giới hạn', description: 'Chỉ officer và senior mới đăng evidence công khai được, nên tớ giữ view này ở chế độ riêng.' }, failed: { title: 'Tra evidence thất bại', description: 'Tớ chưa tải được record evidence.' },
   },
   quickAdd: {
-    deliveryFailed: { title: 'Tớ chưa chuyển đi được', fallback: 'Yêu cầu duyệt chưa tới được tay ai cả. Lát nữa cậu thử lại nhé.' }, sent: { title: 'Tớ gửi đi duyệt rồi', description: '**{name}** đang xếp hàng vào **{list}**, chỉ chờ có người duyệt nữa thôi.' }, failed: { title: 'Lượt quick add đó chưa trót lọt', description: 'Đang ghi lại giúp cậu thì có gì đó trục trặc. Cậu thử lại lần nữa nhé.' },
+    deliveryFailed: { title: 'Tớ chưa chuyển đi được', fallback: 'Yêu cầu duyệt chưa tới được tay ai cả. Lát nữa cậu thử lại nhé.' }, sent: { title: 'Tớ gửi đi duyệt rồi', description: '**{name}** đang xếp hàng vào **{list}**, chỉ chờ có người duyệt nữa thôi.' }, failed: { title: 'Lượt quick add đó chưa trót lọt', description: 'Đang ghi lại giúp cậu thì có gì đó trục trặc. Cậu thử lại lần nữa nhé.' }, invalidType: { title: 'Đó không phải loại list', description: 'Tớ đọc được `{type}`. Quick add chỉ nhận `black`, `white` hoặc `watch` thôi.' },
   },
   remove: {
     notFound: { title: 'Không có gì để xóa', description: '**{name}** không nằm trong list nào cậu nhìn thấy.', footer: 'Dùng `/la-list view` để xem các entry hiện có nhé.' }, titles: { blocked: 'Không thể xóa · {name}', one: 'Đã xóa khỏi {list} · {name}', many: 'Đã xóa khỏi {count} list · {name}', mixed: 'Kết quả hỗn hợp · {name}' },
