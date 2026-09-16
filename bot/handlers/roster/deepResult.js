@@ -7,6 +7,21 @@ import { buildScanResultEmbed, buildScanResultButtons } from '../../utils/scanRe
  * Render a roster deep-scan result and register its Continue session if allowed.
  * Callers retain their guild-context gate; the primary card snapshot and scan
  * totals must come from the same pass so Continue can resume without scraping.
+ * @param {object} args
+ * @param {string} args.callerId - original requester's Discord id, bound into
+ *   the Continue session.
+ * @param {string} args.name - queried character name.
+ * @param {boolean} args.isHidden - hidden-roster variant of the result card.
+ * @param {object|null} args.meta - scan target metadata (guildName, ...).
+ * @param {Array|null} args.guildMembers - guild member snapshot captured in
+ *   the same scan pass; the Continue resume needs it.
+ * @param {object|null} args.altResult - deep-scan outcome (alts, remaining state).
+ * @param {number} args.cap - candidate cap used by this scan pass.
+ * @param {import('discord.js').EmbedBuilder} args.primaryEmbed - base card the
+ *   caller already built; snapshotted to JSON for the session.
+ * @param {boolean} [args.canContinue=true] - render without registering a
+ *   Continue session when false (e.g. the caller lacks guild context).
+ * @param {string} args.lang - locale for UI strings.
  * @returns {{embed: import('discord.js').EmbedBuilder|null, components: Array}}
  */
 export function buildRosterDeepScanResult({

@@ -47,7 +47,22 @@ export async function resolvePendingApprovalAccess({
   };
 }
 
-/** Acknowledge first, then claim a durable, renewable lease for one chosen decision. */
+/**
+ * Acknowledge the component interaction first, then atomically claim a
+ * durable, renewable lease for one chosen decision. The lease token lives on
+ * the PendingApproval document; all further writes must go through the
+ * returned claim (assertOwned/complete/release) so an approval interrupted
+ * after some writes is recognized instead of re-applied.
+ * @param {object} options - resolvePendingApprovalAccess options
+ *   (PendingApprovalModel, requestId, approverId, filters) plus:
+ * @param {object} options.interaction - button interaction to defer-update.
+ * @param {Function} [options.now=Date.now] - test clock.
+ * @param {number} [options.leaseMs=APPROVAL_LEASE_MS] - lease duration per renewal.
+ * @param {number} [options.renewIntervalMs=60000] - auto-renew cadence; 0 disables.
+ * @returns {Promise<object>} `{status, payload, acknowledged}` plus `claim`
+ *   (assertOwned/complete/release) when payload is non-null; without payload,
+ *   status says why (not authorized, expired or already processing).
+ */
 export async function acknowledgeAndClaimApproval({
   interaction, now = Date.now, leaseMs = APPROVAL_LEASE_MS, renewIntervalMs = 60_000, ...options
 }) {

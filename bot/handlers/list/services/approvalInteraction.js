@@ -6,7 +6,17 @@ import { followUpAlert, replyAlert } from '../../../utils/interactionReplies.js'
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { PENDING_APPROVAL_ACCESS, acknowledgeAndClaimApproval, runClaimedApproval } from './pendingApprovalAccess.js';
 
-/** Build the same access notice for decision buttons and the read-only evidence button. */
+/**
+ * Build the same access notice for decision buttons and the read-only
+ * evidence button.
+ * @param {string} status - a PENDING_APPROVAL_ACCESS value; denial becomes an
+ *   error alert, expiry/processing a warning.
+ * @param {string} lang - locale for the message lookup.
+ * @param {object} [options]
+ * @param {boolean} [options.evidence=false] - use the evidence-specific
+ *   denial copy for unauthorized clicks.
+ * @returns {{severity: AlertSeverity, title: string, description: string, lang: string}}
+ */
 export function buildApprovalAccessAlert(status, lang, { evidence = false } = {}) {
   const denied = status === PENDING_APPROVAL_ACCESS.notAuthorized;
   const key = denied ? (evidence ? 'evidenceNotAuthorized' : 'notAuthorized')
@@ -14,7 +24,18 @@ export function buildApprovalAccessAlert(status, lang, { evidence = false } = {}
   return { severity: denied ? AlertSeverity.ERROR : AlertSeverity.WARNING, ...t(`dialogue.approval.flow.${key}`, lang), lang };
 }
 
-/** Own authentication, acknowledgement and lease cleanup for all approval decision buttons. */
+/**
+ * Own authentication, acknowledgement and lease cleanup for all approval
+ * decision buttons.
+ * @param {Function} handleDecision - invoked with `{interaction, action,
+ *   requestId, lang, payload, claim}` once the lease is held; its return
+ *   value passes through to the caller.
+ * @param {object} [options]
+ * @param {object} [options.filters] - extra request filter (e.g.
+ *   `{ action: 'bulk' }`) applied to both the request lookup and the lease
+ *   claim.
+ * @returns {Function} async handler for `action:requestId` custom-id buttons.
+ */
 export function createApprovalDecisionHandler(handleDecision, { filters = {} } = {}) {
   return async function handleApprovalDecision(interaction) {
     const [action, requestId] = interaction.customId.split(':');
