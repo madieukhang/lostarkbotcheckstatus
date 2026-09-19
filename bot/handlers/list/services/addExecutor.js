@@ -26,10 +26,10 @@ import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.j
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
+import { ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
-import { rosterUrl, logsUrl } from '../../../utils/rosterLink.js';
+import { rosterUrl } from '../../../utils/rosterLink.js';
 import {
   formatRosterStatBadges,
   formatLinkedCharacter,
@@ -348,21 +348,10 @@ function resolveSuccessScopeTag(payload, entryScope, lang) {
   return ` \`[${t(`dialogue.approval.scopeTag.${scopeKey}`, lang)}]\``;
 }
 
-function buildSuccessLinkParts(entryName, payload, lang) {
-  const links = [
-    `[${t('dialogue.listAdd.success.roster', lang)}](${rosterUrl(entryName)})`,
-    `[${t('dialogue.listAdd.success.logs', lang)}](${logsUrl(entryName)})`,
-  ];
-  if (payload.logsUrl) {
-    links.push(`[${t('dialogue.listAdd.success.evidenceLogs', lang)}](${payload.logsUrl})`);
-  }
-  return links;
-}
-
 /**
  * Build the field grid for the `/la-list add` success card: the inline
  * run (list, raid, scope, server, item level, CP) padded to whole rows, then the
- * full-width reason, roster list and links.
+ * full-width reason and roster list.
  * @param {object} options
  * @param {object} options.payload - the add request (raid, reason, type)
  * @param {object} options.entry - the saved list entry
@@ -370,7 +359,6 @@ function buildSuccessLinkParts(entryName, payload, lang) {
  * @param {string} options.icon - list-status icon shown beside the label
  * @param {string} options.labelCap - capitalized list name
  * @param {object} [options.rostersField] - prebuilt roster-list field
- * @param {string[]} options.linkParts - rendered links, joined with a dot
  * @param {string} options.lang - locale for every label
  * @param {Map<string, object>} [options.statMap] - roster snapshots, used
  *   to resolve the server across the roster
@@ -383,7 +371,6 @@ export function buildListAddSuccessFields({
   icon,
   labelCap,
   rostersField,
-  linkParts,
   lang,
   statMap,
 }) {
@@ -435,11 +422,6 @@ export function buildListAddSuccessFields({
     inline: false,
   });
   if (rostersField) fields.push(rostersField);
-  fields.push({
-    name: `🔗 ${t('dialogue.listAdd.success.fields.links', lang)}`,
-    value: linkParts.join(' · '),
-    inline: false,
-  });
   return fields;
 }
 
@@ -480,7 +462,6 @@ function buildListAddSuccessEmbed({
     icon,
     labelCap,
     rostersField,
-    linkParts: buildSuccessLinkParts(entry.name, payload, lang),
     lang,
     statMap: rosterStatMap,
   });
@@ -556,11 +537,11 @@ async function buildSuccessfulAddResult({
   });
   const freshDisplayUrl = await resolveDisplayImageUrl(entry, client);
   if (freshDisplayUrl) {
-    // Heading for the embedded image, same as the other cards that show
-    // one · it otherwise butts straight against the last field.
+    // Heading and download link for the embedded image. The link is the
+    // same freshly signed CDN URL as the image, not a permanent one.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: BLANK_FIELD_VALUE,
+      value: t('dialogue.listAdd.success.evidence', lang, { url: freshDisplayUrl }),
       inline: false,
     });
     embed.setImage(freshDisplayUrl);

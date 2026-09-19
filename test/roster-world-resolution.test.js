@@ -156,7 +156,6 @@ test('the la-list add success card restores Server, item level, and CP on whole 
     entryScope: { scope: 'global' },
     icon: '⛔',
     labelCap: 'Blacklist',
-    linkParts: ['[Roster](https://x.test)'],
     lang: 'vi',
     statMap,
   });
@@ -171,6 +170,7 @@ test('the la-list add success card restores Server, item level, and CP on whole 
   assert.equal(inlineNames.filter((name) => name !== ZWSP).length, 6);
   assert.equal(inlineNames.length % 3, 0);
   assert.equal(inlineNames.includes(ZWSP), false);
+  assert.equal(fields.some((field) => field.name.startsWith('🔗')), false);
 });
 
 test('a non-blacklist add pads a partial stat row and omits unavailable CP', () => {
@@ -185,7 +185,6 @@ test('a non-blacklist add pads a partial stat row and omits unavailable CP', () 
     entryScope: { scope: 'server' },
     icon: '✅',
     labelCap: 'Whitelist',
-    linkParts: ['[Roster](https://x.test)'],
     lang: 'vi',
     statMap,
   });
@@ -205,7 +204,6 @@ test('the la-list add success card skips item level and CP when the primary snap
     entryScope: { scope: 'global' },
     icon: '⛔',
     labelCap: 'Blacklist',
-    linkParts: ['[Roster](https://x.test)'],
     lang: 'vi',
     statMap: new Map(),
   });

@@ -407,8 +407,8 @@ export default {
     },
     success: {
       title: '{list} · Added · {name}', hero: '**{user}** added {name} to **{list}**{scope}.',
-      fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Reason', links: 'Links', trackedRosters: 'Tracked rosters' },
-      onlyCharacter: 'Only this character is tracked on this entry.', roster: 'Roster', logs: 'Logs', evidenceLogs: 'Evidence logs',
+      fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Reason', trackedRosters: 'Tracked rosters' },
+      onlyCharacter: 'Only this character is tracked on this entry.', evidence: 'Screenshot attached below · [Download original]({url})',
       sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: 'Added by {user} · {source}', officerFallback: 'an officer',
       content: 'Add approved: **{name}** was added to {list}.',
     },

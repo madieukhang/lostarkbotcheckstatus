@@ -298,7 +298,7 @@ export default {
       title: 'Đã có trong {list}', direct: '{icon} {name} đã nằm trong **{list}** rồi. Tớ chưa thêm gì mới cả.', roster: '{icon} {name} chung roster với {matched}, và người này đã nằm trong **{list}** rồi. Tớ chưa thêm gì mới cả.', matchedName: 'Tên khớp', scope: 'Scope', addedBy: 'Được thêm bởi', timeAdded: 'Thời gian thêm', storedReason: 'Lý do đang lưu', typedReason: 'Lý do cậu vừa gõ', raid: 'Raid', footer: 'Dùng `/la-list edit` để bổ sung lý do của cậu vào entry này.', contentDirect: '{name} đã tồn tại trong {list}.', contentRoster: '{name} đã tồn tại trong {list} qua roster {matched}.',
     },
     success: {
-      title: '{list} · Đã thêm · {name}', hero: '**{user}** đã thêm {name} vào **{list}**{scope}.', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Lý do', links: 'Liên kết', trackedRosters: 'Danh sách roster' }, onlyCharacter: 'Entry này hiện chỉ track character vừa nhập.', roster: 'Roster', logs: 'Logs', evidenceLogs: 'Evidence logs', sourceVisible: 'roster hiển thị', sourceHidden: 'fallback từ roster ẩn', footer: 'Thêm bởi {user} · {source}', officerFallback: 'một officer', content: 'Đã duyệt thêm: **{name}** đã vào {list}.',
+      title: '{list} · Đã thêm · {name}', hero: '**{user}** đã thêm {name} vào **{list}**{scope}.', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Lý do', trackedRosters: 'Danh sách roster' }, onlyCharacter: 'Entry này hiện chỉ track character vừa nhập.', evidence: 'Ảnh evidence ở ngay dưới · [Tải ảnh gốc]({url})', sourceVisible: 'roster hiển thị', sourceHidden: 'fallback từ roster ẩn', footer: 'Thêm bởi {user} · {source}', officerFallback: 'một officer', content: 'Đã duyệt thêm: **{name}** đã vào {list}.',
     },
   },
   listView: {
