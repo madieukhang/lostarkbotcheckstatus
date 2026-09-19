@@ -28,6 +28,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `/la-search` offers report details for blacklist, watchlist and whitelist hits without requiring an image. Details reuse the check card, reload the current entry with blacklist scope checks, and preserve the recorded primary character when the searched name is an alt.
 
 ### Changed
+- The `/la-list remove` card drops its "Successfully removed" list line and the re-add footer. The Artist line names the removed character with its class icon and Bible link, the reason field reads **Reason** (one line per list when several are removed), and **Tracked rosters** lists the whole roster with the removed character first, as the add card does. A card that removed nothing no longer opens with a "removed" line.
 - The `/la-list add` success card drops the **Links** field (Roster, Logs, Evidence logs). Its **Evidence** heading now carries a short line with a download link to the original screenshot. Evidence logs saved on the entry still show in `/la-list view`, `/la-search` and `/la-evidence`.
 - Single, overwrite, and bulk approvals now share their access and lease lifecycle. Removed the obsolete consume-on-read path and unused processing-button builder while retaining the durable retry flow.
 - Removed the filter footer from search result cards. The existing item-level and class filters still apply.

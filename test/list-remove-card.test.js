@@ -41,23 +41,28 @@ test('a removal records who did it and when', () => {
   assert.equal(fields.some((f) => f.name === ZWSP), false);
 });
 
-test('a single removal keeps its reason whole instead of cropping it', () => {
-  const fields = buildRemoveResultCard([OK], {
+test('a single removal keeps its reason whole and names the character with its class and link', () => {
+  const embed = buildRemoveResultCard([OK], {
     name: 'Zhaohang', lang: 'vi', statMap: STATS, removedBy: 'Bao',
-  }).toJSON().fields;
-  const reason = named(fields, 'Lý do của entry vừa gỡ');
+  }).toJSON();
+  const reason = named(embed.fields, 'Lý do');
 
-  // After this card the reason is gone from the database, so the 80-char
-  // crop the list line used would lose the only copy.
+  // After this card the reason is gone from the database, so it is the
+  // only copy left.
   assert.equal(reason.inline, false);
   assert.equal(reason.value, ENTRY.reason);
-  // And it is not repeated on the list line above.
-  assert.doesNotMatch(named(fields, 'Đã xóa thành công').value, /zdps/u);
+  // The title already names the list, so no separate list line repeats it.
+  assert.equal(embed.fields.some((f) => f.name.includes('Đã xóa thành công')), false);
+  // The emoji map is empty in tests, so the class name stands in for the icon.
+  assert.match(
+    embed.description,
+    /Paladin \*\*\[Zhaohang\]\(https:\/\/lostark\.bible\/character\/NA\/Zhaohang\/roster\)\*\*/u
+  );
+  // Nothing to add after a removal, so only the timestamp stays.
+  assert.equal(embed.footer, undefined);
 });
 
-test('removing from several lists keeps the per-line reasons instead', () => {
-  // With more than one entry there is no single reason to lift out, so
-  // each line carries its own cropped copy as before.
+test('removing from several lists keeps every reason, named by its list', () => {
   const second = {
     ok: true,
     entry: { ...ENTRY, reason: 'afk suốt gate 1' },
@@ -69,24 +74,25 @@ test('removing from several lists keeps the per-line reasons instead', () => {
     name: 'Zhaohang', lang: 'vi', statMap: STATS, removedBy: 'Bao',
   }).toJSON().fields;
 
-  assert.equal(fields.some((f) => f.name.includes('Lý do của entry vừa gỡ')), false);
-  const removed = named(fields, 'Đã xóa thành công').value;
-  assert.match(removed, /zdps/u);
-  assert.match(removed, /afk suốt gate 1/u);
+  assert.equal(
+    named(fields, 'Lý do').value,
+    `⛔ **Blacklist**: ${ENTRY.reason}\n⚠️ **Watchlist**: afk suốt gate 1`
+  );
 });
 
-test('alt rows speak the same vocabulary as every other character list', () => {
+test('roster rows speak the same vocabulary as every other character list', () => {
   const fields = buildRemoveResultCard([OK], {
     name: 'Zhaohang', lang: 'vi', statMap: STATS, removedBy: 'Bao',
   }).toJSON().fields;
-  const alts = named(fields, 'Alt được track');
+  const roster = named(fields, 'Danh sách roster');
 
-  // Used to be bare comma-separated links with no class, ilvl or CP.
-  assert.match(alts.name, /\(2\)$/u);
-  assert.match(alts.value, /Bard \[Hanako\]\(\S+\) · `1770\.00` · `≈4089\.17 CP`/u);
+  // The whole roster, removed character first, as the add card lists it.
+  assert.match(roster.name, /\(3\)$/u);
+  assert.match(roster.value, /^\*\*1\.\*\* Paladin \[Zhaohang\]/u);
+  assert.match(roster.value, /Bard \[Hanako\]\(\S+\) · `1770\.00` · `≈4089\.17 CP`/u);
 });
 
-test('a blocked removal says so and offers no re-add hint', () => {
+test('a blocked removal says so without claiming the entry was removed', () => {
   const blocked = {
     ok: false, reason: 'legacy', entry: { name: 'Zhaohang' },
     type: 'black', label: 'Blacklist', icon: '⛔',
@@ -94,8 +100,9 @@ test('a blocked removal says so and offers no re-add hint', () => {
   const embed = buildRemoveResultCard([blocked], { name: 'Zhaohang', lang: 'vi' }).toJSON();
 
   assert.ok(named(embed.fields, 'Không thể xóa'));
-  assert.equal(embed.fields.some((f) => f.name.includes('Lý do của entry vừa gỡ')), false);
-  assert.doesNotMatch(embed.footer.text, /la-list add/u);
+  assert.equal(embed.fields.some((f) => f.name.includes('Lý do')), false);
+  assert.equal(embed.description, undefined);
+  assert.match(embed.footer.text, /la-list edit/u);
 });
 
 test('an entry with no reason gets a line that does not promise a copy', () => {
@@ -104,6 +111,6 @@ test('an entry with no reason gets a line that does not promise a copy', () => {
     name: 'Zhaohang', lang: 'vi', removedBy: 'Bao',
   }).toJSON();
 
-  assert.equal(embed.fields.some((f) => f.name.includes('Lý do của entry vừa gỡ')), false);
+  assert.equal(embed.fields.some((f) => f.name.includes('Lý do')), false);
   assert.doesNotMatch(embed.description, /chép lại lý do/u);
 });

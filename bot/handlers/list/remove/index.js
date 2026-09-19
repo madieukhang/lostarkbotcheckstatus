@@ -18,6 +18,7 @@ import { connectDB } from '../../../db.js';
 import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import {
+  formatLinkedCharacter,
   renderTrackedAltsField,
   resolveRosterWorld,
   statMapFromRosterCharacters,
@@ -26,7 +27,7 @@ import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { normalizeCharacterName } from '../../../utils/names.js';
+import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
 import {
   buildNameRosterQuery,
@@ -103,7 +104,7 @@ export function resolveRemoveResultPresentation(context) {
  * @param {string} options.name - the character name that was searched
  * @param {string} options.lang - locale for every label
  * @param {Map<string, object>} [options.statMap] - roster snapshots, for
- *   the alt rows' class icon, ilvl and CP
+ *   the removed name's class icon and the roster rows' class icon, ilvl and CP
  * @param {string} [options.world] - the entry's server, already resolved
  * @param {string} [options.removedBy] - display name of whoever ran it
  * @returns {import('discord.js').EmbedBuilder}
@@ -119,58 +120,44 @@ export function buildRemoveResultCard(outcomes, {
   const fails = outcomes.filter((o) => !o.ok);
   const { color, titleIcon, title } = resolveRemoveResultPresentation({ oks, fails, name, lang });
 
-  // A single removal gets its reason as a field of its own, at full width
-  // and untruncated. After this card the reason is gone, so an
-  // 80-character crop is a real loss · with two or more lists the
-  // per-line crop stays, because there is no one reason to lift out.
-  const soleRemoval = oks.length === 1 ? oks[0].entry : null;
-  const soleReason = String(soleRemoval?.reason || '').trim();
+  // After this card the reason is gone from the database, so it is kept
+  // whole. Removing from several lists keeps each one, named by its list.
+  const reasonValue = oks.length === 1
+    ? String(oks[0].entry.reason || '').trim()
+    : oks
+      .filter((o) => String(o.entry.reason || '').trim())
+      .map((o) => `${o.icon} **${o.label}**: ${o.entry.reason.trim()}`)
+      .join('\n');
 
-  const sections = [];
-  if (oks.length > 0) {
-    const removedLines = oks.map((o) => {
-      const scopeTag = o.entry.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
-      const reason = !soleRemoval && o.entry.reason
-        ? ` *${(o.entry.reason || '').slice(0, 80)}${o.entry.reason.length > 80 ? '...' : ''}*`
-        : '';
-      return `${o.icon} **${o.label}**${scopeTag}${reason}`;
-    });
-    sections.push({
-      name: `✅ ${t('dialogue.remove.successSection', lang)}`,
-      value: removedLines.join('\n').slice(0, 1024),
-      inline: false,
-    });
-  }
-  if (fails.length > 0) {
-    const failLines = fails.map((o) => {
+  const failedField = fails.length > 0 ? {
+    name: `🚫 ${t('dialogue.remove.failedSection', lang)}`,
+    value: fails.map((o) => {
       if (o.reason === 'legacy') {
         return `⚠️ ${t('dialogue.remove.legacy', lang, { list: o.label })}`;
       }
       const owner = o.entry.addedByTag || o.entry.addedByUserId;
       return `⛔ ${t('dialogue.remove.ownerOnly', lang, { list: o.label, owner })}`;
-    });
-    sections.push({
-      name: `🚫 ${t('dialogue.remove.failedSection', lang)}`,
-      value: failLines.join('\n').slice(0, 1024),
-      inline: false,
-    });
-  }
+    }).join('\n').slice(0, 1024),
+    inline: false,
+  } : null;
 
   // Roster preview identifies the removal target. Scan all entries
   // (successes and failures) for allCharacters; the first one with > 1
   // char wins, since entries usually share the same roster. Rendered
   // through the shared renderer so the rows carry a class icon, ilvl and
-  // CP like every other character list · they used to be bare links.
+  // CP like every other character list, primary included as the add and
+  // view cards list it.
   const sourceEntry = outcomes.find(
     (o) => Array.isArray(o.entry.allCharacters) && o.entry.allCharacters.length > 1
   )?.entry;
-  const altsField = sourceEntry
+  const rosterField = sourceEntry
     ? renderTrackedAltsField({
       names: sourceEntry.allCharacters,
       primaryName: sourceEntry.name,
       statMap,
+      includePrimary: true,
       // The renderer appends its own "(N)", so the label must not carry one.
-      label: `🧬 ${t('dialogue.remove.trackedAlts', lang)}`,
+      label: `🧬 ${t('dialogue.broadcast.fields.trackedRosters', lang)}`,
       overflowTemplate: t('dialogue.remove.more', lang),
     })
     : null;
@@ -194,27 +181,30 @@ export function buildRemoveResultCard(outcomes, {
   ].filter(Boolean));
 
   const fields = [
-    ...sections,
-    soleReason ? {
-      name: `📝 ${t('dialogue.remove.removedReason', lang)}`,
-      value: soleReason.slice(0, 1024),
+    failedField,
+    reasonValue ? {
+      name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
+      value: reasonValue.slice(0, 1024),
       inline: false,
     } : null,
     ...auditFields,
-    altsField,
+    rosterField,
   ].filter(Boolean);
 
-  return createArtistEmbed(lang)
+  const embed = createArtistEmbed(lang)
     .setTitle(`${titleIcon} ${title}`)
-    .setDescription(tPick(`dialogue.remove.${soleReason ? 'line' : 'lineNoReason'}`, lang))
     .addFields(fields)
     .setColor(color)
-    .setFooter({
-      text: oks.length > 0
-        ? t('dialogue.remove.footerReadd', lang, { name })
-        : t('dialogue.remove.footerBlocked', lang),
-    })
     .setTimestamp();
+  // The line says the entry was removed, so a card where nothing was
+  // removed goes without it rather than contradict its own title.
+  if (oks.length > 0) {
+    embed.setDescription(tPick(`dialogue.remove.${reasonValue ? 'line' : 'lineNoReason'}`, lang, {
+      name: formatLinkedCharacter(name, statMap.get(normalizeNameKey(name))),
+    }));
+  }
+  if (fails.length > 0) embed.setFooter({ text: t('dialogue.remove.footerBlocked', lang) });
+  return embed;
 }
 
 /**
