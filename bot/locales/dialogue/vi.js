@@ -331,7 +331,7 @@ export default {
     ] },
     removedBy: 'Người gỡ', removedAt: 'Gỡ lúc',
     failedSection: 'Không thể xóa', legacy: '**{list}**: entry legacy này không có metadata chủ sở hữu. Dùng `/la-list edit` để chỉnh.', ownerOnly: '**{list}**: chỉ **{owner}**, người đã thêm entry, mới xóa được.', more: '+{count} tên khác',
-    footerSuccess: 'Dùng `/la-list view` để xác nhận entry đã được xóa.', footerBlocked: 'Kiểm tra bằng `/la-list view`; dùng `/la-list edit` cho entry legacy.', pickerTitle: 'Đã tìm thấy · {name}', pickerDescription: '**{name}** nằm trong {count} list. Chọn mục cần xóa:', pickerFooter: 'Hết hạn sau 30 giây · chỉ cậu dùng được picker này.', failed: { title: 'Xóa thất bại', description: 'Tớ chưa xóa được entry.' }, unknown: 'không xác định',
+    footerBlocked: 'Kiểm tra bằng `/la-list view`; dùng `/la-list edit` cho entry legacy.', pickerTitle: 'Đã tìm thấy · {name}', pickerDescription: '**{name}** nằm trong {count} list. Chọn mục cần xóa:', pickerFooter: 'Hết hạn sau 30 giây · chỉ cậu dùng được picker này.', failed: { title: 'Xóa thất bại', description: 'Tớ chưa xóa được entry.' }, unknown: 'không xác định',
   },
   check: {
     modeSaved: { title: 'Đã lưu chế độ đọc ảnh', description: 'Chế độ của cậu là **{mode}**. Áp dụng cho ảnh cậu thả vào kênh và `/la-check` khi không chọn mode.', footer: 'Về Daily bằng /la-check-mode mode:daily; mode trong /la-check chỉ đổi cho một ảnh.' },

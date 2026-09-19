@@ -306,7 +306,7 @@ export default {
     ] },
     removedBy: '削除者', removedAt: '削除日時',
     failedSection: '削除できません', legacy: '**{list}**: この legacy entry には owner metadata がありません。`/la-list edit` で変更してくださいませ。', ownerOnly: '**{list}**: 追加した **{owner}** だけが削除できますの。', more: '+{count} 名',
-    footerSuccess: '`/la-list view` で削除結果をご確認くださいませ。', footerBlocked: '`/la-list view` で確認し、legacy entry は `/la-list edit` で変更してくださいませ。', pickerTitle: '発見 · {name}', pickerDescription: '**{name}** は {count} lists にいます。削除対象を選んでくださいませ:', pickerFooter: '30秒で期限切れ · この picker はあなた専用ですの。', failed: { title: '削除に失敗しましたの', description: 'Entry を削除できませんでしたわ。' }, unknown: '不明',
+    footerBlocked: '`/la-list view` で確認し、legacy entry は `/la-list edit` で変更してくださいませ。', pickerTitle: '発見 · {name}', pickerDescription: '**{name}** は {count} lists にいます。削除対象を選んでくださいませ:', pickerFooter: '30秒で期限切れ · この picker はあなた専用ですの。', failed: { title: '削除に失敗しましたの', description: 'Entry を削除できませんでしたわ。' }, unknown: '不明',
   },
   check: {
     modeSaved: { title: '画像モードを保存しました', description: 'モードは **{mode}** です。ご自身の画像投稿と、mode を指定しない `/la-check` に適用します。', footer: '/la-check-mode mode:daily で戻せます。/la-check の mode 指定はその画像だけに適用します。' },

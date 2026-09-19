@@ -457,7 +457,7 @@ export default {
     failedSection: 'Could not remove',
     legacy: '**{list}**: this legacy entry has no owner metadata. Use `/la-list edit` to change it.', ownerOnly: '**{list}**: only **{owner}**, who added it, can remove this entry.',
     more: '+{count} more',
-    footerSuccess: 'Use `/la-list view` to confirm the removal.', footerBlocked: 'Inspect it with `/la-list view`; use `/la-list edit` for legacy entries.',
+    footerBlocked: 'Inspect it with `/la-list view`; use `/la-list edit` for legacy entries.',
     pickerTitle: 'Found · {name}', pickerDescription: '**{name}** is in {count} lists. Choose what to remove:', pickerFooter: 'Expires in 30 seconds · only you can use this picker.',
     failed: { title: 'Removal failed', description: 'I could not remove the entry.' }, unknown: 'unknown',
   },
