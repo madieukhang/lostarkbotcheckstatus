@@ -39,11 +39,4 @@ export default {
   },
   stats: { description: 'Xem thống kê sử dụng bot' },
   remote: { description: 'Senior: xem và chỉnh cấu hình server từ xa, không thông báo server đích', options: { action: 'Thao tác cần thực hiện', guild: 'ID server đích; cần cho off/defaultscope', scope: 'Scope cho action defaultscope', channel: 'Channel dùng cho action evidencechannel' } },
-  choices: {
-    listTypes: { all: 'tất cả', black: 'blacklist', white: 'whitelist', watch: 'watchlist', trusted: 'trusted' },
-    listActions: { add: 'thêm', remove: 'xóa' },
-    scopes: { all: 'tất cả', global: 'global', server: 'server' },
-    multiaddActions: { template: 'template - tải file trắng', file: 'file - tải file đã điền lên' },
-    remoteActions: { view: 'view - xem server và cấu hình', off: 'off - bật/tắt notify của server', defaultscope: 'defaultscope - đặt scope của server', evidencechannel: 'evidencechannel - đặt channel rehost ảnh toàn bot', syncimages: 'syncimages - chuyển URL legacy sang evidence đã rehost' },
-  },
 };

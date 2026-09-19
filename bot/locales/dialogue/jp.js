@@ -248,8 +248,7 @@ export default {
     originalMissing: { title: '元の entry がありませんの', description: 'この承認申請が参照していた entry は、承認完了前に削除されましたわ。' },
     moveBlocked: { title: 'List を移動できませんの', description: '**{name}** はすでに移動先 list にいますので、どちらの list も変更していませんわ。', footer: '競合 entry を先に削除してから、もう一度申請してくださいませ。' },
     scopeRaced: { title: 'Scope が別の場所で変わりましたの', description: '同じ名前の entry が保存前に移動先 scope を取得しましたわ。', footer: '編集を再申請するか、競合 entry を先に削除してくださいませ。' },
-    approvedEntry: '編集承認: **{name}** は {outcome}。', movedTo: '{list} へ移動しました', updated: '更新されました', approvedBy: '**{user}** が編集を承認しましたわ。',
-    changes: { reason: '理由', list: 'List', raid: 'Raid', logs: 'Logs: 更新済み', evidence: 'Evidence: 更新済み', scope: 'Scope' },
+    approvedBy: '**{user}** が編集を承認しましたわ。',
     success: { titleMoved: '{list}{scope} · 編集して移動しましたわ', titleEdited: '{list}{scope} · 編集済み', name: '名前', reason: '理由', raid: 'Raid', changes: '変更 ({count})', footer: '{user} が編集' },
     command: {
       notFound: { title: 'Entry が見つかりませんの', description: '**{name}** は blacklist / whitelist / watchlist にいませんわ。', footer: '`/la-list view` で既存 entry を確認できますの。' }, additionalRestricted: { title: 'この option は制限されていますの', description: '`additional_names` は officer または entry owner だけが使えますわ。', footer: 'Officer に alt 追加をお願いしてくださいませ。' }, noChanges: { title: '変更がありませんの', description: '任意 edit field が一つも設定されていませんわ。', footer: 'reason / type / raid / logs / image / scope / additional_names のどれかを設定してくださいませ。' },
@@ -273,7 +272,7 @@ export default {
       title: '{list} に登録済みですの', direct: '{icon} {name} はすでに **{list}** にいますわ。何も追加していませんの。', roster: '{icon} {name} は {matched} と同じ roster で、この方はすでに **{list}** にいますの。何も追加していませんの。', matchedName: '一致名', scope: 'Scope', addedBy: '追加者', timeAdded: '追加日時', storedReason: '登録中の理由', typedReason: '今入力した理由', raid: 'Raid', footer: '`/la-list edit` で理由を追記できますの。', contentDirect: '{name} は {list} に登録済み。', contentRoster: '{name} は roster {matched} 経由で {list} に登録済み。',
     },
     success: {
-      title: '{list} · 追加済み · {name}', hero: '**{user}** が {name} を **{list}**{scope} へ追加しましたわ。', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: '理由', trackedRosters: '追跡中の roster' }, onlyCharacter: 'この entry は現在この character だけを track していますの。', evidence: 'スクリーンショットは下にありますわ · [元画像をダウンロード]({url})', sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: '{user} が追加 · {source}', officerFallback: 'officer', content: '追加承認: **{name}** を {list} へ追加しましたわ。',
+      title: '{list} · 追加済み · {name}', hero: '**{user}** が {name} を **{list}**{scope} へ追加しましたわ。', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: '理由', trackedRosters: '追跡中の roster' }, evidence: 'スクリーンショットは下にありますわ · [元画像をダウンロード]({url})', sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: '{user} が追加 · {source}', officerFallback: 'officer', content: '追加承認: **{name}** を {list} へ追加しましたわ。',
     },
   },
   listView: {
@@ -366,7 +365,7 @@ export default {
       'この roster は非公開ですので、character を一人も読めませんの。でも guild は開いていますから、そちらから探りましたわ。',
       'roster を隠していらっしゃるので character は見えませんの。幸い guild は公開でしたから、これだけ拾えましたわ。',
       'roster が閉じていて character が見えませんの。guild 側から分かったのはこれで全部ですわ。',
-    ] }, guildField: 'Guild', membersField: 'メンバー', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: '未実行', deepDone: '実行済み', hiddenFooter: 'Source: lostark.bible{stats} · deep:true で同一 account の alt を探せますの', hiddenStatus: 'Roster hidden。Guild: **{guild}** ({count} members)', stronghold: 'Stronghold: **{stronghold}** Lv.{strongholdLevel} · Roster Lv.{rosterLevel}', noDeep: 'Stronghold deep scan は未実行です。`deep:true` で同一 account alt を scan できますの。', blackGuild: 'Blacklist guild members ({count})', whiteGuild: 'Whitelist guild members ({count})', noReason: '理由なし', guildFooter: '{count} guild {word}{stats} · Source: lostark.bible', memberOne: 'member', memberMany: 'members',
+    ] }, guildField: 'Guild', membersField: 'メンバー', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: '未実行', deepDone: '実行済み', hiddenFooter: 'Source: lostark.bible{stats} · deep:true で同一 account の alt を探せますの', blackGuild: 'Blacklist guild members ({count})', whiteGuild: 'Whitelist guild members ({count})', noReason: '理由なし',
   },
   enrich: {
     noEntry: { title: 'List entry がありませんの', description: '**{name}** はどの list にもいませんわ。', footer: '先に `/la-list add` で entry を作成してくださいませ。Enrich は既存 entry に alt を追加するだけですの。' }, profileMissing: { title: 'Profile が見つかりませんの', description: '**{name}** の lostark.bible profile を読み込めませんでしたわ。', footer: 'Profile が private、名前違い、または Bible が一時 unavailable の可能性がありますの。' }, metaMissing: { title: 'Character metadata を取得できませんの', description: '**{name}** の metadata を lostark.bible から取得できませんでしたわ。', footer: 'Profile hidden または Bible が一時 unavailable の可能性がありますの。' },

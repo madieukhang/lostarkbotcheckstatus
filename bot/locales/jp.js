@@ -3,12 +3,6 @@ import commands from './commands/jp.js';
 
 const jp = {
   dialogue,
-  language: {
-    code: 'jp',
-    label: '日本語',
-    nativeShort: '日本語',
-    flag: '🇯🇵',
-  },
 
   common: {
     pagination: {
@@ -18,8 +12,6 @@ const jp = {
     actions: {
       approve: '承認',
       reject: '却下',
-      approving: '承認中...',
-      rejecting: '却下中...',
       approved: '承認済み',
       rejected: '却下済み',
       processed: '処理済み',

@@ -2,12 +2,6 @@ import dialogue from './dialogue/en.js';
 
 const en = {
   dialogue,
-  language: {
-    code: 'en',
-    label: 'English',
-    nativeShort: 'English',
-    flag: '🇬🇧',
-  },
 
   common: {
     pagination: {
@@ -17,8 +11,6 @@ const en = {
     actions: {
       approve: 'Approve',
       reject: 'Reject',
-      approving: 'Approving...',
-      rejecting: 'Rejecting...',
       approved: 'Approved',
       rejected: 'Rejected',
       processed: 'Processed',
@@ -186,35 +178,6 @@ const en = {
         guild: 'Target server ID (required for off/defaultscope)',
         scope: 'Scope value (for defaultscope action only)',
         channel: 'Channel to use (required for evidencechannel action)',
-      },
-    },
-    choices: {
-      listTypes: {
-        all: 'all',
-        black: 'black',
-        white: 'white',
-        watch: 'watch',
-        trusted: 'trusted',
-      },
-      listActions: {
-        add: 'add',
-        remove: 'remove',
-      },
-      scopes: {
-        all: 'all',
-        global: 'global',
-        server: 'server',
-      },
-      multiaddActions: {
-        template: 'template - download blank template',
-        file: 'file - upload filled template',
-      },
-      remoteActions: {
-        view: 'view - show all servers + bot config',
-        off: 'off - toggle notify for a server',
-        defaultscope: 'defaultscope - set scope for a server',
-        evidencechannel: 'evidencechannel - set image rehost channel (bot-wide)',
-        syncimages: 'syncimages - migrate legacy URLs to rehosted evidence',
       },
     },
   },

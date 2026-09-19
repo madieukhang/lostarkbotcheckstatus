@@ -39,11 +39,4 @@ export default {
   },
   stats: { description: 'Bot usage statistics を表示します' },
   remote: { description: 'Senior: 対象 server へ通知せず remote config を管理します', options: { action: '実行 action', guild: '対象 server ID; off/defaultscope で必須', scope: 'Defaultscope action の scope', channel: 'Evidencechannel action の channel' } },
-  choices: {
-    listTypes: { all: 'すべて', black: 'blacklist', white: 'whitelist', watch: 'watchlist', trusted: 'trusted' },
-    listActions: { add: '追加', remove: '削除' },
-    scopes: { all: 'すべて', global: 'global', server: 'server' },
-    multiaddActions: { template: 'template - 空 file を download', file: 'file - 完成 file を upload' },
-    remoteActions: { view: 'view - server と config を表示', off: 'off - server notify を切替', defaultscope: 'defaultscope - server scope を設定', evidencechannel: 'evidencechannel - bot 全体の image rehost channel', syncimages: 'syncimages - legacy URL を rehost evidence へ移行' },
-  },
 };

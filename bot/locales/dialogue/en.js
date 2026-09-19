@@ -361,9 +361,7 @@ export default {
     originalMissing: { title: 'The original entry is gone', description: 'The entry referenced by this approval request was removed before approval completed.' },
     moveBlocked: { title: 'Move blocked', description: '**{name}** already exists in the target list, so I left both lists unchanged.', footer: 'Remove the conflicting target entry first, then submit the edit again.' },
     scopeRaced: { title: 'Scope changed elsewhere', description: 'Another entry with this name claimed the target scope before this edit could be saved.', footer: 'Submit the edit again, or remove the conflicting entry first.' },
-    approvedEntry: 'Edit approved: **{name}** {outcome}.', movedTo: 'moved to {list}', updated: 'updated',
     approvedBy: 'Edit approved by **{user}**.',
-    changes: { reason: 'Reason', list: 'List', raid: 'Raid', logs: 'Logs: updated', evidence: 'Evidence: updated', scope: 'Scope' },
     success: { titleMoved: '{list}{scope} · Edited & moved', titleEdited: '{list}{scope} · Edited', name: 'Name', reason: 'Reason', raid: 'Raid', changes: 'Changes ({count})', footer: 'Edited by {user}' },
     command: {
       notFound: { title: 'Entry not found', description: '**{name}** is not in blacklist, whitelist, or watchlist.', footer: 'Use `/la-list view` to browse existing entries.' },
@@ -408,7 +406,7 @@ export default {
     success: {
       title: '{list} · Added · {name}', hero: '**{user}** added {name} to **{list}**{scope}.',
       fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Reason', trackedRosters: 'Tracked rosters' },
-      onlyCharacter: 'Only this character is tracked on this entry.', evidence: 'Screenshot attached below · [Download original]({url})',
+      evidence: 'Screenshot attached below · [Download original]({url})',
       sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: 'Added by {user} · {source}', officerFallback: 'an officer',
       content: 'Add approved: **{name}** was added to {list}.',
     },
@@ -546,7 +544,7 @@ export default {
       'This roster is locked, so I cannot read a single character off it. The guild is still open though, so I worked from there.',
       'They hid the roster, so no characters for me. The guild page is public at least, and this is what it gave up.',
       'Roster closed, no characters visible. Here is everything the guild side still shows.',
-    ] }, guildField: 'Guild', membersField: 'Members', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: 'Not run', deepDone: 'Done', hiddenFooter: 'Source: lostark.bible{stats} · deep:true to look for same-account alts', hiddenStatus: 'Roster is hidden. Guild: **{guild}** ({count} members)', stronghold: 'Stronghold: **{stronghold}** Lv.{strongholdLevel} · Roster Lv.{rosterLevel}', noDeep: 'Stronghold deep scan was not run. Use `deep:true` to scan same-account alts.', blackGuild: 'Blacklisted guild members ({count})', whiteGuild: 'Whitelisted guild members ({count})', noReason: 'no reason', guildFooter: '{count} guild {word}{stats} · Source: lostark.bible', memberOne: 'member', memberMany: 'members',
+    ] }, guildField: 'Guild', membersField: 'Members', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: 'Not run', deepDone: 'Done', hiddenFooter: 'Source: lostark.bible{stats} · deep:true to look for same-account alts', blackGuild: 'Blacklisted guild members ({count})', whiteGuild: 'Whitelisted guild members ({count})', noReason: 'no reason',
   },
   enrich: {
     noEntry: { title: 'No list entry', description: '**{name}** is not in any list.', footer: 'Create the entry with `/la-list add` first; enrich only appends to existing entries.' },

@@ -3,12 +3,6 @@ import commands from './commands/vi.js';
 
 const vi = {
   dialogue,
-  language: {
-    code: 'vi',
-    label: 'Tiếng Việt',
-    nativeShort: 'Tiếng Việt',
-    flag: '🇻🇳',
-  },
 
   common: {
     pagination: {
@@ -18,8 +12,6 @@ const vi = {
     actions: {
       approve: 'Duyệt',
       reject: 'Từ chối',
-      approving: 'Đang duyệt...',
-      rejecting: 'Đang từ chối...',
       approved: 'Đã duyệt',
       rejected: 'Đã từ chối',
       processed: 'Đã xử lý',
