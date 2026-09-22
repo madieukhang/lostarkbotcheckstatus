@@ -31,12 +31,16 @@ import { t } from '../../../services/i18n/index.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import {
-  formatRosterStatBadges,
   formatLinkedCharacter,
-  renderTrackedAltsField,
   resolveRosterWorld,
   statMapFromRosterCharacters,
 } from '../trackedAltsRender.js';
+import {
+  buildListEntryInlineFields,
+  buildListEntryReasonField,
+  buildListEntryRostersField,
+  formatListScopeTag,
+} from '../entryCardFields.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -96,26 +100,9 @@ export function buildListAddSuccessHeader({
   };
 }
 
-/**
- * Build the complete roster field for an add-success card. The primary
- * character is prepended even when an upstream roster result omitted it, and
- * the shared renderer removes case-insensitive duplicates before counting.
- */
-export function buildListAddTrackedRostersField({
-  names,
-  primaryName,
-  statMap = new Map(),
-  lang = 'en',
-}) {
-  return renderTrackedAltsField({
-    names,
-    primaryName,
-    statMap,
-    includePrimary: true,
-    label: `🧬 ${t('dialogue.listAdd.success.fields.trackedRosters', lang)}`,
-    overflowTemplate: t('dialogue.broadcast.more', lang),
-  });
-}
+// The tracked roster field is shared with the edit card; the old name stays
+// exported for callers and tests that import it from here.
+export { buildListEntryRostersField as buildListAddTrackedRostersField } from '../entryCardFields.js';
 
 function buildTrustedRejection(name, trustedEntry, lang, { viaRoster = false } = {}) {
   const trustedName = trustedEntry.name;
@@ -342,12 +329,6 @@ export function buildListEntryCreateData({ payload, name, allCharacters, entrySc
   return data;
 }
 
-function resolveSuccessScopeTag(payload, entryScope, lang) {
-  if (payload.type !== 'black') return '';
-  const scopeKey = entryScope.scope === 'server' ? 'local' : 'global';
-  return ` \`[${t(`dialogue.approval.scopeTag.${scopeKey}`, lang)}]\``;
-}
-
 /**
  * Build the field grid for the `/la-list add` success card: the inline
  * run (list, raid, scope, server, item level, CP) padded to whole rows, then the
@@ -374,53 +355,19 @@ export function buildListAddSuccessFields({
   lang,
   statMap,
 }) {
-  const inlineFields = [
-    { name: `📒 ${t('dialogue.listAdd.success.fields.list', lang)}`, value: `${icon} ${labelCap}`, inline: true },
-    { name: `🗡️ ${t('dialogue.listAdd.success.fields.raid', lang)}`, value: payload.raid ? `\`${payload.raid}\`` : t('dialogue.broadcast.notAvailable', lang), inline: true },
-  ];
-  if (payload.type === 'black') {
-    const scopeKey = entryScope.scope === 'server' ? 'local' : 'global';
-    inlineFields.push({
-      name: `🌐 ${t('dialogue.listAdd.success.fields.scope', lang)}`,
-      value: t(`dialogue.approval.scopeTag.${scopeKey}`, lang),
-      inline: true,
-    });
-  }
-  // The add flow has just read the roster page, so the server is known
-  // here without another request · resolveRosterWorld also covers the
-  // case where the entry's own record is the one missing it.
-  const world = resolveRosterWorld(entry, statMap);
-  if (world) {
-    inlineFields.push({
-      name: `🌍 ${t('dialogue.roster.server', lang)}`,
-      value: `\`${world}\``,
-      inline: true,
-    });
-  }
-
-  const primaryRecord = statMap?.get(normalizeNameKey(entry?.name));
-  const statBadges = formatRosterStatBadges(primaryRecord);
-  inlineFields.push(...[
-    statBadges.itemLevel ? {
-      name: `📊 ${t('dialogue.broadcast.fields.itemLevel', lang)}`,
-      value: statBadges.itemLevel,
-      inline: true,
-    } : null,
-    statBadges.combatPower ? {
-      name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`,
-      value: statBadges.combatPower,
-      inline: true,
-    } : null,
-  ].filter(Boolean));
-
-  // Optional roster stats can leave a partial second row. Pad only after every
-  // available value is known so Discord never stretches a lone field.
-  const fields = [...padInlineRow(inlineFields)];
-  fields.push({
-    name: `📝 ${t('dialogue.listAdd.success.fields.reason', lang)}`,
-    value: (payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
-    inline: false,
+  // The add flow has just read the roster page, so the stats and server in
+  // statMap need no further request.
+  const fields = buildListEntryInlineFields({
+    type: payload.type,
+    raid: payload.raid,
+    scope: entryScope.scope,
+    entry,
+    statMap,
+    icon,
+    labelCap,
+    lang,
   });
+  fields.push(buildListEntryReasonField({ reason: payload.reason, lang }));
   if (rostersField) fields.push(rostersField);
   return fields;
 }
@@ -437,7 +384,7 @@ function buildListAddSuccessEmbed({
   lang,
 }) {
   const rosterStatMap = statMapFromRosterCharacters(rosterCharacters);
-  const rostersField = buildListAddTrackedRostersField({
+  const rostersField = buildListEntryRostersField({
     names: entry.allCharacters,
     primaryName: entry.name,
     statMap: rosterStatMap,
@@ -451,7 +398,7 @@ function buildListAddSuccessEmbed({
     requesterName,
     entryName: entry.name,
     listLabel: labelCap,
-    scopeTag: resolveSuccessScopeTag(payload, entryScope, lang),
+    scopeTag: formatListScopeTag(payload.type, entryScope.scope, lang),
     primaryRecord: rosterStatMap.get(normalizeNameKey(entry.name)) || null,
     lang,
   });
