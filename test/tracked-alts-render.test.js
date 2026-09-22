@@ -88,3 +88,31 @@ test('tracked alts renderer supports a custom label + class icon for the enrich 
     CLASS_EMOJI_MAP.Bard = oldBard;
   }
 });
+
+test('tracked roster marks newly added names with 🆕', () => {
+  const field = renderTrackedAltsField({
+    names: ['Altone', 'Alttwo'],
+    primaryName: 'Main',
+    includePrimary: true,
+    newNames: ['alttwo'],
+  });
+  const lines = field.value.split('\n');
+
+  assert.equal(lines.length, 3);
+  assert.doesNotMatch(lines.slice(0, 2).join('\n'), /🆕/u);
+  assert.match(lines[2], /\[Alttwo\]\([^)]+\) 🆕$/u);
+});
+
+test('the 🆕 mark is counted inside the 1024-char field budget', () => {
+  const names = Array.from({ length: 60 }, (_, index) => `Alt${String(index).padStart(2, '0')}`);
+  const field = renderTrackedAltsField({
+    names,
+    primaryName: 'Main',
+    includePrimary: true,
+    newNames: names,
+  });
+
+  assert.ok(field.value.length <= 1024);
+  assert.match(field.value, /🆕/u);
+  assert.match(field.value, /more\*$/u);
+});

@@ -107,6 +107,8 @@ export function formatAltLine(name, index, record) {
  *   every other surface keeps the tracked-alts wording.
  * @param {string} [options.overflowTemplate='... and {count} more'] - Localized
  *   overflow copy. `{count}` is replaced after the renderer knows the fit.
+ * @param {string[]} [options.newNames=[]] - Names to mark with 🆕, such as
+ *   alts an edit just added. The mark is counted inside the field budget.
  * @returns {{name: string, value: string, inline: boolean} | null}
  */
 export function renderTrackedAltsField({
@@ -117,6 +119,7 @@ export function renderTrackedAltsField({
   emptySentinel = null,
   label = '🧬 Tracked alts',
   overflowTemplate = '... and {count} more',
+  newNames = [],
 } = {}) {
   const all = Array.isArray(names) ? names : [];
   const primaryKey = normalizeNameKey(primaryName);
@@ -146,8 +149,11 @@ export function renderTrackedAltsField({
   // with rich stat rows still render gracefully.
   const lines = [];
   const overflowText = (count) => String(overflowTemplate).replace('{count}', String(count));
+  const newKeys = new Set(newNames.map(normalizeNameKey));
   for (const name of others) {
-    const line = formatAltLine(name, lines.length, statMap.get(normalizeNameKey(name)));
+    const nameKey = normalizeNameKey(name);
+    const newMark = newKeys.has(nameKey) ? ' 🆕' : '';
+    const line = `${formatAltLine(name, lines.length, statMap.get(nameKey))}${newMark}`;
     const hiddenAfterThis = others.length - lines.length - 1;
     const overflowLine = hiddenAfterThis > 0 ? `\n*${overflowText(hiddenAfterThis)}*` : '';
     const candidate = [...lines, line].join('\n') + overflowLine;
