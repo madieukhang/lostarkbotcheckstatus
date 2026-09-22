@@ -7,9 +7,7 @@
  * legacy null, then broadcasts the change.
  */
 
-import {
-  getInteractionDisplayName,
-} from '../../../utils/names.js';
+import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
@@ -17,7 +15,7 @@ import { t } from '../../../services/i18n/index.js';
 import { moveListEntry } from '../services/moveEntry.js';
 import {
   getListContext,
-  buildListEditSuccessEmbed,
+  buildListEditSuccessEmbeds,
 } from '../helpers.js';
 
 export function buildMovePreflightQuery(existing, targetType, editGuildId) {
@@ -141,23 +139,42 @@ export function buildInPlaceUpdatePlan({
   return { updateFields, updateOps };
 }
 
+async function loadEditCharacterSnapshot(name) {
+  try {
+    return await RosterSnapshot.findOne({ name }, { classId: 1 })
+      .collation({ locale: 'en', strength: 2 }).lean();
+  } catch (err) {
+    console.warn('[list-edit] Class snapshot lookup failed (non-fatal):', err.message);
+    return null;
+  }
+}
+
 async function renderEditSuccess({
   interaction,
   client,
   entry,
+  previousEntry,
+  evidenceChanged,
   changes,
   type,
   isMove,
   lang,
 }) {
-  const freshDisplayUrl = await resolveDisplayImageUrl(entry, client);
+  const [freshDisplayUrl, previousDisplayUrl, primaryRecord] = await Promise.all([
+    resolveDisplayImageUrl(entry, client),
+    evidenceChanged ? resolveDisplayImageUrl(previousEntry, client) : '',
+    loadEditCharacterSnapshot(entry.name),
+  ]);
   await editEmbed(
     interaction,
-    buildListEditSuccessEmbed(entry.toObject?.() || entry, {
+    buildListEditSuccessEmbeds(entry.toObject?.() || entry, {
       changes,
       type,
       freshDisplayUrl,
-      requesterDisplayName: getInteractionDisplayName(interaction),
+      previousDisplayUrl,
+      hadPreviousEvidence: Boolean(previousEntry?.imageUrl || previousEntry?.imageMessageId),
+      evidenceChanged,
+      primaryRecord,
       isMove,
       lang,
     }),
@@ -181,14 +198,20 @@ async function applyTypeChange(args) {
     return false;
   }
 
+  let previousEntry;
   const movedEntry = await moveListEntry({
     oldModel, newModel, existing: args.existing,
-    buildData: source => buildMovedEntryData({ ...args, existing: source }),
+    buildData: source => {
+      previousEntry = source.toObject?.() || { ...source };
+      return buildMovedEntryData({ ...args, existing: source });
+    },
   });
   await renderEditSuccess({
     interaction: args.interaction,
     client: args.client,
     entry: movedEntry,
+    previousEntry,
+    evidenceChanged: Boolean(args.newImageUrl),
     changes: args.changes,
     type: args.targetType,
     isMove: true,
@@ -228,6 +251,8 @@ async function applyInPlaceEdit(args) {
     interaction: args.interaction,
     client: args.client,
     entry: editedEntry,
+    previousEntry: args.existing,
+    evidenceChanged: Boolean(args.newImageUrl),
     changes: args.changes,
     type: args.currentType,
     isMove: false,

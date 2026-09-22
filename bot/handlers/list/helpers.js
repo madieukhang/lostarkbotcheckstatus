@@ -19,7 +19,7 @@ import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, COLORS, ICONS, padInlineRow } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
-import { renderTrackedAltsField } from './trackedAltsRender.js';
+import { formatLinkedCharacter, renderTrackedAltsField } from './trackedAltsRender.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
@@ -110,23 +110,22 @@ export function buildTrustedBlockEmbed(name, reason, { via, lang = 'en' } = {}) 
 }
 
 /**
- * Build a rich success embed for /la-list edit (both auto-approve and approval
- * paths). Replaces the old plain-text "✅ Name edited in blacklist" reply
- * with a color-coded, structured response showing the entry's current state,
- * the changes applied, and (when available) the fresh evidence image.
+ * Build the main /la-list edit success card. Evidence changes are shown by
+ * buildListEditSuccessEmbeds as a before/after pair instead of a repeated
+ * "Evidence: updated" line in the text change list.
  */
 export function buildListEditSuccessEmbed(entry, options = {}) {
-  const { changes = [], type, freshDisplayUrl, requesterDisplayName, isMove = false, lang = 'en' } = options;
+  const { changes = [], type, freshDisplayUrl, primaryRecord, isMove = false, lang = 'en' } = options;
   const { color, icon } = getListContext(type);
   const labelCap = t(`dialogue.broadcast.list.${type}`, lang);
   const scopeTag = entry.scope === 'server' ? ` (${t('dialogue.broadcast.localTag', lang)})` : '';
-  const rosterLink = rosterUrl(entry.name);
+  const textChanges = changes.filter(line => line !== t('dialogue.listEdit.change.evidence', lang));
 
   // Reason is prose and takes the full width · as an inline field it was
   // squeezed into a third of the card and wrapped after a few words.
   // Name and raid are short values and share the row above it.
   const inlineFields = [
-    { name: `👤 ${t('dialogue.listEdit.success.name', lang)}`, value: `[${entry.name}](${rosterLink})`, inline: true },
+    { name: `👤 ${t('dialogue.listEdit.success.name', lang)}`, value: formatLinkedCharacter(entry.name, primaryRecord, { bold: false }), inline: true },
   ];
   if (entry.raid) {
     inlineFields.push({ name: `🗡️ ${t('dialogue.listEdit.success.raid', lang)}`, value: `\`${entry.raid}\``, inline: true });
@@ -137,12 +136,12 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
     value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
     inline: false,
   });
-  if (changes.length > 0) {
+  if (textChanges.length > 0) {
     // Each change line already carries its own icon and code-wrapped
     // values, so a bullet in front of it only adds noise.
-    const changesText = changes.join('\n');
+    const changesText = textChanges.join('\n');
     fields.push({
-      name: `🔁 ${t('dialogue.listEdit.success.changes', lang, { count: changes.length })}`,
+      name: `🔁 ${t('dialogue.listEdit.success.changes', lang, { count: textChanges.length })}`,
       value: changesText.length > 1024 ? changesText.slice(0, 1020) + '…' : changesText,
       inline: false,
     });
@@ -154,7 +153,6 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
     color,
     title: t(`dialogue.listEdit.success.${isMove ? 'titleMoved' : 'titleEdited'}`, lang, { list: labelCap, scope: scopeTag }),
     fields,
-    footer: requesterDisplayName ? t('dialogue.listEdit.success.footer', lang, { user: requesterDisplayName }) : undefined,
     lang,
   });
 
@@ -170,6 +168,42 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   }
 
   return embed;
+}
+
+/** Render changed evidence in order, with one Evidence heading for the pair. */
+export function buildListEditSuccessEmbeds(entry, options = {}) {
+  const {
+    evidenceChanged = false,
+    previousDisplayUrl = '',
+    hadPreviousEvidence = false,
+    freshDisplayUrl = '',
+    lang = 'en',
+  } = options;
+  const main = buildListEditSuccessEmbed(entry, {
+    ...options,
+    freshDisplayUrl: evidenceChanged ? '' : freshDisplayUrl,
+  });
+  if (!evidenceChanged) return [main];
+
+  const beforeLabel = t('dialogue.listEdit.evidence.before', lang);
+  const unavailable = t('dialogue.listEdit.evidence.unavailable', lang);
+  const beforeValue = previousDisplayUrl
+    ? `**${beforeLabel}**`
+    : `**${beforeLabel}:** ${hadPreviousEvidence ? unavailable : t('dialogue.listEdit.evidence.none', lang)}`;
+  main.addFields({ name: t('listView.evidence.attached', lang), value: beforeValue, inline: false });
+  if (previousDisplayUrl) main.setImage(previousDisplayUrl);
+
+  const after = buildAlertEmbed({
+    severity: AlertSeverity.SUCCESS,
+    titleIcon: '',
+    color: getListContext(options.type).color,
+    title: t('dialogue.listEdit.evidence.after', lang),
+    description: freshDisplayUrl ? undefined : unavailable,
+    timestamp: false,
+    lang,
+  });
+  if (freshDisplayUrl) after.setImage(freshDisplayUrl);
+  return [main, after];
 }
 
 /**

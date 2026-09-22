@@ -362,7 +362,8 @@ export default {
     moveBlocked: { title: 'Move blocked', description: '**{name}** already exists in the target list, so I left both lists unchanged.', footer: 'Remove the conflicting target entry first, then submit the edit again.' },
     scopeRaced: { title: 'Scope changed elsewhere', description: 'Another entry with this name claimed the target scope before this edit could be saved.', footer: 'Submit the edit again, or remove the conflicting entry first.' },
     approvedBy: 'Edit approved by **{user}**.',
-    success: { titleMoved: '{list}{scope} · Edited & moved', titleEdited: '{list}{scope} · Edited', name: 'Name', reason: 'Reason', raid: 'Raid', changes: 'Changes ({count})', footer: 'Edited by {user}' },
+    success: { titleMoved: '{list}{scope} · Edited & moved', titleEdited: '{list}{scope} · Edited', name: 'Name', reason: 'Reason', raid: 'Raid', changes: 'Changes ({count})' },
+    evidence: { before: 'Before the edit', after: 'After the edit', none: 'No previous image', unavailable: 'Image unavailable' },
     command: {
       notFound: { title: 'Entry not found', description: '**{name}** is not in blacklist, whitelist, or watchlist.', footer: 'Use `/la-list view` to browse existing entries.' },
       additionalRestricted: { title: 'This option is restricted', description: 'Only officers and the entry owner can use `additional_names`.', footer: 'Ask an officer to append the alts for you.' },

@@ -249,7 +249,8 @@ export default {
     moveBlocked: { title: 'List を移動できませんの', description: '**{name}** はすでに移動先 list にいますので、どちらの list も変更していませんわ。', footer: '競合 entry を先に削除してから、もう一度申請してくださいませ。' },
     scopeRaced: { title: 'Scope が別の場所で変わりましたの', description: '同じ名前の entry が保存前に移動先 scope を取得しましたわ。', footer: '編集を再申請するか、競合 entry を先に削除してくださいませ。' },
     approvedBy: '**{user}** が編集を承認しましたわ。',
-    success: { titleMoved: '{list}{scope} · 編集して移動しましたわ', titleEdited: '{list}{scope} · 編集済み', name: '名前', reason: '理由', raid: 'Raid', changes: '変更 ({count})', footer: '{user} が編集' },
+    success: { titleMoved: '{list}{scope} · 編集して移動しましたわ', titleEdited: '{list}{scope} · 編集済み', name: '名前', reason: '理由', raid: 'Raid', changes: '変更 ({count})' },
+    evidence: { before: '変更前', after: '変更後', none: '以前の画像はありません', unavailable: '画像を読み込めません' },
     command: {
       notFound: { title: 'Entry が見つかりませんの', description: '**{name}** は blacklist / whitelist / watchlist にいませんわ。', footer: '`/la-list view` で既存 entry を確認できますの。' }, additionalRestricted: { title: 'この option は制限されていますの', description: '`additional_names` は officer または entry owner だけが使えますわ。', footer: 'Officer に alt 追加をお願いしてくださいませ。' }, noChanges: { title: '変更がありませんの', description: '任意 edit field が一つも設定されていませんわ。', footer: 'reason / type / raid / logs / image / scope / additional_names のどれかを設定してくださいませ。' },
       scopeNotApplicable: { title: 'Scope はここでは使えませんの', description: '`scope` option は blacklist 専用です。{list} entry は常に global ですわ。', footer: '`scope` を外すか、server scope なら `type:black` にしてくださいませ。' }, scopeBlockedGlobal: '同名の global blacklist entry がすでにありますの。', scopeBlockedServer: 'この server に同名の server-scoped blacklist entry がありますわ。', scopeBlocked: { title: 'Scope を変更できませんの', footer: '競合 entry を削除するか、手動で merge してくださいませ。' }, noEffective: { title: '実際の変更はありませんの', description: '入力値は現在の entry と同じですわ。' },
