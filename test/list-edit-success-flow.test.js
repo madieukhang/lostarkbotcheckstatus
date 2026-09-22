@@ -68,13 +68,14 @@ for (const isMove of [false, true]) {
     assert.match(cards[0].title, isMove ? /Đã sửa và chuyển list/ : /Đã chỉnh sửa/);
     assert.equal(cards[0].image.url, `https://example.test/${source.imageMessageId}.png`);
     assert.equal(cards[1].image.url, 'https://example.test/new-image.png');
-    assert.match(cards[0].fields[0].value, /^<:bard:123456789012345678> \[Tenshi\]/);
+    assert.match(cards[0].description, /<:bard:123456789012345678> \*\*\[Tenshi\]/u);
     assert.deepEqual(fetched.sort(), [source.imageMessageId, 'new-image'].sort());
     assert.equal(persisted.imageMessageId, 'new-image');
     assert.equal(persisted.imageChannelId, 'archive');
     assert.equal(persisted.imageUrl, '');
     assert.equal(existing.imageMessageId, 'old-image');
-    assert.ok(cards.every(card => card.footer === undefined));
+    assert.equal(cards[0].footer.text, '🛡️ Sửa bởi Owner');
+    assert.equal(cards[1].footer, undefined);
   });
 }
 
@@ -95,7 +96,8 @@ test('roster stat lookup failure does not turn a saved edit into an error or dup
   assert.equal(replies[0].embeds.length, 1);
   const card = replies[0].embeds[0].toJSON();
   assert.match(card.title, /Đã chỉnh sửa/);
-  assert.match(card.fields[0].value, /^\[Tenshi\]/);
+  assert.match(card.description, /\*\*\[Tenshi\]/u);
+  assert.equal(card.fields.find(field => field.name.startsWith('📝')).value, '~~Old~~\nNew');
   assert.equal(card.image.url, existing.imageUrl);
   assert.doesNotMatch(JSON.stringify(card), /Trước khi đổi|Sau khi đổi/);
 });

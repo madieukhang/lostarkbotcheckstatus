@@ -17,9 +17,16 @@ import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
-import { BLANK_FIELD_VALUE, COLORS, ICONS, padInlineRow } from '../../utils/ui.js';
+import { BLANK_FIELD_VALUE, COLORS, ICONS } from '../../utils/ui.js';
+import { normalizeNameKey } from '../../utils/names.js';
 import { t } from '../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField } from './trackedAltsRender.js';
+import {
+  buildListEntryInlineFields,
+  buildListEntryReasonField,
+  buildListEntryRostersField,
+  formatListScopeTag,
+} from './entryCardFields.js';
 
 const OFFICER_APPROVER_IDS = config.officerApproverIds;
 const SENIOR_APPROVER_IDS = config.seniorApproverIds;
@@ -110,58 +117,120 @@ export function buildTrustedBlockEmbed(name, reason, { via, lang = 'en' } = {}) 
 }
 
 /**
- * Build the main /la-list edit success card. Evidence changes are shown by
- * buildListEditSuccessEmbeds as a before/after pair instead of a repeated
- * "Evidence: updated" line in the text change list.
+ * Build the main /la-list edit success card on the /la-list add card's
+ * layout: the list icon and character name in the title, a hero line with
+ * the editor and what changed, the add card's field run with replaced
+ * values marked in place, the roster list with new alts marked, and an
+ * editor footer. Replaced evidence is rendered by buildListEditSuccessEmbeds
+ * as a before/after pair.
+ * @param {object} entry - the entry after the edit
+ * @param {object} options
+ * @param {string} options.type - list type after the edit
+ * @param {string} [options.previousType] - list type before the edit
+ * @param {object} [options.previousEntry] - the entry before the edit
+ * @param {boolean} [options.isMove=false] - the edit moved the entry to another list
+ * @param {boolean} [options.logsChanged=false] - the edit replaced the logs link
+ * @param {boolean} [options.evidenceChanged=false] - the edit replaced the image
+ * @param {string[]} [options.addedAlts=[]] - alts the edit added
+ * @param {string} options.editorName - display name of the member who edited
+ * @param {Map<string, object>} [options.statMap] - roster snapshots by name key
+ * @param {string} [options.freshDisplayUrl] - current evidence image, when it did not change
+ * @param {string} [options.lang='en'] - locale
+ * @returns {import('discord.js').EmbedBuilder}
  */
 export function buildListEditSuccessEmbed(entry, options = {}) {
-  const { changes = [], type, freshDisplayUrl, primaryRecord, isMove = false, lang = 'en' } = options;
+  const {
+    type,
+    previousType = type,
+    previousEntry = entry,
+    isMove = false,
+    logsChanged = false,
+    evidenceChanged = false,
+    addedAlts = [],
+    editorName,
+    statMap = new Map(),
+    freshDisplayUrl,
+    lang = 'en',
+  } = options;
   const { color, icon } = getListContext(type);
   const labelCap = t(`dialogue.broadcast.list.${type}`, lang);
-  const scopeTag = entry.scope === 'server' ? ` (${t('dialogue.broadcast.localTag', lang)})` : '';
-  const textChanges = changes.filter(line => line !== t('dialogue.listEdit.change.evidence', lang));
+  const scope = entry.scope || 'global';
+  const reasonChanged = (entry.reason || '') !== (previousEntry.reason || '');
+  const raidChanged = (entry.raid || '') !== (previousEntry.raid || '');
+  // A move into blacklist sets a scope for the first time; plan.js does not
+  // count that as a scope change, and neither does the card.
+  const scopeChanged = !isMove && type === 'black' && scope !== (previousEntry.scope || 'global');
 
-  // Reason is prose and takes the full width · as an inline field it was
-  // squeezed into a third of the card and wrapped after a few words.
-  // Name and raid are short values and share the row above it.
-  const inlineFields = [
-    { name: `👤 ${t('dialogue.listEdit.success.name', lang)}`, value: formatLinkedCharacter(entry.name, primaryRecord, { bold: false }), inline: true },
-  ];
-  if (entry.raid) {
-    inlineFields.push({ name: `🗡️ ${t('dialogue.listEdit.success.raid', lang)}`, value: `\`${entry.raid}\``, inline: true });
+  const previous = {};
+  if (isMove) {
+    previous.list = {
+      icon: getListContext(previousType).icon,
+      labelCap: t(`dialogue.broadcast.list.${previousType}`, lang),
+    };
   }
-  const fields = [...padInlineRow(inlineFields)];
-  fields.push({
-    name: `📝 ${t('dialogue.listEdit.success.reason', lang)}`,
-    value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
-    inline: false,
+  if (raidChanged) previous.raid = previousEntry.raid || '';
+  if (scopeChanged) previous.scope = previousEntry.scope || 'global';
+
+  const fields = buildListEntryInlineFields({
+    type, raid: entry.raid, scope, entry, statMap, icon, labelCap, lang, previous,
   });
-  if (textChanges.length > 0) {
-    // Each change line already carries its own icon and code-wrapped
-    // values, so a bullet in front of it only adds noise.
-    const changesText = textChanges.join('\n');
-    fields.push({
-      name: `🔁 ${t('dialogue.listEdit.success.changes', lang, { count: textChanges.length })}`,
-      value: changesText.length > 1024 ? changesText.slice(0, 1020) + '…' : changesText,
-      inline: false,
-    });
-  }
+  fields.push(buildListEntryReasonField({
+    reason: entry.reason,
+    ...(reasonChanged ? { previousReason: previousEntry.reason || '' } : {}),
+    lang,
+  }));
+  const rostersField = buildListEntryRostersField({
+    names: entry.allCharacters,
+    primaryName: entry.name,
+    statMap,
+    lang,
+    newNames: addedAlts,
+  });
+  if (rostersField) fields.push(rostersField);
+
+  // Logs and evidence have no field on the card, so the hero is the only
+  // place that names them.
+  const changedLabels = [
+    reasonChanged && t('dialogue.listAdd.success.fields.reason', lang),
+    isMove && t('dialogue.listAdd.success.fields.list', lang),
+    raidChanged && t('dialogue.listAdd.success.fields.raid', lang),
+    scopeChanged && t('dialogue.listAdd.success.fields.scope', lang),
+    logsChanged && t('dialogue.listEdit.success.summaryFields.logs', lang),
+    evidenceChanged && t('dialogue.listEdit.success.summaryFields.evidence', lang),
+  ].filter(Boolean).map((label) => `**${label}**`);
+  const summary = [
+    changedLabels.length > 0
+      ? t('dialogue.listEdit.success.summaryChanged', lang, { fields: changedLabels.join(', ') })
+      : '',
+    addedAlts.length > 0
+      ? t('dialogue.listEdit.success.summaryAlts', lang, { count: addedAlts.length })
+      : '',
+  ].join('');
 
   const embed = buildAlertEmbed({
     severity: AlertSeverity.SUCCESS,
-    titleIcon: `${ICONS.edit} ${icon}`,
+    titleIcon: icon,
     color,
-    title: t(`dialogue.listEdit.success.${isMove ? 'titleMoved' : 'titleEdited'}`, lang, { list: labelCap, scope: scopeTag }),
+    title: t(`dialogue.listEdit.success.${isMove ? 'titleMoved' : 'titleEdited'}`, lang, {
+      list: labelCap,
+      name: entry.name,
+    }),
+    description: t('dialogue.listEdit.success.hero', lang, {
+      user: editorName,
+      name: formatLinkedCharacter(entry.name, statMap.get(normalizeNameKey(entry.name))),
+      list: labelCap,
+      scope: formatListScopeTag(type, scope, lang),
+      summary,
+    }),
     fields,
+    footer: `${ICONS.shield} ${t('dialogue.listEdit.success.footer', lang, { user: editorName })}`,
     lang,
   });
 
   if (freshDisplayUrl) {
-    // Heading for the embedded image · without it the screenshot runs
-    // straight on from the change list above it.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: BLANK_FIELD_VALUE,
+      value: t('dialogue.listAdd.success.evidence', lang, { url: freshDisplayUrl }),
       inline: false,
     });
     embed.setImage(freshDisplayUrl);
@@ -198,7 +267,9 @@ export function buildListEditSuccessEmbeds(entry, options = {}) {
     titleIcon: '',
     color: getListContext(options.type).color,
     title: t('dialogue.listEdit.evidence.after', lang),
-    description: freshDisplayUrl ? undefined : unavailable,
+    description: freshDisplayUrl
+      ? t('dialogue.listEdit.evidence.download', lang, { url: freshDisplayUrl })
+      : unavailable,
     timestamp: false,
     lang,
   });

@@ -12,7 +12,7 @@ import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { t } from '../../../services/i18n/index.js';
-import { buildNameKeyMap, normalizeNameKey } from '../../../utils/names.js';
+import { buildNameKeyMap } from '../../../utils/names.js';
 import { LIST_VIEW_SNAPSHOT_PROJECTION } from '../view/pageData.js';
 import { moveListEntry } from '../services/moveEntry.js';
 import {
@@ -169,7 +169,6 @@ async function renderEditSuccess({
   evidenceChanged,
   logsChanged,
   addedAlts,
-  changes,
   type,
   isMove,
   lang,
@@ -182,7 +181,6 @@ async function renderEditSuccess({
   await editEmbed(
     interaction,
     buildListEditSuccessEmbeds(entry.toObject?.() || entry, {
-      changes,
       type,
       previousType,
       previousEntry,
@@ -193,7 +191,6 @@ async function renderEditSuccess({
       logsChanged,
       addedAlts,
       statMap,
-      primaryRecord: statMap.get(normalizeNameKey(entry.name)) || null,
       // Same identity expression as broadcastAppliedEdit.
       editorName: interaction.member?.displayName || interaction.user.username,
       isMove,
@@ -236,7 +233,6 @@ async function applyTypeChange(args) {
     evidenceChanged: Boolean(args.newImageUrl),
     logsChanged: Boolean(args.newLogs),
     addedAlts: args.additionalNamesParsed.added,
-    changes: args.changes,
     type: args.targetType,
     isMove: true,
     lang: args.lang,
@@ -280,7 +276,6 @@ async function applyInPlaceEdit(args) {
     evidenceChanged: Boolean(args.newImageUrl),
     logsChanged: Boolean(args.newLogs),
     addedAlts: args.additionalNamesParsed.added,
-    changes: args.changes,
     type: args.currentType,
     isMove: false,
     lang: args.lang,
