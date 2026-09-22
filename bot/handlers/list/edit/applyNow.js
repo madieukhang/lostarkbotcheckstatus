@@ -12,6 +12,8 @@ import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { t } from '../../../services/i18n/index.js';
+import { buildNameKeyMap, normalizeNameKey } from '../../../utils/names.js';
+import { LIST_VIEW_SNAPSHOT_PROJECTION } from '../view/pageData.js';
 import { moveListEntry } from '../services/moveEntry.js';
 import {
   getListContext,
@@ -139,13 +141,22 @@ export function buildInPlaceUpdatePlan({
   return { updateFields, updateOps };
 }
 
-async function loadEditCharacterSnapshot(name) {
+/**
+ * Snapshot stats for the entry's whole roster, read from the database so
+ * the edit card shows class, item level, CP and server without a Bible
+ * request. A failed read only drops that decoration.
+ * @param {object} entry - the edited entry (name, allCharacters)
+ * @returns {Promise<Map<string, object>>} snapshots by name key
+ */
+async function loadEditRosterStatMap(entry) {
+  const names = [entry.name, ...(entry.allCharacters || [])];
   try {
-    return await RosterSnapshot.findOne({ name }, { classId: 1 })
+    const snapshots = await RosterSnapshot.find({ name: { $in: names } }, LIST_VIEW_SNAPSHOT_PROJECTION)
       .collation({ locale: 'en', strength: 2 }).lean();
+    return buildNameKeyMap(snapshots);
   } catch (err) {
-    console.warn('[list-edit] Class snapshot lookup failed (non-fatal):', err.message);
-    return null;
+    console.warn('[list-edit] Roster snapshot lookup failed (non-fatal):', err.message);
+    return new Map();
   }
 }
 
@@ -154,27 +165,37 @@ async function renderEditSuccess({
   client,
   entry,
   previousEntry,
+  previousType,
   evidenceChanged,
+  logsChanged,
+  addedAlts,
   changes,
   type,
   isMove,
   lang,
 }) {
-  const [freshDisplayUrl, previousDisplayUrl, primaryRecord] = await Promise.all([
+  const [freshDisplayUrl, previousDisplayUrl, statMap] = await Promise.all([
     resolveDisplayImageUrl(entry, client),
     evidenceChanged ? resolveDisplayImageUrl(previousEntry, client) : '',
-    loadEditCharacterSnapshot(entry.name),
+    loadEditRosterStatMap(entry),
   ]);
   await editEmbed(
     interaction,
     buildListEditSuccessEmbeds(entry.toObject?.() || entry, {
       changes,
       type,
+      previousType,
+      previousEntry,
       freshDisplayUrl,
       previousDisplayUrl,
       hadPreviousEvidence: Boolean(previousEntry?.imageUrl || previousEntry?.imageMessageId),
       evidenceChanged,
-      primaryRecord,
+      logsChanged,
+      addedAlts,
+      statMap,
+      primaryRecord: statMap.get(normalizeNameKey(entry.name)) || null,
+      // Same identity expression as broadcastAppliedEdit.
+      editorName: interaction.member?.displayName || interaction.user.username,
       isMove,
       lang,
     }),
@@ -211,7 +232,10 @@ async function applyTypeChange(args) {
     client: args.client,
     entry: movedEntry,
     previousEntry,
+    previousType: args.currentType,
     evidenceChanged: Boolean(args.newImageUrl),
+    logsChanged: Boolean(args.newLogs),
+    addedAlts: args.additionalNamesParsed.added,
     changes: args.changes,
     type: args.targetType,
     isMove: true,
@@ -252,7 +276,10 @@ async function applyInPlaceEdit(args) {
     client: args.client,
     entry: editedEntry,
     previousEntry: args.existing,
+    previousType: args.currentType,
     evidenceChanged: Boolean(args.newImageUrl),
+    logsChanged: Boolean(args.newLogs),
+    addedAlts: args.additionalNamesParsed.added,
     changes: args.changes,
     type: args.currentType,
     isMove: false,

@@ -8,7 +8,7 @@ import { applyListEditNow } from '../bot/handlers/list/edit/applyNow.js';
 import { buildListEditPlan } from '../bot/handlers/list/edit/plan.js';
 
 for (const isMove of [false, true]) {
-  test(`edit reply refreshes both archived images and loads the primary class (${isMove ? 'move' : 'in-place'})`, async t => {
+  test(`edit reply refreshes both archived images and loads the roster stats (${isMove ? 'move' : 'in-place'})`, async t => {
     const existing = {
       _id: 'a'.repeat(24), name: 'Tenshi', reason: 'Reason', allCharacters: [],
       imageUrl: '', imageMessageId: 'old-image', imageChannelId: 'archive',
@@ -30,12 +30,12 @@ for (const isMove of [false, true]) {
         persisted = { ...source, ...update.$set };
       });
     }
-    t.mock.method(RosterSnapshot, 'findOne', (filter, projection) => {
-      assert.deepEqual(filter, { name: 'Tenshi' });
-      assert.deepEqual(projection, { classId: 1 });
+    t.mock.method(RosterSnapshot, 'find', (filter, projection) => {
+      assert.deepEqual(filter, { name: { $in: ['Tenshi'] } });
+      assert.deepEqual(projection, { _id: 0, name: 1, classId: 1, itemLevel: 1, combatScore: 1, world: 1 });
       return {
         collation(value) { assert.deepEqual(value, { locale: 'en', strength: 2 }); return this; },
-        lean: async () => ({ classId: 'bard' }),
+        lean: async () => [{ name: 'Tenshi', classId: 'bard' }],
       };
     });
     const previousEmoji = CLASS_EMOJI_MAP.Bard;
@@ -56,7 +56,7 @@ for (const isMove of [false, true]) {
     });
     await applyListEditNow({
       ...plan, existing, currentType, client,
-      interaction: { user: { id: 'owner' }, editReply: async reply => replies.push(reply) },
+      interaction: { user: { id: 'owner', username: 'Owner' }, editReply: async reply => replies.push(reply) },
       newImageUrl: 'https://example.test/upload.png',
       newImageRehost: { messageId: 'new-image', channelId: 'archive' },
       editGuildId: 'guild', editGuildDefaultScope: 'global', isOwner: true, lang: 'vi',
@@ -78,17 +78,17 @@ for (const isMove of [false, true]) {
   });
 }
 
-test('class lookup failure does not turn a saved edit into an error or duplicate unchanged evidence', async t => {
+test('roster stat lookup failure does not turn a saved edit into an error or duplicate unchanged evidence', async t => {
   const existing = { _id: 'a'.repeat(24), name: 'Tenshi', reason: 'Old', imageUrl: 'https://example.test/current.png' };
   let saved = false;
   t.mock.method(Blacklist, 'updateOne', async () => { saved = true; });
-  t.mock.method(RosterSnapshot, 'findOne', () => { throw new Error('Snapshot unavailable'); });
+  t.mock.method(RosterSnapshot, 'find', () => { throw new Error('Snapshot unavailable'); });
   t.mock.method(console, 'warn', () => {});
   const replies = [];
   await applyListEditNow({
     existing, currentType: 'black', targetType: 'black', newReason: 'New',
     additionalNamesParsed: { added: [] }, changes: ['Reason changed'], isOwner: true,
-    interaction: { editReply: async reply => replies.push(reply) }, client: {}, lang: 'vi',
+    interaction: { user: { id: 'owner', username: 'Owner' }, editReply: async reply => replies.push(reply) }, client: {}, lang: 'vi',
   });
   assert.equal(saved, true);
   assert.equal(replies.length, 1);

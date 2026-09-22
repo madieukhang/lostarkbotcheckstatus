@@ -10,7 +10,7 @@
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { buildNameKeyMap } from '../../../utils/names.js';
 
-const LIST_VIEW_SNAPSHOT_PROJECTION = Object.freeze({
+export const LIST_VIEW_SNAPSHOT_PROJECTION = Object.freeze({
   _id: 0,
   name: 1,
   classId: 1,
