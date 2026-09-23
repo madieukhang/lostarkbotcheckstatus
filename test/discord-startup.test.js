@@ -161,6 +161,17 @@ test('gateway diagnostics report successful re-identify and clear its watchdog',
   );
 });
 
+test('gateway diagnostics ignore a ready or resume that no reconnect started', () => {
+  const { client, timers, messages, terminations } = createGatewayHarness();
+
+  client.emit(Events.ShardReady, 0, new Set());
+  client.emit(Events.ShardResume, 0, 0);
+
+  assert.deepEqual(messages, []);
+  assert.equal(timers.active.size, 0);
+  assert.deepEqual(terminations, []);
+});
+
 test('gateway reconnect watchdog keeps the first deadline and terminates a stuck shard', () => {
   const { client, timers, terminations, warnings } = createGatewayHarness({
     reconnectTimeoutMs: 120_000,
