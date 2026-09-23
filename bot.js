@@ -30,7 +30,7 @@ const client = new Client({
 
 const terminate = createProcessTerminator({ client });
 installProcessLifecycle({ terminate });
-installDiscordGatewayDiagnostics(client);
+installDiscordGatewayDiagnostics(client, { terminate });
 
 client.once(Events.ClientReady, () => {
   void createReadyHandler(client)().catch((error) => terminate({
