@@ -1,7 +1,7 @@
 import { Events } from 'discord.js';
 
 const DISCORD_LOGIN_TIMEOUT_MS = 60_000;
-const DISCORD_RECONNECT_TIMEOUT_MS = 120_000;
+const DISCORD_RECONNECT_TIMEOUT_MS = 600_000;
 
 class DiscordLoginTimeoutError extends Error {
   constructor(timeoutMs) {

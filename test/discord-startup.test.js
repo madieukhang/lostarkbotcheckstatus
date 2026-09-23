@@ -183,6 +183,15 @@ test('gateway reconnect watchdog keeps the first deadline and terminates a stuck
   assert.equal(timers.active.size, 0);
 });
 
+test('gateway reconnect watchdog waits ten minutes by default so short outages resume on their own', () => {
+  const { client, timers } = createGatewayHarness();
+
+  client.emit(Events.ShardReconnecting, 0);
+  const [{ delay }] = timers.active.values();
+
+  assert.equal(delay, 600_000);
+});
+
 test('gateway diagnostics reject invalid watchdog configuration', () => {
   assert.throws(
     () => installDiscordGatewayDiagnostics(new EventEmitter()),
