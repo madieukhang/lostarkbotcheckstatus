@@ -79,6 +79,47 @@ for (const isMove of [false, true]) {
   });
 }
 
+for (const isMove of [false, true]) {
+  test(`edit broadcast carries the new alts and evidence (${isMove ? 'move' : 'in-place'})`, async t => {
+    const existing = {
+      _id: 'b'.repeat(24), name: 'Tenshi', reason: 'Reason', allCharacters: ['Oldalt'],
+      imageUrl: '', imageMessageId: 'old-image', imageChannelId: 'archive', addedByUserId: 'owner',
+    };
+    const currentType = isMove ? 'white' : 'black';
+    if (isMove) {
+      t.mock.method(Blacklist, 'findOne', () => ({ collation() { return this; }, lean: async () => null }));
+      t.mock.method(Whitelist.db, 'transaction', async run => run('session'));
+      t.mock.method(Whitelist, 'findById', () => ({ session: async () => existing }));
+      t.mock.method(Blacklist, 'create', async ([entry]) => [entry]);
+      t.mock.method(Whitelist, 'deleteOne', async () => ({ deletedCount: 1 }));
+    } else {
+      t.mock.method(Blacklist, 'updateOne', async () => {});
+    }
+    t.mock.method(RosterSnapshot, 'find', () => ({ collation() { return this; }, lean: async () => [] }));
+    const client = { channels: { fetch: async () => ({ isTextBased: () => true, messages: {
+      fetch: async messageId => ({ attachments: { first: () => ({ url: `https://example.test/${messageId}.png` }) } }),
+    } }) } };
+    const broadcasts = [];
+    await applyListEditNow({
+      existing, currentType, targetType: 'black', isTypeChange: isMove, targetScope: 'global',
+      newImageUrl: 'https://example.test/upload.png',
+      newImageRehost: { messageId: 'new-image', channelId: 'archive' },
+      additionalNamesParsed: { added: ['Newalt'] }, changes: ['Alts added'], isOwner: false,
+      broadcastListChange: async (_action, entry) => { broadcasts.push(entry); },
+      interaction: {
+        guild: { id: 'guild' },
+        user: { id: 'officer', username: 'Officer', tag: 'Officer#0001' },
+        editReply: async () => {},
+      },
+      client, editGuildId: 'guild', editGuildDefaultScope: 'global', lang: 'en',
+    });
+
+    assert.equal(broadcasts.length, 1);
+    assert.deepEqual(broadcasts[0].allCharacters, ['Oldalt', 'Newalt']);
+    assert.equal(broadcasts[0].imageMessageId, 'new-image');
+  });
+}
+
 test('roster stat lookup failure does not turn a saved edit into an error or duplicate unchanged evidence', async t => {
   const existing = { _id: 'a'.repeat(24), name: 'Tenshi', reason: 'Old', imageUrl: 'https://example.test/current.png' };
   let saved = false;

@@ -213,7 +213,7 @@ async function applyTypeChange(args) {
       ...t('dialogue.listEdit.moveBlocked', args.lang, { name: args.existing.name }),
       lang: args.lang,
     });
-    return false;
+    return null;
   }
 
   let previousEntry;
@@ -237,7 +237,7 @@ async function applyTypeChange(args) {
     isMove: true,
     lang: args.lang,
   });
-  return true;
+  return movedEntry;
 }
 
 function buildEditedEntry(existing, updateFields, additionalNames) {
@@ -259,7 +259,7 @@ async function applyInPlaceEdit(args) {
       ...t('dialogue.listEdit.scopeRaced', args.lang),
       lang: args.lang,
     });
-    return false;
+    return null;
   }
 
   const editedEntry = buildEditedEntry(
@@ -280,17 +280,16 @@ async function applyInPlaceEdit(args) {
     isMove: false,
     lang: args.lang,
   });
-  return true;
+  return editedEntry;
 }
 
-function broadcastAppliedEdit(args) {
-  const entryObj = args.existing.toObject?.() || args.existing;
+// editedEntry is the entry as saved, so the card other servers see lists
+// the added alts and the new evidence instead of the pre-edit values.
+function broadcastAppliedEdit(args, editedEntry) {
   const finalScope = args.targetType === 'black' ? args.targetScope : 'global';
   if (args.isOwner || finalScope === 'server') return;
   args.broadcastListChange('edited', {
-    ...entryObj,
-    reason: args.newReason || args.existing.reason,
-    raid: args.newRaid || args.existing.raid,
+    ...(editedEntry.toObject?.() || editedEntry),
     scope: finalScope,
   }, {
     type: args.targetType,
@@ -361,11 +360,11 @@ export async function applyListEditNow({
     lang,
   };
   try {
-    const applied = isTypeChange
+    const editedEntry = isTypeChange
       ? await applyTypeChange(args)
       : await applyInPlaceEdit(args);
-    if (!applied) return;
-    broadcastAppliedEdit(args);
+    if (!editedEntry) return;
+    broadcastAppliedEdit(args, editedEntry);
   } catch (err) {
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,
