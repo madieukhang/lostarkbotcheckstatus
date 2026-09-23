@@ -852,9 +852,18 @@ export async function handleSetupCommand(interaction) {
     return;
   }
 
+  // The action option is autocomplete-only, so Discord accepts any typed text.
   const action = interaction.options.getString('action', true);
   const handler = SETUP_ACTION_HANDLERS[action];
-  if (handler) await handler(interaction, lang);
+  if (!handler) {
+    await editAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      ...t('dialogue.setup.unknownAction', lang, { action }),
+      lang,
+    });
+    return;
+  }
+  await handler(interaction, lang);
 }
 
 /**

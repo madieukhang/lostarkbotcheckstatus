@@ -234,6 +234,10 @@ export default {
       title: 'Manage Server permission required',
       description: 'You need **Manage Server** to change my settings here.',
     },
+    unknownAction: {
+      title: 'Unknown setup action',
+      description: '`{action}` is not a `/la-setup` action. Pick one from the list that appears as you type in `action`.',
+    },
     defaultScopeSet: 'Default blacklist scope set to **{scope}**.\nWhen `/la-list add type:black` omits scope, I will use **{scope}**.',
   },
   evidence: {

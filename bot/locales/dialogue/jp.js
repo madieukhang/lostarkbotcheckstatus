@@ -156,6 +156,7 @@ export default {
       pinFailed: '言語は変更しましたが、<#{channel}> の {surface} guide を更新できません。足りない権限: {missing}。', pinResult: '**{surface}:** <#{channel}> で {outcome}',
     },
     manageGuildRequired: { title: 'Manage Server 権限が必要ですの', description: 'わたくしの設定を変えるには **Manage Server** 権限が必要ですわ。' },
+    unknownAction: { title: '知らない action ですわ', description: '`{action}` は `/la-setup` の action ではありませんの。`action` 欄に入力すると出る候補から選んでくださいませ。' },
     defaultScopeSet: 'Blacklist の既定 scope を **{scope}** に設定しました。\n`/la-list add type:black` で scope を省略した場合は **{scope}** を使いますの。',
   },
   evidence: {

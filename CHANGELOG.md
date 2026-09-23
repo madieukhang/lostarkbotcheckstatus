@@ -15,6 +15,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ### Fixed
 - A member's bulk-add Confirm answers Discord at once with the processing card, as the officer path already did. The approval request used to be built first (image rehosts, a pause per row, approver DMs), so a batch of about ten rows missed Discord's 3-second window, the click failed, and the request whose DMs had already gone out was deleted.
 - Turning on auto-check cleanup no longer empties the channel within 15 minutes. When the channel already held LoaLogs' pinned guide, the next scheduler tick deleted every unpinned message right away, although both the confirmation and the guide say cleanup runs at 00:00 Asia/Ho_Chi_Minh. Opting in now counts as today's run, so the first cleanup happens at the next 00:00.
+- `/la-setup config` answers an `action` it does not know instead of leaving the reply stuck on "thinking". The option only suggests actions, so any typed text reached the command.
 - Quick Add rejects a typed list type other than `black`, `white` or `watch` with an error. Unknown values used to fall back to blacklist, so a typo such as `watchlist` filed the name for the blacklist.
 - Bulk-add skip reasons strip status icons without splitting other emoji. No current skip message contains emoji, so this closes a latent defect rather than a visible one.
 - Concurrent MongoDB callers share one connection attempt, and reconnects no longer accumulate event listeners.

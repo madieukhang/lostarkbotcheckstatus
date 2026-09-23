@@ -181,6 +181,7 @@ export default {
       pinFailed: 'Đã đổi ngôn ngữ nhưng chưa làm mới được bảng {surface} trong <#{channel}>. Còn thiếu: {missing}.', pinResult: '**{surface}:** {outcome} trong <#{channel}>.',
     },
     manageGuildRequired: { title: 'Cần quyền Manage Server', description: 'Cậu cần quyền **Manage Server** để đổi cấu hình của tớ ở đây.' },
+    unknownAction: { title: 'Tớ không biết action này', description: '`{action}` không phải action của `/la-setup`. Cậu chọn một action trong danh sách gợi ý hiện ra khi gõ vào ô `action` nhé.' },
     defaultScopeSet: 'Đã đặt scope blacklist mặc định thành **{scope}**.\nKhi `/la-list add type:black` bỏ trống scope, tớ sẽ dùng **{scope}**.',
   },
   evidence: {
