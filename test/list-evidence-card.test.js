@@ -106,67 +106,9 @@ test('list-view evidence can omit the list already established by its parent vie
   );
 });
 
-test('notice mode swaps the title bar for an Artist headline', () => {
-  const embed = buildEvidenceEmbed(makeEntry(), '', {
-    lang: 'vi',
-    statMap: statMapFromRosterCharacters(ROSTER),
-    headline: true,
-    attachImage: false,
-  }).toJSON();
-
-  // Same shape a list-change broadcast uses: the list is named in the
-  // title and the character in one spoken line under it.
-  assert.match(embed.title, /Kết quả kiểm tra · Blacklist/u);
-  assert.match(embed.description, /\[Tenshi\]/u);
-  assert.match(embed.description, /Blacklist/u);
-  // The name is already linked in that line, so the title drops its URL
-  // rather than offering the same link twice.
-  assert.equal(embed.url, undefined);
-  // List would restate the headline.
-  assert.equal(embed.fields.some((f) => f.name.includes('List')), false);
-});
-
-test('notice mode keeps evidence off the card entirely', () => {
-  const withImage = buildEvidenceEmbed(makeEntry(), 'https://cdn.example.test/e.png', {
-    lang: 'vi', headline: true, attachImage: false,
-  }).toJSON();
-  const withoutImage = buildEvidenceEmbed(makeEntry(), '', {
-    lang: 'vi', headline: true, attachImage: false,
-  }).toJSON();
-
-  // No embedded screenshot, and no "evidence unavailable" field either ·
-  // the button beside the card is the only evidence affordance.
-  assert.equal(withImage.image, undefined);
-  assert.equal(withoutImage.image, undefined);
-  assert.equal(withoutImage.fields.some((f) => f.name.includes('Evidence')), false);
-
-  // Detail mode is untouched and still embeds the screenshot.
-  const detail = buildEvidenceEmbed(makeEntry(), 'https://cdn.example.test/e.png', { lang: 'vi' }).toJSON();
-  assert.equal(detail.image.url, 'https://cdn.example.test/e.png');
-});
-
-test('notice mode names both sides when the hit came through a roster alt', () => {
-  // /la-roster matches on every character in the roster, so the entry
-  // that hit is often not the name the officer typed.
-  const entry = decorateListEntry({
-    name: 'Hanako',
-    reason: 'Griefing report',
-    allCharacters: ['Hanako', 'Tenshi'],
-  }, 'black');
-  const statMap = statMapFromRosterCharacters(ROSTER);
-  const via = buildEvidenceEmbed(entry, '', {
-    lang: 'vi', statMap, headline: true, attachImage: false, viaName: 'Tenshi',
-  }).toJSON();
-
-  // Both sides are named: what was typed, and what actually hit.
-  assert.match(via.description, /\*\*\[Tenshi\]\(\S+\)\*\* chung roster/u);
-  assert.match(via.description, /\[Hanako\]/u);
-
-  // Searching the blacklisted name itself keeps the direct wording, and
-  // never mentions a second character. Matching is case-insensitive.
-  const direct = buildEvidenceEmbed(entry, '', {
-    lang: 'vi', statMap, headline: true, attachImage: false, viaName: 'hanako',
-  }).toJSON();
-  assert.doesNotMatch(direct.description, /Tenshi/u);
-  assert.doesNotMatch(direct.description, /chung roster/u);
+test('the evidence card embeds its screenshot under a linked title', () => {
+  const embed = buildEvidenceEmbed(makeEntry(), 'https://cdn.example.test/e.png', { lang: 'vi' }).toJSON();
+  assert.equal(embed.image.url, 'https://cdn.example.test/e.png');
+  assert.match(embed.title, /Tenshi/u);
+  assert.ok(embed.url);
 });

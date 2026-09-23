@@ -10,7 +10,6 @@ const { buildCheckEntryDetailsEmbed } = await import('../bot/handlers/list/check
 const { buildBroadcastFields, mergeRosterStatRecords } = await import('../bot/handlers/list/services/broadcasts.js');
 const { buildListAddSuccessFields } = await import('../bot/handlers/list/services/addExecutor.js');
 const { statMapFromRosterCharacters } = await import('../bot/handlers/list/trackedAltsRender.js');
-const { buildEvidenceEmbed } = await import('../bot/handlers/list/view/ui.js');
 const { decorateListEntry } = await import('../bot/handlers/list/helpers.js');
 
 const ZWSP = '​';
@@ -88,37 +87,6 @@ test('the broadcast card reads the server across the roster too', () => {
   });
 
   assert.equal(serverValue(fields), '`Elpon`');
-});
-
-test('the la-roster hit card carries Server and stays at five fields', () => {
-  // This is the card /la-roster puts above the roster it just fetched.
-  // Five real fields use one trailing pad; the exact order below locks the
-  // requested CP / Added swap while Server retains its original position.
-  const statMap = new Map([
-    ['tenshi', { name: 'Tenshi', classId: 'bard', itemLevel: 1770, combatScore: '≈4903.06' }],
-    ['hanako', { name: 'Hanako', world: 'Thaemine' }],
-  ]);
-  const fields = buildEvidenceEmbed(decorateListEntry(ENTRY, 'black'), '', {
-    lang: 'vi',
-    statMap,
-    headline: true,
-    attachImage: false,
-    viaName: 'Hanako',
-  }).toJSON().fields;
-  const inlineNames = fields.filter((f) => f.inline).map((f) => f.name);
-
-  assert.equal(serverValue(fields), '`Thaemine`');
-  assert.deepEqual(inlineNames, [
-    '🗡️ Raid',
-    '⚔️ CP',
-    '📊 ilvl',
-    '🕐 Đã thêm',
-    '🌍 Server',
-    ZWSP,
-  ]);
-  // No "Added by" on this card · the officer who filed the entry is not
-  // what the searcher is being warned about.
-  assert.equal(inlineNames.some((name) => name.includes('Người thêm')), false);
 });
 
 test('the server survives the broadcast stat-record normalizer', () => {

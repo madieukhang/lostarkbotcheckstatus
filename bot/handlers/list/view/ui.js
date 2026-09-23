@@ -1,9 +1,9 @@
 /**
  * handlers/list/view/ui.js
  * Pure render helpers for /la-list view + the evidence card used by
- * /la-list view, /la-search, /la-evidence, /la-roster, and the
- * approval-flow evidence button. Centralising the embed shape here
- * is what makes those five surfaces stay visually consistent.
+ * /la-list view, /la-search, /la-evidence, and the approval-flow
+ * evidence button. Centralising the embed shape here is what makes
+ * those surfaces stay visually consistent.
  *
  * Exports: buildTrustedListEmbed, buildListPageEmbed,
  * buildListViewComponents, buildEvidenceEmbed, buildExpiredComponents.
@@ -320,14 +320,11 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
  * built by statMapFromRosterCharacters or a RosterSnapshot query) is what
  * turns the alt rows from bare links into class + ilvl + CP rows and fills
  * the ilvl / CP slots. It is optional: a caller with no roster data in hand
- * gets the card without those slots rather than a grid of "N/A", which is
- * why this reads as an upgrade on /la-roster and a no-op everywhere else
- * until those callers pass one too.
+ * gets the card without those slots rather than a grid of "N/A".
  */
 function buildEvidenceInlineMeta(entry, snapshot, {
   includeAddedBy,
   includeList,
-  headline,
   lang,
   statMap,
 }) {
@@ -342,9 +339,9 @@ function buildEvidenceInlineMeta(entry, snapshot, {
     entry.raid
       ? { name: t('listView.evidence.raid', lang), value: `\`${entry.raid}\``, inline: true }
       : null,
-    // With a headline, or when /la-list view already establishes the selected
-    // list before this detail opens, repeating the list adds no information.
-    includeList && !headline ? {
+    // When /la-list view already establishes the selected list before this
+    // detail opens, repeating the list adds no information.
+    includeList ? {
       name: t('listView.evidence.list', lang),
       value: getListTypeLabel(entry._listType, entry._label, lang),
       inline: true,
@@ -361,9 +358,6 @@ function buildEvidenceInlineMeta(entry, snapshot, {
     entry.addedAt
       ? { name: t('listView.evidence.added', lang), value: relativeTime(entry.addedAt), inline: true }
       : null,
-  // Added by and Server retain their previous relative positions. Only CP
-  // and Added swap places, so the /la-roster headline reads Raid / CP /
-  // ilvl then Added / Server without disturbing the rest of the card.
     includeAddedBy && addedByDisplay
       ? { name: t('listView.evidence.addedBy', lang), value: addedByDisplay, inline: true }
       : null,
@@ -377,7 +371,6 @@ function buildEvidenceInlineMeta(entry, snapshot, {
 function buildEvidenceFields(entry, snapshot, {
   includeAddedBy,
   includeList,
-  headline,
   lang,
   statMap,
 }) {
@@ -386,7 +379,6 @@ function buildEvidenceFields(entry, snapshot, {
     ...buildEvidenceInlineMeta(entry, snapshot, {
       includeAddedBy,
       includeList,
-      headline,
       lang,
       statMap,
     }),
@@ -417,34 +409,10 @@ function buildEvidenceFields(entry, snapshot, {
   return [...fields, altsField].filter(Boolean);
 }
 
-function applyEvidenceHeader(embed, entry, snapshot, { headline, viaName, statMap, lang }) {
-  if (!headline) {
-    embed.setTitle(`${entry._icon} ${entry.name}`).setURL(rosterUrl(entry.name));
-    return;
-  }
-
-  const listLabel = getListTypeLabel(entry._listType, entry._label, lang);
-  const scopeTag = entry.scope === 'server'
-    ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
-    : '';
-  const searched = String(viaName || '').trim();
-  const isVia = searched && normalizeNameKey(searched) !== normalizeNameKey(entry.name);
-  embed
-    .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
-    .setDescription(t(`dialogue.check.details.${isVia ? 'headlineVia' : 'headline'}`, lang, {
-      icon: getListContext(entry._listType).icon,
-      name: formatLinkedCharacter(entry.name, snapshot),
-      searched: formatLinkedCharacter(searched, statMap.get(normalizeNameKey(searched))),
-      list: listLabel,
-      scope: scopeTag,
-    }));
-}
-
-function applyEvidenceMedia(embed, entry, displayUrl, { attachImage, lang }) {
-  if (attachImage && displayUrl) {
+function applyEvidenceMedia(embed, entry, displayUrl, { lang }) {
+  if (displayUrl) {
     // A heading for the image, so it does not run straight on from the
-    // roster list above it. Notice mode sends evidence to a button and
-    // never reaches here, which is right · there is nothing to caption.
+    // roster list above it.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
       value: BLANK_FIELD_VALUE,
@@ -453,7 +421,6 @@ function applyEvidenceMedia(embed, entry, displayUrl, { attachImage, lang }) {
     embed.setImage(displayUrl);
     return;
   }
-  if (!attachImage) return;
 
   const evidenceMessage = entry.imageMessageId || entry.imageUrl
     ? t('listView.evidence.unavailable', lang)
@@ -470,29 +437,22 @@ export function buildEvidenceEmbed(entry, displayUrl, {
   includeList = true,
   lang = 'en',
   statMap = new Map(),
-  headline = false,
-  attachImage = true,
-  viaName = '',
 } = {}) {
   const snapshot = statMap.get(normalizeNameKey(entry.name)) || null;
   const fields = buildEvidenceFields(entry, snapshot, {
     includeAddedBy,
     includeList,
-    headline,
     lang,
     statMap,
   });
 
   const embed = createArtistEmbed(lang)
+    .setTitle(`${entry._icon} ${entry.name}`)
+    .setURL(rosterUrl(entry.name))
     .addFields(fields)
     .setColor(entry._color)
     .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : undefined);
-  applyEvidenceHeader(embed, entry, snapshot, { headline, viaName, statMap, lang });
-
-  // attachImage:false sends evidence to a button beside the card · a
-  // full-width screenshot dwarfs the data when this card is a side note
-  // rather than the thing the reader asked for.
-  applyEvidenceMedia(embed, entry, displayUrl, { attachImage, lang });
+  applyEvidenceMedia(embed, entry, displayUrl, { lang });
 
   if (entry.logsUrl) {
     embed.addFields({

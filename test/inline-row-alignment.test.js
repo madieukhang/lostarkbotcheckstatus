@@ -72,16 +72,14 @@ test('broadcast fields fill whole inline rows for every optional combination', (
   }
 });
 
-test('evidence card fills whole inline rows in both modes', () => {
+test('evidence card fills whole inline rows', () => {
   const statMap = new Map([['tenshi', SNAP]]);
-  for (const headline of [true, false]) {
-    for (const includeAddedBy of [true, false]) {
-      for (const snap of [statMap, new Map()]) {
-        const embed = buildEvidenceEmbed(decorateListEntry(ENTRY, 'black'), '', {
-          lang: 'vi', headline, includeAddedBy, statMap: snap, attachImage: !headline,
-        }).toJSON();
-        assertWholeRows(`evidence (headline=${headline}, addedBy=${includeAddedBy})`, embed.fields);
-      }
+  for (const includeAddedBy of [true, false]) {
+    for (const snap of [statMap, new Map()]) {
+      const embed = buildEvidenceEmbed(decorateListEntry(ENTRY, 'black'), '', {
+        lang: 'vi', includeAddedBy, statMap: snap,
+      }).toJSON();
+      assertWholeRows(`evidence (addedBy=${includeAddedBy})`, embed.fields);
     }
   }
 });
