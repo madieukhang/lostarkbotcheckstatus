@@ -42,7 +42,7 @@ const en = {
       description: 'Show live server status',
     },
     reset: {
-      description: 'Reset the stored status state back to default',
+      description: 'Clear the stored server status; the next check starts over without an online alert',
     },
     roster: {
       description: 'Fetch roster for a Lost Ark character with progression tracking',
@@ -285,7 +285,6 @@ const en = {
           name: '📡 Server Monitoring',
           lines: [
             '`/la-status` - Show live server status for all monitored servers',
-            '`/la-reset` - Reset the stored status state',
           ],
         },
         {
@@ -343,6 +342,7 @@ const en = {
         name: '👑 Owner Server Only',
         lines: [
           '`/la-stats` - Show bot usage statistics',
+          '`/la-reset` - Clear the stored server status; the next check starts over without an online alert',
           '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
           '`/la-remote action:evidencechannel channel:#...` - Set evidence storage channel (bot rehosts here to avoid Discord CDN expiry)',
           '`/la-remote action:syncimages` - Migrate legacy images to rehost storage. See dropdown for the detailed flow.',

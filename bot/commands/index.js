@@ -499,7 +499,6 @@ function remoteCommand(name) {
 
 const PUBLIC_COMMAND_DEFS = [
   ['la-status', statusCommand],
-  ['la-reset', resetCommand],
   ['la-roster', rosterCommand],
   ['la-list', listCommand],
   ['la-search', searchCommand],
@@ -514,6 +513,7 @@ const PUBLIC_COMMAND_DEFS = [
 const OWNER_COMMAND_DEFS = [
   ['la-stats', statsCommand],
   ['la-remote', remoteCommand],
+  ['la-reset', resetCommand],
 ];
 
 export function buildCommands() {

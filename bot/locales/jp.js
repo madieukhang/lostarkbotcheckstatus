@@ -143,7 +143,6 @@ const jp = {
           name: '📡 サーバー監視',
           lines: [
             '`/la-status` - 監視中の Lost Ark サーバー状態を見る',
-            '`/la-reset` - 保存済みステータスをリセット',
           ],
         },
         {
@@ -201,6 +200,7 @@ const jp = {
         name: '👑 Owner Server のみ',
         lines: [
           '`/la-stats` - bot 統計を見る',
+          '`/la-reset` - 保存済みのサーバー状態を消去 (次回のチェックは最初からやり直し、オンライン通知は出しません)',
           '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
           '`/la-remote action:evidencechannel channel:#...` - evidence 保存 channel を設定 (Discord CDN expiry 回避のため bot が rehost)',
           '`/la-remote action:syncimages` - legacy image を rehost storage へ migrate。詳細は dropdown へ。',

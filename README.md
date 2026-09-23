@@ -47,7 +47,6 @@ image may need fallback or a correction pass. Settings do not create new quota.
 | Command | Description |
 |---|---|
 | `/la-status` | Live server status |
-| `/la-reset` | Reset the stored server status state |
 | `/la-roster name [deep] [deep_limit]` | Fetch roster, progression delta, cross-check lists. `deep:true` runs Stronghold alt scan and is **restricted to officers/seniors** (it depends on the bot owner's residential-IP worker). Plain `/la-roster name` without the deep flag is open to everyone |
 | `/la-search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists, and open blacklist/watchlist/whitelist details even without an evidence image |
 | `/la-evidence name [public]` | Direct evidence lookup for a single listed name. Autocomplete unions blacklist/whitelist/watchlist; bypasses `/la-list view` paging. Ephemeral by default; `public:true` is officer/senior only |
@@ -72,6 +71,8 @@ image may need fallback or a correction pass. Settings do not create new quota.
 | `action:set-default-scope scope:global/server` | Default scope for `/la-list add` |
 | `action:set-language` / `action:repin` / `action:notify-repin` | Set public language / clean non-pinned auto-check messages and refresh its guide / refresh the notification guide |
 | `action:notify-cleanup` | Run one notification-channel cleanup immediately |
+
+Owner-server commands (`/la-stats`, `/la-remote`, `/la-reset`) are registered only in `OWNER_GUILD_ID` and listed in `/la-help` there. `/la-reset` clears the stored server status; the next check starts over without an online alert.
 
 ### Status Icons
 

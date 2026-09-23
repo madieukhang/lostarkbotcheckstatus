@@ -143,7 +143,6 @@ const vi = {
           name: '📡 Theo dõi server',
           lines: [
             '`/la-status` - Xem trạng thái server Lost Ark đang monitor',
-            '`/la-reset` - Reset trạng thái đã lưu',
           ],
         },
         {
@@ -201,6 +200,7 @@ const vi = {
         name: '👑 Chỉ Owner Server',
         lines: [
           '`/la-stats` - Xem thống kê bot',
+          '`/la-reset` - Xoá trạng thái server đã lưu; lần kiểm tra kế tiếp bắt đầu lại và không báo online',
           '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
           '`/la-remote action:evidencechannel channel:#...` - Set channel lưu evidence (bot rehost ảnh ở đây để tránh Discord CDN expire)',
           '`/la-remote action:syncimages` - Migrate ảnh legacy sang rehost storage. Xem chi tiết trong dropdown.',
