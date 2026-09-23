@@ -13,6 +13,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Fixed
+- A member's bulk-add Confirm answers Discord at once with the processing card, as the officer path already did. The approval request used to be built first (image rehosts, a pause per row, approver DMs), so a batch of about ten rows missed Discord's 3-second window, the click failed, and the request whose DMs had already gone out was deleted.
 - Quick Add rejects a typed list type other than `black`, `white` or `watch` with an error. Unknown values used to fall back to blacklist, so a typo such as `watchlist` filed the name for the blacklist.
 - Bulk-add skip reasons strip status icons without splitting other emoji. No current skip message contains emoji, so this closes a latent defect rather than a visible one.
 - Concurrent MongoDB callers share one connection attempt, and reconnects no longer accumulate event listeners.

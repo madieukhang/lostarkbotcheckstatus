@@ -111,17 +111,20 @@ export function createMultiaddConfirmButtonHandler(deps) {
 
     clearMultiaddPending(requestId);
 
-    if (isOfficerOrSenior(pending.requesterId)) {
-      await updateNotice(interaction, t('dialogue.multiadd.confirm.processing', lang, {
-        count: pending.rows.length,
-        seconds: Math.ceil(pending.rows.length * 0.7),
-      }), {
-        severity: AlertSeverity.INFO,
-        titleIcon: '⏳',
-        lang,
-        components: [],
-      });
+    // Both paths rehost images, write to Mongo and message people before they
+    // finish, which outlasts Discord's 3-second window, so the card is
+    // acknowledged and its buttons removed before that work starts.
+    await updateNotice(interaction, t('dialogue.multiadd.confirm.processing', lang, {
+      count: pending.rows.length,
+      seconds: Math.ceil(pending.rows.length * 0.7),
+    }), {
+      severity: AlertSeverity.INFO,
+      titleIcon: '⏳',
+      lang,
+      components: [],
+    });
 
+    if (isOfficerOrSenior(pending.requesterId)) {
       const onProgress = async (current, total) => {
         if (current % 5 !== 0 && current !== total) return;
         try {
@@ -166,7 +169,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
 
       const targetApproverIds = getSeniorApproverIds();
       if (targetApproverIds.length === 0) {
-        await updatePayload(interaction, {
+        await editPayload(interaction, {
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
             ...t('dialogue.multiadd.confirm.routing', lang),
@@ -239,7 +242,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
         await PendingApproval.deleteOne({ requestId }).catch((err) =>
           console.warn('[multiadd] Failed to clean up placeholder approval:', err.message)
         );
-        await updatePayload(interaction, {
+        await editPayload(interaction, {
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
             ...t('dialogue.multiadd.confirm.delivery', lang),
@@ -268,15 +271,17 @@ export function createMultiaddConfirmButtonHandler(deps) {
         .setFooter({ text: t('dialogue.multiadd.confirm.awaiting.footer', lang, { id: requestId.slice(0, 8) }) })
         .setTimestamp();
 
-      await updatePayload(interaction, {
+      // The request and its DMs already exist; a failed card edit must not
+      // reach the catch below, which would delete the approval under them.
+      await editPayload(interaction, {
         content: null,
         embeds: [waitEmbed],
         components: [],
-      });
+      }).catch((err) => console.warn('[multiadd] Approval request sent, but the confirm card update failed:', err.message));
     } catch (err) {
       console.error('[multiadd] Approval request create failed:', err);
       await PendingApproval.deleteOne({ requestId }).catch(() => {});
-      await updatePayload(interaction, {
+      await editPayload(interaction, {
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.WARNING,
           ...t('dialogue.multiadd.confirm.requestFailed', lang),
