@@ -33,6 +33,7 @@ import {
   parseListEntryRef,
 } from '../helpers.js';
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
+import { LIST_VIEW_SNAPSHOT_PROJECTION } from '../view/pageData.js';
 import { buildCheckEntryDetailsEmbed } from './ui.js';
 import { getUserOcrMode } from '../../../services/list-check/preferences.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
@@ -103,9 +104,14 @@ export function buildAutoCheckEvidenceRow(results, lang = 'en') {
 }
 
 /**
- * Load cached character stats for the dropdown detail card. This path is
- * deliberately DB-only: the original check already owns enrichment, so a
- * component click must not trigger another Bible/worker request.
+ * Load cached character stats for an entry's whole roster, for the check
+ * detail card, the search evidence card and the edit card. DB-only on
+ * purpose: those cards follow a check or a write that already owns
+ * enrichment, so rendering them must not trigger another Bible/worker
+ * request. A failed read only drops the stat decoration.
+ * @param {object} entry - list entry with name and allCharacters
+ * @param {{RosterSnapshotModel?: object}} [deps]
+ * @returns {Promise<Map<string, object>>} snapshots keyed by normalized name
  */
 export async function loadCheckDetailStatMap(entry, {
   RosterSnapshotModel = RosterSnapshot,
@@ -117,12 +123,12 @@ export async function loadCheckDetailStatMap(entry, {
   if (names.length === 0) return new Map();
 
   try {
-    const snapshots = await RosterSnapshotModel.find({ name: { $in: names } })
+    const snapshots = await RosterSnapshotModel.find({ name: { $in: names } }, LIST_VIEW_SNAPSHOT_PROJECTION)
       .collation({ locale: 'en', strength: 2 })
       .lean();
     return statMapFromRosterCharacters(snapshots);
   } catch (err) {
-    console.warn('[listcheck] Snapshot lookup for detail card failed (non-fatal):', err.message);
+    console.warn('[list] Roster snapshot lookup failed (non-fatal):', err.message);
     return new Map();
   }
 }

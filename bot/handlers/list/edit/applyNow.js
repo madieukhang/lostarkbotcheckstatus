@@ -7,13 +7,11 @@
  * legacy null, then broadcasts the change.
  */
 
-import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { t } from '../../../services/i18n/index.js';
-import { buildNameKeyMap } from '../../../utils/names.js';
-import { LIST_VIEW_SNAPSHOT_PROJECTION } from '../view/pageData.js';
+import { loadCheckDetailStatMap } from '../check/index.js';
 import { moveListEntry } from '../services/moveEntry.js';
 import {
   getListContext,
@@ -141,25 +139,6 @@ export function buildInPlaceUpdatePlan({
   return { updateFields, updateOps };
 }
 
-/**
- * Snapshot stats for the entry's whole roster, read from the database so
- * the edit card shows class, item level, CP and server without a Bible
- * request. A failed read only drops that decoration.
- * @param {object} entry - the edited entry (name, allCharacters)
- * @returns {Promise<Map<string, object>>} snapshots by name key
- */
-async function loadEditRosterStatMap(entry) {
-  const names = [entry.name, ...(entry.allCharacters || [])];
-  try {
-    const snapshots = await RosterSnapshot.find({ name: { $in: names } }, LIST_VIEW_SNAPSHOT_PROJECTION)
-      .collation({ locale: 'en', strength: 2 }).lean();
-    return buildNameKeyMap(snapshots);
-  } catch (err) {
-    console.warn('[list-edit] Roster snapshot lookup failed (non-fatal):', err.message);
-    return new Map();
-  }
-}
-
 async function renderEditSuccess({
   interaction,
   client,
@@ -176,7 +155,7 @@ async function renderEditSuccess({
   const [freshDisplayUrl, previousDisplayUrl, statMap] = await Promise.all([
     resolveDisplayImageUrl(entry, client),
     evidenceChanged ? resolveDisplayImageUrl(previousEntry, client) : '',
-    loadEditRosterStatMap(entry),
+    loadCheckDetailStatMap(entry),
   ]);
   await editEmbed(
     interaction,
