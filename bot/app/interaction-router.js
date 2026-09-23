@@ -16,6 +16,7 @@ import { resolveAutoCheckCleanupEnabled } from '../services/setup/autoCheckClean
 import { createSystemHandlers } from '../handlers/system/index.js';
 import { handleRosterCommand } from '../handlers/roster/command.js';
 import { handleRosterDeepContinueButton } from '../handlers/roster/deepContinue.js';
+import { ROSTER_EVIDENCE_PREFIX, handleRosterEvidenceButton } from '../handlers/roster/evidenceButton.js';
 import {
   createListHandlers,
   handleListEvidenceAutocomplete,
@@ -207,6 +208,11 @@ export function createButtonRoutes(listHandlers) {
       prefixes: ['roster-deep:continue:'],
       label: '[roster] deep continue button error:',
       handle: handleRosterDeepContinueButton,
+    },
+    {
+      prefixes: [ROSTER_EVIDENCE_PREFIX],
+      label: '[roster] report button error:',
+      handle: handleRosterEvidenceButton,
     },
     {
       prefixes: ['list-add:enrich-hidden:'],

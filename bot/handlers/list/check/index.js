@@ -133,6 +133,49 @@ export async function loadCheckDetailStatMap(entry, {
   }
 }
 
+/**
+ * Show one list entry's detail card on an acknowledged component
+ * interaction. The entry is reloaded under the viewer's guild scope, so an
+ * entry removed or moved to another server since the card was sent stays
+ * hidden.
+ * @param {import('discord.js').MessageComponentInteraction} interaction - already deferred
+ * @param {{listType: string, id: string}} ref - a parsed `<listType>:<_id>`
+ * @param {{client: import('discord.js').Client, lang: string}} options
+ * @returns {Promise<void>}
+ */
+export async function editWithListEntryDetails(interaction, { listType, id }, { client, lang }) {
+  await connectDB();
+  const entry = await getListContext(listType).model.findOne(buildScopedListQuery(
+    listType,
+    { _id: id },
+    interaction.guild?.id || interaction.guildId || '',
+  )).lean();
+
+  if (!entry) {
+    await editAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      ...t('dialogue.check.entryRemoved', lang),
+      lang,
+    });
+    return;
+  }
+
+  const [displayUrl, statMap] = await Promise.all([
+    resolveDisplayImageUrl(entry, client),
+    loadCheckDetailStatMap(entry),
+  ]);
+  const isOfficer =
+    config.officerApproverIds.includes(interaction.user.id)
+    || config.seniorApproverIds.includes(interaction.user.id);
+
+  await editEmbed(interaction, buildCheckEntryDetailsEmbed(decorateListEntry(entry, listType), {
+    displayUrl,
+    includeAddedBy: isOfficer,
+    lang,
+    statMap,
+  }));
+}
+
 function createAutoCheckEvidenceHandler({ client }) {
   return async function handleAutoCheckEvidenceSelect(interaction) {
     const raw = interaction.values?.[0] || '';
@@ -152,38 +195,7 @@ function createAutoCheckEvidenceHandler({ client }) {
       return;
     }
 
-    await connectDB();
-    const ctx = getListContext(parsed.listType);
-    const entry = await ctx.model.findOne(buildScopedListQuery(
-      parsed.listType,
-      { _id: parsed.id },
-      interaction.guild?.id || interaction.guildId || '',
-    )).lean();
-
-    if (!entry) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
-        ...t('dialogue.check.entryRemoved', lang),
-        lang,
-      });
-      return;
-    }
-
-    const decorated = decorateListEntry(entry, parsed.listType);
-    const [displayUrl, statMap] = await Promise.all([
-      resolveDisplayImageUrl(entry, client),
-      loadCheckDetailStatMap(entry),
-    ]);
-    const isOfficer =
-      config.officerApproverIds.includes(interaction.user.id)
-      || config.seniorApproverIds.includes(interaction.user.id);
-
-    await editEmbed(interaction, buildCheckEntryDetailsEmbed(decorated, {
-      displayUrl,
-      includeAddedBy: isOfficer,
-      lang,
-      statMap,
-    }));
+    await editWithListEntryDetails(interaction, parsed, { client, lang });
   };
 }
 

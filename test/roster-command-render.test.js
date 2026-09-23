@@ -17,6 +17,7 @@ const { resolveRosterScanOutcome } = await import('../bot/handlers/roster/comple
 const { mergeContinuationScanResult } = await import('../bot/handlers/roster/deepContinue.js');
 const { buildHiddenFields } = await import('../bot/handlers/roster/hiddenRoster.js');
 const { statMapFromRosterCharacters } = await import('../bot/handlers/list/trackedAltsRender.js');
+const { t } = await import('../bot/services/i18n/index.js');
 
 test('/la-roster renders CP as a code badge with the unit after the score', () => {
   const line = formatVisibleRosterLine({
@@ -168,7 +169,8 @@ test('/la-roster checks watchlist roster aliases alongside the existing list loo
   }));
 });
 
-test('/la-roster shows the watchlist headline and reason without an image in every locale', () => {
+test('/la-roster folds a watchlist hit into a status line and a report button in every locale', () => {
+  const watchId = 'c'.repeat(24);
   for (const lang of ['vi', 'en', 'jp']) {
     const { embed, embeds, evidenceRows } = buildVisibleRosterPresentation({
       name: 'Hailúa', lang, world: 'Thaemine', previousSnapshots: new Map(),
@@ -176,34 +178,53 @@ test('/la-roster shows the watchlist headline and reason without an image in eve
         { name: 'Hailúa', className: 'Souleater', itemLevel: '1730', combatScore: '≈4165.08', world: 'Thaemine' },
         { name: 'Burgerxúcxích', className: 'Breaker', itemLevel: '1730', combatScore: '≈4112.08', world: 'Thaemine' },
       ],
-      matches: { watchlist: { name: 'Burgerxúcxích', reason: 'vua ngủ gật', allCharacters: ['Hailúa', 'Burgerxúcxích'] } },
+      matches: { watchlist: { _id: watchId, name: 'Burgerxúcxích', reason: 'vua ngủ gật', allCharacters: ['Hailúa', 'Burgerxúcxích'] } },
     });
-    assert.equal(embed.toJSON().color, 0xfee75c);
-    assert.equal(embeds.length, 2);
-    assert.equal(embeds[1], embed, 'the existing roster remains below the warning');
-    const warning = embeds[0].toJSON();
-    assert.equal(warning.color, 0xfee75c);
-    assert.match(warning.description, /Hailúa/u);
-    assert.match(warning.description, /Burgerxúcxích/u);
-    assert.ok(warning.fields.some(field => field.value === 'vua ngủ gật'));
-    assert.equal(warning.image, undefined);
-    assert.equal(evidenceRows.length, 0);
+    const card = embed.toJSON();
+    assert.deepEqual(embeds, [embed], 'the roster is the only card');
+    assert.equal(card.color, 0xfee75c);
+    assert.ok(card.description.startsWith(`⚠️ **${t('listView.labels.watch', lang)}:** **Burgerxúcxích** · *vua ngủ gật*\n\n`), card.description);
+
+    const [button, ...others] = evidenceRows.flatMap(row => row.toJSON().components);
+    assert.equal(others.length, 0);
+    assert.equal(button.custom_id, `roster_evidence:watch:${watchId}`);
+    assert.equal(button.emoji.name, '⚠️');
+    assert.equal(button.label, `${t('common.actions.viewEvidence', lang)} · ${t('listView.labels.watch', lang)}`);
   }
 });
 
-test('/la-roster orders reported cards by severity and keeps trusted status', () => {
+test('/la-roster orders list hits by severity and keeps trusted status', () => {
+  const ids = { black: 'a'.repeat(24), watch: 'b'.repeat(24), white: 'd'.repeat(24) };
   const presentation = buildVisibleRosterPresentation({
     name: 'Listed', lang: 'en', previousSnapshots: new Map(),
     characters: [{ name: 'Listed', className: 'Bard', itemLevel: '1730', combatScore: '3000' }],
     matches: {
-      blacklist: { name: 'Listed', reason: 'black report' },
-      watchlist: { name: 'Listed', reason: 'watch report' },
-      whitelist: { name: 'Listed', reason: 'white report' },
+      whitelist: { _id: ids.white, name: 'Listed', reason: 'white report' },
+      watchlist: { _id: ids.watch, name: 'Listed', reason: 'watch report' },
+      blacklist: { _id: ids.black, name: 'Listed', reason: 'black report' },
       trusted: { name: 'Listed', reason: 'trusted report' },
     },
   });
-  assert.deepEqual(presentation.embeds.map(embed => embed.toJSON().color), [0xed4245, 0xfee75c, 0x57f287, 0xed4245]);
-  assert.match(presentation.embed.toJSON().description, /trusted report/u);
+  const description = presentation.embed.toJSON().description;
+  assert.equal(presentation.embeds.length, 1);
+  assert.equal(presentation.embed.toJSON().color, 0xed4245);
+  const positions = ['black report', 'watch report', 'white report', 'trusted report']
+    .map(text => description.indexOf(text));
+  assert.ok(positions.every(position => position >= 0), description);
+  assert.deepEqual([...positions].sort((a, b) => a - b), positions);
+  assert.deepEqual(
+    presentation.evidenceRows.flatMap(row => row.toJSON().components).map(button => button.custom_id),
+    ['black', 'watch', 'white'].map(type => `roster_evidence:${type}:${ids[type]}`),
+  );
+});
+
+test('/la-roster without list hits has no report buttons', () => {
+  const presentation = buildVisibleRosterPresentation({
+    name: 'Clean', lang: 'en', previousSnapshots: new Map(),
+    characters: [{ name: 'Clean', className: 'Bard', itemLevel: '1730', combatScore: '3000' }],
+    matches: {},
+  });
+  assert.deepEqual(presentation.evidenceRows, []);
 });
 
 test('roster scan completion outcome is shared across terminal entry points', () => {

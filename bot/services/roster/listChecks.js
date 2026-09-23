@@ -27,6 +27,7 @@ const LIST_COLLATION = Object.freeze({ locale: 'en', strength: 2 });
  */
 export function shapeRosterListHit(entry) {
   return {
+    _id: entry._id,
     name: entry.name,
     reason: entry.reason ?? '',
     raid: entry.raid ?? '',

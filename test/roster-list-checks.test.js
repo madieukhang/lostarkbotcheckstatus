@@ -10,6 +10,7 @@ const { shapeRosterListHit } = await import('../bot/services/roster/listChecks.j
 test('/la-roster list-hit evidence payload keeps roster metadata', () => {
   const addedAt = new Date('2026-05-17T00:00:00Z');
   const shaped = shapeRosterListHit({
+    _id: 'e'.repeat(24),
     name: 'Main',
     reason: 'test reason',
     raid: 'Thaemine',
@@ -23,6 +24,7 @@ test('/la-roster list-hit evidence payload keeps roster metadata', () => {
     guildId: 'guild-1',
   });
 
+  assert.equal(shaped._id, 'e'.repeat(24), 'the /la-roster report button reloads the entry by id');
   assert.deepEqual(shaped.allCharacters, ['Main', 'Altone']);
   assert.equal(shaped.logsUrl, 'https://logs.example/Main');
   assert.equal(shaped.addedAt, addedAt);

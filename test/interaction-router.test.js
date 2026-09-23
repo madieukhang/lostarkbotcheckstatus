@@ -77,6 +77,12 @@ test('interaction router dispatches compact broadcast evidence buttons', async (
   assert.equal(received, customId);
 });
 
+test('interaction router routes /la-roster report buttons', () => {
+  const route = findCustomIdRoute(createButtonRoutes({}), `roster_evidence:watch:${'c'.repeat(24)}`);
+  assert.ok(route);
+  assert.equal(route.label, '[roster] report button error:');
+});
+
 test('interaction router select table supports exact and prefixed customIds', async () => {
   let quickAddCalls = 0;
   const routes = createSelectRoutes({

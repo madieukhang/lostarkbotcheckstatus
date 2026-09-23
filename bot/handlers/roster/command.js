@@ -33,10 +33,7 @@ import {
   reserveStrongholdScanForInteraction,
 } from '../../utils/strongholdScanGate.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
-import { buildEvidenceEmbed } from '../list/view/ui.js';
-import { buildBroadcastEvidenceComponents } from '../list/evidence/broadcastButton.js';
-import { decorateListEntry } from '../list/helpers.js';
-import { statMapFromRosterCharacters } from '../list/trackedAltsRender.js';
+import { getListContext } from '../list/helpers.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
@@ -44,6 +41,7 @@ import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
 import { resolveRosterScanOutcome } from './completion.js';
+import { buildRosterEvidenceRows } from './evidenceButton.js';
 
 const virtualConsole = createRosterVirtualConsole();
 
@@ -172,35 +170,52 @@ export function rosterCardColor(matches) {
   return rules.find(({ matches: matchesRule }) => matchesRule()).color;
 }
 
-function prependEvidenceCards({ embeds, rows, matches, statMap, name, lang }) {
-  const evidenceCards = [];
-  const evidenceRows = [];
-  for (const [listType, entry] of [
+/** List hits in the severity order rosterCardColor ranks them. */
+function collectListHits(matches) {
+  return [
     ['black', matches.blacklist],
     ['watch', matches.watchlist],
     ['white', matches.whitelist],
-  ]) {
-    if (!entry) continue;
-    evidenceCards.push(buildEvidenceEmbed(decorateListEntry(entry, listType), '', {
-      lang,
-      statMap,
-      headline: true,
-      attachImage: false,
-      viaName: name,
-    }));
-    evidenceRows.push(...buildBroadcastEvidenceComponents(entry, {
-      legacyUrl: entry.imageUrl,
-      lang,
-    }));
-  }
-  // Keep the highest-severity card first, just like the check/search result.
-  embeds.unshift(...evidenceCards);
-  rows.unshift(...evidenceRows);
+  ].filter(([, entry]) => entry).map(([listType, entry]) => ({ listType, entry }));
 }
 
-/** Render list warnings ahead of the visible roster using the shared headline card. */
+function formatStatusLine(icon, text, reason) {
+  return `${icon} ${text}${reason ? ` · *${reason}*` : ''}`;
+}
+
+/**
+ * Render the visible roster. Each list hit is one status line on the card
+ * and one button that opens its full report; trusted status stays a line.
+ * @param {object} params
+ * @param {object[]} params.characters - roster characters from lostark.bible
+ * @param {Map<string, object>} params.previousSnapshots - earlier stats by lowercase name
+ * @param {{blacklist?: object, watchlist?: object, whitelist?: object, trusted?: object}} params.matches
+ * @param {string} params.name - the searched character
+ * @param {string} params.lang
+ * @param {string} [params.world] - in-game server, when bible reported one
+ * @returns {{embed: import('discord.js').EmbedBuilder, embeds: import('discord.js').EmbedBuilder[],
+ *   evidenceRows: import('discord.js').ActionRowBuilder[]}}
+ */
 export function buildVisibleRosterPresentation({ characters, previousSnapshots, matches, name, lang, world = '' }) {
   const fullDescription = buildRosterDescription(characters, previousSnapshots, lang, world);
+  const hits = collectListHits(matches);
+  const statusLines = hits.map(({ listType, entry }) => formatStatusLine(
+    getListContext(listType).icon,
+    `**${t(`listView.labels.${listType}`, lang)}:** **${entry.name}**`,
+    entry.reason,
+  ));
+  if (matches.trusted) {
+    statusLines.push(formatStatusLine(
+      '🛡️',
+      t('dialogue.roster.trusted', lang, { name: matches.trusted.name }),
+      matches.trusted.reason,
+    ));
+  }
+  const status = statusLines.join('\n');
+  const description = status
+    ? [status, fullDescription.slice(0, Math.max(0, 4096 - status.length - 2))].join('\n\n')
+    : fullDescription;
+
   const embed = createArtistEmbed(lang)
     .setTitle(`🛡️ ${t('dialogue.roster.title', lang, {
       name,
@@ -208,27 +223,10 @@ export function buildVisibleRosterPresentation({ characters, previousSnapshots, 
       word: t(`dialogue.roster.${characters.length === 1 ? 'characterOne' : 'characterMany'}`, lang),
     })}`)
     .setURL(rosterUrl(name))
-    .setDescription(fullDescription)
+    .setDescription(description)
     .setColor(rosterCardColor(matches));
 
-  if (matches.trusted) {
-    const status = `🛡️ ${t('dialogue.roster.trusted', lang, { name: matches.trusted.name })}`
-      + (matches.trusted.reason ? ` · *${matches.trusted.reason}*` : '');
-    const remaining = Math.max(0, 4096 - status.length - 2);
-    embed.setDescription([status, fullDescription.slice(0, remaining)].join('\n\n'));
-  }
-
-  const embeds = [embed];
-  const evidenceRows = [];
-  prependEvidenceCards({
-    embeds,
-    rows: evidenceRows,
-    matches,
-    statMap: statMapFromRosterCharacters(characters),
-    name,
-    lang,
-  });
-  return { embed, embeds, evidenceRows };
+  return { embed, embeds: [embed], evidenceRows: buildRosterEvidenceRows(hits, lang) };
 }
 
 function notifyVisibleDeepCompletion({ interaction, replyEditor, visibleDeep, name, lang }) {
