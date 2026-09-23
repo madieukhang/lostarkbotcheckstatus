@@ -121,7 +121,11 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     return null;
   }
 
-  const targetItemLevel = options.targetItemLevel ?? meta.itemLevel ?? await inferHiddenRosterItemLevel(name);
+  const targetItemLevel = options.targetItemLevel ?? meta.itemLevel ?? await inferHiddenRosterItemLevel(name, {
+    allowScraperApi: allowScraperApiForTarget,
+    timeoutMs: options.targetTimeoutMs ?? candidateTimeoutMs,
+    viaWorker,
+  });
 
   console.log(`[alt-detect] Target: SH "${meta.strongholdName}" Lv.${meta.strongholdLevel}, RL ${meta.rosterLevel}, Guild "${meta.guildName}"`);
 
