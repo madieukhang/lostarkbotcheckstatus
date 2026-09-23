@@ -1021,15 +1021,67 @@ test('extractNamesFromImage rejects a MAX_TOKENS prefix even when it is valid JS
   }
 });
 
-test('extractNamesFromImage keeps invalid JSON terminal instead of trying another model', async () => {
+test('extractNamesFromImage tries the next model when a reply is malformed JSON', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  const requestedModels = [];
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels = ['invalid-json-model', 'working-model'];
+  console.warn = () => {};
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl === 'https://cdn.discordapp.com/invalid-json-fallback.png') {
+      return new Response(new Uint8Array([28, 29, 30]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      const model = decodeURIComponent(requestedUrl.match(/models\/([^:]+):/)?.[1] || '');
+      requestedModels.push(model);
+      const text = model === 'invalid-json-model' ? '["Broken",]' : '["Linhieee"]';
+      return Response.json({
+        candidates: [{ finishReason: 'STOP', content: { parts: [{ text }] } }],
+      });
+    }
+
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'invalid-json-fallback',
+      url: 'https://cdn.discordapp.com/invalid-json-fallback.png',
+      contentType: 'image/png',
+    });
+
+    assert.deepEqual(names, ['Linhieee']);
+    assert.deepEqual(requestedModels, config.geminiModels);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    config.geminiApiKey = originalKey;
+    config.geminiModels = originalModels;
+    clearOcrCache();
+  }
+});
+
+test('extractNamesFromImage reports invalid JSON once every model returned it', async () => {
+  clearOcrCache();
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
   const originalKey = config.geminiApiKey;
   const originalModels = [...config.geminiModels];
   let geminiCalls = 0;
 
   config.geminiApiKey = 'fake-gemini-key';
-  config.geminiModels = ['invalid-json-model', 'unused-fallback-model'];
+  config.geminiModels = ['invalid-json-model', 'second-invalid-json-model'];
+  console.warn = () => {};
   globalThis.fetch = async (url) => {
     const requestedUrl = String(url);
     if (requestedUrl === 'https://cdn.discordapp.com/invalid-json.png') {
@@ -1058,9 +1110,10 @@ test('extractNamesFromImage keeps invalid JSON terminal instead of trying anothe
       }),
       /Gemini returned invalid JSON/,
     );
-    assert.equal(geminiCalls, 1);
+    assert.equal(geminiCalls, 2);
   } finally {
     globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
     config.geminiApiKey = originalKey;
     config.geminiModels = originalModels;
     clearOcrCache();

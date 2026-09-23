@@ -41,6 +41,7 @@ const GEMINI_FAILURE_FORMATTERS = {
   http: (result) =>
     `Gemini request failed on ${result.model} (HTTP ${result.status}) ${result.bodyText}`.trim(),
   'response:non-JSON response': () => 'Gemini did not return a JSON array.',
+  'response:invalid JSON': () => 'Gemini returned invalid JSON.',
   'response:max output tokens': () => 'Gemini output was truncated at the token limit.',
   cooldown: (result) => (
     `All Gemini models are temporarily cooling down; retry in ${Math.ceil(result.retryAfterMs / 1000)}s.`
@@ -705,7 +706,7 @@ export async function extractNamesFromImage(image, options = {}) {
         parsed = JSON.parse(jsonMatch[0]);
       } catch {
         console.warn(`[listcheck] Gemini (${model}) JSON parse failed: ${jsonMatch[0].slice(0, 200)}`);
-        throw new Error('Gemini returned invalid JSON.');
+        return { retry: true, reason: 'invalid JSON' };
       }
       if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
       return { value: { parsed, emptyResponse: false } };
