@@ -22,6 +22,7 @@ import {
 } from '../../services/i18n/index.js';
 import { checkBotPermissions } from '../../services/setup/channelPermissions.js';
 import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
+import { getVietnamDayKey } from '../../services/setup/autoCheckCleanup.js';
 import {
   cleanupAndRefreshListNotifyChannel,
   getVietnamHalfHourKey,
@@ -284,15 +285,19 @@ async function handleSetupCleanup(interaction, lang, enabled) {
     }
   }
 
+  const configSet = {
+    autoCheckCleanupEnabled: enabled,
+    updatedByUserId: interaction.user.id,
+    updatedByTag: interaction.user.tag,
+  };
+  if (enabled) {
+    // The confirmation promises the first cleanup at 00:00, so opting in
+    // claims today and the next 15-minute tick leaves the channel alone.
+    configSet.lastAutoCheckCleanupKey = getVietnamDayKey();
+  }
   await GuildConfig.findOneAndUpdate(
     { guildId: interaction.guild.id },
-    {
-      $set: {
-        autoCheckCleanupEnabled: enabled,
-        updatedByUserId: interaction.user.id,
-        updatedByTag: interaction.user.tag,
-      },
-    },
+    { $set: configSet },
     { upsert: true, returnDocument: 'after' }
   );
   invalidateGuildConfig(interaction.guild.id);
