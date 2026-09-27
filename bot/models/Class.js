@@ -45,6 +45,7 @@ export const CLASS_NAMES = {
   yinyangshi:         'Artist',
   weather_artist:     'Aeromancer',
   alchemist:          'Wildsoul',
+  dimension_master:   'Dimensionalist',
 };
 
 /**
@@ -156,6 +157,7 @@ export const CLASS_EMOJI_MAP = {
   Artist: '',
   Aeromancer: '',
   Wildsoul: '',
+  Dimensionalist: '',
 };
 
 /**
