@@ -85,7 +85,6 @@ export function buildAlertEmbed({
   titleIcon,
   color,
   author,
-  lang = 'en',
 }) {
   const config = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.info;
   const finalIcon = titleIcon ?? config.icon;
@@ -108,7 +107,7 @@ export function buildAlertEmbed({
   ];
   mutations.filter(({ enabled }) => enabled).forEach(({ apply }) => apply());
 
-  return decorateArtistEmbed(embed, { lang });
+  return decorateArtistEmbed(embed);
 }
 
 const LEADING_NOTICE_ICON = /^(?:✅|⚠️|❌|ℹ️|🛡️|⏳|🔍|🔔|🔕|🌐|🔒|🛑|✖️)\s*/u;
@@ -143,7 +142,6 @@ export function buildNoticeEmbed(content, {
   color,
   footer,
   timestamp = false,
-  lang = 'en',
 } = {}) {
   const text = String(content ?? '').trim();
   const lines = text.split(/\r?\n/);
@@ -162,6 +160,5 @@ export function buildNoticeEmbed(content, {
     color,
     footer,
     timestamp,
-    lang,
   });
 }

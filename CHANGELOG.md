@@ -52,6 +52,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - Comments that told how the code used to look (release numbers, commit hashes, "the old card", "the previous inline copy") now state only what the code does and why. The measurements behind the deep-scan cap and concurrency stay.
 - The 34 calls that passed a language to `createArtistEmbed()`, which takes no arguments, no longer pass one. The `artistVoice.js` seam itself stays.
 - Slash-command descriptions stay English-only: the Vietnamese and Japanese command locale files, which nothing registered with Discord, are gone. The screenshot mode labels (Daily, Analysis) they also held moved to `dialogue.check.modes`, so mode messages read the same in every language as before.
+- `buildAlertEmbed` and `buildNoticeEmbed` no longer take a `lang` option: its only use was an argument to `decorateArtistEmbed`, which takes the embed alone. The `artistVoice.js` seam is kept as the one place every card is built through.
 
 ### Added
 - Dimensionalist, the new specialist class (Bible ID `dimension_master`), has its class icon: the bot uploads it as an application emoji on its next start, cards show it beside the character like the other classes, and `/la-search` class autocomplete offers it. It counts as DPS.
