@@ -90,7 +90,9 @@ test('locale packs keep the same concrete leaf-key shape', () => {
 });
 
 test('raw locale packs are complete without relying on English fallback', () => {
-  const expected = new Set(leafKeys(rawEn));
+  // Slash-command copy is registered in English only, so vi and jp carry no
+  // `commands` subtree.
+  const expected = new Set(leafKeys(rawEn).filter((key) => !key.startsWith('commands.')));
   for (const [code, tree] of Object.entries({ vi: rawVi, jp: rawJp })) {
     const actual = new Set(leafKeys(tree));
     const missing = [...expected].filter((key) => !actual.has(key));

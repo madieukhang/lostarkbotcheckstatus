@@ -363,8 +363,8 @@ function listCheckCommand(name) {
         .setDescription(commandText('check.options.mode'))
         .setRequired(false)
         .addChoices(
-          { name: commandText('check.modes.daily'), value: 'daily' },
-          { name: commandText('check.modes.analysis'), value: 'analysis' },
+          { name: t('dialogue.check.modes.daily'), value: 'daily' },
+          { name: t('dialogue.check.modes.analysis'), value: 'analysis' },
         )
     );
 }
@@ -396,8 +396,8 @@ function checkModeCommand(name) {
       .setDescription(commandText('checkMode.options.mode'))
       .setRequired(false)
       .addChoices(
-        { name: commandText('check.modes.daily'), value: 'daily' },
-        { name: commandText('check.modes.analysis'), value: 'analysis' },
+        { name: t('dialogue.check.modes.daily'), value: 'daily' },
+        { name: t('dialogue.check.modes.analysis'), value: 'analysis' },
       ));
 }
 

@@ -11,7 +11,6 @@ const { extractNamesFromImage, clearOcrCache, clearGeminiModelCooldowns } = awai
 const { clearNameSuggestionCache } = await import('../bot/services/roster/search.js');
 const { buildCommands } = await import('../bot/commands/index.js');
 const { createCheckHandlers } = await import('../bot/handlers/list/check/index.js');
-const { t: translate } = await import('../bot/services/i18n/index.js');
 
 const image = { url: 'https://cdn.example.test/profile.png', contentType: 'image/png' };
 function response(text) {
@@ -123,16 +122,12 @@ test('disabled or invalid analysis requests fail before any network access', asy
   assert.deepEqual(calls, []);
 });
 
-test('/la-check exposes optional Daily and Analysis choices with localized copy', () => {
+test('/la-check exposes optional Daily and Analysis choices', () => {
   const command = buildCommands().find(command => command.name === 'la-check');
   const option = command.options.find(option => option.name === 'mode');
   assert.equal(option.required, false);
   assert.deepEqual(option.choices.map(choice => choice.value), ['daily', 'analysis']);
-  for (const lang of ['en', 'vi', 'jp']) {
-    for (const key of ['options.mode', 'modes.daily', 'modes.analysis']) {
-      assert.notEqual(translate(`commands.check.${key}`, lang), `commands.check.${key}`);
-    }
-  }
+  assert.deepEqual(option.choices.map(choice => choice.name), ['Daily', 'Analysis']);
 });
 
 test('/la-check forwards explicit analysis and defaults an omitted mode to daily', async () => {

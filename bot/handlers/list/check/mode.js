@@ -32,7 +32,7 @@ export function createOcrModeCommandHandler({
     await editAlert(interaction, {
       severity: AlertSeverity.SUCCESS,
       ...t(requested ? 'dialogue.check.modeSaved' : 'dialogue.check.modeCurrent', lang, {
-        mode: t(`commands.check.modes.${mode}`, lang),
+        mode: t(`dialogue.check.modes.${mode}`, lang),
       }),
       lang,
     });

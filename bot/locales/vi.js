@@ -1,5 +1,4 @@
 import dialogue from './dialogue/vi.js';
-import commands from './commands/vi.js';
 
 const vi = {
   dialogue,
@@ -37,8 +36,6 @@ const vi = {
       enrichNow: 'Enrich ngay',
     },
   },
-
-  commands,
 
   autoCheckWelcome: {
     title: '🎨 Chào các cậu~ Artist ngồi trông channel này nhé',

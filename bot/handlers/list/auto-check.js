@@ -408,7 +408,7 @@ export function createAutoCheckMessageHandler({
               current: index + 1,
               count: request.images.length,
             }),
-            t('dialogue.check.modeProgress', lang, { mode: t(`commands.check.modes.${request.mode}`, lang) }),
+            t('dialogue.check.modeProgress', lang, { mode: t(`dialogue.check.modes.${request.mode}`, lang) }),
             imageLimitLine(request, lang),
           ], lang);
           try {

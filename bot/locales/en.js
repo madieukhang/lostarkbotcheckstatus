@@ -139,7 +139,6 @@ const en = {
         image: 'Raid waiting room screenshot',
         mode: 'Override your saved mode for this image; Analysis uses the Flash model quota',
       },
-      modes: { daily: 'Daily', analysis: 'Analysis' },
     },
     checkMode: {
       description: 'View or change your default screenshot mode (Daily or Analysis)',

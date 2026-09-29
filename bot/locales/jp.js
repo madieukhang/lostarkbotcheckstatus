@@ -1,5 +1,4 @@
 import dialogue from './dialogue/jp.js';
-import commands from './commands/jp.js';
 
 const jp = {
   dialogue,
@@ -37,8 +36,6 @@ const jp = {
       enrichNow: '今すぐ enrich',
     },
   },
-
-  commands,
 
   autoCheckWelcome: {
     title: '🎨 皆さん、こんにちは～ この channel は Artist が見ておりますわ',
