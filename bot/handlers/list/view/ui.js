@@ -22,6 +22,7 @@ import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, COLORS, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
+import { truncateInlineText } from '../../../utils/discordText.js';
 import { t } from '../../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
 import { getListContext } from '../helpers.js';
@@ -50,9 +51,7 @@ function getListTypeLabel(type, fallback, lang) {
 
 function buildEntryMetaLine({ entry, lang = 'en' }) {
   const parts = [
-    entry.reason
-      ? (entry.reason.length > 80 ? entry.reason.slice(0, 77) + '...' : entry.reason)
-      : '',
+    truncateInlineText(entry.reason, 80),
     entry.raid ? `\`${entry.raid}\`` : '',
     entry.addedAt ? relativeTime(entry.addedAt) : '',
   ].filter(Boolean);

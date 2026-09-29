@@ -6,7 +6,7 @@ import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import UserPreference from '../../models/UserPreference.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
-import { COLORS } from '../../utils/ui.js';
+import { COLORS, relativeTime } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
 import {
   deferEphemeralReply,
@@ -87,7 +87,7 @@ export function buildRemoteServerEmbed(guild, guildConfig, { isOwner = false, la
       {
         name: `🕐 ${t('dialogue.remote.fields.lastUpdated', lang)}`,
         value: guildConfig?.updatedAt
-          ? `<t:${Math.floor(new Date(guildConfig.updatedAt).getTime() / 1000)}:R>`
+          ? relativeTime(guildConfig.updatedAt)
           : '-',
         inline: true,
       },

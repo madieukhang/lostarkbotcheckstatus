@@ -1,6 +1,5 @@
 import { connectDB } from '../../../db.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
-import config from '../../../config.js';
 import Blacklist from '../../../models/Blacklist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
@@ -17,19 +16,17 @@ import {
 } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, replyAlert } from '../../../utils/interactionReplies.js';
-import { COLORS, padInlineRow } from '../../../utils/ui.js';
+import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   renderTrackedAltsField,
   statMapFromRosterCharacters,
 } from '../trackedAltsRender.js';
-
-const OFFICER_APPROVER_IDS = config.officerApproverIds;
-const SENIOR_APPROVER_IDS = config.seniorApproverIds;
+import { isOfficerOrSenior } from '../helpers.js';
 
 function buildRemovedTrustEmbed(deleted, interaction, lang) {
   const trustedSince = deleted.createdAt
-    ? `<t:${Math.floor(new Date(deleted.createdAt).getTime() / 1000)}:R>`
+    ? relativeTime(deleted.createdAt)
     : t('dialogue.trust.removed.unknown', lang);
   return buildAlertEmbed({
     severity: AlertSeverity.WARNING,
@@ -204,10 +201,9 @@ async function handleTrustAddition(interaction, name, reason, lang) {
 export function createTrustHandlers() {
   async function handleListTrustCommand(interaction) {
     const userId = interaction.user.id;
-    const isOfficerOrSenior = OFFICER_APPROVER_IDS.includes(userId) || SENIOR_APPROVER_IDS.includes(userId);
     const lang = await getUserLanguage(userId, { UserPreferenceModel: UserPreference });
 
-    if (!isOfficerOrSenior) {
+    if (!isOfficerOrSenior(userId)) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.trust.officerOnly', lang),

@@ -13,6 +13,7 @@ export {
 
 export {
   buildRosterCharacters,
+  stampRosterWorld,
 } from './buildRosterCharacters.js';
 
 export {

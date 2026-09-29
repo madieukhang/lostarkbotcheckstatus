@@ -10,6 +10,7 @@
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
+import { getInteractionDisplayName } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import { loadCheckDetailStatMap } from '../check/index.js';
 import { moveListEntry } from '../services/moveEntry.js';
@@ -171,7 +172,7 @@ async function renderEditSuccess({
       addedAlts,
       statMap,
       // Same identity expression as broadcastAppliedEdit.
-      editorName: interaction.member?.displayName || interaction.user.username,
+      editorName: getInteractionDisplayName(interaction),
       isMove,
       lang,
     }),
@@ -273,7 +274,7 @@ function broadcastAppliedEdit(args, editedEntry) {
   }, {
     type: args.targetType,
     guildId: args.interaction.guild.id,
-    requestedByDisplayName: args.interaction.member?.displayName || args.interaction.user.username,
+    requestedByDisplayName: getInteractionDisplayName(args.interaction),
     requestedByTag: args.interaction.user.tag,
   }, { changes: args.changes }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 }

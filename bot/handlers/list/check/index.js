@@ -30,6 +30,7 @@ import { getUserLanguage, t, tPick } from '../../../services/i18n/index.js';
 import {
   getListContext,
   decorateListEntry,
+  isOfficerOrSenior,
   parseListEntryRef,
 } from '../helpers.js';
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
@@ -164,13 +165,9 @@ export async function editWithListEntryDetails(interaction, { listType, id }, { 
     resolveDisplayImageUrl(entry, client),
     loadCheckDetailStatMap(entry),
   ]);
-  const isOfficer =
-    config.officerApproverIds.includes(interaction.user.id)
-    || config.seniorApproverIds.includes(interaction.user.id);
-
   await editEmbed(interaction, buildCheckEntryDetailsEmbed(decorateListEntry(entry, listType), {
     displayUrl,
-    includeAddedBy: isOfficer,
+    includeAddedBy: isOfficerOrSenior(interaction.user.id),
     lang,
     statMap,
   }));

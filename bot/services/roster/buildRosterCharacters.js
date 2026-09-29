@@ -17,7 +17,7 @@ import { fetchCharacterMeta } from './characterMeta.js';
 import { inferHiddenRosterItemLevel } from './search.js';
 import { detectAltsViaStronghold } from './altDetection.js';
 import { createRosterVirtualConsole } from './dom.js';
-import { parseCharacterMetaFromHtml, parseRosterCharactersFromHtml } from './parsers.js';
+import { parseCharacterMetaFromHtml, parseItemLevelValue, parseRosterCharactersFromHtml } from './parsers.js';
 
 const virtualConsole = createRosterVirtualConsole();
 
@@ -29,13 +29,9 @@ export function stampRosterWorld(characters, world) {
 }
 
 function readTargetStats(targetRecord) {
-  const parsedItemLevel = Number.parseFloat(
-    String(targetRecord?.itemLevel ?? '0').replace(/,/g, '')
-  );
+  const parsedItemLevel = parseItemLevelValue(targetRecord?.itemLevel);
   return {
-    itemLevel: Number.isFinite(parsedItemLevel) && parsedItemLevel > 0
-      ? parsedItemLevel
-      : null,
+    itemLevel: parsedItemLevel > 0 ? parsedItemLevel : null,
     combatScore: targetRecord?.combatScore && targetRecord.combatScore !== '?'
       ? targetRecord.combatScore
       : null,

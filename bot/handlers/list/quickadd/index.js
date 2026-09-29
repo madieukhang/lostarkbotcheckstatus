@@ -23,6 +23,7 @@ import {
   deferEphemeralReply,
   editAlert,
 } from '../../../utils/interactionReplies.js';
+import { getInteractionDisplayName } from '../../../utils/names.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   buildListMutationPayload,
@@ -119,7 +120,7 @@ export function createQuickAddHandlers({ services }) {
 
       const payload = buildListMutationPayload({
         interaction,
-        requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+        requestedByDisplayName: getInteractionDisplayName(interaction),
         lang,
         type,
         name,

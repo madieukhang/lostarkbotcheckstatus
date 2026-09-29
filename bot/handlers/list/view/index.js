@@ -24,7 +24,7 @@ import {
   getUserLanguage,
   t,
 } from '../../../services/i18n/index.js';
-import { decorateListEntry, getListContext, parseListEntryRef } from '../helpers.js';
+import { decorateListEntry, getListContext, isOfficerOrSenior, parseListEntryRef } from '../helpers.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import {
   buildEvidenceEmbed,
@@ -330,10 +330,8 @@ export function createViewHandlers({
             const displayUrl = entry?.imageMessageId || entry?.imageUrl
               ? await resolveImageUrl(entry, client)
               : '';
-            const isOfficer = config.officerApproverIds.includes(componentInteraction.user.id)
-              || config.seniorApproverIds.includes(componentInteraction.user.id);
             await editEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, {
-              includeAddedBy: isOfficer,
+              includeAddedBy: isOfficerOrSenior(componentInteraction.user.id),
               // The typed list view already told the user which collection they
               // opened, so the detail card should spend this slot on new data.
               includeList: false,

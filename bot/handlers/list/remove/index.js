@@ -27,13 +27,14 @@ import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
+import { getInteractionDisplayName, normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
 import {
   buildNameRosterQuery,
   pickPreferredListEntry,
 } from '../../../utils/listEntryMap.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { truncateInlineText } from '../../../utils/discordText.js';
 import {
   deferReply,
   editAlert,
@@ -43,17 +44,11 @@ import {
 import { getUserLanguage, t, tPick } from '../../../services/i18n/index.js';
 import { getListContext } from '../helpers.js';
 
-const REMOVE_COLOR_BY_TYPE = {
-  black: 0xed4245,
-  white: 0x57f287,
-  watch: 0xfee75c,
-};
-
 const REMOVE_RESULT_PRESENTATIONS = [
   {
     matches: ({ oks, fails }) => fails.length > 0 && oks.length === 0,
     resolve: ({ name, lang }) => ({
-      color: 0xfee75c,
+      color: COLORS.warning,
       titleIcon: '⚠️',
       title: t('dialogue.remove.titles.blocked', lang, { name }),
     }),
@@ -61,7 +56,7 @@ const REMOVE_RESULT_PRESENTATIONS = [
   {
     matches: ({ oks, fails }) => oks.length === 1 && fails.length === 0,
     resolve: ({ oks, name, lang }) => ({
-      color: REMOVE_COLOR_BY_TYPE[oks[0].type] || 0xfee75c,
+      color: getListContext(oks[0].type).color,
       titleIcon: oks[0].icon,
       title: t('dialogue.remove.titles.one', lang, { list: oks[0].label, name }),
     }),
@@ -69,7 +64,7 @@ const REMOVE_RESULT_PRESENTATIONS = [
   {
     matches: ({ oks }) => oks.length > 1,
     resolve: ({ oks, name, lang }) => ({
-      color: 0x57f287,
+      color: COLORS.success,
       titleIcon: '🗑️',
       title: t('dialogue.remove.titles.many', lang, { count: oks.length, name }),
     }),
@@ -77,7 +72,7 @@ const REMOVE_RESULT_PRESENTATIONS = [
   {
     matches: () => true,
     resolve: ({ name, lang }) => ({
-      color: 0xfee75c,
+      color: COLORS.warning,
       titleIcon: '⚠️',
       title: t('dialogue.remove.titles.mixed', lang, { name }),
     }),
@@ -302,7 +297,7 @@ export function createRemoveHandlers({ services }) {
         broadcastListChange('removed', entry, {
           type,
           guildId: interaction.guild?.id || '',
-          requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+          requestedByDisplayName: getInteractionDisplayName(interaction),
           requestedByTag: interaction.user.tag,
         }, { onlyOwner: entry.scope === 'server' }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 
@@ -314,7 +309,7 @@ export function createRemoveHandlers({ services }) {
         lang,
         statMap: removeStatMap,
         world: removedWorld,
-        removedBy: interaction.member?.displayName || interaction.user.username,
+        removedBy: getInteractionDisplayName(interaction),
       });
 
       // Single entry · remove directly, render as embed.
@@ -345,7 +340,7 @@ export function createRemoveHandlers({ services }) {
       const listLines = found.map((f, i) => {
         const ctx = getListContext(f.type);
         const scopeTag = f.entry.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
-        const reason = f.entry.reason ? ` *${(f.entry.reason || '').slice(0, 80)}${f.entry.reason.length > 80 ? '...' : ''}*` : '';
+        const reason = f.entry.reason ? ` *${truncateInlineText(f.entry.reason, 80)}*` : '';
         return `${i + 1}. ${ctx.icon} **${t(`dialogue.broadcast.list.${f.type}`, lang)}**${scopeTag}${reason}`;
       });
       const pickerEmbed = createArtistEmbed(lang)

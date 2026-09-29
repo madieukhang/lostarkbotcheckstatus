@@ -9,7 +9,7 @@ import {
   editNotice,
 } from '../../../utils/interactionReplies.js';
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
-import { buildApprovalRetryRow } from '../helpers.js';
+import { buildApprovalRetryRow, listTypeIcon } from '../helpers.js';
 import { createApprovalDecisionHandler, handleApprovalClaimError } from '../services/approvalInteraction.js';
 
 export async function notifyMultiaddRequester({
@@ -58,13 +58,9 @@ function buildRejectBreakdown(rows = []) {
     if (row.type && counts[row.type] !== undefined) counts[row.type] += 1;
   }
 
-  return [
-    ['black', '⛔'],
-    ['watch', '⚠️'],
-    ['white', '✅'],
-  ]
-    .filter(([type]) => counts[type] > 0)
-    .map(([type, icon]) => `${icon} **${counts[type]}**`);
+  return ['black', 'watch', 'white']
+    .filter((type) => counts[type] > 0)
+    .map((type) => `${listTypeIcon(type)} **${counts[type]}**`);
 }
 
 export function createMultiaddApprovalButtonHandler(deps) {

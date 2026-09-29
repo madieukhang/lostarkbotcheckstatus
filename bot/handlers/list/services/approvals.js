@@ -26,6 +26,7 @@ import GuildConfig from '../../../models/GuildConfig.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
+import { truncateInlineText } from '../../../utils/discordText.js';
 
 /**
  * Update the clicked approval message before syncing the other approver DMs.
@@ -185,7 +186,7 @@ export function createApprovalServices({
       ].filter(Boolean);
 
       const previewLines = pending.rows.slice(0, 20).map((row, index) => {
-        const reasonShort = (row.reason || '').length > 40 ? `${(row.reason || '').slice(0, 37)}...` : (row.reason || '');
+        const reasonShort = truncateInlineText(row.reason, 40);
         const scopeTag = row.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
         const raidTag = row.raid ? ` \`${row.raid}\`` : '';
         return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${row.name}**${scopeTag}${raidTag} · ${reasonShort}`;

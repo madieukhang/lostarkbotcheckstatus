@@ -17,6 +17,7 @@ import { getGuildLanguage, t } from '../../../services/i18n/index.js';
 import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { normalizeNameKey } from '../../../utils/names.js';
+import { truncateInlineText } from '../../../utils/discordText.js';
 import { getListContext, listTypeIcon } from '../helpers.js';
 import { buildBroadcastEvidenceComponents } from '../evidence/broadcastButton.js';
 import {
@@ -446,9 +447,7 @@ export function createBroadcastServices({ client }) {
       const snap = snapshotMap.get(normalizeNameKey(name));
       const cls = snap?.classId ? getClassName(snap.classId) : '';
       const classPrefix = cls ? `${getClassEmoji(cls) || cls} ` : '';
-      const reasonShort = (r.entry?.reason || '').length > 60
-        ? (r.entry?.reason || '').slice(0, 57) + '...'
-        : (r.entry?.reason || '');
+      const reasonShort = truncateInlineText(r.entry?.reason, 60);
       return `${i + 1}. ${listTypeIcon(t)} ${classPrefix}**${name}** · ${reasonShort}`;
     };
 

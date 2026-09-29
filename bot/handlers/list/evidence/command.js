@@ -23,6 +23,7 @@ import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
+import { truncateInlineText } from '../../../utils/discordText.js';
 import {
   buildNameRosterQuery,
   pickPreferredListEntry,
@@ -153,9 +154,7 @@ function buildAutocompleteChoices(rawResults, lang = 'en') {
 
     const { icon } = getListContext(type);
     const reasonSnippet = doc.reason
-      ? doc.reason.length > 50
-        ? doc.reason.slice(0, 47) + '...'
-        : doc.reason
+      ? truncateInlineText(doc.reason, 50)
       : t('listView.navigation.noReason', lang);
     // Local-scope tag helps an officer tell apart the same name appearing
     // under global vs server scope (rare but possible for blacklist).

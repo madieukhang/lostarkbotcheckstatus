@@ -7,7 +7,7 @@
 
 import config from '../config.js';
 import ServerMonitorState from '../models/ServerMonitorState.js';
-import { COLORS } from '../utils/ui.js';
+import { COLORS, relativeTime } from '../utils/ui.js';
 import { createArtistEmbed } from '../utils/artistVoice.js';
 import GuildConfig from '../models/GuildConfig.js';
 import { getGuildLanguage, t } from '../services/i18n/index.js';
@@ -40,7 +40,7 @@ async function sendOnlineNotification(client, serverName) {
       },
       {
         name: `🕐 ${t('dialogue.system.onlineNotice.onlineAtField', lang)}`,
-        value: `<t:${Math.floor(Date.now() / 1000)}:R>`,
+        value: relativeTime(Date.now()),
         inline: true,
       },
     ];

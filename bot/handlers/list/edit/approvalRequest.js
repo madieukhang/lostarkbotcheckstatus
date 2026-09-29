@@ -9,6 +9,7 @@
 import PendingApproval from '../../../models/PendingApproval.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert } from '../../../utils/interactionReplies.js';
+import { getInteractionDisplayName } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import {
   buildListMutationPayload,
@@ -61,7 +62,7 @@ export async function sendListEditApprovalRequest({
 
   const payload = buildListMutationPayload({
     interaction,
-    requestedByDisplayName: interaction.member?.displayName || interaction.user.username,
+    requestedByDisplayName: getInteractionDisplayName(interaction),
     lang,
     action: 'edit',
     existingEntryId: String(existingObj._id),

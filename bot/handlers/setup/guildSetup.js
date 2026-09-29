@@ -12,7 +12,7 @@ import config from '../../config.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import UserPreference from '../../models/UserPreference.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
-import { COLORS } from '../../utils/ui.js';
+import { COLORS, relativeTime } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
 import {
   getSupportedLanguages,
@@ -635,10 +635,9 @@ async function handleSetupView(interaction, lang) {
 
   const footerParts = [];
   if (guildConfig?.updatedAt) {
-    const updatedAtUnix = Math.floor(new Date(guildConfig.updatedAt).getTime() / 1000);
     footerParts.push(t('dialogue.setup.view.lastUpdated', lang, {
       user: guildConfig.updatedByTag || t('dialogue.common.unknown', lang),
-      time: `<t:${updatedAtUnix}:R>`,
+      time: relativeTime(guildConfig.updatedAt),
     }));
   } else {
     footerParts.push(t('dialogue.setup.view.noPersisted', lang));

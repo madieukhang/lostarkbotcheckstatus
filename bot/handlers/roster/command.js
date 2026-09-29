@@ -23,6 +23,7 @@ import {
   parseRosterCharactersFromHtml,
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
+  stampRosterWorld,
   upsertRosterSnapshots,
 } from '../../services/roster/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
@@ -91,13 +92,12 @@ async function fetchRosterCharacters(name, deep) {
   // The in-game server rides in the same SSR payload this page already
   // carries, so reading it here costs nothing extra.
   const world = parseCharacterMetaFromHtml(html)?.world || '';
-  // Stamped onto every record, the way buildRosterCharacters does it ·
-  // the server belongs to the roster, so carrying it on the characters
-  // themselves is what lets the cards built from them show it without
-  // threading a separate argument through every builder.
+  // The server belongs to the roster; carrying it on each character lets the
+  // cards built from them show it without threading a separate argument
+  // through every builder.
   const characters = await parseRosterCharactersFromHtml(html, document);
   return {
-    characters: world ? characters.map((c) => ({ ...c, world })) : characters,
+    characters: stampRosterWorld(characters, world),
     world,
   };
 }

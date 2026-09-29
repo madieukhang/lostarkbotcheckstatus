@@ -4,7 +4,6 @@ import {
   ComponentType,
 } from 'discord.js';
 
-import config from '../../config.js';
 import { ICONS } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, editNotice, editPayload, replyAlert } from '../../utils/interactionReplies.js';
@@ -13,7 +12,7 @@ import { resetSelectMenu } from '../../utils/selectMenu.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
-import { decorateListEntry, getListContext } from '../list/helpers.js';
+import { decorateListEntry, getListContext, isOfficerOrSenior } from '../list/helpers.js';
 import { loadCheckDetailStatMap } from '../list/check/index.js';
 import { buildCheckEntryDetailsEmbed } from '../list/check/ui.js';
 
@@ -131,14 +130,12 @@ export function createSearchDetailSelectHandler({
         entryHasImage(entry) ? resolveImageUrl(entry, interaction.client) : '',
         loadStatMap(entry),
       ]);
-      const includeAddedBy = config.officerApproverIds.includes(sel.user.id)
-        || config.seniorApproverIds.includes(sel.user.id);
       // Preserve the stored primary name: the selected result may be its alt.
       // An absent/expired image must never hide the report's text and roster.
       await editEmbed(sel, buildCheckEntryDetailsEmbed(decorateListEntry(entry, detail.listType), {
         displayUrl,
         statMap,
-        includeAddedBy,
+        includeAddedBy: isOfficerOrSenior(sel.user.id),
         lang,
       }));
     } catch (err) {
