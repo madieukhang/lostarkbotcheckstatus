@@ -13,6 +13,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Fixed
+- When `/la-roster` finds a hidden roster, its name suggestions include characters at exactly item level 1700, the floor every other LoaLogs check uses. They used to require more than 1700.
 - A member's bulk-add Confirm answers Discord at once with the processing card, as the officer path already did. The approval request used to be built first (image rehosts, a pause per row, approver DMs), so a batch of about ten rows missed Discord's 3-second window, the click failed, and the request whose DMs had already gone out was deleted.
 - Turning on auto-check cleanup no longer empties the channel within 15 minutes. When the channel already held LoaLogs' pinned guide, the next scheduler tick deleted every unpinned message right away, although both the confirmation and the guide say cleanup runs at 00:00 Asia/Ho_Chi_Minh. Opting in now counts as today's run, so the first cleanup happens at the next 00:00.
 - `/la-setup config` answers an `action` it does not know instead of leaving the reply stuck on "thinking". The option only suggests actions, so any typed text reached the command.

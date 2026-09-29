@@ -261,7 +261,7 @@ function notifyHiddenScanCompletion({ interaction, replyEditor, name, meta, altR
 
 async function replyWithHiddenRosterSuggestions(replyEditor, name, lang) {
   const suggestions = await fetchNameSuggestions(name) || [];
-  const filtered = suggestions.filter((suggestion) => suggestion.itemLevel > 1700);
+  const filtered = suggestions.filter((suggestion) => suggestion.itemLevel >= 1700);
   const alert = filtered.length > 0
     ? {
       severity: AlertSeverity.ERROR,
