@@ -137,9 +137,6 @@ const config = {
   /** ID of the channel where notifications are sent */
   channelId: requireEnv('CHANNEL_ID'),
 
-  /** ID of the role to mention in notifications */
-  // roleId: requireEnv('ROLE_ID'),
-
   /** How often to check server status (milliseconds) */
   checkIntervalMs: parseInterval(),
 
@@ -190,11 +187,6 @@ const config = {
   /** Explicit analysis requests use the separate Flash chain, including 3.8. */
   geminiAnalysisModels: geminiAnalysisWaitlistResolution.models,
 
-  /** Temporarily deferred Gemini models retained outside the active OCR chain. */
-  geminiWaitlistedModels: [
-    ...geminiModelWaitlistResolution.waitlisted, ...geminiAnalysisWaitlistResolution.waitlisted,
-  ],
-
   /** Soft latency cap for the primary Gemini OCR model before failover. */
   geminiPrimaryTimeoutMs,
 
@@ -207,19 +199,9 @@ const config = {
   /** Temporary model cooldown after a recoverable transport/API failure. */
   geminiModelCooldownMs,
 
-  /**
-   * Optional post-check Stronghold scan for flagged OCR names.
-   * Disabled by default because it can fan out into many lostark.bible requests
-   * after a single screenshot check.
-   */
-  listcheckAltEnrichmentEnabled: parseBooleanEnv('LISTCHECK_ALT_ENRICHMENT', false),
-  listcheckAltEnrichmentLimit: parsePositiveIntEnv('LISTCHECK_ALT_ENRICHMENT_LIMIT', 1),
-  listcheckAltEnrichmentCandidateLimit: parsePositiveIntEnv('LISTCHECK_ALT_ENRICHMENT_CANDIDATE_LIMIT', 80),
-
   /** OCR/list-check network bounds. These are direct-only by default; no ScraperAPI. */
   listcheckMaxNames: parsePositiveIntEnv('LISTCHECK_MAX_NAMES', 8),
   listcheckRosterLookupConcurrency: parsePositiveIntEnv('LISTCHECK_ROSTER_LOOKUP_CONCURRENCY', 3),
-  listcheckRosterLookupStartSpacingMs: parsePositiveIntEnv('LISTCHECK_ROSTER_LOOKUP_START_SPACING_MS', 150),
   listcheckRosterLookupTimeoutMs: parsePositiveIntEnv('LISTCHECK_ROSTER_LOOKUP_TIMEOUT_MS', 6000),
   listcheckSimilarLookupLimit: parsePositiveIntEnv('LISTCHECK_SIMILAR_LOOKUP_LIMIT', 3),
   listcheckSuggestionLookupBudget: parsePositiveIntEnv('LISTCHECK_SUGGESTION_LOOKUP_BUDGET', 32),

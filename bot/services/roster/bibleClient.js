@@ -19,7 +19,6 @@ function parseBoolEnv(raw) {
 const workerEnabled = parseBoolEnv(process.env.BIBLE_WORKER_ENABLED);
 
 export const bibleClient = {
-  workerEnabled,
   async fetch(url, options = {}) {
     if (workerEnabled && options.viaWorker === true) {
       return workerBibleClient.fetch(url, options);

@@ -14,7 +14,6 @@ import { startAutoCheckCleanup } from '../services/setup/autoCheckCleanup.js';
 import { startListNotifyCleanup } from '../services/setup/listNotifyCleanup.js';
 import { connectDB } from '../db.js';
 import Blacklist from '../models/Blacklist.js';
-import RosterCache from '../models/RosterCache.js';
 import TrustedUser from '../models/TrustedUser.js';
 import ServerMonitorState from '../models/ServerMonitorState.js';
 import { backfillTrustedRosterLinks } from '../services/maintenance/trustedBackfill.js';
@@ -50,9 +49,6 @@ export function createReadyHandler(client) {
 
     Blacklist.syncIndexes().catch((err) =>
       console.warn('[bot] Blacklist syncIndexes:', err.message),
-    );
-    RosterCache.syncIndexes().catch((err) =>
-      console.warn('[bot] RosterCache syncIndexes:', err.message),
     );
     TrustedUser.syncIndexes().catch((err) =>
       console.warn('[bot] TrustedUser syncIndexes:', err.message),

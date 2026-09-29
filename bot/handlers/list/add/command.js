@@ -7,8 +7,6 @@
  * or fans the request out to approvers via DM.
  */
 
-import { randomUUID } from 'node:crypto';
-
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import { resolveListAddRaidLabel } from '../../../models/Raid.js';
@@ -112,7 +110,6 @@ export function createListAddCommandHandler({
 
   function createListAddPayload(interaction, request, scope, rehostResult, lang) {
     return buildListMutationPayload({
-      requestId: randomUUID(),
       interaction,
       requestedByDisplayName: getInteractionDisplayName(interaction),
       lang,

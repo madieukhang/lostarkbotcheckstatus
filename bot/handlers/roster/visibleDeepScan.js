@@ -43,7 +43,6 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
     // the post-editReply DM block at the bottom can reference them.
     let visibleDeepResult = null;
     let visibleDeepMeta = null;
-    let visibleDeepGuildMembers = null;
     // Components added by the deep-scan path (Continue button when
     // remaining > 0). Empty when deep was off or fully scanned.
     const deepScanComponents = [];
@@ -115,7 +114,6 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
         // post-reply DM. visMeta gives the DM access to guildName.
         visibleDeepResult = altResult;
         visibleDeepMeta = visMeta;
-        visibleDeepGuildMembers = visGuildMembers;
 
         // A visible scan without guild members can render but cannot resume.
         const rendered = buildRosterDeepScanResult({
@@ -146,6 +144,5 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
     components: deepScanComponents,
     result: visibleDeepResult,
     meta: visibleDeepMeta,
-    guildMembers: visibleDeepGuildMembers,
   };
 }

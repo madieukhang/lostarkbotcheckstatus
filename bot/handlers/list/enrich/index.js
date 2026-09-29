@@ -808,7 +808,6 @@ export function createEnrichHandlers({ services }) {
     const encoded = parts.slice(2).join(':');
     const rawName = decodeURIComponent(encoded || '').trim();
     if (!rawName) {
-      const lang = await resolveInteractionLang(interaction);
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.enrich.invalidButton', lang),

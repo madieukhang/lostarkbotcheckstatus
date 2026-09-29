@@ -26,15 +26,9 @@ import {
   resolveRosterWorld,
 } from '../trackedAltsRender.js';
 
-const ACTION_VERB = Object.freeze({
-  added:   'added to',
-  removed: 'removed from',
-  edited:  'edited in',
-  // 'enriched' uses a bespoke headline (see broadcastListChange) that names the
-  // new-alt count instead of the generic "was <verb> <list>" phrasing; the verb
-  // here only feeds the card title ("List enriched broadcast").
-  enriched: 'enriched',
-});
+// Actions with their own dialogue.broadcast.titles key; any other action uses
+// the fallback title.
+const TITLED_ACTIONS = new Set(['added', 'removed', 'edited', 'enriched']);
 
 function parseItemLevel(value) {
   const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
@@ -243,15 +237,10 @@ export async function sendEmbedToChannels({
  *   change embed.
  * @returns {{
  *   broadcastListChange: Function,
- *   resolveBroadcastChannels: Function,
  *   broadcastBulkAdd: Function,
  * }}
  */
-export function createBroadcastServices({
-  client,
-  buildRosterCharactersFn = buildRosterCharacters,
-  upsertRosterSnapshotsFn = upsertRosterSnapshots,
-}) {
+export function createBroadcastServices({ client }) {
   async function findOwnerEnvNotifyChannel(channelIds) {
     for (const envId of config.listNotifyChannelIds) {
       try {
@@ -345,8 +334,6 @@ export function createBroadcastServices({
     const statMap = await hydrateBroadcastStatMap({
       entry,
       initialRecords: [...snapshots, ...rosterCharacters],
-      buildRosterCharactersFn,
-      upsertRosterSnapshotsFn,
     });
 
     const snap = statMap.get(normalizeNameKey(entry.name)) || null;
@@ -395,7 +382,7 @@ export function createBroadcastServices({
         : buildTrackedAltsField(entry, statMap, rosterFieldOptions);
       const fields = buildBroadcastFields({ entry, action, changes, snap, altsField, lang, statMap });
 
-      const titleKey = action in ACTION_VERB ? action : 'fallback';
+      const titleKey = TITLED_ACTIONS.has(action) ? action : 'fallback';
       const embed = createArtistEmbed(lang)
         .setTitle(`🎨 ${t(`dialogue.broadcast.titles.${titleKey}`, lang, { list: listLabel })}`)
         .setDescription(headline)
@@ -535,7 +522,6 @@ export function createBroadcastServices({
 
   return {
     broadcastListChange,
-    resolveBroadcastChannels,
     broadcastBulkAdd,
   };
 }

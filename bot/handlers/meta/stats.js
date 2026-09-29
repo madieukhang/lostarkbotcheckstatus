@@ -14,7 +14,6 @@ import { deferEphemeralReply, editEmbed } from '../../utils/interactionReplies.j
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
-import RosterCache from '../../models/RosterCache.js';
 import GuildConfig from '../../models/GuildConfig.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getScraperApiUsageSnapshot } from '../../utils/scraperApiUsage.js';
@@ -43,11 +42,10 @@ export async function handleStatsCommand(interaction) {
   await connectDB();
   const lang = await getUserLanguage(interaction.user?.id, { UserPreferenceModel: UserPreference });
 
-  const [blackCount, whiteCount, watchCount, cacheCount, guildConfigCount, recentBlackCount] = await Promise.all([
+  const [blackCount, whiteCount, watchCount, guildConfigCount, recentBlackCount] = await Promise.all([
     Blacklist.countDocuments(),
     Whitelist.countDocuments(),
     Watchlist.countDocuments(),
-    RosterCache.countDocuments(),
     GuildConfig.countDocuments(),
     // Last-seven-days addition rate provides a list-growth metric without
     // needing a full time-series chart.
@@ -92,10 +90,7 @@ export async function handleStatsCommand(interaction) {
       },
       {
         name: `${ICONS.refresh} ${t('dialogue.stats.cacheField', lang)}`,
-        value: [
-          t('dialogue.stats.rosterCacheLine', lang, { count: cacheCount }),
-          t('dialogue.stats.guildConfigsLine', lang, { count: guildConfigCount }),
-        ].join('\n'),
+        value: t('dialogue.stats.guildConfigsLine', lang, { count: guildConfigCount }),
         inline: true,
       },
       {

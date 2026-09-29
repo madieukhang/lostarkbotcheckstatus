@@ -37,11 +37,6 @@ export function rosterUrl(name) {
   return joinBase(`${encodeURIComponent(name)}/roster`);
 }
 
-/** Logs page link · `<base>/<name>/logs`. Used by /la-list add success card. */
-export function logsUrl(name) {
-  return joinBase(`${encodeURIComponent(name)}/logs`);
-}
-
 /** Bare profile link · `<base>/<name>`. Used by hidden-roster embeds. */
 export function profileUrl(name) {
   return joinBase(encodeURIComponent(name));

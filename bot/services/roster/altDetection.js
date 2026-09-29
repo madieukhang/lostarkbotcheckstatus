@@ -111,7 +111,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
 
   const meta = options.targetMeta || await fetchCharacterMeta(name, {
     allowScraperApi: allowScraperApiForTarget,
-    timeoutMs: options.targetTimeoutMs ?? candidateTimeoutMs,
+    timeoutMs: candidateTimeoutMs,
     fallbackOnRateLimit: false,
     viaWorker,
   });
@@ -123,7 +123,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
 
   const targetItemLevel = options.targetItemLevel ?? meta.itemLevel ?? await inferHiddenRosterItemLevel(name, {
     allowScraperApi: allowScraperApiForTarget,
-    timeoutMs: options.targetTimeoutMs ?? candidateTimeoutMs,
+    timeoutMs: candidateTimeoutMs,
     viaWorker,
   });
 
@@ -133,8 +133,8 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     ? options.guildMembers
     : await fetchGuildMembers(name, {
         allowScraperApi: allowScraperApiForGuild,
-        timeoutMs: options.guildTimeoutMs ?? candidateTimeoutMs,
-        cacheKey: options.guildMembersCacheKey || meta.guildName,
+        timeoutMs: candidateTimeoutMs,
+        cacheKey: meta.guildName,
         viaWorker,
       });
   if (members.length === 0) {
@@ -196,7 +196,6 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     min: backoffFloorMs,
     max: isGentle ? Math.max(config.scanBackoffMaxMs, 8000) : config.scanBackoffMaxMs,
     step: 500,
-    rateLimitStep: 1500,
     recover: 100,
   };
 

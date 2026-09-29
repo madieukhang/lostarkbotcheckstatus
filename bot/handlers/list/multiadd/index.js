@@ -112,19 +112,10 @@ export function createMultiaddHandlers({ client, services }) {
       requesterDisplayName: getInteractionDisplayName(interaction),
       guildId: interaction.guild.id,
       channelId: interaction.channelId,
-      createdAt: Date.now(),
       expiryTimer,
     });
 
     await editPayload(interaction, buildPreviewReply(parsed, requestId, lang));
-  }
-
-  async function handleUnknownAction(interaction, lang, action) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.multiadd.errors.unknownAction', lang, { action }),
-      lang,
-    });
   }
 
   const actionHandlers = new Map([
@@ -146,9 +137,7 @@ export function createMultiaddHandlers({ client, services }) {
       return;
     }
 
-    const actionHandler = actionHandlers.get(action)
-      || ((targetInteraction, targetLang) => handleUnknownAction(targetInteraction, targetLang, action));
-    await actionHandler(interaction, lang);
+    await actionHandlers.get(action)(interaction, lang);
   }
 
   const sharedDeps = {

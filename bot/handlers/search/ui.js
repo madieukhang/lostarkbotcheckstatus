@@ -32,7 +32,7 @@ function buildSearchDescription(lines, breakdown, lang) {
 export function buildSearchResultEmbed({ name, results, lang = 'en', snapshotMap = new Map() }) {
   const relatedClasses = Object.fromEntries([...snapshotMap].map(([key, snapshot]) => [
     normalizeNameKey(key),
-    snapshot?.className || (snapshot?.classId ? getClassName(snapshot.classId) : ''),
+    snapshot?.classId ? getClassName(snapshot.classId) : '',
   ]));
   const lines = results.map((result, index) => {
     // Format individually: OCR may merge same-roster characters and sort by

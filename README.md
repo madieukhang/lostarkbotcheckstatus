@@ -290,12 +290,8 @@ Copy `.env.example` to `.env` and fill in values.
 | `GEMINI_PRIMARY_TIMEOUT_MS` | model-aware | Per-model cap for the preferred model; restored 3.8 defaults to 8s and the current 3.7 cap is 30s before the fallback reserve is applied |
 | `GEMINI_FALLBACK_RESERVE_MS` | `10000` | Time protected inside the shared 30s OCR deadline for another model after quick recoverable failures; after a true timeout, the next model receives the remainder |
 | `GEMINI_MODEL_COOLDOWN_MS` | `60000` | Process-local cooldown after recoverable 404/429/5xx, timeout, or network failure; later requests skip that model until it is eligible again |
-| `LISTCHECK_ALT_ENRICHMENT` | `false` | Run background Stronghold alt scan after OCR hits; keep off to avoid request spikes |
-| `LISTCHECK_ALT_ENRICHMENT_LIMIT` | `1` | Max flagged OCR names to enrich per screenshot when enrichment is enabled |
-| `LISTCHECK_ALT_ENRICHMENT_CANDIDATE_LIMIT` | `80` | Max guild candidates checked per OCR background alt scan |
 | `LISTCHECK_MAX_NAMES` | `8` | Max OCR names checked per image; auto-check scales this across up to 3 attachments with a hard cap of 24 names |
 | `LISTCHECK_ROSTER_LOOKUP_CONCURRENCY` | `3` | Parallel direct roster lookups during `/la-check` |
-| `LISTCHECK_ROSTER_LOOKUP_START_SPACING_MS` | `150` | Start spacing between `/la-check` roster lookups |
 | `LISTCHECK_ROSTER_LOOKUP_TIMEOUT_MS` | `6000` | Timeout for each direct `/la-check` roster/suggestion lookup |
 | `LISTCHECK_SIMILAR_LOOKUP_LIMIT` | `3` | Max unresolved names that enter deep typo recovery; also caps visual-substitution candidates per name |
 | `LISTCHECK_SUGGESTION_LOOKUP_BUDGET` | `32` | Hard cap on new Bible search HTTP calls shared by OCR refinement and enrichment in one check |

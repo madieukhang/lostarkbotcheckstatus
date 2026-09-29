@@ -95,7 +95,6 @@ export async function acknowledgeAndClaimApproval({
   const claim = {
     get completed() { return completed; },
     get lost() { return lost; },
-    stop,
     async assertOwned() {
       if (lost || closed) throw leaseLost();
       try {

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 
 import { buildCommands } from '../bot/commands/index.js';
 import { getClassAutocompleteChoices, resolveClassId } from '../bot/models/Class.js';
-import RosterCache from '../bot/models/RosterCache.js';
 
 test('/la-search class option uses autocomplete instead of capped static choices', () => {
   const commands = buildCommands();
@@ -30,16 +29,4 @@ test('class resolver accepts display names, IDs, and loose spacing', () => {
   assert.equal(resolveClassId('Soul Eater'), 'soul_eater');
   assert.equal(resolveClassId('unknown_new_class'), 'unknown_new_class');
   assert.equal(resolveClassId(''), null);
-});
-
-test('RosterCache name index is case-insensitive unique', () => {
-  const indexes = RosterCache.schema.indexes();
-  const nameIndex = indexes.find(([fields, options]) =>
-    fields.name === 1 &&
-    options.unique === true &&
-    options.collation?.locale === 'en' &&
-    options.collation?.strength === 2
-  );
-
-  assert.ok(nameIndex, 'expected unique case-insensitive name index');
 });
