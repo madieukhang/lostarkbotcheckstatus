@@ -125,7 +125,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
     deepScanResultEmbed = rendered.embed;
     deepScanComponents.push(...rendered.components);
   } catch (err) {
-    deepScanResultEmbed = createArtistEmbed(lang)
+    deepScanResultEmbed = createArtistEmbed()
       .setTitle(`❌ ${t('dialogue.scan.failed.title', lang, { name })}`)
       .setDescription(t('dialogue.scan.failed.description', lang, { error: err.message }))
       .setColor(COLORS.danger)

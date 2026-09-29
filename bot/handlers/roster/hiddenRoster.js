@@ -201,7 +201,7 @@ function hiddenRosterColor(hits) {
 
 function buildHiddenPrimaryEmbed({ name, meta, guildMembers, hits, deep, altResult, lang, statMap }) {
   const deepStats = formatDeepScanStats(altResult, lang);
-  return createArtistEmbed(lang)
+  return createArtistEmbed()
     .setTitle(`🔒 ${t('dialogue.roster.hiddenTitle', lang, { name })}`)
     .setURL(bibleProfileUrl(name))
     // Open with what cannot be seen · that is the subject of this card,

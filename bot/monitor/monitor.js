@@ -44,7 +44,7 @@ async function sendOnlineNotification(client, serverName) {
         inline: true,
       },
     ];
-    const embed = createArtistEmbed(lang)
+    const embed = createArtistEmbed()
       .setAuthor({ name: t('dialogue.system.onlineNotice.author', lang) })
       .setTitle(`🟢 ${t('dialogue.system.onlineNotice.title', lang, { server: serverName })}`)
       .setDescription(t('dialogue.system.onlineNotice.description', lang, { server: serverName }))

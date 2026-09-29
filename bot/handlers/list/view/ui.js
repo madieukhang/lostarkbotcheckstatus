@@ -441,7 +441,7 @@ export function buildEvidenceEmbed(entry, displayUrl, {
     statMap,
   });
 
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`${entry._icon} ${entry.name}`)
     .setURL(rosterUrl(entry.name))
     .addFields(fields)

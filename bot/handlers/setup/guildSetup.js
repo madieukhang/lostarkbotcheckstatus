@@ -643,7 +643,7 @@ async function handleSetupView(interaction, lang) {
     footerParts.push(t('dialogue.setup.view.noPersisted', lang));
   }
 
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setAuthor({ name: t('dialogue.setup.view.author', lang, { guild: interaction.guild.name }) })
     .setDescription(t('dialogue.setup.view.description', lang))
     .addFields(fields)

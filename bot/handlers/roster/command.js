@@ -216,7 +216,7 @@ export function buildVisibleRosterPresentation({ characters, previousSnapshots, 
     ? [status, fullDescription.slice(0, Math.max(0, 4096 - status.length - 2))].join('\n\n')
     : fullDescription;
 
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`🛡️ ${t('dialogue.roster.title', lang, {
       name,
       count: characters.length,

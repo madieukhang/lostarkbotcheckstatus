@@ -48,7 +48,7 @@ export function buildRemoteServerEmbed(guild, guildConfig, { isOwner = false, la
     isOwner ? ` · **${t('dialogue.remote.ownerServer', lang)}**` : '',
     !guildConfig ? ` · *${t('dialogue.remote.noConfig', lang)}*` : '',
   ].join('');
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`${isOwner ? '👑' : '🖥️'} ${guild.name} ${configured}`)
     .setDescription(`\`${guild.id}\`${descriptionSuffix}`)
     .addFields(
@@ -124,7 +124,7 @@ async function handleViewAction(interaction, lang) {
   const configs = await GuildConfig.find({}).lean();
   const configMap = new Map(configs.map((guildConfig) => [guildConfig.guildId, guildConfig]));
   if (allGuilds.length === 0) {
-    await editEmbed(interaction, createArtistEmbed(lang)
+    await editEmbed(interaction, createArtistEmbed()
       .setTitle(`🛰️ ${t('dialogue.remote.dashboardTitle', lang)}`)
       .setDescription(`*${t('dialogue.remote.noServers', lang)}*`)
       .setColor(COLORS.greyDark));
@@ -207,7 +207,7 @@ async function handleEvidenceChannelAction(interaction, channel, lang) {
     { upsert: true, returnDocument: 'after' }
   );
   invalidateGuildConfig(config.ownerGuildId);
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`🖼️ ${t('dialogue.remote.evidenceUpdated.title', lang)}`)
     .setDescription(t('dialogue.remote.evidenceUpdated.description', lang, { channel: channel.id }))
     .addFields(
@@ -223,7 +223,7 @@ async function handleEvidenceChannelAction(interaction, channel, lang) {
 }
 
 function buildMissingGuildEmbed(lang) {
-  return createArtistEmbed(lang)
+  return createArtistEmbed()
     .setTitle(`❌ ${t('dialogue.remote.missingGuild.title', lang)}`)
     .setDescription(t('dialogue.remote.missingGuild.description', lang))
     .addFields(
@@ -253,7 +253,7 @@ async function handleNotifyToggle(interaction, guildId, guildName, auditFields, 
   );
   invalidateGuildConfig(guildId);
   const stateLabel = t(`dialogue.remote.state.${enabled ? 'enabled' : 'disabled'}`, lang);
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`${enabled ? '🔔' : '🔕'} ${t('dialogue.remote.notifyTitle', lang, { state: stateLabel })}`)
     .addFields(
       { name: t('dialogue.remote.fields.server', lang), value: `**${guildName}**\n\`${guildId}\``, inline: true },
@@ -282,7 +282,7 @@ async function handleDefaultScope(interaction, guildId, guildName, scope, auditF
   );
   invalidateGuildConfig(guildId);
   const isLocal = scope === 'server';
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`${isLocal ? '🔒' : '🌐'} ${t('dialogue.remote.scopeUpdatedTitle', lang)}`)
     .addFields(
       { name: t('dialogue.remote.fields.server', lang), value: `**${guildName}**\n\`${guildId}\``, inline: true },
@@ -331,7 +331,7 @@ export async function handleSetupRemoteCommand(interaction) {
   }
   const guildName = await resolveGuildName(interaction, targetGuildId);
   if (!guildName) {
-    await editEmbed(interaction, createArtistEmbed(lang)
+    await editEmbed(interaction, createArtistEmbed()
       .setTitle(`❌ ${t('dialogue.remote.guildNotFound.title', lang)}`)
       .setDescription(t('dialogue.remote.guildNotFound.description', lang, { guild: targetGuildId }))
       .setColor(COLORS.danger));

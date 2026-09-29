@@ -91,7 +91,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
         // what was thrown out.
         const breakdown = buildRejectBreakdown(payload.bulkRows);
 
-        const buildRejectEmbed = (targetLang) => createArtistEmbed(targetLang)
+        const buildRejectEmbed = (targetLang) => createArtistEmbed()
           .setTitle(`✖️ ${t('dialogue.multiadd.approval.rejectedTitle', targetLang, { count: payload.bulkRows.length })}`)
           .setDescription(t('dialogue.multiadd.approval.rejectedDescription', targetLang, { user: interaction.user.id }))
           .setColor(COLORS.danger)

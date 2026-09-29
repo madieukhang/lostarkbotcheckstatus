@@ -382,7 +382,7 @@ export function createBroadcastServices({ client }) {
       const fields = buildBroadcastFields({ entry, action, changes, snap, altsField, lang, statMap });
 
       const titleKey = TITLED_ACTIONS.has(action) ? action : 'fallback';
-      const embed = createArtistEmbed(lang)
+      const embed = createArtistEmbed()
         .setTitle(`🎨 ${t(`dialogue.broadcast.titles.${titleKey}`, lang, { list: listLabel })}`)
         .setDescription(headline)
         .addFields(fields)
@@ -456,7 +456,7 @@ export function createBroadcastServices({ client }) {
         if (grouped[t]) grouped[t].push(r);
       }
 
-      const embed = createArtistEmbed(lang)
+      const embed = createArtistEmbed()
         .setTitle(`📢 ${t('dialogue.broadcast.bulkTitle', lang, {
           local: isLocal ? t('dialogue.broadcast.localSuffix', lang) : '',
           count: entries.length,

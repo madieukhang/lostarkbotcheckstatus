@@ -260,7 +260,7 @@ export function buildScanResultEmbed({
   });
   const description = sections.join('\n\n').slice(0, 4096);
 
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`${finalIcon}  ${kindLabel} · ${target.name}`)
     .setDescription(description)
     .setColor(finalColor)

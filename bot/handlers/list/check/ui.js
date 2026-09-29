@@ -149,7 +149,7 @@ export function buildCheckEntryDetailsEmbed(entry, {
     buildTrackedAltsField(entry, statMap, lang),
   ].filter(Boolean);
 
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
     .setDescription(t('dialogue.check.details.headline', lang, {
       icon,

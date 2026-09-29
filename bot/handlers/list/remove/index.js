@@ -186,7 +186,7 @@ export function buildRemoveResultCard(outcomes, {
     rosterField,
   ].filter(Boolean);
 
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`${titleIcon} ${title}`)
     .addFields(fields)
     .setColor(color)
@@ -340,7 +340,7 @@ export function createRemoveHandlers({ services }) {
         const reason = f.entry.reason ? ` *${truncateInlineText(f.entry.reason, 80)}*` : '';
         return `${i + 1}. ${ctx.icon} **${t(`dialogue.broadcast.list.${f.type}`, lang)}**${scopeTag}${reason}`;
       });
-      const pickerEmbed = createArtistEmbed(lang)
+      const pickerEmbed = createArtistEmbed()
         .setTitle(`🔎 ${t('dialogue.remove.pickerTitle', lang, { name })}`)
         .setDescription(`${t('dialogue.remove.pickerDescription', lang, { name, count: found.length })}\n\n${listLines.join('\n')}`)
         .setColor(COLORS.info)

@@ -85,7 +85,7 @@ export function buildSearchResultEmbed({ name, results, lang = 'en', snapshotMap
     lang,
   );
 
-  return createArtistEmbed(lang)
+  return createArtistEmbed()
     .setAuthor({ name: `🔍 ${t('dialogue.search.title', lang, { name })} · ${results.length} ${matchWord}` })
     .setDescription(description)
     .setColor(color);

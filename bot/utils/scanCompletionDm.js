@@ -132,7 +132,7 @@ export async function sendScanCompletionDm(opts) {
     } : null,
   ].filter(Boolean);
 
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setAuthor({ name: t('dialogue.scan.dm.author', lang) })
     .setTitle(`${style.icon}  ${headline} · ${scanTargetName}`)
     .setDescription(heroLines.join('\n') + altsBlock)

@@ -271,7 +271,7 @@ export function buildListCheckEmbed({
     elapsedMs,
   });
 
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setAuthor({ name: authorName })
     .setDescription(description)
     .setColor(color);

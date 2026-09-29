@@ -197,7 +197,7 @@ export function createApprovalServices({
         ? `**${t('dialogue.approval.bulk.outcome', lang, { breakdown: breakdownParts.join(' · ') })}**`
         : t('dialogue.approval.bulk.reviewing', lang, { count: pending.rows.length });
 
-      return createArtistEmbed(lang)
+      return createArtistEmbed()
         .setTitle(`📋 ${t('dialogue.approval.bulk.title', lang, { count: pending.rows.length })}`)
         .setDescription([headerLine, '', previewLines.join('\n').slice(0, 3800)].join('\n'))
         .setColor(color)

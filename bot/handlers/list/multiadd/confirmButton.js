@@ -264,7 +264,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
         }
       );
 
-      const waitEmbed = createArtistEmbed(lang)
+      const waitEmbed = createArtistEmbed()
         .setTitle(`⏳ ${t('dialogue.multiadd.confirm.awaiting.title', lang)}`)
         .setDescription(t('dialogue.multiadd.confirm.awaiting.description', lang, { count: pending.rows.length }))
         .setColor(COLORS.warning)

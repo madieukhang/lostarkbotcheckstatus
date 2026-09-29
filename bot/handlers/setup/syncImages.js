@@ -133,7 +133,7 @@ function buildSyncStatsFields(stats, lang) {
 async function sendProgress(interaction, current, total, stats, lang) {
   await editPayload(interaction, {
     embeds: [
-      createArtistEmbed(lang)
+      createArtistEmbed()
         .setTitle(`🔄 ${t('dialogue.syncImages.progressTitle', lang)}`)
         .setDescription(t('dialogue.syncImages.progressDescription', lang, { current, total }))
         .addFields(...buildSyncStatsFields(stats, lang))
@@ -149,7 +149,7 @@ function buildSummaryPayload(interaction, total, stats, lang) {
       ? COLORS.warning
       : COLORS.success;
 
-  const summaryEmbed = createArtistEmbed(lang)
+  const summaryEmbed = createArtistEmbed()
     .setTitle(`✅ ${t('dialogue.syncImages.completeTitle', lang)}`)
     .setDescription(t('dialogue.syncImages.completeDescription', lang, { total }))
     .addFields(...buildSyncStatsFields(stats, lang))
@@ -224,7 +224,7 @@ export async function handleSyncImagesAction(interaction, lang = 'en') {
   if (legacyEntries.length === 0) {
     await editPayload(interaction, {
       embeds: [
-        createArtistEmbed(lang)
+        createArtistEmbed()
           .setTitle(`✅ ${t('dialogue.syncImages.nothingTitle', lang)}`)
           .setDescription(t('dialogue.syncImages.nothingDescription', lang))
           .setColor(COLORS.success)
@@ -237,7 +237,7 @@ export async function handleSyncImagesAction(interaction, lang = 'en') {
 
   await editPayload(interaction, {
     embeds: [
-      createArtistEmbed(lang)
+      createArtistEmbed()
         .setTitle(`🔄 ${t('dialogue.syncImages.startingTitle', lang)}`)
         .setDescription(t('dialogue.syncImages.startingDescription', lang, { count: legacyEntries.length }))
         .addFields(

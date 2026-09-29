@@ -166,7 +166,7 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
     // fields below carry the detail. The old bare-number Added/Skipped/
     // Failed 3-up was dropped · each detail field's header already shows
     // its count, so the 3-up said the same thing twice.
-    const embed = createArtistEmbed(lang)
+    const embed = createArtistEmbed()
       .setTitle(`📋 ${t('dialogue.multiadd.summary.title', lang, { added: results.added.length, total: totalAttempted })}`)
       .setDescription(headline)
       .setColor(color)

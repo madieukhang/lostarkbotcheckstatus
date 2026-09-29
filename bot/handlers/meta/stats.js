@@ -72,7 +72,7 @@ export async function handleStatsCommand(interaction) {
   // Same card anatomy as the /la-list add result: icon title + one-line
   // hero description; the refresh hint lives in the footer tip instead
   // of eating a second description line.
-  const embed = createArtistEmbed(lang)
+  const embed = createArtistEmbed()
     .setTitle(`📊 ${t('dialogue.stats.title', lang)}`)
     .setDescription(t('dialogue.stats.description', lang))
     // Five inline panels · padded to six so the second row keeps the

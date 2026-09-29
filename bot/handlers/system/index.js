@@ -143,7 +143,7 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
         });
       }
 
-      const embed = createArtistEmbed(lang)
+      const embed = createArtistEmbed()
         .setTitle(`${health.titleIcon} ${t('dialogue.system.status.title', lang)}`)
         .setDescription(`${headline}\n\n${t('dialogue.system.status.checked', lang, { time: relativeTime(Date.now()) })}`)
         .addFields(fields)

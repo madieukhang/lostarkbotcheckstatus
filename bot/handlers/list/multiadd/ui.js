@@ -23,7 +23,7 @@ export async function buildTemplateReply(lang = 'en') {
     description: t('dialogue.multiadd.template.attachmentDescription', lang),
   });
 
-  const templateEmbed = createArtistEmbed(lang)
+  const templateEmbed = createArtistEmbed()
     .setTitle(`📋 ${t('dialogue.multiadd.template.title', lang)}`)
     .setDescription(t('dialogue.multiadd.template.description', lang, { count: MULTIADD_MAX_ROWS }))
     .setColor(COLORS.info)
@@ -86,7 +86,7 @@ export function buildPreviewReply(parsed, requestId, lang = 'en') {
       })
     : t('dialogue.multiadd.preview.ready', lang, { count: parsed.rows.length, rowWord: rowWord(parsed.rows.length) });
 
-  const previewEmbed = createArtistEmbed(lang)
+  const previewEmbed = createArtistEmbed()
     .setTitle(`📋 ${t('dialogue.multiadd.preview.title', lang, { count: parsed.rows.length, rowWord: rowWord(parsed.rows.length) })}`)
     .setDescription([headerLine, '', previewLines.join('\n')].join('\n').slice(0, 4096))
     .setColor(COLORS.info)
