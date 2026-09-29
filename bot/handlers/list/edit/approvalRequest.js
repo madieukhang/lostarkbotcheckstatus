@@ -1,6 +1,8 @@
 /**
  * handlers/list/edit/approvalRequest.js
- * Non-officer branch of /la-list edit · creates a PendingApproval doc
+ * Approval branch of /la-list edit, taken when shouldApplyListEditImmediately
+ * returns false (a non-approver editing another user's entry, or moving an
+ * entry into the global blacklist) · creates a PendingApproval doc
  * with kind="edit" and fans out the approval DM to approvers using
  * the SAME sendListAddApprovalToApprovers helper as /la-list add
  * (so the approver UX stays consistent across add + edit).
@@ -24,7 +26,7 @@ import {
  * @param {Function} args.sendListAddApprovalToApprovers - reused
  *   approver DM broadcaster (handles both add + edit kinds)
  * @param {object} args.existing - the entry being edited
- * @param {string} args.currentType - blacklist | whitelist | watchlist
+ * @param {'black'|'white'|'watch'} args.currentType
  * @param {string} args.targetType - destination list type
  *   · plus the rewritten payload fields (newReason, newRaid, newLogs,
  *   newScope, newImage, additional_names, etc.)
@@ -48,8 +50,6 @@ export async function sendListEditApprovalRequest({
   changes,
   lang = 'en',
 }) {
-
-  // Not owner, not approver → send approval request
   const existingObj = existing.toObject?.() || existing;
 
   // Image fields for the approval payload: prefer rehosted refs over URL.

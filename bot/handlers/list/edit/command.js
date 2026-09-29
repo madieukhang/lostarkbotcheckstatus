@@ -98,6 +98,9 @@ async function rejectInvalidListEditInput({
   additionalNamesRaw,
   lang,
 }) {
+  // Manual alt append: officer/senior or entry owner only. It fills the gap
+  // where /la-list enrich cannot run (hidden roster and no guild, so there
+  // is no candidate pool to walk).
   const mayAppendNames = existing.addedByUserId === interaction.user.id
     || isOfficerOrSenior(interaction.user.id);
   const rules = [
@@ -302,9 +305,6 @@ export function createListEditCommandHandler({
 
     const input = readListEditInput(interaction);
     const newImageUrl = input.imageAttachment?.url || '';
-    // Manual alt append: officer/senior or entry owner only. Designed to
-    // fill the gap where /la-list enrich cant run (target has hidden
-    // roster AND no guild = no candidate pool to walk).
 
     // Defer FIRST so the rehost (download + upload, can take 1-3s) does not
     // cross Discord's 3-second interaction ack window. Discord keeps the

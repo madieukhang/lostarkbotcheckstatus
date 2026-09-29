@@ -1,23 +1,11 @@
 /**
  * trackedAltsRender.js
  *
- * Single source of truth for the "🧬 Tracked alts" field rendered on
- * /la-list view evidence detail, /la-list add success, /la-list add
- * approval DMs, and cross-server broadcast cards.
- *
- * Before this module each call site grew its own copy of the same
- * numbered-list-with-overflow logic, drifting on cap behaviour
- * (hard-coded 12 vs dynamic field-size fitting), per-row enrichment
- * (links only vs class icon + ilvl + CP), and empty-state handling
- * (sentinel field vs skipped field vs returned null). Centralising
- * the renderer here keeps all four surfaces visually identical and
- * makes future tweaks (cap, overflow wording, link host) a one-file
- * change.
- *
- * The module sits at the `handlers/list/` layer, not `helpers.js`,
- * because it must be importable by services/broadcasts.js without a
- * circular dependency (broadcasts.js already imports helpers.js for
- * getListContext).
+ * Shared renderer for tracked-roster fields and alt rows: the numbered
+ * list with class icon, ilvl and CP, the overflow line that keeps a field
+ * under Discord's 1024-character limit, and the empty-state sentinel. The
+ * list cards (check, view, add, edit, remove, trust, enrich, broadcasts)
+ * and the scan result cards render alts through it so they stay identical.
  */
 
 import { getClassEmoji, getClassName } from '../../models/Class.js';

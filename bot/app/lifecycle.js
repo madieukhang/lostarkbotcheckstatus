@@ -33,8 +33,8 @@ export function startReadyBackgroundServices(client, {
 
 /**
  * Build the `ready` event handler. Returned async function takes no
- * args (matches discord.js event signature). All subsystems are
- * idempotent so re-invoking on reconnect is safe.
+ * args (matches discord.js event signature). The services it starts are
+ * not idempotent, so bot.js registers it with `client.once`.
  * @param {import('discord.js').Client} client
  * @returns {() => Promise<void>}
  */

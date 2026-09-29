@@ -184,7 +184,6 @@ export function startMonitor(client) {
 
     void runCheck('Scheduled');
   }, config.checkIntervalMs);
-
 }
 
 /**

@@ -289,13 +289,13 @@ async function replyWithHiddenRosterSuggestions(replyEditor, name, lang) {
  * Render the hidden-roster card for /la-roster.
  * @param {object} args
  * @param {import('discord.js').Interaction} args.interaction
- * @param {Function} args.replyEditor - shared editor function passed
- *   by command.js so this module doesn't need to know whether the
- *   reply has been deferred or not.
+ * @param {{edit: Function, getMessage: Function}} args.replyEditor - the
+ *   createLongRunningReplyEditor object passed by command.js so this module
+ *   doesn't need to know whether the reply has been deferred or not.
  * @param {string} args.name - the queried character name
  * @param {boolean} args.deep - whether the caller passed deep:true
- * @param {object} args.deepOptions - deep-scan tuning (concurrency,
- *   candidate cap, etc.) forwarded to detectAltsViaStronghold
+ * @param {{candidateLimit?: number, useScraperApiForCandidates: boolean}} args.deepOptions -
+ *   forwarded to detectAltsViaStronghold
  * @returns {Promise<void>}
  */
 export async function handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions }) {

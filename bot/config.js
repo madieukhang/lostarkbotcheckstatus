@@ -271,10 +271,10 @@ const config = {
   /**
    * Base URL for character-page display links rendered in embeds (e.g.
    * "Tracked alts" rows, evidence detail title, broadcast cards).
-   * The bot appends `<urlencoded-name>/roster` (or `/logs`, `/guild`)
-   * onto this base. Trailing slash is auto-trimmed at use time so both
-   * `https://lostark.bible/character/NA/` and `https://lostark.bible/character/NA`
-   * shapes are accepted. Default keeps current production behavior.
+   * The bot appends `<urlencoded-name>/roster`, or the bare name for
+   * profile links, onto this base. Trailing slashes are trimmed here at
+   * load time so both `https://lostark.bible/character/NA/` and
+   * `https://lostark.bible/character/NA` shapes are accepted.
    *
    * Decoupling rationale: the moderation DB itself is self-sufficient,
    * but historical embeds linked into bible for click-through verification.

@@ -520,14 +520,13 @@ async function buildSuccessfulAddResult({
 /**
  * Build the executeListAddToDatabase executor.
  * @param {object} deps
- * @param {import('discord.js').Client} deps.client - Discord client
- *   (used by the hidden-roster guidance "Enrich now" button + the
- *   success card's evidence-rehost path)
+ * @param {import('discord.js').Client} deps.client - Discord client the
+ *   success card uses to resolve the rehosted evidence image URL.
  * @param {Function} deps.broadcastListChange - guild broadcast helper
  *   called after a successful add so the per-guild notify channel
  *   gets the update.
- * @returns {{executeListAddToDatabase: Function}} the executor (shared
- *   call site between auto-approve + approval-button paths).
+ * @returns {Function} executeListAddToDatabase, shared by the auto-approve,
+ *   approval-button and bulk-add paths.
  */
 export function createListAddExecutor({ client, broadcastListChange }) {
   async function executeListAddToDatabase(payload, { beforeWrite = async () => {} } = {}) {

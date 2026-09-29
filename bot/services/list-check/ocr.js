@@ -563,184 +563,184 @@ export async function extractNamesFromImage(image, options = {}) {
   };
 
   try {
-  const mode = timing.mode;
-  if (mode !== 'daily' && mode !== 'analysis') {
-    throw new RangeError(`Unknown OCR mode: ${mode}`);
-  }
-  const models = mode === 'analysis' ? config.geminiAnalysisModels : config.geminiModels;
-  if (models.length === 0) throw new Error(`No Gemini models are enabled for OCR mode: ${mode}`);
-  if (!config.geminiApiKey) {
-    throw new Error('GEMINI_API_KEY is not configured.');
-  }
+    const mode = timing.mode;
+    if (mode !== 'daily' && mode !== 'analysis') {
+      throw new RangeError(`Unknown OCR mode: ${mode}`);
+    }
+    const models = mode === 'analysis' ? config.geminiAnalysisModels : config.geminiModels;
+    if (models.length === 0) throw new Error(`No Gemini models are enabled for OCR mode: ${mode}`);
+    if (!config.geminiApiKey) {
+      throw new Error('GEMINI_API_KEY is not configured.');
+    }
 
-  if (image.contentType && !image.contentType.startsWith('image/')) {
-    throw new Error('Attachment must be an image file.');
-  }
+    if (image.contentType && !image.contentType.startsWith('image/')) {
+      throw new Error('Attachment must be an image file.');
+    }
 
-  const refineAmbiguousDiacritics = options.refineAmbiguousDiacritics === true;
-  // A deeper retry must not reuse a daily answer for the same attachment.
-  const cacheKey = image.url
-    ? `${image.url}|mode:${mode}|models:${models.join(',')}|refine:${refineAmbiguousDiacritics ? '1' : '0'}`
-    : '';
-  const cachedNames = ocrCache.get(cacheKey);
-  if (cachedNames !== undefined) {
-    timing.cache = 'hit';
-    timing.status = 'ok';
-    timing.names = cachedNames.length;
-    return cachedNames;
-  }
+    const refineAmbiguousDiacritics = options.refineAmbiguousDiacritics === true;
+    // A deeper retry must not reuse a daily answer for the same attachment.
+    const cacheKey = image.url
+      ? `${image.url}|mode:${mode}|models:${models.join(',')}|refine:${refineAmbiguousDiacritics ? '1' : '0'}`
+      : '';
+    const cachedNames = ocrCache.get(cacheKey);
+    if (cachedNames !== undefined) {
+      timing.cache = 'hit';
+      timing.status = 'ok';
+      timing.names = cachedNames.length;
+      return cachedNames;
+    }
 
-  const pending = ocrInFlight.get(cacheKey);
-  if (pending) {
-    timing.cache = 'in-flight';
-    const names = await pending.promise;
+    const pending = ocrInFlight.get(cacheKey);
+    if (pending) {
+      timing.cache = 'in-flight';
+      const names = await pending.promise;
+      timing.status = 'ok';
+      timing.names = names.length;
+      return names.slice();
+    }
+    // Cached and in-flight answers remain usable; only new work needs a healthy
+    // model. Reject before downloading or encoding an image that cannot run.
+    const { failure } = selectAvailableGeminiModels(models);
+    if (failure) throw createGeminiFailureError(failure, models);
+
+    if (cacheKey) {
+      ownedFlight = {};
+      ownedFlight.promise = new Promise((resolve, reject) => Object.assign(ownedFlight, { resolve, reject }));
+      // The owner already propagates errors; the shared promise may have no waiters.
+      ownedFlight.promise.catch(() => {});
+      flightKey = cacheKey;
+      ocrInFlight.set(flightKey, ownedFlight);
+    }
+
+    const downloadStartedAt = Date.now();
+    const imageRes = await fetch(image.url, { signal: AbortSignal.timeout(15000) });
+    timing.downloadMs = Date.now() - downloadStartedAt;
+    if (!imageRes.ok) {
+      throw new Error(`Failed to download attachment (HTTP ${imageRes.status})`);
+    }
+
+    const contentLength = imageRes.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_OCR_IMAGE_BYTES) {
+      throw new Error('Image file too large (max 20MB).');
+    }
+
+    const mimeType = image.contentType || imageRes.headers.get('content-type') || 'image/png';
+    const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+    timing.downloadMs = Date.now() - downloadStartedAt;
+    if (imageBuffer.byteLength > MAX_OCR_IMAGE_BYTES) {
+      throw new Error('Image file too large (max 20MB).');
+    }
+    const imageBase64 = imageBuffer.toString('base64');
+
+    const geminiResult = await requestGeminiWithFallback({
+      prompt: GEMINI_PROMPT,
+      imageBase64,
+      mimeType,
+      models,
+      onModelStart: (model) => {
+        timing.model = model;
+        timing.geminiAttempts += 1;
+      },
+      onModelElapsed: ({ model, elapsedMs }) => {
+        timing.geminiMs += elapsedMs;
+        timing.modelTimings.push(`${model}:${elapsedMs}ms`);
+      },
+      onModelUsage: (usageMetadata = {}) => {
+        const tokenFields = [
+          ['promptTokens', usageMetadata.promptTokenCount],
+          ['outputTokens', usageMetadata.candidatesTokenCount],
+          ['thoughtTokens', usageMetadata.thoughtsTokenCount],
+          ['totalTokens', usageMetadata.totalTokenCount],
+        ];
+        for (const [field, value] of tokenFields) {
+          if (Number.isFinite(value)) timing[field] += value;
+        }
+      },
+      onModelSkipped: ({ model, reason, remainingMs }) => {
+        console.warn(
+          `[listcheck] Gemini ${model} cooling down after ${reason};`
+          + ` skipping for ${Math.ceil(remainingMs / 1000)}s.`,
+        );
+      },
+      onRetry: ({ type, model, status, timeoutMs, cooldownMs }) => {
+        const cooldown = Number.isFinite(cooldownMs)
+          ? ` Cooling it down for ${Math.ceil(cooldownMs / 1000)}s.`
+          : '';
+        const retryMessages = {
+          network: `[listcheck] Gemini timeout/network error on ${model}, trying fallback model.${cooldown}`,
+          timeout: `[listcheck] Gemini model ${model} exceeded ${timeoutMs}ms, trying fallback model.${cooldown}`,
+          http: `[listcheck] Gemini recoverable HTTP ${status} on ${model}, trying fallback model.${cooldown}`,
+        };
+        if (retryMessages[type]) console.warn(retryMessages[type]);
+      },
+      parseResponse: ({ finishReason, text, model, usageMetadata }) => {
+        if (finishReason && finishReason !== 'STOP') {
+          console.warn(
+            `[listcheck] Gemini (${model}) finishReason: ${finishReason}`
+            + `${formatGeminiTokenUsage(usageMetadata)}, text: ${text.slice(0, 100)}`,
+          );
+        }
+
+        // A syntactically closed array can still be only the prefix of the lobby
+        // when generation hit its ceiling. Never accept it as a complete roster.
+        if (finishReason === 'MAX_TOKENS') {
+          return { retry: true, reason: 'max output tokens' };
+        }
+
+        if (!text) return { value: { parsed: [], emptyResponse: true } };
+
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          console.warn(`[listcheck] Gemini (${model}) returned non-JSON text: ${text.slice(0, 200)}`);
+          return { retry: true, reason: 'non-JSON response' };
+        }
+
+        let parsed;
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch {
+          console.warn(`[listcheck] Gemini (${model}) JSON parse failed: ${jsonMatch[0].slice(0, 200)}`);
+          return { retry: true, reason: 'invalid JSON' };
+        }
+        if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
+        return { value: { parsed, emptyResponse: false } };
+      },
+    });
+
+    if (!geminiResult.ok) {
+      throw createGeminiFailureError(geminiResult, models);
+    }
+
+    if (geminiResult.value.emptyResponse) {
+      timing.status = 'ok';
+      ownedFlight?.resolve([]);
+      return [];
+    }
+
+    let names = filterAndDeduplicateNames(geminiResult.value.parsed);
+    if (refineAmbiguousDiacritics) {
+      const refineStartedAt = Date.now();
+      try {
+        names = await refineAmbiguousOcrNames(names, {
+          imageBase64,
+          mimeType,
+          models,
+          suggestionCache: options.suggestionCache,
+          suggestionContext: options.suggestionContext,
+        });
+      } finally {
+        timing.refineMs = Date.now() - refineStartedAt;
+      }
+      // Two distinct OCR strings may converge on the same Bible-confirmed name.
+      // Collapse them before caching so the shared check pipeline never repeats
+      // Mongo/enrichment/render work for one character.
+      names = filterAndDeduplicateNames(names);
+    }
+    ocrCache.set(cacheKey, names);
     timing.status = 'ok';
     timing.names = names.length;
-    return names.slice();
-  }
-  // Cached and in-flight answers remain usable; only new work needs a healthy
-  // model. Reject before downloading or encoding an image that cannot run.
-  const { failure } = selectAvailableGeminiModels(models);
-  if (failure) throw createGeminiFailureError(failure, models);
-
-  if (cacheKey) {
-    ownedFlight = {};
-    ownedFlight.promise = new Promise((resolve, reject) => Object.assign(ownedFlight, { resolve, reject }));
-    // The owner already propagates errors; the shared promise may have no waiters.
-    ownedFlight.promise.catch(() => {});
-    flightKey = cacheKey;
-    ocrInFlight.set(flightKey, ownedFlight);
-  }
-
-  const downloadStartedAt = Date.now();
-  const imageRes = await fetch(image.url, { signal: AbortSignal.timeout(15000) });
-  timing.downloadMs = Date.now() - downloadStartedAt;
-  if (!imageRes.ok) {
-    throw new Error(`Failed to download attachment (HTTP ${imageRes.status})`);
-  }
-
-  const contentLength = imageRes.headers.get('content-length');
-  if (contentLength && parseInt(contentLength, 10) > MAX_OCR_IMAGE_BYTES) {
-    throw new Error('Image file too large (max 20MB).');
-  }
-
-  const mimeType = image.contentType || imageRes.headers.get('content-type') || 'image/png';
-  const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-  timing.downloadMs = Date.now() - downloadStartedAt;
-  if (imageBuffer.byteLength > MAX_OCR_IMAGE_BYTES) {
-    throw new Error('Image file too large (max 20MB).');
-  }
-  const imageBase64 = imageBuffer.toString('base64');
-
-  const geminiResult = await requestGeminiWithFallback({
-    prompt: GEMINI_PROMPT,
-    imageBase64,
-    mimeType,
-    models,
-    onModelStart: (model) => {
-      timing.model = model;
-      timing.geminiAttempts += 1;
-    },
-    onModelElapsed: ({ model, elapsedMs }) => {
-      timing.geminiMs += elapsedMs;
-      timing.modelTimings.push(`${model}:${elapsedMs}ms`);
-    },
-    onModelUsage: (usageMetadata = {}) => {
-      const tokenFields = [
-        ['promptTokens', usageMetadata.promptTokenCount],
-        ['outputTokens', usageMetadata.candidatesTokenCount],
-        ['thoughtTokens', usageMetadata.thoughtsTokenCount],
-        ['totalTokens', usageMetadata.totalTokenCount],
-      ];
-      for (const [field, value] of tokenFields) {
-        if (Number.isFinite(value)) timing[field] += value;
-      }
-    },
-    onModelSkipped: ({ model, reason, remainingMs }) => {
-      console.warn(
-        `[listcheck] Gemini ${model} cooling down after ${reason};`
-        + ` skipping for ${Math.ceil(remainingMs / 1000)}s.`,
-      );
-    },
-    onRetry: ({ type, model, status, timeoutMs, cooldownMs }) => {
-      const cooldown = Number.isFinite(cooldownMs)
-        ? ` Cooling it down for ${Math.ceil(cooldownMs / 1000)}s.`
-        : '';
-      const retryMessages = {
-        network: `[listcheck] Gemini timeout/network error on ${model}, trying fallback model.${cooldown}`,
-        timeout: `[listcheck] Gemini model ${model} exceeded ${timeoutMs}ms, trying fallback model.${cooldown}`,
-        http: `[listcheck] Gemini recoverable HTTP ${status} on ${model}, trying fallback model.${cooldown}`,
-      };
-      if (retryMessages[type]) console.warn(retryMessages[type]);
-    },
-    parseResponse: ({ finishReason, text, model, usageMetadata }) => {
-      if (finishReason && finishReason !== 'STOP') {
-        console.warn(
-          `[listcheck] Gemini (${model}) finishReason: ${finishReason}`
-          + `${formatGeminiTokenUsage(usageMetadata)}, text: ${text.slice(0, 100)}`,
-        );
-      }
-
-      // A syntactically closed array can still be only the prefix of the lobby
-      // when generation hit its ceiling. Never accept it as a complete roster.
-      if (finishReason === 'MAX_TOKENS') {
-        return { retry: true, reason: 'max output tokens' };
-      }
-
-      if (!text) return { value: { parsed: [], emptyResponse: true } };
-
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        console.warn(`[listcheck] Gemini (${model}) returned non-JSON text: ${text.slice(0, 200)}`);
-        return { retry: true, reason: 'non-JSON response' };
-      }
-
-      let parsed;
-      try {
-        parsed = JSON.parse(jsonMatch[0]);
-      } catch {
-        console.warn(`[listcheck] Gemini (${model}) JSON parse failed: ${jsonMatch[0].slice(0, 200)}`);
-        return { retry: true, reason: 'invalid JSON' };
-      }
-      if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
-      return { value: { parsed, emptyResponse: false } };
-    },
-  });
-
-  if (!geminiResult.ok) {
-    throw createGeminiFailureError(geminiResult, models);
-  }
-
-  if (geminiResult.value.emptyResponse) {
-    timing.status = 'ok';
-    ownedFlight?.resolve([]);
-    return [];
-  }
-
-  let names = filterAndDeduplicateNames(geminiResult.value.parsed);
-  if (refineAmbiguousDiacritics) {
-    const refineStartedAt = Date.now();
-    try {
-      names = await refineAmbiguousOcrNames(names, {
-        imageBase64,
-        mimeType,
-        models,
-        suggestionCache: options.suggestionCache,
-        suggestionContext: options.suggestionContext,
-      });
-    } finally {
-      timing.refineMs = Date.now() - refineStartedAt;
-    }
-    // Two distinct OCR strings may converge on the same Bible-confirmed name.
-    // Collapse them before caching so the shared check pipeline never repeats
-    // Mongo/enrichment/render work for one character.
-    names = filterAndDeduplicateNames(names);
-  }
-  ocrCache.set(cacheKey, names);
-  timing.status = 'ok';
-  timing.names = names.length;
-  ownedFlight?.resolve(names.slice());
-  return names;
+    ownedFlight?.resolve(names.slice());
+    return names;
   } catch (error) {
     ownedFlight?.reject(error);
     throw error;

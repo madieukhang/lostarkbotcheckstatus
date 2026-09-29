@@ -1,6 +1,6 @@
 /**
  * services/roster/listChecks.js
- * Roster-vs-list lookup helpers backing /la-check + auto-check.
+ * Roster-vs-list lookup helpers backing /la-roster.
  * Blacklist + whitelist queries are case-insensitive (collation
  * strength 2) so OCR-folded names land on the right row. Returns the
  * full entry shape via shapeRosterListHit so callers don't have to

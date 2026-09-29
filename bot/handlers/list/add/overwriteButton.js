@@ -1,11 +1,11 @@
 /**
  * handlers/list/add/overwriteButton.js
  * "Overwrite" + "Keep existing" buttons on the duplicate-detection
- * branch of /la-list add. When the requester is adding a name that
- * already exists on another list (or same list with different reason),
- * the approval card offers an overwrite path · this handler refreshes
- * allCharacters via a fresh bible scrape, stamps the enrichment meta,
- * and rewrites the existing entry in place.
+ * branch of /la-list add. When an approved request hits an entry already
+ * on the same list (by name or tracked roster), the approver's card offers
+ * an overwrite path · this handler refreshes allCharacters via a fresh
+ * bible scrape, stamps the enrichment meta, and rewrites the existing
+ * entry in place. Keep existing closes the request and tells the requester.
  */
 
 import { buildRosterCharacters } from '../../../services/roster/index.js';

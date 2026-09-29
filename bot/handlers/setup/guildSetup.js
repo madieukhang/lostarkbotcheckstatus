@@ -1,4 +1,4 @@
-﻿/**
+/**
  * handlers/setup/guildSetup.js
  * Handles /la-setup command for per-guild channel configuration.
  * Allows server admins to set auto-check and notification channels

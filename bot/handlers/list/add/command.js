@@ -1,10 +1,10 @@
 /**
  * handlers/list/add/command.js
  * /la-list add: slash entry that opens the approval flow for adding
- * a character to one of the four lists (blacklist / whitelist /
- * watchlist / trusted). Performs bible roster scrape for `allCharacters`,
- * resolves evidence image rehost, then either auto-approves (officer)
- * or fans the request out to approvers via DM.
+ * a character to the blacklist, whitelist or watchlist. Performs bible
+ * roster scrape for `allCharacters` and resolves evidence image rehost.
+ * Server-scoped entries and requests from any configured approver are
+ * written at once; the rest go to the approvers via DM.
  */
 
 import { connectDB } from '../../../db.js';

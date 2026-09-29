@@ -31,12 +31,6 @@ export const LIST_VIEW_ALT_PREVIEW_LIMIT = 3;
 const EMBED_DESCRIPTION_LIMIT = 4096;
 const ALT_PREVIEW_FIT_LEVELS = Object.freeze([LIST_VIEW_ALT_PREVIEW_LIMIT, 2, 1, 0]);
 
-/**
- * Render the meta line that sits under each entry's name. Uses middot
- * separators to match the rest of the embed family. Falsy fields are
- * dropped silently so entries without a reason, raid, or timestamp don't show
- * empty separators.
- */
 function capitalizeLabel(value) {
   const text = String(value || '');
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
@@ -49,6 +43,12 @@ function getListTypeLabel(type, fallback, lang) {
   return translated === `listView.labels.${type}` ? capitalizeLabel(fallback) : translated;
 }
 
+/**
+ * Render the meta line that sits under each entry's name. Uses middot
+ * separators to match the rest of the embed family. Falsy fields are
+ * dropped silently so entries without a reason, raid, or timestamp don't show
+ * empty separators.
+ */
 function buildEntryMetaLine({ entry, lang = 'en' }) {
   const parts = [
     truncateInlineText(entry.reason, 80),
@@ -299,28 +299,6 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
   return rows;
 }
 
-/**
- * Detail view for a single list entry, used when an officer clicks
- * the evidence dropdown in /la-list view (and now also as the shared
- * renderer for /la-search evidence clicks). Layout has 3 visual blocks:
- *
- *   1. Title bar    - list-icon + entry name + bible-link via setURL
- *   2. Reason field - full reason text (1024 char cap)
- *   3. Inline meta  - Raid · List · CP · ilvl · Added · Added by · Server,
- *                     with List omitted when the caller already establishes it
- *                     padded with zero-width spacers to whole 3-up rows
- *   4. Roster field - "Tracked alts" with linked names; falls back
- *                     to "(only this character)" if allCharacters is
- *                     just the entry name
- *   5. Evidence     - image, expired warning, or an explicit not-attached note
- *   6. Logs (optional)
- *
- * `statMap` (lowercase name -> `{ className, itemLevel, combatScore }`,
- * built by statMapFromRosterCharacters or a RosterSnapshot query) is what
- * turns the alt rows from bare links into class + ilvl + CP rows and fills
- * the ilvl / CP slots. It is optional: a caller with no roster data in hand
- * gets the card without those slots rather than a grid of "N/A".
- */
 function buildEvidenceInlineMeta(entry, snapshot, {
   includeAddedBy,
   includeList,
@@ -345,9 +323,9 @@ function buildEvidenceInlineMeta(entry, snapshot, {
       value: getListTypeLabel(entry._listType, entry._label, lang),
       inline: true,
     } : null,
-  // ilvl and CP only appear when the caller supplied a stat snapshot.
-  // Rendering them as "N/A" would cost two slots on every surface that
-  // has no roster data to give, which is most of them.
+    // ilvl and CP only appear when the caller supplied a stat snapshot.
+    // Rendering them as "N/A" would cost two slots on every surface that
+    // has no roster data to give, which is most of them.
     combatScore && combatScore !== '?'
       ? { name: t('listView.evidence.combatPower', lang), value: `\`${combatScore}\``, inline: true }
       : null,
@@ -383,18 +361,8 @@ function buildEvidenceFields(entry, snapshot, {
     }),
   ];
 
-  // Roster (allCharacters) field. Counts alts excluding the entry's own
-  // name, then renders a numbered list with bible roster links so the
-  // officer can click straight through to verify any alt. Capped at 12
-  // visible names with `+N more` overflow line so the field stays
-  // under Discord's 1024-char field-value limit.
-  // Tracked alts via the shared renderer. View detail always shows the
-  // field (sentinel when empty) because it's part of the layout grammar
-  // the officer expects · the field is removed only when there is no
-  // entry at all, not when an entry happens to have no alts.
-  // The full roster, primary included · this is the same list the
-  // broadcast card renders (buildTrackedAltsField), and leaving the
-  // searched character out of it made the card disagree with the roster
+  // The full roster, primary included · the same list the broadcast card
+  // renders (buildTrackedAltsField), so this card agrees with the roster
   // card printed right below it.
   const altsField = renderTrackedAltsField({
     names: entry.allCharacters,
@@ -431,6 +399,34 @@ function applyEvidenceMedia(embed, entry, displayUrl, { lang }) {
   });
 }
 
+/**
+ * Detail card for a single list entry, shared by the /la-list view evidence
+ * dropdown, /la-evidence and the approval request's evidence button. Layout,
+ * top to bottom:
+ *
+ *   1. Title bar    - list-icon + entry name + bible-link via setURL
+ *   2. Reason field - full reason text (1024 char cap)
+ *   3. Inline meta  - Raid · List · CP · ilvl · Added · Added by · Server,
+ *                     with List omitted when the caller already establishes it,
+ *                     padded with zero-width spacers to whole 3-up rows
+ *   4. Roster field - tracked rosters, the entry's own name first
+ *   5. Evidence     - image, expired warning, or an explicit not-attached note
+ *   6. Logs (optional)
+ *
+ * `statMap` (lowercase name -> `{ className, itemLevel, combatScore }`,
+ * built by statMapFromRosterCharacters or a RosterSnapshot query) is what
+ * turns the alt rows from bare links into class + ilvl + CP rows and fills
+ * the ilvl / CP slots. It is optional: a caller with no roster data in hand
+ * gets the card without those slots rather than a grid of "N/A".
+ * @param {object} entry - list entry decorated with `_icon` and `_color`
+ * @param {string|null} displayUrl - resolved evidence image URL, or null
+ * @param {object} [options]
+ * @param {boolean} [options.includeAddedBy=false]
+ * @param {boolean} [options.includeList=true]
+ * @param {string} [options.lang='en']
+ * @param {Map<string, object>} [options.statMap]
+ * @returns {import('discord.js').EmbedBuilder}
+ */
 export function buildEvidenceEmbed(entry, displayUrl, {
   includeAddedBy = false,
   includeList = true,

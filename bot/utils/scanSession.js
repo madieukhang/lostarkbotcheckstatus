@@ -75,8 +75,8 @@ export function reserveUserScan(userId, info = {}, options = {}) {
 
 /**
  * Build the standard Stop-scan button row attached to scan progress
- * embeds. customId shape: `scan-cancel:<sessionId>`. The dispatch in
- * bot.js routes that prefix family.
+ * embeds. customId shape: `scan-cancel:<sessionId>`. The route table in
+ * app/interaction-router.js dispatches that prefix family.
  *
  * @param {string} sessionId
  * @param {Object} [opts]

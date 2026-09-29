@@ -43,7 +43,7 @@ const guildConfigSchema = new mongoose.Schema({
   /** Whether this guild receives global list notifications from other servers */
   globalNotifyEnabled: { type: Boolean, default: true },
 
-   /** Default blacklist scope for /la-list add when scope option is not specified */
+  /** Default blacklist scope for /la-list add when scope option is not specified */
   defaultBlacklistScope: { type: String, enum: ['global', 'server'], default: 'global' },
 
   /**

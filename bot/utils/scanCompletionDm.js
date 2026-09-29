@@ -98,7 +98,7 @@ export async function sendScanCompletionDm(opts) {
   //   2. Source context (guild name)
   //   3. Alt list (when matches exist)
   // Anything technical (counts, retries, ScraperAPI) goes into the
-  // addFields stats grid below — keeps the description tight.
+  // addFields stats grid below, which keeps the description tight.
   const heroLines = [
     t('dialogue.scan.dm.hero', lang, {
       command: commandLabel,

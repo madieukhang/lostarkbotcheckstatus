@@ -15,9 +15,8 @@
  *   - Blacklist entries may identify only one alt while the account has
  *     others, so officers can opt into thorough discovery on demand.
  *
- * Access: everyone can run this, but regular users are limited to one
- * active Stronghold scan at a time. Officers/seniors can run parallel
- * operational scans when needed.
+ * Access: officers and seniors only (denyIfNotOfficer), and they may run
+ * Stronghold scans in parallel.
  *
  * Cooldown: 30 seconds per entry (in-memory). Deep scans consume Bible
  * quota; the cooldown prevents an accidental double-click from

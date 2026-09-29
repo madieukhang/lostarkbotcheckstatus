@@ -166,10 +166,9 @@ export function createApprovalServices({
       if (typeCounts[r.type] !== undefined) typeCounts[r.type]++;
       if (r.scope === 'server') serverScopedCount++;
     }
-    // Color follows the dominant outcome: blacklist-heavy batches tint
-    // red, whitelist-heavy go green, watch-heavy yellow. Mixed batches
-    // fall back to blurple. Approvers reading a stack of DMs scan
-    // colors first.
+    // Color follows the largest list type: blacklist red (it also wins
+    // ties), watchlist yellow (over whitelist on a tie), whitelist green.
+    // Approvers reading a stack of DMs scan colors first.
     let color;
     if (typeCounts.black >= typeCounts.white && typeCounts.black >= typeCounts.watch) color = COLORS.danger;
     else if (typeCounts.watch >= typeCounts.white) color = COLORS.warning;

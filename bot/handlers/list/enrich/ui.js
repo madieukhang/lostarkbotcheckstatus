@@ -43,25 +43,26 @@ export function buildEnrichProgressEmbed({ entry, foundType, meta, progress, lan
 }
 
 /**
- * Post-confirm success card. Replaces the older one-line "Appended N
- * alt(s) to the entry's `allCharacters`" with a layout containing per-alt
- * class and item level, scan source, hidden-roster state, and a next-step
- * hint. Database counters such as `matched=1 · modified=1` are written to
- * debug logs rather than the public footer.
+ * Post-confirm success card. Database counters such as `matched=1 ·
+ * modified=1` go to the server log rather than the public card.
  *
  * Layout:
- *   ${list-icon} Saved · ${entry.name}        (color: list-type tint)
+ *   author       Stronghold scan · <guild>                 [when the guild is known]
+ *   title        ${list-icon} <entry name> · +N new alts    (color: list-type tint)
+ *   description  one spoken line, pooled by one alt vs many
+ *   🆕 Newly tracked (N): numbered alt rows with class, ilvl and CP
+ *   📊 Scanned · 🎯 Alts found · 🔒 Roster                 [each only when known]
+ *   footer       characters now tracked on the entry
  *
- *   ✨ Localized confirmation with the appended-alt count.
- *   📍 Source: Stronghold scan in **<guild>**
- *   🔒 Roster was hidden, matched via stronghold fingerprint  [optional]
- *
- *   **🆕 Newly tracked characters:**
- *   1. [Name](link) · Class · `1750.83`
- *   2. [Name](link) · Class · `1740.00`
- *   ...
- *
- *   💡 Tip: /la-list view <type> to browse the full list.
+ * @param {object} session - enrich session (type, entryName, newAlts,
+ *   scanStats, targetIsHidden)
+ * @param {{matchedCount?: number, modifiedCount?: number}|null} updateResult -
+ *   MongoDB update result, logged when the write changed nothing
+ * @param {string} [lang='en']
+ * @param {object} [options]
+ * @param {number} [options.trackedTotal=0] - character count read back after
+ *   the write; the footer falls back to the new-alt count without it
+ * @returns {import('discord.js').EmbedBuilder}
  */
 export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en', { trackedTotal = 0 } = {}) {
   const ctx = LIST_LABELS[session.type];

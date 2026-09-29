@@ -71,7 +71,8 @@ function matchedAlt(candidate, candidateMeta, targetMeta) {
  * @param {object} [options] - see options destructure inside (mode,
  *   concurrency, viaWorker, candidateLimit, target/guild meta overrides)
  * @returns {Promise<object|null>} alt detection result · see callers in
- *   handlers/list/enrich, handlers/list/multiadd, services/multiadd
+ *   handlers/list/enrich and handlers/roster (hiddenRoster, visibleDeepScan,
+ *   deepContinue)
  */
 export async function detectAltsViaStronghold(name, options = {}) {
   return runWithScraperApiUsageScope(() => detectAltsViaStrongholdInScope(name, options));
@@ -188,9 +189,10 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
 
   console.log(`[alt-detect] Scanning ${limitedCandidates.length} candidate(s)...`);
 
-  // Backoff floor matches mode: gentle = 1500ms (POC pace), fast = env
-  // default (300ms). Both modes ramp up to scanBackoffMaxMs (3000ms)
-  // on consecutive failures, recovering 100ms per success.
+  // Backoff by mode: gentle starts at 1500ms and ramps up to
+  // max(scanBackoffMaxMs, 8000ms); fast starts at scanBackoffMinMs (300ms
+  // default) and ramps up to scanBackoffMaxMs (3000ms default). Both step
+  // 500ms per failure and recover 100ms per success.
   const backoff = {
     current: backoffFloorMs,
     min: backoffFloorMs,

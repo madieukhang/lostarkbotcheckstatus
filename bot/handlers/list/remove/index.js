@@ -1,7 +1,7 @@
 /**
  * handlers/list/remove/index.js
- * /la-list remove: officer/senior-only entry to delete a list entry.
- * Shows a multi-list confirm picker when the name exists on more
+ * /la-list remove: deletes a list entry, allowed only for the user who added
+ * it. Shows a multi-list confirm picker when the name exists on more
  * than one list, then removes the chosen one and broadcasts the
  * change.
  */

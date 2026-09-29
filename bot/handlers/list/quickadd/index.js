@@ -37,7 +37,7 @@ import {
  *   (sendListAddApprovalToApprovers, executeListAddToDatabase)
  * @returns {{
  *   handleQuickAddSelect: Function,
- *   handleQuickAddModalSubmit: Function,
+ *   handleQuickAddModal: Function,
  * }}
  */
 export function createQuickAddHandlers({ services }) {

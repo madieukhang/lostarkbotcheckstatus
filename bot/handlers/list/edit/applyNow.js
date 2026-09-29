@@ -286,7 +286,7 @@ function broadcastAppliedEdit(args, editedEntry) {
  * @param {import('discord.js').Client} args.client
  * @param {Function} args.broadcastListChange - guild broadcast
  * @param {object} args.existing - the Mongoose entry being edited
- * @param {string} args.currentType - blacklist | whitelist | watchlist
+ * @param {'black'|'white'|'watch'} args.currentType
  * @param {string} args.targetType - the destination list type (same as
  *   currentType for in-place edit, different for cross-list move)
  *   · plus the rewritten payload fields (reason, raid, scope, image,
