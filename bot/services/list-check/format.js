@@ -14,8 +14,8 @@ function linkName(name, item) {
   const trimmed = String(name || '').trim();
   if (!trimmed) return trimmed;
   // Class comes from the related-name snapshots the check service loads
-  // for the entry and its alts · the searched name has its own
-  // snapClassName, and everyone else was previously rendered bare.
+  // for the entry and its alts · the searched name also has its own
+  // snapClassName.
   const className = item?.relatedClasses?.[normalizeNameKey(trimmed)] || '';
   const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
   return `${classPrefix}[${trimmed}](${rosterUrl(trimmed)})`;

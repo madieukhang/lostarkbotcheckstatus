@@ -1,10 +1,9 @@
 /**
  * alertEmbed.js
  *
- * Shared helper for building consistent "alert" embeds across the bot.
- * Before this existed, warning/error/info messages were a mix of plain-text
- * replies, ad-hoc embeds, and handler-specific helpers · which made the UX
- * inconsistent and made color-coded severity impossible to read at a glance.
+ * Shared helper for building consistent "alert" embeds across the bot, so
+ * warning, error and info messages read the same everywhere and severity
+ * shows as a color at a glance.
  *
  * Tokens live in `bot/utils/ui.js`. This module is the thin builder that
  * pairs a severity with the right color/icon and returns an EmbedBuilder

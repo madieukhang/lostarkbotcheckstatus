@@ -68,9 +68,8 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
     // Route through the shared buildEvidenceEmbed so the approval-flow
     // evidence card carries the same tokens (Reason field, list icon,
     // inline meta, Tracked alts) that /la-evidence, /la-search,
-    // /la-list view, and /la-check already render. Approvers reviewing
-    // evidence used to see a thinner card here than they would later
-    // in /la-list view; this closes that gap.
+    // /la-list view, and /la-check already render, so approvers see the
+    // card they would later see in /la-list view.
     const decorated = {
       ...decorateListEntry(payload, payload.type),
       addedAt: payload.createdAt || payload.addedAt,

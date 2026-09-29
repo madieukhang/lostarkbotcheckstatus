@@ -153,9 +153,9 @@ async function handleSetupNotifyChannel(interaction, lang) {
   const cleanupEnabled = existing?.listNotifyCleanupEnabled === true;
   const sameAsAutoCheck = existing?.autoCheckChannelId === channel.id;
 
-  // A persistent guide replaces the old transient test message, so pin access
-  // is part of a successful setup. Manage Messages is only required when this
-  // guild explicitly enabled notify cleanup.
+  // Setup posts a pinned guide, so pin access is part of a successful setup.
+  // Manage Messages is only required when this guild explicitly enabled
+  // notify cleanup.
   const { ok, missing } = checkBotPermissions(channel, interaction.guild, {
     cleanup: cleanupEnabled,
     welcomePin: true,

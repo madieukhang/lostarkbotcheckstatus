@@ -119,10 +119,8 @@ export async function hydrateBroadcastStatMap({
 // formatBroadcastCharacterLine + buildTrackedAltsField are kept as thin
 // wrappers around the shared renderer in handlers/list/trackedAltsRender.js
 // so the broadcast-specific public API (which tests import) stays stable
-// while the actual rendering logic lives in one place. Numbering changed
-// from "1." plain to "**1.**" bold to match the shared renderer's
-// formatting · cross-server broadcasts now read identically to the
-// /la-list view evidence detail card.
+// while the actual rendering logic lives in one place, and cross-server
+// broadcasts read identically to the /la-list view evidence detail card.
 
 export const formatBroadcastCharacterLine = formatAltLine;
 
@@ -320,8 +318,8 @@ export function createBroadcastServices({ client }) {
 
     // RosterSnapshot enrichment for class icon + ilvl + CP. Best-effort:
     // if /la-roster has queried this name before, the broadcast carries
-    // the same rich vocabulary as the v0.5.67 OCR check / scan cards.
-    // Otherwise fall back to the older name-only headline.
+    // the class icon, ilvl and CP that the check and scan cards show.
+    // Otherwise the headline carries the name only.
     const allChars = Array.isArray(entry.allCharacters) ? entry.allCharacters : [];
     const lookupNames = [...new Set([entry.name, ...allChars].filter(Boolean))];
     let snapshots = [];
@@ -341,7 +339,7 @@ export function createBroadcastServices({ client }) {
     // Description leads with a one-line headline so the recipient
     // sees "What changed in which list" without parsing the fields.
     // Class icon (when known) sits between the list-status icon and
-    // the linked name to match the rest of the v0.5.67 vocabulary.
+    // the linked name, as on the check and scan cards.
     // Enrich gets a bespoke headline naming the new-alt count + running
     // total (deliberately does NOT name the officer who ran it - the
     // guild only needs to know the entry grew, not by whom).
@@ -427,7 +425,7 @@ export function createBroadcastServices({ client }) {
 
     // Snapshot enrichment for the bulk preview line: one query for all
     // names in the batch instead of N. When snapshot data is present,
-    // each row picks up a class-icon prefix (matches v0.5.67 vocab);
+    // each row picks up a class-icon prefix;
     // names without a snapshot fall back to the bare name + reason.
     const allBulkNames = addedResults.map((r) => r.entry?.name || r.name).filter(Boolean);
     let snapshotMap = new Map();

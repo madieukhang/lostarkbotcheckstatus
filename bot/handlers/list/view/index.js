@@ -325,8 +325,7 @@ export function createViewHandlers({
             }
             // An entry without a screenshot still has a reason, a raid and
             // its tracked alts · the card renders those and says the
-            // evidence is missing, which the old early return replaced
-            // with a bare "no image" notice and nothing else.
+            // evidence is missing.
             const displayUrl = entry?.imageMessageId || entry?.imageUrl
               ? await resolveImageUrl(entry, client)
               : '';

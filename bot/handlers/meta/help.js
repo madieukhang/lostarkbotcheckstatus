@@ -40,8 +40,8 @@ function fieldValue(value) {
   return Array.isArray(value) ? value.join('\n') : String(value || '');
 }
 
-// One field per command family (locale `help.overview.groups`) instead of
-// the old single description wall. Discord's 1024-char field cap is the
+// One field per command family (locale `help.overview.groups`) rather than
+// one long description. Discord's 1024-char field cap is the
 // per-group budget guard; groups are sized in the locale files so the
 // longest (Lists, vi) stays well under it.
 function buildOverviewEmbed(lang, isOwnerGuild) {

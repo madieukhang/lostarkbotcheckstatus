@@ -247,17 +247,14 @@ export function buildListCheckEmbed({
     lang,
   });
 
-  // Description leads straight with the per-name list now (the breakdown moved
-  // up into the title). Ceiling is 4096; the slice is a safety net for long
+  // Description leads with the per-name list; the outcome breakdown is in
+  // the title. Ceiling is 4096; the slice is a safety net for long
   // reasons / many similar-name suggestions.
   const description = (`${formattedLines.join('\n')}${resultNotes}`).slice(0, 4096);
 
-  // Stats grid (Checked / Flagged / Cleared) was a 3-up inline field
-  // panel pre-v0.5.73. The Outcome breakdown line at the top of the
-  // description carries the same per-status info (with finer
-  // granularity), so the panel duplicated information and increased visual
-  // density. Reintroduce it only when separate aggregate counts are required.
-  // Aggregate cleared count is therefore intentionally not computed here.
+  // No Checked / Flagged / Cleared stats grid: the outcome breakdown in the
+  // title carries the same per-status counts, so an aggregate cleared count
+  // is not computed here.
 
   // Footer hint differs between modes:
   //   slash:  Tip toward /la-roster on a flagged hit OR retry hint when unflagged.

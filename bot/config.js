@@ -220,21 +220,19 @@ const config = {
    * fetching each guild candidate profile, so an unbounded scan can consume
    * ScraperAPI quota and take a long time on large guilds.
    *
-   * Cap increased from 30 to 300 after a production scan of an 820-member
-   * guild (437 candidates >= 1700 ilvl) showed the target's five alts
-   * spread from candidate #70 down to #267 in the absolute ilvl-desc sort.
-   * The legacy cap of 30 caught zero alts because the top of a large guild
-   * is dominated by other accounts with many high-item-level characters; the
-   * target's own alts sit much further down the sort. Cap 300 covers any
-   * plausible alt distribution in similarly large guilds; smaller guilds
-   * terminate the scan when candidates are exhausted.
+   * Cap 300: a production scan of an 820-member guild (437 candidates
+   * >= 1700 ilvl) found the target's five alts spread from candidate #70
+   * down to #267 in the absolute ilvl-desc sort, so a cap of 30 caught
+   * none of them. The top of a large guild is dominated by other accounts
+   * with many high-item-level characters; the target's own alts sit much
+   * further down the sort. Smaller guilds end the scan when candidates run
+   * out.
    *
-   * Concurrency lowered 6 -> 3 because the scanWorker has no internal
-   * throttle and concurrency 6 triggered immediate 429 storms on bible
-   * (verified in smoke runs: 30/30 candidates failing back-to-back).
-   * Concurrency 3 halves the burst rate and lets bible's rate limiter
-   * recover between fan-outs. Wall-clock impact at the new cap: roughly
-   * 5-7 min for a full 300-candidate scan in production.
+   * Concurrency 3: the scanWorker has no internal throttle, and
+   * concurrency 6 triggered immediate 429 storms on bible (smoke runs
+   * showed 30/30 candidates failing back-to-back). 3 halves the burst rate
+   * and lets bible's rate limiter recover between fan-outs; a full
+   * 300-candidate scan takes roughly 5-7 min in production.
    */
   strongholdDeepCandidateLimit: parsePositiveIntEnv('STRONGHOLD_DEEP_CANDIDATE_LIMIT', 300),
   strongholdDeepConcurrency: parsePositiveIntEnv('STRONGHOLD_DEEP_CONCURRENCY', 3),
@@ -255,8 +253,7 @@ const config = {
 
   /**
    * Adaptive backoff bounds for the deep-scan worker. The worker has
-   * no built-in throttle; it relied entirely on concurrency reduction
-   * to avoid bible 429s. Adaptive backoff adds a self-regulating per-
+   * no built-in throttle, so adaptive backoff adds a self-regulating per-
    * worker pause: starts at 300ms, grows by 500ms on every null
    * (transient failure) up to the max, shrinks by 100ms on every
    * success back to the floor. Shared across the workers in one scan

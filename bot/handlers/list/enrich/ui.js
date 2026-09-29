@@ -68,11 +68,10 @@ export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en', { tr
   const ctx = LIST_LABELS[session.type];
   const newCount = session.newAlts.length;
 
-  // Rendered through the shared alt-row formatter rather than a local
-  // copy · this card used to hand-roll the same line and so missed every
-  // later change to it (the CP badge, for one). alt.classId may already
-  // be a resolved className or a raw bible-side id ("deathblade"), so the
-  // record is normalised to the shape formatAltLine expects.
+  // Rendered through the shared alt-row formatter so the rows match every
+  // other card, CP badge included. alt.classId may already be a resolved
+  // className or a raw bible-side id ("deathblade"), so the record is
+  // normalised to the shape formatAltLine expects.
   const altLines = session.newAlts
     .map((alt, index) => {
       const idStr = alt.classId == null ? '' : String(alt.classId);
@@ -81,9 +80,8 @@ export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en', { tr
     })
     .join('\n');
 
-  // What the scan cost, as three badges rather than a sentence. Reading
-  // "48 quét · 5 tìm được" is what makes the count in the title credible;
-  // buried in prose it was just decoration.
+  // What the scan cost, as three badges rather than a sentence: the
+  // scanned and found counts are what make the count in the title credible.
   const inlineFields = padInlineRow([
     session.scanStats?.scanned > 0 ? {
       name: `📊 ${t('dialogue.enrich.success.scanned', lang)}`,

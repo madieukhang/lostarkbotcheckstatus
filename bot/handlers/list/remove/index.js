@@ -89,7 +89,7 @@ export function resolveRemoveResultPresentation(context) {
  * A removal cannot be undone, and once this card is sent nothing about
  * the entry is left in the database. So the card is written as a receipt:
  * it keeps the reason it just deleted, and it records who removed it and
- * when, neither of which the old card carried at all.
+ * when.
  *
  * Color and title icon follow the strongest outcome present · any failure
  * tints warning, otherwise the list icon when a single type was removed.
@@ -274,9 +274,7 @@ export function createRemoveHandlers({ services }) {
       const removedWorld = resolveRosterWorld(found[0].entry, removeStatMap);
 
       // removeOne returns a structured outcome envelope so the caller
-      // can render it as an embed. The previous string-based return
-      // produced plain content lines which lacked visual hierarchy
-      // (no color, no inline scope tag, no allCharacters reference).
+      // can render it as an embed.
       //
       // Outcome shapes:
       //   { ok: false, reason: 'legacy' | 'not-owner', entry, type }
@@ -319,9 +317,8 @@ export function createRemoveHandlers({ services }) {
         return;
       }
 
-      // Multiple entries · show selection buttons. Promote the prior
-      // plain-text "Found X in Y" line into an embed so the picker
-      // dialog matches the post-confirm result card visually.
+      // Multiple entries · show selection buttons in an embed so the
+      // picker matches the post-confirm result card.
       const buttonStyles = { black: ButtonStyle.Danger, white: ButtonStyle.Success, watch: ButtonStyle.Secondary };
       const row = new ActionRowBuilder().addComponents(
         ...found.map((f, i) => {

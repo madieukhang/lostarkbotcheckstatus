@@ -79,10 +79,7 @@ export async function buildRosterCharacters(name, options = {}) {
 
       // Use the canonical parser that /la-roster also uses. It returns
       // per-character records with name + itemLevel + combatScore +
-      // classId + className already resolved. The previous inline
-      // duplicate did its own DOM walk and a separate rosterClassMap
-      // lookup that could silently fail for some names · routing
-      // through the proven function eliminates that drift.
+      // classId + className already resolved.
       // The server is a property of the roster, not of each character, so
       // it is read once and stamped onto every record · that is the shape
       // upsertRosterSnapshots stores and every card reads back.
@@ -111,7 +108,7 @@ export async function buildRosterCharacters(name, options = {}) {
         hasValidRoster = true;
         rosterVisibility = 'visible';
         // Dedup by name string so two same-named entries (rare on
-        // bible) collapse to one. Same shape as the old behaviour.
+        // bible) collapse to one.
         allCharacters = [...new Set(rosterChars.map((c) => c.name))];
       } else if (hiddenRosterFallback) {
         const meta = await fetchCharacterMeta(name, options);

@@ -49,6 +49,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - Removed the filter footer from search result cards. The existing item-level and class filters still apply.
 - Tests that matched `guildSetup.js` source with regexes, rebuilt the expected output with the code under test, or repeated another file's case now call the real code or are gone. `/la-setup` language, auto-channel, repin and the Manage Server guard run through their handlers with stubbed Discord and MongoDB, and the Stronghold scan limit is tested through `reserveStrongholdScanForInteraction`. The suite has 721 tests.
 - Comments and JSDoc that described behavior the code no longer has now match it: who may run `/la-list remove` and `/la-list enrich`, when `/la-list add` and `/la-list edit` skip approval, the enrich success card layout, scan backoff bounds and several return types. `ocr.js` and `visibleDeepScan.js` are reindented and two setup files lose a UTF-8 byte-order mark. No behavior changes.
+- Comments that told how the code used to look (release numbers, commit hashes, "the old card", "the previous inline copy") now state only what the code does and why. The measurements behind the deep-scan cap and concurrency stay.
 
 ### Added
 - Dimensionalist, the new specialist class (Bible ID `dimension_master`), has its class icon: the bot uploads it as an application emoji on its next start, cards show it beside the character like the other classes, and `/la-search` class autocomplete offers it. It counts as DPS.

@@ -107,8 +107,7 @@ async function runHiddenDeepScan({ interaction, replyEditor, name, meta, guildMe
  *
  * Whoever reads this card is deciding whether to take the person into a
  * raid, so each row carries what that decision needs: the class icon and
- * ilvl beside the name, then the reason. They used to be bold plain text
- * with the raid in square brackets.
+ * ilvl beside the name, then the reason.
  *
  * @param {Array<object>} entries - list entries that matched a guildmate
  * @param {string} icon - the list's status glyph

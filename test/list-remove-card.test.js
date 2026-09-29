@@ -26,8 +26,8 @@ const STATS = statMapFromRosterCharacters([
 const named = (fields, needle) => fields.find((f) => f.name.includes(needle));
 
 test('a removal records who did it and when', () => {
-  // Removal cannot be undone and the old card recorded neither, so an
-  // entry could vanish with no trace of who took it out.
+  // Removal cannot be undone, so the card is the only trace of who took the
+  // entry out and when.
   const fields = buildRemoveResultCard([OK], {
     name: 'Zhaohang', lang: 'vi', statMap: STATS, world: 'Vairgrys', removedBy: 'Bao',
   }).toJSON().fields;

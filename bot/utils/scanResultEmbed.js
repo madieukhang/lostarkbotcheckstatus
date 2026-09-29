@@ -2,11 +2,9 @@
  * scanResultEmbed.js
  *
  * Unified post-scan embed + button matrix for the long-running stronghold
- * deep scans (/la-list enrich, /la-roster deep:true). Replaces the four
- * branch-specific embed builds that grew up alongside the scan flow
- * (completed-with-alts, completed-no-alts, stopped-with-alts,
- * stopped-no-alts) so all paths render with consistent layout, icon
- * vocabulary, and resume affordances.
+ * deep scans (/la-list enrich, /la-roster deep:true). One builder covers
+ * all four outcomes (completed or stopped, with or without alts) so they
+ * share one layout, icon vocabulary, and resume affordances.
  *
  * Layout (top to bottom):
  *   1. Status banner   - completed | stopped | cap-hit, color follows state

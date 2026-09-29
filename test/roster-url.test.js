@@ -56,10 +56,10 @@ test('buildRosterCharacters can accept hidden rosters when profile meta exists',
   const originalFetch = globalThis.fetch;
   const requestedUrls = [];
 
-  // Post-Phase-1 (commit 2908724) fetchCharacterMeta probes
-  // `/__data.json` first and falls back to HTML on parse failure. The
-  // mock here returns non-JSON content for the data.json probe so the
-  // fallback path runs, exercising both legs in a single test.
+  // fetchCharacterMeta probes `/__data.json` first and falls back to HTML
+  // on parse failure. The mock here returns non-JSON content for the
+  // data.json probe so the fallback path runs, exercising both legs in a
+  // single test.
   globalThis.fetch = async (url) => {
     const requestedUrl = String(url);
     requestedUrls.push(requestedUrl);

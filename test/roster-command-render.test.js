@@ -121,7 +121,7 @@ test('/la-roster hidden hits carry class, ilvl and a badged raid', () => {
   const hit = fields.find((f) => !f.inline);
 
   // Whoever reads this is deciding on a raid invite, so the row carries
-  // what that needs · it used to be bold plain text and a bracketed raid.
+  // what that needs: class, linked name, ilvl and a badged raid.
   assert.match(hit.name, /Blacklisted guild members \(1\)/u);
   assert.match(hit.value, /\*\*1\.\*\* Bard \*\*\[Lungzhu\]\(\S+\)\*\* · `1737\.50` · `Kazeros Nor`/u);
   assert.match(hit.value, /\nzdps$/u);

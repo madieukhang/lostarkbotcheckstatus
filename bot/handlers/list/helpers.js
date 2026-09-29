@@ -51,10 +51,8 @@ export function listTypeIcon(type) {
 /**
  * Tack the visual tokens onto a list-entry document so it can flow into
  * `buildEvidenceEmbed` (and any other renderer that reads `_icon` /
- * `_label` / `_color`). Replaces the `{ ...entry, _icon: ctx.icon, ...}`
- * one-liner that was sprawled across /la-evidence, /la-search,
- * /la-check, /la-roster, and the approval-flow evidence button. Returns
- * a shallow clone so the caller's input doc isn't mutated.
+ * `_label` / `_color`). Returns a shallow clone so the caller's input doc
+ * isn't mutated.
  */
 export function decorateListEntry(entry, listType) {
   const ctx = getListContext(listType);

@@ -47,10 +47,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 3 levels up from bot/services/discord/ → repo root, then assets/.
-// Pre-refactor file lived at bot/services/ so 2 levels was correct;
-// the cef2187 refactor pushed this file one level deeper without
-// updating the path, which caused icon discovery to return no files (file walk
-// returned empty → bootstrap reused stale Discord emoji slots only).
+// A wrong depth makes icon discovery find no files, and the bootstrap then
+// only reuses the emoji slots already on Discord.
 const CLASS_ICONS_DIR = path.resolve(__dirname, '..', '..', '..', 'assets', 'class-icons');
 
 // Class IDs that share art use one uploaded emoji and map both display names
