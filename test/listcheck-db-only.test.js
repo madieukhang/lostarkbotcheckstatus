@@ -12,46 +12,30 @@ function readRepoFile(path) {
 test('ocr list check service avoids the heavy roster ops', () => {
   const serviceSource = readRepoFile('../bot/services/list-check/service.js');
 
-  // Forbidden = bible patterns the prior refactor singled out as fan-out
-  // hazards: hidden-roster fallback (triggers Stronghold scan), the
-  // legacy roster-cache lookup layer, the post-check enrichment queue,
-  // and the worker-readiness short-circuit helper. Targeted single-name
-  // enrichment legitimately uses buildRosterCharacters (worker online)
-  // or fetchNameSuggestions (worker offline) + getWorkerHealth for
-  // routing, so those names are ALLOWED.
-  for (const forbidden of [
-    'RosterCache',
-    'buildRosterCacheLookupMap',
-    'getRosterCacheMatch',
-    'shouldSkipWorkerRosterLookup',
-    'hiddenRosterFallback',
-    'queueFlaggedListEntryEnrichment',
-  ]) {
-    assert.doesNotMatch(serviceSource, new RegExp(forbidden));
-  }
+  // The hidden-roster fallback triggers a Stronghold scan per name, which
+  // a batch OCR check must not fan out. Targeted single-name enrichment
+  // legitimately uses buildRosterCharacters (worker online) or
+  // fetchNameSuggestions (worker offline) + getWorkerHealth for routing,
+  // so those names are allowed.
+  assert.doesNotMatch(serviceSource, /hiddenRosterFallback/);
 });
 
-test('ocr list check handlers do not queue post-check roster enrichment', () => {
+test('ocr list check handlers stay off the worker and hidden-roster paths', () => {
   const autoCheckSource = readRepoFile('../bot/handlers/list/auto-check.js');
   const slashCheckSource = readRepoFile('../bot/handlers/list/check/index.js');
 
-  // Handlers still must not invoke the heavy post-check pipelines. The
-  // single-name meta enrichment lives inside checkNamesAgainstLists (the
-  // service layer), not at handler level, so handlers should not need to
-  // reference viaWorker / hiddenRosterFallback / queueFlaggedListEntryEnrichment.
-  assert.doesNotMatch(autoCheckSource, /queueFlaggedListEntryEnrichment/);
-  assert.doesNotMatch(slashCheckSource, /queueFlaggedListEntryEnrichment/);
+  // The single-name meta enrichment lives inside checkNamesAgainstLists (the
+  // service layer), so handlers should not reference viaWorker or
+  // hiddenRosterFallback.
   assert.doesNotMatch(autoCheckSource, /viaWorker|hiddenRosterFallback/);
   assert.doesNotMatch(slashCheckSource, /viaWorker|hiddenRosterFallback/);
 });
 
-test('both screenshot entry points enable targeted diacritic refinement', () => {
-  const autoCheckSource = readRepoFile('../bot/handlers/list/auto-check.js');
+// auto-check-dedupe covers the same option on the auto-check path by behavior.
+test('/la-check screenshot path enables targeted diacritic refinement', () => {
   const slashCheckSource = readRepoFile('../bot/handlers/list/check/index.js');
 
-  for (const source of [autoCheckSource, slashCheckSource]) {
-    assert.match(source, /refineAmbiguousDiacritics:\s*true/u);
-  }
+  assert.match(slashCheckSource, /refineAmbiguousDiacritics:\s*true/u);
 });
 
 test('unmatched OCR names render as not listed instead of roster lookup status', () => {

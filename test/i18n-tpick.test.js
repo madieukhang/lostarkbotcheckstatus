@@ -10,6 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { t, tPick } from '../bot/services/i18n/index.js';
+import dialogueEn from '../bot/locales/dialogue/en.js';
 
 test('plain string keys pass straight through to t()', () => {
   const key = 'autoCheckWelcome.title';
@@ -25,14 +26,14 @@ test('bare arrays are multi-line blocks, never variant pools', () => {
 });
 
 test('a {variants} pool yields one member, selectable by index', () => {
-  const pool = ['alpha {n}', 'beta {n}', 'gamma {n}'];
-  const fake = { variants: pool };
-  // Exercised through the real resolver by way of a temporary key would need
-  // module surgery; instead assert the selection maths the picker relies on.
-  for (let i = 0; i < pool.length; i++) {
-    assert.equal(((i % pool.length) + pool.length) % pool.length, i);
-  }
-  assert.equal(fake.variants.length, 3);
+  const key = 'dialogue.cleanupNotice.trivial';
+  const pool = dialogueEn.cleanupNotice.trivial.variants;
+  const filled = (line) => line.replace('{n}', '3');
+
+  assert.equal(tPick(key, 'en', { n: 3 }, { index: 0 }), filled(pool[0]));
+  assert.equal(tPick(key, 'en', { n: 3 }, { index: -1 }), filled(pool.at(-1)));
+  assert.equal(tPick(key, 'en', { n: 3 }, { index: pool.length }), filled(pool[0]));
+  assert.equal(tPick(key, 'en', { n: 3 }, { random: () => 0.999 }), filled(pool.at(-1)));
 });
 
 test('a missing key still degrades to the raw key string', () => {

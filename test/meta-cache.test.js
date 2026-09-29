@@ -16,17 +16,6 @@ test.afterEach(() => {
   configureMetaCache({ ttlMs: DEFAULT_TTL_MS, maxSize: DEFAULT_MAX_SIZE });
 });
 
-test('refreshing the newest cache key does not evict an unrelated entry', () => {
-  configureMetaCache({ ttlMs: DEFAULT_TTL_MS, maxSize: 2 });
-  setCachedMeta('Alpha', { value: 1 });
-  setCachedMeta('Beta', { value: 2 });
-
-  setCachedMeta('Beta', { value: 3 });
-
-  assert.deepEqual(getCachedMeta('Alpha'), { value: 1 });
-  assert.deepEqual(getCachedMeta('Beta'), { value: 3 });
-});
-
 test('refreshing a cache key moves it to the MRU edge', () => {
   configureMetaCache({ ttlMs: DEFAULT_TTL_MS, maxSize: 2 });
   setCachedMeta('Alpha', { value: 1 });

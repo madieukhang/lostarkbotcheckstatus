@@ -11,6 +11,7 @@ const {
   buildBroadcastEvidenceComponents,
   createBroadcastEvidenceButtonHandler,
 } = await import('../bot/handlers/list/evidence/broadcastButton.js');
+const { t } = await import('../bot/services/i18n/index.js');
 
 test('broadcast evidence uses a compact refreshable button for rehosted images', () => {
   const rows = buildBroadcastEvidenceComponents({
@@ -102,5 +103,5 @@ test('broadcast evidence button uses the clicker language, not the message autho
   });
 
   assert.equal(resolvedUserId, 'clicker-b');
-  assert.match(editedPayload.embeds[0].toJSON().title, /bằng chứng|evidence/i);
+  assert.ok(editedPayload.embeds[0].toJSON().title.includes(t('dialogue.evidence.missing', 'vi').title));
 });

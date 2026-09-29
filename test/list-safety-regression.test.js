@@ -14,9 +14,8 @@ import Whitelist from '../bot/models/Whitelist.js';
 import Watchlist from '../bot/models/Watchlist.js';
 import TrustedUser from '../bot/models/TrustedUser.js';
 import GuildConfig from '../bot/models/GuildConfig.js';
-import { invalidateGuildConfig } from '../bot/utils/scope.js';
+import { buildScopedListQuery, invalidateGuildConfig } from '../bot/utils/scope.js';
 import { createListEditCommandHandler } from '../bot/handlers/list/edit/command.js';
-import { buildScopedListQuery } from '../bot/utils/scope.js';
 import PendingApproval from '../bot/models/PendingApproval.js';
 import { handleApprovedEditRequest } from '../bot/handlers/list/add/editApproval.js';
 import { createEnrichHandlers } from '../bot/handlers/list/enrich/index.js';
@@ -72,7 +71,6 @@ test('old auto-check menu denies an entry moved into another guild', async t => 
   assert.deepEqual(queries[0], buildScopedListQuery('black', { _id: entry._id }, 'other-guild'));
   assert.doesNotMatch(JSON.stringify(response.embeds[0].toJSON()), /PRIVATE_REASON_AFTER_SCOPE_CHANGE/);
   assert.equal(await loadSearchDetailEntry({ entry, listType: 'black' }, 'other-guild'), null);
-
 });
 
 test('search and list-view one-item menus include a reset option', () => {
@@ -125,7 +123,6 @@ test('owner cannot add a Trusted character through additional_names', async t =>
   });
   assert.equal(trustedReads, 1);
   assert.equal(write, undefined);
-
 });
 
 for (const currentType of ['black', 'white']) {

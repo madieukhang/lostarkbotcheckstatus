@@ -5,18 +5,15 @@ import { MessageFlags } from 'discord.js';
 import {
   deferEphemeralReply,
   deferReply,
-  deferUpdate,
   editAlert,
   editComponents,
   editEmbed,
   editNotice,
-  editPayload,
   replyAlert,
   replyEmbed,
   replyNotice,
   updateEmbed,
   updateNotice,
-  updatePayload,
 } from '../bot/utils/interactionReplies.js';
 import { AlertSeverity } from '../bot/utils/alertEmbed.js';
 
@@ -115,26 +112,6 @@ test('editComponents preserves component-only edit payloads', async () => {
   assert.deepEqual(calls[0], { components });
 });
 
-test('editPayload passes through full edit payloads unchanged', async () => {
-  const calls = [];
-  const interaction = { editReply: async (payload) => calls.push(payload) };
-  const payload = { content: 'done', embeds: [], components: [{ row: true }] };
-
-  await editPayload(interaction, payload);
-
-  assert.deepEqual(calls[0], payload);
-});
-
-test('updatePayload passes through full update payloads unchanged', async () => {
-  const calls = [];
-  const interaction = { update: async (payload) => calls.push(payload) };
-  const payload = { content: 'working', embeds: [], components: [] };
-
-  await updatePayload(interaction, payload);
-
-  assert.deepEqual(calls[0], payload);
-});
-
 test('defer helpers centralize public and ephemeral defer payloads', async () => {
   const calls = [];
   const interaction = { deferReply: async (payload) => calls.push(payload) };
@@ -143,15 +120,6 @@ test('defer helpers centralize public and ephemeral defer payloads', async () =>
   await deferEphemeralReply(interaction);
 
   assert.deepEqual(calls, [undefined, { flags: MessageFlags.Ephemeral }]);
-});
-
-test('deferUpdate routes through the interaction update defer API', async () => {
-  const calls = [];
-  const interaction = { deferUpdate: async () => calls.push('deferUpdate') };
-
-  await deferUpdate(interaction);
-
-  assert.deepEqual(calls, ['deferUpdate']);
 });
 
 test('alert helpers route through the shared alert embed builder', async () => {

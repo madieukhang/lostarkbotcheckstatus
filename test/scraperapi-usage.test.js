@@ -48,7 +48,6 @@ test('scraper api usage tracks success, http failures, network errors, and per-k
       },
     ],
   );
-
 });
 
 test('scoped scraper api usage isolates concurrent async work', async () => {

@@ -7,8 +7,6 @@ process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const { buildRosterDeepScanResult } = await import('../bot/handlers/roster/deepResult.js');
 const { clearRosterDeepSession, getRosterDeepSession } = await import('../bot/utils/rosterDeepSession.js');
-const { buildScanResultEmbed } = await import('../bot/utils/scanResultEmbed.js');
-const { rosterUrl } = await import('../bot/utils/rosterLink.js');
 const { t } = await import('../bot/services/i18n/index.js');
 
 const altResult = {
@@ -20,11 +18,6 @@ const altResult = {
   scannedNames: ['Memberone'],
   alts: [{ name: 'Altone' }],
 };
-
-function withoutTimestamp(embed) {
-  const { timestamp, ...json } = embed.toJSON();
-  return json;
-}
 
 for (const lang of ['vi', 'en', 'jp']) {
   for (const isHidden of [true, false]) {
@@ -40,14 +33,13 @@ for (const lang of ['vi', 'en', 'jp']) {
       assert.match(customId, /^roster-deep:continue:/);
       const sessionId = customId.slice('roster-deep:continue:'.length);
       try {
-        const expected = buildScanResultEmbed({
-          target: { name: 'Targetname', isHidden, guildName: meta.guildName, profileUrl: rosterUrl('Targetname') },
-          kind: isHidden ? 'roster-hidden' : 'roster-visible',
-          result: altResult,
-          summaryLine: t('dialogue.enrich.summary', lang, { guild: meta.guildName, name: 'Targetname', resumed: '' }),
-          lang,
-        });
-        assert.deepEqual(withoutTimestamp(output.embed), withoutTimestamp(expected.embed));
+        const card = output.embed.toJSON();
+        const kindLabel = t(`dialogue.scan.result.kinds.${isHidden ? 'hidden' : 'deep'}`, lang);
+        assert.ok(card.title.includes(`${kindLabel} · Targetname`), card.title);
+        assert.equal(card.url, 'https://lostark.bible/character/NA/Targetname/roster');
+        assert.ok(card.description.includes(
+          t('dialogue.enrich.summary', lang, { guild: 'Test Guild', name: 'Targetname', resumed: '' })
+        ));
         const session = getRosterDeepSession(sessionId);
         assert.equal(session.callerId, 'caller-1');
         assert.equal(session.targetName, 'Targetname');

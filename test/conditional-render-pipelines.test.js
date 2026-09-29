@@ -162,10 +162,7 @@ test('deep scan metric table keeps optional metrics in display order', () => {
     usedScraperApiForCandidates: false,
   }, 'en');
 
-  assert.match(stats, /2/);
-  assert.ok(stats.indexOf('4') < stats.indexOf('1'));
-  assert.ok(stats.indexOf('1') < stats.lastIndexOf('2'));
-  assert.match(stats, /3/);
+  assert.equal(stats, 'checked 2 · attempted 4 · skipped 1 by limit · failed 2 · concurrency 3 · ScraperAPI off');
 });
 
 test('scan completion field pipeline includes each enabled optional block once', async () => {

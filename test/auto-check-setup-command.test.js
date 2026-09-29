@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { ChannelType, PermissionFlagsBits } from 'discord.js';
+import mongoose from 'mongoose';
 
 import { buildCommands } from '../bot/commands/index.js';
 import GuildConfig from '../bot/models/GuildConfig.js';
+import UserPreference from '../bot/models/UserPreference.js';
+import { disconnectDB } from '../bot/db.js';
 import { startReadyBackgroundServices } from '../bot/app/lifecycle.js';
+import { handleSetupCommand, SETUP_ACTION_HANDLERS } from '../bot/handlers/setup/guildSetup.js';
 
 test('/la-setup collapses into a single config subcommand with the action option', () => {
   const setup = buildCommands().find((command) => command.name === 'la-setup');
@@ -24,8 +28,7 @@ test('/la-setup collapses into a single config subcommand with the action option
   assert.deepEqual(opts.scope.choices.map((choice) => choice.value), ['global', 'server']);
 });
 
-test('/la-setup dispatch maps every action to a handler', async () => {
-  const { SETUP_ACTION_HANDLERS } = await import('../bot/handlers/setup/guildSetup.js');
+test('/la-setup dispatch maps every action to a handler', () => {
   assert.deepEqual(Object.keys(SETUP_ACTION_HANDLERS).sort(), [
     'cleanup-off', 'cleanup-on', 'notify-cleanup', 'notify-cleanup-off',
     'notify-cleanup-on', 'notify-off', 'notify-on', 'notify-repin', 'repin',
@@ -63,48 +66,107 @@ test('ready background services include both channel cleanup schedulers', () => 
   ]);
 });
 
-test('/la-setup autochannel does not claim the cleanup day before cleanup runs', () => {
-  const source = readFileSync(
-    new URL('../bot/handlers/setup/guildSetup.js', import.meta.url),
-    'utf8'
-  );
-  const start = source.indexOf('async function handleSetupAutoChannel');
-  const end = source.indexOf('async function handleSetupNotifyChannel');
-  const handlerSource = source.slice(start, end);
+function mockGuildConfig(context, stored) {
+  const writes = [];
+  context.mock.method(mongoose, 'connect', async () => mongoose);
+  context.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => stored }));
+  context.mock.method(GuildConfig, 'findOneAndUpdate', async (_filter, update) => {
+    writes.push(update.$set);
+    return null;
+  });
+  context.after(disconnectDB);
+  return writes;
+}
 
-  assert.ok(start >= 0 && end > start);
-  assert.doesNotMatch(handlerSource, /lastAutoCheckCleanupKey|getVietnamDayKey/);
-  assert.doesNotMatch(handlerSource, /GuildConfig\.findOneAndUpdate/);
-  assert.match(handlerSource, /configSet:\s*\{/);
-  assert.match(handlerSource, /autoCheckCleanupEnabled:\s*cleanupEnabled/);
-  assert.match(handlerSource, /cleanupEnabled,/);
-  assert.match(handlerSource, /!welcome\.pinned\s*\|\|\s*!welcome\.persisted/);
+// Pins read as empty and the message history fetch fails, so any cleanup
+// the welcome flow runs ends incomplete.
+function createTextChannel({ missingFlag = null } = {}) {
+  const calls = { sent: 0, cleanupFetches: 0 };
+  const channel = {
+    id: 'chan-1',
+    name: 'auto-check',
+    guildId: 'guild-1',
+    type: ChannelType.GuildText,
+    permissionsFor: () => ({ has: (flag) => flag !== missingFlag }),
+    messages: {
+      fetchPins: async () => [],
+      fetch: async () => {
+        calls.cleanupFetches += 1;
+        throw new Error('offline');
+      },
+    },
+    send: async () => {
+      calls.sent += 1;
+      return { id: 'welcome-1', pin: async () => {} };
+    },
+  };
+  return { channel, calls };
+}
+
+function createSetupInteraction(channel) {
+  return {
+    guild: {
+      id: 'guild-1',
+      name: 'Guild',
+      members: { me: {} },
+      channels: { cache: new Map([[channel.id, channel]]) },
+    },
+    user: { id: 'admin-1', tag: 'Admin#0001' },
+    client: { user: { id: 'bot-1' } },
+    options: { getChannel: () => channel },
+    editReply: async () => {},
+  };
+}
+
+test('/la-setup set-auto-channel does not claim the cleanup day when its cleanup fails', async (t) => {
+  const writes = mockGuildConfig(t, { guildId: 'guild-1', autoCheckCleanupEnabled: true });
+  const { channel, calls } = createTextChannel();
+
+  await SETUP_ACTION_HANDLERS['set-auto-channel'](createSetupInteraction(channel), 'en');
+
+  assert.ok(calls.cleanupFetches > 0, 'the initial cleanup ran');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].autoCheckChannelId, 'chan-1');
+  assert.equal(writes[0].autoCheckCleanupEnabled, true);
+  assert.equal(Object.hasOwn(writes[0], 'lastAutoCheckCleanupKey'), false);
 });
 
-test('/la-setup repin forces cleanup and requires cleanup permission', () => {
-  const source = readFileSync(
-    new URL('../bot/handlers/setup/guildSetup.js', import.meta.url),
-    'utf8'
-  );
-  const start = source.indexOf('async function handleSetupRepin');
-  const end = source.indexOf('async function handleSetupLanguage');
-  const handlerSource = source.slice(start, end);
+test('/la-setup repin requires cleanup permission and cleans while the schedule is off', async (t) => {
+  mockGuildConfig(t, {
+    guildId: 'guild-1',
+    autoCheckChannelId: 'chan-1',
+    autoCheckCleanupEnabled: false,
+  });
 
-  assert.ok(start >= 0 && end > start);
-  assert.match(handlerSource, /cleanupRequired:\s*true/);
-  assert.match(handlerSource, /forceCleanup:\s*true/);
-  assert.match(handlerSource, /welcome\.cleanupComplete/);
+  const blocked = createTextChannel({ missingFlag: PermissionFlagsBits.ManageMessages });
+  await SETUP_ACTION_HANDLERS.repin(createSetupInteraction(blocked.channel), 'en');
+  assert.equal(blocked.calls.sent, 0);
+
+  const allowed = createTextChannel();
+  await SETUP_ACTION_HANDLERS.repin(createSetupInteraction(allowed.channel), 'en');
+  assert.ok(allowed.calls.cleanupFetches > 0, 'repin forced a cleanup');
+  assert.equal(allowed.calls.sent, 1);
 });
 
-test('/la-setup imports the Discord permission flags used by its guild guard', () => {
-  const source = readFileSync(
-    new URL('../bot/handlers/setup/guildSetup.js', import.meta.url),
-    'utf8'
-  );
+test('/la-setup stops members without Manage Server before reading the action', async (t) => {
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => null }));
+  let checkedFlag;
+  const replies = [];
 
-  assert.match(
-    source,
-    /import\s*\{[^}]*\bPermissionFlagsBits\b[^}]*\}\s*from\s*['"]discord\.js['"]/
-  );
-  assert.match(source, /PermissionFlagsBits\.ManageGuild/);
+  await handleSetupCommand({
+    guild: { id: 'guild-1' },
+    user: { id: 'member-1' },
+    memberPermissions: {
+      has: (flag) => {
+        checkedFlag = flag;
+        return false;
+      },
+    },
+    options: { getString: () => assert.fail('the action must not be read') },
+    deferReply: async () => {},
+    editReply: async (payload) => { replies.push(payload); },
+  });
+
+  assert.equal(checkedFlag, PermissionFlagsBits.ManageGuild);
+  assert.equal(replies.length, 1);
 });

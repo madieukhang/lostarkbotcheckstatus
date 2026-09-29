@@ -7,6 +7,7 @@ process.env.MEMBER_APPROVER_IDS = 'member-1';
 
 const { isPrivilegedStrongholdScanUser } = await import('../bot/utils/scanPermissions.js');
 const { reserveUserScan } = await import('../bot/utils/scanSession.js');
+const { reserveStrongholdScanForInteraction } = await import('../bot/utils/strongholdScanGate.js');
 
 test('Stronghold scan privileged users are officers and seniors only', () => {
   assert.equal(isPrivilegedStrongholdScanUser('officer-1'), true);
@@ -30,14 +31,20 @@ test('regular users can reserve only one active Stronghold scan', () => {
   third.release();
 });
 
-test('privileged users can bypass the one-active-scan reservation', () => {
-  const first = reserveUserScan('officer-1', { label: 'first scan' }, {
-    allowMultiple: isPrivilegedStrongholdScanUser('officer-1'),
-  });
-  const second = reserveUserScan('officer-1', { label: 'second scan' }, {
-    allowMultiple: isPrivilegedStrongholdScanUser('officer-1'),
-  });
+test('the Stronghold scan gate lets only privileged users run scans in parallel', () => {
+  const asUser = (id) => ({ user: { id } });
 
-  assert.equal(first.ok, true);
-  assert.equal(second.ok, true);
+  const officerFirst = reserveStrongholdScanForInteraction(asUser('officer-1'), 'first scan');
+  const officerSecond = reserveStrongholdScanForInteraction(asUser('officer-1'), 'second scan');
+  const memberFirst = reserveStrongholdScanForInteraction(asUser('member-1'), 'first scan');
+  const memberSecond = reserveStrongholdScanForInteraction(asUser('member-1'), 'second scan');
+
+  assert.equal(officerFirst.ok, true);
+  assert.equal(officerSecond.ok, true);
+  assert.equal(memberFirst.ok, true);
+  assert.equal(memberSecond.ok, false);
+
+  officerFirst.release();
+  officerSecond.release();
+  memberFirst.release();
 });
