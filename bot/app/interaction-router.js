@@ -70,10 +70,6 @@ async function handleRoute(interaction, route) {
   try {
     await route.handle(interaction);
   } catch (err) {
-    if (route.onError) {
-      await route.onError(interaction, err);
-      return;
-    }
     console.error(route.label, err?.message || err);
     await replyOrEdit(interaction);
   }
@@ -269,11 +265,8 @@ function createModalRoutes(listHandlers) {
   return [
     {
       prefixes: ['quickadd_modal:'],
+      label: '[quickadd] Modal error:',
       handle: (interaction) => listHandlers.handleQuickAddModal(interaction),
-      onError: async (interaction, err) => {
-        console.error('[quickadd] Modal error:', err.message);
-        await replyOrEdit(interaction);
-      },
     },
   ];
 }
@@ -392,13 +385,7 @@ export function createInteractionRouter({ client }) {
 
       console.error(`[bot] Unhandled error in /${commandName}:`, err);
 
-      try {
-        await replyOrEdit(interaction);
-      } catch (replyErr) {
-        if (!isTransientInteractionError(replyErr)) {
-          console.warn(`[bot] Failed to send error reply on /${commandName}:`, replyErr.message);
-        }
-      }
+      await replyOrEdit(interaction);
     }
   };
 }

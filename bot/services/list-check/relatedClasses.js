@@ -91,13 +91,13 @@ async function hydrateMissingClasses(
 
   const hydrated = (await mapWithConcurrency(
     missing,
-    config.listcheckRosterLookupConcurrency || 3,
+    config.listcheckRosterLookupConcurrency,
     async ({ key, name, rosterName }) => {
       const suggestions = await fetchNameSuggestions(name, {
         // This is cosmetic metadata repair, not a hidden-roster scan. Never
         // spend ScraperAPI quota merely to decorate an already-valid DB hit.
         allowScraperApi: false,
-        timeoutMs: config.listcheckRosterLookupTimeoutMs || 6000,
+        timeoutMs: config.listcheckRosterLookupTimeoutMs,
         suggestionCache,
         suggestionContext,
       });

@@ -154,7 +154,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   const targetKey = normalizeNameKey(name);
   const baseCandidates = members
     .filter((member) => normalizeNameKey(member.name) !== targetKey && member.ilvl >= 1700)
-    .sort((a, b) => (b.ilvl || 0) - (a.ilvl || 0));
+    .sort((a, b) => b.ilvl - a.ilvl);
   const candidates = excludeSet.size > 0
     ? baseCandidates.filter((member) => !excludeSet.has(normalizeNameKey(member.name)))
     : baseCandidates;

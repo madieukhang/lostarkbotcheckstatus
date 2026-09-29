@@ -84,7 +84,7 @@ function scraperAttemptState({ res, keyDead, error }) {
 }
 
 async function fetchViaScraperApi(url, { signal } = {}) {
-  const keys = config.scraperApiKeys || [];
+  const keys = config.scraperApiKeys;
   if (keys.length === 0) return null;
 
   const errors = [];

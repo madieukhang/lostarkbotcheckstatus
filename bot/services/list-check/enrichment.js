@@ -54,9 +54,9 @@ export async function enrichListCheckResults(
   // lightweight search endpoint.
   const health = await getWorkerHealth()
     .catch(() => ({ online: false, reason: 'health-check-threw' }));
-  const concurrency = config.listcheckRosterLookupConcurrency || 3;
-  const lookupTimeoutMs = config.listcheckRosterLookupTimeoutMs || 6000;
-  const deepLimit = Math.max(1, config.listcheckSimilarLookupLimit || 3);
+  const concurrency = config.listcheckRosterLookupConcurrency;
+  const lookupTimeoutMs = config.listcheckRosterLookupTimeoutMs;
+  const deepLimit = config.listcheckSimilarLookupLimit;
   const enrichStartedAt = Date.now();
   const mode = health.online ? 'worker-meta' : 'search-direct';
   const pendingSnapshots = new Map();

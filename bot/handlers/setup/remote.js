@@ -300,8 +300,7 @@ async function handleDefaultScope(interaction, guildId, guildName, scope, auditF
 export async function handleSetupRemoteCommand(interaction) {
   await deferEphemeralReply(interaction);
   const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-  const seniorIds = config.seniorApproverIds || [];
-  if (!seniorIds.includes(interaction.user.id)) {
+  if (!config.seniorApproverIds.includes(interaction.user.id)) {
     await editAlert(interaction, {
       severity: AlertSeverity.ERROR,
       ...t('dialogue.remote.seniorOnly', lang),

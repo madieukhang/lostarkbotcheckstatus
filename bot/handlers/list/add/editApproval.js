@@ -28,11 +28,10 @@ function buildApprovalAlertPayload({ embed, status, lang }) {
 
 async function closeApprovalWithAlert({
   interaction,
-  requestId,
   embed,
   status = 'Failed',
   lang,
-  completeApproval = () => PendingApproval.deleteOne({ requestId }),
+  completeApproval,
 }) {
   await completeApproval();
   await editPayload(interaction, buildApprovalAlertPayload({ embed, status, lang }));
@@ -107,7 +106,6 @@ async function rejectBlockedTypeChange({
   if (targetDupe) {
     await closeApprovalWithAlert({
       interaction,
-      requestId,
       completeApproval,
       embed: buildLocalizedAlert(
         'dialogue.listEdit.moveBlocked',
@@ -200,7 +198,6 @@ async function applyApprovedInPlaceUpdate(args) {
     if (err.code !== 11000 || !updateFields.scope) throw err;
     await closeApprovalWithAlert({
       interaction: args.interaction,
-      requestId: args.requestId,
       completeApproval: args.completeApproval,
       embed: buildLocalizedAlert('dialogue.listEdit.scopeRaced', args.lang),
       lang: args.lang,
@@ -225,7 +222,7 @@ function broadcastApprovedEdit({ payload, existingEntry, broadcastListChange }) 
     guildId: payload.guildId,
     requestedByDisplayName: payload.requestedByDisplayName,
     requestedByTag: payload.requestedByTag,
-  }, { onlyOwner: scope === 'server' }).catch(() => {});
+  }, { onlyOwner: scope === 'server' }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 }
 
 function buildApprovedPayload(interaction, targetLang) {
@@ -242,11 +239,10 @@ function buildApprovedPayload(interaction, targetLang) {
 async function finishApprovedEdit({
   interaction,
   payload,
-  requestId,
   syncApproverDmMessages,
   notifyRequesterAboutDecision,
   lang,
-  completeApproval = () => PendingApproval.deleteOne({ requestId }),
+  completeApproval,
 }) {
   await completeApproval();
   await editPayload(interaction, buildApprovedPayload(interaction, lang));
@@ -294,14 +290,13 @@ export async function handleApprovedEditRequest({
       : null;
     if (moved && moved.name === payload.name) {
       await finishApprovedEdit({
-        interaction, payload, requestId, syncApproverDmMessages,
+        interaction, payload, syncApproverDmMessages,
         notifyRequesterAboutDecision, lang, completeApproval,
       });
       return;
     }
     await closeApprovalWithAlert({
       interaction,
-      requestId,
       completeApproval,
       embed: buildLocalizedAlert('dialogue.listEdit.originalMissing', lang),
       lang,
@@ -318,7 +313,7 @@ export async function handleApprovedEditRequest({
     const trustedNow = await findTrustedEditConflict(existingEntry, payload.additionalNames || []);
     if (trustedNow) {
       await closeApprovalWithAlert({
-        interaction, requestId, lang, status: 'Blocked', completeApproval,
+        interaction, lang, status: 'Blocked', completeApproval,
         embed: buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason, { lang }),
       });
       return;
@@ -333,7 +328,6 @@ export async function handleApprovedEditRequest({
   await finishApprovedEdit({
     interaction,
     payload,
-    requestId,
     completeApproval,
     syncApproverDmMessages,
     notifyRequesterAboutDecision,

@@ -275,7 +275,7 @@ function broadcastAppliedEdit(args, editedEntry) {
     guildId: args.interaction.guild.id,
     requestedByDisplayName: args.interaction.member?.displayName || args.interaction.user.username,
     requestedByTag: args.interaction.user.tag,
-  }, { changes: args.changes }).catch(() => {});
+  }, { changes: args.changes }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 }
 
 /**

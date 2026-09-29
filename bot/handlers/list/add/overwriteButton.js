@@ -185,7 +185,7 @@ export function createListAddOverwriteButtonHandler({
       }, {
         onlyOwner: dupeEntry.scope === 'server',
         rosterCharacters: rosterResult?.rosterCharacters || [],
-      }).catch(() => {});
+      }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 
       await notifyRequesterAboutDecision(payload, { ok: true }, false);
     } catch (err) {

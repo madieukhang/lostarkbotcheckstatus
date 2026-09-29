@@ -347,7 +347,7 @@ export function createBroadcastServices({ client }) {
     const newAlts = (Array.isArray(newAltNames) ? newAltNames : []).filter(Boolean);
     const newCount = newAlts.length;
     const entryKey = normalizeNameKey(entry.name);
-    const totalTracked = Math.max(0, allChars.filter((name) => normalizeNameKey(name) !== entryKey).length);
+    const totalTracked = allChars.filter((name) => normalizeNameKey(name) !== entryKey).length;
     function buildPayloadForLanguage(lang) {
       const listLabel = t(`dialogue.broadcast.list.${payload.type}`, lang);
       const scopeTag = entry.scope === 'server'

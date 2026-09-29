@@ -210,7 +210,7 @@ function createGeminiFailureError(result, models) {
 }
 
 function coolDownGeminiModel(model, reason, retryAfterMs = 0, now = Date.now()) {
-  const configuredMs = Math.max(1, config.geminiModelCooldownMs || 60_000);
+  const configuredMs = config.geminiModelCooldownMs;
   const cooldownMs = Math.min(
     Math.max(configuredMs, retryAfterMs),
     Math.max(configuredMs, MAX_GEMINI_MODEL_COOLDOWN_MS),
@@ -288,7 +288,7 @@ async function requestGeminiWithFallback({
     const attemptTimeoutMs = resolveGeminiAttemptTimeoutMs({
       remainingMs,
       modelTimeoutMs,
-      fallbackReserveMs: config.geminiFallbackReserveMs || 10_000,
+      fallbackReserveMs: config.geminiFallbackReserveMs,
       hasFallback: shouldProtectFallback,
     });
     // Quick recoverable failures keep producing soft deadlines. A real timeout
@@ -408,8 +408,8 @@ async function findAmbiguousOcrChoices(
   names,
   { suggestionCache, suggestionContext } = {},
 ) {
-  const concurrency = config.listcheckRosterLookupConcurrency || 3;
-  const lookupTimeoutMs = config.listcheckRosterLookupTimeoutMs || 6000;
+  const concurrency = config.listcheckRosterLookupConcurrency;
+  const lookupTimeoutMs = config.listcheckRosterLookupTimeoutMs;
   // One absolute deadline bounds the whole candidate-discovery phase. Without
   // it, eight slow names at concurrency 3 could restart the timeout in three
   // waves, and each direct failure could restart it again through ScraperAPI.
@@ -419,18 +419,12 @@ async function findAmbiguousOcrChoices(
     // Skip those locally instead of creating already-aborted HTTP requests.
     if (lookupSignal.aborted) return null;
 
-    let suggestions;
-    try {
-      suggestions = await fetchNameSuggestions(name, {
-        timeoutMs: lookupTimeoutMs,
-        signal: lookupSignal,
-        suggestionCache,
-        suggestionContext,
-      });
-    } catch (err) {
-      console.warn(`[listcheck] OCR refine search skipped for ${name}: ${err.message}`);
-      return null;
-    }
+    const suggestions = await fetchNameSuggestions(name, {
+      timeoutMs: lookupTimeoutMs,
+      signal: lookupSignal,
+      suggestionCache,
+      suggestionContext,
+    });
     if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
 
     // A wrong mark can be just as dangerous as a dropped mark: the OCR result
@@ -498,7 +492,7 @@ async function refineAmbiguousOcrNames(
 ) {
   // Keep overflow names for the ignored-count UI, but avoid spending HTTP
   // calls on rows that cannot enter the bounded list-check pipeline.
-  const refineLimit = config.listcheckMaxNames || names.length;
+  const refineLimit = config.listcheckMaxNames;
   const choices = await findAmbiguousOcrChoices(
     names.slice(0, refineLimit),
     { suggestionCache, suggestionContext },

@@ -399,11 +399,10 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
  * @returns {string[]} unique Discord user IDs
  */
 export function getApproverRecipientIds() {
-  const officers = OFFICER_APPROVER_IDS.filter(Boolean);
   const recipientIds = getSeniorApproverIds();
 
-  if (officers.length > 0) {
-    const randomOfficerId = officers[Math.floor(Math.random() * officers.length)];
+  if (OFFICER_APPROVER_IDS.length > 0) {
+    const randomOfficerId = OFFICER_APPROVER_IDS[Math.floor(Math.random() * OFFICER_APPROVER_IDS.length)];
     if (!recipientIds.includes(randomOfficerId)) {
       recipientIds.push(randomOfficerId);
     }
@@ -443,7 +442,7 @@ export function getSeniorApproverIds() {
   const seen = new Set();
   const out = [];
   for (const id of SENIOR_APPROVER_IDS) {
-    if (id && !seen.has(id)) {
+    if (!seen.has(id)) {
       seen.add(id);
       out.push(id);
     }

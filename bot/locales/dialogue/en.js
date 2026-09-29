@@ -561,7 +561,6 @@ export default {
     notYourSession: { title: 'This is not your enrich session', description: 'Only the person who started it can {action}.' },
     actionContinue: 'continue it', actionConfirm: 'confirm it', actionCancel: 'cancel it',
     invalidButton: { title: 'That button is invalid', description: 'I could not read the entry name from this button. Use `/la-list enrich` directly.' },
-    internalType: { title: 'Unknown list type', description: 'The session contains unknown list type `{type}`.', footer: 'The entry was not changed. Please report this to an officer.' },
     nothing: { title: 'Nothing new to save', description: 'No new alts were discovered, so the entry stayed unchanged.', footer: 'Run `/la-list enrich` again later if Bible has cooled down.' },
     cancelled: 'Cancelled · the entry was not changed.', cooldown: 'Please wait {seconds}s before enriching **{name}** again.', continueCooldown: 'Please wait {seconds}s before continuing the scan for **{name}**.',
     scanFinished: { title: 'This scan has already finished', description: 'The scan completed or was cancelled. Run the command again for a fresh scan.' },

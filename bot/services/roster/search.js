@@ -63,8 +63,7 @@ export function createNameSuggestionContext({
 }
 
 function trimSharedSuggestionCache() {
-  const maxSize = Math.max(1, config.nameSuggestionCacheMaxSize || 1000);
-  while (sharedSuggestionCache.size >= maxSize) {
+  while (sharedSuggestionCache.size >= config.nameSuggestionCacheMaxSize) {
     const oldestKey = sharedSuggestionCache.keys().next().value;
     if (oldestKey === undefined) break;
     sharedSuggestionCache.delete(oldestKey);
@@ -257,18 +256,12 @@ export async function fetchNameSuggestions(name, options = {}) {
   if (cacheKey) setSharedSuggestionPending(cacheKey, request);
   if (canCache) requestCache.set(cacheKey, request);
 
-  try {
-    const result = await request;
-    if (cacheKey) settleSharedSuggestion(cacheKey, request, result);
-    // Keep successful and empty lookups for this request. Transport or
-    // contract failures remain retryable if the upstream recovers.
-    if (canCache && result === null) requestCache.delete(cacheKey);
-    return result;
-  } catch (err) {
-    if (cacheKey) settleSharedSuggestion(cacheKey, request, null);
-    if (canCache) requestCache.delete(cacheKey);
-    throw err;
-  }
+  const result = await request;
+  if (cacheKey) settleSharedSuggestion(cacheKey, request, result);
+  // Keep successful and empty lookups for this request. Transport or
+  // contract failures remain retryable if the upstream recovers.
+  if (canCache && result === null) requestCache.delete(cacheKey);
+  return result;
 }
 
 /**

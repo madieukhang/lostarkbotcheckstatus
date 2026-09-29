@@ -48,7 +48,7 @@ export async function renderListAddExecutionResult(
   } = {},
 ) {
   if ((result.embeds?.length ?? 0) > 0) {
-    return editEmbedFn(interaction, result.embeds ?? [], {
+    return editEmbedFn(interaction, result.embeds, {
       content: null,
       components: result.components ?? [],
     });

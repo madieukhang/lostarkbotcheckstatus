@@ -316,7 +316,7 @@ export async function recoverViaVisualSubstitution(name, options = {}) {
   if (source.length < 5) return null;
 
   const {
-    recoveryCandidateLimit = config.listcheckSimilarLookupLimit || 3,
+    recoveryCandidateLimit = config.listcheckSimilarLookupLimit,
     ...searchOptions
   } = options;
   const candidateLimit = Math.max(1, Number(recoveryCandidateLimit) || 1);

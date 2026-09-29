@@ -853,17 +853,9 @@ export function createEnrichHandlers({ services }) {
     await deferUpdate(interaction);
 
     const Model = MODELS_BY_TYPE[session.type];
-    if (!Model) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.enrich.internalType', lang, { type: session.type }),
-        lang,
-      }, { components: [] });
-      return;
-    }
 
     await connectDB();
-    const altNames = (session.newAlts || []).map((a) => a.name);
+    const altNames = session.newAlts.map((a) => a.name);
     if (altNames.length === 0) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
@@ -930,7 +922,7 @@ export function createEnrichHandlers({ services }) {
           {
             onlyOwner: enrichedEntry.scope === 'server',
             newAltNames: altNames,
-            rosterCharacters: session.newAlts || [],
+            rosterCharacters: session.newAlts,
           }
         ).catch((err) => console.warn('[enrich] Broadcast failed:', err?.message || err));
       }

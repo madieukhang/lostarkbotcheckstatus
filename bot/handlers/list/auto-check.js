@@ -40,7 +40,6 @@ const COOLDOWN_MS = 10_000; // 10 seconds between checks per user
 const processedMessages = new Map(); // messageId -> timestamp
 const inFlightMessages = new Set();
 const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
-const AUTO_CHECK_MAX_NAMES_PER_IMAGE = 8;
 const AUTO_CHECK_MAX_BATCH_NAMES = 24;
 const AUTO_CHECK_MAX_IMAGES = 3;
 const AUTO_CHECK_MAX_COOLDOWN_RETRY_AFTER_MS = 60_000;
@@ -227,7 +226,7 @@ export function createAutoCheckMessageHandler({
   formatCheckResultsFn = formatCheckResults,
   buildListCheckEmbedFn = buildListCheckEmbed,
   buildAutoCheckEvidenceRowFn = buildAutoCheckEvidenceRow,
-  maxNames = config.listcheckMaxNames || AUTO_CHECK_MAX_NAMES_PER_IMAGE,
+  maxNames = config.listcheckMaxNames,
   imageChecksEnabled = Boolean(config.geminiApiKey),
   waitFn = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
 } = {}) {
@@ -479,11 +478,11 @@ export function createAutoCheckMessageHandler({
         ], lang);
       });
     } else {
-      mergeUniqueNames(names, request.textRequest?.names || [], new Set());
+      mergeUniqueNames(names, request.textRequest.names, new Set());
     }
 
     if (request.images.length > 0 && failedImages.length === request.images.length) {
-      const lastError = failedImages.at(-1)?.error;
+      const lastError = failedImages.at(-1).error;
       throw new Error(
         `OCR failed for all ${request.images.length} image(s).`
         + ` Last error: ${lastError?.message || String(lastError)}`,
