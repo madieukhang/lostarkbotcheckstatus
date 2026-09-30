@@ -25,6 +25,7 @@ import { formatLinkedCharacter } from '../trackedAltsRender.js';
 import { COLORS } from '../../../utils/ui.js';
 import { AlertSeverity, buildAlertEmbed } from '../../../utils/alertEmbed.js';
 import GuildConfig from '../../../models/GuildConfig.js';
+import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
@@ -59,9 +60,10 @@ const DECISION_SEVERITY = Object.freeze({
  * @param {object} payload - the pending add or edit request
  * @param {'approved'|'rejected'|'duplicate'|'failed'} decision - the outcome
  * @param {string} lang - guild language
+ * @param {object|null} snapshot - the character's roster snapshot, for its class icon
  * @returns {import('discord.js').EmbedBuilder} the decision card
  */
-function buildDecisionEmbed(payload, decision, lang) {
+function buildDecisionEmbed(payload, decision, lang, snapshot) {
   const labelCap = t(`dialogue.broadcast.list.${payload.type}`, lang);
   return buildAlertEmbed({
     severity: DECISION_SEVERITY[decision],
@@ -71,7 +73,7 @@ function buildDecisionEmbed(payload, decision, lang) {
       name: payload.name,
     }),
     description: t(`dialogue.approval.public.${payload.action === 'edit' ? 'edit' : 'add'}.${decision}`, lang, {
-      name: formatLinkedCharacter(payload.name, null),
+      name: formatLinkedCharacter(payload.name, snapshot),
       list: labelCap,
       scope: formatListScopeTag(payload.type, payload.scope, lang),
     }),
@@ -108,6 +110,7 @@ export function createApprovalServices({
   getSeniorApproverIdsFn = getSeniorApproverIds,
   UserPreferenceModel = UserPreference,
   GuildConfigModel = GuildConfig,
+  RosterSnapshotModel = RosterSnapshot,
 }) {
   async function deliverApprovalDms({ approverIds, buildMessage, logPrefix }) {
     const deliveredApproverIds = [];
@@ -312,7 +315,15 @@ export function createApprovalServices({
 
       if (!channel || !channel.isTextBased()) return;
 
-      const lang = await getGuildLanguageFn(guild.id, { GuildConfigModel });
+      const [lang, snapshot] = await Promise.all([
+        getGuildLanguageFn(guild.id, { GuildConfigModel }),
+        // Only the class icon comes from the snapshot, so a failed read
+        // must not cost the requester their notice.
+        RosterSnapshotModel.findOne({ name: payload.name })
+          .collation({ locale: 'en', strength: 2 })
+          .lean()
+          .catch(() => null),
+      ]);
       const decision = rejected
         ? (result?.isDuplicate ? 'duplicate' : 'rejected')
         : (result?.ok === false ? 'failed' : 'approved');
@@ -322,7 +333,7 @@ export function createApprovalServices({
         // the guild-language embed so the requester still gets notified.
         content: `<@${payload.requestedByUserId}>`,
         allowedMentions: { users: [payload.requestedByUserId] },
-        embeds: [buildDecisionEmbed(payload, decision, lang)],
+        embeds: [buildDecisionEmbed(payload, decision, lang, snapshot)],
         components: [],
       };
 

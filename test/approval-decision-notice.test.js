@@ -10,7 +10,7 @@ const words = {
   jp: { duplicate: /すでに list にあり/, kept: /既存の entry を残しました/, failed: /保存できませんでした/, rejected: /却下されました/, approved: /承認され、保存されました/ },
 };
 
-function harness(lang, { missingOriginal = false } = {}) {
+function harness(lang, { missingOriginal = false, snapshot = null, snapshotError = null } = {}) {
   const replies = [];
   const sends = [];
   const message = { reply: async value => replies.push(value) };
@@ -26,6 +26,13 @@ function harness(lang, { missingOriginal = false } = {}) {
     client: { guilds: { fetch: async () => ({ id: 'guild', channels: { fetch: async () => channel } }) } },
     getGuildLanguageFn: async () => lang,
     getUserLanguageFn: async () => assert.fail('Origin-channel notices use the guild language'),
+    RosterSnapshotModel: { findOne: () => ({
+      collation() { return this; },
+      lean: async () => {
+        if (snapshotError) throw snapshotError;
+        return snapshot;
+      },
+    }) },
   });
   const payload = {
     guildId: 'guild', channelId: 'channel', requestMessageId: 'request',
@@ -74,6 +81,18 @@ for (const lang of Object.keys(words)) {
     });
   }
 }
+
+test('the decision card shows the class from the roster snapshot, and a failed read still sends it', async () => {
+  const known = harness('en', { snapshot: { name: 'Samplechar', className: 'Berserker' } });
+  await known.service.notifyRequesterAboutDecision(known.payload, { ok: true }, false);
+  // No emoji bootstrap in tests, so the class name stands in for its icon.
+  assert.match(known.replies[0].embeds[0].toJSON().description, /Berserker \*\*\[Samplechar\]/);
+
+  const broken = harness('en', { snapshotError: new Error('snapshot read failed') });
+  await broken.service.notifyRequesterAboutDecision(broken.payload, { ok: true }, false);
+  assert.equal(broken.replies.length, 1);
+  assert.match(broken.replies[0].embeds[0].toJSON().description, /^Your request to add \*\*\[Samplechar\]/);
+});
 
 test('a missing original message falls back once to the channel with the duplicate reason intact', async () => {
   const h = harness('vi', { missingOriginal: true });

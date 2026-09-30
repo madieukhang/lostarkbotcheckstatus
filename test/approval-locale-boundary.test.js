@@ -204,6 +204,7 @@ test('approval result posted in a guild channel uses guild-global language', asy
   const services = createApprovalServices({
     client,
     getGuildLanguageFn: async () => 'vi',
+    RosterSnapshotModel: { findOne: () => ({ collation() { return this; }, lean: async () => null }) },
   });
   const payload = {
     guildId: guild.id,
