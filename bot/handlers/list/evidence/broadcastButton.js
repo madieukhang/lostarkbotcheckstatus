@@ -21,28 +21,36 @@ import UserPreference from '../../../models/UserPreference.js';
 
 export const BROADCAST_EVIDENCE_PREFIX = 'listbroadcast_evidence';
 
-export function buildBroadcastEvidenceComponents(entry, { legacyUrl, lang = 'en' } = {}) {
+/**
+ * The evidence button for a list entry or request: View evidence when the
+ * image sits in the archive, Open evidence for a legacy direct link.
+ * @param {object} entry - carries imageMessageId/imageChannelId or imageUrl
+ * @param {object} [options]
+ * @param {string} [options.legacyUrl] - direct image link to prefer over entry.imageUrl
+ * @param {string} [options.lang='en'] - locale of the label
+ * @returns {ButtonBuilder|null} null when the entry has no evidence
+ */
+export function buildBroadcastEvidenceButton(entry, { legacyUrl, lang = 'en' } = {}) {
   const messageId = String(entry?.imageMessageId || '').trim();
   const channelId = String(entry?.imageChannelId || '').trim();
-  let button = null;
-
   if (messageId && channelId) {
-    button = new ButtonBuilder()
+    return new ButtonBuilder()
       .setCustomId(`${BROADCAST_EVIDENCE_PREFIX}:${channelId}:${messageId}`)
       .setLabel(t('common.actions.viewEvidence', lang))
       .setEmoji('📎')
       .setStyle(ButtonStyle.Secondary);
-  } else {
-    const directUrl = String(legacyUrl || entry?.imageUrl || '').trim();
-    if (directUrl) {
-      button = new ButtonBuilder()
-        .setLabel(t('common.actions.openEvidence', lang))
-        .setEmoji('📎')
-        .setURL(directUrl)
-        .setStyle(ButtonStyle.Link);
-    }
   }
+  const directUrl = String(legacyUrl || entry?.imageUrl || '').trim();
+  if (!directUrl) return null;
+  return new ButtonBuilder()
+    .setLabel(t('common.actions.openEvidence', lang))
+    .setEmoji('📎')
+    .setURL(directUrl)
+    .setStyle(ButtonStyle.Link);
+}
 
+export function buildBroadcastEvidenceComponents(entry, options = {}) {
+  const button = buildBroadcastEvidenceButton(entry, options);
   return button ? [new ActionRowBuilder().addComponents(button)] : [];
 }
 

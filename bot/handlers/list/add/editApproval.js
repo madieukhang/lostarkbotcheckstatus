@@ -16,7 +16,7 @@ import {
   getListContext,
   buildTrustedBlockEmbed,
   buildApprovalResultRow,
-  buildDecidedApprovalEmbed,
+  buildDecidedApprovalPayload,
 } from '../helpers.js';
 
 function buildApprovalAlertPayload({ embed, status, lang }) {
@@ -233,17 +233,13 @@ function broadcastApprovedEdit({ payload, existingEntry, broadcastListChange }) 
 }
 
 function buildApprovedPayload(interaction, payload, targetLang) {
-  return {
-    content: null,
-    embeds: [buildDecidedApprovalEmbed({
-      client: interaction.client,
-      payload,
-      outcome: 'editApproved',
-      approver: interaction.user.tag,
-      lang: targetLang,
-    })],
-    components: [buildApprovalResultRow('Approved', targetLang)],
-  };
+  return buildDecidedApprovalPayload({
+    client: interaction.client,
+    payload,
+    outcome: 'editApproved',
+    approver: interaction.user.tag,
+    lang: targetLang,
+  });
 }
 
 async function finishApprovedEdit({

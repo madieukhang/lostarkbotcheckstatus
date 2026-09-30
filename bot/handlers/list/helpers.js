@@ -21,6 +21,7 @@ import { BLANK_FIELD_VALUE, COLORS, ICONS } from '../../utils/ui.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { t } from '../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField } from './trackedAltsRender.js';
+import { buildBroadcastEvidenceButton } from './evidence/broadcastButton.js';
 import {
   buildListEntryInlineFields,
   buildListEntryReasonField,
@@ -352,6 +353,7 @@ const APPROVAL_CARD_VIEWS = Object.freeze({
       scope: scopeTag,
     }),
     footer: (lang) => `${ICONS.shield} ${t('dialogue.approval.footer', lang)}`,
+    color: (listColor) => listColor,
     showsRequester: true,
   },
   requester: {
@@ -365,6 +367,8 @@ const APPROVAL_CARD_VIEWS = Object.freeze({
       scope: scopeTag,
     }),
     footer: (lang) => t('dialogue.approval.requester.footer', lang),
+    // Blurple marks a request still waiting, whatever list it targets.
+    color: () => COLORS.info,
     showsRequester: false,
   },
 });
@@ -458,7 +462,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   const embed = buildAlertEmbed({
     severity: AlertSeverity.INFO,
     titleIcon: '',
-    color: listColor,
+    color: view.color(listColor),
     title,
     description: heroLine,
     fields,
@@ -481,21 +485,21 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
 }
 
 const DECIDED_APPROVAL_STYLES = Object.freeze({
-  approved: { icon: '✅', color: COLORS.success },
-  editApproved: { icon: '✅', color: COLORS.success },
-  overwritten: { icon: '✅', color: COLORS.success },
-  returned: { icon: '⚠️', color: COLORS.warning },
-  rejected: { icon: '✖️', color: COLORS.greyDark },
-  kept: { icon: '✖️', color: COLORS.greyDark },
+  approved: { icon: '✅', color: COLORS.success, resultLabel: 'Approved' },
+  editApproved: { icon: '✅', color: COLORS.success, resultLabel: 'Approved' },
+  overwritten: { icon: '✅', color: COLORS.success, resultLabel: 'Overwritten' },
+  returned: { icon: '⚠️', color: COLORS.warning, resultLabel: 'Processed' },
+  rejected: { icon: '✖️', color: COLORS.greyDark, resultLabel: 'Rejected' },
+  kept: { icon: '✖️', color: COLORS.greyDark, resultLabel: 'Kept Existing' },
 });
 
 /**
  * Rebuild an approval DM card once it is decided, so the approver keeps a
  * record of what they decided: every field of the request stays, the
  * title and colour show the outcome, and a Decision field names who
- * decided and when. The evidence image and its heading go because
- * deciding deletes the pending request, which the image link and the View
- * evidence button both depend on.
+ * decided and when. The inline evidence image and its heading go because
+ * its link came from the pending request, which deciding deletes; the
+ * archive button of buildDecidedApprovalPayload opens it instead.
  * @param {object} options
  * @param {import('discord.js').Client} options.client - resolves the
  *   origin guild's name for the hero line
@@ -531,6 +535,21 @@ export function buildDecidedApprovalEmbed({ client, payload, outcome, approver, 
       },
     )
     .setFooter({ text: t('dialogue.approval.decided.footer', lang) });
+}
+
+/**
+ * The whole decided approval DM: the decided card, a disabled button
+ * naming the outcome and, when the request carried evidence, a button that
+ * opens it from the archive without the deleted pending request.
+ * @param {object} options - as buildDecidedApprovalEmbed takes them
+ * @returns {{content: null, embeds: object[], components: object[]}}
+ */
+export function buildDecidedApprovalPayload(options) {
+  const { payload, outcome, lang } = options;
+  const row = buildApprovalResultRow(DECIDED_APPROVAL_STYLES[outcome].resultLabel, lang);
+  const evidenceButton = buildBroadcastEvidenceButton(payload, { lang });
+  if (evidenceButton) row.addComponents(evidenceButton);
+  return { content: null, embeds: [buildDecidedApprovalEmbed(options)], components: [row] };
 }
 
 /**

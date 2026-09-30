@@ -18,7 +18,7 @@ import {
   getListContext,
   buildApprovalResultRow,
   buildApprovalRetryRow,
-  buildDecidedApprovalEmbed,
+  buildDecidedApprovalPayload,
   buildTrustedBlockEmbed,
 } from '../helpers.js';
 import { findTrustedEditConflict } from '../edit/trustedGuard.js';
@@ -74,12 +74,8 @@ export function createListAddOverwriteButtonHandler({
     if (!isOverwrite) {
       await claim.complete();
       // Keep the existing entry and explain the duplicate to the requester.
-      const buildKeptPayload = (targetLang) => ({
-        content: null,
-        embeds: [buildDecidedApprovalEmbed({
-          client: interaction.client, payload, outcome: 'kept', approver: interaction.user.tag, lang: targetLang,
-        })],
-        components: [buildApprovalResultRow('Kept Existing', targetLang)],
+      const buildKeptPayload = (targetLang) => buildDecidedApprovalPayload({
+        client: interaction.client, payload, outcome: 'kept', approver: interaction.user.tag, lang: targetLang,
       });
       await updateApprovers(buildKeptPayload);
 
@@ -169,12 +165,8 @@ export function createListAddOverwriteButtonHandler({
 
       console.log(`[list] Overwrite: updated ${payload.type} entry for ${dupeEntry.name} in-place`);
 
-      const buildOverwrittenPayload = (targetLang) => ({
-        content: null,
-        embeds: [buildDecidedApprovalEmbed({
-          client: interaction.client, payload, outcome: 'overwritten', approver: interaction.user.tag, lang: targetLang,
-        })],
-        components: [buildApprovalResultRow('Overwritten', targetLang)],
+      const buildOverwrittenPayload = (targetLang) => buildDecidedApprovalPayload({
+        client: interaction.client, payload, outcome: 'overwritten', approver: interaction.user.tag, lang: targetLang,
       });
       await updateApprovers(buildOverwrittenPayload);
 

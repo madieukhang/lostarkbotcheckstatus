@@ -73,6 +73,8 @@ test('a member quick add sent for approval reads like the /la-list add card', as
 
   const embed = replies.at(-1).embeds[0].toJSON();
   assert.equal(embed.title, '📨 Blacklist · Sent for approval · Mokoko');
+  // Blurple marks the waiting state; the blacklist red belongs to the decision.
+  assert.equal(embed.color, COLORS.info);
   assert.match(embed.description, /^I sent \*\*\[Mokoko\]\(.+\)\*\* to the approvers for the \*\*Blacklist\*\* `\[Global\]`/);
   const names = embed.fields.map((field) => field.name);
   for (const expected of ['📒 List', '🗡️ Raid', '🌐 Scope', '📝 Reason']) assert.ok(names.includes(expected), `missing ${expected}`);

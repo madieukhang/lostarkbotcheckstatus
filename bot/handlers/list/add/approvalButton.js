@@ -12,9 +12,8 @@ import {
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { t } from '../../../services/i18n/index.js';
 import {
-  buildApprovalResultRow,
   buildApprovalRetryRow,
-  buildDecidedApprovalEmbed,
+  buildDecidedApprovalPayload,
 } from '../helpers.js';
 import { createApprovalDecisionHandler, handleApprovalClaimError } from '../services/approvalInteraction.js';
 import { handleApprovedEditRequest } from './editApproval.js';
@@ -63,12 +62,8 @@ export function createListAddApprovalButtonHandler({
     if (!isApproveAction) {
       await claim.complete();
 
-      const buildRejectedPayload = (targetLang) => ({
-        content: null,
-        embeds: [buildDecidedApprovalEmbed({
-          client: interaction.client, payload, outcome: 'rejected', approver: interaction.user.tag, lang: targetLang,
-        })],
-        components: [buildApprovalResultRow('Rejected', targetLang)],
+      const buildRejectedPayload = (targetLang) => buildDecidedApprovalPayload({
+        client: interaction.client, payload, outcome: 'rejected', approver: interaction.user.tag, lang: targetLang,
       });
       await updateApprovers(buildRejectedPayload);
 
@@ -121,17 +116,13 @@ export function createListAddApprovalButtonHandler({
       // Success or non-duplicate error · clean up
       await claim.complete();
 
-      const buildCompletedPayload = (targetLang) => ({
-        content: null,
-        embeds: [buildDecidedApprovalEmbed({
-          client: interaction.client,
-          payload,
-          outcome: result.ok ? 'approved' : 'returned',
-          approver: interaction.user.tag,
-          result: result.content,
-          lang: targetLang,
-        })],
-        components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', targetLang)],
+      const buildCompletedPayload = (targetLang) => buildDecidedApprovalPayload({
+        client: interaction.client,
+        payload,
+        outcome: result.ok ? 'approved' : 'returned',
+        approver: interaction.user.tag,
+        result: result.content,
+        lang: targetLang,
       });
       await updateApprovers(buildCompletedPayload);
 

@@ -12,7 +12,8 @@ const PAYLOAD = {
   requestId: 'decided', action: 'add', name: 'Burgerxucxich', type: 'black', scope: 'global',
   raid: 'Kazeros Hard', reason: 'Left Kazeros Hard G2 after the first wipe.',
   guildId: 'origin-guild', requestedByUserId: 'requester', requestedByDisplayName: 'Rainfox',
-  imageUrl: 'https://cdn.example/evidence.png', approverIds: ['approver'],
+  imageUrl: 'https://cdn.example/evidence.png', imageMessageId: 'archived-msg', imageChannelId: 'archive-channel',
+  approverIds: ['approver'],
 };
 
 async function decide(t, action, executeListAddToDatabase = async () => ({ ok: true })) {
@@ -57,13 +58,14 @@ for (const [action, outcome, line] of [
     assert.equal(decision.name, '🛡️ Decision');
     assert.match(decision.value, line);
     assert.match(decision.value, /<t:\d+:R>/);
-    // Deciding deletes the pending request, so its evidence link and button
-    // would stop working.
+    // The inline image came from the pending request, which deciding
+    // deletes; the evidence opens from the archive instead.
     assert.equal(embed.image, undefined);
     assert.ok(!names.some((name) => /Evidence/i.test(name)));
     assert.equal(final.components.length, 1);
-    assert.equal(final.components[0].toJSON().components.length, 1);
-    assert.equal(final.components[0].toJSON().components[0].disabled, true);
+    const [result, evidence] = final.components[0].toJSON().components;
+    assert.equal(result.disabled, true);
+    assert.equal(evidence.custom_id, 'listbroadcast_evidence:archive-channel:archived-msg');
   });
 }
 
