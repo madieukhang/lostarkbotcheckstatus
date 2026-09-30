@@ -405,7 +405,8 @@ const en = {
             name: '⚖️ Limits & rules',
             value: [
               '- Max **30 rows** per file',
-              '- File size <= **1 MB**, `.xlsx` only',
+              '- File size <= **1 MB** (<= **8 MB** unpacked), `.xlsx` only',
+              '- Each cell <= **6000** characters',
               '- Preview expires after **5 minutes**',
               '- Reuses `/la-list add` rules: ilvl >= 1700, trusted users skipped, duplicate check',
               '- Failed rows listed in preview but **do not block** valid rows',

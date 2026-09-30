@@ -261,7 +261,8 @@ const jp = {
             name: '⚖️ Limits & rules',
             value: [
               '- 1 file 最大 **30 rows**',
-              '- File size <= **1 MB**、`.xlsx` のみ',
+              '- File size <= **1 MB** (展開後 <= **8 MB**)、`.xlsx` のみ',
+              '- 各セル <= **6000** 文字',
               '- Preview は **5分** で expire',
               '- `/la-list add` rules を再利用: ilvl >= 1700, trusted skip, duplicate check',
               '- Failed rows は preview に出るが、valid rows は **block しない**',

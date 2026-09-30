@@ -261,7 +261,8 @@ const vi = {
             name: '⚖️ Giới hạn & luật',
             value: [
               '- Tối đa **30 rows** mỗi file',
-              '- File size <= **1 MB**, chỉ `.xlsx`',
+              '- File size <= **1 MB** (giải nén <= **8 MB**), chỉ `.xlsx`',
+              '- Mỗi ô <= **6000** ký tự',
               '- Preview hết hạn sau **5 phút**',
               '- Tái sử dụng luật `/la-list add`: ilvl >= 1700, trusted bị skip, duplicate check',
               '- Row lỗi vẫn hiện ở preview nhưng **không block** row hợp lệ',
