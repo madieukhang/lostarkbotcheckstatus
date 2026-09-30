@@ -28,6 +28,7 @@ for (const isMove of [false, true]) {
     } else {
       t.mock.method(Blacklist, 'updateOne', async (_filter, update) => {
         persisted = { ...source, ...update.$set };
+        return { acknowledged: true, matchedCount: 1, modifiedCount: 1 };
       });
     }
     t.mock.method(RosterSnapshot, 'find', (filter, projection) => {
@@ -93,7 +94,7 @@ for (const isMove of [false, true]) {
       t.mock.method(Blacklist, 'create', async ([entry]) => [entry]);
       t.mock.method(Whitelist, 'deleteOne', async () => ({ deletedCount: 1 }));
     } else {
-      t.mock.method(Blacklist, 'updateOne', async () => {});
+      t.mock.method(Blacklist, 'updateOne', async () => ({ acknowledged: true, matchedCount: 1, modifiedCount: 1 }));
     }
     t.mock.method(RosterSnapshot, 'find', () => ({ collation() { return this; }, lean: async () => [] }));
     const client = { channels: { fetch: async () => ({ isTextBased: () => true, messages: {
@@ -126,7 +127,10 @@ for (const isMove of [false, true]) {
 test('roster stat lookup failure does not turn a saved edit into an error or duplicate unchanged evidence', async t => {
   const existing = { _id: 'a'.repeat(24), name: 'Tenshi', reason: 'Old', imageUrl: 'https://example.test/current.png' };
   let saved = false;
-  t.mock.method(Blacklist, 'updateOne', async () => { saved = true; });
+  t.mock.method(Blacklist, 'updateOne', async () => {
+    saved = true;
+    return { acknowledged: true, matchedCount: 1, modifiedCount: 1 };
+  });
   t.mock.method(RosterSnapshot, 'find', () => { throw new Error('Snapshot unavailable'); });
   t.mock.method(console, 'warn', () => {});
   const replies = [];
@@ -145,3 +149,22 @@ test('roster stat lookup failure does not turn a saved edit into an error or dup
   assert.equal(card.image.url, existing.imageUrl);
   assert.doesNotMatch(JSON.stringify(card), /Trước khi đổi|Sau khi đổi/);
 });
+
+for (const matchedCount of [0, 1]) {
+  test(`in-place edit broadcasts only a matched entry, including an unchanged write (matched=${matchedCount})`, async t => {
+    const existing = { _id: 'a'.repeat(24), name: 'Alpha', reason: 'Old', scope: 'global', allCharacters: [] };
+    t.mock.method(Blacklist, 'updateOne', async () => ({ acknowledged: true, matchedCount, modifiedCount: 0 }));
+    t.mock.method(RosterSnapshot, 'find', () => ({ collation() { return this; }, lean: async () => [] }));
+    const replies = [], broadcasts = [];
+    await applyListEditNow({
+      existing, currentType: 'black', targetType: 'black', targetScope: 'global', newReason: 'New',
+      additionalNamesParsed: { added: [] }, isOwner: false, lang: 'en', client: {},
+      interaction: { guild: { id: 'guild' }, user: { id: 'owner', username: 'Owner' }, editReply: async reply => replies.push(reply) },
+      broadcastListChange: async (...args) => broadcasts.push(args),
+    });
+    assert.equal(replies.length, 1);
+    assert.equal(broadcasts.length, matchedCount);
+    const title = replies[0].embeds[0].toJSON().title;
+    assert.match(title, matchedCount ? /Edited/ : /original entry is gone/);
+  });
+}

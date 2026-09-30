@@ -231,7 +231,15 @@ async function applyInPlaceEdit(args) {
   const { model } = getListContext(args.currentType);
   const { updateFields, updateOps } = buildInPlaceUpdatePlan(args);
   try {
-    await model.updateOne({ _id: args.existing._id }, updateOps);
+    const write = await model.updateOne({ _id: args.existing._id }, updateOps);
+    if (write.matchedCount !== 1) {
+      await editAlert(args.interaction, {
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.listEdit.originalMissing', args.lang),
+        lang: args.lang,
+      });
+      return null;
+    }
   } catch (err) {
     if (err.code !== 11000 || !args.isScopeChange) throw err;
     await editAlert(args.interaction, {

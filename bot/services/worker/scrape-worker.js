@@ -11,7 +11,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-import ScrapeJob from '../../models/ScrapeJob.js';
+import ScrapeJob, { buildUnexpiredJobFilter } from '../../models/ScrapeJob.js';
 import { FETCH_HEADERS } from '../roster/bibleHeaders.js';
 
 const FETCH_DEFAULT_TIMEOUT_MS = 15_000;
@@ -26,6 +26,11 @@ function abbreviateUrl(url) {
   return `${url.slice(0, 80)}...${url.slice(-15)}`;
 }
 
+/**
+ * Select unexpired pending jobs and abandoned worker claims.
+ * @param {object} options - clock and claim lease duration
+ * @returns {object} MongoDB claim filter
+ */
 export function buildClaimNextJobFilter({
   now = Date.now,
   staleAfterMs = DEFAULT_JOB_LEASE_MS,
@@ -34,12 +39,7 @@ export function buildClaimNextJobFilter({
   const staleStartedBefore = new Date(nowDate.getTime() - staleAfterMs);
   return {
     $and: [
-      {
-        $or: [
-          { deadlineAt: null },
-          { deadlineAt: { $gt: nowDate } },
-        ],
-      },
+      buildUnexpiredJobFilter(nowDate),
       {
         $or: [
           { status: 'pending' },

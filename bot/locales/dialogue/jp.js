@@ -293,7 +293,7 @@ export default {
     },
   },
   listEdit: {
-    originalMissing: { title: '元の entry がありませんの', description: 'この承認申請が参照していた entry は、承認完了前に削除されましたわ。' },
+    originalMissing: { title: '元の entry がありませんの', description: '変更を保存する前に、entry が削除されたか別の list に移されましたわ。' },
     moveBlocked: { title: 'List を移動できませんの', description: '**{name}** はすでに移動先 list にいますので、どちらの list も変更していませんわ。', footer: '競合 entry を先に削除してから、もう一度申請してくださいませ。' },
     scopeRaced: { title: 'Scope が別の場所で変わりましたの', description: '同じ名前の entry が保存前に移動先 scope を取得しましたわ。', footer: '編集を再申請するか、競合 entry を先に削除してくださいませ。' },
     success: { titleMoved: '{list} · 編集して移動しましたわ · {name}', titleEdited: '{list} · 編集済み · {name}', hero: '**{user}** が **{list}**{scope} の {name} を編集しましたわ{summary}。', summaryChanged: ' · 変更: {fields}', summaryAlts: ' · alt **{count}** 体を追加', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: '{user} が編集' },

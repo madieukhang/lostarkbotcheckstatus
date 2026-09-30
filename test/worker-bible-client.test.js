@@ -240,3 +240,65 @@ test('workerBibleClient still inserts when pending queue is below backpressure t
   assert.equal(res.status, 200);
   assert.ok(ScrapeJob.inserted());
 });
+
+test('workerBibleClient rejects a pre-aborted caller before probing health or inserting a job', async () => {
+  const controller = new AbortController();
+  const reason = new Error('Caller phase ended');
+  controller.abort(reason);
+  const ScrapeJob = buildFakeScrapeJob();
+  const client = createWorkerBibleClient({
+    ScrapeJob, getWorkerHealth: async () => assert.fail('An aborted request must not probe health'),
+  });
+  await assert.rejects(client.fetch('https://lostark.bible/character/NA/Test', { signal: controller.signal }), error => error === reason);
+  assert.equal(ScrapeJob.inserted(), null);
+});
+
+test('workerBibleClient does not insert if the caller aborts during the health probe', async () => {
+  const controller = new AbortController();
+  const ScrapeJob = buildFakeScrapeJob();
+  const client = createWorkerBibleClient({
+    ScrapeJob,
+    getWorkerHealth: async () => { controller.abort(); return { online: true }; },
+  });
+  await assert.rejects(client.fetch('https://lostark.bible/character/NA/Test', { signal: controller.signal }), { name: 'AbortError' });
+  assert.equal(ScrapeJob.inserted(), null);
+});
+
+test('workerBibleClient cancels a job created while its caller aborts', async t => {
+  const controller = new AbortController();
+  const reason = new Error('Caller phase ended during insert');
+  const ScrapeJob = buildFakeScrapeJob();
+  const create = ScrapeJob.create;
+  t.mock.method(ScrapeJob, 'create', async payload => {
+    controller.abort(reason);
+    return create(payload);
+  });
+  t.mock.method(ScrapeJob, 'findById', () => assert.fail('An aborted caller must not poll its job'));
+  const client = createWorkerBibleClient({ ScrapeJob });
+  await assert.rejects(client.fetch('https://lostark.bible/character/NA/Test', { signal: controller.signal }), error => error === reason);
+  assert.equal(ScrapeJob.updates()[0].update.$set.status, 'cancelled');
+});
+
+for (const workerDone of [false, true]) {
+  test(`workerBibleClient interrupts polling and preserves a concurrently completed job (done=${workerDone})`, async t => {
+    const controller = new AbortController();
+    const reason = new Error('Caller phase ended during polling');
+    const ScrapeJob = buildFakeScrapeJob();
+    const findById = ScrapeJob.findById;
+    let polls = 0;
+    t.mock.method(ScrapeJob, 'findById', id => {
+      polls++;
+      setTimeout(() => {
+        if (workerDone) ScrapeJob.flipTo({ status: 'done', result: { status: 200, body: 'ok' } });
+        controller.abort(reason);
+      }, 5);
+      return findById(id);
+    });
+    const client = createWorkerBibleClient({ ScrapeJob, pollIntervalMs: 60_000 });
+    await assert.rejects(client.fetch('https://lostark.bible/character/NA/Test', { signal: controller.signal }), error => error === reason);
+    assert.equal(polls, 1);
+    const stored = await findById(ScrapeJob.inserted()._id).lean();
+    assert.equal(stored.status, workerDone ? 'done' : 'cancelled');
+    assert.equal(ScrapeJob.updates().length, 1);
+  });
+}

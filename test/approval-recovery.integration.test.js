@@ -194,3 +194,41 @@ test('a concurrent ownership change aborts the transaction instead of deleting t
   assert.equal((await Whitelist.findById(existing._id)).addedByUserId, 'new-owner');
   assert.equal(await Blacklist.countDocuments({}), 0);
 });
+
+for (const surface of ['immediate', 'approval']) {
+  test(`an in-place ${surface} edit detects a source removed before the write`, async () => {
+    const existing = await Blacklist.create({ name: 'Example', reason: 'Before' });
+    const replies = [], broadcasts = [], notices = [];
+    let completed = false;
+    const interaction = {
+      deferred: true, guild: { id: 'guild' }, user: { id: 'officer', username: 'Officer' },
+      message: { id: 'dm' }, client: { guilds: { cache: new Map() } },
+      editReply: async reply => replies.push(reply),
+    };
+    const broadcastListChange = async (...args) => broadcasts.push(args);
+    if (surface === 'immediate') {
+      await Blacklist.deleteOne({ _id: existing._id });
+      await applyListEditNow({
+        interaction, client: {}, existing, currentType: 'black', targetType: 'black',
+        targetScope: 'global', newReason: 'After', additionalNamesParsed: { added: [] },
+        isOwner: false, broadcastListChange, lang: 'en',
+      });
+    } else {
+      await handleApprovedEditRequest({
+        interaction,
+        payload: { name: existing.name, existingEntryId: existing._id, currentType: 'black', type: 'black', reason: 'After' },
+        requestId: 'request', lang: 'en', broadcastListChange,
+        beforeWrite: async () => { await Blacklist.deleteOne({ _id: existing._id }); },
+        completeApproval: async () => { completed = true; },
+        syncApproverDmMessages: async () => {},
+        notifyRequesterAboutDecision: async (...args) => notices.push(args),
+      });
+      assert.equal(completed, true);
+    }
+    assert.equal(await Blacklist.countDocuments(), 0);
+    assert.equal(broadcasts.length, 0);
+    assert.equal(notices.length, 0);
+    assert.equal(replies.length, 1);
+    assert.match(replies[0].embeds[0].toJSON().title, /original entry is gone/);
+  });
+}

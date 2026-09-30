@@ -50,4 +50,18 @@ const scrapeJobSchema = new mongoose.Schema({
   completedAt: { type: Date, default: null },
 });
 
+/**
+ * Match jobs that still have time to run, including legacy jobs without a deadline.
+ * @param {Date} nowDate - current queue observation time
+ * @returns {object} MongoDB deadline filter
+ */
+export function buildUnexpiredJobFilter(nowDate) {
+  return {
+    $or: [
+      { deadlineAt: null },
+      { deadlineAt: { $gt: nowDate } },
+    ],
+  };
+}
+
 export default mongoose.model('ScrapeJob', scrapeJobSchema, 'scrape_jobs');

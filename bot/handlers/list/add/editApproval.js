@@ -185,7 +185,7 @@ async function applyApprovedInPlaceUpdate(args) {
   if (Object.keys(updateFields).length === 0 && additionalNames.length === 0) return true;
   try {
     await args.beforeWrite();
-    await args.oldModel.updateOne(
+    const write = await args.oldModel.updateOne(
       { _id: args.existingEntry._id },
       {
         $set: updateFields,
@@ -194,6 +194,15 @@ async function applyApprovedInPlaceUpdate(args) {
           : {}),
       }
     );
+    if (write.matchedCount !== 1) {
+      await closeApprovalWithAlert({
+        interaction: args.interaction,
+        completeApproval: args.completeApproval,
+        embed: buildLocalizedAlert('dialogue.listEdit.originalMissing', args.lang),
+        lang: args.lang,
+      });
+      return false;
+    }
     return true;
   } catch (err) {
     if (err.code !== 11000 || !updateFields.scope) throw err;

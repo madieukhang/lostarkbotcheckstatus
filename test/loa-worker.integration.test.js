@@ -13,6 +13,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 import ScrapeJob from '../bot/models/ScrapeJob.js';
+import { createWorkerBibleClient } from '../bot/services/roster/workerBibleClient.js';
 import {
   claimAndProcessOne,
   claimNextJob,
@@ -39,6 +40,44 @@ test.beforeEach(async () => {
 test('claimAndProcessOne reports idle when no pending jobs', async () => {
   const result = await claimAndProcessOne({ logger: silentLogger });
   assert.equal(result.state, 'idle');
+});
+
+test('expired pending jobs do not block a fresh request or get claimed by the worker', async t => {
+  const nowMs = Date.now();
+  await ScrapeJob.insertMany(Array.from({ length: 100 }, () => ({
+    url: 'https://lostark.bible/expired', status: 'pending', deadlineAt: new Date(nowMs - 30_000),
+  })));
+  assert.equal(await claimNextJob(), null);
+  t.mock.method(globalThis, 'fetch', async url => {
+    assert.equal(url, 'https://lostark.bible/fresh');
+    return new Response('ok', { status: 200 });
+  });
+  const client = createWorkerBibleClient({
+    ScrapeJob: {
+      countDocuments: filter => ScrapeJob.countDocuments(filter),
+      create: async payload => {
+        const job = await ScrapeJob.create(payload);
+        await claimAndProcessOne({ logger: silentLogger });
+        return job;
+      },
+      findById: id => ScrapeJob.findById(id),
+    },
+  });
+  const response = await client.fetch('https://lostark.bible/fresh');
+  assert.equal(await response.text(), 'ok');
+  assert.equal(await ScrapeJob.countDocuments({ status: 'pending' }), 100);
+});
+
+test('unexpired and legacy pending jobs still count toward backpressure', async () => {
+  await ScrapeJob.insertMany(Array.from({ length: 100 }, (_, index) => ({
+    url: 'https://lostark.bible/queued', status: 'pending',
+    deadlineAt: index % 2 === 0 ? null : new Date(Date.now() + 60_000),
+  })));
+  await assert.rejects(
+    createWorkerBibleClient({ ScrapeJob }).fetch('https://lostark.bible/fresh'),
+    /overloaded: 100 pending jobs/,
+  );
+  assert.equal(await ScrapeJob.countDocuments(), 100);
 });
 
 test('claimAndProcessOne processes a pending job and writes back done state', async () => {

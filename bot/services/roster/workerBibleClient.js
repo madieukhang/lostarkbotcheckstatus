@@ -9,9 +9,9 @@
  * 30s timeouts when the worker is offline.
  */
 
-import ScrapeJobDefault from '../../models/ScrapeJob.js';
+import ScrapeJobDefault, { buildUnexpiredJobFilter } from '../../models/ScrapeJob.js';
 import { getWorkerHealth as getDefaultWorkerHealth } from '../worker/heartbeat.js';
-import { sleep } from '../../utils/async.js';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 const DEFAULT_POLL_INTERVAL_MS = 500;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -77,12 +77,28 @@ export function createWorkerBibleClient({
   backpressureThreshold = DEFAULT_BACKPRESSURE_THRESHOLD,
   now = () => Date.now(),
 } = {}) {
+  async function cancelJob(jobId, error) {
+    try {
+      await ScrapeJob.updateOne(
+        { _id: jobId, status: { $in: ['pending', 'in_progress'] } },
+        { $set: { status: 'cancelled', completedAt: new Date(), error } },
+      );
+      return '';
+    } catch (err) {
+      return `; cancellation failed: ${err?.message || String(err)}`;
+    }
+  }
+
   return {
     async fetch(url, options = {}) {
+      const signal = options.signal;
+      signal?.throwIfAborted();
+      const startedAtMs = now();
       const sanitized = sanitizeOptions(options);
 
       if (getWorkerHealth) {
         const health = await getWorkerHealth();
+        signal?.throwIfAborted();
         if (!health.online) {
           const age = Number.isFinite(health.ageMs)
             ? `; last heartbeat ${Math.round(health.ageMs / 1000)}s ago`
@@ -99,7 +115,11 @@ export function createWorkerBibleClient({
       // is offline / overwhelmed and the queue grows past threshold,
       // reject immediately so the bot surfaces overload to users
       // rather than every caller eating a 30s timeout.
-      const pendingCount = await ScrapeJob.countDocuments({ status: 'pending' });
+      const pendingCount = await ScrapeJob.countDocuments({
+        status: 'pending',
+        ...buildUnexpiredJobFilter(new Date(now())),
+      });
+      signal?.throwIfAborted();
       if (pendingCount >= backpressureThreshold) {
         throw new Error(
           `Scraping service overloaded: ${pendingCount} pending jobs ` +
@@ -114,7 +134,7 @@ export function createWorkerBibleClient({
       const timeoutMs = sanitized.timeoutMs
         ? sanitized.timeoutMs + 5_000
         : defaultTimeoutMs;
-      const deadline = now() + timeoutMs;
+      const deadline = startedAtMs + timeoutMs;
 
       const job = await ScrapeJob.create({
         url,
@@ -123,38 +143,38 @@ export function createWorkerBibleClient({
         deadlineAt: new Date(deadline),
       });
 
-      while (now() < deadline) {
-        const fresh = await ScrapeJob.findById(job._id).lean();
-        if (!fresh) {
-          throw new Error(
-            `Worker job ${job._id} disappeared (TTL expired or manually deleted).`
-          );
-        }
-        // Status 204/205/304 disallow a non-null body; the done handler
-        // coerces empty body strings to null before constructing Response.
-        const terminalHandler = WORKER_TERMINAL_STATUS_HANDLERS[fresh.status];
-        if (terminalHandler) return terminalHandler({ fresh, jobId: job._id });
-        await sleep(pollIntervalMs);
-      }
-
-      const finalJob = await ScrapeJob.findById(job._id).lean();
-      const finalStatus = finalJob?.status || 'missing';
-      let cancellationFailure = '';
+      let finalStatus;
       try {
-        await ScrapeJob.updateOne(
-          { _id: job._id, status: { $in: ['pending', 'in_progress'] } },
-          {
-            $set: {
-              status: 'cancelled',
-              completedAt: new Date(),
-              error: `Bot stopped waiting after ${timeoutMs}ms`,
-            },
-          },
-        );
+        signal?.throwIfAborted();
+        while (now() < deadline) {
+          const fresh = await ScrapeJob.findById(job._id).lean();
+          signal?.throwIfAborted();
+          if (!fresh) {
+            throw new Error(
+              `Worker job ${job._id} disappeared (TTL expired or manually deleted).`
+            );
+          }
+          // Status 204/205/304 disallow a non-null body; the done handler
+          // coerces empty body strings to null before constructing Response.
+          const terminalHandler = WORKER_TERMINAL_STATUS_HANDLERS[fresh.status];
+          if (terminalHandler) return terminalHandler({ fresh, jobId: job._id });
+          await sleep(pollIntervalMs, undefined, { signal });
+        }
+
+        const finalJob = await ScrapeJob.findById(job._id).lean();
+        signal?.throwIfAborted();
+        finalStatus = finalJob?.status || 'missing';
       } catch (err) {
-        cancellationFailure = `; cancellation failed: ${err?.message || String(err)}`;
+        if (!signal?.aborted) throw err;
+        const cancellationFailure = await cancelJob(
+          job._id,
+          `Caller stopped waiting: ${signal.reason?.message || String(signal.reason)}`,
+        );
+        if (cancellationFailure) console.warn(`[worker-client] job ${job._id}${cancellationFailure}`);
+        throw signal.reason;
       }
 
+      const cancellationFailure = await cancelJob(job._id, `Bot stopped waiting after ${timeoutMs}ms`);
       throw new Error(
         `Worker fetch timed out after ${timeoutMs}ms (job ${job._id} still ${finalStatus})${cancellationFailure}.`
       );

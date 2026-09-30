@@ -99,6 +99,7 @@ test('approval promotes scope and appends requested alts without replacing newer
       $set: { scope: 'global', guildId: '' },
       $addToSet: { allCharacters: { $each: ['Newalt'] } },
     });
+    return { acknowledged: true, matchedCount: 1, modifiedCount: 1 };
   });
   t.mock.method(PendingApproval, 'deleteOne', async () => { events.push('close'); });
   await handleApprovedEditRequest({
@@ -119,3 +120,31 @@ test('approval promotes scope and appends requested alts without replacing newer
   assert.deepEqual(events, ['write', 'close', 'reply', 'notify']);
   assert.deepEqual(buildApprovalMoveData(payload, entry).allCharacters, ['Existingalt', 'Concurrentalt', 'Newalt']);
 });
+
+for (const matchedCount of [0, 1]) {
+  test(`approved edit reports success only for a matched entry (matched=${matchedCount})`, async t => {
+    const entry = { _id: 'a'.repeat(24), name: 'Alpha', reason: 'Old', scope: 'global', allCharacters: [] };
+    t.mock.method(Blacklist, 'findById', async () => entry);
+    t.mock.method(Blacklist, 'updateOne', async () => ({ acknowledged: true, matchedCount, modifiedCount: 0 }));
+    const replies = [], broadcasts = [], notices = [];
+    let completed = 0;
+    await handleApprovedEditRequest({
+      payload: { existingEntryId: entry._id, name: entry.name, type: 'black', currentType: 'black', reason: 'New' },
+      requestId: 'request', lang: 'en',
+      interaction: {
+        deferred: true, user: { id: 'officer', username: 'Officer' }, message: { id: 'dm' },
+        client: { guilds: { cache: new Map() } }, editReply: async reply => replies.push(reply),
+      },
+      completeApproval: async () => { completed++; },
+      syncApproverDmMessages: async () => {},
+      broadcastListChange: async (...args) => broadcasts.push(args),
+      notifyRequesterAboutDecision: async (_payload, notice) => notices.push(notice),
+    });
+    assert.equal(completed, 1);
+    assert.equal(broadcasts.length, matchedCount);
+    assert.equal(notices.length, matchedCount);
+    if (matchedCount) assert.equal(notices[0].ok, true);
+    assert.match(replies[0].embeds[0].toJSON().title, matchedCount ? /Approved/ : /original entry is gone/);
+    if (!matchedCount) assert.match(JSON.stringify(replies[0].components), /Failed/);
+  });
+}
