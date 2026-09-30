@@ -21,6 +21,25 @@ export async function mapWithConcurrency(items, concurrency, worker) {
 }
 
 /**
+ * Log a listener's rejection instead of letting it escape. EventEmitter
+ * ignores the promise an async listener returns, and process-lifecycle exits
+ * the bot on any unhandled rejection, such as a component collector's
+ * deferReply failing with Discord's "Unknown interaction".
+ * @param {string} label log tag
+ * @param {(...args: unknown[]) => Promise<void>} listener
+ * @returns {(...args: unknown[]) => Promise<void>} a listener that never rejects
+ */
+export function catchListenerErrors(label, listener) {
+  return async (...args) => {
+    try {
+      await listener(...args);
+    } catch (err) {
+      console.warn(`[${label}] Listener failed:`, err?.message || err);
+    }
+  };
+}
+
+/**
  * Coalesce overlapping update requests into the fewest possible async runs.
  * A request arriving during a run schedules one follow-up against the latest
  * state instead of racing an older render into the message afterwards.

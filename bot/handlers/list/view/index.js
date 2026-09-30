@@ -9,7 +9,7 @@ import config from '../../../config.js';
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { createLatestOnlyQueue } from '../../../utils/async.js';
+import { catchListenerErrors, createLatestOnlyQueue } from '../../../utils/async.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
@@ -280,7 +280,7 @@ export function createViewHandlers({
         : await interaction.fetchReply();
       const collector = reply.createMessageComponentCollector({ time: 300000 });
 
-      collector.on('collect', async (componentInteraction) => {
+      collector.on('collect', catchListenerErrors('list-view', async (componentInteraction) => {
         if (componentInteraction.user.id !== interaction.user.id) {
           const clickerLang = await getLanguage(componentInteraction.user.id, { UserPreferenceModel: UserPreference });
           await replyAlert(componentInteraction, {
@@ -346,7 +346,7 @@ export function createViewHandlers({
             });
           }
         }
-      });
+      }));
 
       collector.on('end', async () => {
         collectorEnded = true;

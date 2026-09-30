@@ -48,6 +48,28 @@ for (const revoked of [true, false]) {
   });
 }
 
+test('list-view collector survives a button Discord has already expired', async t => {
+  t.mock.method(console, 'warn', () => {});
+  let collect;
+  const handler = createViewHandlers({
+    client: {}, connectDatabase: async () => {}, getLanguage: async () => 'en',
+    loadStatMap: async () => new Map(),
+    loadEntries: async () => [{ _id: 'a'.repeat(24), name: 'Original', reason: 'Initial report', _listType: 'black', _icon: '⛔', _color: 0xed4245 }],
+  }).handleListViewCommand;
+  await handler({
+    user: { id: 'viewer' }, guild: { id: 'guild' }, options: { getString: key => key === 'type' ? 'black' : null },
+    deferReply: async () => {}, editReply: async () => ({
+      createMessageComponentCollector: () => ({ on: (event, callback) => { if (event === 'collect') collect = callback; } }),
+    }),
+  });
+
+  // A rejection here reaches process-lifecycle, which exits the bot.
+  await assert.doesNotReject(collect({
+    customId: 'listview_next', user: { id: 'viewer' },
+    deferUpdate: async () => { throw Object.assign(new Error('Unknown interaction'), { code: 10062 }); },
+  }));
+});
+
 test('blacklist view scope query uses the first matching policy rule', () => {
   assert.deepEqual(
     buildBlacklistViewQuery({ isOwnerGuild: true, scopeFilter: 'all', viewGuildId: 'g1' }),

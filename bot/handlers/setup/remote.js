@@ -7,6 +7,7 @@ import GuildConfig from '../../models/GuildConfig.js';
 import UserPreference from '../../models/UserPreference.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
 import { COLORS, relativeTime } from '../../utils/ui.js';
+import { catchListenerErrors } from '../../utils/async.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
 import {
   deferEphemeralReply,
@@ -152,7 +153,7 @@ async function handleViewAction(interaction, lang) {
   if (totalPages <= 1) return;
 
   const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120_000 });
-  collector.on('collect', async (buttonInteraction) => {
+  collector.on('collect', catchListenerErrors('la-remote', async (buttonInteraction) => {
     if (buttonInteraction.user.id !== interaction.user.id) {
       const clickerLang = await getUserLanguage(buttonInteraction.user.id, { UserPreferenceModel: UserPreference });
       await replyAlert(buttonInteraction, {
@@ -168,7 +169,7 @@ async function handleViewAction(interaction, lang) {
       embeds: buildPage(currentPage),
       components: buildRemoteNavigation(currentPage, totalPages, lang),
     });
-  });
+  }));
   collector.on('end', () => editPayload(interaction, { components: [] }).catch(() => {}));
 }
 

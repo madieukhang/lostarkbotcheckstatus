@@ -7,6 +7,7 @@ process.env.CHANNEL_ID = 'test';
 process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
 
 const {
+  attachSearchDetailCollector,
   getSearchDetailResults,
   buildSearchDetailComponents,
   createSearchDetailSelectHandler,
@@ -159,6 +160,26 @@ test('search detail actions reject another user or a malformed result index befo
     assert.equal(reads, 0);
     assert.equal(selected.calls.at(-1).kind, userId === 'owner' ? 'edit' : 'reply');
   }
+});
+
+test('search detail collector survives a selection Discord has already expired', async t => {
+  t.mock.method(console, 'warn', () => {});
+  let collect;
+  await attachSearchDetailCollector({
+    interaction: {
+      user: { id: 'owner' },
+      fetchReply: async () => ({
+        createMessageComponentCollector: () => ({ on: (event, callback) => { if (event === 'collect') collect = callback; } }),
+      }),
+    },
+    detailResults: getSearchDetailResults([{ name: 'Hailúa', watch: entry }]),
+  });
+  const expired = {
+    ...makeInteraction(),
+    deferReply: async () => { throw Object.assign(new Error('Unknown interaction'), { code: 10062 }); },
+  };
+  // A rejection here reaches process-lifecycle, which exits the bot.
+  await assert.doesNotReject(collect(expired));
 });
 
 test('search detail actions show a removed-entry notice instead of a stale report', async () => {

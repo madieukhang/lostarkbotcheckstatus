@@ -10,6 +10,7 @@ import { deferReply, editAlert, editEmbed, editNotice, editPayload, replyAlert }
 import { buildScopedListQuery } from '../../utils/scope.js';
 import { resetSelectMenu } from '../../utils/selectMenu.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
+import { catchListenerErrors } from '../../utils/async.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { decorateListEntry, getListContext, isOfficerOrSenior } from '../list/helpers.js';
@@ -157,7 +158,7 @@ export async function attachSearchDetailCollector({ interaction, detailResults, 
     componentType: ComponentType.StringSelect,
     time: 300000,
   });
-  collector.on('collect', createSearchDetailSelectHandler({ interaction, detailResults, lang }));
+  collector.on('collect', catchListenerErrors('search', createSearchDetailSelectHandler({ interaction, detailResults, lang })));
   collector.on('end', async () => {
     await editPayload(interaction, { components: [] }).catch(() => {});
   });
