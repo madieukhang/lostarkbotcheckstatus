@@ -241,11 +241,21 @@ export default {
     footer: 'Các nút Duyệt / Từ chối ở bên dưới · luồng duyệt của LoaLogs',
     bulk: { title: 'Duyệt thêm hàng loạt · {count} dòng', outcome: 'Phân loại: {breakdown}', reviewing: 'Đang duyệt **{count}** entry.', local: 'nội bộ', more: '... và {count} dòng khác' },
     public: {
-      rejected: '<@{user}> Yêu cầu {action} **{name}** của cậu đã bị officer từ chối.',
-      duplicate: '<@{user}> Yêu cầu {action} **{name}** của cậu không được áp dụng.\n**Lý do:** Trùng với entry đã có trong danh sách. Officer đã chọn giữ entry hiện tại.',
-      failed: '<@{user}> Bot chưa thể hoàn tất yêu cầu {action} **{name}** dù officer đã duyệt.\nNhờ officer kiểm tra lại trước khi gửi lại nhé.',
-      approved: '<@{user}> Yêu cầu {action} **{name}** của cậu đã được duyệt.',
-      add: 'thêm', edit: 'chỉnh sửa',
+      title: '{list} · {decision} · {name}',
+      decisions: { approved: 'Đã duyệt', rejected: 'Bị từ chối', duplicate: 'Không áp dụng', failed: 'Chưa lưu được' },
+      add: {
+        approved: 'Yêu cầu thêm {name} vào **{list}**{scope} của cậu đã được duyệt và lưu.',
+        rejected: 'Yêu cầu thêm {name} vào **{list}**{scope} của cậu bị từ chối, nên chưa có gì được lưu.',
+        duplicate: 'Yêu cầu thêm {name} vào **{list}**{scope} của cậu không được áp dụng: character này đã có trong list, và người duyệt giữ entry hiện tại.',
+        failed: 'Yêu cầu thêm {name} vào **{list}**{scope} của cậu đã được duyệt, nhưng tớ chưa lưu được. Cậu nhờ officer kiểm tra trước khi gửi lại nhé.',
+      },
+      edit: {
+        approved: 'Yêu cầu sửa {name} trong **{list}**{scope} của cậu đã được duyệt và lưu.',
+        rejected: 'Yêu cầu sửa {name} trong **{list}**{scope} của cậu bị từ chối, nên chưa có gì thay đổi.',
+        duplicate: 'Yêu cầu sửa {name} trong **{list}**{scope} của cậu không được áp dụng: character này đã có trong list, và người duyệt giữ entry hiện tại.',
+        failed: 'Yêu cầu sửa {name} trong **{list}**{scope} của cậu đã được duyệt, nhưng tớ chưa lưu được. Cậu nhờ officer kiểm tra trước khi gửi lại nhé.',
+      },
+      rejectedFooter: '💬 Muốn biết lý do thì cậu hỏi officer nhé.',
     },
     flow: {
       retry: 'Thử lại quyết định này',

@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApprovalServices } from '../bot/handlers/list/services/approvals.js';
+import { t } from '../bot/services/i18n/index.js';
 import { COLORS } from '../bot/utils/ui.js';
 
 const words = {
-  en: { duplicate: /matching entry already exists/i, kept: /keep the existing entry/i, failed: /could not complete/i, rejected: /rejected by an officer/i, approved: /was approved/i },
-  vi: { duplicate: /trùng với entry đã có/i, kept: /giữ entry hiện tại/i, failed: /chưa thể hoàn tất/i, rejected: /officer từ chối/i, approved: /đã được duyệt/i },
-  jp: { duplicate: /既存の entry と重複/, kept: /既存の entry を残す/, failed: /処理を完了できませんでした/, rejected: /officer に却下/, approved: /承認されました/ },
+  en: { duplicate: /already listed/i, kept: /kept the existing entry/i, failed: /could not save it/i, rejected: /was rejected/i, approved: /was approved and saved/i },
+  vi: { duplicate: /đã có trong list/i, kept: /giữ entry hiện tại/i, failed: /chưa lưu được/i, rejected: /bị từ chối/i, approved: /đã được duyệt và lưu/i },
+  jp: { duplicate: /すでに list にあり/, kept: /既存の entry を残しました/, failed: /保存できませんでした/, rejected: /却下されました/, approved: /承認され、保存されました/ },
 };
 
 function harness(lang, { missingOriginal = false } = {}) {
@@ -29,6 +30,7 @@ function harness(lang, { missingOriginal = false } = {}) {
   const payload = {
     guildId: 'guild', channelId: 'channel', requestMessageId: 'request',
     requestedByUserId: 'requester', action: 'add', name: 'Samplechar',
+    type: 'black', scope: 'global', raid: 'Kazeros Hard',
     reason: 'Private report content must not become a rejection reason',
   };
   return { service, payload, replies, sends };
@@ -59,7 +61,16 @@ for (const lang of Object.keys(words)) {
       assert.equal(notice.content, '<@requester>');
       assert.deepEqual(notice.components, []);
       const color = state === 'approved' ? COLORS.success : state === 'rejected' ? COLORS.danger : COLORS.warning;
-      assert.equal(notice.embeds[0].toJSON().color, color);
+      const embed = notice.embeds[0].toJSON();
+      assert.equal(embed.color, color);
+      // The card reads like the /la-list add card: List · Decision · Name,
+      // then the list, raid and scope the request asked for.
+      assert.match(embed.title, new RegExp(`Blacklist · ${t(`dialogue.approval.public.decisions.${state}`, lang)} · Samplechar$`));
+      assert.deepEqual(
+        embed.fields.slice(0, 3).map((field) => field.value),
+        ['⛔ Blacklist', '`Kazeros Hard`', t('dialogue.approval.scopeTag.global', lang)],
+      );
+      assert.doesNotMatch(JSON.stringify(embed.fields), /Private report content/);
     });
   }
 }

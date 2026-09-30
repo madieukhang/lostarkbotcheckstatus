@@ -12,6 +12,9 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Changed
+- The notice a requester gets when their list add or edit is decided reads like the `/la-list add` card: `Blacklist · Approved · Name`, one line saying what happened, then the list, raid and scope the request asked for. It no longer says "an officer" decided, since approvers are seniors. The report's reason stays off this public card.
+
 ### Fixed
 - Screenshot OCR runs one job at a time across `/la-check` and auto-check. Checks of different images used to download, encode and send to Gemini in parallel, and nine 12 MiB screenshots at once pushed the process past 512 MiB. A queued job waits before downloading anything, and the OCR timing log now reports the wait as `queue=`.
 - A click on the `/la-search` details menu, the `/la-list view` controls or the `/la-remote` pages that Discord had already expired no longer shuts the bot down. Their collectors log the failed acknowledgement instead of leaving an unhandled rejection, which the process treats as fatal.

@@ -20,8 +20,10 @@ import {
   getSeniorApproverIds,
   listTypeIcon,
 } from '../helpers.js';
+import { buildListEntryInlineFields, formatListScopeTag } from '../entryCardFields.js';
+import { formatLinkedCharacter } from '../trackedAltsRender.js';
 import { COLORS } from '../../../utils/ui.js';
-import { AlertSeverity, buildNoticeEmbed } from '../../../utils/alertEmbed.js';
+import { AlertSeverity, buildAlertEmbed } from '../../../utils/alertEmbed.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
@@ -40,6 +42,50 @@ export function createApprovalMessageUpdater({ interaction, payload, lang, syncA
       excludeMessageId: interaction.message.id,
     });
   };
+}
+
+const DECISION_SEVERITY = Object.freeze({
+  approved: AlertSeverity.SUCCESS,
+  rejected: AlertSeverity.ERROR,
+  duplicate: AlertSeverity.WARNING,
+  failed: AlertSeverity.WARNING,
+});
+
+/**
+ * Build the requester's decision card in the /la-list add card grammar:
+ * `List · Decision · Name`, one hero line, then list, raid and scope. The
+ * report's reason stays off it because the card is posted in a public
+ * channel.
+ * @param {object} payload - the pending add or edit request
+ * @param {'approved'|'rejected'|'duplicate'|'failed'} decision - the outcome
+ * @param {string} lang - guild language
+ * @returns {import('discord.js').EmbedBuilder} the decision card
+ */
+function buildDecisionEmbed(payload, decision, lang) {
+  const labelCap = t(`dialogue.broadcast.list.${payload.type}`, lang);
+  return buildAlertEmbed({
+    severity: DECISION_SEVERITY[decision],
+    title: t('dialogue.approval.public.title', lang, {
+      list: labelCap,
+      decision: t(`dialogue.approval.public.decisions.${decision}`, lang),
+      name: payload.name,
+    }),
+    description: t(`dialogue.approval.public.${payload.action === 'edit' ? 'edit' : 'add'}.${decision}`, lang, {
+      name: formatLinkedCharacter(payload.name, null),
+      list: labelCap,
+      scope: formatListScopeTag(payload.type, payload.scope, lang),
+    }),
+    fields: buildListEntryInlineFields({
+      type: payload.type,
+      raid: payload.raid,
+      scope: payload.scope,
+      entry: { name: payload.name },
+      icon: listTypeIcon(payload.type),
+      labelCap,
+      lang,
+    }),
+    footer: decision === 'rejected' ? t('dialogue.approval.public.rejectedFooter', lang) : undefined,
+  });
 }
 
 /**
@@ -266,34 +312,16 @@ export function createApprovalServices({
       if (!channel || !channel.isTextBased()) return;
 
       const lang = await getGuildLanguageFn(guild.id, { GuildConfigModel });
-      const actionLabel = t(`dialogue.approval.public.${payload.action === 'edit' ? 'edit' : 'add'}`, lang);
       const decision = rejected
         ? (result?.isDuplicate ? 'duplicate' : 'rejected')
         : (result?.ok === false ? 'failed' : 'approved');
-      const severity = {
-        approved: AlertSeverity.SUCCESS,
-        rejected: AlertSeverity.ERROR,
-        duplicate: AlertSeverity.WARNING,
-        failed: AlertSeverity.WARNING,
-      }[decision];
-      const decisionContent = t(`dialogue.approval.public.${decision}`, lang, {
-        user: payload.requestedByUserId,
-        action: actionLabel,
-        name: payload.name,
-      });
 
       const decisionPayload = {
         // Keep only the ping outside the card; all readable copy belongs to
         // the guild-language embed so the requester still gets notified.
         content: `<@${payload.requestedByUserId}>`,
         allowedMentions: { users: [payload.requestedByUserId] },
-        embeds: [buildNoticeEmbed(
-          decisionContent.replace(`<@${payload.requestedByUserId}>`, '').trim(),
-          {
-            severity,
-            lang,
-          }
-        )],
+        embeds: [buildDecisionEmbed(payload, decision, lang)],
         components: [],
       };
 

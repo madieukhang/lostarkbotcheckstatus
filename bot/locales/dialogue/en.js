@@ -325,11 +325,21 @@ export default {
       more: '... and {count} more rows',
     },
     public: {
-      rejected: '<@{user}> Your list {action} request for **{name}** was rejected by an officer.',
-      duplicate: '<@{user}> Your list {action} request for **{name}** was not applied.\n**Reason:** A matching entry already exists. An officer chose to keep the existing entry.',
-      failed: '<@{user}> The bot could not complete your list {action} request for **{name}** after officer approval.\nPlease ask an officer to check before submitting it again.',
-      approved: '<@{user}> Your list {action} request for **{name}** was approved.',
-      add: 'add', edit: 'edit',
+      title: '{list} · {decision} · {name}',
+      decisions: { approved: 'Approved', rejected: 'Rejected', duplicate: 'Not applied', failed: 'Not saved' },
+      add: {
+        approved: 'Your request to add {name} to the **{list}**{scope} was approved and saved.',
+        rejected: 'Your request to add {name} to the **{list}**{scope} was rejected, so nothing was saved.',
+        duplicate: 'Your request to add {name} to the **{list}**{scope} was not applied: that character is already listed, and the approver kept the existing entry.',
+        failed: 'Your request to add {name} to the **{list}**{scope} was approved, but I could not save it. Ask an officer to check before you submit it again.',
+      },
+      edit: {
+        approved: 'Your request to edit {name} on the **{list}**{scope} was approved and saved.',
+        rejected: 'Your request to edit {name} on the **{list}**{scope} was rejected, so nothing changed.',
+        duplicate: 'Your request to edit {name} on the **{list}**{scope} was not applied: that character is already listed, and the approver kept the existing entry.',
+        failed: 'Your request to edit {name} on the **{list}**{scope} was approved, but I could not save it. Ask an officer to check before you submit it again.',
+      },
+      rejectedFooter: '💬 Ask an officer if you want to know why.',
     },
     flow: {
       retry: 'Retry this decision',

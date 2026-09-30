@@ -211,27 +211,20 @@ test('approval result posted in a guild channel uses guild-global language', asy
     requestedByUserId: 'requester-1',
     action: 'add',
     name: 'Artist',
+    type: 'white',
   };
 
   await services.notifyRequesterAboutDecision(payload, {}, false);
 
   assert.equal(sent.length, 1);
-  const localizedCopy = t('dialogue.approval.public.approved', 'vi', {
-    user: payload.requestedByUserId,
-    action: t('dialogue.approval.public.add', 'vi'),
-    name: payload.name,
-  });
   assert.equal(sent[0].content, `<@${payload.requestedByUserId}>`);
   assert.deepEqual(sent[0].allowedMentions, { users: [payload.requestedByUserId] });
   assert.equal(sent[0].embeds.length, 1);
-  assert.ok(
-    sent[0].embeds[0].toJSON().title.includes(
-      // Embed titles render no markdown, so buildNoticeEmbed strips the
-      // emphasis when it promotes the first line into the title.
-      localizedCopy
-        .replace(`<@${payload.requestedByUserId}>`, '')
-        .replace(/\*\*/g, '')
-        .trim()
-    )
-  );
+  const embed = sent[0].embeds[0].toJSON();
+  assert.ok(embed.title.endsWith(t('dialogue.approval.public.title', 'vi', {
+    list: t('dialogue.broadcast.list.white', 'vi'),
+    decision: t('dialogue.approval.public.decisions.approved', 'vi'),
+    name: payload.name,
+  })));
+  assert.match(embed.description, /đã được duyệt và lưu/);
 });
