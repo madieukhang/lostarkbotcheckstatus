@@ -191,7 +191,10 @@ export async function refreshImageUrl(messageId, channelId, client) {
     const channel = await client.channels.fetch(channelId);
     if (!channel || !channel.isTextBased?.()) return null;
 
-    const message = await channel.messages.fetch(messageId);
+    // A cached message holds the URL signed when it was cached, which may
+    // have expired; only a REST fetch returns a newly signed one. The result
+    // stays out of the cache because the next refresh fetches again anyway.
+    const message = await channel.messages.fetch({ message: messageId, force: true, cache: false });
     const attachment = message.attachments?.first();
     return attachment?.url || null;
   } catch (err) {

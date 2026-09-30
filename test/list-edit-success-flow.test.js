@@ -44,7 +44,7 @@ for (const isMove of [false, true]) {
     const fetched = [];
     const client = { channels: { fetch: async channelId => {
       assert.equal(channelId, 'archive');
-      return { isTextBased: () => true, messages: { fetch: async messageId => {
+      return { isTextBased: () => true, messages: { fetch: async ({ message: messageId }) => {
         fetched.push(messageId);
         return { attachments: { first: () => ({ url: `https://example.test/${messageId}.png` }) } };
       } } };
@@ -97,7 +97,7 @@ for (const isMove of [false, true]) {
     }
     t.mock.method(RosterSnapshot, 'find', () => ({ collation() { return this; }, lean: async () => [] }));
     const client = { channels: { fetch: async () => ({ isTextBased: () => true, messages: {
-      fetch: async messageId => ({ attachments: { first: () => ({ url: `https://example.test/${messageId}.png` }) } }),
+      fetch: async ({ message: messageId }) => ({ attachments: { first: () => ({ url: `https://example.test/${messageId}.png` }) } }),
     } }) } };
     const broadcasts = [];
     await applyListEditNow({
