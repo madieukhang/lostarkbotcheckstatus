@@ -206,7 +206,7 @@ const en = {
       '**Blacklist** entries carry a scope:',
       '• 🌐 **Global** - shared with every server that uses me, so a name flagged elsewhere still shows up here.',
       '• 🔒 **Server** - visible only in this server.',
-      'Whitelist, watchlist and trusted are always **server-only**. The default scope for new blacklist entries here is set with `/la-setup config action:set-default-scope`.',
+      'Whitelist, watchlist and trusted entries are always **global**: every server that uses me sees them. The default scope for new blacklist entries here is set with `/la-setup config action:set-default-scope`.',
     ],
     cleanupName: '🧹 I tidy this channel once a day',
     cleanupValue: [
@@ -546,9 +546,9 @@ const en = {
 
   quickAdd: {
     selectPlaceholder: '⚡ Quick Add to List · select a name',
-    noListHit: 'No DB list hit',
+    noListHit: 'Not on any list',
     modalTitle: 'Quick Add · {name}',
-    typeLabel: 'Type (black / watch)',
+    typeLabel: 'List (black / white / watch)',
     typePlaceholder: 'black',
     reasonLabel: 'Reason',
     reasonPlaceholder: 'Why add this player?',

@@ -91,25 +91,25 @@ export default {
   cleanupNotice: {
     trivial: {
       variants: [
-        "Tidied up **{n}** message(s) here overnight. Pinned messages stayed put~",
+        "Tidied up **{n}** message(s) here. Pinned messages stayed put.",
         "Just **{n}** message(s) to clear this time - barely any work at all~",
         "Swept **{n}** message(s) while you were away. Nothing pinned was touched.",
-        "A light night: **{n}** message(s) cleared, pins untouched~",
+        "A light sweep: **{n}** message(s) cleared, pins untouched.",
       ],
     },
     normal: {
       variants: [
-        "Cleared **{n}** messages here overnight. Pinned messages stayed put~",
-        "The nightly sweep took **{n}** messages. Anything pinned is still here.",
-        "**{n}** messages tidied away while you were asleep~",
-        "Done for the night: **{n}** messages cleared, pins left alone.",
+        "Cleared **{n}** messages here. Pinned messages stayed put.",
+        "The daily sweep took **{n}** messages. Anything pinned is still here.",
+        "**{n}** messages tidied away~",
+        "Done for today: **{n}** messages cleared, pins left alone.",
       ],
     },
     heavy: {
       variants: [
-        "Busy night - **{n}** messages cleared. Pinned messages stayed put~",
+        "Busy day: **{n}** messages cleared. Pinned messages stayed put.",
         "That was a lot: **{n}** messages swept away. Nothing pinned was touched.",
-        "**{n}** messages tidied overnight. You lot were talkative~",
+        "**{n}** messages tidied. You lot were talkative~",
         "Worked overtime on this one - **{n}** messages cleared, pins left alone.",
       ],
     },
@@ -446,7 +446,7 @@ export default {
     duplicate: {
       title: 'Already in {list}', direct: '{icon} {name} is already on the **{list}**. Nothing new was saved.', roster: '{icon} {name} shares a roster with {matched}, who is already on the **{list}**. Nothing new was saved.',
       matchedName: 'Matched name', scope: 'Scope', addedBy: 'Added by', timeAdded: 'Time added', storedReason: 'Stored reason', typedReason: 'Reason you just typed', raid: 'Raid',
-      footer: 'Use `/la-list edit` to add your reason to this entry.', contentDirect: '{name} already exists in {list}.', contentRoster: '{name} already exists in {list} through roster match {matched}.',
+      footer: 'To change this entry, use /la-list edit. A new reason replaces the stored one.', contentDirect: '{name} already exists in {list}.', contentRoster: '{name} already exists in {list} through roster match {matched}.',
     },
     success: {
       title: '{list} · Added · {name}', hero: '**{user}** added {name} to **{list}**{scope}.',
@@ -509,13 +509,13 @@ export default {
     modes: { daily: 'Daily', analysis: 'Analysis' },
     malformed: 'I could not make sense of that evidence pick. Run the check again and I will start fresh.',
     entryRemoved: { title: 'That one is gone now', description: 'Someone removed the list entry this evidence belonged to, so there is nothing left for me to show you.' },
-    ocrFailed: { title: 'I could not read that image', description: 'I stared at this screenshot and could not pull a single character name out of it.', footer: 'A clearer shot of the raid waiting room usually does the trick.' },
+    ocrFailed: { title: 'I could not read that image', description: 'My image reader failed on this one, so no names were checked.', footer: 'Post the same screenshot again in a minute.' },
     noNames: { title: 'Nothing in there looked like a name', description: 'I read the image fine, but none of it looked like a character name.', footer: 'The raid waiting-room screen is the easiest one for me to read.' },
     noVerifiedNames: { title: 'No verified characters', description: 'I read {count} candidate name(s), but none matched lostark.bible, a saved roster snapshot, or a visible list record.', footer: 'Unverified OCR/text is hidden and cannot be offered through Quick Add.' },
     details: { title: 'Check result · {list}', headline: '{icon} {name} is on the **{list}**{scope}. Here is everything I have saved about them.' },
     text: {
       empty: { title: 'You forgot the name~', description: 'Type `check <character>` or `check: <character>` here and I will look them up for you.', footer: 'Several at once is fine - separate them with spaces, commas, or new lines.' },
-      invalid: { title: 'Those do not look like names', description: 'I could not read these as Lost Ark character names: {tokens}', footer: 'Character names only after `check`, please - I skip links and mentions.' },
+      invalid: { title: 'Those do not look like names', description: 'I could not read these as Lost Ark character names: {tokens}', footer: 'Send only character names after "check". A link, mention or other word stops the whole check.' },
       progress: {
       variants: [
           'Received **{count}** {word} · checking the database lists…',
@@ -536,11 +536,11 @@ export default {
     failed: { title: 'The check did not finish', description: 'I got the names off the image, but I could not finish checking them against the lists.' },
     autoFailed: { title: 'I could not finish that check', description: 'Something went wrong partway through this one. Post it again and I will have another go.' },
     embed: {
-      imageAuthor: 'Here is the list from the image you sent.', textAuthor: 'Here is the check based on the name you sent.', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: 'not listed', configured: 'configured', ignored: 'Ignored {count} extra {word} (cap: {limit}).', unverified: 'Skipped {count} unverified candidate(s); Quick Add was disabled for them.',
+      imageAuthor: 'Here is what I found in your screenshot check.', textAuthor: 'Here is what I found for the names you sent.', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: 'not listed', configured: 'configured', ignored: 'Ignored {count} extra {word} (cap: {limit}).', unverified: 'Skipped {count} unverified candidate(s); Quick Add was disabled for them.',
       flagged: 'FLAGGED {count}', clear: 'CLEAR', elapsed: '⏱️ TOOK {seconds}s', elapsedQuick: { variants: [
-        '⏱️ Read in {seconds}s. That screenshot was nice and sharp.',
-        '⏱️ Only {seconds}s. Clean capture, easy read.',
         '⏱️ Done in {seconds}s.',
+        '⏱️ Only {seconds}s.',
+        '⏱️ {seconds}s, a quick one.',
       ] }, elapsedSteady: { variants: [
         '⏱️ Took {seconds}s to be sure of these.',
         '⏱️ {seconds}s, cross-checked every name.',
@@ -551,7 +551,7 @@ export default {
         '⏱️ A long {seconds}s, but nothing was guessed.',
       ] }, correctedOcr: 'OCR corrected {count} · compare with the screenshot', correctedText: 'Typed name corrected {count} · compare with the original input', quickFlagged: 'Quick Add unflagged via the dropdown · /la-roster <name> for details', quickClean: 'Quick Add unflagged names with the dropdown below', rosterTip: '/la-roster <name> for the full roster of a flagged hit', rerunTip: 'Run again with a fresh image to re-check', source: 'SRC db blacklist + whitelist + watchlist + trusted',
     },
-    format: { via: 'via **{name}**', correctedOcr: 'OCR **{input}** → lostark.bible **{name}**', correctedText: 'typed **{input}** → lostark.bible **{name}**', rosterVia: 'roster alt **{name}**', rosterEntry: 'roster alt **{name}** → entry **{entry}**', alts: 'alts', more: '+{count} more', local: 'Local', trusted: 'trusted' },
+    format: { via: 'via **{name}**', correctedOcr: 'read as **{input}**, matched to **{name}**', correctedText: 'typed as **{input}**, matched to **{name}**', rosterVia: 'same roster as **{name}**', rosterEntry: 'same roster as **{name}**, listed under **{entry}**', alts: 'alts', more: '+{count} more', local: 'Local', trusted: 'trusted' },
   },
   scan: {
     limit: { title: 'A scan is already running', description: 'You already have a Stronghold scan running. Wait for it, or press **Stop scan** on its active card.', active: 'Active: {label}' },

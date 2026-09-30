@@ -73,7 +73,7 @@ test('unmatched OCR names render as not listed instead of roster lookup status',
   });
 
   const rendered = embed.toJSON();
-  assert.equal(rendered.author.name, '🔎 Here is the check based on the name you sent.');
+  assert.equal(rendered.author.name, '🔎 Here is what I found for the names you sent.');
   assert.equal(rendered.title, undefined);
   assert.equal(rendered.footer, undefined);
   assert.equal(rendered.timestamp, undefined);

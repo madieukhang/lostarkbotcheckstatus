@@ -747,7 +747,7 @@ test('party-level context corrects unmarked exact OCR when marked sibling fits t
     assert.equal(corrected.matchDetails.white, null);
     assert.equal(corrected.matchDetails.watch, null);
     assert.match(lines.join('\n'), /Cr\u00fcelfighter/);
-    assert.match(lines.join('\n'), /OCR \*\*Cruelfighter\*\*.*Cr\u00fcelfighter/);
+    assert.match(lines.join('\n'), /read as \*\*Cruelfighter\*\*.*Cr\u00fcelfighter/);
     assert.doesNotMatch(lines.join('\n'), /Cruelfighter · `1640\.00`/);
   } finally {
     globalThis.fetch = originalFetch;
@@ -937,7 +937,7 @@ test('visual-substitution recovery resolves y read as q (Qiqlyn -> Qiylyn)', asy
     assert.equal(results[0].trustedEntry?.name, 'Qiylyn');
     assert.match(lines.join('\n'), /Qiylyn/);
     assert.doesNotMatch(lines[0].split('\n')[0], /Qiqlyn/);
-    assert.match(lines[0], /OCR \*\*Qiqlyn\*\*.*Qiylyn/);
+    assert.match(lines[0], /read as \*\*Qiqlyn\*\*.*Qiylyn/);
   } finally {
     stub.restore();
   }
@@ -1184,7 +1184,7 @@ test('worker-online enrichment falls back to bible search canonical names', asyn
     assert.equal(results[0].identityVerificationSource, 'bible-search');
     assert.match(lines[0], /Qyoir/);
     assert.doesNotMatch(lines[0].split('\n')[0], /Qy\u00F6ir/);
-    assert.match(lines[0], /OCR \*\*Qy\u00F6ir\*\*.*Qyoir/);
+    assert.match(lines[0], /read as \*\*Qy\u00F6ir\*\*.*Qyoir/);
     assert.equal(stub.counts.rosterCalls, 1);
     assert.equal(stub.counts.searchCalls, 1);
 
@@ -1347,7 +1347,7 @@ test('worker-online canonicalization repairs short i/l look-alike names', async 
     assert.equal(results[0].snapItemLevel, 1741.67);
     assert.match(lines[0], /Qyoir/);
     assert.doesNotMatch(lines[0].split('\n')[0], /Qyolr/);
-    assert.match(lines[0], /OCR \*\*Qyolr\*\*.*Qyoir/);
+    assert.match(lines[0], /read as \*\*Qyolr\*\*.*Qyoir/);
     assert.equal(stub.counts.rosterCalls, 1);
     assert.equal(stub.counts.searchCalls, 1);
   } finally {

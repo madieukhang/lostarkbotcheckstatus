@@ -65,7 +65,7 @@ test('formatCheckResults does not add a via line for a direct list hit', () => {
     line,
     /\n   ↳ \*A deliberately long report remains beside its raid\* · `Act 4 Hard`$/u,
   );
-  assert.doesNotMatch(line, /\n   ↳ (?:via|roster alt) /u);
+  assert.doesNotMatch(line, /\n   ↳ (?:via|same roster as) /u);
 });
 
 test('formatCheckResults omits via characters from the alt preview and overflow count', () => {
@@ -175,8 +175,8 @@ test('formatCheckResults shows OCR correction and the roster path used to confir
     snapItemLevel: 1720,
   }]);
 
-  assert.match(lines[0], /OCR \*\*Altchxr\*\* → lostark\.bible \*\*Altchar\*\*/);
-  assert.match(lines[0], /roster alt \*\*\[Rosteralt\]\(\S+\)\*\* → entry \*\*\[Mainchar\]\(\S+\)\*\*/);
+  assert.match(lines[0], /read as \*\*Altchxr\*\*, matched to \*\*Altchar\*\*/);
+  assert.match(lines[0], /same roster as \*\*\[Rosteralt\]\(\S+\)\*\*, listed under \*\*\[Mainchar\]\(\S+\)\*\*/);
 });
 
 test('formatCheckResults does not label a typed-name correction as OCR', () => {
@@ -188,8 +188,8 @@ test('formatCheckResults does not label a typed-name correction as OCR', () => {
     snapItemLevel: 0,
   }]);
 
-  assert.match(line, /typed \*\*Altchxr\*\* → lostark\.bible \*\*Altchar\*\*/);
-  assert.doesNotMatch(line, /OCR/);
+  assert.match(line, /typed as \*\*Altchxr\*\*, matched to \*\*Altchar\*\*/);
+  assert.doesNotMatch(line, /read as/);
 });
 
 test('formatCheckResults keeps list-state precedence without empty detail branches', () => {

@@ -317,7 +317,7 @@ export default {
     },
     itemLevel: { title: 'Item level が足りませんの', description: '**{name}** は list entry の最低 item level に届いていませんわ。', character: 'Character', itemLevel: 'Item level', minimum: '必要最低値', targetList: '対象 list', footer: 'Ilvl gate で inactive / undeveloped alt の noise を防ぎますの。', content: '{name} の item level は {level}、1700 未満ですわ。' },
     duplicate: {
-      title: '{list} に登録済みですの', direct: '{icon} {name} はすでに **{list}** にいますわ。何も追加していませんの。', roster: '{icon} {name} は {matched} と同じ roster で、この方はすでに **{list}** にいますの。何も追加していませんの。', matchedName: '一致名', scope: 'Scope', addedBy: '追加者', timeAdded: '追加日時', storedReason: '登録中の理由', typedReason: '今入力した理由', raid: 'Raid', footer: '`/la-list edit` で理由を追記できますの。', contentDirect: '{name} は {list} に登録済み。', contentRoster: '{name} は roster {matched} 経由で {list} に登録済み。',
+      title: '{list} に登録済みですの', direct: '{icon} {name} はすでに **{list}** にいますわ。何も追加していませんの。', roster: '{icon} {name} は {matched} と同じ roster で、この方はすでに **{list}** にいますの。何も追加していませんの。', matchedName: '一致名', scope: 'Scope', addedBy: '追加者', timeAdded: '追加日時', storedReason: '登録中の理由', typedReason: '今入力した理由', raid: 'Raid', footer: 'この entry を変えるなら /la-list edit を使ってくださいませ。新しい理由は保存中の理由を置き換えますの。', contentDirect: '{name} は {list} に登録済み。', contentRoster: '{name} は roster {matched} 経由で {list} に登録済み。',
     },
     success: {
       title: '{list} · 追加済み · {name}', hero: '**{user}** が {name} を **{list}**{scope} へ追加しましたわ。', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: '理由', trackedRosters: '追跡中の roster' }, evidence: 'スクリーンショットは下にありますわ · [元画像をダウンロード]({url})', sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: '{user} が追加 · {source}', officerFallback: 'officer', content: '追加承認: **{name}** を {list} へ追加しましたわ。',
@@ -361,9 +361,9 @@ export default {
     modeUnavailable: { title: '詳細分析は利用できません', description: '現在、有効な詳細分析モデルがありません。保存済みの設定は変更していません。' },
     modeProgress: 'モード: **{mode}**',
     modes: { daily: 'Daily', analysis: '詳細分析' },
-    malformed: 'どの証拠を選ばれたのか読み取れませんでしたの。もう一度 check を実行してくだされば、最初からやり直しますわ。', entryRemoved: { title: 'そちらはもう消えてしまいましたの', description: 'この証拠が結びついていた list entry は、どなたかが消してしまいましたの。もうお見せできるものが残っておりませんわ。' }, ocrFailed: { title: 'その画像を読めませんでしたの', description: 'この screenshot をじっと見つめてみましたけれど、character の名前をひとつも拾えませんでしたわ。', footer: 'raid の待機所を鮮明に写した screenshot なら、たいてい上手くいきますの〜' }, noNames: { title: '名前らしきものが見当たりませんの', description: '画像はきちんと読めましたけれど、character の名前らしきものはひとつもありませんでしたわ。', footer: 'raid の待機所の画面が、わたくしには一番読みやすいですの〜' }, noVerifiedNames: { title: '確認済み character がありませんの', description: '{count} 件の candidate を読み取りましたが、lostark.bible、保存済み roster snapshot、または表示可能な list record のどれにも一致しませんでしたわ。', footer: '未確認 OCR/text は表示せず、Quick Add にも出しませんの。' },
+    malformed: 'どの証拠を選ばれたのか読み取れませんでしたの。もう一度 check を実行してくだされば、最初からやり直しますわ。', entryRemoved: { title: 'そちらはもう消えてしまいましたの', description: 'この証拠が結びついていた list entry は、どなたかが消してしまいましたの。もうお見せできるものが残っておりませんわ。' }, ocrFailed: { title: 'その画像を読めませんでしたの', description: '画像の読み取りでエラーが起きたので、まだどの名前も check していませんの。', footer: '1分ほどしてから、同じ screenshot をもう一度送ってくださいませ。' }, noNames: { title: '名前らしきものが見当たりませんの', description: '画像はきちんと読めましたけれど、character の名前らしきものはひとつもありませんでしたわ。', footer: 'raid の待機所の画面が、わたくしには一番読みやすいですの〜' }, noVerifiedNames: { title: '確認済み character がありませんの', description: '{count} 件の candidate を読み取りましたが、lostark.bible、保存済み roster snapshot、または表示可能な list record のどれにも一致しませんでしたわ。', footer: '未確認 OCR/text は表示せず、Quick Add にも出しませんの。' },
     details: { title: 'チェック結果 · {list}', headline: '{icon} {name} は **{list}**{scope} にいますわ。控えてあることを、すべて下にまとめましたの。' },
-    text: { empty: { title: '肝心のお名前が抜けておりますわ〜', description: 'ここで `check <character>` か `check: <character>` と入力してくだされば、お調べいたしますわ〜', footer: '何名でもかまいませんの。スペース、カンマ、改行で区切ってくださいませ。' }, invalid: { title: 'そちらは名前には見えませんの', description: 'こちらは Lost Ark の character 名として読み取れませんでしたわ: {tokens}', footer: '`check` のあとは character 名だけにしてくださいませ。link と mention は読み飛ばしますの。' }, progress: {
+    text: { empty: { title: '肝心のお名前が抜けておりますわ〜', description: 'ここで `check <character>` か `check: <character>` と入力してくだされば、お調べいたしますわ〜', footer: '何名でもかまいませんの。スペース、カンマ、改行で区切ってくださいませ。' }, invalid: { title: 'そちらは名前には見えませんの', description: 'こちらは Lost Ark の character 名として読み取れませんでしたわ: {tokens}', footer: '"check" のあとは character 名だけを送ってくださいませ。link、mention、ほかの言葉があると check 全体が止まりますの。' }, progress: {
       variants: [
           '**{count}** {word}を受信 · database list を確認中ですの…',
           '**{count}** {word}を承りましたわ · list を照合中ですの…',
@@ -379,9 +379,9 @@ export default {
           'screenshot から **{count}** {word} · 確認しておりますわ…',
         ],
     }, imageQueued: '画像 check を順番待ちに入れましたわ · 前に **{count}** 件ございますの…', imageProgress: '画像を受け取りましたわ · **{current}/{count}** 枚目を読み取り中ですの…', imageCooldownWait: 'API error のため Gemini が cooldown 中ですの · **{seconds}秒** 後に画像 **{current}/{count}** を再試行いたしますわ…', imageIgnored: '一度に処理できるのは {limit} 枚までですので、あふれた **{count}** 枚は見送りましたわ。', partialImages: { title: '一部の画像を読み取れませんでしたの', description: 'OCR error のため **{failed}/{count}** 枚を見送りましたわ。上の結果は、読み取りに成功した画像だけを使っておりますの。', footer: '失敗した画像だけ、あとでもう一度お送りいただけますわ。' }, ignored: '一度にお預かりできるのは {limit} 名までですので、あふれた **{count}** 名は見送りましたわ。', nameOne: 'name', nameMany: 'names', failed: { title: '確認が最後まで終わりませんでしたの', description: '画像から名前は読み取れましたけれど、list との照合を最後まで終えられませんでしたわ。' }, autoFailed: { title: 'その確認を終えられませんでしたの', description: '途中でつまずいてしまいましたの。もう一度貼っていただければ、また見てみますわ。' },
-    embed: { imageAuthor: '送ってくれた画像から読み取ったリストだよ。', textAuthor: '送ってくれた名前をもとに確認したリストだよ。', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: '未登録', configured: 'configured', ignored: '上限 {limit} のため {count} {word}を除外しましたの。', unverified: '未確認 candidate {count} 件を除外し、Quick Add を無効にしましたの。', flagged: 'FLAGGED {count}', clear: 'CLEAR', elapsed: '⏱️ 解析 {seconds}s', elapsedQuick: { variants: [
-        '⏱️ {seconds}s で読めましたわ。綺麗な screenshot ですのね~',
-        '⏱️ たった {seconds}s ですの。撮り方がお上手ですわ。',
+    embed: { imageAuthor: '送ってくれた screenshot の check 結果ですわ。', textAuthor: '送ってくれた名前の check 結果ですわ。', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: '未登録', configured: 'configured', ignored: '上限 {limit} のため {count} {word}を除外しましたの。', unverified: '未確認 candidate {count} 件を除外し、Quick Add を無効にしましたの。', flagged: 'FLAGGED {count}', clear: 'CLEAR', elapsed: '⏱️ 解析 {seconds}s', elapsedQuick: { variants: [
+        '⏱️ {seconds}s で終わりましたわ。',
+        '⏱️ たった {seconds}s ですの。',
         '⏱️ {seconds}s で完了ですわ。',
       ] }, elapsedSteady: { variants: [
         '⏱️ 確実にするため {seconds}s いただきましたわ。',
@@ -392,7 +392,7 @@ export default {
         '⏱️ {seconds}s ですわ。当てずっぽうより、ゆっくり読む方を選びましたの。',
         '⏱️ 長い {seconds}s でしたが、推測は一つもしておりませんわ。',
       ] }, correctedOcr: 'OCR 補正 {count} 名 · screenshot と照合', correctedText: '入力名を {count} 名補正 · 元の入力と照合', quickFlagged: 'Dropdown で未登録名を Quick Add · /la-roster <name> で詳細', quickClean: '下の dropdown で未登録名を Quick Add', rosterTip: '/la-roster <name> で flagged hit の full roster', rerunTip: 'Fresh image で再実行してくださいませ', source: 'SRC db blacklist + whitelist + watchlist + trusted' },
-    format: { via: '**{name}** 経由', correctedOcr: 'OCR **{input}** → lostark.bible **{name}**', correctedText: '入力 **{input}** → lostark.bible **{name}**', rosterVia: 'roster alt **{name}**', rosterEntry: 'roster alt **{name}** → entry **{entry}**', alts: 'alts', more: '+{count} 名', local: 'サーバー内', trusted: 'trusted' },
+    format: { via: '**{name}** 経由', correctedOcr: '**{input}** と読み取り、**{name}** に一致', correctedText: '**{input}** と入力、**{name}** に一致', rosterVia: '**{name}** と同じ roster', rosterEntry: '**{name}** と同じ roster、**{entry}** として登録', alts: 'alts', more: '+{count} 名', local: 'サーバー内', trusted: 'trusted' },
   },
   scan: {
     limit: { title: 'Scan がすでに実行中ですの', description: 'Stronghold scan が実行中です。完了を待つか active card の **scan 停止** を押してくださいませ。', active: '実行中: {label}' }, progress: 'Stronghold scan 実行中 · {name}', resuming: 'Stronghold scan 再開 · {name}', guild: 'Guild **{guild}**', guildMembers: 'Guild **{guild}** ({count} members)', continuePass: 'Continue pass', visibleRoster: 'visible roster', hiddenRoster: 'hidden roster',

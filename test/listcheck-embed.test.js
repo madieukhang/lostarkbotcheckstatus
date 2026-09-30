@@ -18,7 +18,7 @@ test('auto text card uses the compact search author and omits redundant chrome',
     mode: 'auto',
   });
   const j = embed.toJSON();
-  assert.equal(j.author.name, '🔎 Here is the check based on the name you sent.');
+  assert.equal(j.author.name, '🔎 Here is what I found for the names you sent.');
   assert.equal(j.title, undefined);
   assert.equal(j.footer, undefined);
   assert.equal(j.timestamp, undefined);
@@ -76,7 +76,7 @@ test('OCR image card uses the compact camera author and omits redundant chrome',
 
   const rendered = embed.toJSON();
   assert.equal(counts.black, 1);
-  assert.equal(rendered.author.name, '📸 Danh sách chụp dựa trên ảnh cậu gửi nè.');
+  assert.equal(rendered.author.name, '📸 Đây là kết quả check từ ảnh cậu gửi.');
   assert.equal(rendered.title, undefined);
   assert.equal(rendered.footer, undefined);
   assert.equal(rendered.timestamp, undefined);
@@ -95,7 +95,7 @@ test('Vietnamese auto text card uses the compact name-based author', () => {
   });
 
   const rendered = embed.toJSON();
-  assert.equal(rendered.author.name, '🔎 Danh sách kiểm tra dựa trên tên cậu gửi nè.');
+  assert.equal(rendered.author.name, '🔎 Đây là kết quả check các tên cậu gửi.');
   assert.equal(rendered.title, undefined);
   assert.equal(rendered.footer, undefined);
   assert.equal(rendered.timestamp, undefined);

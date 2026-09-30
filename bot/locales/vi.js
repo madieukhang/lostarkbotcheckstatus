@@ -62,7 +62,7 @@ const vi = {
       'Mỗi entry **blacklist** mang một scope:',
       '• 🌐 **Global** - dùng chung với mọi server xài tớ, nên tên bị đánh dấu ở server khác vẫn hiện ở đây.',
       '• 🔒 **Server** - chỉ thấy trong server này.',
-      'Whitelist, watchlist và trusted thì luôn **chỉ trong server**. Scope mặc định cho entry blacklist mới ở đây chỉnh bằng `/la-setup config action:set-default-scope`.',
+      'Whitelist, watchlist và trusted luôn là **toàn cục**: mọi server dùng tớ đều thấy. Scope mặc định cho entry blacklist mới ở đây chỉnh bằng `/la-setup config action:set-default-scope`.',
     ],
     cleanupName: '🧹 Mỗi ngày tớ dọn channel này một lần',
     cleanupValue: [
@@ -402,9 +402,9 @@ const vi = {
 
   quickAdd: {
     selectPlaceholder: '⚡ Quick Add vào list · chọn tên',
-    noListHit: 'Chưa có hit trong DB',
+    noListHit: 'Chưa có trong list nào',
     modalTitle: 'Quick Add · {name}',
-    typeLabel: 'Loại (black / watch)',
+    typeLabel: 'List (black / white / watch)',
     typePlaceholder: 'black',
     reasonLabel: 'Lý do',
     reasonPlaceholder: 'Vì sao thêm player này?',

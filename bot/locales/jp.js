@@ -62,7 +62,7 @@ const jp = {
       '**Blacklist** の entry には scope がございますわ:',
       '• 🌐 **Global** - わたくしを使う全 server と共有ですの。他の server で marked された名前もここに表示されますわ。',
       '• 🔒 **Server** - この server でのみ表示されますの。',
-      'Whitelist、watchlist、trusted は常に **server 限定** ですわ。新規 blacklist entry の既定 scope は `/la-setup config action:set-default-scope` で設定できますの。',
+      'Whitelist、watchlist、trusted は常に **グローバル** ですわ。わたくしを使うすべての server で見えますの。新規 blacklist entry の既定 scope は `/la-setup config action:set-default-scope` で設定できますの。',
     ],
     cleanupName: '🧹 この channel は毎日わたくしが片付けますわ',
     cleanupValue: [
@@ -402,9 +402,9 @@ const jp = {
 
   quickAdd: {
     selectPlaceholder: '⚡ Quick Add to List · 名前を選択',
-    noListHit: 'DB list hit なし',
+    noListHit: 'どの list にもいません',
     modalTitle: 'Quick Add · {name}',
-    typeLabel: 'Type (black / watch)',
+    typeLabel: 'List (black / white / watch)',
     typePlaceholder: 'black',
     reasonLabel: 'Reason',
     reasonPlaceholder: 'この player を追加する理由',
