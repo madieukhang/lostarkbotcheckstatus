@@ -113,3 +113,23 @@ test('a failed shared OCR request is released so a later request can retry', asy
   assert.deepEqual(await extractNamesFromImage(image), ['Alice']);
   assert.equal(downloads, 2);
 });
+
+test('OCR jobs for different images hold the download and Gemini call one at a time', async t => {
+  setup(t);
+  let active = 0;
+  let peak = 0;
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (String(url).startsWith('https://cdn.discordapp.com/')) {
+      active += 1;
+      peak = Math.max(peak, active);
+      return imageResponse();
+    }
+    await new Promise(resolve => setTimeout(resolve, 5));
+    active -= 1;
+    return namesResponse();
+  });
+  const images = [1, 2, 3].map(n => ({ url: `https://cdn.discordapp.com/job-${n}.png`, contentType: 'image/png' }));
+  const results = await Promise.all(images.map(img => extractNamesFromImage(img)));
+  assert.deepEqual(results, [['Alice'], ['Alice'], ['Alice']]);
+  assert.equal(peak, 1);
+});

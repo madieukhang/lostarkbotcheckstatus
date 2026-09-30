@@ -56,6 +56,19 @@ const geminiModelCooldowns = new Map();
 // Share only identical OCR work; list permissions and downstream lookups stay
 // request-local. Failures leave no entry, so a subsequent request can retry.
 const ocrInFlight = new Map();
+// A running OCR job holds the downloaded image, its base64 copy and the Gemini
+// request body. Jobs for different images would each hold their own, which
+// exhausts a 512 MB container, so they take this single slot one at a time.
+// Waiting jobs have downloaded nothing yet.
+let ocrSlotTail = Promise.resolve();
+
+function acquireOcrSlot() {
+  let release;
+  const slot = new Promise((resolve) => { release = resolve; });
+  const turn = ocrSlotTail.then(() => release);
+  ocrSlotTail = ocrSlotTail.then(() => slot);
+  return turn;
+}
 
 function formatGeminiFailure(result) {
   const key = result.type === 'response'
@@ -545,12 +558,14 @@ export async function extractNamesFromImage(image, options = {}) {
   const startedAt = Date.now();
   let ownedFlight;
   let flightKey;
+  let releaseOcrSlot;
   const timing = {
     mode: options.mode ?? 'daily',
     cache: 'miss',
     status: 'error',
     model: 'none',
     names: 0,
+    queueMs: 0,
     downloadMs: 0,
     geminiMs: 0,
     geminiAttempts: 0,
@@ -611,6 +626,10 @@ export async function extractNamesFromImage(image, options = {}) {
       flightKey = cacheKey;
       ocrInFlight.set(flightKey, ownedFlight);
     }
+
+    const queuedAt = Date.now();
+    releaseOcrSlot = await acquireOcrSlot();
+    timing.queueMs = Date.now() - queuedAt;
 
     const downloadStartedAt = Date.now();
     const imageRes = await fetch(image.url, { signal: AbortSignal.timeout(15000) });
@@ -745,12 +764,14 @@ export async function extractNamesFromImage(image, options = {}) {
     ownedFlight?.reject(error);
     throw error;
   } finally {
+    releaseOcrSlot?.();
     if (ownedFlight && ocrInFlight.get(flightKey) === ownedFlight) ocrInFlight.delete(flightKey);
     const lookupStats = options.suggestionContext?.stats || {};
     console.log([
       `[listcheck] OCR timing total=${Date.now() - startedAt}ms`,
       `status=${timing.status}`,
       `cache=${timing.cache}`,
+      `queue=${timing.queueMs}ms`,
       `download=${timing.downloadMs}ms`,
       `gemini=${timing.geminiMs}ms`,
       `attempts=${timing.geminiAttempts}`,

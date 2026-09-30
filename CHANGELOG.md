@@ -13,6 +13,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Fixed
+- Screenshot OCR runs one job at a time across `/la-check` and auto-check. Checks of different images used to download, encode and send to Gemini in parallel, and nine 12 MiB screenshots at once pushed the process past 512 MiB. A queued job waits before downloading anything, and the OCR timing log now reports the wait as `queue=`.
 - When `/la-roster` finds a hidden roster, its name suggestions include characters at exactly item level 1700, the floor every other LoaLogs check uses. They used to require more than 1700.
 - A cross-server broadcast that fails after a `/la-list edit`, an approved edit or a duplicate overwrite is logged as `[list] Broadcast failed`, as adds and removals already were. Those three paths used to drop the error silently.
 - A member's bulk-add Confirm answers Discord at once with the processing card, as the officer path already did. The approval request used to be built first (image rehosts, a pause per row, approver DMs), so a batch of about ten rows missed Discord's 3-second window, the click failed, and the request whose DMs had already gone out was deleted.
