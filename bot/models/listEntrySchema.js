@@ -70,7 +70,14 @@ export function createListEntrySchema({ scoped = false } = {}) {
       { collation: CASE_INSENSITIVE_COLLATION }
     );
   } else {
-    schema.index({ allCharacters: 1 });
+    // Alias lookups run with the case-insensitive collation, and Mongo
+    // skips an index whose collation differs. The name lets this index sit
+    // beside the uncollated allCharacters_1 already in the database, which
+    // autoIndex creates around but never replaces.
+    schema.index(
+      { allCharacters: 1 },
+      { collation: CASE_INSENSITIVE_COLLATION, name: 'allCharacters_ci' }
+    );
   }
   schema.index({ addedAt: -1 });
   return schema;

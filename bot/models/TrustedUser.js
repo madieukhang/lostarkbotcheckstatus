@@ -17,7 +17,12 @@ trustedUserSchema.index(
   { name: 1 },
   { unique: true, collation: { locale: 'en', strength: 2 } }
 );
-trustedUserSchema.index({ allCharacters: 1 });
+// Alias lookups use the same collation. syncIndexes at startup drops the
+// uncollated allCharacters_1 this replaces.
+trustedUserSchema.index(
+  { allCharacters: 1 },
+  { collation: { locale: 'en', strength: 2 }, name: 'allCharacters_ci' }
+);
 trustedUserSchema.index({ addedAt: -1 });
 
 export default mongoose.model('TrustedUser', trustedUserSchema);

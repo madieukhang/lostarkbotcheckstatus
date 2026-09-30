@@ -91,8 +91,14 @@ test('list entry indexes keep current uniqueness and roster lookup contracts', (
     collation: { locale: 'en', strength: 2 },
   });
 
-  for (const model of [Whitelist, Watchlist]) {
-    assert.deepEqual(findIndex(model, { allCharacters: 1 })?.[1], {});
+  // Alias lookups run with the case-insensitive collation, and Mongo skips an
+  // index whose collation differs. The name keeps it clear of the uncollated
+  // allCharacters_1 that autoIndex cannot replace.
+  for (const model of [Whitelist, Watchlist, TrustedUser]) {
+    assert.deepEqual(findIndex(model, { allCharacters: 1 })?.[1], {
+      collation: { locale: 'en', strength: 2 },
+      name: 'allCharacters_ci',
+    });
   }
   for (const model of [Blacklist, Whitelist, Watchlist]) {
     assert.deepEqual(findIndex(model, { addedAt: -1 })?.[1], {});
