@@ -228,6 +228,11 @@ export default {
       },
       footer: '申請者には、そのチャンネルでお知らせ済みですわ。',
     },
+    requester: {
+      title: '📨 {list} · 承認待ち · {name}',
+      hero: '{name} を **{list}**{scope} の承認者へお送りしましたわ。結果はこのチャンネルでお知らせしますの。',
+      footer: '⏳ 承認者の判断をお待ちしていますわ',
+    },
     bulk: { title: '一括追加の承認 · {count} rows', outcome: '内訳: {breakdown}', reviewing: '**{count}** entries を確認中ですの。', local: 'サーバー内', more: '...ほか {count} rows' },
     public: {
       title: '{list} · {decision} · {name}',
@@ -283,7 +288,7 @@ export default {
   listAdd: {
     command: {
       reasonRequired: { title: '理由がまだありませんの', description: 'List entry には理由が必要ですわ。Command を再実行して `reason` を入力してくださいませ。' }, invalidRaid: { title: '自由な raid tag は watchlist 専用ですの', description: '`{raid}` は {list} の標準 raid ではありません。候補から選ぶか、自由入力には `type:watch` を使ってくださいませ。' }, invalidImage: { title: '添付 file は画像ではありませんの', description: '`image` option は画像 file のみです。Discord は `{type}` と判定しましたわ。' },
-      deliveryFailed: { title: '承認してくださる方までお届けできませんでしたわ', description: '指定された approver のどなたにも連絡がつきませんでしたの。', footer: '何も保存されておりませんわ。もう一度お試しになるか、officer に直接ご連絡くださいませ。' }, submittedTitle: 'List 追加 · 提案送信済み',
+      deliveryFailed: { title: '承認してくださる方までお届けできませんでしたわ', description: '指定された approver のどなたにも連絡がつきませんでしたの。', footer: '何も保存されておりませんわ。もう一度お試しになるか、officer に直接ご連絡くださいませ。' },
       proposalFailed: { title: '提案を作れませんでしたの', description: '承認 request の作成に失敗しましたわ。', footer: 'Entry は作成されていません。再実行し、続く場合は officer にご連絡くださいませ。' },
     },
     hidden: { title: 'Hidden roster を検出しましたわ', withGuild: '現在は入力した名前だけを track していますの。Bible に guild **{guild}** があるので、`/la-list enrich name:{name}` または **今すぐ enrich** で同じ stronghold の guildmate alt を探せますわ。', withoutGuild: '現在は入力した名前だけを track していますの。Bible は guild member list を公開していないため、`/la-list edit name:{name} additional_names:Alt1, Alt2` で既知 alt を手動追加してくださいませ。' },
@@ -313,7 +318,7 @@ export default {
     publicRestricted: { title: 'Public evidence は制限されていますの', description: 'Evidence を public 投稿できるのは officer / senior だけなので、この view は private にしましたわ。' }, failed: { title: 'Evidence 検索に失敗しましたの', description: 'Evidence record を読み込めませんでしたわ。' },
   },
   quickAdd: {
-    deliveryFailed: { title: 'そちらをお渡しできませんでしたの', fallback: '承認のお願いがどなたにも届きませんでしたわ。少し経ってからもう一度お試しくださいませ。' }, sent: { title: '承認へ送っておきましたわ', description: '**{name}** を **{list}** へ、とお伝えしてありますの。あとはどなたかが頷いてくださるのを待つだけですわ〜' }, failed: { title: 'その quick add は通りませんでしたの', description: 'お預かりして書き留めている途中で、どこかに引っかかってしまいましたの。もう一度お試しくださいませ。' }, invalidType: { title: 'それは list の種類ではありませんの', description: '`{type}` と読めましたわ。quick add は `black`、`white`、`watch` のどれかでお願いしますの。' },
+    deliveryFailed: { title: 'そちらをお渡しできませんでしたの', fallback: '承認のお願いがどなたにも届きませんでしたわ。少し経ってからもう一度お試しくださいませ。' }, failed: { title: 'その quick add は通りませんでしたの', description: 'お預かりして書き留めている途中で、どこかに引っかかってしまいましたの。もう一度お試しくださいませ。' }, invalidType: { title: 'それは list の種類ではありませんの', description: '`{type}` と読めましたわ。quick add は `black`、`white`、`watch` のどれかでお願いしますの。' },
   },
   remove: {
     notFound: { title: '削除するものがありませんの', description: '**{name}** は表示可能な list にいませんわ。', footer: '`/la-list view` で既存 entry を確認できますの。' }, titles: { blocked: '削除できません · {name}', one: '{list} から削除 · {name}', many: '{count} lists から削除 · {name}', mixed: 'Mixed result · {name}' },

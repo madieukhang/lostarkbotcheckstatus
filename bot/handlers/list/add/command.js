@@ -157,11 +157,7 @@ export function createListAddCommandHandler({
       }),
       onQueued: () => editEmbed(
         interaction,
-        buildListAddApprovalEmbed(interaction.guild, payload, {
-          title: t('dialogue.listAdd.command.submittedTitle', lang),
-          includeRequestedBy: false,
-          lang,
-        })
+        buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang })
       ),
     });
     if (submission.status === 'queued') {

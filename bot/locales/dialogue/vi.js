@@ -253,6 +253,11 @@ export default {
       },
       footer: 'Người yêu cầu đã được báo trong channel của họ.',
     },
+    requester: {
+      title: '📨 {list} · Đã gửi duyệt · {name}',
+      hero: 'Tớ đã gửi {name} tới người duyệt cho **{list}**{scope}. Có kết quả tớ sẽ báo trong channel này.',
+      footer: '⏳ Đang chờ người duyệt',
+    },
     bulk: { title: 'Duyệt thêm hàng loạt · {count} dòng', outcome: 'Phân loại: {breakdown}', reviewing: 'Đang duyệt **{count}** entry.', local: 'nội bộ', more: '... và {count} dòng khác' },
     public: {
       title: '{list} · {decision} · {name}',
@@ -308,7 +313,7 @@ export default {
   listAdd: {
     command: {
       reasonRequired: { title: 'Cậu còn thiếu lý do', description: 'Mỗi entry đều cần lý do. Chạy lại command và điền `reason` nhé.' }, invalidRaid: { title: 'Raid tùy ý chỉ dùng cho watchlist', description: '`{raid}` không phải raid chuẩn của {list}. Chọn một raid được gợi ý, hoặc dùng `type:watch` để nhập nhãn tùy ý.' }, invalidImage: { title: 'File đính kèm không phải ảnh', description: 'Option `image` chỉ nhận file ảnh; Discord báo loại `{type}`.' },
-      deliveryFailed: { title: 'Tớ chưa đưa được cái này tới người duyệt', description: 'Không approver nào được chỉ định mà tớ liên hệ được.', footer: 'Chưa có gì được lưu cả. Cậu thử lại, hoặc tìm thẳng officer cũng được.' }, submittedTitle: 'Thêm vào list · Đã gửi đề xuất',
+      deliveryFailed: { title: 'Tớ chưa đưa được cái này tới người duyệt', description: 'Không approver nào được chỉ định mà tớ liên hệ được.', footer: 'Chưa có gì được lưu cả. Cậu thử lại, hoặc tìm thẳng officer cũng được.' },
       proposalFailed: { title: 'Chưa tạo được đề xuất', description: 'Tớ chưa tạo được yêu cầu duyệt.', footer: 'Chưa có entry nào được tạo. Chạy lại command; nếu vẫn lỗi thì liên hệ officer nhé.' },
     },
     hidden: { title: 'Phát hiện roster đang ẩn', withGuild: 'Hiện mới track tên cậu nhập. Bible hiển thị guild **{guild}**, nên dùng `/la-list enrich name:{name}` hoặc bấm **Enrich ngay** để quét guildmate cùng stronghold.', withoutGuild: 'Hiện mới track tên cậu nhập. Bible không hiển thị danh sách guild, nên dùng `/la-list edit name:{name} additional_names:Alt1, Alt2` để thêm alt đã biết thủ công.' },
@@ -338,7 +343,7 @@ export default {
     publicRestricted: { title: 'Evidence public được giới hạn', description: 'Chỉ officer và senior mới đăng evidence công khai được, nên tớ giữ view này ở chế độ riêng.' }, failed: { title: 'Tra evidence thất bại', description: 'Tớ chưa tải được record evidence.' },
   },
   quickAdd: {
-    deliveryFailed: { title: 'Tớ chưa chuyển đi được', fallback: 'Yêu cầu duyệt chưa tới được tay ai cả. Lát nữa cậu thử lại nhé.' }, sent: { title: 'Tớ gửi đi duyệt rồi', description: '**{name}** đang xếp hàng vào **{list}**, chỉ chờ có người duyệt nữa thôi.' }, failed: { title: 'Lượt quick add đó chưa trót lọt', description: 'Đang ghi lại giúp cậu thì có gì đó trục trặc. Cậu thử lại lần nữa nhé.' }, invalidType: { title: 'Đó không phải loại list', description: 'Tớ đọc được `{type}`. Quick add chỉ nhận `black`, `white` hoặc `watch` thôi.' },
+    deliveryFailed: { title: 'Tớ chưa chuyển đi được', fallback: 'Yêu cầu duyệt chưa tới được tay ai cả. Lát nữa cậu thử lại nhé.' }, failed: { title: 'Lượt quick add đó chưa trót lọt', description: 'Đang ghi lại giúp cậu thì có gì đó trục trặc. Cậu thử lại lần nữa nhé.' }, invalidType: { title: 'Đó không phải loại list', description: 'Tớ đọc được `{type}`. Quick add chỉ nhận `black`, `white` hoặc `watch` thôi.' },
   },
   remove: {
     notFound: { title: 'Không có gì để xóa', description: '**{name}** không nằm trong list nào cậu nhìn thấy.', footer: 'Dùng `/la-list view` để xem các entry hiện có nhé.' }, titles: { blocked: 'Không thể xóa · {name}', one: 'Đã xóa khỏi {list} · {name}', many: 'Đã xóa khỏi {count} list · {name}', mixed: 'Kết quả hỗn hợp · {name}' },

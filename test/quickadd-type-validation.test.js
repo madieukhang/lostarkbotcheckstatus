@@ -59,6 +59,27 @@ test('quick add rejects an unknown list type instead of filing it as blacklist',
   assert.match(embed.description, /`watchlist`/);
 });
 
+test('a member quick add sent for approval reads like the /la-list add card', async (t) => {
+  stubEnglishViewer(t);
+  const { default: PendingApproval } = await import('../bot/models/PendingApproval.js');
+  t.mock.method(PendingApproval, 'create', async (doc) => doc);
+  const replies = [];
+  const { handleQuickAddModal } = createQuickAddHandlers({ services: {
+    sendListAddApprovalToApprovers: async () => ({ success: true, deliveredApproverIds: ['senior'], deliveredDmMessages: [] }),
+    executeListAddToDatabase: async () => assert.fail('a member add waits for an approver'),
+  } });
+
+  await handleQuickAddModal(modalSubmit('black', replies));
+
+  const embed = replies.at(-1).embeds[0].toJSON();
+  assert.equal(embed.title, '📨 Blacklist · Sent for approval · Mokoko');
+  assert.match(embed.description, /^I sent \*\*\[Mokoko\]\(.+\)\*\* to the approvers for the \*\*Blacklist\*\* `\[Global\]`/);
+  const names = embed.fields.map((field) => field.name);
+  for (const expected of ['📒 List', '🗡️ Raid', '🌐 Scope', '📝 Reason']) assert.ok(names.includes(expected), `missing ${expected}`);
+  assert.ok(!names.some((name) => /Requested by/.test(name)));
+  assert.equal(embed.footer.text, '⏳ Waiting on an approver');
+});
+
 test('quick add submits a valid type after trimming and lowercasing it', async (t) => {
   stubEnglishViewer(t);
   const calls = [];

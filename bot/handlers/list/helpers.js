@@ -275,6 +275,38 @@ export function buildListEditSuccessEmbeds(entry, options = {}) {
   return [main, after];
 }
 
+// Title, hero and footer of an approval card for the approvers' DM and for
+// the requester's own copy of the same request.
+const APPROVAL_CARD_VIEWS = Object.freeze({
+  approver: {
+    title: ({ isEdit, listIcon, payload, lang }) => t(`dialogue.approval.${isEdit ? 'titleEdit' : 'titleAdd'}`, lang, {
+      icon: listIcon,
+      name: payload.name,
+    }),
+    hero: ({ isEdit, guild, payload, listLabel, scopeTag, lang }) => t(`dialogue.approval.${isEdit ? 'heroEdit' : 'heroAdd'}`, lang, {
+      guild: guild.name,
+      name: payload.name,
+      list: listLabel,
+      scope: scopeTag,
+    }),
+    footer: (lang) => `${ICONS.shield} ${t('dialogue.approval.footer', lang)}`,
+    showsRequester: true,
+  },
+  requester: {
+    title: ({ payload, listLabel, lang }) => t('dialogue.approval.requester.title', lang, {
+      list: listLabel,
+      name: payload.name,
+    }),
+    hero: ({ payload, listLabel, scopeTag, lang }) => t('dialogue.approval.requester.hero', lang, {
+      name: formatLinkedCharacter(payload.name, null),
+      list: listLabel,
+      scope: scopeTag,
+    }),
+    footer: (lang) => t('dialogue.approval.requester.footer', lang),
+    showsRequester: false,
+  },
+});
+
 /**
  * Approval-DM card sent to senior + officer approvers when a non-bypass
  * member submits a /la-list add (or /la-list edit). Approvers review
@@ -293,9 +325,13 @@ export function buildListEditSuccessEmbeds(entry, options = {}) {
  * The list-type icon (⛔/✅/⚠️) is preferred over the generic shield
  * because approvers triage at a glance: a red ⛔ DM lands differently
  * from a green ✅ one even before they read the title.
+ *
+ * With `options.forRequester`, the same request renders as the requester's
+ * own copy: a "sent for approval" title, hero and footer, and no
+ * Requested by field.
  */
 export function buildListAddApprovalEmbed(guild, payload, options = {}) {
-  const includeRequestedBy = options.includeRequestedBy ?? true;
+  const view = APPROVAL_CARD_VIEWS[options.forRequester ? 'requester' : 'approver'];
   const lang = options.lang || 'en';
   const isEdit = payload.action === 'edit';
 
@@ -306,23 +342,15 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   };
   const { icon: listIcon, color: listColor } = listContext;
   const listLabel = t(`dialogue.broadcast.list.${payload.type}`, lang);
-
-  const title = options.title || t(`dialogue.approval.${isEdit ? 'titleEdit' : 'titleAdd'}`, lang, {
-    icon: listIcon,
-    name: payload.name,
-  });
   const scopeTag = payload.scope === 'server'
     ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\``
     : payload.scope === 'global'
       ? ` \`[${t('dialogue.approval.scopeTag.global', lang)}]\``
       : '';
+  const context = { guild, payload, isEdit, listIcon, listLabel, scopeTag, lang };
 
-  const heroLine = t(`dialogue.approval.${isEdit ? 'heroEdit' : 'heroAdd'}`, lang, {
-    guild: guild.name,
-    name: payload.name,
-    list: listLabel,
-    scope: scopeTag,
-  });
+  const title = options.title || view.title(context);
+  const heroLine = view.hero(context);
 
   const fields = [
     { name: `📒 ${t('dialogue.approval.fields.list', lang)}`, value: `${listIcon} ${listLabel}`, inline: true },
@@ -345,7 +373,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   });
   fields.push(...[
     altsField,
-    includeRequestedBy
+    view.showsRequester
       ? {
           name: `👤 ${t('dialogue.approval.fields.requestedBy', lang)}`,
           value: `${payload.requestedByDisplayName} (<@${payload.requestedByUserId}>)`,
@@ -372,7 +400,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     title,
     description: heroLine,
     fields,
-    footer: `${ICONS.shield} ${t('dialogue.approval.footer', lang)}`,
+    footer: view.footer(lang),
     lang,
   });
 

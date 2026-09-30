@@ -331,6 +331,11 @@ export default {
       },
       footer: 'The requester has been told in their channel.',
     },
+    requester: {
+      title: '📨 {list} · Sent for approval · {name}',
+      hero: 'I sent {name} to the approvers for the **{list}**{scope}. I will post their decision in this channel.',
+      footer: '⏳ Waiting on an approver',
+    },
     bulk: {
       title: 'Bulk add approval · {count} rows',
       outcome: 'Outcome: {breakdown}',
@@ -404,7 +409,6 @@ export default {
       invalidRaid: { title: 'That raid label is only available for watchlist', description: '`{raid}` is not a standard raid for {list}. Choose one of the raid suggestions, or use `type:watch` for a custom label.' },
       invalidImage: { title: 'That attachment is not an image', description: 'The `image` option only accepts image files; Discord reported `{type}`.' },
       deliveryFailed: { title: 'I could not get that in front of an approver', description: 'None of the assigned approvers could be reached.', footer: 'Nothing was saved. Try again, or go straight to an officer.' },
-      submittedTitle: 'List add · Proposal submitted',
       proposalFailed: { title: 'The proposal could not be created', description: 'I could not create the approval request.', footer: 'No entry was created. Try the command again; if this repeats, contact an officer.' },
     },
     hidden: {
@@ -455,7 +459,6 @@ export default {
   },
   quickAdd: {
     deliveryFailed: { title: 'I could not pass that on', fallback: 'The approval request did not reach anyone. Try again in a moment.' },
-    sent: { title: 'Sent it off for approval', description: '**{name}** is queued for the **{list}** - just waiting on someone to approve it.' },
     failed: { title: 'That quick add did not go through', description: 'Something went wrong while I was filing that one. Give it another try.' },
     invalidType: { title: 'That is not a list type', description: 'I read `{type}`. Quick add takes `black`, `white` or `watch`.' },
   },

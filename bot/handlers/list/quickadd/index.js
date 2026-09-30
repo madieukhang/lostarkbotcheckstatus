@@ -22,7 +22,9 @@ import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import {
   deferEphemeralReply,
   editAlert,
+  editEmbed,
 } from '../../../utils/interactionReplies.js';
+import { buildListAddApprovalEmbed } from '../helpers.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
@@ -144,12 +146,10 @@ export function createQuickAddHandlers({ services }) {
           description: delivery.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
           lang,
         }),
-        onQueued: () => editAlert(interaction, {
-          severity: AlertSeverity.INFO,
-          titleIcon: '📨',
-          ...t('dialogue.quickAdd.sent', lang, { name, list: t(`dialogue.broadcast.list.${type}`, lang) }),
-          lang,
-        }),
+        onQueued: () => editEmbed(
+          interaction,
+          buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang }),
+        ),
       });
     } catch (err) {
       console.error('[quickadd] Failed:', err.message);
