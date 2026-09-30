@@ -24,6 +24,13 @@ import { AttachmentBuilder } from 'discord.js';
 import config from '../config.js';
 import { getGuildConfig } from './scope.js';
 import { AlertSeverity, buildNoticeEmbed } from './alertEmbed.js';
+import { readBodyWithin } from './responseBody.js';
+
+// Bot uploads are capped at 25 MB; the margin leaves room for the message.
+const REHOST_MAX_BYTES = 24 * 1024 * 1024;
+// Multiadd rows can name any image host, so a stalled server must not hold
+// the confirm flow open.
+const REHOST_DOWNLOAD_TIMEOUT_MS = 30_000;
 
 const EVIDENCE_LIST_ICON = Object.freeze({
   black: '⛔',
@@ -87,7 +94,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   // nonsense messages.
   let response;
   try {
-    response = await fetch(originalUrl);
+    response = await fetch(originalUrl, { signal: AbortSignal.timeout(REHOST_DOWNLOAD_TIMEOUT_MS) });
   } catch (err) {
     return fail(`download fetch threw: ${err.message}`);
   }
@@ -98,9 +105,11 @@ export async function rehostImage(originalUrl, client, meta = {}) {
 
   let buffer;
   try {
-    buffer = Buffer.from(await response.arrayBuffer());
+    buffer = await readBodyWithin(response, REHOST_MAX_BYTES);
   } catch (err) {
-    return fail(`download read body failed: ${err.message}`);
+    return fail(err.code === 'BODY_TOO_LARGE'
+      ? 'file too large to rehost (> 24 MB limit)'
+      : `download read body failed: ${err.message}`);
   }
 
   // Try to extract a sensible filename from the URL path. Failure is
@@ -113,11 +122,6 @@ export async function rehostImage(originalUrl, client, meta = {}) {
       filename = lastSegment;
     }
   } catch { /* leave default filename */ }
-
-  // Sanity check size · Discord attachments max 25 MB for bots without nitro
-  if (buffer.length > 24 * 1024 * 1024) {
-    return fail(`file too large to rehost (${(buffer.length / 1024 / 1024).toFixed(1)} MB > 24 MB limit)`);
-  }
 
   // Step 2: Upload to the evidence channel
   let channel;

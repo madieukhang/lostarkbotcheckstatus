@@ -10,6 +10,7 @@ import {
 } from '../../utils/names.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 import { createLruTtlCache } from '../../utils/cache/lruTtlCache.js';
+import { readBodyWithin } from '../../utils/responseBody.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 import { stripDiacritics } from './nameRecovery.js';
 
@@ -638,17 +639,11 @@ export async function extractNamesFromImage(image, options = {}) {
       throw new Error(`Failed to download attachment (HTTP ${imageRes.status})`);
     }
 
-    const contentLength = imageRes.headers.get('content-length');
-    if (contentLength && parseInt(contentLength, 10) > MAX_OCR_IMAGE_BYTES) {
-      throw new Error('Image file too large (max 20MB).');
-    }
-
     const mimeType = image.contentType || imageRes.headers.get('content-type') || 'image/png';
-    const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+    const imageBuffer = await readBodyWithin(imageRes, MAX_OCR_IMAGE_BYTES).catch((err) => {
+      throw err.code === 'BODY_TOO_LARGE' ? new Error('Image file too large (max 20MB).') : err;
+    });
     timing.downloadMs = Date.now() - downloadStartedAt;
-    if (imageBuffer.byteLength > MAX_OCR_IMAGE_BYTES) {
-      throw new Error('Image file too large (max 20MB).');
-    }
     const imageBase64 = imageBuffer.toString('base64');
 
     const geminiResult = await requestGeminiWithFallback({
