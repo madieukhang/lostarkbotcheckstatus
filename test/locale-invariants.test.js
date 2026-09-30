@@ -19,6 +19,7 @@ const PLACEHOLDER_EXCEPTIONS = new Set([
   'dialogue.stats.recentBlacklist',
   'dialogue.broadcast.headlines.enriched',
   'dialogue.check.ignored',
+  'dialogue.listEdit.success.summaryAlts',
 ]);
 
 function flatten(node, prefix, out) {

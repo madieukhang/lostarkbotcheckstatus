@@ -18,18 +18,25 @@ import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { normalizeNameKey } from '../../../utils/names.js';
 import { truncateInlineText } from '../../../utils/discordText.js';
-import { getListContext, listTypeIcon } from '../helpers.js';
+import {
+  describeListEntryEdit,
+  formatListEditSummary,
+  getListContext,
+  listTypeIcon,
+} from '../helpers.js';
+import { buildListEntryReasonField, buildMarkedInlineField } from '../entryCardFields.js';
 import { buildBroadcastEvidenceComponents } from '../evidence/broadcastButton.js';
 import {
   formatAltLine,
   formatLinkedCharacter,
+  formatRosterStatBadges,
   renderTrackedAltsField,
   resolveRosterWorld,
 } from '../trackedAltsRender.js';
 
-// Actions with their own dialogue.broadcast.titles key; any other action uses
-// the fallback title.
-const TITLED_ACTIONS = new Set(['added', 'removed', 'edited', 'enriched']);
+// An add keeps the list icon in the title; the other actions show what
+// happened to the entry.
+const BROADCAST_TITLE_ICONS = Object.freeze({ removed: '🗑️', edited: '✏️', enriched: '🆕' });
 
 function parseItemLevel(value) {
   const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
@@ -137,44 +144,66 @@ export function buildTrackedAltsField(entry, statMap = new Map(), options = {}) 
 
 /**
  * Build the field grid for a list-change broadcast: full-width reason,
- * then the inline metadata row, then the change list and roster list.
+ * then the inline metadata row, then the roster list. An edit marks the
+ * reason and raid it replaced in place, as the /la-list edit card does.
+ * Fixed tokens and numbers (raid, ilvl, CP) are code-wrapped; the
+ * timestamp stays plain so Discord can localize <t:UNIX:R>.
  * @param {object} options
  * @param {object} options.entry - the list entry being announced
- * @param {'added'|'edited'|'removed'|'enriched'} options.action - drives
- *   the timestamp label and whether the change list is rendered
- * @param {string[]} [options.changes] - one line per edited field
+ * @param {'added'|'edited'|'removed'|'enriched'} options.action - an edit
+ *   stamps the time of the edit, every other action the time of the add
  * @param {object} [options.snap] - the entry's own RosterSnapshot
  * @param {object} [options.altsField] - prebuilt roster-list field
  * @param {string} [options.lang='en'] - locale for every label
  * @param {Map<string, object>} [options.statMap] - snapshots for the whole
  *   roster · lets the server fall back to a sibling. Omit to read the
  *   server off `snap` alone.
+ * @param {object} [options.previous] - inline values an edit replaced, as
+ *   describeListEntryEdit returns them
+ * @param {string} [options.previousReason] - the reason an edit replaced
  * @returns {Array<object>} embed fields, inline ones padded to whole rows
  */
-export function buildBroadcastFields({ entry, action, changes = [], snap, altsField, lang = 'en', statMap }) {
-  const changesText = changes.join('\n');
+export function buildBroadcastFields({
+  entry,
+  action,
+  snap,
+  altsField,
+  lang = 'en',
+  statMap,
+  previous = {},
+  previousReason,
+}) {
   // Server is a roster-level fact, so a sibling's snapshot answers for
   // this entry when its own row has none · see resolveRosterWorld. Falls
   // back to `snap` alone for callers that pass no statMap.
   const world = statMap
     ? resolveRosterWorld(entry, statMap)
     : String(snap?.world || '').trim();
+  const notAvailable = t('dialogue.broadcast.notAvailable', lang);
+  const raidChanged = 'raid' in previous;
+  const stampedAt = action === 'edited' ? new Date() : entry.addedAt;
+  const statBadges = formatRosterStatBadges(snap);
   const inlineFields = [
-    entry.raid
-      ? { name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`, value: `\`${entry.raid}\``, inline: true }
+    entry.raid || raidChanged
+      ? buildMarkedInlineField(
+          `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`,
+          entry.raid ? `\`${entry.raid}\`` : notAvailable,
+          raidChanged,
+          previous.raid || notAvailable,
+        )
       : null,
-    entry.addedAt
+    stampedAt
       ? {
           name: `🕐 ${t(`dialogue.broadcast.fields.${action === 'edited' ? 'edited' : 'added'}`, lang)}`,
-          value: relativeTime(entry.addedAt),
+          value: relativeTime(stampedAt),
           inline: true,
         }
       : null,
-    snap?.itemLevel > 0
-      ? { name: `📊 ${t('dialogue.broadcast.fields.itemLevel', lang)}`, value: `\`${snap.itemLevel.toFixed(2)}\``, inline: true }
+    statBadges.itemLevel
+      ? { name: `📊 ${t('dialogue.broadcast.fields.itemLevel', lang)}`, value: statBadges.itemLevel, inline: true }
       : null,
-    snap?.combatScore
-      ? { name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`, value: `\`${snap.combatScore}\``, inline: true }
+    statBadges.combatPower
+      ? { name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`, value: statBadges.combatPower, inline: true }
       : null,
     world
       ? { name: `🌍 ${t('dialogue.roster.server', lang)}`, value: `\`${world}\``, inline: true }
@@ -182,21 +211,118 @@ export function buildBroadcastFields({ entry, action, changes = [], snap, altsFi
   ].filter(Boolean);
 
   return [
-    {
-      name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
-      value: (entry.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024),
-      inline: false,
-    },
+    buildListEntryReasonField({ reason: entry.reason, previousReason, lang }),
     ...padInlineRow(inlineFields),
-    action === 'edited' && changesText
-      ? {
-          name: `🔁 ${t('dialogue.listEdit.success.changes', lang, { count: changes.length })}`,
-          value: changesText.length > 1024 ? `${changesText.slice(0, 1020)}…` : changesText,
-          inline: false,
-        }
-      : null,
     altsField,
   ].filter(Boolean);
+}
+
+function evidenceRef(entry) {
+  return entry.imageMessageId || entry.imageUrl || '';
+}
+
+/**
+ * What an edit changed, compared against the entry before it: the values
+ * to mark in place, the alts it added, and the headline summary for the
+ * rest.
+ */
+function describeBroadcastEdit({ entry, previousEntry, type, previousType, lang }) {
+  const { changed, previous, previousReason } = describeListEntryEdit({
+    entry, previousEntry, type, previousType, lang,
+  });
+  const previousAltKeys = new Set((previousEntry.allCharacters || []).map(normalizeNameKey));
+  const addedAlts = (entry.allCharacters || [])
+    .filter((name) => !previousAltKeys.has(normalizeNameKey(name)));
+  const evidenceChanged = evidenceRef(entry) !== evidenceRef(previousEntry);
+  const summary = formatListEditSummary({
+    changed,
+    logsChanged: (entry.logsUrl || '') !== (previousEntry.logsUrl || ''),
+    evidenceChanged,
+    addedAltCount: addedAlts.length,
+    lang,
+  });
+  return { previous, previousReason, addedAlts, evidenceChanged, summary };
+}
+
+/**
+ * Build the broadcast message for one list change in one language. The
+ * title follows the /la-list success cards, `{list} · {action} · {name}`,
+ * and the headline says what happened without naming who did it.
+ * @param {object} options
+ * @param {'added'|'edited'|'removed'|'enriched'} options.action
+ * @param {object} options.entry - the entry as saved
+ * @param {string} options.type - list type: black | white | watch
+ * @param {Map<string, object>} options.statMap - roster snapshots by name key
+ * @param {object} [options.previousEntry] - an edit's entry before the edit;
+ *   required when action is 'edited'
+ * @param {string} [options.previousType] - an edit's list type before the edit
+ * @param {string[]} [options.newAltNames=[]] - alts an enrich run found
+ * @param {string} [options.legacyUrl] - image URL for the View evidence
+ *   button when the entry has no archived evidence message
+ * @param {string} options.lang - locale
+ * @returns {{embeds: Array<import('discord.js').EmbedBuilder>, components?: Array<object>}}
+ */
+export function buildBroadcastPayload({
+  action,
+  entry,
+  type,
+  statMap,
+  previousEntry,
+  previousType = type,
+  newAltNames = [],
+  legacyUrl,
+  lang,
+}) {
+  const { color, icon } = getListContext(type);
+  const listLabel = t(`dialogue.broadcast.list.${type}`, lang);
+  const snap = statMap.get(normalizeNameKey(entry.name)) || null;
+  const edit = action === 'edited'
+    ? describeBroadcastEdit({ entry, previousEntry, type, previousType, lang })
+    : null;
+  const isEnrich = action === 'enriched';
+  const newAlts = newAltNames.filter(Boolean);
+  const entryKey = normalizeNameKey(entry.name);
+  const totalTracked = (entry.allCharacters || [])
+    .filter((name) => normalizeNameKey(name) !== entryKey).length;
+
+  const headline = t(`dialogue.broadcast.headlines.${action}`, lang, {
+    name: formatLinkedCharacter(entry.name, snap),
+    list: listLabel,
+    scope: entry.scope === 'server' ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\`` : '',
+    summary: edit?.summary || '',
+    newCount: newAlts.length,
+    total: totalTracked,
+    altWord: t(`dialogue.broadcast.${newAlts.length === 1 ? 'altOne' : 'altMany'}`, lang),
+  });
+
+  const rosterFieldOptions = {
+    label: `${isEnrich ? '🆕' : '🧬'} ${t(`dialogue.broadcast.fields.${isEnrich ? 'newAlts' : 'trackedRosters'}`, lang)}`,
+    overflowTemplate: t('dialogue.broadcast.more', lang),
+  };
+  const altsField = isEnrich
+    ? renderTrackedAltsField({ names: newAlts, primaryName: entry.name, statMap, ...rosterFieldOptions })
+    : buildTrackedAltsField(entry, statMap, { ...rosterFieldOptions, newNames: edit?.addedAlts || [] });
+  const fields = buildBroadcastFields({
+    entry, action, snap, altsField, lang, statMap,
+    previous: edit?.previous,
+    previousReason: edit?.previousReason,
+  });
+
+  const embed = createArtistEmbed()
+    .setTitle(`${BROADCAST_TITLE_ICONS[action] || icon} ${t(`dialogue.broadcast.titles.${action}`, lang, {
+      list: listLabel,
+      name: entry.name,
+    })}`)
+    .setDescription(headline)
+    .addFields(fields)
+    .setColor(color)
+    .setTimestamp(new Date());
+  const components = buildBroadcastEvidenceComponents(entry, { legacyUrl, lang });
+  // The broadcast shows no image, so a replaced one is pointed at the button.
+  if (edit?.evidenceChanged && components.length > 0) {
+    embed.setFooter({ text: t('dialogue.broadcast.evidenceUpdatedFooter', lang) });
+  }
+  return { embeds: [embed], ...(components.length > 0 ? { components } : {}) };
 }
 
 export async function sendEmbedToChannels({
@@ -305,16 +431,32 @@ export function createBroadcastServices({ client }) {
     }
   }
 
+  /**
+   * Post a list change to every notify channel, each in its server's
+   * language.
+   * @param {'added'|'edited'|'removed'|'enriched'} action
+   * @param {object} entry - the entry as saved
+   * @param {object} payload - request context: type, guildId
+   * @param {object} [options]
+   * @param {boolean} [options.onlyOwner=false] - post to the owner server only
+   * @param {string} [options.displayUrl] - pre-resolved evidence image URL
+   * @param {object[]} [options.rosterCharacters=[]] - roster stats in hand
+   * @param {string[]} [options.newAltNames=[]] - alts an enrich run found
+   * @param {object} [options.previousEntry] - an edit's entry before the
+   *   edit; required when action is 'edited'
+   * @param {string} [options.previousType] - an edit's list type before
+   *   the edit, when it moved the entry
+   * @returns {Promise<void>}
+   */
   async function broadcastListChange(action, entry, payload, options = {}) {
     const {
       onlyOwner = false,
       displayUrl: preResolvedUrl,
       rosterCharacters = [],
       newAltNames = [],
-      changes = [],
+      previousEntry,
+      previousType,
     } = options;
-    const isEnrich = action === 'enriched';
-    const { color, icon } = getListContext(payload.type);
 
     // RosterSnapshot enrichment for class icon + ilvl + CP. Best-effort:
     // if /la-roster has queried this name before, the broadcast carries
@@ -335,66 +477,6 @@ export function createBroadcastServices({ client }) {
       initialRecords: [...snapshots, ...rosterCharacters],
     });
 
-    const snap = statMap.get(normalizeNameKey(entry.name)) || null;
-    // Description leads with a one-line headline so the recipient
-    // sees "What changed in which list" without parsing the fields.
-    // Class icon (when known) sits between the list-status icon and
-    // the linked name, as on the check and scan cards.
-    // Enrich gets a bespoke headline naming the new-alt count + running
-    // total (deliberately does NOT name the officer who ran it - the
-    // guild only needs to know the entry grew, not by whom).
-    const newAlts = (Array.isArray(newAltNames) ? newAltNames : []).filter(Boolean);
-    const newCount = newAlts.length;
-    const entryKey = normalizeNameKey(entry.name);
-    const totalTracked = allChars.filter((name) => normalizeNameKey(name) !== entryKey).length;
-    function buildPayloadForLanguage(lang) {
-      const listLabel = t(`dialogue.broadcast.list.${payload.type}`, lang);
-      const scopeTag = entry.scope === 'server'
-        ? ` \`[${t('dialogue.broadcast.localTag', lang)}]\``
-        : '';
-      const linkedName = formatLinkedCharacter(entry.name, snap);
-      const headlineKey = `dialogue.broadcast.headlines.${isEnrich ? 'enriched' : action}`;
-      const headline = t(headlineKey, lang, {
-        icon,
-        name: linkedName,
-        list: listLabel,
-        scope: scopeTag,
-        newCount,
-        total: totalTracked,
-        altWord: t(`dialogue.broadcast.${newCount === 1 ? 'altOne' : 'altMany'}`, lang),
-      });
-
-      // Code-wrap rule for every card in the list surfaces: fixed tokens
-      // and numbers (raid, ilvl, CP) render as `code` so they read as
-      // values; prose (reason) and links stay plain, and the timestamp
-      // MUST stay plain because backticks would print the raw
-      // <t:UNIX:R> instead of letting Discord localize it.
-      // An edit broadcast said only "someone edited this entry", which
-      // left every reader to diff the card against a memory of the old
-      // one. The same change lines the editor saw go here too.
-      const rosterFieldOptions = {
-        label: `${isEnrich ? '🆕' : '🧬'} ${t(`dialogue.broadcast.fields.${isEnrich ? 'newAlts' : 'trackedRosters'}`, lang)}`,
-        overflowTemplate: t('dialogue.broadcast.more', lang),
-      };
-      const altsField = isEnrich
-        ? renderTrackedAltsField({ names: newAlts, primaryName: entry.name, statMap, ...rosterFieldOptions })
-        : buildTrackedAltsField(entry, statMap, rosterFieldOptions);
-      const fields = buildBroadcastFields({ entry, action, changes, snap, altsField, lang, statMap });
-
-      const titleKey = TITLED_ACTIONS.has(action) ? action : 'fallback';
-      const embed = createArtistEmbed()
-        .setTitle(`🎨 ${t(`dialogue.broadcast.titles.${titleKey}`, lang, { list: listLabel })}`)
-        .setDescription(headline)
-        .addFields(fields)
-        .setColor(color)
-        .setTimestamp(new Date());
-      const components = buildBroadcastEvidenceComponents(entry, {
-        legacyUrl: preResolvedUrl !== undefined ? preResolvedUrl : entry.imageUrl,
-        lang,
-      });
-      return { embeds: [embed], ...(components.length > 0 ? { components } : {}) };
-    }
-
     const channelIds = await resolveBroadcastChannels(payload.guildId || '', { onlyOwner });
     if (channelIds.size === 0) return;
 
@@ -403,7 +485,17 @@ export function createBroadcastServices({ client }) {
       channelIds,
       buildPayload: async ({ channel }) => {
         const lang = await getGuildLanguage(channel.guild?.id, { GuildConfigModel: GuildConfig });
-        return buildPayloadForLanguage(lang);
+        return buildBroadcastPayload({
+          action,
+          entry,
+          type: payload.type,
+          statMap,
+          previousEntry,
+          previousType,
+          newAltNames,
+          legacyUrl: preResolvedUrl !== undefined ? preResolvedUrl : entry.imageUrl,
+          lang,
+        });
       },
       logLabel: '[list] Broadcast',
     });

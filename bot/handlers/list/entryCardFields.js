@@ -50,6 +50,23 @@ export function formatStruckValue(value, maxLength = Infinity) {
 }
 
 /**
+ * Build an inline field. When an edit changed its value, the label gains
+ * ✏️ and the old value is struck through above the new one.
+ * @param {string} label - field name with its icon
+ * @param {string} value - the value now
+ * @param {boolean} changed - the edit replaced this value
+ * @param {string} [oldValue] - the value before the edit
+ * @returns {{name: string, value: string, inline: boolean}}
+ */
+export function buildMarkedInlineField(label, value, changed, oldValue) {
+  return {
+    name: changed ? `${label}${CHANGED_MARK}` : label,
+    value: changed ? `${formatStruckValue(oldValue)}\n${value}` : value,
+    inline: true,
+  };
+}
+
+/**
  * The scope tag a success hero appends after the list name. Only
  * blacklist entries have a scope.
  * @param {string} type - black | white | watch
@@ -91,20 +108,14 @@ export function buildListEntryInlineFields({
   previous = {},
 }) {
   const notAvailable = t('dialogue.broadcast.notAvailable', lang);
-  const field = (label, value, changed, oldValue) => ({
-    name: changed ? `${label}${CHANGED_MARK}` : label,
-    value: changed ? `${formatStruckValue(oldValue)}\n${value}` : value,
-    inline: true,
-  });
-
   const inlineFields = [
-    field(
+    buildMarkedInlineField(
       `📒 ${t('dialogue.listAdd.success.fields.list', lang)}`,
       `${icon} ${labelCap}`,
       'list' in previous,
       previous.list ? `${previous.list.icon} ${previous.list.labelCap}` : '',
     ),
-    field(
+    buildMarkedInlineField(
       `🗡️ ${t('dialogue.listAdd.success.fields.raid', lang)}`,
       raid ? `\`${raid}\`` : notAvailable,
       'raid' in previous,
@@ -112,7 +123,7 @@ export function buildListEntryInlineFields({
     ),
   ];
   if (type === 'black') {
-    inlineFields.push(field(
+    inlineFields.push(buildMarkedInlineField(
       `🌐 ${t('dialogue.listAdd.success.fields.scope', lang)}`,
       scopeLabel(scope, lang),
       'scope' in previous,

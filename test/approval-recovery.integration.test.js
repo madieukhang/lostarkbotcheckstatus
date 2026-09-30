@@ -130,7 +130,7 @@ for (const surface of ['immediate', 'approved']) {
       await applyListEditNow({
         interaction, client: {}, existing, currentType: 'white', targetType: 'black', isTypeChange: true,
         targetScope: 'global', newScope: 'global', additionalNamesParsed: { added: [] },
-        changes: ['Move'], isOwner: true, editGuildId: 'guild', editGuildDefaultScope: 'global',
+        isOwner: true, editGuildId: 'guild', editGuildDefaultScope: 'global',
       });
     } else {
       let closed = false;

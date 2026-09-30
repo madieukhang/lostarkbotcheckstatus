@@ -104,8 +104,8 @@ for (const isMove of [false, true]) {
       existing, currentType, targetType: 'black', isTypeChange: isMove, targetScope: 'global',
       newImageUrl: 'https://example.test/upload.png',
       newImageRehost: { messageId: 'new-image', channelId: 'archive' },
-      additionalNamesParsed: { added: ['Newalt'] }, changes: ['Alts added'], isOwner: false,
-      broadcastListChange: async (_action, entry) => { broadcasts.push(entry); },
+      additionalNamesParsed: { added: ['Newalt'] }, isOwner: false,
+      broadcastListChange: async (_action, entry, _meta, options) => { broadcasts.push({ entry, options }); },
       interaction: {
         guild: { id: 'guild' },
         user: { id: 'officer', username: 'Officer', tag: 'Officer#0001' },
@@ -115,8 +115,11 @@ for (const isMove of [false, true]) {
     });
 
     assert.equal(broadcasts.length, 1);
-    assert.deepEqual(broadcasts[0].allCharacters, ['Oldalt', 'Newalt']);
-    assert.equal(broadcasts[0].imageMessageId, 'new-image');
+    assert.deepEqual(broadcasts[0].entry.allCharacters, ['Oldalt', 'Newalt']);
+    assert.equal(broadcasts[0].entry.imageMessageId, 'new-image');
+    // The broadcast marks the edit against the entry as it was before it.
+    assert.deepEqual([...broadcasts[0].options.previousEntry.allCharacters], ['Oldalt']);
+    assert.equal(broadcasts[0].options.previousType, currentType);
   });
 }
 
@@ -129,7 +132,7 @@ test('roster stat lookup failure does not turn a saved edit into an error or dup
   const replies = [];
   await applyListEditNow({
     existing, currentType: 'black', targetType: 'black', newReason: 'New',
-    additionalNamesParsed: { added: [] }, changes: ['Reason changed'], isOwner: true,
+    additionalNamesParsed: { added: [] }, isOwner: true,
     interaction: { user: { id: 'owner', username: 'Owner' }, editReply: async reply => replies.push(reply) }, client: {}, lang: 'vi',
   });
   assert.equal(saved, true);

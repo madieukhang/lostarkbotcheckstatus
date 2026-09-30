@@ -207,12 +207,14 @@ async function applyApprovedInPlaceUpdate(args) {
   }
 }
 
+// The broadcast compares the entry as saved with the one read before the
+// write, so it carries the same text and evidence updates the write applied.
 function broadcastApprovedEdit({ payload, existingEntry, broadcastListChange }) {
   const scope = payload.scope || existingEntry.scope || 'global';
+  const previousEntry = existingEntry.toObject?.() || existingEntry;
   broadcastListChange('edited', {
-    ...(existingEntry.toObject?.() || existingEntry),
-    reason: payload.reason || existingEntry.reason,
-    raid: payload.raid || existingEntry.raid,
+    ...previousEntry,
+    ...buildApprovalUpdateFields(payload, existingEntry),
     scope,
     allCharacters: normalizeNameList([
       ...(existingEntry.allCharacters || []),
@@ -223,7 +225,11 @@ function broadcastApprovedEdit({ payload, existingEntry, broadcastListChange }) 
     guildId: payload.guildId,
     requestedByDisplayName: payload.requestedByDisplayName,
     requestedByTag: payload.requestedByTag,
-  }, { onlyOwner: scope === 'server' }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
+  }, {
+    onlyOwner: scope === 'server',
+    previousEntry,
+    previousType: payload.currentType || payload.type,
+  }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 }
 
 function buildApprovedPayload(interaction, payload, targetLang) {

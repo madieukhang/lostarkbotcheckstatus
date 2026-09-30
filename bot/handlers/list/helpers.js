@@ -115,6 +115,99 @@ export function buildTrustedBlockEmbed(name, reason, { via, lang = 'en' } = {}) 
 }
 
 /**
+ * Compare a list entry with its state before an edit, in the shapes the
+ * entry card builders take: `previous` holds only the inline values that
+ * changed, and `previousReason` is set only when the reason changed.
+ * @param {object} options
+ * @param {object} options.entry - the entry after the edit
+ * @param {object} options.previousEntry - the entry before the edit
+ * @param {string} options.type - list type after the edit
+ * @param {string} [options.previousType] - list type before the edit
+ * @param {boolean} [options.isMove] - the edit moved the entry to another
+ *   list; defaults to comparing the two types
+ * @param {string} options.lang - locale
+ * @returns {{
+ *   changed: {reason: boolean, list: boolean, raid: boolean, scope: boolean},
+ *   previous: object,
+ *   previousReason: (string|undefined),
+ * }}
+ */
+export function describeListEntryEdit({
+  entry,
+  previousEntry,
+  type,
+  previousType = type,
+  isMove = previousType !== type,
+  lang,
+}) {
+  const scope = entry.scope || 'global';
+  const changed = {
+    reason: (entry.reason || '') !== (previousEntry.reason || ''),
+    list: isMove,
+    raid: (entry.raid || '') !== (previousEntry.raid || ''),
+    // A move into blacklist sets a scope for the first time; plan.js does
+    // not count that as a scope change, and neither do the cards.
+    scope: !isMove && type === 'black' && scope !== (previousEntry.scope || 'global'),
+  };
+
+  const previous = {};
+  if (changed.list) {
+    previous.list = {
+      icon: getListContext(previousType).icon,
+      labelCap: t(`dialogue.broadcast.list.${previousType}`, lang),
+    };
+  }
+  if (changed.raid) previous.raid = previousEntry.raid || '';
+  if (changed.scope) previous.scope = previousEntry.scope || 'global';
+
+  return {
+    changed,
+    previous,
+    previousReason: changed.reason ? previousEntry.reason || '' : undefined,
+  };
+}
+
+/**
+ * The tail an edit hero or headline appends: the fields that changed, then
+ * the number of alts added. Logs and evidence have no field on the cards,
+ * so this is the only place that names them.
+ * @param {object} options
+ * @param {object} options.changed - from describeListEntryEdit
+ * @param {boolean} [options.logsChanged=false] - the edit replaced the logs link
+ * @param {boolean} [options.evidenceChanged=false] - the edit replaced the image
+ * @param {number} [options.addedAltCount=0] - alts the edit added
+ * @param {string} options.lang - locale
+ * @returns {string} '' when the edit changed nothing named here
+ */
+export function formatListEditSummary({
+  changed,
+  logsChanged = false,
+  evidenceChanged = false,
+  addedAltCount = 0,
+  lang,
+}) {
+  const changedLabels = [
+    changed.reason && t('dialogue.listAdd.success.fields.reason', lang),
+    changed.list && t('dialogue.listAdd.success.fields.list', lang),
+    changed.raid && t('dialogue.listAdd.success.fields.raid', lang),
+    changed.scope && t('dialogue.listAdd.success.fields.scope', lang),
+    logsChanged && t('dialogue.listEdit.success.summaryFields.logs', lang),
+    evidenceChanged && t('dialogue.listEdit.success.summaryFields.evidence', lang),
+  ].filter(Boolean).map((label) => `**${label}**`);
+  return [
+    changedLabels.length > 0
+      ? t('dialogue.listEdit.success.summaryChanged', lang, { fields: changedLabels.join(', ') })
+      : '',
+    addedAltCount > 0
+      ? t('dialogue.listEdit.success.summaryAlts', lang, {
+        count: addedAltCount,
+        altWord: t(`dialogue.broadcast.${addedAltCount === 1 ? 'altOne' : 'altMany'}`, lang),
+      })
+      : '',
+  ].join('');
+}
+
+/**
  * Build the main /la-list edit success card on the /la-list add card's
  * layout: the list icon and character name in the title, a hero line with
  * the editor and what changed, the add card's field run with replaced
@@ -153,30 +246,14 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   const { color, icon } = getListContext(type);
   const labelCap = t(`dialogue.broadcast.list.${type}`, lang);
   const scope = entry.scope || 'global';
-  const reasonChanged = (entry.reason || '') !== (previousEntry.reason || '');
-  const raidChanged = (entry.raid || '') !== (previousEntry.raid || '');
-  // A move into blacklist sets a scope for the first time; plan.js does not
-  // count that as a scope change, and neither does the card.
-  const scopeChanged = !isMove && type === 'black' && scope !== (previousEntry.scope || 'global');
-
-  const previous = {};
-  if (isMove) {
-    previous.list = {
-      icon: getListContext(previousType).icon,
-      labelCap: t(`dialogue.broadcast.list.${previousType}`, lang),
-    };
-  }
-  if (raidChanged) previous.raid = previousEntry.raid || '';
-  if (scopeChanged) previous.scope = previousEntry.scope || 'global';
+  const { changed, previous, previousReason } = describeListEntryEdit({
+    entry, previousEntry, type, previousType, isMove, lang,
+  });
 
   const fields = buildListEntryInlineFields({
     type, raid: entry.raid, scope, entry, statMap, icon, labelCap, lang, previous,
   });
-  fields.push(buildListEntryReasonField({
-    reason: entry.reason,
-    ...(reasonChanged ? { previousReason: previousEntry.reason || '' } : {}),
-    lang,
-  }));
+  fields.push(buildListEntryReasonField({ reason: entry.reason, previousReason, lang }));
   const rostersField = buildListEntryRostersField({
     names: entry.allCharacters,
     primaryName: entry.name,
@@ -186,24 +263,9 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   });
   if (rostersField) fields.push(rostersField);
 
-  // Logs and evidence have no field on the card, so the hero is the only
-  // place that names them.
-  const changedLabels = [
-    reasonChanged && t('dialogue.listAdd.success.fields.reason', lang),
-    isMove && t('dialogue.listAdd.success.fields.list', lang),
-    raidChanged && t('dialogue.listAdd.success.fields.raid', lang),
-    scopeChanged && t('dialogue.listAdd.success.fields.scope', lang),
-    logsChanged && t('dialogue.listEdit.success.summaryFields.logs', lang),
-    evidenceChanged && t('dialogue.listEdit.success.summaryFields.evidence', lang),
-  ].filter(Boolean).map((label) => `**${label}**`);
-  const summary = [
-    changedLabels.length > 0
-      ? t('dialogue.listEdit.success.summaryChanged', lang, { fields: changedLabels.join(', ') })
-      : '',
-    addedAlts.length > 0
-      ? t('dialogue.listEdit.success.summaryAlts', lang, { count: addedAlts.length })
-      : '',
-  ].join('');
+  const summary = formatListEditSummary({
+    changed, logsChanged, evidenceChanged, addedAltCount: addedAlts.length, lang,
+  });
 
   const embed = buildAlertEmbed({
     severity: AlertSeverity.SUCCESS,

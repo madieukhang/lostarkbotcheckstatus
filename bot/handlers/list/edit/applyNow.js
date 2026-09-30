@@ -276,7 +276,10 @@ function broadcastAppliedEdit(args, editedEntry) {
     guildId: args.interaction.guild.id,
     requestedByDisplayName: getInteractionDisplayName(args.interaction),
     requestedByTag: args.interaction.user.tag,
-  }, { changes: args.changes }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
+  }, {
+    previousEntry: args.existing,
+    previousType: args.currentType,
+  }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 }
 
 /**
@@ -312,7 +315,6 @@ export async function applyListEditNow({
   newImageRehost,
   newScope,
   additionalNamesParsed,
-  changes,
   isOwner,
   lang = 'en',
 }) {
@@ -335,7 +337,6 @@ export async function applyListEditNow({
     newImageRehost,
     newScope,
     additionalNamesParsed,
-    changes,
     isOwner,
     lang,
   };

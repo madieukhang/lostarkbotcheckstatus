@@ -129,6 +129,9 @@ export function createListAddOverwriteButtonHandler({
         return;
       }
 
+      // The broadcast marks what the overwrite replaced, so keep the entry
+      // as it was before the fields below are rewritten in place.
+      const previousEntry = dupeEntry.toObject?.() || { ...dupeEntry };
       dupeEntry.name = newName;
       // Only update roster if fetch succeeded · preserve old snapshot on failure
       if (rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0) {
@@ -184,6 +187,7 @@ export function createListAddOverwriteButtonHandler({
       }, {
         onlyOwner: dupeEntry.scope === 'server',
         rosterCharacters: rosterResult?.rosterCharacters || [],
+        previousEntry,
       }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 
       await notifyRequesterAboutDecision(payload, { ok: true }, false);

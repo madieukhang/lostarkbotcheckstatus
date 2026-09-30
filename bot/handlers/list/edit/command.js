@@ -250,7 +250,6 @@ async function dispatchListEdit({
       newImageRehost,
       newScope: input.newScope,
       additionalNamesParsed: plan.additionalNamesParsed,
-      changes: plan.changes,
       isOwner,
       lang,
     });

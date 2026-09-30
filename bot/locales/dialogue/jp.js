@@ -195,13 +195,14 @@ export default {
   broadcast: {
     list: { black: 'Blacklist', white: 'Whitelist', watch: 'Watchlist' },
     localTag: 'サーバー内',
-    titles: { added: '新しい記録ですの · {list}', removed: 'List から外れましたわ · {list}', edited: '記録を更新しましたの · {list}', enriched: 'Roster の手がかりが増えましたわ · {list}', fallback: 'List 更新 · {list}' },
+    titles: { added: '{list} · 追加 · {name}', removed: '{list} · 削除 · {name}', edited: '{list} · 更新 · {name}', enriched: '{list} · alt 追加 · {name}' },
     headlines: {
-      added: '{icon} {name} が **{list}**{scope} に入りましたわ。知っておきたいことは下にまとめてありますの。',
-      removed: '{icon} {name} が **{list}**{scope} から外れましたわ。その entry にあった内容はこちらですの。',
-      edited: '{icon} どなたかが **{list}**{scope} の {name} を書き直されましたわ。新しい内容は下にございますの。',
-      enriched: '{icon} **{list}**{scope} の {name} から alt をさらに **{newCount}** 名たどりましたわ。これで **{total}** 名を追っておりますの。',
+      added: '{name} が **{list}**{scope} に追加されましたわ。',
+      removed: '{name} が **{list}**{scope} から外れましたわ。',
+      edited: '**{list}**{scope} の {name} が更新されましたわ{summary}。',
+      enriched: '**{list}**{scope} の {name} から alt をさらに **{newCount}** 名たどりましたわ。これで **{total}** 名を追っておりますの。',
     },
+    evidenceUpdatedFooter: '📎 evidence が更新されましたわ · 下のボタンで開けますの',
     altOne: 'alt', altMany: 'alts',
     fields: { reason: '理由', raid: 'Raid', edited: '更新', added: '追加', itemLevel: 'ilvl', combatPower: 'CP', trackedRosters: '追跡中の roster', newAlts: '新しい alt' },
     notAvailable: '未設定', more: '...ほか {count} 名',
@@ -276,7 +277,7 @@ export default {
     originalMissing: { title: '元の entry がありませんの', description: 'この承認申請が参照していた entry は、承認完了前に削除されましたわ。' },
     moveBlocked: { title: 'List を移動できませんの', description: '**{name}** はすでに移動先 list にいますので、どちらの list も変更していませんわ。', footer: '競合 entry を先に削除してから、もう一度申請してくださいませ。' },
     scopeRaced: { title: 'Scope が別の場所で変わりましたの', description: '同じ名前の entry が保存前に移動先 scope を取得しましたわ。', footer: '編集を再申請するか、競合 entry を先に削除してくださいませ。' },
-    success: { titleMoved: '{list} · 編集して移動しましたわ · {name}', titleEdited: '{list} · 編集済み · {name}', changes: '変更 ({count})', hero: '**{user}** が **{list}**{scope} の {name} を編集しましたわ{summary}。', summaryChanged: ' · 変更: {fields}', summaryAlts: ' · alt **{count}** 体を追加', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: '{user} が編集' },
+    success: { titleMoved: '{list} · 編集して移動しましたわ · {name}', titleEdited: '{list} · 編集済み · {name}', hero: '**{user}** が **{list}**{scope} の {name} を編集しましたわ{summary}。', summaryChanged: ' · 変更: {fields}', summaryAlts: ' · alt **{count}** 体を追加', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: '{user} が編集' },
     evidence: { before: '変更前', after: '変更後', none: '以前の画像はありません', unavailable: '画像を読み込めません', download: '[元画像をダウンロード]({url})' },
     command: {
       notFound: { title: 'Entry が見つかりませんの', description: '**{name}** は blacklist / whitelist / watchlist にいませんわ。', footer: '`/la-list view` で既存 entry を確認できますの。' }, additionalRestricted: { title: 'この option は制限されていますの', description: '`additional_names` は officer または entry owner だけが使えますわ。', footer: 'Officer に alt 追加をお願いしてくださいませ。' }, noChanges: { title: '変更がありませんの', description: '任意 edit field が一つも設定されていませんわ。', footer: 'reason / type / raid / logs / image / scope / additional_names のどれかを設定してくださいませ。' },

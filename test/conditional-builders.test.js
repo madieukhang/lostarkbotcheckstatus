@@ -13,26 +13,37 @@ test('broadcast fields keep optional metadata ordered without empty placeholders
   const fields = buildBroadcastFields({
     entry: {
       name: 'Main',
-      reason: 'Reason',
+      reason: 'New reason',
       raid: 'Aegir',
       addedAt: new Date('2026-08-30T00:00:00Z'),
     },
     action: 'edited',
-    changes: ['Reason: old → new'],
     snap: { itemLevel: 1790, combatScore: '6180.57' },
     altsField: rosterField,
     lang: 'en',
+    previous: { raid: 'Brelshaza' },
+    previousReason: 'Old reason',
   });
 
   // Reason, four inline metadata fields padded to a whole three-column
-  // row, then changes and the roster list.
-  assert.equal(fields.length, 9);
-  assert.equal(fields[1].value, '`Aegir`');
+  // row, then the roster list. The replaced values sit struck above the
+  // new ones, as on the /la-list edit card.
+  assert.equal(fields.length, 8);
+  assert.deepEqual(
+    { name: fields[0].name, value: fields[0].value },
+    { name: '📝 Reason ✏️', value: '~~Old reason~~\nNew reason' },
+  );
+  assert.deepEqual(
+    { name: fields[1].name, value: fields[1].value },
+    { name: '🗡️ Raid ✏️', value: '~~Brelshaza~~\n`Aegir`' },
+  );
+  // An edit is stamped with the time of the edit, not of the add.
+  const [, editedAt] = fields[2].value.match(/^<t:(\d+):R>$/);
+  assert.ok(Math.abs(Number(editedAt) - Date.now() / 1000) < 60);
   assert.equal(fields[3].value, '`1790.00`');
-  assert.equal(fields[4].value, '`6180.57`');
+  assert.equal(fields[4].value, '`6180.57 CP`');
   assert.equal(fields.filter((field) => field.inline).length % 3, 0);
-  assert.match(fields[7].value, /old → new/);
-  assert.equal(fields[8], rosterField);
+  assert.equal(fields[7], rosterField);
 
   const minimal = buildBroadcastFields({
     entry: { name: 'Main', reason: '' },

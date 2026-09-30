@@ -220,13 +220,14 @@ export default {
   broadcast: {
     list: { black: 'Blacklist', white: 'Whitelist', watch: 'Watchlist' },
     localTag: 'Nội bộ server',
-    titles: { added: 'Một ghi chú mới · {list}', removed: 'Một cái tên rời list · {list}', edited: 'Ghi chú vừa được sửa · {list}', enriched: 'Dấu vết roster vừa dài thêm · {list}', fallback: 'Cập nhật list · {list}' },
+    titles: { added: '{list} · Đã thêm · {name}', removed: '{list} · Đã gỡ · {name}', edited: '{list} · Đã cập nhật · {name}', enriched: '{list} · Thêm alt · {name}' },
     headlines: {
-      added: '{icon} {name} vừa vào **{list}**{scope} rồi. Mọi thứ đáng biết tớ để ngay bên dưới.',
-      removed: '{icon} {name} vừa rời khỏi **{list}**{scope}. Đây là những gì entry đó từng có.',
-      edited: '{icon} Có người vừa sửa lại {name} trong **{list}**{scope}. Nội dung mới nằm bên dưới.',
-      enriched: '{icon} Tớ lần ra thêm **{newCount}** alt của {name} trong **{list}**{scope} - vị chi là **{total}** alt đang theo dõi.',
+      added: '{name} đã được thêm vào **{list}**{scope}.',
+      removed: '{name} đã được gỡ khỏi **{list}**{scope}.',
+      edited: '{name} trong **{list}**{scope} vừa được cập nhật{summary}.',
+      enriched: 'Tớ tìm thêm được **{newCount}** alt của {name} trong **{list}**{scope}, giờ đang theo dõi **{total}** alt.',
     },
+    evidenceUpdatedFooter: '📎 Evidence đã đổi · bấm nút bên dưới để mở',
     altOne: 'alt', altMany: 'alt',
     fields: { reason: 'Lý do', raid: 'Raid', edited: 'Đã sửa', added: 'Đã thêm', itemLevel: 'ilvl', combatPower: 'CP', trackedRosters: 'Danh sách roster', newAlts: 'Alt mới' },
     notAvailable: 'Chưa có', more: '... và {count} tên khác',
@@ -301,7 +302,7 @@ export default {
     originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry của yêu cầu duyệt này đã bị xóa trước khi lượt duyệt hoàn tất.' },
     moveBlocked: { title: 'Không thể chuyển list', description: '**{name}** đã tồn tại trong list đích nên tớ giữ nguyên cả hai list.', footer: 'Xóa entry bị trùng ở list đích rồi gửi lại yêu cầu nhé.' },
     scopeRaced: { title: 'Scope vừa bị thay đổi ở nơi khác', description: 'Một entry cùng tên đã chiếm scope đích trước khi chỉnh sửa này được lưu.', footer: 'Gửi lại chỉnh sửa hoặc xóa entry bị trùng trước nhé.' },
-    success: { titleMoved: '{list} · Đã sửa và chuyển list · {name}', titleEdited: '{list} · Đã chỉnh sửa · {name}', changes: 'Thay đổi ({count})', hero: '**{user}** đã sửa {name} trong **{list}**{scope}{summary}.', summaryChanged: ' · đổi {fields}', summaryAlts: ' · thêm **{count}** alt', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: 'Sửa bởi {user}' },
+    success: { titleMoved: '{list} · Đã sửa và chuyển list · {name}', titleEdited: '{list} · Đã chỉnh sửa · {name}', hero: '**{user}** đã sửa {name} trong **{list}**{scope}{summary}.', summaryChanged: ' · đổi {fields}', summaryAlts: ' · thêm **{count}** alt', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: 'Sửa bởi {user}' },
     evidence: { before: 'Trước khi đổi', after: 'Sau khi đổi', none: 'Chưa có ảnh', unavailable: 'Không tải được ảnh', download: '[Tải ảnh gốc]({url})' },
     command: {
       notFound: { title: 'Không tìm thấy entry', description: '**{name}** không nằm trong blacklist, whitelist hay watchlist.', footer: 'Dùng `/la-list view` để xem entry hiện có nhé.' }, additionalRestricted: { title: 'Option này được giới hạn', description: 'Chỉ officer và chủ entry mới dùng được `additional_names`.', footer: 'Nhờ officer thêm alt giúp cậu nhé.' }, noChanges: { title: 'Chưa có thay đổi nào', description: 'Cậu chưa đặt field chỉnh sửa tùy chọn nào.', footer: 'Đặt ít nhất một mục: reason / type / raid / logs / image / scope / additional_names.' },

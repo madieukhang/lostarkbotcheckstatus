@@ -72,6 +72,7 @@ for (const protectedAlt of [true, false]) {
     mockPendingApprovalModel(t, PendingApproval, payload);
     let saves = 0;
     let broadcasts = 0;
+    let broadcastPrevious;
     const original = { name: 'Original', allCharacters: ['Originalalt'], scope: 'server', guildId: 'original-guild', save: async () => { saves += 1; } };
     t.mock.method(Blacklist, 'findById', async () => original);
     t.mock.method(TrustedUser, 'findOne', query => {
@@ -83,7 +84,10 @@ for (const protectedAlt of [true, false]) {
     await createListAddOverwriteButtonHandler({
       buildRosterCharactersFn: async () => ({ hasValidRoster: true, allCharacters: ['Newmain', 'Protectedalt'] }),
       syncApproverDmMessages: async () => {},
-      broadcastListChange: async () => { broadcasts += 1; },
+      broadcastListChange: async (_action, _entry, _meta, options) => {
+        broadcasts += 1;
+        broadcastPrevious = options.previousEntry;
+      },
       notifyRequesterAboutDecision: async (_payload, result) => { decision = result; },
     })({
       customId: 'listadd_overwrite:pending', user: { id: 'officer', tag: 'Officer' }, message: { id: 'dm' },
@@ -96,6 +100,14 @@ for (const protectedAlt of [true, false]) {
     assert.deepEqual(original.allCharacters, protectedAlt ? ['Originalalt'] : ['Newmain', 'Protectedalt']);
     assert.equal(original.scope, 'server', 'overwrite must retain the original scope');
     assert.equal(original.guildId, 'original-guild');
+    if (!protectedAlt) {
+      // The overwrite rewrites the entry in place; the broadcast compares
+      // against the entry as it was before that.
+      assert.deepEqual(
+        { name: broadcastPrevious.name, allCharacters: broadcastPrevious.allCharacters },
+        { name: 'Original', allCharacters: ['Originalalt'] },
+      );
+    }
     assert.deepEqual(decision, { ok: !protectedAlt });
     if (protectedAlt) assert.match(JSON.stringify(edits[0].embeds[0].toJSON()), /Newly trusted/);
   });
