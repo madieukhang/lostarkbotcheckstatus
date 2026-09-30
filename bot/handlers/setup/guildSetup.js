@@ -43,12 +43,15 @@ import {
   resolveWelcomePinContext,
 } from './setupGuards.js';
 
+function welcomeCleanupLine(outcome, lang) {
+  if (!outcome?.cleanupAttempted) return '';
+  return outcome.cleanupComplete
+    ? `🧹 ${t('dialogue.setup.welcomeCleaned', lang, { count: outcome.cleanupDeleted })}`
+    : `⚠️ ${t('dialogue.setup.welcomeCleanupIncomplete', lang, { count: outcome.cleanupDeleted })}`;
+}
+
 export function welcomeOutcomeText(outcome, lang) {
-  const cleanupLine = outcome?.cleanupAttempted
-    ? outcome.cleanupComplete
-      ? `🧹 ${t('dialogue.setup.welcomeCleaned', lang, { count: outcome.cleanupDeleted })}`
-      : `⚠️ ${t('dialogue.setup.welcomeCleanupIncomplete', lang, { count: outcome.cleanupDeleted })}`
-    : '';
+  const cleanupLine = welcomeCleanupLine(outcome, lang);
   if (outcome?.pinned && outcome?.persisted) {
     const pinLine = `🎨 ${t('dialogue.setup.welcomePinned', lang)}` +
       (outcome.removedOldCount > 0
@@ -60,6 +63,64 @@ export function welcomeOutcomeText(outcome, lang) {
     ? 'dialogue.setup.welcomeFailed'
     : 'dialogue.setup.welcomeCreateFailed';
   return [cleanupLine, `⚠️ ${t(failureKey, lang)}`].filter(Boolean).join('\n');
+}
+
+// Per channel purpose: the other purpose a shared channel also serves, and
+// the actions that turn this channel's cleanup on and off.
+const CHANNEL_SET_PURPOSES = Object.freeze({
+  autoCheck: { other: 'notification', cleanupActions: { on: 'cleanup-on', off: 'cleanup-off' } },
+  notification: { other: 'autoCheck', cleanupActions: { on: 'notify-cleanup-on', off: 'notify-cleanup-off' } },
+});
+
+/**
+ * The result card of set-auto-channel and set-notify-channel. The channel
+ * opens the description because Discord renders no mention in a title.
+ * @param {object} options
+ * @param {'autoCheck'|'notification'} options.purpose - which channel was set
+ * @param {string} options.channelId - the channel now configured
+ * @param {boolean} options.cleanupEnabled - this channel's cleanup setting
+ * @param {boolean} options.sharesChannel - the channel also serves the other purpose
+ * @param {object} options.welcome - outcome of pinning the channel guide
+ * @param {string} options.lang - locale
+ * @returns {object} options for buildAlertEmbed
+ */
+export function buildChannelSetResult({ purpose, channelId, cleanupEnabled, sharesChannel, welcome, lang }) {
+  const copy = `dialogue.setup.channelSet.${purpose}`;
+  const { other, cleanupActions } = CHANNEL_SET_PURPOSES[purpose];
+  const cleanup = cleanupEnabled ? 'on' : 'off';
+  const toggle = cleanupEnabled ? 'off' : 'on';
+  const guide = [
+    t('dialogue.setup.channelSet.pinned', lang),
+    welcome.removedOldCount > 0
+      ? t('dialogue.setup.welcomeReplaced', lang, { count: welcome.removedOldCount })
+      : '',
+  ].filter(Boolean).join(' · ');
+  return {
+    severity: AlertSeverity.SUCCESS,
+    title: t(`${copy}.title`, lang),
+    description: [
+      `📍 <#${channelId}>`,
+      t(`${copy}.line`, lang),
+      sharesChannel
+        ? `⚠️ ${t('dialogue.setup.sameChannelWarning', lang, { other: t(`dialogue.setup.purpose.${other}`, lang) })}`
+        : '',
+      welcomeCleanupLine(welcome, lang),
+    ].filter(Boolean).join('\n'),
+    fields: [
+      { name: `📌 ${t('dialogue.setup.channelSet.fields.guide', lang)}`, value: guide, inline: true },
+      {
+        name: `🧹 ${t('dialogue.setup.channelSet.fields.cleanup', lang)}`,
+        value: t(`dialogue.setup.channelSet.cleanupState.${cleanup}`, lang),
+        inline: true,
+      },
+      {
+        name: `💡 ${t(`dialogue.setup.channelSet.fields.turnCleanup.${toggle}`, lang)}`,
+        value: `\`/la-setup config action:${cleanupActions[toggle]}\``,
+        inline: true,
+      },
+    ],
+    footer: t(`${copy}.footer.${cleanup}`, lang),
+  };
 }
 
 function buildCleanupToggleMessage(namespace, enabled, guideLine, lang) {
@@ -116,23 +177,14 @@ async function handleSetupAutoChannel(interaction, lang) {
     return;
   }
 
-  const warning = sameAsNotify
-    ? `\n⚠️ ${t('dialogue.setup.sameChannelWarning', lang, { other: t('dialogue.setup.purpose.notification', lang) })}`
-    : '';
-
-  await editNotice(
-    interaction,
-    `✅ ${t('dialogue.setup.autoChannelSet', lang, {
-      channel: channel.id,
-      cleanup: t(
-        `dialogue.setup.autoCleanup.${cleanupEnabled ? 'enabled' : 'disabled'}`,
-        lang
-      ),
-      warning,
-      welcome: welcomeOutcomeText(welcome, lang),
-    })}`,
-    { severity: AlertSeverity.SUCCESS, lang }
-  );
+  await editAlert(interaction, buildChannelSetResult({
+    purpose: 'autoCheck',
+    channelId: channel.id,
+    cleanupEnabled,
+    sharesChannel: sameAsNotify,
+    welcome,
+    lang,
+  }));
 
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) set autoCheckChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);
@@ -194,22 +246,14 @@ async function handleSetupNotifyChannel(interaction, lang) {
     return;
   }
 
-  const warning = sameAsAutoCheck
-    ? `\n⚠️ ${t('dialogue.setup.sameChannelWarning', lang, { other: t('dialogue.setup.purpose.autoCheck', lang) })}`
-    : '';
-
-  await editNotice(interaction, `✅ ${t('dialogue.setup.notifyChannelSet', lang, {
-    channel: channel.id,
-    warning,
-    welcome: welcomeOutcomeText(welcome, lang),
-    cleanup: t(
-      `dialogue.setup.listNotifyCleanup.${cleanupEnabled ? 'enabled' : 'disabled'}`,
-      lang
-    ),
-  })}`, {
-    severity: AlertSeverity.SUCCESS,
+  await editAlert(interaction, buildChannelSetResult({
+    purpose: 'notification',
+    channelId: channel.id,
+    cleanupEnabled,
+    sharesChannel: sameAsAutoCheck,
+    welcome,
     lang,
-  });
+  }));
 
   invalidateGuildConfig(interaction.guild.id);
   console.log(`[la-setup] Guild ${interaction.guild.name} (${interaction.guild.id}) set listNotifyChannel → #${channel.name} (${channel.id}) by ${interaction.user.tag}`);

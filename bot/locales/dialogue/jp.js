@@ -95,9 +95,28 @@ export default {
     welcomeCleanupIncomplete: '最初の掃除は **{count}** 件削除したところで未完了でしたの。毎日の cleaner が再試行しますわ。',
     sameChannelWarning: 'ここは {other} チャンネルと同じですの。分けた方が読みやすいですわ。',
     autoChannelNotSet: '<#{channel}> に welcome pin を作成して保存できなかったため、auto-check チャンネルは変更していませんの。\n{welcome}',
-    autoChannelSet: 'Auto-check チャンネルを <#{channel}> に設定しました。\nわたくしが投稿された screenshot を自動確認しますの。{warning}\n{welcome}\n{cleanup}',
     notifyChannelNotSet: '<#{channel}> に welcome pin を作成して保存できなかったため、通知チャンネルは変更していませんの。\n{welcome}',
-    notifyChannelSet: '通知チャンネルを <#{channel}> に設定しました。\nリスト変更をここへ送りますの。{warning}\n{welcome}\n{cleanup}',
+    channelSet: {
+      pinned: 'ピン留め済み',
+      fields: { guide: 'ガイド', cleanup: 'Cleanup', turnCleanup: { on: 'Cleanup をオンにする', off: 'Cleanup をオフにする' } },
+      cleanupState: { on: 'オン', off: 'オフ' },
+      autoCheck: {
+        title: 'Auto-check チャンネルを設定しましたわ',
+        line: 'わたくしが投稿された screenshot を自動確認しますの。',
+        footer: {
+          on: '00:00 (ベトナム時間) に通常 message を片付けますわ。ピンはすべて残しますの。',
+          off: 'Cleanup がオフの間、通常 message は削除しませんわ。',
+        },
+      },
+      notification: {
+        title: '通知チャンネルを設定しましたわ',
+        line: '他の server のリスト変更をここへ送りますの。',
+        footer: {
+          on: '30分ごとに未 pin のカードを片付けて、ガイドを作り直しますわ。',
+          off: 'Cleanup がオフの間、カードは admin が片付けるまで残りますの。',
+        },
+      },
+    },
     actions: {
       show: 'ステータスを表示',
       setAutoChannel: 'auto-check channel を設定',

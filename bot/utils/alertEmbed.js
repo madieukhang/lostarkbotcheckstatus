@@ -111,6 +111,9 @@ export function buildAlertEmbed({
 }
 
 const LEADING_NOTICE_ICON = /^(?:✅|⚠️|❌|ℹ️|🛡️|⏳|🔍|🔔|🔕|🌐|🔒|🛑|✖️)\s*/u;
+// A title shows <#id>, <@id> and <t:unix> as raw text, so a first line
+// that names a channel, member, role or time is never promoted to one.
+const DISCORD_MENTION = /<(?:#|@[!&]?|t:)\d+/u;
 
 /**
  * Discord renders no markdown in an embed title, so bold and code marks
@@ -146,7 +149,10 @@ export function buildNoticeEmbed(content, {
   const text = String(content ?? '').trim();
   const lines = text.split(/\r?\n/);
   const firstLine = (lines[0] || '').replace(LEADING_NOTICE_ICON, '').trim();
-  const canPromoteFirstLine = !title && firstLine.length > 0 && firstLine.length <= 256;
+  const canPromoteFirstLine = !title
+    && firstLine.length > 0
+    && firstLine.length <= 256
+    && !DISCORD_MENTION.test(firstLine);
   const resolvedTitle = title || (canPromoteFirstLine ? stripInlineMarkdown(firstLine) : undefined);
   const description = canPromoteFirstLine
     ? lines.slice(1).join('\n').trim()

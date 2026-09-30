@@ -116,9 +116,28 @@ export default {
     welcomeCleanupIncomplete: 'Lần dọn đầu chưa hoàn tất sau khi xóa **{count}** tin; bộ dọn hằng ngày sẽ thử lại.',
     sameChannelWarning: 'Đây cũng là channel {other}. Tách riêng hai channel sẽ dễ đọc hơn.',
     autoChannelNotSet: 'Auto-check channel chưa được thay đổi vì tớ không thể tạo và lưu welcome pin trong <#{channel}>.\n{welcome}',
-    autoChannelSet: 'Đã đặt auto-check channel thành <#{channel}>.\nTớ sẽ tự kiểm tra screenshot gửi tại đó.{warning}\n{welcome}\n{cleanup}',
     notifyChannelNotSet: 'Notification channel chưa được thay đổi vì tớ không thể tạo và lưu welcome pin trong <#{channel}>.\n{welcome}',
-    notifyChannelSet: 'Đã đặt notification channel thành <#{channel}>.\nCác thay đổi danh sách sẽ được gửi tại đó.{warning}\n{welcome}\n{cleanup}',
+    channelSet: {
+      pinned: 'Đã ghim',
+      fields: { guide: 'Hướng dẫn', cleanup: 'Dọn dẹp', turnCleanup: { on: 'Bật dọn dẹp', off: 'Tắt dọn dẹp' } },
+      cleanupState: { on: 'Bật', off: 'Tắt' },
+      autoCheck: {
+        title: 'Đã đặt auto-check channel',
+        line: 'Tớ sẽ tự kiểm tra screenshot gửi tại đó.',
+        footer: {
+          on: 'Lúc 00:00 (giờ VN) tớ dọn tin thường ở đó và giữ nguyên mọi tin đã ghim.',
+          off: 'Khi dọn dẹp đang tắt, tớ không bao giờ xoá tin thường.',
+        },
+      },
+      notification: {
+        title: 'Đã đặt notification channel',
+        line: 'Thay đổi list từ các server khác sẽ được gửi tại đó.',
+        footer: {
+          on: 'Cứ 30 phút tớ dọn các card chưa ghim ở đó và dựng lại hướng dẫn.',
+          off: 'Khi dọn dẹp đang tắt, card nằm lại cho tới khi admin dọn.',
+        },
+      },
+    },
     actions: {
       show: 'Xem trạng thái',
       setAutoChannel: 'Đặt channel auto-check',

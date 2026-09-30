@@ -147,9 +147,28 @@ export default {
     welcomeCleanupIncomplete: 'Initial cleanup was incomplete after removing **{count}** message(s); the daily cleaner will retry.',
     sameChannelWarning: 'This is also the {other} channel. Separate channels will be easier to read.',
     autoChannelNotSet: 'Auto-check channel was not changed because I could not create and save a welcome pin in <#{channel}>.\n{welcome}',
-    autoChannelSet: 'Auto-check channel set to <#{channel}>.\nI will check screenshots posted there automatically.{warning}\n{welcome}\n{cleanup}',
     notifyChannelNotSet: 'Notification channel was not changed because I could not create and save a welcome pin in <#{channel}>.\n{welcome}',
-    notifyChannelSet: 'Notification channel set to <#{channel}>.\nList changes will be broadcast there.{warning}\n{welcome}\n{cleanup}',
+    channelSet: {
+      pinned: 'Pinned',
+      fields: { guide: 'Guide', cleanup: 'Cleanup', turnCleanup: { on: 'Turn cleanup on', off: 'Turn cleanup off' } },
+      cleanupState: { on: 'On', off: 'Off' },
+      autoCheck: {
+        title: 'Auto-check channel set',
+        line: 'I will check screenshots posted there automatically.',
+        footer: {
+          on: 'At 00:00 (VN time) I clear ordinary messages there and keep every pin.',
+          off: 'While cleanup is off I never delete ordinary messages.',
+        },
+      },
+      notification: {
+        title: 'Notification channel set',
+        line: 'List changes from other servers will be posted there.',
+        footer: {
+          on: 'Every 30 minutes I clear unpinned cards there and rebuild the guide.',
+          off: 'While cleanup is off, cards stay until an admin clears them.',
+        },
+      },
+    },
     actions: {
       show: 'Show status',
       setAutoChannel: 'Set auto-check channel',
