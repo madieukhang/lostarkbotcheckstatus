@@ -14,6 +14,7 @@ import { t } from '../../../services/i18n/index.js';
 import {
   buildApprovalResultRow,
   buildApprovalRetryRow,
+  buildDecidedApprovalEmbed,
 } from '../helpers.js';
 import { createApprovalDecisionHandler, handleApprovalClaimError } from '../services/approvalInteraction.js';
 import { handleApprovedEditRequest } from './editApproval.js';
@@ -64,10 +65,9 @@ export function createListAddApprovalButtonHandler({
 
       const buildRejectedPayload = (targetLang) => ({
         content: null,
-        embeds: [buildNoticeEmbed(
-          t('dialogue.approval.flow.rejectedBy', targetLang, { user: interaction.user.tag }),
-          { severity: AlertSeverity.ERROR, titleIcon: '✖️', lang: targetLang }
-        )],
+        embeds: [buildDecidedApprovalEmbed({
+          client: interaction.client, payload, outcome: 'rejected', approver: interaction.user.tag, lang: targetLang,
+        })],
         components: [buildApprovalResultRow('Rejected', targetLang)],
       });
       await updateApprovers(buildRejectedPayload);
@@ -123,16 +123,14 @@ export function createListAddApprovalButtonHandler({
 
       const buildCompletedPayload = (targetLang) => ({
         content: null,
-        embeds: [buildNoticeEmbed(
-          t(`dialogue.approval.flow.${result.ok ? 'approvedSuccess' : 'approvedReturned'}`, targetLang, {
-            user: interaction.user.tag,
-            result: result.content,
-          }),
-          {
-            severity: result.ok ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
-            lang: targetLang,
-          }
-        )],
+        embeds: [buildDecidedApprovalEmbed({
+          client: interaction.client,
+          payload,
+          outcome: result.ok ? 'approved' : 'returned',
+          approver: interaction.user.tag,
+          result: result.content,
+          lang: targetLang,
+        })],
         components: [buildApprovalResultRow(result.ok ? 'Approved' : 'Processed', targetLang)],
       });
       await updateApprovers(buildCompletedPayload);

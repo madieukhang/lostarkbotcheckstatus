@@ -22,7 +22,6 @@ const jp = {
       keepExisting: '既存を維持',
       keptExisting: '既存を維持済み',
       overwritten: '上書き済み',
-      viewEvidenceFresh: '📎 evidence を見る (fresh)',
       viewEvidence: 'evidence を見る',
       openEvidence: 'evidence を開く',
       approveAdd: '承認 · {count} 件追加',

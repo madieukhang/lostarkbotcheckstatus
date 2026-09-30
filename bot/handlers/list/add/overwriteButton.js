@@ -11,13 +11,14 @@
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
-import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { t } from '../../../services/i18n/index.js';
 import {
   getListContext,
   buildApprovalResultRow,
   buildApprovalRetryRow,
+  buildDecidedApprovalEmbed,
   buildTrustedBlockEmbed,
 } from '../helpers.js';
 import { findTrustedEditConflict } from '../edit/trustedGuard.js';
@@ -75,10 +76,9 @@ export function createListAddOverwriteButtonHandler({
       // Keep the existing entry and explain the duplicate to the requester.
       const buildKeptPayload = (targetLang) => ({
         content: null,
-        embeds: [buildNoticeEmbed(
-          t('dialogue.approval.flow.keptExisting', targetLang, { name: payload.name }),
-          { severity: AlertSeverity.SUCCESS, lang: targetLang }
-        )],
+        embeds: [buildDecidedApprovalEmbed({
+          client: interaction.client, payload, outcome: 'kept', approver: interaction.user.tag, lang: targetLang,
+        })],
         components: [buildApprovalResultRow('Kept Existing', targetLang)],
       });
       await updateApprovers(buildKeptPayload);
@@ -168,10 +168,9 @@ export function createListAddOverwriteButtonHandler({
 
       const buildOverwrittenPayload = (targetLang) => ({
         content: null,
-        embeds: [buildNoticeEmbed(
-          t('dialogue.approval.flow.overwritten', targetLang, { user: interaction.user.tag }),
-          { severity: AlertSeverity.SUCCESS, lang: targetLang }
-        )],
+        embeds: [buildDecidedApprovalEmbed({
+          client: interaction.client, payload, outcome: 'overwritten', approver: interaction.user.tag, lang: targetLang,
+        })],
         components: [buildApprovalResultRow('Overwritten', targetLang)],
       });
       await updateApprovers(buildOverwrittenPayload);

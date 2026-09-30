@@ -22,7 +22,6 @@ const vi = {
       keepExisting: 'Giữ entry cũ',
       keptExisting: 'Đã giữ entry cũ',
       overwritten: 'Đã ghi đè',
-      viewEvidenceFresh: '📎 Xem evidence (fresh)',
       viewEvidence: 'Xem evidence',
       openEvidence: 'Mở evidence',
       approveAdd: 'Duyệt · thêm {count}',

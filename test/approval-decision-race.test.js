@@ -36,6 +36,7 @@ for (const secondAction of ['reject', 'approve']) {
     });
     const click = (id, action) => ({
       customId: `listadd_${action}:race`, user: { id, tag: id }, message: { id },
+      client: { guilds: { cache: new Map() } },
       deferUpdate: async () => { if (++acknowledgements === 2) release(); await acknowledged; },
       editReply: async () => {}, reply: async () => {}, followUp: async () => {},
     });
@@ -122,6 +123,7 @@ test('a transient single-approval failure retains a working retry button and com
   });
   const click = {
     customId: 'listadd_approve:race', user: { id: 'a' }, message: { id: 'dm' },
+    client: { guilds: { cache: new Map() } },
     deferUpdate: async () => {}, editReply: async value => edits.push(value), followUp: async () => {},
   };
   await handler(click);

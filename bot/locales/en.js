@@ -22,7 +22,6 @@ const en = {
       keepExisting: 'Keep Existing',
       keptExisting: 'Kept Existing',
       overwritten: 'Overwritten',
-      viewEvidenceFresh: '📎 View Evidence (Fresh)',
       viewEvidence: 'View evidence',
       openEvidence: 'Open evidence',
       approveAdd: 'Approve · Add {count}',

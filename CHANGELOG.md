@@ -14,6 +14,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ### Changed
 - The notice a requester gets when their list add or edit is decided reads like the `/la-list add` card: `Blacklist · Approved · Name`, one line saying what happened, then the list, raid and scope the request asked for. It no longer says "an officer" decided, since approvers are seniors. The report's reason stays off this public card.
+- An approver's DM keeps the whole request after they decide. It used to collapse into one line such as "Approved by …"; now every field stays, the title and colour show the outcome, and a **Decision** field names who decided and when. The request card itself says "A member of … asked to add …" instead of "An officer …", and its evidence button reads **View evidence**.
 
 ### Fixed
 - Screenshot OCR runs one job at a time across `/la-check` and auto-check. Checks of different images used to download, encode and send to Gemini in parallel, and nine 12 MiB screenshots at once pushed the process past 512 MiB. A queued job waits before downloading anything, and the OCR timing log now reports the wait as `queue=`.

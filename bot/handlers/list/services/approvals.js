@@ -164,7 +164,8 @@ export function createApprovalServices({
         buttons.push(
           new ButtonBuilder()
             .setCustomId(`listadd_viewevidence:${payload.requestId}`)
-            .setLabel(t('common.actions.viewEvidenceFresh', lang))
+            .setEmoji('📎')
+            .setLabel(t('common.actions.viewEvidence', lang))
             .setStyle(ButtonStyle.Secondary)
         );
       }

@@ -5,7 +5,7 @@
  */
 
 import PendingApproval from '../../../models/PendingApproval.js';
-import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { normalizeNameList } from '../../../utils/names.js';
@@ -16,6 +16,7 @@ import {
   getListContext,
   buildTrustedBlockEmbed,
   buildApprovalResultRow,
+  buildDecidedApprovalEmbed,
 } from '../helpers.js';
 
 function buildApprovalAlertPayload({ embed, status, lang }) {
@@ -225,13 +226,16 @@ function broadcastApprovedEdit({ payload, existingEntry, broadcastListChange }) 
   }, { onlyOwner: scope === 'server' }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 }
 
-function buildApprovedPayload(interaction, targetLang) {
+function buildApprovedPayload(interaction, payload, targetLang) {
   return {
     content: null,
-    embeds: [buildNoticeEmbed(
-      t('dialogue.listEdit.approvedBy', targetLang, { user: interaction.user.tag }),
-      { severity: AlertSeverity.SUCCESS, lang: targetLang }
-    )],
+    embeds: [buildDecidedApprovalEmbed({
+      client: interaction.client,
+      payload,
+      outcome: 'editApproved',
+      approver: interaction.user.tag,
+      lang: targetLang,
+    })],
     components: [buildApprovalResultRow('Approved', targetLang)],
   };
 }
@@ -245,10 +249,10 @@ async function finishApprovedEdit({
   completeApproval,
 }) {
   await completeApproval();
-  await editPayload(interaction, buildApprovedPayload(interaction, lang));
+  await editPayload(interaction, buildApprovedPayload(interaction, payload, lang));
   await syncApproverDmMessages(
     payload,
-    (targetLang) => buildApprovedPayload(interaction, targetLang),
+    (targetLang) => buildApprovedPayload(interaction, payload, targetLang),
     { excludeMessageId: interaction.message.id }
   );
   await notifyRequesterAboutDecision(payload, { ok: true }, false);

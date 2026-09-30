@@ -31,6 +31,7 @@ test('keep-existing rejects an unassigned user without consuming the approver re
     customId: 'listadd_keep:approval-1',
     user: { id: 'outsider' },
     message: { id: 'dm-1' },
+    client: { guilds: { cache: new Map() } },
     reply: async payload => replies.push(payload),
     editReply: async payload => edits.push(payload),
     deferUpdate: async () => { deferred += 1; },
@@ -86,6 +87,7 @@ for (const protectedAlt of [true, false]) {
       notifyRequesterAboutDecision: async (_payload, result) => { decision = result; },
     })({
       customId: 'listadd_overwrite:pending', user: { id: 'officer', tag: 'Officer' }, message: { id: 'dm' },
+      client: { guilds: { cache: new Map() } },
       deferUpdate: async () => {}, editReply: async value => { edits.push(value); },
     });
     assert.equal(saves, protectedAlt ? 0 : 1);

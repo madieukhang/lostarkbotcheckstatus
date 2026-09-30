@@ -104,6 +104,7 @@ test('approval promotes scope and appends requested alts without replacing newer
   await handleApprovedEditRequest({
     interaction: {
       user: { id: 'officer', tag: 'Officer' }, message: { id: 'dm' },
+      client: { guilds: { cache: new Map() } },
       editReply: async () => { events.push('reply'); },
     },
     payload, requestId: 'request',

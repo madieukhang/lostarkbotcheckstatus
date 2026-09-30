@@ -390,6 +390,59 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   return embed;
 }
 
+const DECIDED_APPROVAL_STYLES = Object.freeze({
+  approved: { icon: '✅', color: COLORS.success },
+  editApproved: { icon: '✅', color: COLORS.success },
+  overwritten: { icon: '✅', color: COLORS.success },
+  returned: { icon: '⚠️', color: COLORS.warning },
+  rejected: { icon: '✖️', color: COLORS.greyDark },
+  kept: { icon: '✖️', color: COLORS.greyDark },
+});
+
+/**
+ * Rebuild an approval DM card once it is decided, so the approver keeps a
+ * record of what they decided: every field of the request stays, the
+ * title and colour show the outcome, and a Decision field names who
+ * decided and when. The evidence image and its heading go because
+ * deciding deletes the pending request, which the image link and the View
+ * evidence button both depend on.
+ * @param {object} options
+ * @param {import('discord.js').Client} options.client - resolves the
+ *   origin guild's name for the hero line
+ * @param {object} options.payload - the decided request
+ * @param {keyof typeof DECIDED_APPROVAL_STYLES} options.outcome - what happened
+ * @param {string} options.approver - tag of the approver who decided
+ * @param {string} [options.result=''] - why the executor refused, for 'returned'
+ * @param {string} options.lang - the approver's language
+ * @returns {import('discord.js').EmbedBuilder} the decided card
+ */
+export function buildDecidedApprovalEmbed({ client, payload, outcome, approver, result = '', lang }) {
+  const { icon, color } = DECIDED_APPROVAL_STYLES[outcome];
+  const guild = client.guilds.cache.get(payload.guildId) ?? { name: payload.guildId };
+  const title = t('dialogue.approval.decided.title', lang, {
+    title: t(`dialogue.approval.${payload.action === 'edit' ? 'titleEdit' : 'titleAdd'}`, lang, { icon, name: payload.name }),
+    outcome: t(`dialogue.approval.decided.outcomes.${outcome}`, lang),
+  });
+  const embed = buildListAddApprovalEmbed(guild, payload, { lang, title });
+  const evidenceHeading = t('listView.evidence.attached', lang);
+  return embed
+    .setColor(color)
+    .setImage(null)
+    .setFields(
+      ...embed.data.fields.filter((field) => field.name !== evidenceHeading),
+      {
+        name: `${ICONS.shield} ${t('dialogue.approval.decided.field', lang)}`,
+        value: t(`dialogue.approval.decided.lines.${outcome}`, lang, {
+          user: approver,
+          time: `<t:${Math.floor(Date.now() / 1000)}:R>`,
+          result,
+        }),
+        inline: false,
+      },
+    )
+    .setFooter({ text: t('dialogue.approval.decided.footer', lang) });
+}
+
 /**
  * Build approval-DM recipients while preserving the configured senior order.
  * At most one random officer is appended. Overlapping roles never receive

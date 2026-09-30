@@ -125,7 +125,7 @@ for (const surface of ['immediate', 'approved']) {
   test(`${surface} edit uses the transactional move and renders only its committed result`, async () => {
     const existing = await seedSource();
     const cards = [];
-    const interaction = { user: { id: 'owner', tag: 'Owner' }, guild: { id: 'guild' }, message: { id: 'dm' }, editReply: async payload => cards.push(payload) };
+    const interaction = { user: { id: 'owner', tag: 'Owner' }, guild: { id: 'guild' }, message: { id: 'dm' }, client: { guilds: { cache: new Map() } }, editReply: async payload => cards.push(payload) };
     if (surface === 'immediate') {
       await applyListEditNow({
         interaction, client: {}, existing, currentType: 'white', targetType: 'black', isTypeChange: true,
@@ -159,7 +159,7 @@ test('approval interrupted after move commit recognizes the destination on retry
   const source = await seedSource();
   let completed = false;
   const args = {
-    interaction: { user: { id: 'officer' }, message: { id: 'dm' }, editReply: async () => {} },
+    interaction: { user: { id: 'officer' }, message: { id: 'dm' }, client: { guilds: { cache: new Map() } }, editReply: async () => {} },
     payload: { name: source.name, currentType: 'white', type: 'black', existingEntryId: String(source._id), scope: 'global', guildId: 'guild' },
     requestId: 'request', syncApproverDmMessages: async () => {}, broadcastListChange: async () => {}, notifyRequesterAboutDecision: async () => {},
   };
