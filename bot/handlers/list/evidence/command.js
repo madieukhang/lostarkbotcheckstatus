@@ -24,6 +24,7 @@ import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { truncateInlineText } from '../../../utils/discordText.js';
+import { buildNoteHistoryRows } from '../notes/entryNotes.js';
 import {
   buildNameRosterQuery,
   pickPreferredListEntry,
@@ -260,7 +261,7 @@ export function createEvidenceHandlers({ client }) {
         }));
       }
 
-      await editEmbed(interaction, embeds);
+      await editEmbed(interaction, embeds, { components: buildNoteHistoryRows(type, entry, lang) });
     } catch (err) {
       console.error('[evidence] Lookup failed:', err.message);
       await editAlert(interaction, {

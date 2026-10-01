@@ -34,6 +34,7 @@ import {
   buildTrustedListEmbed,
 } from './ui.js';
 import { loadListViewStatMap } from './pageData.js';
+import { buildNoteHistoryRows } from '../notes/entryNotes.js';
 import { resetSelectMenu } from '../../../utils/selectMenu.js';
 
 const ITEMS_PER_PAGE = 8;
@@ -336,7 +337,7 @@ export function createViewHandlers({
               includeList: false,
               lang,
               statMap,
-            }));
+            }), { components: buildNoteHistoryRows(entry._listType, entry, lang) });
           } catch (err) {
             console.warn('[list-view] Evidence lookup failed:', err.message);
             await editAlert(componentInteraction, {

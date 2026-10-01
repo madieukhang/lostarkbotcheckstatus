@@ -33,6 +33,7 @@ import {
   isOfficerOrSenior,
   parseListEntryRef,
 } from '../helpers.js';
+import { buildNoteHistoryRows } from '../notes/entryNotes.js';
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 import { LIST_VIEW_SNAPSHOT_PROJECTION } from '../view/pageData.js';
 import { buildCheckEntryDetailsEmbed } from './ui.js';
@@ -170,7 +171,7 @@ export async function editWithListEntryDetails(interaction, { listType, id }, { 
     includeAddedBy: isOfficerOrSenior(interaction.user.id),
     lang,
     statMap,
-  }));
+  }), { components: buildNoteHistoryRows(listType, entry, lang) });
 }
 
 function createAutoCheckEvidenceHandler({ client }) {

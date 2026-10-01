@@ -14,7 +14,7 @@ import { getInteractionDisplayName } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import { loadCheckDetailStatMap } from '../check/index.js';
 import { moveListEntry } from '../services/moveEntry.js';
-import { carryNotesWithEdit, planLatestNoteEdit } from '../notes/entryNotes.js';
+import { buildNoteHistoryRows, carryNotesWithEdit, planLatestNoteEdit } from '../notes/entryNotes.js';
 import {
   getListContext,
   buildListEditSuccessEmbeds,
@@ -178,7 +178,7 @@ async function renderEditSuccess({
       isMove,
       lang,
     }),
-    { content: null }
+    { content: null, components: buildNoteHistoryRows(type, entry, lang) }
   );
 }
 

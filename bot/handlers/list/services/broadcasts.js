@@ -7,6 +7,7 @@
  * the multiadd reject/summary embeds.
  */
 
+import { ActionRowBuilder } from 'discord.js';
 import config from '../../../config.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
@@ -25,7 +26,8 @@ import {
   listTypeIcon,
 } from '../helpers.js';
 import { buildListEntryReasonField, buildMarkedInlineField } from '../entryCardFields.js';
-import { buildBroadcastEvidenceComponents } from '../evidence/broadcastButton.js';
+import { buildBroadcastEvidenceButton } from '../evidence/broadcastButton.js';
+import { buildNoteCountLine, buildNoteHistoryButton } from '../notes/entryNotes.js';
 import {
   formatAltLine,
   formatLinkedCharacter,
@@ -211,7 +213,13 @@ export function buildBroadcastFields({
   ].filter(Boolean);
 
   return [
-    buildListEntryReasonField({ reason: entry.reason, previousReason, lang }),
+    buildListEntryReasonField({
+      reason: entry.reason,
+      previousReason,
+      // A removed entry has no history left to open.
+      noteLine: action === 'removed' ? null : buildNoteCountLine(entry, lang),
+      lang,
+    }),
     ...padInlineRow(inlineFields),
     altsField,
   ].filter(Boolean);
@@ -317,9 +325,14 @@ export function buildBroadcastPayload({
     .addFields(fields)
     .setColor(color)
     .setTimestamp(new Date());
-  const components = buildBroadcastEvidenceComponents(entry, { legacyUrl, lang });
+  const evidenceButton = buildBroadcastEvidenceButton(entry, { legacyUrl, lang });
+  const buttons = [
+    evidenceButton,
+    action === 'removed' ? null : buildNoteHistoryButton(type, entry, lang),
+  ].filter(Boolean);
+  const components = buttons.length > 0 ? [new ActionRowBuilder().addComponents(buttons)] : [];
   // The broadcast shows no image, so a replaced one is pointed at the button.
-  if (edit?.evidenceChanged && components.length > 0) {
+  if (edit?.evidenceChanged && evidenceButton) {
     embed.setFooter({ text: t('dialogue.broadcast.evidenceUpdatedFooter', lang) });
   }
   return { embeds: [embed], ...(components.length > 0 ? { components } : {}) };

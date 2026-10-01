@@ -8,31 +8,25 @@ process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const {
   BROADCAST_EVIDENCE_PREFIX,
-  buildBroadcastEvidenceComponents,
+  buildBroadcastEvidenceButton,
   createBroadcastEvidenceButtonHandler,
 } = await import('../bot/handlers/list/evidence/broadcastButton.js');
 const { t } = await import('../bot/services/i18n/index.js');
 
 test('broadcast evidence uses a compact refreshable button for rehosted images', () => {
-  const rows = buildBroadcastEvidenceComponents({
+  const button = buildBroadcastEvidenceButton({
     imageChannelId: '123456789',
     imageMessageId: '987654321',
-  });
-
-  assert.equal(rows.length, 1);
-  const button = rows[0].components[0].toJSON();
+  }).toJSON();
   assert.equal(button.custom_id, `${BROADCAST_EVIDENCE_PREFIX}:123456789:987654321`);
   assert.equal(button.label, 'View evidence');
   assert.equal(button.emoji.name, '📎');
 });
 
 test('broadcast evidence keeps a link fallback for legacy direct URLs', () => {
-  const rows = buildBroadcastEvidenceComponents({
+  const button = buildBroadcastEvidenceButton({
     imageUrl: 'https://cdn.example.test/evidence.png',
-  });
-
-  assert.equal(rows.length, 1);
-  const button = rows[0].components[0].toJSON();
+  }).toJSON();
   assert.equal(button.url, 'https://cdn.example.test/evidence.png');
   assert.equal(button.label, 'Open evidence');
 });

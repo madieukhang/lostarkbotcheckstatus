@@ -7,7 +7,6 @@
  */
 
 import {
-  ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
 } from 'discord.js';
@@ -47,11 +46,6 @@ export function buildBroadcastEvidenceButton(entry, { legacyUrl, lang = 'en' } =
     .setEmoji('📎')
     .setURL(directUrl)
     .setStyle(ButtonStyle.Link);
-}
-
-export function buildBroadcastEvidenceComponents(entry, options = {}) {
-  const button = buildBroadcastEvidenceButton(entry, options);
-  return button ? [new ActionRowBuilder().addComponents(button)] : [];
 }
 
 function parseEvidenceCustomId(customId) {

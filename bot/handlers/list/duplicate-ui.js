@@ -4,6 +4,7 @@ import { normalizeNameKey } from '../../utils/names.js';
 import { relativeTime } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
 import { getListContext } from './helpers.js';
+import { buildNoteCountLine, withNoteCountLine } from './notes/entryNotes.js';
 import { formatLinkedCharacter } from './trackedAltsRender.js';
 
 /**
@@ -21,7 +22,7 @@ export function buildDuplicateReasonFields(existed, typedReason, lang, { forAppr
   return [
     {
       name: `📝 ${t('dialogue.listAdd.duplicate.storedReason', lang)}`,
-      value: (existed.reason || fallback).slice(0, 1024),
+      value: withNoteCountLine((existed.reason || fallback).slice(0, 1024), buildNoteCountLine(existed, lang)),
       inline: false,
     },
     // Keep identical reasons visible: the reviewer still needs both sides.

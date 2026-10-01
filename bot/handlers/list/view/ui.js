@@ -26,6 +26,7 @@ import { truncateInlineText } from '../../../utils/discordText.js';
 import { t } from '../../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
 import { getListContext } from '../helpers.js';
+import { buildNoteCountLine, withNoteCountLine } from '../notes/entryNotes.js';
 
 export const LIST_VIEW_ALT_PREVIEW_LIMIT = 3;
 const EMBED_DESCRIPTION_LIMIT = 4096;
@@ -352,7 +353,7 @@ function buildEvidenceFields(entry, snapshot, {
   statMap,
 }) {
   const fields = [
-    { name: t('listView.evidence.reason', lang), value: (entry.reason || 'N/A').slice(0, 1024), inline: false },
+    { name: t('listView.evidence.reason', lang), value: withNoteCountLine((entry.reason || 'N/A').slice(0, 1024), buildNoteCountLine(entry, lang)), inline: false },
     ...buildEvidenceInlineMeta(entry, snapshot, {
       includeAddedBy,
       includeList,

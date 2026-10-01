@@ -11,6 +11,7 @@ import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
+import { buildNoteCountLine, withNoteCountLine } from '../notes/entryNotes.js';
 import { renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
 
 function parsePositiveNumber(value) {
@@ -77,7 +78,7 @@ function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang, statM
   return [
     {
       name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
-      value: (entry.reason || notAvailable).slice(0, 1024),
+      value: withNoteCountLine((entry.reason || notAvailable).slice(0, 1024), buildNoteCountLine(entry, lang)),
       inline: false,
     },
     // Added by is optional, so the inline count is 5 or 6 depending on

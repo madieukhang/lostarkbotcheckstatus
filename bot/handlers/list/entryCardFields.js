@@ -156,20 +156,23 @@ export function buildListEntryInlineFields({
  * @param {string} options.reason - the reason now
  * @param {string} [options.previousReason] - the reason before the edit;
  *   omit it when the reason did not change
+ * @param {string|null} [options.noteLine=null] - the note count line under the reason
  * @param {string} options.lang - locale
  * @returns {{name: string, value: string, inline: boolean}}
  */
-export function buildListEntryReasonField({ reason, previousReason, lang }) {
+export function buildListEntryReasonField({ reason, previousReason, noteLine = null, lang }) {
   const label = `📝 ${t('dialogue.listAdd.success.fields.reason', lang)}`;
   const notAvailable = t('dialogue.broadcast.notAvailable', lang);
-  const current = (reason || notAvailable).slice(0, FIELD_VALUE_LIMIT);
-  if (previousReason === undefined) return { name: label, value: current, inline: false };
+  const limit = FIELD_VALUE_LIMIT - (noteLine ? noteLine.length + 1 : 0);
+  const withLine = value => (noteLine ? `${value}\n${noteLine}` : value);
+  const current = (reason || notAvailable).slice(0, limit);
+  if (previousReason === undefined) return { name: label, value: withLine(current), inline: false };
 
-  const room = FIELD_VALUE_LIMIT - current.length - 1;
+  const room = limit - current.length - 1;
   const value = room < MIN_STRUCK_REASON_LENGTH
     ? current
     : `${formatStruckValue(previousReason || notAvailable, room)}\n${current}`;
-  return { name: `${label}${CHANGED_MARK}`, value, inline: false };
+  return { name: `${label}${CHANGED_MARK}`, value: withLine(value), inline: false };
 }
 
 /**

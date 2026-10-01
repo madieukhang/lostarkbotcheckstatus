@@ -22,6 +22,7 @@ import { normalizeNameKey } from '../../utils/names.js';
 import { t } from '../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField } from './trackedAltsRender.js';
 import { buildBroadcastEvidenceButton } from './evidence/broadcastButton.js';
+import { buildNoteCountLine } from './notes/entryNotes.js';
 import {
   buildListEntryInlineFields,
   buildListEntryReasonField,
@@ -254,7 +255,7 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
   const fields = buildListEntryInlineFields({
     type, raid: entry.raid, scope, entry, statMap, icon, labelCap, lang, previous,
   });
-  fields.push(buildListEntryReasonField({ reason: entry.reason, previousReason, lang }));
+  fields.push(buildListEntryReasonField({ reason: entry.reason, previousReason, noteLine: buildNoteCountLine(entry, lang), lang }));
   const rostersField = buildListEntryRostersField({
     names: entry.allCharacters,
     primaryName: entry.name,
