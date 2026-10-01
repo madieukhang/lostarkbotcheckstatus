@@ -21,12 +21,14 @@ const legacy = {
 };
 const refreshed = { ok: true, status: 200, json: async () => ({ refreshed_urls: [{ original: DISCORD_LINK, refreshed: FRESH_LINK }] }) };
 const gone = { ok: false, status: 400, json: async () => ({}) };
+const missingFile = { ok: false, status: 404 };
 
-function mockDiscord(t, response) {
+// Answers each request with the next response; the last one repeats.
+function mockDiscord(t, ...responses) {
   const requests = [];
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     requests.push({ url, init });
-    return response;
+    return responses[Math.min(requests.length, responses.length) - 1];
   });
   return requests;
 }
@@ -49,6 +51,13 @@ test('a Discord link Discord no longer serves resolves to nothing and says why',
   mockDiscord(t, gone);
   assert.deepEqual(await refreshLegacyImageUrl(DISCORD_LINK, client), { url: '', error: 'refresh API returned 400' });
   assert.equal(await resolveDisplayImageUrl(legacy, client), '');
+});
+
+test('a re-signed Discord link whose file is gone resolves to nothing', async t => {
+  // Discord re-signs links to deleted ephemeral attachments without an error.
+  const requests = mockDiscord(t, refreshed, missingFile);
+  assert.deepEqual(await refreshLegacyImageUrl(DISCORD_LINK, client), { url: '', error: 'file returned 404' });
+  assert.deepEqual([requests[1].url, requests[1].init.method], [FRESH_LINK, 'HEAD']);
 });
 
 test('an entry outside the archive gets a View evidence button that names the entry', () => {

@@ -219,8 +219,8 @@ function isDiscordCdnUrl(url) {
 /**
  * Make a stored direct evidence link viewable. A Discord attachment link
  * carries a signature that expires, so it is re-signed through Discord's
- * refresh endpoint, which only works while Discord still has the file.
- * Links on other hosts are returned as stored.
+ * refresh endpoint and then checked, since a re-signed link can still
+ * point at a deleted file. Links on other hosts are returned as stored.
  * @param {string} url - the entry's stored imageUrl
  * @param {Client} client - the bot client; its token signs the request
  * @returns {Promise<{url: string, error: string}>} url is '' when Discord
@@ -240,9 +240,12 @@ export async function refreshLegacyImageUrl(url, client) {
   if (!response.ok) return { url: '', error: `refresh API returned ${response.status}` };
 
   const refreshed = (await response.json())?.refreshed_urls?.[0]?.refreshed;
-  return refreshed
-    ? { url: refreshed, error: '' }
-    : { url: '', error: 'refresh returned no URL (file likely deleted)' };
+  if (!refreshed) return { url: '', error: 'refresh returned no URL (file likely deleted)' };
+
+  // Discord re-signs links to ephemeral attachments it has already deleted,
+  // so only a request for the file itself shows whether it is still there.
+  const file = await fetch(refreshed, { method: 'HEAD' });
+  return file.ok ? { url: refreshed, error: '' } : { url: '', error: `file returned ${file.status}` };
 }
 
 /**
