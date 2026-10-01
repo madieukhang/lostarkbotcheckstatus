@@ -5,6 +5,7 @@
 
 import config from '../config.js';
 import GuildConfig from '../models/GuildConfig.js';
+import { createLruTtlCache } from './cache/lruTtlCache.js';
 
 /**
  * Build a MongoDB scope filter for blacklist queries.
@@ -66,12 +67,14 @@ export function buildScopedListQuery(type, baseQuery, guildId, options) {
 
 // ─── GuildConfig cache ─────────────────────────────────────────────────────
 
-const guildConfigCache = new Map();
 const GUILD_CONFIG_TTL = 60_000; // 60 seconds
+const GUILD_CONFIG_MAX_SIZE = 256;
+const guildConfigCache = createLruTtlCache({ ttlMs: GUILD_CONFIG_TTL, maxSize: GUILD_CONFIG_MAX_SIZE });
+const guildConfigLoads = new Map();
 
 /**
- * Get GuildConfig with in-memory cache (60s TTL).
- * Reduces DB round-trips for frequently accessed guild settings.
+ * Share overlapping GuildConfig reads and cache results for 60 seconds.
+ * Invalidated reads reload before returning so setup changes take precedence.
  *
  * @param {string} guildId
  * @returns {Promise<object|null>}
@@ -80,19 +83,31 @@ export async function getGuildConfig(guildId) {
   if (!guildId) return null;
 
   const cached = guildConfigCache.get(guildId);
-  if (cached && Date.now() - cached.ts < GUILD_CONFIG_TTL) {
-    return cached.data;
-  }
+  if (cached !== undefined) return cached;
+  const inFlight = guildConfigLoads.get(guildId);
+  if (inFlight) return inFlight.promise;
 
-  const data = await GuildConfig.findOne({ guildId }).lean();
-  guildConfigCache.set(guildId, { data, ts: Date.now() });
-  return data;
+  const request = { promise: null };
+  request.promise = Promise.resolve()
+    .then(() => GuildConfig.findOne({ guildId }).lean())
+    .then((data) => {
+      if (guildConfigLoads.get(guildId) !== request) return getGuildConfig(guildId);
+      guildConfigCache.set(guildId, data);
+      return data;
+    })
+    .finally(() => {
+      if (guildConfigLoads.get(guildId) === request) guildConfigLoads.delete(guildId);
+    });
+  guildConfigLoads.set(guildId, request);
+  return request.promise;
 }
 
 /**
  * Invalidate cache for a guild (call after /la-setup changes).
  * @param {string} guildId
+ * @returns {void}
  */
 export function invalidateGuildConfig(guildId) {
   guildConfigCache.delete(guildId);
+  guildConfigLoads.delete(guildId);
 }

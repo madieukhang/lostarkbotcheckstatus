@@ -9,7 +9,7 @@
  * @param {Function} [options.normalizeKey] Canonicalize lookup and write keys.
  * @param {Function} [options.cloneValue] Copy values on reads and writes.
  * @param {() => number} [options.now] Clock used to calculate expiry.
- * @returns {{clear: Function, get: Function, set: Function}} Cache operations.
+ * @returns {{clear: Function, delete: Function, get: Function, set: Function}} Cache operations.
  */
 export function createLruTtlCache({
   ttlMs,
@@ -49,7 +49,7 @@ export function createLruTtlCache({
 
     const entry = entries.get(key);
     if (!entry) return undefined;
-    if (now() > entry.expiresAt) {
+    if (now() >= entry.expiresAt) {
       entries.delete(key);
       return undefined;
     }
@@ -87,6 +87,7 @@ export function createLruTtlCache({
 
   return {
     clear,
+    delete: (rawKey) => entries.delete(normalizeKey(rawKey)),
     get,
     set,
   };

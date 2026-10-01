@@ -20,7 +20,7 @@ test('LRU TTL cache expires lazily and refreshes recency on reads', () => {
   assert.equal(cache.get('Beta'), undefined);
   assert.deepEqual(cache.get('Gamma'), { value: 3 });
 
-  currentTime = 111;
+  currentTime = 110;
   assert.equal(cache.get('Alpha'), undefined);
 });
 

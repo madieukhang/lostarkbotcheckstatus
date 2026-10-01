@@ -21,6 +21,7 @@ import {
 } from '../../services/list-check/service.js';
 import { createNameSuggestionContext } from '../../services/roster/search.js';
 import { getGuildConfig } from '../../utils/scope.js';
+import { createCooldownStore } from '../../utils/cooldownStore.js';
 import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
 import {
@@ -34,9 +35,8 @@ import { buildAutoCheckEvidenceRow } from './check/index.js';
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);
 
-/** Per-user cooldown to prevent spam (userId → timestamp) */
-const userCooldowns = new Map();
 const COOLDOWN_MS = 10_000; // 10 seconds between checks per user
+const userCooldowns = createCooldownStore(COOLDOWN_MS);
 const processedMessages = new Map(); // messageId -> timestamp
 const inFlightMessages = new Set();
 const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
@@ -573,9 +573,8 @@ export function createAutoCheckMessageHandler({
       } else {
         // Text-only checks remain rate-limited. Screenshot work is queued
         // instead, so rapid image messages are never silently discarded.
-        const lastCheck = userCooldowns.get(message.author.id) || 0;
-        if (Date.now() - lastCheck < COOLDOWN_MS) return;
-        userCooldowns.set(message.author.id, Date.now());
+        if (userCooldowns.remainingMs(message.author.id) > 0) return;
+        userCooldowns.mark(message.author.id);
       }
       await processAutoCheckRequest(message, request, requestUi, lang);
     } catch (err) {

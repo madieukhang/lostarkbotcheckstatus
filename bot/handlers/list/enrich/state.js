@@ -1,22 +1,27 @@
 import { createExpiringSessionStore } from '../../../utils/expiringSessionStore.js';
+import { createCooldownStore } from '../../../utils/cooldownStore.js';
 import { normalizeNameKey } from '../../../utils/names.js';
 
 const ENRICH_COOLDOWN_MS = 30 * 1000;
 const SESSION_TTL_MS = 5 * 60 * 1000;
 
-const enrichCooldown = new Map();
+const enrichCooldown = createCooldownStore(ENRICH_COOLDOWN_MS);
 const sessionStore = createExpiringSessionStore({ ttlMs: SESSION_TTL_MS });
 
+/**
+ * @param {string} name Character whose scan cooldown is checked.
+ * @returns {number} Remaining cooldown rounded up to seconds.
+ */
 export function getCooldownWaitSeconds(name) {
-  const cooldownKey = normalizeNameKey(name);
-  const lastRun = enrichCooldown.get(cooldownKey);
-  if (!lastRun) return 0;
-  const remainingMs = ENRICH_COOLDOWN_MS - (Date.now() - lastRun);
-  return remainingMs > 0 ? Math.ceil(remainingMs / 1000) : 0;
+  return Math.ceil(enrichCooldown.remainingMs(normalizeNameKey(name)) / 1000);
 }
 
+/**
+ * @param {string} name Character whose scan starts now.
+ * @returns {void}
+ */
 export function markCooldown(name) {
-  enrichCooldown.set(normalizeNameKey(name), Date.now());
+  enrichCooldown.mark(normalizeNameKey(name));
 }
 
 export function createEnrichSession(payload) {
