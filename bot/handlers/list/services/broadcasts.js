@@ -38,7 +38,9 @@ import {
 
 // An add keeps the list icon in the title; the other actions show what
 // happened to the entry.
-const BROADCAST_TITLE_ICONS = Object.freeze({ removed: '🗑️', edited: '✏️', enriched: '🆕' });
+const BROADCAST_TITLE_ICONS = Object.freeze({ removed: '🗑️', edited: '✏️', enriched: '🆕', noted: '📝' });
+// Edits and notes stamp when they happened; every other action shows the add.
+const STAMP_FIELDS = Object.freeze({ edited: 'edited', noted: 'noted' });
 
 function parseItemLevel(value) {
   const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
@@ -152,8 +154,8 @@ export function buildTrackedAltsField(entry, statMap = new Map(), options = {}) 
  * timestamp stays plain so Discord can localize <t:UNIX:R>.
  * @param {object} options
  * @param {object} options.entry - the list entry being announced
- * @param {'added'|'edited'|'removed'|'enriched'} options.action - an edit
- *   stamps the time of the edit, every other action the time of the add
+ * @param {'added'|'edited'|'removed'|'enriched'|'noted'} options.action - an
+ *   edit or a note stamps when it happened, every other action the time of the add
  * @param {object} [options.snap] - the entry's own RosterSnapshot
  * @param {object} [options.altsField] - prebuilt roster-list field
  * @param {string} [options.lang='en'] - locale for every label
@@ -183,7 +185,8 @@ export function buildBroadcastFields({
     : String(snap?.world || '').trim();
   const notAvailable = t('dialogue.broadcast.notAvailable', lang);
   const raidChanged = 'raid' in previous;
-  const stampedAt = action === 'edited' ? new Date() : entry.addedAt;
+  const stampField = STAMP_FIELDS[action];
+  const stampedAt = stampField ? new Date() : entry.addedAt;
   const statBadges = formatRosterStatBadges(snap);
   const inlineFields = [
     entry.raid || raidChanged
@@ -196,7 +199,7 @@ export function buildBroadcastFields({
       : null,
     stampedAt
       ? {
-          name: `🕐 ${t(`dialogue.broadcast.fields.${action === 'edited' ? 'edited' : 'added'}`, lang)}`,
+          name: `🕐 ${t(`dialogue.broadcast.fields.${stampField || 'added'}`, lang)}`,
           value: relativeTime(stampedAt),
           inline: true,
         }
@@ -257,14 +260,14 @@ function describeBroadcastEdit({ entry, previousEntry, type, previousType, lang 
  * title follows the /la-list success cards, `{list} · {action} · {name}`,
  * and the headline says what happened without naming who did it.
  * @param {object} options
- * @param {'added'|'edited'|'removed'|'enriched'} options.action
+ * @param {'added'|'edited'|'removed'|'enriched'|'noted'} options.action
  * @param {object} options.entry - the entry as saved
  * @param {string} options.type - list type: black | white | watch
  * @param {Map<string, object>} options.statMap - roster snapshots by name key
  * @param {object} [options.previousEntry] - an edit's entry before the edit;
  *   required when action is 'edited'
  * @param {string} [options.previousType] - an edit's list type before the edit
- * @param {string[]} [options.newAltNames=[]] - alts an enrich run found
+ * @param {string[]} [options.newAltNames=[]] - alts an enrich run or a note found
  * @param {string} [options.legacyUrl] - image URL for the View evidence
  *   button when the entry has no archived evidence message
  * @param {string} options.lang - locale
@@ -309,7 +312,7 @@ export function buildBroadcastPayload({
   };
   const altsField = isEnrich
     ? renderTrackedAltsField({ names: newAlts, primaryName: entry.name, statMap, ...rosterFieldOptions })
-    : buildTrackedAltsField(entry, statMap, { ...rosterFieldOptions, newNames: edit?.addedAlts || [] });
+    : buildTrackedAltsField(entry, statMap, { ...rosterFieldOptions, newNames: edit?.addedAlts ?? newAlts });
   const fields = buildBroadcastFields({
     entry, action, snap, altsField, lang, statMap,
     previous: edit?.previous,
@@ -447,14 +450,14 @@ export function createBroadcastServices({ client }) {
   /**
    * Post a list change to every notify channel, each in its server's
    * language.
-   * @param {'added'|'edited'|'removed'|'enriched'} action
+   * @param {'added'|'edited'|'removed'|'enriched'|'noted'} action
    * @param {object} entry - the entry as saved
    * @param {object} payload - request context: type, guildId
    * @param {object} [options]
    * @param {boolean} [options.onlyOwner=false] - post to the owner server only
    * @param {string} [options.displayUrl] - pre-resolved evidence image URL
    * @param {object[]} [options.rosterCharacters=[]] - roster stats in hand
-   * @param {string[]} [options.newAltNames=[]] - alts an enrich run found
+   * @param {string[]} [options.newAltNames=[]] - alts an enrich run or a note found
    * @param {object} [options.previousEntry] - an edit's entry before the
    *   edit; required when action is 'edited'
    * @param {string} [options.previousType] - an edit's list type before

@@ -214,16 +214,17 @@ export default {
   broadcast: {
     list: { black: 'Blacklist', white: 'Whitelist', watch: 'Watchlist' },
     localTag: 'サーバー内',
-    titles: { added: '{list} · 追加 · {name}', removed: '{list} · 削除 · {name}', edited: '{list} · 更新 · {name}', enriched: '{list} · alt 追加 · {name}' },
+    titles: { added: '{list} · 追加 · {name}', removed: '{list} · 削除 · {name}', edited: '{list} · 更新 · {name}', enriched: '{list} · alt 追加 · {name}', noted: '{list} · 新しいメモ · {name}' },
     headlines: {
       added: '{name} が **{list}**{scope} に追加されましたわ。',
       removed: '{name} が **{list}**{scope} から外れましたわ。',
       edited: '**{list}**{scope} の {name} が更新されましたわ{summary}。',
       enriched: '**{list}**{scope} の {name} から alt をさらに **{newCount}** 名たどりましたわ。これで **{total}** 名を追っておりますの。',
+      noted: '**{list}**{scope} の {name} に新しいメモが追加されましたわ。',
     },
     evidenceUpdatedFooter: '📎 evidence が更新されましたわ · 下のボタンで開けますの',
     altOne: 'alt', altMany: 'alts',
-    fields: { reason: '理由', raid: 'Raid', edited: '更新', added: '追加', itemLevel: 'ilvl', combatPower: 'CP', trackedRosters: '追跡中の roster', newAlts: '新しい alt' },
+    fields: { reason: '理由', raid: 'Raid', edited: '更新', added: '追加', itemLevel: 'ilvl', combatPower: 'CP', trackedRosters: '追跡中の roster', newAlts: '新しい alt', noted: '記入' },
     notAvailable: '未設定', more: '...ほか {count} 名',
     bulkTitle: '一括追加{local} · {count} {entryWord}', localSuffix: ' (サーバー内)', entryOne: 'entry', entryMany: 'entries',
   },
@@ -299,6 +300,13 @@ export default {
       head: '{icon} {list}{scope} · メモ **{count}** 件、古い順',
       original: '最初のメモ', latest: '最新', by: '記入: {name}',
       footer: '{page}/{pages} ページ · あなたにだけ表示', footerSingle: 'あなたにだけ表示されていますわ',
+    },
+    added: {
+      title: '{list} · メモ追加 · {name}',
+      hero: 'あなたのメモが **{list}**{scope} の {name} の最新メモになりましたわ。',
+      noted: '記入日時', notedBy: '記入者',
+      footer: 'lostark.bible からロスターを更新 · 新しい {altWord} {count} 名',
+      footerNoAlts: 'lostark.bible からロスターを更新しましたわ',
     },
   },
   listEdit: {

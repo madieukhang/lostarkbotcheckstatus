@@ -239,16 +239,17 @@ export default {
   broadcast: {
     list: { black: 'Blacklist', white: 'Whitelist', watch: 'Watchlist' },
     localTag: 'Nội bộ server',
-    titles: { added: '{list} · Đã thêm · {name}', removed: '{list} · Đã gỡ · {name}', edited: '{list} · Đã cập nhật · {name}', enriched: '{list} · Thêm alt · {name}' },
+    titles: { added: '{list} · Đã thêm · {name}', removed: '{list} · Đã gỡ · {name}', edited: '{list} · Đã cập nhật · {name}', enriched: '{list} · Thêm alt · {name}', noted: '{list} · Ghi chú mới · {name}' },
     headlines: {
       added: '{name} đã được thêm vào **{list}**{scope}.',
       removed: '{name} đã được gỡ khỏi **{list}**{scope}.',
       edited: '{name} trong **{list}**{scope} vừa được cập nhật{summary}.',
       enriched: 'Tớ tìm thêm được **{newCount}** alt của {name} trong **{list}**{scope}, giờ đang theo dõi **{total}** alt.',
+      noted: '{name} trong **{list}**{scope} vừa có ghi chú mới.',
     },
     evidenceUpdatedFooter: '📎 Evidence đã đổi · bấm nút bên dưới để mở',
     altOne: 'alt', altMany: 'alt',
-    fields: { reason: 'Lý do', raid: 'Raid', edited: 'Đã sửa', added: 'Đã thêm', itemLevel: 'ilvl', combatPower: 'CP', trackedRosters: 'Danh sách roster', newAlts: 'Alt mới' },
+    fields: { reason: 'Lý do', raid: 'Raid', edited: 'Đã sửa', added: 'Đã thêm', itemLevel: 'ilvl', combatPower: 'CP', trackedRosters: 'Danh sách roster', newAlts: 'Alt mới', noted: 'Đã ghi chú' },
     notAvailable: 'Chưa có', more: '... và {count} tên khác',
     bulkTitle: 'Thêm hàng loạt{local} · {count} {entryWord}', localSuffix: ' (Nội bộ)', entryOne: 'entry', entryMany: 'entry',
   },
@@ -324,6 +325,13 @@ export default {
       head: '{icon} {list}{scope} · **{count}** ghi chú, cũ trước mới sau',
       original: 'Ghi chú gốc', latest: 'Mới nhất', by: 'bởi {name}',
       footer: 'Trang {page}/{pages} · chỉ cậu thấy', footerSingle: 'Chỉ cậu thấy card này',
+    },
+    added: {
+      title: '{list} · Đã ghi chú · {name}',
+      hero: 'Ghi chú của cậu giờ là ghi chú mới nhất của {name} trong **{list}**{scope}.',
+      noted: 'Ghi lúc', notedBy: 'Người ghi',
+      footer: 'Roster đã làm mới từ lostark.bible · {count} {altWord} mới',
+      footerNoAlts: 'Roster đã làm mới từ lostark.bible',
     },
   },
   listEdit: {

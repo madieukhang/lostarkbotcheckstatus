@@ -60,3 +60,20 @@ test('an add broadcast is titled like the /la-list add card and has no footer', 
   assert.match(card.description, /was added to the \*\*Blacklist\*\*\.$/);
   assert.equal(card.footer, undefined);
 });
+
+test('a note broadcast is titled New note and marks the alts it found', () => {
+  const at = new Date('2026-07-02T00:00:00Z');
+  const { embeds } = buildBroadcastPayload({
+    action: 'noted', type: 'black', statMap: new Map(), lang: 'en', newAltNames: ['Pepsji'],
+    entry: {
+      _id: 'f'.repeat(24), name: 'Lovesiiii', scope: 'global', reason: 'vẫn thế', raid: 'Kazeros Hard',
+      allCharacters: ['Lovesiiii', 'Pepsji'], addedAt: at,
+      notes: [{ at, reason: 'one', raid: '', byUserId: 'a', byName: 'A' }, { at, reason: 'vẫn thế', raid: 'Kazeros Hard', byUserId: 'b', byName: 'B' }],
+    },
+  });
+  const embed = embeds[0].toJSON();
+  assert.equal(embed.title, '📝 Blacklist · New note · Lovesiiii');
+  assert.match(embed.description, /has a new note/);
+  assert.match(JSON.stringify(embed.fields), /Pepsji.*🆕/);
+  assert.ok(embed.fields.some(field => field.name.includes('Noted')));
+});
