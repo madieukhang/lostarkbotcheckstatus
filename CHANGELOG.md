@@ -12,6 +12,11 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 
 ## Unreleased
 
+### Added
+- **Note history on list entries**: a duplicate `/la-list add` (and Quick Add) offers **Add to history**, which saves the typed reason and raid as the entry's latest note instead of only saying it is already listed. The roster fetched for the add is merged into the tracked alts and a new screenshot replaces the evidence.
+- **History button**: cards that show a reason (check details, list view, edit result, broadcasts, duplicate cards) count the notes and open the history once an entry has two; it lists every note oldest first with its date, raid and writer, ten per page, only for the clicker.
+- Other servers get a `Blacklist · New note · Name` card. `/la-list edit` still overwrites the latest note, and stops without writing if a note lands while the edit is being saved.
+
 ### Changed
 - The notice a requester gets when their list add or edit is decided reads like the `/la-list add` card: `Blacklist · Approved · Name`, one line saying what happened, then the list, raid and scope the request asked for. It no longer says "an officer" decided, since approvers are seniors. The report's reason stays off this public card.
 - An approver's DM keeps the whole request after they decide. It used to collapse into one line such as "Approved by …"; now every field stays, the title and colour show the outcome, and a **Decision** field names who decided and when. The request card itself says "A member of … asked to add …" instead of "An officer …", and its evidence button reads **View evidence**.

@@ -333,6 +333,8 @@ export default {
       footer: 'Roster đã làm mới từ lostark.bible · {count} {altWord} mới',
       footerNoAlts: 'Roster đã làm mới từ lostark.bible',
     },
+    pendingExpired: { title: 'Card này hết hạn rồi', description: 'Tớ không còn giữ lần report của card này nữa. Cậu chạy lại `/la-list add` để ghi nó vào lịch sử nhé.' },
+    notYours: { title: 'Card này không phải của cậu', description: 'Chỉ người chạy lệnh `/la-list add` này mới ghi được lần report vào lịch sử.' },
   },
   listEdit: {
     originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry đã bị xóa hoặc chuyển sang list khác trước khi thay đổi được lưu.' },
@@ -360,7 +362,7 @@ export default {
     },
     itemLevel: { title: 'Item level còn quá thấp', description: '**{name}** chưa đạt item level tối thiểu để vào list.', character: 'Character', itemLevel: 'Item level', minimum: 'Mức tối thiểu', targetList: 'List đích', footer: 'Cổng ilvl giúp list không bị nhiễu bởi alt chưa phát triển hoặc đã nghỉ.', content: '{name} có item level {level}, thấp hơn 1700.' },
     duplicate: {
-      title: 'Đã có trong {list}', direct: '{icon} {name} đã nằm trong **{list}** rồi. Tớ chưa thêm gì mới cả.', roster: '{icon} {name} chung roster với {matched}, và người này đã nằm trong **{list}** rồi. Tớ chưa thêm gì mới cả.', matchedName: 'Tên khớp', scope: 'Scope', addedBy: 'Được thêm bởi', timeAdded: 'Thời gian thêm', storedReason: 'Lý do đang lưu', typedReason: 'Lý do cậu vừa gõ', raid: 'Raid', footer: 'Muốn đổi entry này thì dùng /la-list edit. Lý do mới sẽ thay lý do đang lưu.', contentDirect: '{name} đã tồn tại trong {list}.', contentRoster: '{name} đã tồn tại trong {list} qua roster {matched}.',
+      title: 'Đã có trong {list}', direct: '{icon} {name} đã nằm trong **{list}** rồi. Tớ chưa thêm gì mới cả.', roster: '{icon} {name} chung roster với {matched}, và người này đã nằm trong **{list}** rồi. Tớ chưa thêm gì mới cả.', matchedName: 'Tên khớp', scope: 'Scope', addedBy: 'Được thêm bởi', timeAdded: 'Thời gian thêm', storedReason: 'Lý do đang lưu', typedReason: 'Ghi chú mới của cậu', raid: 'Raid', footer: 'Ghi vào lịch sử giữ nguyên các ghi chú cũ và lưu lý do của cậu thành ghi chú mới nhất. /la-list edit vẫn ghi đè ghi chú mới nhất.', contentDirect: '{name} đã tồn tại trong {list}.', contentRoster: '{name} đã tồn tại trong {list} qua roster {matched}.',
     },
     success: {
       title: '{list} · Đã thêm · {name}', hero: '**{user}** đã thêm {name} vào **{list}**{scope}.', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Lý do', trackedRosters: 'Danh sách roster' }, evidence: 'Ảnh evidence ở ngay dưới · [Tải ảnh gốc]({url})', sourceVisible: 'roster hiển thị', sourceHidden: 'fallback từ roster ẩn', footer: 'Thêm bởi {user} · {source}', officerFallback: 'một officer', content: 'Đã duyệt thêm: **{name}** đã vào {list}.',

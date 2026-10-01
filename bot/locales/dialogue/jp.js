@@ -308,6 +308,8 @@ export default {
       footer: 'lostark.bible からロスターを更新 · 新しい {altWord} {count} 名',
       footerNoAlts: 'lostark.bible からロスターを更新しましたわ',
     },
+    pendingExpired: { title: 'このカードは期限切れですわ', description: 'このカードの報告はもう保持しておりませんの。メモとして追加するには、もう一度 `/la-list add` を実行してくださいませ。' },
+    notYours: { title: 'あなたのカードではありませんわ', description: 'この `/la-list add` を実行した方だけが、報告を履歴に追加できますの。' },
   },
   listEdit: {
     originalMissing: { title: '元の entry がありませんの', description: '変更を保存する前に、entry が削除されたか別の list に移されましたわ。' },
@@ -335,7 +337,7 @@ export default {
     },
     itemLevel: { title: 'Item level が足りませんの', description: '**{name}** は list entry の最低 item level に届いていませんわ。', character: 'Character', itemLevel: 'Item level', minimum: '必要最低値', targetList: '対象 list', footer: 'Ilvl gate で inactive / undeveloped alt の noise を防ぎますの。', content: '{name} の item level は {level}、1700 未満ですわ。' },
     duplicate: {
-      title: '{list} に登録済みですの', direct: '{icon} {name} はすでに **{list}** にいますわ。何も追加していませんの。', roster: '{icon} {name} は {matched} と同じ roster で、この方はすでに **{list}** にいますの。何も追加していませんの。', matchedName: '一致名', scope: 'Scope', addedBy: '追加者', timeAdded: '追加日時', storedReason: '登録中の理由', typedReason: '今入力した理由', raid: 'Raid', footer: 'この entry を変えるなら /la-list edit を使ってくださいませ。新しい理由は保存中の理由を置き換えますの。', contentDirect: '{name} は {list} に登録済み。', contentRoster: '{name} は roster {matched} 経由で {list} に登録済み。',
+      title: '{list} に登録済みですの', direct: '{icon} {name} はすでに **{list}** にいますわ。何も追加していませんの。', roster: '{icon} {name} は {matched} と同じ roster で、この方はすでに **{list}** にいますの。何も追加していませんの。', matchedName: '一致名', scope: 'Scope', addedBy: '追加者', timeAdded: '追加日時', storedReason: '登録中の理由', typedReason: 'あなたの新しいメモ', raid: 'Raid', footer: '履歴に追加すると、保存済みのメモを残したまま、あなたの理由を最新のメモとして保存しますわ。/la-list edit は今まで通り最新のメモを上書きしますの。', contentDirect: '{name} は {list} に登録済み。', contentRoster: '{name} は roster {matched} 経由で {list} に登録済み。',
     },
     success: {
       title: '{list} · 追加済み · {name}', hero: '**{user}** が {name} を **{list}**{scope} へ追加しましたわ。', fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: '理由', trackedRosters: '追跡中の roster' }, evidence: 'スクリーンショットは下にありますわ · [元画像をダウンロード]({url})', sourceVisible: 'visible roster', sourceHidden: 'hidden-roster fallback', footer: '{user} が追加 · {source}', officerFallback: 'officer', content: '追加承認: **{name}** を {list} へ追加しましたわ。',

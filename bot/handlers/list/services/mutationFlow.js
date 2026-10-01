@@ -4,6 +4,7 @@ import { connectDB } from '../../../db.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editEmbed, editNotice } from '../../../utils/interactionReplies.js';
 import { isRequesterAutoApprover } from '../helpers.js';
+import { attachNoteControls } from '../notes/pendingNotes.js';
 
 export function buildListMutationPayload({
   requestId = randomUUID(),
@@ -88,7 +89,7 @@ export async function submitListMutation({
 
   if (autoApproved) {
     const result = await executeListAddToDatabase(payload);
-    await renderExecutionResultFn(interaction, result, lang);
+    await renderExecutionResultFn(interaction, attachNoteControls(result, payload, lang), lang);
     return { status: 'executed', result };
   }
 

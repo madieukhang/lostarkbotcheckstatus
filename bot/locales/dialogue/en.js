@@ -420,6 +420,8 @@ export default {
       footer: 'Roster refreshed from lostark.bible · {count} new {altWord}',
       footerNoAlts: 'Roster refreshed from lostark.bible',
     },
+    pendingExpired: { title: 'This card has expired', description: 'I no longer hold the report from this card. Run `/la-list add` again to add it as a note.' },
+    notYours: { title: 'This card is not yours', description: 'Only the member who ran this `/la-list add` can add its report to the history.' },
   },
   listEdit: {
     originalMissing: { title: 'The original entry is gone', description: 'The entry was removed or moved to another list before these changes could be saved.' },
@@ -464,8 +466,8 @@ export default {
     },
     duplicate: {
       title: 'Already in {list}', direct: '{icon} {name} is already on the **{list}**. Nothing new was saved.', roster: '{icon} {name} shares a roster with {matched}, who is already on the **{list}**. Nothing new was saved.',
-      matchedName: 'Matched name', scope: 'Scope', addedBy: 'Added by', timeAdded: 'Time added', storedReason: 'Stored reason', typedReason: 'Reason you just typed', raid: 'Raid',
-      footer: 'To change this entry, use /la-list edit. A new reason replaces the stored one.', contentDirect: '{name} already exists in {list}.', contentRoster: '{name} already exists in {list} through roster match {matched}.',
+      matchedName: 'Matched name', scope: 'Scope', addedBy: 'Added by', timeAdded: 'Time added', storedReason: 'Stored reason', typedReason: 'Your new note', raid: 'Raid',
+      footer: 'Add to history keeps the stored notes and saves yours as the latest. /la-list edit still replaces the latest note.', contentDirect: '{name} already exists in {list}.', contentRoster: '{name} already exists in {list} through roster match {matched}.',
     },
     success: {
       title: '{list} · Added · {name}', hero: '**{user}** added {name} to **{list}**{scope}.',

@@ -258,6 +258,9 @@ export function buildDuplicateListAddResult({
   lang,
   statMap = new Map(),
   typedReason = '',
+  typedRaid = '',
+  rosterNames = [],
+  rosterCharacters = [],
 }) {
   const isRosterMatch = normalizeNameKey(existed.name) !== normalizeNameKey(name);
   const variant = isRosterMatch ? 'roster' : 'direct';
@@ -280,13 +283,16 @@ export function buildDuplicateListAddResult({
   // Reason pair first, grid after · the same order every other card in the
   // bot uses, and it puts the decision the officer has to make at the top.
   const fields = [
-    ...buildDuplicateReasonFields(existed, typedReason, lang),
+    ...buildDuplicateReasonFields(existed, typedReason, lang, { typedRaid }),
     ...buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap),
   ];
   return {
     ok: false,
     isDuplicate: true,
     existingEntry: existed,
+    // Kept for the card's Add to history button, which merges this roster.
+    rosterNames,
+    rosterCharacters,
     content: t(`dialogue.listAdd.duplicate.${contentVariant}`, lang, values),
     embeds: [buildAlertEmbed({
       severity: AlertSeverity.WARNING,
@@ -585,6 +591,9 @@ export function createListAddExecutor({ client, broadcastListChange }) {
         lang,
         statMap: statMapFromRosterCharacters(roster.rosterCharacters),
         typedReason: payload.reason,
+        typedRaid: payload.raid,
+        rosterNames: roster.allCharacters,
+        rosterCharacters: roster.rosterCharacters,
       });
     }
 

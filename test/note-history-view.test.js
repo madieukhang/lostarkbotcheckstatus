@@ -88,7 +88,7 @@ test('the History button opens an ephemeral card scoped like the check details',
   const queries = [];
   const entry = entryWith([note(2, 'one'), note(3, 'two')]);
   t.mock.method(Blacklist, 'findOne', query => { queries.push(query); return { lean: async () => entry }; });
-  const { handleListNoteHistoryButton } = createNoteHandlers();
+  const { handleListNoteHistoryButton } = createNoteHandlers({ services: {} });
   const { calls, interaction } = buttonInteraction(`listnote_history:black:${entry._id}:1`);
   await handleListNoteHistoryButton(interaction);
   assert.equal(calls.deferred, 1);
@@ -99,7 +99,7 @@ test('the History button opens an ephemeral card scoped like the check details',
 test('an entry hidden from this server or removed answers with the removed notice', async t => {
   mockLanguage(t);
   t.mock.method(Blacklist, 'findOne', () => ({ lean: async () => null }));
-  const { handleListNoteHistoryButton } = createNoteHandlers();
+  const { handleListNoteHistoryButton } = createNoteHandlers({ services: {} });
   const { calls, interaction } = buttonInteraction(`listnote_history:black:${'b'.repeat(24)}:1`, null);
   await handleListNoteHistoryButton(interaction);
   assert.doesNotMatch(JSON.stringify(calls.edits[0]), /Note history/);
@@ -110,7 +110,7 @@ test('the page buttons edit the history card in place', async t => {
   mockLanguage(t);
   const entry = entryWith(Array.from({ length: 12 }, (_, i) => note(i + 1, `report ${i + 1}`)));
   t.mock.method(Blacklist, 'findOne', () => ({ lean: async () => entry }));
-  const { handleListNotePageButton } = createNoteHandlers();
+  const { handleListNotePageButton } = createNoteHandlers({ services: {} });
   const { calls, interaction } = buttonInteraction(`listnote_page:black:${entry._id}:2`);
   await handleListNotePageButton(interaction);
   assert.equal(calls.updated, 1);

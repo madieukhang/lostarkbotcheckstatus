@@ -25,6 +25,7 @@ const vi = {
       viewEvidence: 'Xem evidence',
       openEvidence: 'Mở evidence',
       noteHistory: 'Lịch sử · {count}',
+      addToHistory: 'Ghi vào lịch sử',
       approveAdd: 'Duyệt · thêm {count}',
       confirmAdd: 'Xác nhận thêm {count}',
       confirmAddCompact: 'Xác nhận · thêm {count}',
@@ -153,7 +154,7 @@ const vi = {
         {
           name: '📒 Lists',
           lines: [
-            '`/la-list add type name reason [raid] [logs] [image] [scope]` - Thêm vào blacklist/whitelist/watchlist. Scope global/server chỉ áp dụng blacklist.',
+            '`/la-list add type name reason [raid] [logs] [image] [scope]` - Thêm vào blacklist/whitelist/watchlist. Scope global/server chỉ áp dụng blacklist. Nếu nhân vật đã có trong list, **Ghi vào lịch sử** lưu lý do và raid của cậu thành ghi chú mới của entry đó.',
             '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` - Sửa entry đã có. `additional_names` dùng để append alt thủ công cho case hidden roster/no-guild.',
             '`/la-list remove name` - Xoá entry khỏi list',
             '`/la-list view type [scope]` - Xem list (type: all/black/white/watch/trusted, scope: all/global/server)',

@@ -202,6 +202,11 @@ export function createButtonRoutes(listHandlers) {
       handle: (interaction) => listHandlers.handleListNotePageButton(interaction),
     },
     {
+      prefixes: ['listnote_add:'],
+      label: '[list] Add to history button error:',
+      handle: (interaction) => listHandlers.handleListNoteAddButton(interaction),
+    },
+    {
       prefixes: [
         'list-enrich:confirm:',
         'list-enrich:cancel:',

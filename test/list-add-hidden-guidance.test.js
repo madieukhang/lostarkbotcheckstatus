@@ -82,7 +82,7 @@ test('duplicate roster result opens with the reason pair and fills a whole six-c
     // Reason pair opens the card: stored above, typed directly under it.
     assert.deepEqual(fields.slice(0, 2).map((f) => [f.name, f.value, f.inline]), [
       ['📝 Stored reason', 'zdps', false],
-      ['✏️ Reason you just typed', 'ninja loot g2', false],
+      ['✏️ Your new note', 'ninja loot g2', false],
     ]);
 
     const grid = fields.slice(2);

@@ -13,12 +13,17 @@ import { formatLinkedCharacter } from './trackedAltsRender.js';
  * @param {object} existed Stored list entry.
  * @param {string} typedReason Reason submitted with the add request.
  * @param {string} lang Recipient language.
- * @param {{forApproval?: boolean}} options Whether the reader is an approver.
+ * @param {{forApproval?: boolean, typedRaid?: string}} options Whether the reader is an
+ *   approver, and the raid the direct add's new note would carry.
  * @returns {Array<object>} Discord embed fields.
  */
-export function buildDuplicateReasonFields(existed, typedReason, lang, { forApproval = false } = {}) {
+export function buildDuplicateReasonFields(existed, typedReason, lang, { forApproval = false, typedRaid = '' } = {}) {
   const fallback = t('dialogue.broadcast.notAvailable', lang);
   const typed = String(typedReason || '').trim();
+  // The direct card names the raid the new note will carry; the approval
+  // card already shows it in the New request column.
+  const raidLine = !forApproval && typedRaid ? `-# 🗡️ ${typedRaid}` : '';
+  const typedText = typed || t('dialogue.approval.flow.unchangedValue', lang);
   return [
     {
       name: `📝 ${t('dialogue.listAdd.duplicate.storedReason', lang)}`,
@@ -28,7 +33,9 @@ export function buildDuplicateReasonFields(existed, typedReason, lang, { forAppr
     // Keep identical reasons visible: the reviewer still needs both sides.
     typed || forApproval ? {
       name: `✏️ ${t(forApproval ? 'dialogue.approval.flow.requestReason' : 'dialogue.listAdd.duplicate.typedReason', lang)}`,
-      value: (typed || t('dialogue.approval.flow.unchangedValue', lang)).slice(0, 1024),
+      value: raidLine
+        ? `${typedText.slice(0, 1024 - raidLine.length - 1)}\n${raidLine}`
+        : typedText.slice(0, 1024),
       inline: false,
     } : null,
   ].filter(Boolean);

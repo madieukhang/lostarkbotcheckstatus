@@ -34,7 +34,7 @@ export function createListHandlers({ client }) {
     ...createEvidenceHandlers({ client }),
     handleBroadcastEvidenceButton: createBroadcastEvidenceButtonHandler({ client }),
     ...createMultiaddHandlers({ client, services }),
-    ...createNoteHandlers(),
+    ...createNoteHandlers({ services }),
     ...createQuickAddHandlers({ services }),
     ...createRemoveHandlers({ services }),
     ...createTrustHandlers({ client }),

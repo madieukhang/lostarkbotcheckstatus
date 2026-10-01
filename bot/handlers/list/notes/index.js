@@ -8,10 +8,14 @@ import { connectDB } from '../../../db.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
-import { deferEphemeralReply, deferUpdate, editAlert, editPayload } from '../../../utils/interactionReplies.js';
+import { deferEphemeralReply, deferUpdate, editAlert, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { getListContext } from '../helpers.js';
+import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
+import { buildNoteAddedPayload } from './addedCard.js';
+import { appendEntryNote, listAddedAlts } from './appendNote.js';
 import { buildNoteHistoryPayload } from './historyView.js';
+import { NOTE_ADD_PREFIX, peekPendingNote, takePendingNote } from './pendingNotes.js';
 
 // Same visibility as the check details card: a server-scoped entry only
 // opens inside its own server.
@@ -34,9 +38,15 @@ async function renderHistory(interaction, lang) {
 }
 
 /**
- * @returns {{handleListNoteHistoryButton: Function, handleListNotePageButton: Function}}
+ * @param {object} deps
+ * @param {object} deps.services - shared list services (broadcastListChange)
+ * @returns {{
+ *   handleListNoteHistoryButton: Function,
+ *   handleListNotePageButton: Function,
+ *   handleListNoteAddButton: Function,
+ * }}
  */
-export function createNoteHandlers() {
+export function createNoteHandlers({ services }) {
   const languageOf = interaction => getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   async function handleListNoteHistoryButton(interaction) {
@@ -49,5 +59,44 @@ export function createNoteHandlers() {
     await renderHistory(interaction, await languageOf(interaction));
   }
 
-  return { handleListNoteHistoryButton, handleListNotePageButton };
+  async function handleListNoteAddButton(interaction) {
+    const key = interaction.customId.slice(NOTE_ADD_PREFIX.length + 1);
+    const lang = await languageOf(interaction);
+    const pending = peekPendingNote(key);
+    const refusal = !pending ? 'pendingExpired'
+      : pending.payload.requestedByUserId !== interaction.user.id ? 'notYours'
+        : null;
+    if (refusal) {
+      await replyAlert(interaction, { severity: AlertSeverity.WARNING, ...t(`dialogue.notes.${refusal}`, lang), lang });
+      return;
+    }
+    takePendingNote(key);
+    await deferUpdate(interaction);
+    await connectDB();
+    const { payload, entryId, rosterNames, rosterCharacters } = pending;
+    const { model } = getListContext(payload.type);
+    const entry = await model.findById(entryId).lean();
+    const saved = entry ? await appendEntryNote({ model, entry, payload, rosterNames }) : null;
+    if (!saved) {
+      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang), lang }, { components: [] });
+      return;
+    }
+    const addedAlts = listAddedAlts(entry, saved);
+    await editPayload(interaction, buildNoteAddedPayload({
+      entry: saved, type: payload.type, addedAlts, statMap: statMapFromRosterCharacters(rosterCharacters), lang: pending.lang,
+    }));
+    services.broadcastListChange('noted', saved, {
+      type: payload.type,
+      guildId: payload.guildId,
+      requestedByDisplayName: payload.requestedByDisplayName,
+      requestedByTag: payload.requestedByTag,
+    }, {
+      // Server-scoped entries announce to the owner server only, as overwrites did.
+      onlyOwner: saved.scope === 'server',
+      rosterCharacters,
+      newAltNames: addedAlts,
+    }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
+  }
+
+  return { handleListNoteHistoryButton, handleListNotePageButton, handleListNoteAddButton };
 }

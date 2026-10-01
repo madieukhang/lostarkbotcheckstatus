@@ -25,6 +25,7 @@ const jp = {
       viewEvidence: 'evidence を見る',
       openEvidence: 'evidence を開く',
       noteHistory: '履歴 · {count}',
+      addToHistory: '履歴に追加',
       approveAdd: '承認 · {count} 件追加',
       confirmAdd: '{count} 件追加を確定',
       confirmAddCompact: '確定 · {count} 件追加',
@@ -153,7 +154,7 @@ const jp = {
         {
           name: '📒 Lists',
           lines: [
-            '`/la-list add type name reason [raid] [logs] [image] [scope]` - blacklist/whitelist/watchlist に追加。scope global/server は blacklist のみ。',
+            '`/la-list add type name reason [raid] [logs] [image] [scope]` - blacklist/whitelist/watchlist に追加。scope global/server は blacklist のみ。すでに登録済みの場合は、**履歴に追加** で理由とレイドをそのエントリーの新しいメモとして保存できますわ。',
             '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` - 既存 entry を編集。`additional_names` は hidden roster/no-guild 用の手動 alt 追加。',
             '`/la-list remove name` - list から entry を削除',
             '`/la-list view type [scope]` - list 表示 (type: all/black/white/watch/trusted, scope: all/global/server)',
