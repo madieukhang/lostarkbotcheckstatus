@@ -316,7 +316,6 @@ export default {
       noEvidence: { title: 'Không có bằng chứng để xem', description: 'Yêu cầu này không kèm ảnh, hoặc message lưu ảnh đã bị xóa.' },
       evidenceFooterLegacy: 'Ảnh legacy · có thể đã hết hạn vì được gửi trước cơ chế rehost', evidenceFooterFresh: 'URL mới vừa được lấy từ kho evidence',
       originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry trùng đã bị một phiên khác xóa trước khi thao tác này hoàn tất.', footer: 'Chạy lại `/la-list add` để tạo entry mới nhé.' },
-      overwriteFailed: { title: 'Ghi đè thất bại', description: 'LoaLogs chưa cập nhật được entry hiện có.' },
     },
   },
   notes: {

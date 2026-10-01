@@ -291,7 +291,6 @@ export default {
       noEvidence: { title: 'Evidence がありませんの', description: '画像が添付されていないか、保存 message が削除されていますわ。' },
       evidenceFooterLegacy: 'Legacy image · evidence rehost 前の画像なので期限切れの可能性がありますの', evidenceFooterFresh: 'Evidence archive から fresh URL を取得しましたわ',
       originalMissing: { title: '元の entry がありませんの', description: '操作中に別 session が重複 entry を削除したようですわ。', footer: '`/la-list add` をもう一度実行して新規 entry を作成してくださいませ。' },
-      overwriteFailed: { title: '上書きできませんでしたの', description: 'LoaLogs は既存 entry を更新できませんでしたわ。' },
     },
   },
   notes: {

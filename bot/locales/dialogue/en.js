@@ -403,7 +403,6 @@ export default {
       evidenceFooterLegacy: 'Legacy image · it may have expired because it predates evidence rehosting',
       evidenceFooterFresh: 'Fresh URL resolved from the evidence archive just now',
       originalMissing: { title: 'The original entry is gone', description: 'The duplicate entry was removed by another session before this action completed.', footer: 'Run `/la-list add` again to create a fresh entry.' },
-      overwriteFailed: { title: 'Overwrite failed', description: 'LoaLogs could not update the existing entry.' },
     },
   },
   notes: {

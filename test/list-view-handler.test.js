@@ -48,6 +48,32 @@ for (const revoked of [true, false]) {
   });
 }
 
+test('list-view detail carries the History button from two notes', async t => {
+  const at = new Date('2026-07-02T00:00:00Z');
+  const entry = {
+    _id: 'c'.repeat(24), name: 'Noted', reason: 'second', _listType: 'black', _icon: '⛔', _color: 0xed4245,
+    notes: [{ at, reason: 'first', raid: '', byUserId: 'a', byName: 'A' }, { at, reason: 'second', raid: '', byUserId: 'b', byName: 'B' }],
+  };
+  let collect;
+  let detailReply;
+  await createViewHandlers({
+    client: {}, connectDatabase: async () => {}, getLanguage: async () => 'en',
+    loadStatMap: async () => new Map(), loadEntries: async () => [entry],
+    resolveImageUrl: async () => '',
+  }).handleListViewCommand({
+    user: { id: 'viewer' }, guild: { id: 'guild' }, options: { getString: key => key === 'type' ? 'black' : null },
+    deferReply: async () => {}, editReply: async () => ({
+      createMessageComponentCollector: () => ({ on: (event, callback) => { if (event === 'collect') collect = callback; } }),
+    }),
+  });
+  t.mock.method(Blacklist, 'findOne', () => ({ lean: async () => entry }));
+  await collect({
+    customId: 'listview_evidence', user: { id: 'viewer' }, values: [`black:${entry._id}`],
+    deferReply: async () => {}, editReply: async payload => { detailReply = payload; },
+  });
+  assert.equal(detailReply.components[0].toJSON().components[0].custom_id, `listnote_history:black:${entry._id}:1`);
+});
+
 test('list-view collector survives a button Discord has already expired', async t => {
   t.mock.method(console, 'warn', () => {});
   let collect;
