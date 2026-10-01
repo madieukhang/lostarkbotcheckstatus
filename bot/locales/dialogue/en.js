@@ -408,6 +408,7 @@ export default {
   },
   listEdit: {
     originalMissing: { title: 'The original entry is gone', description: 'The entry was removed or moved to another list before these changes could be saved.' },
+    entryChanged: { title: 'This entry just got a new note', description: 'A note was added to this entry before the edit could be saved, so nothing changed. Run `/la-list edit` again to edit the latest note.' },
     moveBlocked: { title: 'Move blocked', description: '**{name}** already exists in the target list, so I left both lists unchanged.', footer: 'Remove the conflicting target entry first, then submit the edit again.' },
     scopeRaced: { title: 'Scope changed elsewhere', description: 'Another entry with this name claimed the target scope before this edit could be saved.', footer: 'Submit the edit again, or remove the conflicting entry first.' },
     success: { titleMoved: '{list} · Edited & moved · {name}', titleEdited: '{list} · Edited · {name}', hero: '**{user}** edited {name} in **{list}**{scope}{summary}.', summaryChanged: ' · changed {fields}', summaryAlts: ' · added **{count}** {altWord}', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: 'Edited by {user}' },

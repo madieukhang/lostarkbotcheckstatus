@@ -14,6 +14,7 @@ import { getInteractionDisplayName } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import { loadCheckDetailStatMap } from '../check/index.js';
 import { moveListEntry } from '../services/moveEntry.js';
+import { carryNotesWithEdit, planLatestNoteEdit } from '../notes/entryNotes.js';
 import {
   getListContext,
   buildListEditSuccessEmbeds,
@@ -88,6 +89,7 @@ export function buildMovedEntryData({
     addedByTag: existing.addedByTag,
     addedByDisplayName: existing.addedByDisplayName,
     addedAt: existing.addedAt,
+    notes: carryNotesWithEdit(existing, { reason: newReason, raid: newRaid }),
     ...resolveMoveScopeFields({
       targetType,
       newScope,
@@ -230,12 +232,19 @@ function buildEditedEntry(existing, updateFields, additionalNames) {
 async function applyInPlaceEdit(args) {
   const { model } = getListContext(args.currentType);
   const { updateFields, updateOps } = buildInPlaceUpdatePlan(args);
+  const noteEdit = planLatestNoteEdit(args.existing, { reason: args.newReason, raid: args.newRaid });
   try {
-    const write = await model.updateOne({ _id: args.existing._id }, updateOps);
+    const write = await model.updateOne(
+      { _id: args.existing._id, ...noteEdit.filter },
+      { ...updateOps, $set: { ...updateOps.$set, ...noteEdit.set } },
+    );
     if (write.matchedCount !== 1) {
+      // The note-count filter also misses when a note landed after the
+      // read; the edit was meant for the note the editor saw.
+      const stillListed = await model.exists({ _id: args.existing._id });
       await editAlert(args.interaction, {
         severity: AlertSeverity.WARNING,
-        ...t('dialogue.listEdit.originalMissing', args.lang),
+        ...t(`dialogue.listEdit.${stillListed ? 'entryChanged' : 'originalMissing'}`, args.lang),
         lang: args.lang,
       });
       return null;

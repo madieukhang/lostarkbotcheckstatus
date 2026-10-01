@@ -126,6 +126,7 @@ for (const matchedCount of [0, 1]) {
     const entry = { _id: 'a'.repeat(24), name: 'Alpha', reason: 'Old', scope: 'global', allCharacters: [] };
     t.mock.method(Blacklist, 'findById', async () => entry);
     t.mock.method(Blacklist, 'updateOne', async () => ({ acknowledged: true, matchedCount, modifiedCount: 0 }));
+    t.mock.method(Blacklist, 'exists', async () => null);
     const replies = [], broadcasts = [], notices = [];
     let completed = 0;
     await handleApprovedEditRequest({

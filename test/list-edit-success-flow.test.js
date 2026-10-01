@@ -154,6 +154,7 @@ for (const matchedCount of [0, 1]) {
   test(`in-place edit broadcasts only a matched entry, including an unchanged write (matched=${matchedCount})`, async t => {
     const existing = { _id: 'a'.repeat(24), name: 'Alpha', reason: 'Old', scope: 'global', allCharacters: [] };
     t.mock.method(Blacklist, 'updateOne', async () => ({ acknowledged: true, matchedCount, modifiedCount: 0 }));
+    t.mock.method(Blacklist, 'exists', async () => null);
     t.mock.method(RosterSnapshot, 'find', () => ({ collation() { return this; }, lean: async () => [] }));
     const replies = [], broadcasts = [];
     await applyListEditNow({

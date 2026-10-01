@@ -322,6 +322,7 @@ export default {
   },
   listEdit: {
     originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry đã bị xóa hoặc chuyển sang list khác trước khi thay đổi được lưu.' },
+    entryChanged: { title: 'Entry vừa có ghi chú mới', description: 'Có người vừa thêm ghi chú vào entry này trước khi edit kịp lưu, nên tớ chưa đổi gì cả. Cậu chạy lại `/la-list edit` để sửa ghi chú mới nhất nhé.' },
     moveBlocked: { title: 'Không thể chuyển list', description: '**{name}** đã tồn tại trong list đích nên tớ giữ nguyên cả hai list.', footer: 'Xóa entry bị trùng ở list đích rồi gửi lại yêu cầu nhé.' },
     scopeRaced: { title: 'Scope vừa bị thay đổi ở nơi khác', description: 'Một entry cùng tên đã chiếm scope đích trước khi chỉnh sửa này được lưu.', footer: 'Gửi lại chỉnh sửa hoặc xóa entry bị trùng trước nhé.' },
     success: { titleMoved: '{list} · Đã sửa và chuyển list · {name}', titleEdited: '{list} · Đã chỉnh sửa · {name}', hero: '**{user}** đã sửa {name} trong **{list}**{scope}{summary}.', summaryChanged: ' · đổi {fields}', summaryAlts: ' · thêm **{count}** alt', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: 'Sửa bởi {user}' },

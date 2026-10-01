@@ -12,6 +12,7 @@ import { normalizeNameList } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import { findTrustedEditConflict } from '../edit/trustedGuard.js';
 import { moveListEntry } from '../services/moveEntry.js';
+import { carryNotesWithEdit, planLatestNoteEdit } from '../notes/entryNotes.js';
 import {
   getListContext,
   buildTrustedBlockEmbed,
@@ -81,6 +82,7 @@ export function buildApprovalMoveData(payload, existingEntry) {
     addedByTag: existingEntry.addedByTag,
     addedByDisplayName: existingEntry.addedByDisplayName,
     addedAt: existingEntry.addedAt,
+    notes: carryNotesWithEdit(existingEntry, { reason: payload.reason, raid: payload.raid }),
     ...resolveApprovalMoveScope(payload, existingEntry),
   };
 }
@@ -183,22 +185,24 @@ async function applyApprovedInPlaceUpdate(args) {
   const updateFields = buildApprovalUpdateFields(args.payload, args.existingEntry);
   const additionalNames = normalizeNameList(args.payload.additionalNames || []);
   if (Object.keys(updateFields).length === 0 && additionalNames.length === 0) return true;
+  const noteEdit = planLatestNoteEdit(args.existingEntry, { reason: updateFields.reason, raid: updateFields.raid });
   try {
     await args.beforeWrite();
     const write = await args.oldModel.updateOne(
-      { _id: args.existingEntry._id },
+      { _id: args.existingEntry._id, ...noteEdit.filter },
       {
-        $set: updateFields,
+        $set: { ...updateFields, ...noteEdit.set },
         ...(additionalNames.length > 0
           ? { $addToSet: { allCharacters: { $each: additionalNames } } }
           : {}),
       }
     );
     if (write.matchedCount !== 1) {
+      const stillListed = await args.oldModel.exists({ _id: args.existingEntry._id });
       await closeApprovalWithAlert({
         interaction: args.interaction,
         completeApproval: args.completeApproval,
-        embed: buildLocalizedAlert('dialogue.listEdit.originalMissing', args.lang),
+        embed: buildLocalizedAlert(`dialogue.listEdit.${stillListed ? 'entryChanged' : 'originalMissing'}`, args.lang),
         lang: args.lang,
       });
       return false;

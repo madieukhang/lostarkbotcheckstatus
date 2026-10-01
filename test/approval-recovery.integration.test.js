@@ -232,3 +232,32 @@ for (const surface of ['immediate', 'approval']) {
     assert.match(replies[0].embeds[0].toJSON().title, /original entry is gone/);
   });
 }
+
+test('an approved edit raced by a new note closes without writing', async () => {
+  const at = new Date();
+  const existing = await Blacklist.create({
+    name: 'Example', reason: 'Before', notes: [{ at, reason: 'Before', raid: '', byUserId: 'a', byName: 'A' }],
+  });
+  const replies = [];
+  let completed = false;
+  await handleApprovedEditRequest({
+    interaction: {
+      deferred: true, guild: { id: 'guild' }, user: { id: 'officer', username: 'Officer' },
+      message: { id: 'dm' }, client: { guilds: { cache: new Map() } },
+      editReply: async reply => replies.push(reply),
+    },
+    payload: { name: existing.name, existingEntryId: existing._id, currentType: 'black', type: 'black', reason: 'After' },
+    requestId: 'request', lang: 'en', broadcastListChange: async () => assert.fail('nothing was saved'),
+    beforeWrite: async () => {
+      await Blacklist.updateOne({ _id: existing._id }, { $push: { notes: { at, reason: 'Raced', raid: '', byUserId: 'b', byName: 'B' } } });
+    },
+    completeApproval: async () => { completed = true; },
+    syncApproverDmMessages: async () => {},
+    notifyRequesterAboutDecision: async () => assert.fail('nothing was saved'),
+  });
+  const saved = await Blacklist.findById(existing._id).lean();
+  assert.equal(saved.reason, 'Before');
+  assert.deepEqual(saved.notes.map(note => note.reason), ['Before', 'Raced']);
+  assert.equal(completed, true);
+  assert.match(replies[0].embeds[0].toJSON().title, /new note/);
+});
