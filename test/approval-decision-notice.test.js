@@ -102,3 +102,17 @@ test('a missing original message falls back once to the channel with the duplica
   assert.match(textOf(h.sends[0]), words.vi.duplicate);
   assert.match(textOf(h.sends[0]), words.vi.kept);
 });
+
+for (const lang of Object.keys(words)) {
+  test(`${lang} requester notice says a duplicate report went into the history`, async () => {
+    const h = harness(lang);
+    await h.service.notifyRequesterAboutDecision(h.payload, { ok: true, isNoted: true }, false);
+    assert.equal(h.replies.length, 1);
+    const notice = h.replies[0];
+    const embed = notice.embeds[0].toJSON();
+    assert.ok(embed.title.includes(t('dialogue.approval.public.decisions.noted', lang)));
+    assert.doesNotMatch(textOf(notice), words[lang].approved);
+    assert.match(textOf(notice), /Samplechar/);
+    assert.equal(embed.color, COLORS.success);
+  });
+}

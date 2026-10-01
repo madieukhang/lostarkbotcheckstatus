@@ -19,6 +19,7 @@ import { createApprovalDecisionHandler, handleApprovalClaimError } from '../serv
 import { handleApprovedEditRequest } from './editApproval.js';
 import { createApprovalMessageUpdater } from '../services/approvals.js';
 import { buildDuplicateApprovalEmbed } from '../duplicate-ui.js';
+import { buildNoteHistoryButton } from '../notes/entryNotes.js';
 
 /**
  * Build the Approve / Reject handler for single add and edit requests.
@@ -90,14 +91,17 @@ export function createListAddApprovalButtonHandler({
 
       const result = await executeListAddToDatabase(payload, { beforeWrite: () => claim.assertOwned() });
 
-      // Duplicate found · show comparison and overwrite option
+      // Duplicate found · show the comparison with the Add to history option
       if (!result.ok && result.isDuplicate) {
         const existing = result.existingEntry;
         const buildDuplicatePayload = (targetLang) => {
-          const overwriteRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`listadd_overwrite:${requestId}`).setLabel(t('common.actions.overwrite', targetLang)).setStyle(ButtonStyle.Danger),
+          // The custom id keeps its old name: the approval lease stores the
+          // action string, and requests claimed under it must still resume.
+          const overwriteRow = new ActionRowBuilder().addComponents([
+            new ButtonBuilder().setCustomId(`listadd_overwrite:${requestId}`).setLabel(t('common.actions.addToHistory', targetLang)).setEmoji('📝').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId(`listadd_keep:${requestId}`).setLabel(t('common.actions.keepExisting', targetLang)).setStyle(ButtonStyle.Secondary),
-          );
+            buildNoteHistoryButton(payload.type, existing, targetLang),
+          ].filter(Boolean));
           return {
             content: null,
             embeds: [buildDuplicateApprovalEmbed(existing, payload, targetLang)],

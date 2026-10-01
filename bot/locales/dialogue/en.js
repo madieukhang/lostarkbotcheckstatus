@@ -340,14 +340,14 @@ export default {
     footer: 'Approve or reject below. The requester hears back in their channel.',
     decided: {
       title: '{title} · {outcome}',
-      outcomes: { approved: 'Approved', returned: 'Not added', rejected: 'Rejected', editApproved: 'Approved', overwritten: 'Overwritten', kept: 'Kept existing' },
+      outcomes: { approved: 'Approved', returned: 'Not added', rejected: 'Rejected', editApproved: 'Approved', noted: 'Added to history', kept: 'Kept existing' },
       field: 'Decision',
       lines: {
         approved: 'Approved and saved by **{user}** · {time}',
         returned: 'Approved by **{user}** · {time}, but I could not add it: {result}',
         rejected: 'Rejected by **{user}** · {time}',
         editApproved: 'Edit approved and saved by **{user}** · {time}',
-        overwritten: '**{user}** overwrote the existing entry · {time}',
+        noted: '**{user}** added this report to the entry history · {time}',
         kept: '**{user}** kept the existing entry and discarded this request · {time}',
       },
       footer: 'The requester has been told in their channel.',
@@ -366,12 +366,13 @@ export default {
     },
     public: {
       title: '{list} · {decision} · {name}',
-      decisions: { approved: 'Approved', rejected: 'Rejected', duplicate: 'Not applied', failed: 'Not saved' },
+      decisions: { approved: 'Approved', rejected: 'Rejected', duplicate: 'Not applied', failed: 'Not saved', noted: 'Added to history' },
       add: {
         approved: 'Your request to add {name} to the **{list}**{scope} was approved and saved.',
         rejected: 'Your request to add {name} to the **{list}**{scope} was rejected, so nothing was saved.',
         duplicate: 'Your request to add {name} to the **{list}**{scope} was not applied: that character is already listed, and the approver kept the existing entry.',
         failed: 'Your request to add {name} to the **{list}**{scope} was approved, but I could not save it. Ask an officer to check before you submit it again.',
+        noted: '{name} is already on the **{list}**{scope}, so your report was added to that entry as a new note.',
       },
       edit: {
         approved: 'Your request to edit {name} on the **{list}**{scope} was approved and saved.',
@@ -396,7 +397,7 @@ export default {
       duplicateDirect: '{icon} {name} is already in **{list}**.',
       duplicateRoster: '{icon} {name} shares a roster with {matched}, who is already in **{list}**.',
       requestReason: 'Reason in the new request', unchangedValue: 'Keep existing value',
-      comparisonFooter: 'Overwrite to update the content; keep the existing entry to skip the new request.',
+      comparisonFooter: 'Add to history saves this request as the latest note; a new screenshot replaces the evidence. Keep existing skips the request.',
       executionFailed: { title: 'Approval could not be completed', description: 'The request was approved by **{user}**, but saving it failed.', requesterDescription: 'A senior approved the request, but LoaLogs could not save it.', footer: 'No entry was created. Submit it again, or contact a senior.' },
       noEvidence: { title: 'No evidence is available', description: 'This request has no evidence image, or its archived message was removed.' },
       evidenceFooterLegacy: 'Legacy image · it may have expired because it predates evidence rehosting',

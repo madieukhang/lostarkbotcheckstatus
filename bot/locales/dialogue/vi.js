@@ -262,14 +262,14 @@ export default {
     footer: 'Duyệt hoặc từ chối ở các nút bên dưới. Người yêu cầu sẽ nhận kết quả trong channel của họ.',
     decided: {
       title: '{title} · {outcome}',
-      outcomes: { approved: 'Đã duyệt', returned: 'Chưa thêm được', rejected: 'Đã từ chối', editApproved: 'Đã duyệt', overwritten: 'Đã ghi đè', kept: 'Giữ entry cũ' },
+      outcomes: { approved: 'Đã duyệt', returned: 'Chưa thêm được', rejected: 'Đã từ chối', editApproved: 'Đã duyệt', noted: 'Đã ghi vào lịch sử', kept: 'Giữ entry cũ' },
       field: 'Quyết định',
       lines: {
         approved: '**{user}** đã duyệt và lưu · {time}',
         returned: '**{user}** đã duyệt · {time}, nhưng tớ chưa thêm được: {result}',
         rejected: '**{user}** đã từ chối · {time}',
         editApproved: '**{user}** đã duyệt bản sửa và lưu · {time}',
-        overwritten: '**{user}** đã ghi đè entry hiện có · {time}',
+        noted: '**{user}** đã ghi lần report này vào lịch sử của entry · {time}',
         kept: '**{user}** giữ entry hiện có và bỏ yêu cầu này · {time}',
       },
       footer: 'Người yêu cầu đã được báo trong channel của họ.',
@@ -282,12 +282,13 @@ export default {
     bulk: { title: 'Duyệt thêm hàng loạt · {count} dòng', outcome: 'Phân loại: {breakdown}', reviewing: 'Đang duyệt **{count}** entry.', local: 'nội bộ', more: '... và {count} dòng khác' },
     public: {
       title: '{list} · {decision} · {name}',
-      decisions: { approved: 'Đã duyệt', rejected: 'Bị từ chối', duplicate: 'Không áp dụng', failed: 'Chưa lưu được' },
+      decisions: { approved: 'Đã duyệt', rejected: 'Bị từ chối', duplicate: 'Không áp dụng', failed: 'Chưa lưu được', noted: 'Đã ghi vào lịch sử' },
       add: {
         approved: 'Yêu cầu thêm {name} vào **{list}**{scope} của cậu đã được duyệt và lưu.',
         rejected: 'Yêu cầu thêm {name} vào **{list}**{scope} của cậu bị từ chối, nên chưa có gì được lưu.',
         duplicate: 'Yêu cầu thêm {name} vào **{list}**{scope} của cậu không được áp dụng: character này đã có trong list, và người duyệt giữ entry hiện tại.',
         failed: 'Yêu cầu thêm {name} vào **{list}**{scope} của cậu đã được duyệt, nhưng tớ chưa lưu được. Cậu nhờ officer kiểm tra trước khi gửi lại nhé.',
+        noted: '{name} đã có trong **{list}**{scope}, nên lần report của cậu được ghi thành ghi chú mới của entry đó.',
       },
       edit: {
         approved: 'Yêu cầu sửa {name} trong **{list}**{scope} của cậu đã được duyệt và lưu.',
@@ -310,7 +311,7 @@ export default {
       duplicateDirect: '{icon} {name} đã có trong **{list}**.',
       duplicateRoster: '{icon} {name} cùng roster với {matched}, đã có trong **{list}**.',
       requestReason: 'Lý do trong yêu cầu mới', unchangedValue: 'Giữ giá trị cũ',
-      comparisonFooter: 'Ghi đè để cập nhật nội dung; giữ entry hiện tại để bỏ qua yêu cầu mới.',
+      comparisonFooter: 'Ghi vào lịch sử lưu yêu cầu này thành ghi chú mới nhất; ảnh mới (nếu có) thay evidence. Giữ nguyên thì bỏ qua yêu cầu.',
       executionFailed: { title: 'Chưa thể hoàn tất lượt duyệt', description: 'Yêu cầu đã được **{user}** duyệt nhưng lúc lưu dữ liệu gặp lỗi.', requesterDescription: 'Senior đã duyệt, nhưng LoaLogs chưa lưu được dữ liệu.', footer: 'Chưa có entry nào được tạo. Gửi lại yêu cầu hoặc liên hệ Senior nhé.' },
       noEvidence: { title: 'Không có bằng chứng để xem', description: 'Yêu cầu này không kèm ảnh, hoặc message lưu ảnh đã bị xóa.' },
       evidenceFooterLegacy: 'Ảnh legacy · có thể đã hết hạn vì được gửi trước cơ chế rehost', evidenceFooterFresh: 'URL mới vừa được lấy từ kho evidence',

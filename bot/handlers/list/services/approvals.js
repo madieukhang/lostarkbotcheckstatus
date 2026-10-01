@@ -50,6 +50,7 @@ const DECISION_SEVERITY = Object.freeze({
   rejected: AlertSeverity.ERROR,
   duplicate: AlertSeverity.WARNING,
   failed: AlertSeverity.WARNING,
+  noted: AlertSeverity.SUCCESS,
 });
 
 /**
@@ -58,7 +59,7 @@ const DECISION_SEVERITY = Object.freeze({
  * report's reason stays off it because the card is posted in a public
  * channel.
  * @param {object} payload - the pending add or edit request
- * @param {'approved'|'rejected'|'duplicate'|'failed'} decision - the outcome
+ * @param {'approved'|'rejected'|'duplicate'|'failed'|'noted'} decision - the outcome
  * @param {string} lang - guild language
  * @param {object|null} snapshot - the character's roster snapshot, for its class icon
  * @returns {import('discord.js').EmbedBuilder} the decision card
@@ -305,7 +306,7 @@ export function createApprovalServices({
    * Reply in the origin channel's language, preserving duplicate and save-failure
    * outcomes. An officer's approval alone does not mean the write succeeded.
    * @param {object} payload Pending request and origin-message references.
-   * @param {{ok?: boolean, isDuplicate?: boolean}|null} result Execution outcome.
+   * @param {{ok?: boolean, isDuplicate?: boolean, isNoted?: boolean}|null} result Execution outcome.
    * @param {boolean} rejected Whether the officer declined to apply the request.
    */
   async function notifyRequesterAboutDecision(payload, result, rejected = false) {
@@ -326,7 +327,7 @@ export function createApprovalServices({
       ]);
       const decision = rejected
         ? (result?.isDuplicate ? 'duplicate' : 'rejected')
-        : (result?.ok === false ? 'failed' : 'approved');
+        : (result?.ok === false ? 'failed' : result?.isNoted ? 'noted' : 'approved');
 
       const decisionPayload = {
         // Keep only the ping outside the card; all readable copy belongs to

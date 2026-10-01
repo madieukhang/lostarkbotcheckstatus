@@ -21,7 +21,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 ## Commands
 
 Trusted protection also applies when appending alts through manual edits or enrichment,
-and is checked again when an edit or duplicate overwrite is approved. Each pending
+and is checked again when an edit or a duplicate's Add to history is approved. Each pending
 approval accepts one decision, including when several approvers click at once.
 The request stays saved during processing. **Retry this decision** resumes interrupted
 work once its processing lease expires; it cannot reverse a decision already started.
@@ -231,7 +231,7 @@ Five compose principles:
 4. **Utilities stay pure where possible.** Cross-feature formatting/session helpers live under `utils/`; OCR/name cleanup is centralized in `utils/names.js` so slash check, auto-check, and list edits normalize the same way.
 5. **Factory pattern for closure-dependent code.** Modules that need the Discord `client` export `create*({ client, ... })` factories. `app/interaction-router.js` builds those closures once and routes slash commands, buttons, modals, selects, and autocomplete through them.
 
-Single, overwrite, and bulk approval buttons share authentication, acknowledgement,
+Single, Add to history, and bulk approval buttons share authentication, acknowledgement,
 and lease cleanup in `handlers/list/services/approvalInteraction.js`. Their decision
 handlers retain the operation-specific writes, retry cards, and notifications.
 

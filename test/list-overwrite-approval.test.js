@@ -60,55 +60,53 @@ test('keep-existing rejects an unassigned user without consuming the approver re
 });
 
 for (const protectedAlt of [true, false]) {
-  test(`overwrite rechecks refreshed roster names against Trusted (protected=${protectedAlt})`, async t => {
+  test(`Add to history rechecks refreshed roster names against Trusted (protected=${protectedAlt})`, async t => {
     t.mock.method(mongoose, 'connect', async () => mongoose);
     t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
     clearUserLanguageCache();
     t.after(async () => { clearUserLanguageCache(); await disconnectDB(); });
     const payload = {
       requestId: 'pending', name: 'Newmain', type: 'black', duplicateEntryId: 'original',
-      approverIds: ['officer'], scope: 'global',
+      approverIds: ['officer'], scope: 'global', reason: 'New report', raid: 'Kazeros Hard',
+      requestedByUserId: 'requester', requestedByDisplayName: 'Requester',
     };
     mockPendingApprovalModel(t, PendingApproval, payload);
-    let saves = 0;
-    let broadcasts = 0;
-    let broadcastPrevious;
-    const original = { name: 'Original', allCharacters: ['Originalalt'], scope: 'server', guildId: 'original-guild', save: async () => { saves += 1; } };
-    t.mock.method(Blacklist, 'findById', async () => original);
+    const original = { _id: 'original', name: 'Original', reason: 'Old', allCharacters: ['Originalalt'], scope: 'server', guildId: 'original-guild' };
+    const saved = { ...original, reason: 'New report', allCharacters: ['Originalalt', 'Newmain', 'Protectedalt'] };
+    const writes = [];
+    t.mock.method(Blacklist, 'findById', () => Object.assign(Promise.resolve(original), { lean: async () => original }));
+    t.mock.method(Blacklist, 'findOneAndUpdate', (filter, update) => { writes.push({ filter, update }); return { lean: async () => saved }; });
     t.mock.method(TrustedUser, 'findOne', query => {
       assert.match(JSON.stringify(query), /Protectedalt/);
       return { collation() { return this; }, lean: async () => protectedAlt ? { name: 'Protectedalt', reason: 'Newly trusted' } : null };
     });
     const edits = [];
+    const broadcasts = [];
     let decision;
     await createListAddOverwriteButtonHandler({
       buildRosterCharactersFn: async () => ({ hasValidRoster: true, allCharacters: ['Newmain', 'Protectedalt'] }),
       syncApproverDmMessages: async () => {},
-      broadcastListChange: async (_action, _entry, _meta, options) => {
-        broadcasts += 1;
-        broadcastPrevious = options.previousEntry;
-      },
+      broadcastListChange: async (...args) => { broadcasts.push(args); },
       notifyRequesterAboutDecision: async (_payload, result) => { decision = result; },
     })({
       customId: 'listadd_overwrite:pending', user: { id: 'officer', tag: 'Officer' }, message: { id: 'dm' },
       client: { guilds: { cache: new Map() } },
       deferUpdate: async () => {}, editReply: async value => { edits.push(value); },
     });
-    assert.equal(saves, protectedAlt ? 0 : 1);
-    assert.equal(broadcasts, protectedAlt ? 0 : 1);
-    assert.equal(original.name, protectedAlt ? 'Original' : 'Newmain');
-    assert.deepEqual(original.allCharacters, protectedAlt ? ['Originalalt'] : ['Newmain', 'Protectedalt']);
-    assert.equal(original.scope, 'server', 'overwrite must retain the original scope');
-    assert.equal(original.guildId, 'original-guild');
-    if (!protectedAlt) {
-      // The overwrite rewrites the entry in place; the broadcast compares
-      // against the entry as it was before that.
-      assert.deepEqual(
-        { name: broadcastPrevious.name, allCharacters: broadcastPrevious.allCharacters },
-        { name: 'Original', allCharacters: ['Originalalt'] },
-      );
+    assert.equal(writes.length, protectedAlt ? 0 : 1);
+    assert.equal(broadcasts.length, protectedAlt ? 0 : 1);
+    if (protectedAlt) {
+      assert.deepEqual(decision, { ok: false });
+      assert.match(JSON.stringify(edits[0].embeds[0].toJSON()), /Newly trusted/);
+      return;
     }
-    assert.deepEqual(decision, { ok: !protectedAlt });
-    if (protectedAlt) assert.match(JSON.stringify(edits[0].embeds[0].toJSON()), /Newly trusted/);
+    assert.equal(writes[0].update.$set.reason, 'New report');
+    assert.equal(writes[0].update.$set.name, undefined, 'the entry keeps its name');
+    assert.equal(writes[0].update.$set.scope, undefined, 'the entry keeps its scope');
+    assert.equal(writes[0].update.$set.notes[1].byName, 'Requester', 'the requester wrote the note');
+    assert.equal(broadcasts[0][0], 'noted');
+    assert.deepEqual(broadcasts[0][3].newAltNames, ['Newmain', 'Protectedalt']);
+    assert.deepEqual(decision, { ok: true, isNoted: true });
+    assert.equal(edits.at(-1).components[0].toJSON().components[0].label, 'Added to History');
   });
 }

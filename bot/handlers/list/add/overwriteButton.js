@@ -1,11 +1,11 @@
 /**
  * handlers/list/add/overwriteButton.js
- * "Overwrite" + "Keep existing" buttons on the duplicate-detection
- * branch of /la-list add. When an approved request hits an entry already
- * on the same list (by name or tracked roster), the approver's card offers
- * an overwrite path · this handler refreshes allCharacters via a fresh
- * bible scrape, stamps the enrichment meta, and rewrites the existing
- * entry in place. Keep existing closes the request and tells the requester.
+ * "Add to history" + "Keep existing" buttons on the duplicate branch of
+ * an approved /la-list add. Add to history saves the request as the
+ * entry's latest note, merges a fresh lostark.bible roster and takes a new
+ * screenshot as evidence; Keep existing closes the request and tells the
+ * requester. The button keeps the listadd_overwrite custom id because the
+ * approval lease stores that action string.
  */
 
 import { buildRosterCharacters } from '../../../services/roster/index.js';
@@ -24,6 +24,7 @@ import {
 import { findTrustedEditConflict } from '../edit/trustedGuard.js';
 import { createApprovalDecisionHandler, handleApprovalClaimError } from '../services/approvalInteraction.js';
 import { createApprovalMessageUpdater } from '../services/approvals.js';
+import { appendEntryNote, listAddedAlts } from '../notes/appendNote.js';
 
 function buildDuplicateLookupQuery(payload) {
   const nameMatch = buildNameRosterQuery(normalizeCharacterName(payload.name));
@@ -51,8 +52,8 @@ export async function findDuplicateEntry(model, payload) {
 }
 
 /**
- * Build the Overwrite / Keep-existing button handler for the duplicate
- * branch of /la-list add.
+ * Build the Add to history / Keep-existing button handler for the
+ * duplicate branch of /la-list add.
  * @param {object} deps
  * @param {Function} deps.syncApproverDmMessages - approver DM sync
  * @param {Function} deps.broadcastListChange - guild broadcast
@@ -66,12 +67,12 @@ export function createListAddOverwriteButtonHandler({
   buildRosterCharactersFn = buildRosterCharacters,
 }) {
   return createApprovalDecisionHandler(async ({ interaction, action, requestId, lang, payload, claim }) => {
-    const isOverwrite = action === 'listadd_overwrite';
+    const isAddToHistory = action === 'listadd_overwrite';
     const updateApprovers = createApprovalMessageUpdater({
       interaction, payload, lang, syncApproverDmMessages,
     });
 
-    if (!isOverwrite) {
+    if (!isAddToHistory) {
       await claim.complete();
       // Keep the existing entry and explain the duplicate to the requester.
       const buildKeptPayload = (targetLang) => buildDecidedApprovalPayload({
@@ -83,7 +84,6 @@ export function createListAddOverwriteButtonHandler({
       return;
     }
 
-    // Overwrite: update existing entry in-place (safe · no delete-then-add risk)
     try {
       const { model } = getListContext(payload.type);
 
@@ -105,87 +105,63 @@ export function createListAddOverwriteButtonHandler({
         return;
       }
 
-      // Update in-place: overwrite fields + refresh roster for new canonical name
-      const newName = normalizeCharacterName(payload.name);
-      const rosterResult = await buildRosterCharactersFn(newName, {
+      // The approval may come long after the request, so the roster is
+      // fetched again rather than taken from the request.
+      const typedName = normalizeCharacterName(payload.name);
+      const rosterResult = await buildRosterCharactersFn(typedName, {
         hiddenRosterFallback: true,
       }).catch(() => null);
-
-      const proposedNames = rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0
-        ? rosterResult.allCharacters : dupeEntry.allCharacters || [];
-      const trustedNow = await findTrustedEditConflict({ name: newName, allCharacters: proposedNames });
+      const rosterNames = rosterResult?.hasValidRoster ? rosterResult.allCharacters || [] : [];
+      const trustedNow = await findTrustedEditConflict({
+        name: typedName,
+        allCharacters: rosterNames.length > 0 ? rosterNames : dupeEntry.allCharacters || [],
+      });
       if (trustedNow) {
         await claim.complete();
         await updateApprovers(targetLang => ({
           content: null,
-          embeds: [buildTrustedBlockEmbed(newName, trustedNow.reason, { lang: targetLang })],
+          embeds: [buildTrustedBlockEmbed(typedName, trustedNow.reason, { lang: targetLang })],
           components: [buildApprovalResultRow('Blocked', targetLang)],
         }));
         await notifyRequesterAboutDecision(payload, { ok: false }, false);
         return;
       }
 
-      // The broadcast marks what the overwrite replaced, so keep the entry
-      // as it was before the fields below are rewritten in place.
-      const previousEntry = dupeEntry.toObject?.() || { ...dupeEntry };
-      dupeEntry.name = newName;
-      // Only update roster if fetch succeeded · preserve old snapshot on failure
-      if (rosterResult?.hasValidRoster && rosterResult.allCharacters?.length > 0) {
-        dupeEntry.allCharacters = rosterResult.allCharacters;
-        // Refresh stamped the alt list from a bible scrape just now, so
-        // record source + timestamp. Without this the stale-loop would
-        // misread the entry as legacy/null even though it was just refreshed.
-        dupeEntry.enrichmentSource = 'bible';
-        dupeEntry.enrichedAt = new Date();
-      }
-      dupeEntry.reason = payload.reason || dupeEntry.reason;
-      dupeEntry.raid = payload.raid || dupeEntry.raid;
-      dupeEntry.logsUrl = payload.logsUrl || dupeEntry.logsUrl;
-      // Image overwrite: prefer new rehost refs, fall back to new legacy URL,
-      // else preserve existing entry's image fields entirely.
-      if (payload.imageMessageId) {
-        dupeEntry.imageUrl = '';
-        dupeEntry.imageMessageId = payload.imageMessageId;
-        dupeEntry.imageChannelId = payload.imageChannelId || '';
-      } else if (payload.imageUrl) {
-        dupeEntry.imageUrl = payload.imageUrl;
-        dupeEntry.imageMessageId = '';
-        dupeEntry.imageChannelId = '';
-      }
-      // Preserve existing scope · overwrite should not change global↔server
-      // (scope is a structural property, not metadata)
-      dupeEntry.addedByUserId = payload.requestedByUserId;
-      dupeEntry.addedByTag = payload.requestedByTag;
-      dupeEntry.addedByName = payload.requestedByName;
-      dupeEntry.addedByDisplayName = payload.requestedByDisplayName;
-      dupeEntry.addedAt = new Date();
-      await claim.assertOwned();
-      await dupeEntry.save();
-      await claim.complete();
-
-      console.log(`[list] Overwrite: updated ${payload.type} entry for ${dupeEntry.name} in-place`);
-
-      const buildOverwrittenPayload = (targetLang) => buildDecidedApprovalPayload({
-        client: interaction.client, payload, outcome: 'overwritten', approver: interaction.user.tag, lang: targetLang,
+      const saved = await appendEntryNote({
+        model, entry: dupeEntry, payload, rosterNames, beforeWrite: () => claim.assertOwned(),
       });
-      await updateApprovers(buildOverwrittenPayload);
+      await claim.complete();
+      if (!saved) {
+        await editPayload(interaction, {
+          content: '',
+          embeds: [buildAlertEmbed({ severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang), lang })],
+          components: [buildApprovalResultRow('Failed', lang)],
+        });
+        return;
+      }
 
-      // Broadcast overwrite: global to all, server-scoped to owner only
-      broadcastListChange('edited', dupeEntry, {
+      console.log(`[list] Note added: ${payload.type} entry ${saved.name}`);
+
+      await updateApprovers(targetLang => buildDecidedApprovalPayload({
+        client: interaction.client, payload, outcome: 'noted', approver: interaction.user.tag, lang: targetLang,
+      }));
+
+      // Server-scoped entries announce to the owner server only.
+      broadcastListChange('noted', saved, {
         type: payload.type,
         guildId: payload.guildId,
         requestedByDisplayName: payload.requestedByDisplayName,
         requestedByTag: payload.requestedByTag,
       }, {
-        onlyOwner: dupeEntry.scope === 'server',
+        onlyOwner: saved.scope === 'server',
         rosterCharacters: rosterResult?.rosterCharacters || [],
-        previousEntry,
+        newAltNames: listAddedAlts(dupeEntry, saved),
       }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 
-      await notifyRequesterAboutDecision(payload, { ok: true }, false);
+      await notifyRequesterAboutDecision(payload, { ok: true, isNoted: true }, false);
     } catch (err) {
-      if (await handleApprovalClaimError({ claim, interaction, error: err, lang, label: 'Overwrite' })) return;
-      console.error('[list] Overwrite failed:', err.message);
+      if (await handleApprovalClaimError({ claim, interaction, error: err, lang, label: 'Add to history' })) return;
+      console.error('[list] Add to history failed:', err.message);
       await editPayload(interaction, {
         content: '',
         embeds: [buildAlertEmbed({

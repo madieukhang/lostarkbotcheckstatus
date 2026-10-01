@@ -82,6 +82,7 @@ for (const lang of ['en', 'vi', 'jp']) {
       assert.deepEqual(card.components[0].toJSON().components.map(button => button.custom_id), [
         'listadd_overwrite:request-id', 'listadd_keep:request-id',
       ]);
+      assert.equal(card.components[0].toJSON().components[0].label, translate('common.actions.addToHistory', lang));
       assert.equal(peerCard.embeds[0].toJSON().author.name, `⚠️ ${translate('dialogue.approval.flow.duplicateTitle', 'jp')}`);
       assert.equal(peerCard.components[0].toJSON().components[1].label, translate('common.actions.keepExisting', 'jp'));
     });

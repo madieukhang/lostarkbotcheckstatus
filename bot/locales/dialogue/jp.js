@@ -237,14 +237,14 @@ export default {
     footer: '下のボタンで承認または却下してくださいませ。結果は申請者のチャンネルでお知らせしますわ。',
     decided: {
       title: '{title} · {outcome}',
-      outcomes: { approved: '承認済み', returned: '追加できず', rejected: '却下済み', editApproved: '承認済み', overwritten: '上書き済み', kept: '既存を維持' },
+      outcomes: { approved: '承認済み', returned: '追加できず', rejected: '却下済み', editApproved: '承認済み', noted: '履歴に追加', kept: '既存を維持' },
       field: '判断',
       lines: {
         approved: '**{user}** が承認し、保存しましたわ · {time}',
         returned: '**{user}** が承認しましたわ · {time}。ただ、わたくしは追加できませんでしたの: {result}',
         rejected: '**{user}** が却下しましたわ · {time}',
         editApproved: '**{user}** が編集を承認し、保存しましたわ · {time}',
-        overwritten: '**{user}** が既存の entry を上書きしましたわ · {time}',
+        noted: '**{user}** がこの報告を entry の履歴に追加しましたわ · {time}',
         kept: '**{user}** が既存の entry を残し、この申請を破棄しましたわ · {time}',
       },
       footer: '申請者には、そのチャンネルでお知らせ済みですわ。',
@@ -257,12 +257,13 @@ export default {
     bulk: { title: '一括追加の承認 · {count} rows', outcome: '内訳: {breakdown}', reviewing: '**{count}** entries を確認中ですの。', local: 'サーバー内', more: '...ほか {count} rows' },
     public: {
       title: '{list} · {decision} · {name}',
-      decisions: { approved: '承認', rejected: '却下', duplicate: '未反映', failed: '保存できず' },
+      decisions: { approved: '承認', rejected: '却下', duplicate: '未反映', failed: '保存できず', noted: '履歴に追加' },
       add: {
         approved: '{name} を **{list}**{scope} へ追加する申請が承認され、保存されましたわ。',
         rejected: '{name} を **{list}**{scope} へ追加する申請は却下されましたの。何も保存されていませんわ。',
         duplicate: '{name} を **{list}**{scope} へ追加する申請は反映されませんでしたの。この character はすでに list にあり、承認者が既存の entry を残しましたわ。',
         failed: '{name} を **{list}**{scope} へ追加する申請は承認されましたが、わたくしが保存できませんでしたの。再申請の前に officer に確認をお願いしてくださいませ。',
+        noted: '{name} はすでに **{list}**{scope} に登録済みのため、あなたの報告はその entry の新しいメモとして追加されましたわ。',
       },
       edit: {
         approved: '**{list}**{scope} の {name} を編集する申請が承認され、保存されましたわ。',
@@ -285,7 +286,7 @@ export default {
       duplicateDirect: '{icon} {name} はすでに **{list}** に登録されていますわ。',
       duplicateRoster: '{icon} {name} は、すでに **{list}** に登録されている {matched} と同じ roster にいますの。',
       requestReason: '新しい申請の理由', unchangedValue: '既存の値を保持',
-      comparisonFooter: '内容を更新するには上書き、新しい申請を取り下げるには既存 entry を保持してくださいませ。',
+      comparisonFooter: '「履歴に追加」はこの申請を最新のメモとして保存し、新しいスクリーンショットがあれば evidence を差し替えますわ。「既存を維持」は申請を見送りますの。',
       executionFailed: { title: '承認を完了できませんでしたの', description: '**{user}** が承認しましたが、保存に失敗しましたわ。', requesterDescription: 'Senior が承認しましたが、LoaLogs は保存できませんでしたの。', footer: 'Entry は作成されていません。再申請するか Senior にご連絡くださいませ。' },
       noEvidence: { title: 'Evidence がありませんの', description: '画像が添付されていないか、保存 message が削除されていますわ。' },
       evidenceFooterLegacy: 'Legacy image · evidence rehost 前の画像なので期限切れの可能性がありますの', evidenceFooterFresh: 'Evidence archive から fresh URL を取得しましたわ',

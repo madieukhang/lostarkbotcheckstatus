@@ -488,7 +488,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
 const DECIDED_APPROVAL_STYLES = Object.freeze({
   approved: { icon: '✅', color: COLORS.success, resultLabel: 'Approved' },
   editApproved: { icon: '✅', color: COLORS.success, resultLabel: 'Approved' },
-  overwritten: { icon: '✅', color: COLORS.success, resultLabel: 'Overwritten' },
+  noted: { icon: '📝', color: COLORS.success, resultLabel: 'Added to History' },
   returned: { icon: '⚠️', color: COLORS.warning, resultLabel: 'Processed' },
   rejected: { icon: '✖️', color: COLORS.greyDark, resultLabel: 'Rejected' },
   kept: { icon: '✖️', color: COLORS.greyDark, resultLabel: 'Kept Existing' },
@@ -619,7 +619,7 @@ function localizeApprovalResultLabel(actionLabel, lang) {
     Failed: 'common.actions.failed',
     Blocked: 'common.actions.blocked',
     'Kept Existing': 'common.actions.keptExisting',
-    Overwritten: 'common.actions.overwritten',
+    'Added to History': 'common.actions.addedToHistory',
   };
   const key = keyByLabel[actionLabel];
   return key ? t(key, lang) : actionLabel;
