@@ -292,6 +292,9 @@ export default {
       overwriteFailed: { title: '上書きできませんでしたの', description: 'LoaLogs は既存 entry を更新できませんでしたわ。' },
     },
   },
+  notes: {
+    countLine: 'メモ {count} 件 · 最初は {date}',
+  },
   listEdit: {
     originalMissing: { title: '元の entry がありませんの', description: '変更を保存する前に、entry が削除されたか別の list に移されましたわ。' },
     moveBlocked: { title: 'List を移動できませんの', description: '**{name}** はすでに移動先 list にいますので、どちらの list も変更していませんわ。', footer: '競合 entry を先に削除してから、もう一度申請してくださいませ。' },

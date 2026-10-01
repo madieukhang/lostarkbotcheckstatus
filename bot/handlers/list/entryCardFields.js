@@ -18,7 +18,7 @@ import {
   resolveRosterWorld,
 } from './trackedAltsRender.js';
 
-const FIELD_VALUE_LIMIT = 1024;
+export const FIELD_VALUE_LIMIT = 1024;
 const CHANGED_MARK = ' ✏️';
 // The two ~~ pairs, the trailing … and 15 characters of the old reason.
 // Less than that reads as noise, so the struck line is dropped instead.

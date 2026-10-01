@@ -24,6 +24,7 @@ const vi = {
       overwritten: 'Đã ghi đè',
       viewEvidence: 'Xem evidence',
       openEvidence: 'Mở evidence',
+      noteHistory: 'Lịch sử · {count}',
       approveAdd: 'Duyệt · thêm {count}',
       confirmAdd: 'Xác nhận thêm {count}',
       confirmAddCompact: 'Xác nhận · thêm {count}',

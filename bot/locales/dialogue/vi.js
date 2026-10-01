@@ -317,6 +317,9 @@ export default {
       overwriteFailed: { title: 'Ghi đè thất bại', description: 'LoaLogs chưa cập nhật được entry hiện có.' },
     },
   },
+  notes: {
+    countLine: '{count} ghi chú · đầu tiên ngày {date}',
+  },
   listEdit: {
     originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry đã bị xóa hoặc chuyển sang list khác trước khi thay đổi được lưu.' },
     moveBlocked: { title: 'Không thể chuyển list', description: '**{name}** đã tồn tại trong list đích nên tớ giữ nguyên cả hai list.', footer: 'Xóa entry bị trùng ở list đích rồi gửi lại yêu cầu nhé.' },

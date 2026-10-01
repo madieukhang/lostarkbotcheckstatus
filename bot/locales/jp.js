@@ -24,6 +24,7 @@ const jp = {
       overwritten: '上書き済み',
       viewEvidence: 'evidence を見る',
       openEvidence: 'evidence を開く',
+      noteHistory: '履歴 · {count}',
       approveAdd: '承認 · {count} 件追加',
       confirmAdd: '{count} 件追加を確定',
       confirmAddCompact: '確定 · {count} 件追加',

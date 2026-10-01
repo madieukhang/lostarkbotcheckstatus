@@ -403,6 +403,9 @@ export default {
       overwriteFailed: { title: 'Overwrite failed', description: 'LoaLogs could not update the existing entry.' },
     },
   },
+  notes: {
+    countLine: '{count} notes · first on {date}',
+  },
   listEdit: {
     originalMissing: { title: 'The original entry is gone', description: 'The entry was removed or moved to another list before these changes could be saved.' },
     moveBlocked: { title: 'Move blocked', description: '**{name}** already exists in the target list, so I left both lists unchanged.', footer: 'Remove the conflicting target entry first, then submit the edit again.' },

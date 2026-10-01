@@ -24,6 +24,7 @@ const en = {
       overwritten: 'Overwritten',
       viewEvidence: 'View evidence',
       openEvidence: 'Open evidence',
+      noteHistory: 'History · {count}',
       approveAdd: 'Approve · Add {count}',
       confirmAdd: 'Confirm Add {count}',
       confirmAddCompact: 'Confirm · Add {count}',

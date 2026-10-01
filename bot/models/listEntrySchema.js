@@ -31,6 +31,19 @@ function buildCommonFields() {
     ...buildRosterIdentityFields(),
     raid: { type: String, default: '', trim: true },
     logsUrl: { type: String, default: '', trim: true },
+    // Report history, oldest first. `reason` and `raid` above mirror the
+    // last note; an entry without notes reads its add as the only note.
+    notes: {
+      type: [{
+        _id: false,
+        at: { type: Date },
+        reason: { type: String, default: '', trim: true },
+        raid: { type: String, default: '', trim: true },
+        byUserId: { type: String, default: '', trim: true },
+        byName: { type: String, default: '', trim: true },
+      }],
+      default: [],
+    },
 
     // `imageUrl` is the legacy expiring Discord CDN field. New entries store
     // the evidence message/channel ids and resolve a fresh URL on demand.
