@@ -143,14 +143,15 @@ export function buildNoteCountLine(entry, lang) {
 }
 
 /**
- * Append the count line to a field value, cutting the value so both fit.
+ * Append subtext lines (a raid, the note count) to a field value, cutting
+ * the value so the lines always fit.
  * @param {string} value - the field value
- * @param {string|null} noteLine - from buildNoteCountLine
+ * @param {string|null} line - one or more lines; empty or null appends nothing
  * @returns {string}
  */
-export function withNoteCountLine(value, noteLine) {
-  if (!noteLine) return value;
-  return `${value.slice(0, FIELD_VALUE_LIMIT - noteLine.length - 1)}\n${noteLine}`;
+export function appendFieldLine(value, line) {
+  if (!line) return value;
+  return `${value.slice(0, FIELD_VALUE_LIMIT - line.length - 1)}\n${line}`;
 }
 
 /**

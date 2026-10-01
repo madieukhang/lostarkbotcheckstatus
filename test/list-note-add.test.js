@@ -28,8 +28,11 @@ test('the direct duplicate card names the new note with its raid and keeps the f
     typedReason: 'vẫn thế', typedRaid: 'Kazeros Hard', rosterNames: ['Lovesiiii', 'Pepsji'], rosterCharacters: [],
   });
   const embed = result.embeds[0].toJSON();
+  // Each reason carries its own raid, so the grid does not repeat one of them.
+  assert.equal(embed.fields[0].value, 'afk G1\n-# 🗡️ Act4 Nor');
   assert.equal(embed.fields[1].name, '✏️ Your new note');
   assert.equal(embed.fields[1].value, 'vẫn thế\n-# 🗡️ Kazeros Hard');
+  assert.ok(!embed.fields.some(field => field.name.includes('Raid')));
   assert.match(embed.footer.text, /Add to history/);
   assert.deepEqual(result.rosterNames, ['Lovesiiii', 'Pepsji']);
   assert.deepEqual(result.rosterCharacters, []);

@@ -13,7 +13,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 ## Unreleased
 
 ### Added
-- **Note history on list entries**: a duplicate `/la-list add` (and Quick Add) offers **Add to history**, which saves the typed reason and raid as the entry's latest note instead of only saying it is already listed. The roster fetched for the add is merged into the tracked alts and a new screenshot replaces the evidence.
+- **Note history on list entries**: a duplicate `/la-list add` (and Quick Add) offers **Add to history**, which saves the typed reason and raid as the entry's latest note instead of only saying it is already listed. On that card each reason shows its own raid beneath it, so the stored raid and the new one read as a pair. The roster fetched for the add is merged into the tracked alts and a new screenshot replaces the evidence.
 - **History button**: cards that show a reason (check details, list view, edit result, broadcasts, duplicate cards) count the notes and open the history once an entry has two; it lists every note oldest first with its date, raid and writer, ten per page, only for the clicker.
 - Other servers get a `Blacklist · New note · Name` card. `/la-list edit` still overwrites the latest note, and stops without writing if a note lands while the edit is being saved.
 

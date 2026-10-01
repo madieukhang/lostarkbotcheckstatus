@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  appendFieldLine,
   buildNoteAppend,
   buildNoteCountLine,
   buildNoteHistoryButton,
@@ -10,7 +11,6 @@ import {
   formatNoteDate,
   planLatestNoteEdit,
   readEntryNotes,
-  withNoteCountLine,
 } from '../bot/handlers/list/notes/entryNotes.js';
 
 const JULY = new Date('2026-07-02T12:00:00Z');
@@ -93,8 +93,8 @@ test('the count line and history button appear from two notes on', () => {
 
 test('the count line fits under a full reason', () => {
   const line = buildNoteCountLine(twoNotes, 'en');
-  const value = withNoteCountLine('x'.repeat(1024), line);
+  const value = appendFieldLine('x'.repeat(1024), line);
   assert.equal(value.length, 1024);
   assert.ok(value.endsWith(`\n${line}`));
-  assert.equal(withNoteCountLine('short', null), 'short');
+  assert.equal(appendFieldLine('short', null), 'short');
 });

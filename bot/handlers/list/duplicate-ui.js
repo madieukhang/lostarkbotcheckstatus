@@ -4,7 +4,7 @@ import { normalizeNameKey } from '../../utils/names.js';
 import { relativeTime } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
 import { getListContext } from './helpers.js';
-import { buildNoteCountLine, withNoteCountLine } from './notes/entryNotes.js';
+import { appendFieldLine, buildNoteCountLine } from './notes/entryNotes.js';
 import { formatLinkedCharacter } from './trackedAltsRender.js';
 
 /**
@@ -20,22 +20,21 @@ import { formatLinkedCharacter } from './trackedAltsRender.js';
 export function buildDuplicateReasonFields(existed, typedReason, lang, { forApproval = false, typedRaid = '' } = {}) {
   const fallback = t('dialogue.broadcast.notAvailable', lang);
   const typed = String(typedReason || '').trim();
-  // The direct card names the raid the new note will carry; the approval
-  // card already shows it in the New request column.
-  const raidLine = !forApproval && typedRaid ? `-# 🗡️ ${typedRaid}` : '';
-  const typedText = typed || t('dialogue.approval.flow.unchangedValue', lang);
+  // On the direct card each reason carries its own raid, so the two raids
+  // read as a pair. The approval card shows both raids in its comparison
+  // columns instead.
+  const raidLine = raid => (!forApproval && raid ? `-# 🗡️ ${raid}` : '');
+  const storedLines = [raidLine(existed.raid), buildNoteCountLine(existed, lang)].filter(Boolean).join('\n');
   return [
     {
       name: `📝 ${t('dialogue.listAdd.duplicate.storedReason', lang)}`,
-      value: withNoteCountLine((existed.reason || fallback).slice(0, 1024), buildNoteCountLine(existed, lang)),
+      value: appendFieldLine((existed.reason || fallback).slice(0, 1024), storedLines),
       inline: false,
     },
     // Keep identical reasons visible: the reviewer still needs both sides.
     typed || forApproval ? {
       name: `✏️ ${t(forApproval ? 'dialogue.approval.flow.requestReason' : 'dialogue.listAdd.duplicate.typedReason', lang)}`,
-      value: raidLine
-        ? `${typedText.slice(0, 1024 - raidLine.length - 1)}\n${raidLine}`
-        : typedText.slice(0, 1024),
+      value: appendFieldLine((typed || t('dialogue.approval.flow.unchangedValue', lang)).slice(0, 1024), raidLine(typedRaid)),
       inline: false,
     } : null,
   ].filter(Boolean);

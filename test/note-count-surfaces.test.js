@@ -38,8 +38,9 @@ for (const [label, render] of [
 }
 
 test('the duplicate cards count the stored notes under the stored reason', () => {
-  assert.equal(buildDuplicateReasonFields(noted, 'new', 'en')[0].value, `afk G1\n${LINE}`);
-  assert.equal(buildDuplicateReasonFields(single, 'new', 'en')[0].value, 'afk G1');
+  assert.equal(buildDuplicateReasonFields(noted, 'new', 'en')[0].value, `afk G1\n-# 🗡️ Kazeros Hard\n${LINE}`);
+  assert.equal(buildDuplicateReasonFields(noted, 'new', 'en', { forApproval: true })[0].value, `afk G1\n${LINE}`);
+  assert.equal(buildDuplicateReasonFields(single, 'new', 'en')[0].value, 'afk G1\n-# 🗡️ Kazeros Hard');
 });
 
 const HISTORY_ID = `listnote_history:black:${'d'.repeat(24)}:1`;

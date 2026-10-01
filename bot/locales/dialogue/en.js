@@ -466,7 +466,7 @@ export default {
     },
     duplicate: {
       title: 'Already in {list}', direct: '{icon} {name} is already on the **{list}**. Nothing new was saved.', roster: '{icon} {name} shares a roster with {matched}, who is already on the **{list}**. Nothing new was saved.',
-      matchedName: 'Matched name', scope: 'Scope', addedBy: 'Added by', timeAdded: 'Time added', storedReason: 'Stored reason', typedReason: 'Your new note', raid: 'Raid',
+      matchedName: 'Matched name', scope: 'Scope', addedBy: 'Added by', timeAdded: 'Time added', storedReason: 'Stored reason', typedReason: 'Your new note',
       footer: 'Add to history keeps the stored notes and saves yours as the latest. /la-list edit still replaces the latest note.', contentDirect: '{name} already exists in {list}.', contentRoster: '{name} already exists in {list} through roster match {matched}.',
     },
     success: {

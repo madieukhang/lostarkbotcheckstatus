@@ -33,7 +33,7 @@ test('hidden roster add guidance avoids enrich button without a guild', () => {
   assert.equal(guidance.components.length, 0);
 });
 
-test('duplicate roster result opens with the reason pair and fills a whole six-cell grid', () => {
+test('duplicate roster result opens with the reason pair, each with its raid, and pads the grid to whole rows', () => {
   const existed = {
     name: 'Lungzhu',
     scope: 'global',
@@ -80,8 +80,10 @@ test('duplicate roster result opens with the reason pair and fills a whole six-c
     assert.match(embed.description, /Nothing new was saved/u);
 
     // Reason pair opens the card: stored above, typed directly under it.
+    // The stored raid sits under its own reason, not in the grid, so it
+    // cannot be read as the raid of the new note.
     assert.deepEqual(fields.slice(0, 2).map((f) => [f.name, f.value, f.inline]), [
-      ['📝 Stored reason', 'zdps', false],
+      ['📝 Stored reason', 'zdps\n-# 🗡️ Kazeros Nor', false],
       ['✏️ Your new note', 'ninja loot g2', false],
     ]);
 
@@ -91,18 +93,15 @@ test('duplicate roster result opens with the reason pair and fills a whole six-c
       '🧬 Matched name',
       '🌍 Server',
       '🌐 Scope',
-      '🗡️ Raid',
       '👤 Added by',
       '🕐 Time added',
+      ZWSP,
     ]);
-    // Six fills two rows exactly, so nothing needs a spacer.
-    assert.equal(grid.some((field) => field.name === ZWSP), false);
     assert.equal(
       grid[0].value,
       '<:bard:43> **[Lungzhu](https://lostark.bible/character/NA/Lungzhu/roster)**',
     );
     assert.equal(grid[1].value, '`Vairgrys`');
-    assert.equal(grid[3].value, '`Kazeros Nor`');
 
     // Match type is gone · the sentence above already says how it matched.
     assert.equal(fields.some((field) => field.name.includes('Match type')), false);
