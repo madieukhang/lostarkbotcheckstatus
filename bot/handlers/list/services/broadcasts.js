@@ -328,7 +328,10 @@ export function buildBroadcastPayload({
     .addFields(fields)
     .setColor(color)
     .setTimestamp(new Date());
-  const evidenceButton = buildBroadcastEvidenceButton(entry, { legacyUrl, lang });
+  // A removed entry cannot be looked up again, so its stored link stays a link.
+  const evidenceButton = buildBroadcastEvidenceButton(entry, {
+    type: action === 'removed' ? undefined : type, legacyUrl, lang,
+  });
   const buttons = [
     evidenceButton,
     action === 'removed' ? null : buildNoteHistoryButton(type, entry, lang),

@@ -54,7 +54,7 @@ export function buildNoteAddedPayload({ entry, type, addedAlts, statMap, lang })
       : t('dialogue.notes.added.footerNoAlts', lang),
     lang,
   });
-  const buttons = [buildNoteHistoryButton(type, entry, lang), buildBroadcastEvidenceButton(entry, { lang })].filter(Boolean);
+  const buttons = [buildNoteHistoryButton(type, entry, lang), buildBroadcastEvidenceButton(entry, { type, lang })].filter(Boolean);
   return {
     content: null,
     embeds: [embed],

@@ -19,28 +19,39 @@ import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import UserPreference from '../../../models/UserPreference.js';
 
 export const BROADCAST_EVIDENCE_PREFIX = 'listbroadcast_evidence';
+// Handled in entryButton.js, which needs helpers.js; helpers.js imports
+// this file, so the prefix lives here to keep the import one-way.
+export const ENTRY_EVIDENCE_PREFIX = 'listentry_evidence';
+
+const viewEvidenceButton = (customId, lang) => new ButtonBuilder()
+  .setCustomId(customId)
+  .setLabel(t('common.actions.viewEvidence', lang))
+  .setEmoji('📎')
+  .setStyle(ButtonStyle.Secondary);
 
 /**
- * The evidence button for a list entry or request: View evidence when the
- * image sits in the archive, Open evidence for a legacy direct link.
+ * The evidence button for a list entry or request. View evidence opens the
+ * image inside Discord: from the archive, or for a stored direct link by
+ * looking the entry up again, since the link does not fit in a custom id.
+ * Open evidence, a plain link, is left only for a link with no entry to
+ * look up: a request, or an entry that was just removed.
  * @param {object} entry - carries imageMessageId/imageChannelId or imageUrl
  * @param {object} [options]
+ * @param {string} [options.type] - the entry's list; omit when the entry
+ *   cannot be looked up again
  * @param {string} [options.legacyUrl] - direct image link to prefer over entry.imageUrl
  * @param {string} [options.lang='en'] - locale of the label
  * @returns {ButtonBuilder|null} null when the entry has no evidence
  */
-export function buildBroadcastEvidenceButton(entry, { legacyUrl, lang = 'en' } = {}) {
+export function buildBroadcastEvidenceButton(entry, { type, legacyUrl, lang = 'en' } = {}) {
   const messageId = String(entry?.imageMessageId || '').trim();
   const channelId = String(entry?.imageChannelId || '').trim();
   if (messageId && channelId) {
-    return new ButtonBuilder()
-      .setCustomId(`${BROADCAST_EVIDENCE_PREFIX}:${channelId}:${messageId}`)
-      .setLabel(t('common.actions.viewEvidence', lang))
-      .setEmoji('📎')
-      .setStyle(ButtonStyle.Secondary);
+    return viewEvidenceButton(`${BROADCAST_EVIDENCE_PREFIX}:${channelId}:${messageId}`, lang);
   }
   const directUrl = String(legacyUrl || entry?.imageUrl || '').trim();
   if (!directUrl) return null;
+  if (type && entry._id) return viewEvidenceButton(`${ENTRY_EVIDENCE_PREFIX}:${type}:${entry._id}`, lang);
   return new ButtonBuilder()
     .setLabel(t('common.actions.openEvidence', lang))
     .setEmoji('📎')

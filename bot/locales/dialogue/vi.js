@@ -214,6 +214,16 @@ export default {
       description: 'Tớ để tấm ảnh này ra riêng cho phần thông báo kia đỡ rối mắt. Cậu mở ảnh lên là xem được cỡ gốc nhé.',
       footer: 'Chỉ mình cậu thấy · tớ vừa lấy nó ra từ trong kho ảnh',
     },
+    legacy: {
+      title: 'Ảnh bằng chứng',
+      description: 'Tấm ảnh này vẫn là link Discord, chưa nằm trong kho ảnh của tớ. Cậu mở ảnh lên là xem được cỡ gốc nhé.',
+      footer: 'Chỉ mình cậu thấy · tớ vừa nhờ Discord làm mới link',
+    },
+    legacyGone: {
+      title: 'Ảnh bằng chứng không còn trên Discord',
+      description: 'Tấm ảnh này chỉ được lưu dưới dạng link Discord, chưa từng được cất vào kho ảnh của tớ (kho có từ 11/04/2026). Discord đã không còn giữ file nên tớ không mở lại được.',
+      footer: 'Nhờ officer gắn một tấm ảnh mới vào chỗ đó nhé.',
+    },
   },
   remote: {
     seniorOnly: { title: 'Chỉ Senior mới dùng được', description: 'Phần cấu hình từ xa được dành riêng cho Senior nhé.' },

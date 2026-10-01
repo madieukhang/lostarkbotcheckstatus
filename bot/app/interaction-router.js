@@ -192,6 +192,11 @@ export function createButtonRoutes(listHandlers) {
       handle: (interaction) => listHandlers.handleBroadcastEvidenceButton(interaction),
     },
     {
+      prefixes: ['listentry_evidence:'],
+      label: '[list] Entry evidence button error:',
+      handle: (interaction) => listHandlers.handleEntryEvidenceButton(interaction),
+    },
+    {
       prefixes: ['listnote_history:'],
       label: '[list] Note history button error:',
       handle: (interaction) => listHandlers.handleListNoteHistoryButton(interaction),

@@ -8,6 +8,7 @@ import {
   handleListEvidenceAutocomplete,
 } from './evidence/command.js';
 import { createBroadcastEvidenceButtonHandler } from './evidence/broadcastButton.js';
+import { createEntryEvidenceButtonHandler } from './evidence/entryButton.js';
 import { createMultiaddHandlers } from './multiadd/index.js';
 import { createNoteHandlers } from './notes/index.js';
 import { createQuickAddHandlers } from './quickadd/index.js';
@@ -33,6 +34,7 @@ export function createListHandlers({ client }) {
     ...createEnrichHandlers({ services }),
     ...createEvidenceHandlers({ client }),
     handleBroadcastEvidenceButton: createBroadcastEvidenceButtonHandler({ client }),
+    handleEntryEvidenceButton: createEntryEvidenceButtonHandler({ client }),
     ...createMultiaddHandlers({ client, services }),
     ...createNoteHandlers({ services }),
     ...createQuickAddHandlers({ services }),

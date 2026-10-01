@@ -18,6 +18,7 @@ import {
   StringSelectMenuBuilder,
 } from 'discord.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
+import { isLegacyEvidence } from '../../../utils/imageRehost.js';
 
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
@@ -391,7 +392,7 @@ function applyEvidenceMedia(embed, entry, displayUrl, { lang }) {
   }
 
   const evidenceMessage = entry.imageMessageId || entry.imageUrl
-    ? t('listView.evidence.unavailable', lang)
+    ? t(`listView.evidence.${isLegacyEvidence(entry) ? 'legacyGone' : 'unavailable'}`, lang)
     : t('listView.evidence.noImage', lang);
   embed.addFields({
     name: `${ICONS.warn} ${t('listView.evidence.evidence', lang)}`,

@@ -189,6 +189,16 @@ export default {
       description: 'Broadcast を読みやすくするため screenshot は別にしてありますの。画像を開いて元の大きさでご確認くださいませ。',
       footer: 'あなただけに見えていますわ · わたくしの証拠アーカイブから取り出したばかりですの',
     },
+    legacy: {
+      title: '証拠の画像',
+      description: 'この screenshot はまだ Discord の画像 link のままで、わたくしのアーカイブには入っていませんの。画像を開いて元の大きさでご確認くださいませ。',
+      footer: 'あなただけに見えていますわ · Discord で link を更新したばかりですの',
+    },
+    legacyGone: {
+      title: 'Discord に証拠が残っていませんの',
+      description: 'この screenshot は Discord の画像 link としてだけ保存されていて、わたくしの証拠アーカイブ（2026/04/11 から）には入っていませんでしたの。Discord にもうファイルがないので、お見せできませんわ。',
+      footer: 'Officer に新しい screenshot をその entry へ付け直してもらえますわ。',
+    },
   },
   remote: {
     seniorOnly: { title: 'Senior 限定ですの', description: 'Remote 設定は Senior だけが使えますわ。' },

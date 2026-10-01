@@ -269,6 +269,16 @@ export default {
       description: 'I kept this screenshot separate so the broadcast stays easy to read. Open the image to inspect it at its natural size.',
       footer: 'Only you can see this · pulled fresh from my evidence archive',
     },
+    legacy: {
+      title: 'Evidence',
+      description: 'This screenshot is still a Discord image link outside my archive. Open the image to inspect it at its natural size.',
+      footer: 'Only you can see this · link renewed through Discord just now',
+    },
+    legacyGone: {
+      title: 'Evidence no longer on Discord',
+      description: 'This screenshot was only ever kept as a Discord image link and never made it into my evidence archive, which started on 11 Apr 2026. Discord no longer has the file, so I cannot show it.',
+      footer: 'An officer can attach a fresh screenshot to that entry.',
+    },
   },
   remote: {
     seniorOnly: { title: 'Senior access only', description: 'Remote configuration is restricted to seniors.' },

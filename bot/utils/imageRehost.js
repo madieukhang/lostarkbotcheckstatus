@@ -207,6 +207,54 @@ export async function refreshImageUrl(messageId, channelId, client) {
   }
 }
 
+function isDiscordCdnUrl(url) {
+  try {
+    const { hostname } = new URL(url);
+    return hostname.endsWith('discordapp.com') || hostname.endsWith('discordapp.net');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Make a stored direct evidence link viewable. A Discord attachment link
+ * carries a signature that expires, so it is re-signed through Discord's
+ * refresh endpoint, which only works while Discord still has the file.
+ * Links on other hosts are returned as stored.
+ * @param {string} url - the entry's stored imageUrl
+ * @param {Client} client - the bot client; its token signs the request
+ * @returns {Promise<{url: string, error: string}>} url is '' when Discord
+ *   no longer serves the file, and error then says what Discord answered
+ */
+export async function refreshLegacyImageUrl(url, client) {
+  if (!isDiscordCdnUrl(url)) return { url, error: '' };
+
+  const response = await fetch('https://discord.com/api/v10/attachments/refresh-urls', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bot ${client.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ attachment_urls: [url] }),
+  });
+  if (!response.ok) return { url: '', error: `refresh API returned ${response.status}` };
+
+  const refreshed = (await response.json())?.refreshed_urls?.[0]?.refreshed;
+  return refreshed
+    ? { url: refreshed, error: '' }
+    : { url: '', error: 'refresh returned no URL (file likely deleted)' };
+}
+
+/**
+ * Whether an entry's evidence is only a stored link that was never copied
+ * into the evidence archive.
+ * @param {object} entry - a list entry
+ * @returns {boolean}
+ */
+export function isLegacyEvidence(entry) {
+  return !entry.imageMessageId && Boolean(entry.imageUrl);
+}
+
 /**
  * Resolve the best display URL for an entry's evidence image. Prefers the
  * rehost-aware path (fresh URL from message) and falls back to the legacy
@@ -228,6 +276,13 @@ export async function resolveDisplayImageUrl(entry, client) {
     // Refresh failed (message deleted etc.) · fall through to legacy
   }
 
-  // Path 2: legacy direct URL · may be expired but try anyway
-  return entry.imageUrl || '';
+  // Path 2: legacy direct URL · re-signed when it is a Discord link. When
+  // Discord cannot be reached, the stored link is still worth a try.
+  if (!entry.imageUrl) return '';
+  try {
+    return (await refreshLegacyImageUrl(entry.imageUrl, client)).url;
+  } catch (err) {
+    console.warn('[imageRehost] Legacy link refresh failed:', err.message);
+    return entry.imageUrl;
+  }
 }

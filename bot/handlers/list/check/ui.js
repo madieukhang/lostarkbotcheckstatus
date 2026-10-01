@@ -7,6 +7,7 @@
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { t } from '../../../services/i18n/index.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
+import { isLegacyEvidence } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
@@ -119,7 +120,7 @@ function applyCheckEvidence(embed, entry, displayUrl, lang) {
   if (!entry.imageMessageId && !entry.imageUrl) return;
   embed.addFields({
     name: `${ICONS.warn} ${t('listView.evidence.evidence', lang)}`,
-    value: t('listView.evidence.unavailable', lang),
+    value: t(`listView.evidence.${isLegacyEvidence(entry) ? 'legacyGone' : 'unavailable'}`, lang),
     inline: false,
   });
 }

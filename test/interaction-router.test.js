@@ -77,6 +77,19 @@ test('interaction router dispatches compact broadcast evidence buttons', async (
   assert.equal(received, customId);
 });
 
+test('interaction router dispatches entry evidence buttons', async () => {
+  let received = null;
+  const routes = createButtonRoutes({
+    handleEntryEvidenceButton: async (interaction) => { received = interaction.customId; },
+  });
+
+  const customId = `listentry_evidence:black:${'e'.repeat(24)}`;
+  const route = findCustomIdRoute(routes, customId);
+  assert.ok(route);
+  await route.handle({ customId });
+  assert.equal(received, customId);
+});
+
 test('interaction router routes /la-roster report buttons', () => {
   const route = findCustomIdRoute(createButtonRoutes({}), `roster_evidence:watch:${'c'.repeat(24)}`);
   assert.ok(route);

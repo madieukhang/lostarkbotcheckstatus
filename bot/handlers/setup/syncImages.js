@@ -10,47 +10,15 @@ import GuildConfig from '../../models/GuildConfig.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
-import { rehostImage } from '../../utils/imageRehost.js';
+import { refreshLegacyImageUrl, rehostImage } from '../../utils/imageRehost.js';
 import { t } from '../../services/i18n/index.js';
 
-function isDiscordCdnUrl(url) {
-  try {
-    const u = new URL(url);
-    return u.hostname.endsWith('discordapp.com') || u.hostname.endsWith('discordapp.net');
-  } catch {
-    return false;
-  }
-}
-
 async function resolveDownloadUrl(entry, interaction, stats) {
-  if (!isDiscordCdnUrl(entry.imageUrl)) {
-    return entry.imageUrl;
-  }
-
-  const refreshResponse = await fetch('https://discord.com/api/v10/attachments/refresh-urls', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bot ${interaction.client.token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ attachment_urls: [entry.imageUrl] }),
-  });
-
-  if (!refreshResponse.ok) {
-    stats.skippedDead += 1;
-    stats.errors.push(`${entry.name}: refresh API returned ${refreshResponse.status}`);
-    return null;
-  }
-
-  const refreshData = await refreshResponse.json();
-  const refreshedUrl = refreshData?.refreshed_urls?.[0]?.refreshed;
-  if (!refreshedUrl) {
-    stats.skippedDead += 1;
-    stats.errors.push(`${entry.name}: refresh returned no URL (file likely deleted)`);
-    return null;
-  }
-
-  return refreshedUrl;
+  const { url, error } = await refreshLegacyImageUrl(entry.imageUrl, interaction.client);
+  if (url) return url;
+  stats.skippedDead += 1;
+  stats.errors.push(`${entry.name}: ${error}`);
+  return null;
 }
 
 async function rehostWithRetry(downloadUrl, entry, type, interaction, stats) {
