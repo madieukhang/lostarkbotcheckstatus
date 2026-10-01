@@ -319,6 +319,12 @@ export default {
   },
   notes: {
     countLine: '{count} ghi chú · đầu tiên ngày {date}',
+    history: {
+      title: 'Lịch sử ghi chú · {name}',
+      head: '{icon} {list}{scope} · **{count}** ghi chú, cũ trước mới sau',
+      original: 'Ghi chú gốc', latest: 'Mới nhất', by: 'bởi {name}',
+      footer: 'Trang {page}/{pages} · chỉ cậu thấy', footerSingle: 'Chỉ cậu thấy card này',
+    },
   },
   listEdit: {
     originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry đã bị xóa hoặc chuyển sang list khác trước khi thay đổi được lưu.' },

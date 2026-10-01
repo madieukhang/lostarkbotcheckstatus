@@ -192,6 +192,16 @@ export function createButtonRoutes(listHandlers) {
       handle: (interaction) => listHandlers.handleBroadcastEvidenceButton(interaction),
     },
     {
+      prefixes: ['listnote_history:'],
+      label: '[list] Note history button error:',
+      handle: (interaction) => listHandlers.handleListNoteHistoryButton(interaction),
+    },
+    {
+      prefixes: ['listnote_page:'],
+      label: '[list] Note history page error:',
+      handle: (interaction) => listHandlers.handleListNotePageButton(interaction),
+    },
+    {
       prefixes: [
         'list-enrich:confirm:',
         'list-enrich:cancel:',

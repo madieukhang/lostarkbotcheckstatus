@@ -294,6 +294,12 @@ export default {
   },
   notes: {
     countLine: 'メモ {count} 件 · 最初は {date}',
+    history: {
+      title: 'メモ履歴 · {name}',
+      head: '{icon} {list}{scope} · メモ **{count}** 件、古い順',
+      original: '最初のメモ', latest: '最新', by: '記入: {name}',
+      footer: '{page}/{pages} ページ · あなたにだけ表示', footerSingle: 'あなたにだけ表示されていますわ',
+    },
   },
   listEdit: {
     originalMissing: { title: '元の entry がありませんの', description: '変更を保存する前に、entry が削除されたか別の list に移されましたわ。' },

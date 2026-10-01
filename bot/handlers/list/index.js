@@ -9,6 +9,7 @@ import {
 } from './evidence/command.js';
 import { createBroadcastEvidenceButtonHandler } from './evidence/broadcastButton.js';
 import { createMultiaddHandlers } from './multiadd/index.js';
+import { createNoteHandlers } from './notes/index.js';
 import { createQuickAddHandlers } from './quickadd/index.js';
 import { createRemoveHandlers } from './remove/index.js';
 import { createTrustHandlers } from './trust/index.js';
@@ -33,6 +34,7 @@ export function createListHandlers({ client }) {
     ...createEvidenceHandlers({ client }),
     handleBroadcastEvidenceButton: createBroadcastEvidenceButtonHandler({ client }),
     ...createMultiaddHandlers({ client, services }),
+    ...createNoteHandlers(),
     ...createQuickAddHandlers({ services }),
     ...createRemoveHandlers({ services }),
     ...createTrustHandlers({ client }),

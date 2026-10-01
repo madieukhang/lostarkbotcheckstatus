@@ -405,6 +405,12 @@ export default {
   },
   notes: {
     countLine: '{count} notes · first on {date}',
+    history: {
+      title: 'Note history · {name}',
+      head: '{icon} {list}{scope} · **{count}** notes, oldest first',
+      original: 'Original note', latest: 'Latest', by: 'by {name}',
+      footer: 'Page {page}/{pages} · only you can see this', footerSingle: 'Only you can see this',
+    },
   },
   listEdit: {
     originalMissing: { title: 'The original entry is gone', description: 'The entry was removed or moved to another list before these changes could be saved.' },
