@@ -31,10 +31,12 @@ test('an entry saved before notes reads as one original note built from its add'
   assert.equal(countEntryNotes(twoNotes), 2);
 });
 
-test('the first appended note writes the original note with it and pins "no notes yet"', () => {
+test('the first appended note writes the original note with it and pins "no notes yet" and the original', () => {
   const added = note('vẫn thế', new Date('2026-10-01T00:00:00Z'));
   const { filter, update } = buildNoteAppend(legacy, added, { rosterNames: ['Lovesiiii', 'Pepsji'], set: { logsUrl: 'https://logs' } });
-  assert.deepEqual(filter, { _id: 'entry-id', $or: [{ notes: { $exists: false } }, { notes: { $size: 0 } }] });
+  assert.deepEqual(filter, {
+    _id: 'entry-id', $or: [{ notes: { $exists: false } }, { notes: { $size: 0 } }], reason: 'Đánh quá yếu', raid: 'Act4 Nor',
+  });
   assert.deepEqual(update.$set.notes, [readEntryNotes(legacy)[0], added]);
   assert.equal(update.$set.reason, 'vẫn thế');
   assert.equal(update.$set.raid, 'Kazeros Hard');

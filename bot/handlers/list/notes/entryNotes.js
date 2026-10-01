@@ -74,8 +74,11 @@ export function countEntryNotes(entry) {
 export function buildNoteAppend(entry, note, { rosterNames = [], set = {} } = {}) {
   const hasStoredNotes = storedNotes(entry).length > 0;
   const refreshesRoster = rosterNames.length > 0;
+  // The original note is built from reason and raid as read, and an edit
+  // of an entry without notes changes only those, so they are pinned too.
+  const readOriginal = hasStoredNotes ? {} : { reason: entry.reason ?? null, raid: entry.raid ?? null };
   return {
-    filter: { _id: entry._id, ...notesSizeFilter(entry) },
+    filter: { _id: entry._id, ...notesSizeFilter(entry), ...readOriginal },
     update: {
       $set: {
         ...set,

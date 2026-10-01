@@ -36,6 +36,17 @@ export function takePendingNote(key) {
 }
 
 /**
+ * Hold a taken duplicate add again after its save failed, so the card can
+ * be pressed again until its original TTL ends.
+ * @param {string} key - from the button custom id
+ * @param {object} pending - what takePendingNote returned
+ * @returns {void}
+ */
+export function restorePendingNote(key, pending) {
+  if (Date.now() < pending.expiresAt) pendingNotes.set(key, pending);
+}
+
+/**
  * Hold a duplicate add result and give its card the Add to history
  * button, plus History when the entry already has two notes.
  * @param {object} result - executeListAddToDatabase result
@@ -52,6 +63,7 @@ export function attachNoteControls(result, payload, lang) {
     entryId: String(result.existingEntry._id),
     rosterNames: result.rosterNames,
     rosterCharacters: result.rosterCharacters,
+    expiresAt: Date.now() + PENDING_NOTE_TTL_MS,
   });
   setTimeout(() => pendingNotes.delete(key), PENDING_NOTE_TTL_MS).unref();
   const buttons = [

@@ -41,6 +41,9 @@ function buildCommonFields() {
         raid: { type: String, default: '', trim: true },
         byUserId: { type: String, default: '', trim: true },
         byName: { type: String, default: '', trim: true },
+        // The approval request or duplicate card the note came from, so a
+        // retried save recognises a note that already landed.
+        requestId: { type: String },
       }],
       default: [],
     },

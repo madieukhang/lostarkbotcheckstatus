@@ -127,8 +127,10 @@ export function createListAddOverwriteButtonHandler({
         return;
       }
 
+      // The request id lets a Retry after a failed complete() find the note
+      // this run saved instead of saving the report twice.
       const saved = await appendEntryNote({
-        model, entry: dupeEntry, payload, rosterNames, beforeWrite: () => claim.assertOwned(),
+        model, entry: dupeEntry, payload, rosterNames, requestId, beforeWrite: () => claim.assertOwned(),
       });
       await claim.complete();
       if (!saved) {

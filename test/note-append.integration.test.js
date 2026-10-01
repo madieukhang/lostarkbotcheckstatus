@@ -43,6 +43,34 @@ test('a note saved in between is kept: the stale write re-reads and appends afte
   assert.equal(saved.reason, 'Third');
 });
 
+test('an edit landing before the first note is kept as the original note', async () => {
+  const created = await Blacklist.create({ name: 'Target', reason: 'A', raid: 'Act4 Nor' });
+  const stale = await Blacklist.findById(created._id).lean();
+  // A /la-list edit on an entry without notes rewrites only reason and raid.
+  await Blacklist.updateOne({ _id: created._id }, { $set: { reason: 'B', raid: 'Act4 Hard' } });
+  const saved = await appendEntryNote({ model: Blacklist, entry: stale, payload: payload('C') });
+  assert.deepEqual(saved.notes.map(note => [note.reason, note.raid]), [['B', 'Act4 Hard'], ['C', 'Kazeros Hard']]);
+});
+
+test('reports saved at the same moment all land', async () => {
+  const created = await Blacklist.create({ name: 'Target', reason: 'First' });
+  const stale = await Blacklist.findById(created._id).lean();
+  const results = await Promise.all(['R1', 'R2', 'R3'].map(reason =>
+    appendEntryNote({ model: Blacklist, entry: stale, payload: payload(reason) })));
+  assert.ok(results.every(Boolean), 'no report reads as a removed entry');
+  const stored = await Blacklist.findById(created._id).lean();
+  assert.deepEqual(stored.notes.map(note => note.reason).sort(), ['First', 'R1', 'R2', 'R3']);
+});
+
+test('a retried save of the same request finds its note instead of adding it twice', async () => {
+  const created = await Blacklist.create({ name: 'Target', reason: 'First' });
+  const stale = await Blacklist.findById(created._id).lean();
+  const first = await appendEntryNote({ model: Blacklist, entry: stale, payload: payload('Second'), requestId: 'req-1' });
+  const retried = await appendEntryNote({ model: Blacklist, entry: stale, payload: payload('Second'), requestId: 'req-1' });
+  assert.deepEqual(retried.notes.map(note => note.reason), ['First', 'Second']);
+  assert.deepEqual(retried.notes, first.notes);
+});
+
 test('a removed entry takes no note', async () => {
   const created = await Blacklist.create({ name: 'Target', reason: 'First' });
   const entry = await Blacklist.findById(created._id).lean();

@@ -104,6 +104,7 @@ for (const protectedAlt of [true, false]) {
     assert.equal(writes[0].update.$set.name, undefined, 'the entry keeps its name');
     assert.equal(writes[0].update.$set.scope, undefined, 'the entry keeps its scope');
     assert.equal(writes[0].update.$set.notes[1].byName, 'Requester', 'the requester wrote the note');
+    assert.equal(writes[0].update.$set.notes[1].requestId, 'pending', 'a retried approval can find its note');
     assert.equal(broadcasts[0][0], 'noted');
     assert.deepEqual(broadcasts[0][3].newAltNames, ['Newmain', 'Protectedalt']);
     assert.deepEqual(decision, { ok: true, isNoted: true });

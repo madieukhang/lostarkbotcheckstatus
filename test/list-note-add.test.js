@@ -117,6 +117,26 @@ test('a second click finds the card used up and writes nothing', async t => {
   assert.equal(broadcasts[0][0], 'noted');
 });
 
+test('a click that fails before saving leaves the card usable, and the note carries its card key', async t => {
+  const { handlers } = setup(t);
+  let reads = 0;
+  const writes = [];
+  t.mock.method(Blacklist, 'findById', () => ({
+    lean: async () => { reads += 1; if (reads === 1) throw new Error('connection reset'); return existing; },
+  }));
+  t.mock.method(Blacklist, 'findOneAndUpdate', (filter, update) => { writes.push(update); return { lean: async () => ({ ...existing, notes: [] }) }; });
+  const key = addKeyOf(attachNoteControls(duplicate(), payload, 'en'));
+
+  await assert.rejects(handlers.handleListNoteAddButton(click(key, 'owner').interaction), /connection reset/);
+  assert.equal(writes.length, 0);
+
+  const retry = click(key, 'owner');
+  await handlers.handleListNoteAddButton(retry.interaction);
+  assert.equal(retry.calls.replies.length, 0, 'the card has not expired');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].$set.notes[1].requestId, key.slice('listnote_add:'.length));
+});
+
 test('an entry removed before the click is not recreated', async t => {
   const { handlers, broadcasts } = setup(t);
   t.mock.method(Blacklist, 'findById', () => ({ lean: async () => null }));

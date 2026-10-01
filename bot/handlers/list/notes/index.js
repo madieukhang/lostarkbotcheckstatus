@@ -15,7 +15,7 @@ import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 import { buildNoteAddedPayload } from './addedCard.js';
 import { appendEntryNote, listAddedAlts } from './appendNote.js';
 import { buildNoteHistoryPayload } from './historyView.js';
-import { NOTE_ADD_PREFIX, peekPendingNote, takePendingNote } from './pendingNotes.js';
+import { NOTE_ADD_PREFIX, peekPendingNote, restorePendingNote, takePendingNote } from './pendingNotes.js';
 
 // Same visibility as the check details card: a server-scoped entry only
 // opens inside its own server.
@@ -71,12 +71,21 @@ export function createNoteHandlers({ services }) {
       return;
     }
     takePendingNote(key);
-    await deferUpdate(interaction);
-    await connectDB();
     const { payload, entryId, rosterNames, rosterCharacters } = pending;
     const { model } = getListContext(payload.type);
-    const entry = await model.findById(entryId).lean();
-    const saved = entry ? await appendEntryNote({ model, entry, payload, rosterNames }) : null;
+    let entry;
+    let saved;
+    // Taken above so a second click cannot save the report twice; given back
+    // when the save fails, which the card key on the note makes safe to retry.
+    try {
+      await deferUpdate(interaction);
+      await connectDB();
+      entry = await model.findById(entryId).lean();
+      saved = entry ? await appendEntryNote({ model, entry, payload, rosterNames, requestId: key }) : null;
+    } catch (err) {
+      restorePendingNote(key, pending);
+      throw err;
+    }
     if (!saved) {
       await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang), lang }, { components: [] });
       return;
