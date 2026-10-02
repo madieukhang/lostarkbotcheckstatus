@@ -3,11 +3,21 @@ import {
   SUPPORTED_LANGUAGES,
   TRANSLATIONS,
 } from '../../locales/index.js';
+import { createLruTtlCache } from '../../utils/cache/lruTtlCache.js';
 
 const SUPPORTED_CODES = new Set(SUPPORTED_LANGUAGES.map((entry) => entry.code));
 const KNOWN_LOCALE_CODES = new Set(Object.keys(TRANSLATIONS));
-const userLanguageCache = new Map();
-const guildLanguageCache = new Map();
+const LANGUAGE_CACHE_TTL_MS = 60 * 60 * 1000;
+const userLanguageCache = createLruTtlCache({
+  ttlMs: LANGUAGE_CACHE_TTL_MS,
+  maxSize: 2048,
+  now: () => Date.now(),
+});
+const guildLanguageCache = createLruTtlCache({
+  ttlMs: LANGUAGE_CACHE_TTL_MS,
+  maxSize: 256,
+  now: () => Date.now(),
+});
 const userLanguageLoads = new Map();
 const guildLanguageLoads = new Map();
 

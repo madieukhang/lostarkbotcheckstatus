@@ -241,6 +241,109 @@ test('workerBibleClient still inserts when pending queue is below backpressure t
   assert.ok(ScrapeJob.inserted());
 });
 
+test('workerBibleClient admits concurrent jobs without exceeding the pending threshold', async () => {
+  const jobs = [];
+  const controllers = Array.from({ length: 10 }, () => new AbortController());
+  const ScrapeJob = {
+    async countDocuments() {
+      return jobs.filter((job) => job.status === 'pending').length;
+    },
+    async create(payload) {
+      const job = { _id: `concurrent-${jobs.length + 1}`, ...payload };
+      jobs.push(job);
+      // Keep the insert open for one event-loop turn so concurrent callers
+      // can expose a count-then-create admission race.
+      await new Promise((resolve) => setImmediate(resolve));
+      return job;
+    },
+    async updateOne(filter, update) {
+      const job = jobs.find((entry) => entry._id === filter._id);
+      if (!job || !filter.status.$in.includes(job.status)) return { modifiedCount: 0 };
+      Object.assign(job, update.$set);
+      return { modifiedCount: 1 };
+    },
+    findById(id) {
+      return {
+        async lean() {
+          return jobs.find((entry) => entry._id === id) || null;
+        },
+      };
+    },
+  };
+  const client = createWorkerBibleClient({
+    ScrapeJob,
+    pollIntervalMs: 60_000,
+    defaultTimeoutMs: 60_000,
+    backpressureThreshold: 5,
+  });
+
+  const requests = controllers.map((controller, index) => client.fetch(
+    `https://lostark.bible/character/NA/Concurrent${index}/__data.json`,
+    { signal: controller.signal },
+  ));
+  const outcomesPromise = Promise.allSettled(requests);
+  while (jobs.length < 5) await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  controllers.forEach((controller) => controller.abort(new Error('test cleanup')));
+  const outcomes = await outcomesPromise;
+
+  assert.equal(jobs.length, 5);
+  assert.equal(
+    outcomes.filter(({ reason }) => /Scraping service overloaded/.test(reason?.message)).length,
+    5,
+  );
+});
+
+test('workerBibleClient does not insert a queued request after its deadline', async () => {
+  let nowValue = 0;
+  let releaseCreate;
+  let markCreateStarted;
+  const createStarted = new Promise((resolve) => { markCreateStarted = resolve; });
+  const createGate = new Promise((resolve) => { releaseCreate = resolve; });
+  const jobs = [];
+  const ScrapeJob = {
+    async countDocuments() {
+      return jobs.filter((job) => job.status === 'pending').length;
+    },
+    async create(payload) {
+      const job = { _id: `deadline-${jobs.length + 1}`, ...payload };
+      jobs.push(job);
+      markCreateStarted();
+      await createGate;
+      return job;
+    },
+    async updateOne(filter, update) {
+      const job = jobs.find((entry) => entry._id === filter._id);
+      if (!job || !filter.status.$in.includes(job.status)) return { modifiedCount: 0 };
+      Object.assign(job, update.$set);
+      return { modifiedCount: 1 };
+    },
+  };
+  const client = createWorkerBibleClient({
+    ScrapeJob,
+    defaultTimeoutMs: 100,
+    backpressureThreshold: 10,
+    now: () => nowValue,
+  });
+  const firstController = new AbortController();
+  const firstReason = new Error('release first admission');
+  const firstRequest = client.fetch('https://lostark.bible/first', {
+    signal: firstController.signal,
+  });
+  const firstRejected = assert.rejects(firstRequest, (error) => error === firstReason);
+  await createStarted;
+
+  const queuedRequest = client.fetch('https://lostark.bible/expired-in-queue');
+  const queuedRejected = assert.rejects(queuedRequest, /timed out before queue admission after 100ms/);
+  nowValue = 101;
+  firstController.abort(firstReason);
+  releaseCreate();
+
+  await Promise.all([firstRejected, queuedRejected]);
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].status, 'cancelled');
+});
+
 test('workerBibleClient rejects a pre-aborted caller before probing health or inserting a job', async () => {
   const controller = new AbortController();
   const reason = new Error('Caller phase ended');

@@ -51,7 +51,7 @@ test('rehost stops reading an oversized body at its 24 MiB ceiling and sets a do
   assert.ok(signal instanceof AbortSignal);
 });
 
-test('OCR stops reading a body without Content-Length at its 20 MiB ceiling', async t => {
+test('OCR stops reading a body without Content-Length before base64 would exceed Gemini inline limit', async t => {
   clearOcrCache();
   clearGeminiModelCooldowns();
   const key = config.geminiApiKey;
@@ -64,5 +64,5 @@ test('OCR stops reading a body without Content-Length at its 20 MiB ceiling', as
     extractNamesFromImage({ url: 'https://cdn.discordapp.com/huge.png', contentType: 'image/png' }),
     /Image file too large/,
   );
-  assert.ok(pulls.count <= 22, `pulled ${pulls.count} MiB`);
+  assert.ok(pulls.count <= 16, `pulled ${pulls.count} MiB`);
 });

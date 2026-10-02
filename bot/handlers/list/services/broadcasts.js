@@ -17,6 +17,7 @@ import { upsertRosterSnapshots } from '../../../services/roster/rosterSnapshots.
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
 import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
+import { mapWithConcurrency } from '../../../utils/async.js';
 import { normalizeNameKey } from '../../../utils/names.js';
 import { truncateInlineText } from '../../../utils/discordText.js';
 import {
@@ -41,6 +42,7 @@ import {
 const BROADCAST_TITLE_ICONS = Object.freeze({ removed: '🗑️', edited: '✏️', enriched: '🆕', noted: '📝' });
 // Edits and notes stamp when they happened; every other action shows the add.
 const STAMP_FIELDS = Object.freeze({ edited: 'edited', noted: 'noted' });
+const BROADCAST_CONCURRENCY = 4;
 
 function parseItemLevel(value) {
   const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
@@ -344,6 +346,19 @@ export function buildBroadcastPayload({
   return { embeds: [embed], ...(components.length > 0 ? { components } : {}) };
 }
 
+/**
+ * Deliver one broadcast to configured channels with bounded Discord work.
+ * A failed destination is logged without stopping the remaining deliveries.
+ * @param {object} options
+ * @param {import('discord.js').Client} options.client
+ * @param {Iterable<string>} options.channelIds
+ * @param {object} [options.embed]
+ * @param {object[]} [options.components]
+ * @param {Function} [options.buildPayload]
+ * @param {string} [options.logLabel]
+ * @param {Console} [options.logger]
+ * @returns {Promise<void>}
+ */
 export async function sendEmbedToChannels({
   client,
   channelIds,
@@ -353,8 +368,10 @@ export async function sendEmbedToChannels({
   logLabel = '[list broadcast]',
   logger = console,
 }) {
-  await Promise.all(
-    [...(channelIds || [])].map(async (channelId) => {
+  await mapWithConcurrency(
+    [...(channelIds || [])],
+    BROADCAST_CONCURRENCY,
+    async (channelId) => {
       try {
         const channel = await client.channels.fetch(channelId);
         if (channel?.isTextBased()) {
@@ -369,7 +386,7 @@ export async function sendEmbedToChannels({
       } catch (err) {
         logger.warn?.(`${logLabel} channel ${channelId} failed: ${err.message}`);
       }
-    })
+    }
   );
 }
 
@@ -400,7 +417,10 @@ export function createBroadcastServices({ client }) {
     const channelIds = new Set();
     if (!config.ownerGuildId) return channelIds;
     try {
-      const ownerConfig = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
+      const ownerConfig = await GuildConfig.findOne(
+        { guildId: config.ownerGuildId },
+        { _id: 0, globalNotifyEnabled: 1, listNotifyChannelId: 1 }
+      ).lean();
       if (ownerConfig?.globalNotifyEnabled === false) return channelIds;
       if (ownerConfig?.listNotifyChannelId) channelIds.add(ownerConfig.listNotifyChannelId);
       else await findOwnerEnvNotifyChannel(channelIds);
@@ -428,7 +448,12 @@ export function createBroadcastServices({ client }) {
 
   async function loadConfiguredBroadcastChannels(originGuildId, isOwnerOrigin) {
     try {
-      const guildConfigs = await GuildConfig.find({}).lean();
+      const guildConfigs = await GuildConfig.find({}, {
+        _id: 0,
+        guildId: 1,
+        globalNotifyEnabled: 1,
+        listNotifyChannelId: 1,
+      }).lean();
       return indexConfiguredBroadcastChannels(guildConfigs, originGuildId, isOwnerOrigin);
     } catch (err) {
       console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);

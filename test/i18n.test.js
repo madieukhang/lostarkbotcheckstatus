@@ -202,3 +202,67 @@ test('guild language helpers normalize and cache through the GuildConfig model b
     $setOnInsert: { guildId: 'guild-1' },
   });
 });
+
+test('language caches evict old IDs instead of retaining every user and guild forever', async () => {
+  clearUserLanguageCache();
+  clearGuildLanguageCache();
+  let userReads = 0;
+  let guildReads = 0;
+  const UserPreferenceModel = {
+    findOne() {
+      userReads += 1;
+      return { lean: async () => ({ language: 'en' }) };
+    },
+  };
+  const GuildConfigModel = {
+    findOne() {
+      guildReads += 1;
+      return { lean: async () => ({ language: 'en' }) };
+    },
+  };
+
+  await Promise.all(Array.from(
+    { length: 2049 },
+    (_, index) => getUserLanguage(`user-${index}`, { UserPreferenceModel })
+  ));
+  await Promise.all(Array.from(
+    { length: 257 },
+    (_, index) => getGuildLanguage(`guild-${index}`, { GuildConfigModel })
+  ));
+
+  assert.equal(userReads, 2049);
+  assert.equal(guildReads, 257);
+  await getUserLanguage('user-0', { UserPreferenceModel });
+  await getGuildLanguage('guild-0', { GuildConfigModel });
+  assert.equal(userReads, 2050);
+  assert.equal(guildReads, 258);
+});
+
+test('language caches reload entries after their lazy TTL expires', async (t) => {
+  clearUserLanguageCache();
+  clearGuildLanguageCache();
+  let now = 1_000;
+  t.mock.method(Date, 'now', () => now);
+  let userReads = 0;
+  let guildReads = 0;
+  const UserPreferenceModel = {
+    findOne() {
+      userReads += 1;
+      return { lean: async () => ({ language: 'jp' }) };
+    },
+  };
+  const GuildConfigModel = {
+    findOne() {
+      guildReads += 1;
+      return { lean: async () => ({ language: 'vi' }) };
+    },
+  };
+
+  assert.equal(await getUserLanguage('expiring-user', { UserPreferenceModel }), 'jp');
+  assert.equal(await getGuildLanguage('expiring-guild', { GuildConfigModel }), 'vi');
+  now += 60 * 60 * 1000;
+  assert.equal(await getUserLanguage('expiring-user', { UserPreferenceModel }), 'jp');
+  assert.equal(await getGuildLanguage('expiring-guild', { GuildConfigModel }), 'vi');
+  assert.equal(userReads, 2);
+  assert.equal(guildReads, 2);
+});

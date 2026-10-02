@@ -503,7 +503,8 @@ test('auto-check queues rapid image messages instead of dropping them to cooldow
         markFirstExtractionStarted();
         await firstExtractionGate;
       }
-      return [image.id === 'queued-image-1' ? 'First' : 'Second'];
+      const number = image.id.split('-').at(-1);
+      return [image.id === 'queued-image-1' ? 'First' : `Name${number}`];
     },
     checkNamesAgainstListsFn: async (names) => {
       if (names[0] === 'First') {
@@ -544,32 +545,41 @@ test('auto-check queues rapid image messages instead of dropping them to cooldow
     };
   }
 
-  const first = createQueuedMessage(1);
-  const second = createQueuedMessage(2);
-  const firstRun = handler(first.message);
+  const requests = Array.from({ length: 9 }, (_, index) => createQueuedMessage(index + 1));
+  const accepted = requests.slice(0, 8);
+  const rejected = requests.at(-1);
+  const firstRun = handler(accepted[0].message);
   await firstExtractionStarted;
-  const secondRun = handler(second.message);
+  const queuedRuns = accepted.slice(1).map(request => handler(request.message));
+  const rejectedRun = handler(rejected.message);
   await new Promise((resolve) => setImmediate(resolve));
+  await rejectedRun;
 
   assert.deepEqual(extractedOrder, ['queued-image-1']);
-  assert.equal(second.replies.length, 1);
-  assert.match(second.replies[0].embeds[0].toJSON().title, /queued/i);
-  assert.match(second.replies[0].embeds[0].toJSON().title, /1 image request/i);
+  assert.equal(accepted[1].replies.length, 1);
+  assert.match(accepted[1].replies[0].embeds[0].toJSON().title, /queued/i);
+  assert.match(accepted[1].replies[0].embeds[0].toJSON().title, /1 image request/i);
+  assert.equal(rejected.replies.length, 1);
+  assert.match(rejected.replies[0].embeds[0].toJSON().title, /queue is full/i);
+  assert.equal(claimAutoCheckMessage(rejected.message.id), true,
+    'a queue-full request must be immediately retryable');
+  completeAutoCheckMessage(rejected.message.id, { processed: false });
 
   releaseFirstExtraction();
   await firstCheckStarted;
   await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
   try {
-    assert.deepEqual(extractedOrder, ['queued-image-1', 'queued-image-2'],
-      'The next OCR must start while the first request is still checking lists');
+    assert.deepEqual(extractedOrder, accepted.map((_, index) => `queued-image-${index + 1}`),
+      'The bounded queue must drain while the first request is still checking lists');
   } finally {
     releaseFirstCheck();
   }
-  await Promise.all([firstRun, secondRun]);
+  await Promise.all([firstRun, ...queuedRuns]);
 
-  assert.deepEqual(extractedOrder, ['queued-image-1', 'queued-image-2']);
-  assert.equal(first.edits.at(-1).embeds[0].title, 'First');
-  assert.equal(second.edits.at(-1).embeds[0].title, 'Second');
+  assert.deepEqual(extractedOrder, accepted.map((_, index) => `queued-image-${index + 1}`));
+  assert.equal(accepted[0].edits.at(-1).embeds[0].title, 'First');
+  assert.equal(accepted[1].edits.at(-1).embeds[0].title, 'Name2');
 });
 
 test('auto-check keeps partial results when one image OCR attempt fails', async () => {

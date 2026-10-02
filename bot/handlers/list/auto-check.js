@@ -42,8 +42,10 @@ const inFlightMessages = new Set();
 const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
 const AUTO_CHECK_MAX_BATCH_NAMES = 24;
 const AUTO_CHECK_MAX_IMAGES = 3;
+const AUTO_CHECK_MAX_IMAGE_REQUESTS = 8;
 const AUTO_CHECK_MAX_COOLDOWN_RETRY_AFTER_MS = 60_000;
 const AUTO_CHECK_COOLDOWN_WAIT_BUFFER_MS = 250;
+const AUTO_CHECK_QUEUE_FULL_CODE = 'AUTO_CHECK_IMAGE_QUEUE_FULL';
 
 // Gemini OCR is intentionally serialized. A burst of two or three screenshots
 // should become visible queued work instead of concurrent requests that compete
@@ -158,6 +160,12 @@ export function resetAutoCheckDedupeForTest() {
  */
 async function runQueuedImageRequest(task, onQueued) {
   const waitingAhead = queuedImageRequestCount;
+  if (waitingAhead >= AUTO_CHECK_MAX_IMAGE_REQUESTS) {
+    const error = new Error(`Screenshot queue is full (${AUTO_CHECK_MAX_IMAGE_REQUESTS} requests).`);
+    error.code = AUTO_CHECK_QUEUE_FULL_CODE;
+    error.limit = AUTO_CHECK_MAX_IMAGE_REQUESTS;
+    throw error;
+  }
   queuedImageRequestCount += 1;
 
   const previous = imageRequestQueueTail.catch(() => {});
@@ -578,6 +586,22 @@ export function createAutoCheckMessageHandler({
       }
       await processAutoCheckRequest(message, request, requestUi, lang);
     } catch (err) {
+      if (err?.code === AUTO_CHECK_QUEUE_FULL_CODE) {
+        shouldRememberMessage = false;
+        console.warn(`[auto-check] Screenshot queue full at ${err.limit} requests; rejecting ${message.id}.`);
+        await removeSearchReaction(message);
+        await message.react('⚠️').catch(() => {});
+        await message.reply({
+          content: null,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            ...t('dialogue.check.imageQueueFull', lang, { limit: err.limit }),
+            lang,
+          })],
+          components: [],
+        }).catch(() => {});
+        return;
+      }
       console.error('[auto-check] Error processing request:', err.message);
       await removeSearchReaction(message);
       await message.react('❌').catch(() => {});

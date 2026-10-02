@@ -22,6 +22,7 @@ import {
 
 let mongod;
 const silentLogger = { log: () => {}, warn: () => {} };
+const MIB = 1024 * 1024;
 
 test.before(async () => {
   mongod = await MongoMemoryServer.create();
@@ -115,6 +116,24 @@ test('claimAndProcessOne processes a pending job and writes back done state', as
   }
 });
 
+test('executeJob preserves a successful response with no body', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 204 }));
+  const job = await ScrapeJob.create({
+    url: 'https://example.com/no-content',
+    status: 'in_progress',
+    claimId: 'no-content-claim',
+  });
+
+  const outcome = await executeJob(job, { logger: silentLogger });
+
+  assert.equal(outcome.state, 'done');
+  assert.equal(outcome.status, 204);
+  assert.equal(outcome.bodyLength, 0);
+  const fresh = await ScrapeJob.findById(job._id).lean();
+  assert.equal(fresh.status, 'done');
+  assert.equal(fresh.result.body, '');
+});
+
 test('claimAndProcessOne marks job failed when fetch throws', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => {
@@ -138,6 +157,70 @@ test('claimAndProcessOne marks job failed when fetch throws', async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('executeJob rejects a declared response body that is too large to persist', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('ignored', {
+    status: 200,
+    headers: { 'content-length': String(24 * MIB) },
+  }));
+  const job = await ScrapeJob.create({
+    url: 'https://example.com/oversized-declared',
+    status: 'in_progress',
+    claimId: 'declared-claim',
+  });
+
+  const outcome = await executeJob(job, { logger: silentLogger });
+
+  assert.equal(outcome.state, 'failed');
+  const fresh = await ScrapeJob.findById(job._id).lean();
+  assert.equal(fresh.status, 'failed');
+  assert.match(fresh.error, /response body is larger than/);
+  assert.equal(fresh.result?.body ?? null, null);
+});
+
+test('executeJob stops streaming a response once it passes the persistence ceiling', async t => {
+  const pulls = { count: 0 };
+  const chunk = new Uint8Array(MIB);
+  t.mock.method(globalThis, 'fetch', async () => new Response(new ReadableStream({
+    pull(controller) {
+      pulls.count += 1;
+      if (pulls.count > 24) controller.close();
+      else controller.enqueue(chunk);
+    },
+  }), { status: 200 }));
+  const job = await ScrapeJob.create({
+    url: 'https://example.com/oversized-stream',
+    status: 'in_progress',
+    claimId: 'stream-claim',
+  });
+
+  const outcome = await executeJob(job, { logger: silentLogger });
+
+  assert.equal(outcome.state, 'failed');
+  assert.ok(pulls.count <= 14, `pulled ${pulls.count} MiB`);
+  const fresh = await ScrapeJob.findById(job._id).lean();
+  assert.equal(fresh.status, 'failed');
+  assert.match(fresh.error, /response body is larger than/);
+  assert.equal(fresh.result?.body ?? null, null);
+});
+
+test('executeJob rejects decoded text that would exceed the persistence ceiling', async t => {
+  const invalidUtf8 = new Uint8Array(4 * MIB + 1).fill(0xff);
+  t.mock.method(globalThis, 'fetch', async () => new Response(invalidUtf8, { status: 200 }));
+  const job = await ScrapeJob.create({
+    url: 'https://example.com/expanded-utf8',
+    status: 'in_progress',
+    claimId: 'expanded-claim',
+  });
+
+  const outcome = await executeJob(job, { logger: silentLogger });
+
+  assert.equal(outcome.state, 'failed');
+  const fresh = await ScrapeJob.findById(job._id).lean();
+  assert.equal(fresh.status, 'failed');
+  assert.match(fresh.error, /after UTF-8 decoding/);
+  assert.equal(fresh.result?.body ?? null, null);
 });
 
 test('claimAndProcessOne picks the oldest pending job when several are waiting', async () => {

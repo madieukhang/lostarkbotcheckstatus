@@ -1016,11 +1016,12 @@ test('extractNamesFromImage rejects oversized downloads even when content-length
   }
 });
 
-test('extractNamesFromImage rejects inline payloads that exceed Gemini limit after encoding', async () => {
+test('extractNamesFromImage rejects declared bodies that cannot fit after base64 before reading them', async () => {
   clearOcrCache();
   const originalFetch = globalThis.fetch;
   const originalKey = config.geminiApiKey;
   const requestedUrls = [];
+  let bodyPulls = 0;
 
   config.geminiApiKey = 'fake-gemini-key';
   globalThis.fetch = async (url) => {
@@ -1029,9 +1030,17 @@ test('extractNamesFromImage rejects inline payloads that exceed Gemini limit aft
 
     if (requestedUrl === 'https://cdn.discordapp.com/base64-overhead.png') {
       // 15 MiB becomes 20 MiB as base64 before JSON and prompt overhead.
-      return new Response(new Uint8Array(15 * 1024 * 1024), {
+      return new Response(new ReadableStream({
+        pull(controller) {
+          bodyPulls += 1;
+          controller.enqueue(new Uint8Array([1]));
+        },
+      }), {
         status: 200,
-        headers: { 'content-type': 'image/png' },
+        headers: {
+          'content-type': 'image/png',
+          'content-length': String(15 * 1024 * 1024),
+        },
       });
     }
 
@@ -1045,9 +1054,10 @@ test('extractNamesFromImage rejects inline payloads that exceed Gemini limit aft
         url: 'https://cdn.discordapp.com/base64-overhead.png',
         contentType: 'image/png',
       }),
-      /inline request too large/,
+      /Image file too large/,
     );
     assert.equal(requestedUrls.length, 1);
+    assert.ok(bodyPulls <= 1, `pulled ${bodyPulls} body chunks`);
   } finally {
     config.geminiApiKey = originalKey;
     globalThis.fetch = originalFetch;

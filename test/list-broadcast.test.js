@@ -155,3 +155,38 @@ test('sendEmbedToChannels resolves public copy from each destination guild langu
     ['b', { content: 'guild-b:b' }],
   ]);
 });
+
+test('sendEmbedToChannels bounds destination work and continues after a failed channel', async () => {
+  let activeFetches = 0;
+  let peakFetches = 0;
+  const delivered = [];
+  const warnings = [];
+  const channelIds = Array.from({ length: 10 }, (_, index) => `channel-${index}`);
+  const client = {
+    channels: {
+      async fetch(channelId) {
+        activeFetches += 1;
+        peakFetches = Math.max(peakFetches, activeFetches);
+        await new Promise((resolve) => setImmediate(resolve));
+        activeFetches -= 1;
+        if (channelId === 'channel-5') throw new Error('deleted channel');
+        return {
+          isTextBased: () => true,
+          async send() { delivered.push(channelId); },
+        };
+      },
+    },
+  };
+
+  await sendEmbedToChannels({
+    client,
+    channelIds,
+    embed: { title: 'List changed' },
+    logger: { warn: (message) => warnings.push(message) },
+  });
+
+  assert.equal(peakFetches, 4);
+  assert.deepEqual(delivered.sort(), channelIds.filter((id) => id !== 'channel-5').sort());
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /channel-5 failed: deleted channel$/);
+});

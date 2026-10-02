@@ -12,9 +12,12 @@
 import { randomUUID } from 'node:crypto';
 
 import ScrapeJob, { buildUnexpiredJobFilter } from '../../models/ScrapeJob.js';
+import { readBodyWithin } from '../../utils/responseBody.js';
 import { FETCH_HEADERS } from '../roster/bibleHeaders.js';
 
 const FETCH_DEFAULT_TIMEOUT_MS = 15_000;
+// Leave headroom below MongoDB's 16 MiB document limit for job metadata.
+const MAX_SCRAPE_RESPONSE_BYTES = 12 * 1024 * 1024;
 const DEFAULT_JOB_LEASE_MS = (() => {
   const raw = parseInt(process.env.WORKER_JOB_LEASE_MS, 10);
   return Number.isFinite(raw) && raw > 0 ? raw : 2 * 60 * 1000;
@@ -82,7 +85,17 @@ export async function executeJob(job, { logger = console } = {}) {
       headers: FETCH_HEADERS,
       signal: AbortSignal.timeout(timeoutMs),
     });
-    const body = await res.text();
+    const bodyBytes = res.body
+      ? await readBodyWithin(res, MAX_SCRAPE_RESPONSE_BYTES)
+      : Buffer.alloc(0);
+    const bodyLength = bodyBytes.byteLength;
+    const body = new TextDecoder().decode(bodyBytes);
+    if (Buffer.byteLength(body) > MAX_SCRAPE_RESPONSE_BYTES) {
+      throw Object.assign(
+        new RangeError(`response body is larger than ${MAX_SCRAPE_RESPONSE_BYTES} bytes after UTF-8 decoding`),
+        { code: 'BODY_TOO_LARGE' },
+      );
+    }
     const headers = {};
     res.headers.forEach((value, key) => {
       headers[key] = value;
@@ -104,9 +117,9 @@ export async function executeJob(job, { logger = console } = {}) {
     }
     logger.log?.(
       `[worker] done ${job._id} ${Date.now() - startedAt}ms ` +
-      `HTTP ${res.status} ${body.length}B ${abbreviateUrl(job.url)}`,
+      `HTTP ${res.status} ${bodyLength}B ${abbreviateUrl(job.url)}`,
     );
-    return { state: 'done', status: res.status, bodyLength: body.length };
+    return { state: 'done', status: res.status, bodyLength };
   } catch (err) {
     const errorMessage = err?.message || String(err);
     const write = await ScrapeJob.updateOne(

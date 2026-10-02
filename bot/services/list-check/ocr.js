@@ -14,7 +14,6 @@ import { readBodyWithin } from '../../utils/responseBody.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 import { stripDiacritics } from './nameRecovery.js';
 
-const MAX_OCR_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_GEMINI_INLINE_REQUEST_BYTES = 20 * 1024 * 1024;
 const GEMINI_REQUEST_TIMEOUT_MS = 30_000;
 // Gemini 3.6+ deprecated the legacy sampling knobs. OCR is a bounded extraction
@@ -132,6 +131,15 @@ function createGeminiRequestBody(prompt, imageBase64, mimeType) {
     contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType, data: imageBase64 } }] }],
     generationConfig: GEMINI_GENERATION_CONFIG,
   };
+}
+
+function maxInlineImageBytes(prompt, mimeType) {
+  const emptyImageBytes = Buffer.byteLength(
+    JSON.stringify(createGeminiRequestBody(prompt, '', mimeType)),
+    'utf8',
+  );
+  const availableBase64Bytes = MAX_GEMINI_INLINE_REQUEST_BYTES - emptyImageBytes - 1;
+  return Math.max(0, Math.floor(availableBase64Bytes / 4) * 3);
 }
 
 function extractGeminiResponse(payload) {
@@ -640,8 +648,11 @@ export async function extractNamesFromImage(image, options = {}) {
     }
 
     const mimeType = image.contentType || imageRes.headers.get('content-type') || 'image/png';
-    const imageBuffer = await readBodyWithin(imageRes, MAX_OCR_IMAGE_BYTES).catch((err) => {
-      throw err.code === 'BODY_TOO_LARGE' ? new Error('Image file too large (max 20MB).') : err;
+    const maxImageBytes = maxInlineImageBytes(GEMINI_PROMPT, mimeType);
+    const imageBuffer = await readBodyWithin(imageRes, maxImageBytes).catch((err) => {
+      throw err.code === 'BODY_TOO_LARGE'
+        ? new Error('Image file too large for a Gemini inline request.')
+        : err;
     });
     timing.downloadMs = Date.now() - downloadStartedAt;
     const imageBase64 = imageBuffer.toString('base64');

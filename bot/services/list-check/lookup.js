@@ -6,21 +6,26 @@ import { buildListEntryMaps, buildNameRosterQuery } from '../../utils/listEntryM
 import { buildBlacklistQuery } from '../../utils/scope.js';
 
 export const LIST_LOOKUP_COLLATION = Object.freeze({ locale: 'en', strength: 2 });
+// Summary cards use the mirrored latest report. Detail clicks reload the full entry.
+const LIST_SUMMARY_PROJECTION = { notes: 0 };
 
 /**
  * Execute the shared bulk list lookup used by search and both image/text check.
  * Keeping blacklist scoping and map precedence here prevents those surfaces
  * from drifting while still issuing the four independent Mongo queries in
  * parallel.
+ * @param {string[]} names - primary and alias names to check
+ * @param {{ guildId?: string }} [options] - requesting guild for blacklist visibility
+ * @returns {Promise<{ maps: object }>} summary entries indexed by normalized name
  */
 export async function loadListLookup(names, { guildId } = {}) {
   const nameQuery = buildNameRosterQuery(names);
   const [black, white, watch, trusted] = await Promise.all([
-    Blacklist.find(buildBlacklistQuery(nameQuery, guildId))
+    Blacklist.find(buildBlacklistQuery(nameQuery, guildId), LIST_SUMMARY_PROJECTION)
       .collation(LIST_LOOKUP_COLLATION)
       .lean(),
-    Whitelist.find(nameQuery).collation(LIST_LOOKUP_COLLATION).lean(),
-    Watchlist.find(nameQuery).collation(LIST_LOOKUP_COLLATION).lean(),
+    Whitelist.find(nameQuery, LIST_SUMMARY_PROJECTION).collation(LIST_LOOKUP_COLLATION).lean(),
+    Watchlist.find(nameQuery, LIST_SUMMARY_PROJECTION).collation(LIST_LOOKUP_COLLATION).lean(),
     TrustedUser.find(nameQuery).collation(LIST_LOOKUP_COLLATION).lean(),
   ]);
   const entries = { black, white, watch, trusted };

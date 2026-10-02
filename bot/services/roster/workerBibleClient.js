@@ -77,6 +77,35 @@ export function createWorkerBibleClient({
   backpressureThreshold = DEFAULT_BACKPRESSURE_THRESHOLD,
   now = () => Date.now(),
 } = {}) {
+  let admissionTail = Promise.resolve();
+
+  function createAdmittedJob(payload, signal, deadline, timeoutMs) {
+    const admission = admissionTail.then(async () => {
+      signal?.throwIfAborted();
+      const pendingCount = await ScrapeJob.countDocuments({
+        status: 'pending',
+        ...buildUnexpiredJobFilter(new Date(now())),
+      });
+      signal?.throwIfAborted();
+      if (now() >= deadline) {
+        throw new Error(`Worker fetch timed out before queue admission after ${timeoutMs}ms.`);
+      }
+      if (pendingCount >= backpressureThreshold) {
+        throw new Error(
+          `Scraping service overloaded: ${pendingCount} pending jobs ` +
+          `(>= ${backpressureThreshold} threshold). Worker may be offline ` +
+          `or behind. Try again in a minute.`
+        );
+      }
+      return ScrapeJob.create(payload);
+    });
+
+    // The count and insert are one process-local admission window. MongoDB's
+    // count still observes other producers, but separate bot replicas can race.
+    admissionTail = admission.catch(() => {});
+    return admission;
+  }
+
   async function cancelJob(jobId, error) {
     try {
       await ScrapeJob.updateOne(
@@ -111,23 +140,6 @@ export function createWorkerBibleClient({
         }
       }
 
-      // Backpressure: count pending jobs before insert. If the worker
-      // is offline / overwhelmed and the queue grows past threshold,
-      // reject immediately so the bot surfaces overload to users
-      // rather than every caller eating a 30s timeout.
-      const pendingCount = await ScrapeJob.countDocuments({
-        status: 'pending',
-        ...buildUnexpiredJobFilter(new Date(now())),
-      });
-      signal?.throwIfAborted();
-      if (pendingCount >= backpressureThreshold) {
-        throw new Error(
-          `Scraping service overloaded: ${pendingCount} pending jobs ` +
-          `(>= ${backpressureThreshold} threshold). Worker may be offline ` +
-          `or behind. Try again in a minute.`
-        );
-      }
-
       // Bot-side timeout is the caller's hint plus a small buffer for
       // the round trip through Mongo. Persist the deadline before insert so
       // an offline worker cannot later process a request nobody is awaiting.
@@ -136,12 +148,12 @@ export function createWorkerBibleClient({
         : defaultTimeoutMs;
       const deadline = startedAtMs + timeoutMs;
 
-      const job = await ScrapeJob.create({
+      const job = await createAdmittedJob({
         url,
         options: sanitized,
         status: 'pending',
         deadlineAt: new Date(deadline),
-      });
+      }, signal, deadline, timeoutMs);
 
       let finalStatus;
       try {
