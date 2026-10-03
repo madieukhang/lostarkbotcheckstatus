@@ -22,6 +22,7 @@ export default {
       failed: { title: 'サーバー状況を読めませんでしたの', description: '今回は状況ソースから返事がありませんでした。少し待ってからお試しくださいませ。' },
     },
     reset: { title: '保存した状況を消しましたわ', description: '保存中のサーバー状態を消しました。次の監視周期から LoaLogs が追跡し直しますの。' },
+    seniorOnly: { title: 'Senior 限定ですの', description: 'このコマンドは Senior approver 限定ですわ。' },
     onlineNotice: {
       author: 'Artist · サーバー見守り', title: '{server} がオンラインに戻りましたわ',
       description: '**{server}** にまたログインできますの。レイドのお時間ですわね〜',
@@ -389,6 +390,7 @@ export default {
     modeSaved: { title: '画像モードを保存しました', description: 'モードは **{mode}** です。ご自身の画像投稿と、mode を指定しない `/la-check` に適用します。', footer: '/la-check-mode mode:daily で戻せます。/la-check の mode 指定はその画像だけに適用します。' },
     modeCurrent: { title: '現在の画像モード', description: '現在は **{mode}** です。初期設定は Daily。この設定はご自身の画像だけに適用します。', footer: '/la-check-mode mode:daily または mode:analysis で変更できます。' },
     modeUnavailable: { title: '詳細分析は利用できません', description: '現在、有効な詳細分析モデルがありません。保存済みの設定は変更していません。' },
+    ocrQueueFull: { title: '画像の読み取りが混雑していますの', description: '現在 {limit} 件の画像読み取りを順番待ちで抱えておりますの。列が進んでから、もう一度画像をお送りくださいませ。', footer: 'この request は保持しておりませんので、すぐに再試行できますわ。' },
     modeProgress: 'モード: **{mode}**',
     modes: { daily: 'Daily', analysis: '詳細分析' },
     malformed: 'どの証拠を選ばれたのか読み取れませんでしたの。もう一度 check を実行してくだされば、最初からやり直しますわ。', entryRemoved: { title: 'そちらはもう消えてしまいましたの', description: 'この証拠が結びついていた list entry は、どなたかが消してしまいましたの。もうお見せできるものが残っておりませんわ。' }, ocrFailed: { title: 'その画像を読めませんでしたの', description: '画像の読み取りでエラーが起きたので、まだどの名前も check していませんの。', footer: '1分ほどしてから、同じ screenshot をもう一度送ってくださいませ。' }, noNames: { title: '名前らしきものが見当たりませんの', description: '画像はきちんと読めましたけれど、character の名前らしきものはひとつもありませんでしたわ。', footer: 'raid の待機所の画面が、わたくしには一番読みやすいですの〜' }, noVerifiedNames: { title: '確認済み character がありませんの', description: '{count} 件の candidate を読み取りましたが、lostark.bible、保存済み roster snapshot、または表示可能な list record のどれにも一致しませんでしたわ。', footer: '未確認 OCR/text は表示せず、Quick Add にも出しませんの。' },

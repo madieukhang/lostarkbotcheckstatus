@@ -1,5 +1,7 @@
 import { createArtistEmbed } from '../../utils/artistVoice.js';
 
+import config from '../../config.js';
+import { connectDB } from '../../db.js';
 import { STATUS } from '../../monitor/serverStatus.js';
 import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
@@ -69,9 +71,10 @@ export function resolveSystemHealth(counts) {
   };
 }
 
-export function createSystemHandlers({ checkStatus, resetState, client }) {
+export function createSystemHandlers({ checkStatus, resetState, client, connectDBFn = connectDB }) {
   async function handleStatusCommand(interaction) {
     await deferReply(interaction);
+    await connectDBFn();
     const lang = await getUserLanguage(interaction.user?.id, { UserPreferenceModel: UserPreference });
 
     try {
@@ -164,7 +167,18 @@ export function createSystemHandlers({ checkStatus, resetState, client }) {
 
   async function handleResetCommand(interaction) {
     await deferReply(interaction);
+    await connectDBFn();
     const lang = await getUserLanguage(interaction.user?.id, { UserPreferenceModel: UserPreference });
+    // /la-reset wipes the shared monitor state, so it is senior-only by
+    // handler check · owner-guild registration alone is not a permission.
+    if (!config.seniorApproverIds.includes(interaction.user?.id)) {
+      await editAlert(interaction, {
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.system.seniorOnly', lang),
+        lang,
+      });
+      return;
+    }
     await resetState();
     await editAlert(interaction, {
       severity: AlertSeverity.SUCCESS,

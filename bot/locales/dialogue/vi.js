@@ -40,6 +40,7 @@ export default {
       failed: { title: 'Tớ chưa đọc được trạng thái server', description: 'Nguồn trạng thái chưa trả lời lần này. Cậu thử lại sau một chút nhé.' },
     },
     reset: { title: 'Đã xóa trạng thái đã nhớ', description: 'Tớ đã xóa trạng thái server đang lưu. LoaLogs sẽ theo dõi lại từ chu kỳ kế tiếp.' },
+    seniorOnly: { title: 'Chỉ Senior mới dùng được', description: 'Lệnh này dành riêng cho Senior approver nhé.' },
     onlineNotice: {
       author: 'Artist · Trông server',
       title: '{server} online trở lại rồi',
@@ -414,6 +415,7 @@ export default {
     modeSaved: { title: 'Đã lưu chế độ đọc ảnh', description: 'Chế độ của cậu là **{mode}**. Áp dụng cho ảnh cậu thả vào kênh và `/la-check` khi không chọn mode.', footer: 'Về Daily bằng /la-check-mode mode:daily; mode trong /la-check chỉ đổi cho một ảnh.' },
     modeCurrent: { title: 'Chế độ đọc ảnh của cậu', description: 'Cậu đang dùng **{mode}**. Người chưa đổi chế độ sẽ dùng Daily. Thiết lập này chỉ áp dụng cho ảnh của cậu.', footer: 'Đổi bằng /la-check-mode mode:daily hoặc mode:analysis.' },
     modeUnavailable: { title: 'Chưa dùng được Phân tích sâu', description: 'Hiện bot không có model Phân tích sâu nào đang bật. Chế độ đã lưu của cậu vẫn được giữ nguyên.' },
+    ocrQueueFull: { title: 'Bộ đọc ảnh đang kín lượt', description: 'Tớ đang giữ {limit} lượt đọc ảnh xếp hàng chờ tới. Cậu gửi lại ảnh sau khi hàng đợi vơi bớt nhé.', footer: 'Lượt này không bị giữ lại, nên cậu có thể thử lại ngay.' },
     modeProgress: 'Chế độ: **{mode}**',
     modes: { daily: 'Daily', analysis: 'Phân tích sâu' },
     malformed: 'Tớ không hiểu cậu vừa chọn tấm ảnh nào. Cậu chạy lại lượt check nhé, tớ làm lại từ đầu.', entryRemoved: { title: 'Cái đó không còn nữa rồi', description: 'Cái tên mà tấm ảnh này gắn vào đã bị gỡ khỏi list, nên tớ chẳng còn gì để đưa cậu xem.' }, ocrFailed: { title: 'Tớ không đọc nổi tấm ảnh này', description: 'Bộ đọc ảnh của tớ gặp lỗi ở tấm này, nên chưa tên nào được check.', footer: 'Cậu gửi lại đúng tấm ảnh này sau một phút nhé.' }, noNames: { title: 'Trong ảnh không có gì giống tên cả', description: 'Ảnh thì tớ đọc được, nhưng không có chữ nào trông giống tên character.', footer: 'Màn hình phòng chờ raid là chỗ tớ đọc dễ nhất.' }, noVerifiedNames: { title: 'Không xác minh được character', description: 'Tớ đọc được {count} tên candidate, nhưng không tên nào khớp lostark.bible, roster snapshot đã lưu hoặc record list đang hiển thị.', footer: 'Tên OCR/text chưa xác minh sẽ bị ẩn và không được đưa vào Quick Add.' },

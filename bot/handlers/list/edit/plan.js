@@ -157,7 +157,12 @@ export function buildScopeConflictQuery({ existing, targetScope, guildId }) {
   };
 }
 
-/** Route scope expansion and new global blacklist entries through approval, even for owners. */
+/**
+ * Route scope expansion and new global blacklist entries through approval, even for owners.
+ * Server-scoped entries stay editable without approval only for the entry owner
+ * or approvers · a stranger editing someone else's server entry goes through
+ * the approval flow like every other non-owner edit.
+ */
 export function shouldApplyListEditImmediately({
   isOwner,
   isApprover,
@@ -171,9 +176,5 @@ export function shouldApplyListEditImmediately({
     || (targetType === 'black' && currentType !== 'black')
   );
   if (needsGlobalApproval) return Boolean(isApprover);
-  return Boolean(
-    isOwner
-    || isApprover
-    || (targetType === 'black' && targetScope === 'server')
-  );
+  return Boolean(isOwner || isApprover);
 }

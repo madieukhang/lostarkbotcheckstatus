@@ -1,9 +1,10 @@
 /**
  * handlers/list/remove/index.js
  * /la-list remove: deletes a list entry, allowed only for the user who added
- * it. Shows a multi-list confirm picker when the name exists on more
- * than one list, then removes the chosen one and broadcasts the
- * change.
+ * it (officers/seniors fall back to custodians for legacy entries that
+ * predate ownership tracking). Shows a multi-list confirm picker when the
+ * name exists on more than one list or scope, then removes the chosen one
+ * and broadcasts the change.
  */
 
 import {
@@ -42,7 +43,7 @@ import {
   updateEmbed,
 } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t, tPick } from '../../../services/i18n/index.js';
-import { getListContext } from '../helpers.js';
+import { getListContext, isOfficerOrSenior } from '../helpers.js';
 
 const REMOVE_RESULT_PRESENTATIONS = [
   {
@@ -235,14 +236,23 @@ export function createRemoveHandlers({ services }) {
           .collation({ locale: 'en', strength: 2 })
           .lean(),
       ]);
-      const blackEntry = pickPreferredListEntry(blackEntries, [name], {
+      // The picker offers every blacklist entry the scope query matched,
+      // preferred one first (current-guild server > other server > global).
+      // Offering only the preferred entry shadowed same-named entries: an
+      // owner could be locked out of removing their own global entry while
+      // a server entry existed under the same name.
+      const preferredBlack = pickPreferredListEntry(blackEntries, [name], {
         preferServerScope: true,
         preferredGuildId: removeGuildId,
       });
+      const orderedBlackEntries = [
+        ...(preferredBlack ? [preferredBlack] : []),
+        ...blackEntries.filter((entry) => entry !== preferredBlack),
+      ];
 
       // Collect all found entries
       const found = [
-        blackEntry ? { entry: blackEntry, type: 'black' } : null,
+        ...orderedBlackEntries.map((entry) => ({ entry, type: 'black' })),
         whiteEntry ? { entry: whiteEntry, type: 'white' } : null,
         watchEntry ? { entry: watchEntry, type: 'watch' } : null,
       ].filter(Boolean);
@@ -284,9 +294,12 @@ export function createRemoveHandlers({ services }) {
         const label = t(`dialogue.broadcast.list.${type}`, lang);
 
         if (!entry.addedByUserId) {
-          return { ok: false, reason: 'legacy', entry, type, label, icon };
-        }
-        if (entry.addedByUserId !== interaction.user.id) {
+          // Pre-ownership entries have no owner to authorize the removal,
+          // so officers/seniors act as the fallback custodians.
+          if (!isOfficerOrSenior(interaction.user.id)) {
+            return { ok: false, reason: 'legacy', entry, type, label, icon };
+          }
+        } else if (entry.addedByUserId !== interaction.user.id) {
           return { ok: false, reason: 'not-owner', entry, type, label, icon };
         }
 
@@ -318,25 +331,41 @@ export function createRemoveHandlers({ services }) {
       }
 
       // Multiple entries · show selection buttons in an embed so the
-      // picker matches the post-confirm result card.
+      // picker matches the post-confirm result card. Custom IDs carry the
+      // entry index: several same-type entries (e.g. a server and a global
+      // blacklist under one name) must stay separately addressable.
       const buttonStyles = { black: ButtonStyle.Danger, white: ButtonStyle.Success, watch: ButtonStyle.Secondary };
-      const row = new ActionRowBuilder().addComponents(
+      const buttons = [
         ...found.map((f, i) => {
           const label = t(`dialogue.broadcast.list.${f.type}`, lang);
           return new ButtonBuilder()
-            .setCustomId(`remove_${f.type}`)
+            .setCustomId(`remove_${i}`)
             .setLabel(t('remove.removeFrom', lang, { index: i + 1, label }))
             .setStyle(buttonStyles[f.type] || ButtonStyle.Secondary);
         }),
         new ButtonBuilder()
           .setCustomId('remove_all')
           .setLabel(t('remove.removeAll', lang, { index: found.length + 1 }))
-          .setStyle(ButtonStyle.Secondary)
-      );
+          .setStyle(ButtonStyle.Secondary),
+      ];
+      // Discord caps a row at five components · longer pickers wrap onto
+      // further rows instead of dropping entries.
+      const rows = [];
+      for (let i = 0; i < buttons.length; i += 5) {
+        rows.push(new ActionRowBuilder().addComponents(...buttons.slice(i, i + 5)));
+      }
 
       const listLines = found.map((f, i) => {
         const ctx = getListContext(f.type);
-        const scopeTag = f.entry.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
+        // In the owner guild the scope query returns server entries from
+        // every guild, so a foreign guild's id disambiguates same-tagged
+        // local rows.
+        const foreignGuildId = f.entry.scope === 'server'
+          && f.entry.guildId && f.entry.guildId !== removeGuildId
+          ? ` · ${f.entry.guildId}` : '';
+        const scopeTag = f.entry.scope === 'server'
+          ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}${foreignGuildId}]\``
+          : '';
         const reason = f.entry.reason ? ` *${truncateInlineText(f.entry.reason, 80)}*` : '';
         return `${i + 1}. ${ctx.icon} **${t(`dialogue.broadcast.list.${f.type}`, lang)}**${scopeTag}${reason}`;
       });
@@ -347,7 +376,7 @@ export function createRemoveHandlers({ services }) {
         .setFooter({ text: t('dialogue.remove.pickerFooter', lang) })
         .setTimestamp();
 
-      await editEmbed(interaction, pickerEmbed, { content: '', components: [row] });
+      await editEmbed(interaction, pickerEmbed, { content: '', components: rows });
 
       const reply = await interaction.fetchReply();
       const button = await reply.awaitMessageComponent({
@@ -360,7 +389,8 @@ export function createRemoveHandlers({ services }) {
       if (button.customId === 'remove_all') {
         outcomes = await Promise.all(found.map((f) => removeOne(f.entry, f.type)));
       } else {
-        const target = found.find((f) => button.customId === `remove_${f.type}`);
+        const targetIndex = Number(button.customId.slice('remove_'.length));
+        const target = found[targetIndex];
         outcomes = target
           ? [await removeOne(target.entry, target.type)]
           : [{ ok: false, reason: 'unknown-selection', entry: { name }, type: 'black', label: t('dialogue.remove.unknown', lang), icon: '⚠️' }];

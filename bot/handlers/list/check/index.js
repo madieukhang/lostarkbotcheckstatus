@@ -12,6 +12,7 @@ import {
   checkNamesAgainstLists,
   formatCheckResults,
   partitionListCheckResultsByVerification,
+  OCR_QUEUE_FULL_CODE,
 } from '../../../services/list-check/service.js';
 import { didListCheckNameChange } from '../../../services/list-check/matchResolution.js';
 import { createNameSuggestionContext } from '../../../services/roster/search.js';
@@ -219,6 +220,19 @@ export function createCheckHandlers({
     const languagePromise = getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     let lang;
 
+    // Same gate as /la-check-mode: an explicit analysis request must get the
+    // specialized "mode unavailable" notice, not a generic OCR failure after
+    // the OCR boundary throws on the empty analysis model chain.
+    if (requestedMode === 'analysis' && config.geminiAnalysisModels.length === 0) {
+      lang = await languagePromise;
+      await editAlert(interaction, {
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.check.modeUnavailable', lang),
+        lang,
+      });
+      return;
+    }
+
     try {
       [lang, names] = await Promise.all([
         languagePromise,
@@ -232,6 +246,18 @@ export function createCheckHandlers({
       ]);
     } catch (err) {
       lang = await languagePromise;
+      if (err?.code === OCR_QUEUE_FULL_CODE) {
+        console.warn(
+          `[listcheck] OCR queue full (depth ${err.queueDepth ?? '?'}, limit ${err.limit ?? '?'});`
+          + ' rejecting /la-check without queuing.',
+        );
+        await editAlert(interaction, {
+          severity: AlertSeverity.WARNING,
+          ...t('dialogue.check.ocrQueueFull', lang, { limit: err.limit }),
+          lang,
+        });
+        return;
+      }
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.ocrFailed', lang),

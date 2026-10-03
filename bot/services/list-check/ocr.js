@@ -61,13 +61,48 @@ const ocrInFlight = new Map();
 // exhausts a 512 MB container, so they take this single slot one at a time.
 // Waiting jobs have downloaded nothing yet.
 let ocrSlotTail = Promise.resolve();
+// Callers that asked for the slot but have not been granted it yet; the head of
+// the queue keeps counting until its turn actually arrives. Without a cap, a
+// burst of interactions queues linearly behind the slot and the tail of the
+// line outlives Discord's interaction window while still holding its defer.
+let ocrSlotQueueLength = 0;
+
+/** Stable error code for OCR slot-queue rejections, checked across modules. */
+export const OCR_QUEUE_FULL_CODE = 'OCR_QUEUE_FULL';
+
+/** Thrown when the single OCR slot already has a full waiting queue. */
+export class OcrQueueFullError extends Error {
+  constructor({ queueDepth, limit }) {
+    super(`OCR queue is full: ${queueDepth} request(s) already waiting (limit ${limit}).`);
+    this.name = 'OcrQueueFullError';
+    this.code = OCR_QUEUE_FULL_CODE;
+    this.queueDepth = queueDepth;
+    this.limit = limit;
+  }
+}
 
 function acquireOcrSlot() {
+  if (ocrSlotQueueLength >= config.listcheckOcrMaxQueue) {
+    throw new OcrQueueFullError({
+      queueDepth: ocrSlotQueueLength,
+      limit: config.listcheckOcrMaxQueue,
+    });
+  }
+  ocrSlotQueueLength += 1;
   let release;
   const slot = new Promise((resolve) => { release = resolve; });
-  const turn = ocrSlotTail.then(() => release);
+  const turn = ocrSlotTail.then(() => {
+    ocrSlotQueueLength -= 1;
+    return release;
+  });
   ocrSlotTail = ocrSlotTail.then(() => slot);
   return turn;
+}
+
+/** Reset the OCR slot queue; test seam for deterministic queue-cap tests. */
+export function resetOcrSlotQueue() {
+  ocrSlotTail = Promise.resolve();
+  ocrSlotQueueLength = 0;
 }
 
 function formatGeminiFailure(result) {

@@ -1,22 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  createSystemHandlers,
-  resolveSystemHealth,
-} from '../bot/handlers/system/index.js';
-import { STATUS } from '../bot/monitor/serverStatus.js';
-import { COLORS } from '../bot/utils/ui.js';
+process.env.DISCORD_TOKEN = 'test';
+process.env.CHANNEL_ID = 'test';
+process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/test';
+process.env.SENIOR_APPROVER_IDS = 'senior-1';
 
-function createInteractionRecorder() {
+const { createSystemHandlers, resolveSystemHealth } = await import('../bot/handlers/system/index.js');
+const { STATUS } = await import('../bot/monitor/serverStatus.js');
+const { COLORS } = await import('../bot/utils/ui.js');
+const { default: UserPreference } = await import('../bot/models/UserPreference.js');
+
+function createInteractionRecorder(userId) {
   const calls = [];
   return {
     calls,
     interaction: {
+      ...(userId ? { user: { id: userId } } : {}),
       deferReply: async (...args) => calls.push({ method: 'deferReply', args }),
       editReply: async (payload) => calls.push({ method: 'editReply', payload }),
     },
   };
+}
+
+function mockEnglishPreference(t) {
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
 }
 
 const HEALTH_CASES = [
@@ -53,10 +61,12 @@ for (const healthCase of HEALTH_CASES) {
   });
 }
 
-test('system status uses a public deferred embed reply', async () => {
-  const { calls, interaction } = createInteractionRecorder();
+test('system status uses a public deferred embed reply', async (t) => {
+  mockEnglishPreference(t);
+  const { calls, interaction } = createInteractionRecorder('anyone-1');
   const handlers = createSystemHandlers({
     client: {},
+    connectDBFn: async () => {},
     resetState: async () => {},
     checkStatus: async () => new Map([
       ['Azena', STATUS.ONLINE],
@@ -71,11 +81,13 @@ test('system status uses a public deferred embed reply', async () => {
   assert.equal(calls[1].payload.embeds.length, 1);
 });
 
-test('system reset uses the shared alert edit path after public defer', async () => {
-  const { calls, interaction } = createInteractionRecorder();
+test('system reset uses the shared alert edit path after public defer', async (t) => {
+  mockEnglishPreference(t);
+  const { calls, interaction } = createInteractionRecorder('senior-1');
   let resetCalled = false;
   const handlers = createSystemHandlers({
     client: {},
+    connectDBFn: async () => {},
     checkStatus: async () => new Map(),
     resetState: async () => {
       resetCalled = true;
@@ -88,4 +100,41 @@ test('system reset uses the shared alert edit path after public defer', async ()
   assert.deepEqual(calls[0], { method: 'deferReply', args: [] });
   assert.equal(calls[1].method, 'editReply');
   assert.equal(calls[1].payload.embeds.length, 1);
+});
+
+test('system reset is senior-only: strangers never reach resetState', async (t) => {
+  mockEnglishPreference(t);
+  const { calls, interaction } = createInteractionRecorder('stranger-1');
+  let resetCalled = false;
+  const handlers = createSystemHandlers({
+    client: {},
+    connectDBFn: async () => {},
+    checkStatus: async () => new Map(),
+    resetState: async () => {
+      resetCalled = true;
+    },
+  });
+
+  await handlers.handleResetCommand(interaction);
+
+  assert.equal(resetCalled, false);
+  assert.deepEqual(calls[0], { method: 'deferReply', args: [] });
+  assert.equal(calls[1].method, 'editReply');
+  assert.equal(calls[1].payload.embeds.length, 1);
+});
+
+test('system handlers re-establish the DB connection before doing work', async (t) => {
+  mockEnglishPreference(t);
+  const order = [];
+  const handlers = createSystemHandlers({
+    client: {},
+    connectDBFn: async () => { order.push('connect'); },
+    resetState: async () => { order.push('reset'); },
+    checkStatus: async () => { order.push('check'); return new Map(); },
+  });
+
+  await handlers.handleResetCommand(createInteractionRecorder('senior-1').interaction);
+  await handlers.handleStatusCommand(createInteractionRecorder('senior-1').interaction);
+
+  assert.deepEqual(order, ['connect', 'reset', 'connect', 'check']);
 });

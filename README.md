@@ -51,8 +51,8 @@ image may need fallback or a correction pass. Settings do not create new quota.
 | `/la-search name [min_ilvl] [max_ilvl] [class]` | Search similar names (default iLvl ≥ 1700), cross-check all lists, and open blacklist/watchlist/whitelist details even without an evidence image |
 | `/la-evidence name [public]` | Direct evidence lookup for a single listed name. Autocomplete unions blacklist/whitelist/watchlist; bypasses `/la-list view` paging. Ephemeral by default; `public:true` is officer/senior only |
 | `/la-list add type name reason [raid] [logs] [image] [scope]` | Add to blacklist/whitelist/watchlist. `scope`: `global` / `server` (blacklist only). When the character is already listed, the duplicate card offers **Add to history**: the typed reason and raid become the entry's latest note, the roster fetched for the add is merged into its tracked alts, and a new screenshot replaces the evidence. Cards that show a reason add a `📜 N notes` line and a **History** button once an entry has two notes; the history opens only for the clicker, oldest first, ten notes per page. `/la-list edit` still overwrites the latest note |
-| `/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` | Edit existing entry. Owners can edit existing metadata, but server-to-global promotion and moves into global blacklist require approval unless the requester has auto-approval rights. `additional_names` appends alts manually for hidden-roster + no-guild cases and stays pending with any edit that requires approval. |
-| `/la-list remove name` | Remove an entry (ownership check) |
+| `/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` | Edit existing entry. The entry owner and approvers edit directly; everyone else routes through the approval flow. Server-to-global promotion and moves into global blacklist always require approval unless the requester has auto-approval rights. `additional_names` appends alts manually for hidden-roster + no-guild cases and stays pending with any edit that requires approval. |
+| `/la-list remove name` | Remove an entry (ownership check). When one name exists on several entries/scopes, the picker lists each match (server entries of the requesting guild first) instead of only the preferred one. Legacy entries from before ownership tracking have no owner: officers/seniors act as fallback custodians and may remove them |
 | `/la-list view type [scope]` | View entries. `scope`: `all` / `global` / `server` |
 | `/la-list trust action name [reason]` | Manage trusted list — `add` / `remove` (officer/senior only) |
 | `/la-list enrich name [deep_limit]` | Stronghold deep-scan an existing entry and append discovered alts. **Restricted to officers/seniors** (depends on the bot owner's residential-IP worker; ~10-15 min wall clock) |
@@ -72,7 +72,7 @@ image may need fallback or a correction pass. Settings do not create new quota.
 | `action:set-language` / `action:repin` / `action:notify-repin` | Set public language / clean non-pinned auto-check messages and refresh its guide / refresh the notification guide |
 | `action:notify-cleanup` | Run one notification-channel cleanup immediately |
 
-Owner-server commands (`/la-stats`, `/la-remote`, `/la-reset`) are registered only in `OWNER_GUILD_ID` and listed in `/la-help` there. `/la-reset` clears the stored server status; the next check starts over without an online alert.
+Owner-server commands (`/la-stats`, `/la-remote`, `/la-reset`) are registered only in `OWNER_GUILD_ID` and listed in `/la-help` there. All three also check `SENIOR_APPROVER_IDS` in the handler · owner-guild registration alone is not a permission. `/la-reset` clears the stored server status; the next check starts over without an online alert.
 
 ### Status Icons
 

@@ -18,6 +18,7 @@ import {
   formatCheckResults,
   isCharacterIdentityVerified,
   partitionListCheckResultsByVerification,
+  OCR_QUEUE_FULL_CODE,
 } from '../../services/list-check/service.js';
 import { createNameSuggestionContext } from '../../services/roster/search.js';
 import { getGuildConfig } from '../../utils/scope.js';
@@ -491,6 +492,11 @@ export function createAutoCheckMessageHandler({
 
     if (request.images.length > 0 && failedImages.length === request.images.length) {
       const lastError = failedImages.at(-1).error;
+      // A full OCR slot queue is a busy signal, not an OCR failure. Keep the
+      // error identity so the handler answers with the dedicated notice.
+      if (failedImages.every(({ error }) => error?.code === OCR_QUEUE_FULL_CODE)) {
+        throw lastError;
+      }
       throw new Error(
         `OCR failed for all ${request.images.length} image(s).`
         + ` Last error: ${lastError?.message || String(lastError)}`,
@@ -600,6 +606,30 @@ export function createAutoCheckMessageHandler({
           })],
           components: [],
         }).catch(() => {});
+        return;
+      }
+      if (err?.code === OCR_QUEUE_FULL_CODE) {
+        shouldRememberMessage = false;
+        console.warn(
+          `[auto-check] OCR slot queue full (depth ${err.queueDepth ?? '?'},`
+          + ` limit ${err.limit ?? '?'}); rejecting ${message.id}.`,
+        );
+        await removeSearchReaction(message);
+        await message.react('⚠️').catch(() => {});
+        const ocrQueueFullPayload = {
+          content: null,
+          embeds: [buildAlertEmbed({
+            severity: AlertSeverity.WARNING,
+            ...t('dialogue.check.ocrQueueFull', lang, { limit: err.limit }),
+            lang,
+          })],
+          components: [],
+        };
+        if (requestUi.progressMsg) {
+          await requestUi.progressMsg.edit(ocrQueueFullPayload).catch(() => {});
+        } else {
+          await message.reply(ocrQueueFullPayload).catch(() => {});
+        }
         return;
       }
       console.error('[auto-check] Error processing request:', err.message);

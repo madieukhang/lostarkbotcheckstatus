@@ -205,6 +205,7 @@ const config = {
   listcheckRosterLookupTimeoutMs: parsePositiveIntEnv('LISTCHECK_ROSTER_LOOKUP_TIMEOUT_MS', 6000),
   listcheckSimilarLookupLimit: parsePositiveIntEnv('LISTCHECK_SIMILAR_LOOKUP_LIMIT', 3),
   listcheckSuggestionLookupBudget: parsePositiveIntEnv('LISTCHECK_SUGGESTION_LOOKUP_BUDGET', 32),
+  listcheckOcrMaxQueue: parsePositiveIntEnv('LISTCHECK_OCR_MAX_QUEUE', 24),
 
   /** Cross-request lostark.bible search cache. Empty results expire sooner. */
   nameSuggestionCacheTtlMs: parsePositiveIntEnv('NAME_SUGGESTION_CACHE_TTL_MS', 5 * 60 * 1000),

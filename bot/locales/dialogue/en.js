@@ -51,6 +51,10 @@ export default {
       title: 'Status memory cleared',
       description: 'I cleared the stored server state. LoaLogs will begin tracking again on the next monitor cycle.',
     },
+    seniorOnly: {
+      title: 'Senior access only',
+      description: 'This command is reserved for senior approvers.',
+    },
     onlineNotice: {
       author: 'Artist · Server watch',
       title: '{server} is back online',
@@ -536,6 +540,7 @@ export default {
     modeSaved: { title: 'Screenshot mode saved', description: 'Your mode is **{mode}**. This applies to your uploads and `/la-check` when no mode is selected.', footer: 'Switch back with /la-check-mode mode:daily; a /la-check mode override affects one image only.' },
     modeCurrent: { title: 'Your screenshot mode', description: 'Your mode is **{mode}**. New users start in Daily. This setting only changes how your own images are read.', footer: 'Use /la-check-mode mode:daily or mode:analysis to change it.' },
     modeUnavailable: { title: 'Analysis is unavailable', description: 'The bot currently has no enabled Analysis models. Your saved mode was not changed.' },
+    ocrQueueFull: { title: 'The image reader is busy', description: 'I already have {limit} screenshot read(s) waiting in line. Send this image again once the line moves.', footer: 'This request was not kept, so it can be retried right away.' },
     modeProgress: 'Mode: **{mode}**',
     modes: { daily: 'Daily', analysis: 'Analysis' },
     malformed: 'I could not make sense of that evidence pick. Run the check again and I will start fresh.',

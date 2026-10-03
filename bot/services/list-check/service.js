@@ -32,7 +32,11 @@ import { attachRelatedClassNames } from './relatedClasses.js';
 import { hasDatabaseListMatch } from './verification.js';
 
 export { formatCheckResults } from './format.js';
-export { extractNamesFromImage } from './ocr.js';
+export {
+  extractNamesFromImage,
+  OcrQueueFullError,
+  OCR_QUEUE_FULL_CODE,
+} from './ocr.js';
 export {
   isCharacterIdentityVerified,
   partitionListCheckResultsByVerification,

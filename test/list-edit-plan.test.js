@@ -19,7 +19,7 @@ function makeEntry(overrides = {}) {
   };
 }
 
-test('list edit plan resolves the final blacklist scope before approval routing', () => {
+test('list edit plan routes a stranger\'s server-scope blacklist move through approval', () => {
   const plan = buildListEditPlan({
     existing: makeEntry({ scope: undefined }),
     currentType: 'white',
@@ -32,12 +32,26 @@ test('list edit plan resolves the final blacklist scope before approval routing'
   assert.equal(plan.isTypeChange, true);
   assert.equal(plan.isScopeChange, false);
   assert.equal(plan.changes.length, 1);
+  // A stranger converting an entry into a server blacklist still needs an
+  // approver; only the entry owner or approvers apply such edits directly.
   assert.equal(shouldApplyListEditImmediately({
     isOwner: false,
     isApprover: false,
     targetType: plan.targetType,
     targetScope: plan.targetScope,
-  }), true);
+  }), false);
+});
+
+test('server-scoped blacklist edits apply immediately only for owner or approver', () => {
+  const shape = {
+    currentType: 'black',
+    currentScope: 'server',
+    targetType: 'black',
+    targetScope: 'server',
+  };
+  assert.equal(shouldApplyListEditImmediately({ isOwner: false, isApprover: false, ...shape }), false);
+  assert.equal(shouldApplyListEditImmediately({ isOwner: true, isApprover: false, ...shape }), true);
+  assert.equal(shouldApplyListEditImmediately({ isOwner: false, isApprover: true, ...shape }), true);
 });
 
 test('list edit plan distinguishes requested no-ops from missing options', () => {
