@@ -10,6 +10,7 @@
  */
 
 import config from '../../config.js';
+import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
 import { getClassName } from '../../models/Class.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { sleep } from '../../utils/async.js';
@@ -154,7 +155,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   );
   const targetKey = normalizeNameKey(name);
   const baseCandidates = members
-    .filter((member) => normalizeNameKey(member.name) !== targetKey && member.ilvl >= 1700)
+    .filter((member) => normalizeNameKey(member.name) !== targetKey && member.ilvl >= MIN_TRACKED_ITEM_LEVEL)
     .sort((a, b) => b.ilvl - a.ilvl);
   const candidates = excludeSet.size > 0
     ? baseCandidates.filter((member) => !excludeSet.has(normalizeNameKey(member.name)))
@@ -163,7 +164,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   const limitedCandidates = candidateLimit > 0 ? candidates.slice(0, candidateLimit) : candidates;
   const skippedCandidates = Math.max(0, candidates.length - limitedCandidates.length);
   console.log(
-    `[alt-detect] ${candidates.length} candidate(s) after filtering ilvl >= 1700; scanning ${limitedCandidates.length}`
+    `[alt-detect] ${candidates.length} candidate(s) after filtering ilvl >= ${MIN_TRACKED_ITEM_LEVEL}; scanning ${limitedCandidates.length}`
     + (skippedCandidates > 0 ? `, skipping ${skippedCandidates} by limit` : '')
     + `. Mode: ${mode}. Candidate ScraperAPI: ${useScraperApiForCandidates ? 'on' : 'off'}. Concurrency: ${concurrency}. Transient retry: ${retryOnRateLimit ? 'on' : 'off'}.`
   );
@@ -274,7 +275,6 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     // Pass a shallow snapshot of the current matches so the UI can render
     // names during the scan. Display truncation belongs to the UI.
     Promise.resolve(options.onProgress({
-      scannedCandidates: attemptedCandidates,
       checkedCandidates,
       attemptedCandidates,
       totalCandidates: limitedCandidates.length,
@@ -389,7 +389,6 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     totalEligibleInGuild: baseCandidates.length,
     eligibleCandidates: candidates.length,
     totalCandidates: limitedCandidates.length,
-    scannedCandidates: checkedCandidates,
     checkedCandidates,
     attemptedCandidates,
     skippedCandidates,

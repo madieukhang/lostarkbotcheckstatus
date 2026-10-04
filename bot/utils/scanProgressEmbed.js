@@ -37,8 +37,8 @@ export function buildScanProgressEmbed({
   lang = 'en',
 }) {
   const total = Math.max(1, progress.totalCandidates || 1);
-  const attemptedCandidates = progress.attemptedCandidates ?? progress.scannedCandidates ?? 0;
-  const checkedCandidates = progress.checkedCandidates ?? progress.scannedCandidates ?? 0;
+  const attemptedCandidates = progress.attemptedCandidates ?? 0;
+  const checkedCandidates = progress.checkedCandidates ?? 0;
   const pct = Math.round((attemptedCandidates / total) * 100);
   const bar = buildProgressBar(pct);
   const startedLine = progress.startedAt

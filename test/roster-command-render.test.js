@@ -251,7 +251,7 @@ test('continued roster passes merge alts and accumulate scan counters once', () 
       { name: 'NewAlt', itemLevel: 1720 },
     ],
     scannedNames: ['NewAlt'],
-    scannedCandidates: 1,
+    checkedCandidates: 1,
     attemptedCandidates: 2,
     failedCandidates: 1,
     rateLimitRetries: 2,
@@ -260,7 +260,7 @@ test('continued roster passes merge alts and accumulate scan counters once', () 
   assert.deepEqual(cumulative.alts.map((alt) => alt.name), ['existing', 'NewAlt']);
   assert.equal(cumulative.alts[0].itemLevel, 1710);
   assert.deepEqual(cumulative.scannedNames, ['Existing', 'NewAlt']);
-  assert.equal(cumulative.scannedCandidates, 2);
+  assert.equal(cumulative.checkedCandidates, 2);
   assert.equal(cumulative.attemptedCandidates, 4);
   assert.equal(cumulative.failedCandidates, 2);
   assert.equal(cumulative.rateLimitRetries, 3);

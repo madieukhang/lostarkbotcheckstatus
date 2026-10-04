@@ -17,6 +17,7 @@ import TrustedUser from '../../models/TrustedUser.js';
 import Watchlist from '../../models/Watchlist.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import UserPreference from '../../models/UserPreference.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
 import {
   bibleClient,
   parseCharacterMetaFromHtml,
@@ -34,6 +35,7 @@ import {
   reserveStrongholdScanForInteraction,
 } from '../../utils/strongholdScanGate.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
+import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
 import { getListContext } from '../list/helpers.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { getClassEmoji } from '../../models/Class.js';
@@ -106,7 +108,7 @@ async function loadPreviousSnapshotMap(characters) {
   const snapshots = await RosterSnapshot.find({
     name: { $in: characters.map((character) => character.name) },
   })
-    .collation({ locale: 'en', strength: 2 })
+    .collation(CASE_INSENSITIVE_COLLATION)
     .lean();
   return new Map(snapshots.map((snapshot) => [snapshot.name.toLowerCase(), snapshot]));
 }
@@ -143,16 +145,16 @@ export async function loadVisibleRosterMatches(characters, guildId, {
   TrustedUserModel = TrustedUser,
 } = {}) {
   const checkNames = characters
-    .filter((character) => parseItemLevel(character.itemLevel) >= 1700)
+    .filter((character) => parseItemLevel(character.itemLevel) >= MIN_TRACKED_ITEM_LEVEL)
     .map((character) => character.name);
   const [blacklist, whitelist, watchlist, trusted] = await Promise.all([
     checkBlacklist(checkNames, { guildId }),
     checkWhitelist(checkNames),
     WatchlistModel.findOne(buildNameRosterQuery(checkNames))
-      .collation({ locale: 'en', strength: 2 })
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean(),
     TrustedUserModel.findOne(buildNameRosterQuery(checkNames))
-      .collation({ locale: 'en', strength: 2 })
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean(),
   ]);
   return { blacklist, whitelist, watchlist, trusted };

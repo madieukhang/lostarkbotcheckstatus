@@ -10,6 +10,7 @@ import {
 } from '../../utils/names.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 import { createLruTtlCache } from '../../utils/cache/lruTtlCache.js';
+import { parseRetryAfterMs } from '../../utils/parseRetryAfterMs.js';
 import { readBodyWithin } from '../../utils/responseBody.js';
 import { fetchNameSuggestions } from '../roster/search.js';
 import { stripDiacritics } from './nameRecovery.js';
@@ -202,17 +203,6 @@ function formatGeminiTokenUsage(usageMetadata) {
   ].filter(([, value]) => Number.isFinite(value));
   if (fields.length === 0) return '';
   return `, tokens: ${fields.map(([label, value]) => `${label}=${value}`).join(' ')}`;
-}
-
-function parseRetryAfterMs(value, now = Date.now()) {
-  const text = String(value || '').trim();
-  if (!text) return 0;
-
-  const seconds = Number(text);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds * 1000);
-
-  const retryAt = Date.parse(text);
-  return Number.isFinite(retryAt) ? Math.max(0, retryAt - now) : 0;
 }
 
 function selectAvailableGeminiModels(models, now = Date.now()) {

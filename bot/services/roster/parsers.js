@@ -5,6 +5,18 @@ export function parseItemLevelValue(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Parse a comma-grouped stat such as an item level for display and storage.
+ * Unlike parseItemLevelValue, missing or non-positive input becomes 0 so
+ * snapshots and stat badges never hold null.
+ * @param {unknown} value - raw value such as "1,712.5" or 1712.5
+ * @returns {number} the positive number, or 0
+ */
+export function parsePositiveNumber(value) {
+  const parsed = Number(String(value ?? '').replace(/,/g, ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 export function extractCharacterItemLevelFromHtml(html) {
   const patterns = [
     /itemLevel:(\d+(?:\.\d+)?)/,

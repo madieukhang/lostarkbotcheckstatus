@@ -33,7 +33,7 @@ import { t } from '../services/i18n/index.js';
  * @property {string} [resultMessageUrl] - Discord message URL to attach as a Link button.
  * @property {string} [lang='en'] - Display language for interactive controls.
  * @property {'completed'|'no-alts'|'stopped-with-alts'|'stopped-no-alts'|'enrich-saved'} outcome
- * @property {object} [result] - Scan result: { scannedCandidates, failedCandidates, alts? }
+ * @property {object} [result] - Scan result: { checkedCandidates, failedCandidates, alts? }
  * @property {Array} [alts] - Optional override for the alt list (use this when
  *   the caller has filtered the alts down to "new only" before DM).
  */
@@ -107,8 +107,8 @@ export async function sendScanCompletionDm(opts) {
     ...(guildName ? ['', `📍 ${t('dialogue.scan.dm.guild', lang, { guild: guildName })}`] : []),
   ];
 
-  const checkedCandidates = result.checkedCandidates ?? result.scannedCandidates ?? 0;
-  const attemptedCandidates = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
+  const checkedCandidates = result.checkedCandidates ?? 0;
+  const attemptedCandidates = result.attemptedCandidates ?? 0;
   const statFields = [
     { name: `🔍 ${t('dialogue.scan.dm.fields.checked', lang)}`, value: String(checkedCandidates), inline: true },
     { name: `🎯 ${t('dialogue.scan.dm.fields.found', lang)}`, value: String(alts.length), inline: true },

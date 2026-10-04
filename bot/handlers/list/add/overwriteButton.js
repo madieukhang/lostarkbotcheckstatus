@@ -8,6 +8,7 @@
  * approval lease stores that action string.
  */
 
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
@@ -41,7 +42,7 @@ export async function findDuplicateEntry(model, payload) {
   const lookupStrategies = [
     () => payload.duplicateEntryId ? model.findById(payload.duplicateEntryId) : null,
     () => model.findOne(buildDuplicateLookupQuery(payload))
-      .collation({ locale: 'en', strength: 2 }),
+      .collation(CASE_INSENSITIVE_COLLATION),
   ];
 
   for (const lookup of lookupStrategies) {

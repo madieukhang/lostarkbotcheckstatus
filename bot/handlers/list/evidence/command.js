@@ -32,6 +32,7 @@ import {
 import { buildEvidenceEmbed } from '../view/ui.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import UserPreference from '../../../models/UserPreference.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   decorateListEntry,
@@ -41,7 +42,6 @@ import {
 } from '../helpers.js';
 
 const KNOWN_TYPES = ['black', 'white', 'watch'];
-const COLLATION = { locale: 'en', strength: 2 };
 const AUTOCOMPLETE_MAX = 25;
 const PER_LIST_FETCH_CAP = 25;
 
@@ -68,7 +68,7 @@ function parseNameValue(raw) {
 async function findEntryById({ entryId, type, guildId }) {
   const { model } = getListContext(type);
   const query = buildScopedListQuery(type, { _id: entryId }, guildId);
-  const entry = await model.findOne(query).collation(COLLATION).lean();
+  const entry = await model.findOne(query).collation(CASE_INSENSITIVE_COLLATION).lean();
   if (entry) return { entry, type };
   return { entry: null, type: null };
 }
@@ -90,11 +90,11 @@ async function findEntryByName({ name, preferredType, guildId }) {
     const query = buildScopedListQuery(type, buildNameRosterQuery(name), guildId);
     const entry = type === 'black'
       ? pickPreferredListEntry(
-          await model.find(query).collation(COLLATION).lean(),
+          await model.find(query).collation(CASE_INSENSITIVE_COLLATION).lean(),
           [name],
           { preferServerScope: true, preferredGuildId: guildId },
         )
-      : await model.findOne(query).collation(COLLATION).lean();
+      : await model.findOne(query).collation(CASE_INSENSITIVE_COLLATION).lean();
     if (entry) return { entry, type };
   }
   return { entry: null, type: null };
@@ -124,7 +124,7 @@ async function lookupAutocompleteCandidates(query, guildId) {
     const scoped = buildScopedListQuery(type, baseQuery, guildId);
     const docs = await model
       .find(scoped)
-      .collation(COLLATION)
+      .collation(CASE_INSENSITIVE_COLLATION)
       .sort({ addedAt: -1 })
       .limit(PER_LIST_FETCH_CAP)
       .lean();

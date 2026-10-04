@@ -177,7 +177,7 @@ test('enrich continuation merges cumulative stats and exposes only unknown alts'
         { name: 'Newalt', classId: 204, itemLevel: 1730 },
       ],
       scannedNames: ['Membertwo'],
-      scannedCandidates: 5,
+      checkedCandidates: 5,
       attemptedCandidates: 6,
       failedCandidates: 2,
       rateLimitRetries: 3,

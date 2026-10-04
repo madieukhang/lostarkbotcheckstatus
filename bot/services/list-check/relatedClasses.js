@@ -15,7 +15,7 @@ import {
   LIST_CHECK_ALT_PREVIEW_LIMIT,
   pickAltsForDisplay,
 } from './format.js';
-import { LIST_LOOKUP_COLLATION } from './lookup.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
 
 const RELATED_ENTRY_KEYS = Object.freeze([
   ['black', 'blackEntry'],
@@ -52,7 +52,7 @@ async function loadSnapshotClasses(wantedByKey, classByName) {
   try {
     const names = [...wantedByKey.values()].map(({ name }) => name);
     const snapshots = await RosterSnapshot.find({ name: { $in: names } })
-      .collation(LIST_LOOKUP_COLLATION)
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean();
     for (const snapshot of snapshots) {
       const className = snapshot?.classId ? getClassName(snapshot.classId) : '';

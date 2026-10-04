@@ -11,6 +11,7 @@ import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
 import UserPreference from '../../../models/UserPreference.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import {
   normalizeCharacterName,
   normalizeNameKey,
@@ -58,12 +59,12 @@ function readListEditInput(interaction) {
   };
 }
 
-async function findListEditTarget({ name, guildId, collation }) {
+async function findListEditTarget({ name, guildId }) {
   const query = buildNameRosterQuery(name);
   const [blackEntries, whiteEntry, watchEntry] = await Promise.all([
-    Blacklist.find(buildBlacklistQuery(query, guildId)).collation(collation),
-    Whitelist.findOne(query).collation(collation),
-    Watchlist.findOne(query).collation(collation),
+    Blacklist.find(buildBlacklistQuery(query, guildId)).collation(CASE_INSENSITIVE_COLLATION),
+    Whitelist.findOne(query).collation(CASE_INSENSITIVE_COLLATION),
+    Watchlist.findOne(query).collation(CASE_INSENSITIVE_COLLATION),
   ]);
   const blackEntry = pickPreferredListEntry(blackEntries, [name], {
     preferServerScope: true,
@@ -80,14 +81,13 @@ async function findScopeConflict({
   existing,
   targetScope,
   guildId,
-  collation,
 }) {
   if (!isScopeChange) return null;
   return Blacklist.findOne(buildScopeConflictQuery({
     existing,
     targetScope,
     guildId,
-  })).collation(collation).lean();
+  })).collation(CASE_INSENSITIVE_COLLATION).lean();
 }
 
 async function rejectInvalidListEditInput({
@@ -153,7 +153,6 @@ async function rejectInvalidListEditState({
   existing,
   plan,
   editGuildId,
-  collation,
   lang,
 }) {
   const conflict = await findScopeConflict({
@@ -161,7 +160,6 @@ async function rejectInvalidListEditState({
     existing,
     targetScope: plan.targetScope,
     guildId: editGuildId,
-    collation,
   });
   if (conflict) {
     const descriptionKey = plan.targetScope === 'global'
@@ -325,7 +323,6 @@ export function createListEditCommandHandler({
     }
 
     // Find existing entry across all lists (scope-aware for blacklist)
-    const collation = { locale: 'en', strength: 2 };
     const editGuildId = interaction.guild.id;
     const editGuildConfig = await getGuildConfig(editGuildId);
     const editGuildDefaultScope = editGuildConfig?.defaultBlacklistScope || 'global';
@@ -333,7 +330,6 @@ export function createListEditCommandHandler({
     const { existing, currentType } = await findListEditTarget({
       name: input.name,
       guildId: editGuildId,
-      collation,
     });
     if (!existing) {
       await editAlert(interaction, {
@@ -371,7 +367,6 @@ export function createListEditCommandHandler({
       existing,
       plan,
       editGuildId,
-      collation,
       lang,
     })) return;
 

@@ -14,8 +14,10 @@ export const GEMINI_MODEL_PROFILES = Object.freeze({
   analysis: Object.freeze(DEFAULT_GEMINI_MODELS.filter((model) => !model.endsWith('-lite'))),
 });
 
-// Explicit operator waitlists still apply to both profiles. 3.8 is available
-// again for analysis, while daily traffic stays on the two Flash-Lite models.
+// Default deferral list for models an operator can still park via
+// GEMINI_MODEL_WAITLIST. Empty means both profiles run their full chains
+// unblocked; daily traffic rides the two Flash-Lite models while analysis
+// walks every non-Lite model above.
 export const DEFAULT_GEMINI_MODEL_WAITLIST = Object.freeze([]);
 
 const DEFAULT_PRIMARY_TIMEOUT_MS_BY_MODEL = Object.freeze({

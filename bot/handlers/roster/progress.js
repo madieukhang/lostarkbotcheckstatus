@@ -20,8 +20,10 @@ import { t } from '../../services/i18n/index.js';
 // ~40-60 progress updates over a typical 10-15 minute gentle-mode
 // scan; well under the rate-limit ceiling. Tightened from 30s after
 // users reported the embed felt frozen between ticks.
-const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
-const PROGRESS_EDIT_FAILURE_LIMIT = 3;
+// Shared with the /la-list enrich progress card so both scan surfaces
+// throttle identically.
+export const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
+export const PROGRESS_EDIT_FAILURE_LIMIT = 3;
 
 /**
  * Own one active roster scan's cancellation registry and progress UI context.
@@ -77,7 +79,7 @@ export function createRosterScanRuntime({
       color: COLORS.info,
       lang,
       progress: {
-        scannedCandidates: 0,
+        attemptedCandidates: 0,
         totalCandidates,
         altsFound: 0,
         failedCandidates: 0,
@@ -130,7 +132,7 @@ export function makeRosterScanProgressCallback({ interaction, replyEditor, name,
 
   return (progress) => {
     const now = Date.now();
-    const isFinal = progress.scannedCandidates >= progress.totalCandidates;
+    const isFinal = progress.attemptedCandidates >= progress.totalCandidates;
     if (!isFinal && now - lastEditRef.value < PROGRESS_EDIT_THROTTLE_MS) {
       return;
     }
@@ -176,8 +178,8 @@ export function makeRosterScanProgressCallback({ interaction, replyEditor, name,
 export function formatDeepScanStats(altResult, lang = 'en') {
   if (!altResult) return '';
 
-  const checked = altResult.checkedCandidates ?? altResult.scannedCandidates ?? 0;
-  const attempted = altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0;
+  const checked = altResult.checkedCandidates ?? 0;
+  const attempted = altResult.attemptedCandidates ?? 0;
   const optionalMetrics = [
     { visible: attempted > checked, key: 'attempted', count: attempted },
     { visible: (altResult.skippedCandidates ?? 0) > 0, key: 'skipped', count: altResult.skippedCandidates },

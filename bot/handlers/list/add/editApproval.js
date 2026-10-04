@@ -5,6 +5,7 @@
  */
 
 import PendingApproval from '../../../models/PendingApproval.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
@@ -104,7 +105,7 @@ async function rejectBlockedTypeChange({
     nameMatch,
     payload.guildId || '',
     { ownerSeesAll: false, includeEmptyServerScope: true }
-  )).collation({ locale: 'en', strength: 2 }).lean();
+  )).collation(CASE_INSENSITIVE_COLLATION).lean();
 
   if (targetDupe) {
     await closeApprovalWithAlert({

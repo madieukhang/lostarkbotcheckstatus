@@ -5,11 +5,8 @@
  */
 
 import RosterSnapshot from '../../models/RosterSnapshot.js';
-
-function parseItemLevel(value) {
-  const parsed = Number(String(value ?? '').replace(/,/g, ''));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
+import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
+import { parsePositiveNumber } from './parsers.js';
 
 function normalizeCombatScore(value) {
   const text = String(value ?? '').trim();
@@ -33,7 +30,7 @@ export async function upsertRosterSnapshots(
       const name = String(record?.name || '').trim();
       if (!name) return null;
       const set = {
-        itemLevel: parseItemLevel(record?.itemLevel),
+        itemLevel: parsePositiveNumber(record?.itemLevel),
         classId: String(record?.classId || '').trim(),
         rosterName: String(rosterName || name).trim(),
         updatedAt: now,
@@ -51,7 +48,7 @@ export async function upsertRosterSnapshots(
             $set: set,
           },
           upsert: true,
-          collation: { locale: 'en', strength: 2 },
+          collation: CASE_INSENSITIVE_COLLATION,
         },
       };
     })

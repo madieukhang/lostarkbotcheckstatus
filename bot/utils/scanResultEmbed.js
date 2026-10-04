@@ -60,7 +60,7 @@ export function deriveScanState(result) {
     : (Number.isFinite(result?.eligibleCandidates)
       ? result.eligibleCandidates
       : (result?.totalCandidates ?? 0));
-  const scanned = result?.checkedCandidates ?? result?.scannedCandidates ?? 0;
+  const scanned = result?.checkedCandidates ?? 0;
   const cancelled = result?.cancelled === true;
   const pausedForFailureStorm = result?.pausedForFailureStorm === true;
   const abortedBySystem = Boolean(result?.abortReason && result.abortReason !== 'user-stopped');
@@ -96,7 +96,7 @@ const STOP_HINT_BUILDERS = {
     detail: result.abortDetail || '',
   }),
   'failure-storm': ({ result, lang }) => {
-    const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
+    const attempted = result.attemptedCandidates ?? 0;
     const failed = result.failedCandidates ?? 0;
     const rate = attempted > 0 ? Math.round((failed / attempted) * 100) : 0;
     const lastError = truncateInlineText(result.lastFailureReason, 140);
@@ -161,8 +161,8 @@ function buildResultSections({ target, result, state, style, alts, altList, summ
 }
 
 function buildResultFields(result, state, altCount, lang) {
-  const checked = result.checkedCandidates ?? result.scannedCandidates ?? 0;
-  const attempted = result.attemptedCandidates ?? result.scannedCandidates ?? 0;
+  const checked = result.checkedCandidates ?? 0;
+  const attempted = result.attemptedCandidates ?? 0;
   const fields = [
     { name: `🔍 ${t('dialogue.scan.result.fields.checked', lang)}`, value: String(checked), inline: true },
     { name: `🎯 ${t('dialogue.scan.result.fields.found', lang)}`, value: String(altCount), inline: true },

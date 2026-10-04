@@ -5,6 +5,7 @@
  */
 
 import mongoose from 'mongoose';
+import { CASE_INSENSITIVE_COLLATION } from './collation.js';
 
 const rosterSnapshotSchema = new mongoose.Schema({
   /** Character name (unique per snapshot) */
@@ -36,7 +37,7 @@ const rosterSnapshotSchema = new mongoose.Schema({
 
 rosterSnapshotSchema.index(
   { name: 1 },
-  { unique: true, collation: { locale: 'en', strength: 2 } }
+  { unique: true, collation: CASE_INSENSITIVE_COLLATION }
 );
 
 rosterSnapshotSchema.index({ rosterName: 1 });

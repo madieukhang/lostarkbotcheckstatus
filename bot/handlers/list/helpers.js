@@ -511,7 +511,7 @@ const DECIDED_APPROVAL_STYLES = Object.freeze({
  * @param {string} options.lang - the approver's language
  * @returns {import('discord.js').EmbedBuilder} the decided card
  */
-export function buildDecidedApprovalEmbed({ client, payload, outcome, approver, result = '', lang }) {
+function buildDecidedApprovalEmbed({ client, payload, outcome, approver, result = '', lang }) {
   const { icon, color } = DECIDED_APPROVAL_STYLES[outcome];
   const guild = client.guilds.cache.get(payload.guildId) ?? { name: payload.guildId };
   const title = t('dialogue.approval.decided.title', lang, {

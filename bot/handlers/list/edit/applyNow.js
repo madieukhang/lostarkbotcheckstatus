@@ -7,6 +7,7 @@
  * legacy null, then broadcasts the change.
  */
 
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
@@ -187,7 +188,7 @@ async function applyTypeChange(args) {
   const { model: newModel } = getListContext(args.targetType);
   const targetDupe = await newModel.findOne(
     buildMovePreflightQuery(args.existing, args.targetType, args.editGuildId)
-  ).collation({ locale: 'en', strength: 2 }).lean();
+  ).collation(CASE_INSENSITIVE_COLLATION).lean();
 
   if (targetDupe) {
     await editAlert(args.interaction, {

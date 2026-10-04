@@ -56,8 +56,8 @@ export function buildRosterContinuationSessionPayload({
     allDiscoveredAlts: altResult.alts || [],
     cap,
     scanStats: {
-      scanned: altResult.scannedCandidates || 0,
-      attempted: altResult.attemptedCandidates ?? altResult.scannedCandidates ?? 0,
+      scanned: altResult.checkedCandidates || 0,
+      attempted: altResult.attemptedCandidates ?? 0,
       failed: altResult.failedCandidates || 0,
       rateLimitRetries: altResult.rateLimitRetries || 0,
     },

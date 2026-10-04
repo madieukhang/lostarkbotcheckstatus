@@ -12,10 +12,12 @@ import { createArtistEmbed } from '../../utils/artistVoice.js';
 
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
+import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import { COLORS, ICONS, padInlineRow } from '../../utils/ui.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
 import {
   formatLinkedCharacter,
   statMapFromRosterCharacters,
@@ -43,10 +45,10 @@ async function loadGuildListHits(guildMembers, guildId) {
   const memberNameQuery = buildNameRosterQuery(memberNames);
   const [black, white] = await Promise.all([
     Blacklist.find(buildBlacklistQuery(memberNameQuery, guildId || ''))
-      .collation({ locale: 'en', strength: 2 })
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean(),
     Whitelist.find(memberNameQuery)
-      .collation({ locale: 'en', strength: 2 })
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean(),
   ]);
   return { black, white };
@@ -65,7 +67,7 @@ function buildHiddenScanError(err, name, lang) {
 }
 
 async function runHiddenDeepScan({ interaction, replyEditor, name, meta, guildMembers, deepOptions, lang }) {
-  const filteredCount = guildMembers.filter((member) => member.name !== name && member.ilvl >= 1700).length;
+  const filteredCount = guildMembers.filter((member) => member.name !== name && member.ilvl >= MIN_TRACKED_ITEM_LEVEL).length;
   const cap = deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit;
   const scan = createRosterScanRuntime({
     interaction,
@@ -260,7 +262,7 @@ function notifyHiddenScanCompletion({ interaction, replyEditor, name, meta, altR
 
 async function replyWithHiddenRosterSuggestions(replyEditor, name, lang) {
   const suggestions = await fetchNameSuggestions(name) || [];
-  const filtered = suggestions.filter((suggestion) => suggestion.itemLevel >= 1700);
+  const filtered = suggestions.filter((suggestion) => suggestion.itemLevel >= MIN_TRACKED_ITEM_LEVEL);
   const alert = filtered.length > 0
     ? {
       severity: AlertSeverity.ERROR,
@@ -334,7 +336,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
   if (hitNames.length > 0) {
     try {
       const snapshots = await RosterSnapshot.find({ name: { $in: hitNames } })
-        .collation({ locale: 'en', strength: 2 })
+        .collation(CASE_INSENSITIVE_COLLATION)
         .lean();
       hitStatMap = statMapFromRosterCharacters(snapshots);
     } catch (err) {

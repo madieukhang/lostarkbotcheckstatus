@@ -31,6 +31,7 @@
 
 import { connectDB } from '../../../db.js';
 import config from '../../../config.js';
+import { MIN_TRACKED_ITEM_LEVEL } from '../../../config/itemLevelThreshold.js';
 import UserPreference from '../../../models/UserPreference.js';
 import {
   fetchCharacterMeta,
@@ -88,12 +89,10 @@ import { sendScanCompletionDm, buildResultMessageUrl } from '../../../utils/scan
 import { createLongRunningReplyEditor } from '../../../utils/longRunningReply.js';
 import { mergeAltsByName } from '../../../utils/alts.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
-
-// Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
-// ~40-60 updates over a 10-15 minute gentle-mode scan; well under the
-// rate-limit ceiling while keeping progress updates timely.
-const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;
-const PROGRESS_EDIT_FAILURE_LIMIT = 3;
+import {
+  PROGRESS_EDIT_THROTTLE_MS,
+  PROGRESS_EDIT_FAILURE_LIMIT,
+} from '../../roster/progress.js';
 
 const SCAN_CANCEL_STATE_RULES = Object.freeze([
   { state: 'finished', matches: ({ scan }) => !scan },
@@ -227,12 +226,12 @@ export function buildInitialEnrichProgress({
   );
   const passEligible = guildMembers.filter((member) => (
     member.name !== name
-    && member.ilvl >= 1700
+    && member.ilvl >= MIN_TRACKED_ITEM_LEVEL
     && !excludedNames.has(normalizeNameKey(member.name))
   )).length;
   const passLimit = resolvedCap || passEligible;
   return {
-    scannedCandidates: 0,
+    attemptedCandidates: 0,
     totalCandidates: Math.min(passEligible, passLimit),
     failedCandidates: 0,
     altsFound: 0,
@@ -257,7 +256,7 @@ function createEnrichProgressHandler({
   let progressEditFailures = 0;
   return (progress) => {
     const now = Date.now();
-    const isFinal = progress.scannedCandidates >= progress.totalCandidates;
+    const isFinal = progress.attemptedCandidates >= progress.totalCandidates;
     if (!isFinal && now - lastProgressEdit < PROGRESS_EDIT_THROTTLE_MS) return;
     lastProgressEdit = now;
     if (isFinal) return;
@@ -387,11 +386,9 @@ function numericOrZero(value) {
 
 function buildCumulativeScanCounts(existingSession, result) {
   const prior = existingSession?.scanStats ?? {};
-  const attemptedThisPass = result.attemptedCandidates
-    ?? result.scannedCandidates
-    ?? 0;
+  const attemptedThisPass = result.attemptedCandidates ?? 0;
   return {
-    scanned: numericOrZero(prior.scanned) + numericOrZero(result.scannedCandidates),
+    scanned: numericOrZero(prior.scanned) + numericOrZero(result.checkedCandidates),
     attempted: numericOrZero(prior.attempted) + numericOrZero(attemptedThisPass),
     failed: numericOrZero(prior.failed) + numericOrZero(result.failedCandidates),
     rateLimitRetries: numericOrZero(prior.rateLimitRetries) + numericOrZero(result.rateLimitRetries),
@@ -477,7 +474,6 @@ function persistEnrichSession({
 function buildCumulativeEnrichResult(result, cumulative) {
   return {
     ...result,
-    scannedCandidates: cumulative.scanned,
     checkedCandidates: cumulative.scanned,
     attemptedCandidates: cumulative.attempted,
     failedCandidates: cumulative.failed,

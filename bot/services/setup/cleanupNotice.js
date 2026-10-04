@@ -17,15 +17,6 @@ import { resolveCleanupVolume } from './cleanupVolume.js';
 export const AUTO_CHECK_CLEANUP_NOTICE_TTL_MS = 5 * 60 * 1000;
 
 /**
- * Pick the tone bucket for a sweep result.
- * @param {number} deleted - messages removed by the sweep
- * @returns {'trivial'|'normal'|'heavy'|null} null when there is nothing to say
- */
-export function resolveCleanupVolumeBucket(deleted) {
-  return resolveCleanupVolume(deleted);
-}
-
-/**
  * Build the post-sweep notice text.
  * @param {number} deleted - messages removed by the sweep
  * @param {string} lang - guild language
@@ -33,7 +24,7 @@ export function resolveCleanupVolumeBucket(deleted) {
  * @returns {string|null} null when nothing should be posted
  */
 export function buildCleanupNoticeContent(deleted, lang, { translate = tPick } = {}) {
-  const bucket = resolveCleanupVolumeBucket(deleted);
+  const bucket = resolveCleanupVolume(deleted);
   if (!bucket) return null;
 
   return translate(`dialogue.cleanupNotice.${bucket}`, lang, { n: Number(deleted) });

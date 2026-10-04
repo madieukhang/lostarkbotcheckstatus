@@ -28,6 +28,7 @@ import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
 import UserPreference from '../../../models/UserPreference.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { getInteractionDisplayName, normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
 import {
@@ -227,13 +228,13 @@ export function createRemoveHandlers({ services }) {
       const nameQuery = buildNameRosterQuery(name);
       const [blackEntries, whiteEntry, watchEntry] = await Promise.all([
         Blacklist.find(buildBlacklistQuery(nameQuery, removeGuildId))
-          .collation({ locale: 'en', strength: 2 })
+          .collation(CASE_INSENSITIVE_COLLATION)
           .lean(),
         Whitelist.findOne(nameQuery)
-          .collation({ locale: 'en', strength: 2 })
+          .collation(CASE_INSENSITIVE_COLLATION)
           .lean(),
         Watchlist.findOne(nameQuery)
-          .collation({ locale: 'en', strength: 2 })
+          .collation(CASE_INSENSITIVE_COLLATION)
           .lean(),
       ]);
       // The picker offers every blacklist entry the scope query matched,
@@ -275,7 +276,7 @@ export function createRemoveHandlers({ services }) {
       let removeStatMap = new Map();
       try {
         const snapshots = await RosterSnapshot.find({ name: { $in: snapshotNames } })
-          .collation({ locale: 'en', strength: 2 })
+          .collation(CASE_INSENSITIVE_COLLATION)
           .lean();
         removeStatMap = statMapFromRosterCharacters(snapshots);
       } catch (err) {

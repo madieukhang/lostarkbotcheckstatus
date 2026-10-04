@@ -9,6 +9,7 @@
  */
 
 import { getClassEmoji, getClassName } from '../../models/Class.js';
+import { parsePositiveNumber } from '../../services/roster/parsers.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 
@@ -16,11 +17,6 @@ const FIELD_VALUE_LIMIT = 1024;
 
 function classNameFromRecord(record) {
   return record?.className || (record?.classId ? getClassName(record.classId) : '');
-}
-
-function parsePositiveNumber(value) {
-  const parsed = Number(String(value ?? '').replace(/,/g, ''));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 /**

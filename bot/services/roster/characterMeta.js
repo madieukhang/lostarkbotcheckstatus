@@ -13,6 +13,7 @@ import {
   shapeCharacterMetaFromHeader,
 } from './parsers.js';
 import { sleep } from '../../utils/async.js';
+import { parseRetryAfterMs } from '../../utils/parseRetryAfterMs.js';
 
 configureMetaCache({
   ttlMs: config.metaCacheTtlMs,
@@ -44,23 +45,6 @@ function cacheMetaResult(name, meta) {
   return meta;
 }
 
-function parseRetryAfterMs(res, fallbackMs) {
-  const raw = res.headers?.get?.('retry-after');
-  if (!raw) return fallbackMs;
-
-  const seconds = Number(raw);
-  if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.min(seconds * 1000, MAX_META_RETRY_DELAY_MS);
-  }
-
-  const retryAt = Date.parse(raw);
-  if (Number.isFinite(retryAt)) {
-    return Math.min(Math.max(0, retryAt - Date.now()), MAX_META_RETRY_DELAY_MS);
-  }
-
-  return fallbackMs;
-}
-
 function shouldRetryMetaStatus(status, options) {
   if (options.retryOnRateLimit === false) return false;
   return RETRYABLE_META_STATUSES.has(status);
@@ -87,7 +71,10 @@ async function fetchMetaResponse(url, name, phase, options = {}) {
         return res;
       }
 
-      const delayMs = parseRetryAfterMs(res, fallbackDelayMs);
+      const delayMs = parseRetryAfterMs(res.headers?.get?.('retry-after'), {
+        fallbackMs: fallbackDelayMs,
+        capMs: MAX_META_RETRY_DELAY_MS,
+      });
       options.onRetryableStatus?.({ status: res.status, phase, name, attempt, delayMs });
       if (!options.suppressRetryWarnings) {
         console.warn(

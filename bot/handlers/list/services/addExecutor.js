@@ -16,6 +16,8 @@ import {
 import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
+import { MIN_TRACKED_ITEM_LEVEL } from '../../../config/itemLevelThreshold.js';
 import {
   buildRosterCharacters,
   fetchCharacterMeta,
@@ -120,7 +122,7 @@ function buildTrustedRejection(name, trustedEntry, lang, { viaRoster = false } =
 
 async function findTrustedEntry(names) {
   return TrustedUser.findOne(buildNameRosterQuery(names))
-    .collation({ locale: 'en', strength: 2 })
+    .collation(CASE_INSENSITIVE_COLLATION)
     .lean();
 }
 
@@ -174,7 +176,7 @@ async function saveRosterSnapshotsBestEffort(rosterCharacters, name) {
 }
 
 function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang }) {
-  if (targetItemLevel === null || targetItemLevel >= 1700) return null;
+  if (targetItemLevel === null || targetItemLevel >= MIN_TRACKED_ITEM_LEVEL) return null;
   const formattedLevel = targetItemLevel.toFixed(2);
   return {
     ok: false,
@@ -186,7 +188,7 @@ function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang }) {
       fields: [
         { name: `🎯 ${t('dialogue.listAdd.itemLevel.character', lang)}`, value: `[${name}](${rosterUrl(name)})`, inline: true },
         { name: `📊 ${t('dialogue.listAdd.itemLevel.itemLevel', lang)}`, value: `\`${formattedLevel}\``, inline: true },
-        { name: `📉 ${t('dialogue.listAdd.itemLevel.minimum', lang)}`, value: '`1700.00`', inline: true },
+        { name: `📉 ${t('dialogue.listAdd.itemLevel.minimum', lang)}`, value: `\`${MIN_TRACKED_ITEM_LEVEL.toFixed(2)}\``, inline: true },
         { name: `📒 ${t('dialogue.listAdd.itemLevel.targetList', lang)}`, value: labelCap, inline: true },
         buildInlineSpacer(),
         buildInlineSpacer(),
@@ -575,7 +577,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       { ownerSeesAll: false }
     );
     const existed = await model.findOne(duplicateQuery)
-      .collation({ locale: 'en', strength: 2 })
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean();
     if (existed) {
       return buildDuplicateListAddResult({

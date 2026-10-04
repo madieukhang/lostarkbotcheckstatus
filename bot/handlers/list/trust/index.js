@@ -3,6 +3,7 @@ import { rosterUrl } from '../../../utils/rosterLink.js';
 import Blacklist from '../../../models/Blacklist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import {
   normalizeCharacterName,
@@ -47,7 +48,7 @@ function buildRemovedTrustEmbed(deleted, interaction, lang) {
 
 async function handleTrustRemoval(interaction, name, lang) {
   const deleted = await TrustedUser.findOneAndDelete(buildNameRosterQuery([name]))
-    .collation({ locale: 'en', strength: 2 });
+    .collation(CASE_INSENSITIVE_COLLATION);
   if (!deleted) {
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,
@@ -75,14 +76,14 @@ async function findRosterTrustConflict(existing, allCharacters) {
   const query = existing
     ? { $and: [buildNameRosterQuery(allCharacters), { _id: { $ne: existing._id } }] }
     : buildNameRosterQuery(allCharacters);
-  return TrustedUser.findOne(query).collation({ locale: 'en', strength: 2 });
+  return TrustedUser.findOne(query).collation(CASE_INSENSITIVE_COLLATION);
 }
 
 async function rejectBlacklistedTrust(interaction, name, allCharacters, lang) {
   const guildId = interaction.guild?.id || '';
   const entries = await Blacklist.find(
     buildBlacklistQuery(buildNameRosterQuery(allCharacters), guildId)
-  ).collation({ locale: 'en', strength: 2 }).lean();
+  ).collation(CASE_INSENSITIVE_COLLATION).lean();
   const blacklisted = pickPreferredListEntry(entries, allCharacters, {
     preferServerScope: true,
     preferredGuildId: guildId,
@@ -160,7 +161,7 @@ function buildTrustSuccessEmbed(args) {
 
 async function handleTrustAddition(interaction, name, reason, lang) {
   const existing = await TrustedUser.findOne(buildNameRosterQuery([name]))
-    .collation({ locale: 'en', strength: 2 });
+    .collation(CASE_INSENSITIVE_COLLATION);
   if (existing && normalizeNameKey(existing.name) !== normalizeNameKey(name)) {
     await replyExistingTrust(interaction, name, existing, lang);
     return;

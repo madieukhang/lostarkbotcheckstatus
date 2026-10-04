@@ -24,7 +24,6 @@ test('roster progress callback aborts scan after repeated message edit failures'
   });
 
   const progress = {
-    scannedCandidates: 5,
     attemptedCandidates: 5,
     checkedCandidates: 0,
     totalCandidates: 437,
@@ -36,10 +35,10 @@ test('roster progress callback aborts scan after repeated message edit failures'
   callback(progress);
   await new Promise((resolve) => setTimeout(resolve, 10));
   lastEditRef.value = 0;
-  callback({ ...progress, scannedCandidates: 10, attemptedCandidates: 10, failedCandidates: 10 });
+  callback({ ...progress, attemptedCandidates: 10, failedCandidates: 10 });
   await new Promise((resolve) => setTimeout(resolve, 10));
   lastEditRef.value = 0;
-  callback({ ...progress, scannedCandidates: 15, attemptedCandidates: 15, failedCandidates: 15 });
+  callback({ ...progress, attemptedCandidates: 15, failedCandidates: 15 });
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   assert.equal(cancelFlag.cancelled, true);
@@ -52,7 +51,6 @@ test('scan progress embed surfaces the latest bible failure reason', () => {
     title: 'Stronghold scan in progress - Ainslinn',
     subtitle: 'Guild **Bullet Shell**',
     progress: {
-      scannedCandidates: 20,
       attemptedCandidates: 20,
       checkedCandidates: 0,
       totalCandidates: 437,

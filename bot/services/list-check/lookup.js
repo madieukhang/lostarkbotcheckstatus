@@ -4,8 +4,8 @@ import Watchlist from '../../models/Watchlist.js';
 import Whitelist from '../../models/Whitelist.js';
 import { buildListEntryMaps, buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
 
-export const LIST_LOOKUP_COLLATION = Object.freeze({ locale: 'en', strength: 2 });
 // Summary cards use the mirrored latest report. Detail clicks reload the full entry.
 const LIST_SUMMARY_PROJECTION = { notes: 0 };
 
@@ -22,11 +22,11 @@ export async function loadListLookup(names, { guildId } = {}) {
   const nameQuery = buildNameRosterQuery(names);
   const [black, white, watch, trusted] = await Promise.all([
     Blacklist.find(buildBlacklistQuery(nameQuery, guildId), LIST_SUMMARY_PROJECTION)
-      .collation(LIST_LOOKUP_COLLATION)
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean(),
-    Whitelist.find(nameQuery, LIST_SUMMARY_PROJECTION).collation(LIST_LOOKUP_COLLATION).lean(),
-    Watchlist.find(nameQuery, LIST_SUMMARY_PROJECTION).collation(LIST_LOOKUP_COLLATION).lean(),
-    TrustedUser.find(nameQuery).collation(LIST_LOOKUP_COLLATION).lean(),
+    Whitelist.find(nameQuery, LIST_SUMMARY_PROJECTION).collation(CASE_INSENSITIVE_COLLATION).lean(),
+    Watchlist.find(nameQuery, LIST_SUMMARY_PROJECTION).collation(CASE_INSENSITIVE_COLLATION).lean(),
+    TrustedUser.find(nameQuery).collation(CASE_INSENSITIVE_COLLATION).lean(),
   ]);
   const entries = { black, white, watch, trusted };
   return { maps: buildListEntryMaps(entries, { preferredGuildId: guildId }) };

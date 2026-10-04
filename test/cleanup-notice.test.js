@@ -3,24 +3,24 @@ import assert from 'node:assert/strict';
 
 import {
   AUTO_CHECK_CLEANUP_NOTICE_TTL_MS,
-  resolveCleanupVolumeBucket,
   buildCleanupNoticeContent,
   postCleanupNotice,
 } from '../bot/services/setup/cleanupNotice.js';
+import { resolveCleanupVolume } from '../bot/services/setup/cleanupVolume.js';
 import { TRANSLATIONS } from '../bot/locales/index.js';
 
 test('volume buckets scale with how much was cleared', () => {
-  assert.equal(resolveCleanupVolumeBucket(1), 'trivial');
-  assert.equal(resolveCleanupVolumeBucket(5), 'trivial');
-  assert.equal(resolveCleanupVolumeBucket(6), 'normal');
-  assert.equal(resolveCleanupVolumeBucket(20), 'normal');
-  assert.equal(resolveCleanupVolumeBucket(21), 'heavy');
+  assert.equal(resolveCleanupVolume(1), 'trivial');
+  assert.equal(resolveCleanupVolume(5), 'trivial');
+  assert.equal(resolveCleanupVolume(6), 'normal');
+  assert.equal(resolveCleanupVolume(20), 'normal');
+  assert.equal(resolveCleanupVolume(21), 'heavy');
 });
 
 test('an empty sweep says nothing at all', () => {
   // A nightly "there was nothing to clean" is noise in a quiet channel.
-  assert.equal(resolveCleanupVolumeBucket(0), null);
-  assert.equal(resolveCleanupVolumeBucket(-3), null);
+  assert.equal(resolveCleanupVolume(0), null);
+  assert.equal(resolveCleanupVolume(-3), null);
   assert.equal(buildCleanupNoticeContent(0, 'en'), null);
 });
 

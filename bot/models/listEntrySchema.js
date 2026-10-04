@@ -5,8 +5,7 @@
  */
 
 import mongoose from 'mongoose';
-
-const CASE_INSENSITIVE_COLLATION = Object.freeze({ locale: 'en', strength: 2 });
+import { CASE_INSENSITIVE_COLLATION } from './collation.js';
 
 export function buildRosterIdentityFields() {
   return {

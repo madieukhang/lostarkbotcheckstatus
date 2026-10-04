@@ -15,8 +15,7 @@ import {
   buildNameRosterQuery,
   pickPreferredListEntry,
 } from '../../utils/listEntryMap.js';
-
-const LIST_COLLATION = Object.freeze({ locale: 'en', strength: 2 });
+import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
 
 /**
  * Project a Blacklist/Whitelist entry to the slim shape the embeds
@@ -63,7 +62,7 @@ export async function handleRosterBlackListCheck(names, options = {}) {
     const nameQuery = buildNameRosterQuery(names);
 
     const entries = await Blacklist.find(buildBlacklistQuery(nameQuery, guildId))
-      .collation(LIST_COLLATION)
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean();
     const entry = pickPreferredListEntry(entries, names, {
       preferServerScope: true,
@@ -89,7 +88,7 @@ export async function handleRosterWhiteListCheck(names) {
     await connectDB();
 
     const entry = await Whitelist.findOne(buildNameRosterQuery(names))
-      .collation(LIST_COLLATION)
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean();
 
     if (entry) {

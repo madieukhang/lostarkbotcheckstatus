@@ -1,11 +1,10 @@
 import Blacklist from '../../../models/Blacklist.js';
 import Whitelist from '../../../models/Whitelist.js';
 import Watchlist from '../../../models/Watchlist.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { pickPreferredListEntry } from '../../../utils/listEntryMap.js';
 import { buildBlacklistQuery } from '../../../utils/scope.js';
 import { COLORS } from '../../../utils/ui.js';
-
-const COLLATION = { locale: 'en', strength: 2 };
 
 // Note: watchlist uses 👁️ (not the canonical ⚠️ from getListContext) on
 // purpose - the enrich UI emphasises the "under observation" aspect of
@@ -26,9 +25,9 @@ export const MODELS_BY_TYPE = {
 export async function findEntryByName(name, guildId = '') {
   const query = { name };
   const [blackEntries, white, watch] = await Promise.all([
-    Blacklist.find(buildBlacklistQuery(query, guildId)).collation(COLLATION).lean(),
-    Whitelist.findOne(query).collation(COLLATION).lean(),
-    Watchlist.findOne(query).collation(COLLATION).lean(),
+    Blacklist.find(buildBlacklistQuery(query, guildId)).collation(CASE_INSENSITIVE_COLLATION).lean(),
+    Whitelist.findOne(query).collation(CASE_INSENSITIVE_COLLATION).lean(),
+    Watchlist.findOne(query).collation(CASE_INSENSITIVE_COLLATION).lean(),
   ]);
   const black = pickPreferredListEntry(blackEntries, [name], {
     preferServerScope: true,

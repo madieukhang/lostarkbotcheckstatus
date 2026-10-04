@@ -1,17 +1,16 @@
 import { connectDB } from '../../db.js';
+import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
 import { AlertSeverity } from '../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../utils/interactionReplies.js';
 import UserPreference from '../../models/UserPreference.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import { getClassName, resolveClassId } from '../../models/Class.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
 import {
   createNameSuggestionContext,
   fetchNameSuggestions,
 } from '../../services/roster/index.js';
-import {
-  LIST_LOOKUP_COLLATION,
-  loadListLookup,
-} from '../../services/list-check/lookup.js';
+import { loadListLookup } from '../../services/list-check/lookup.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import {
   buildNameKeyMap,
@@ -77,7 +76,7 @@ export async function handleSearchCommand(interaction) {
   let resultCount = 0;
   const raw = interaction.options.getString('name', true);
   const name = normalizeCharacterName(raw);
-  const minIlvl = interaction.options.getInteger('min_ilvl') ?? 1700;
+  const minIlvl = interaction.options.getInteger('min_ilvl') ?? MIN_TRACKED_ITEM_LEVEL;
   const maxIlvl = interaction.options.getInteger('max_ilvl') ?? null;
   const classFilter = resolveClassId(interaction.options.getString('class'));
 
@@ -143,7 +142,7 @@ export async function handleSearchCommand(interaction) {
     const [lookup, allSnapshots] = await Promise.all([
       loadListLookup(allNames, { guildId: searchGuildId }),
       RosterSnapshot.find({ name: { $in: allNames } })
-        .collation(LIST_LOOKUP_COLLATION)
+        .collation(CASE_INSENSITIVE_COLLATION)
         .lean(),
     ]);
     dbMs = Date.now() - dbStartedAt;
@@ -159,7 +158,7 @@ export async function handleSearchCommand(interaction) {
     if (viaNames.length > 0) {
       try {
         const viaSnapshots = await RosterSnapshot.find({ name: { $in: viaNames } })
-          .collation(LIST_LOOKUP_COLLATION)
+          .collation(CASE_INSENSITIVE_COLLATION)
           .lean();
         for (const snapshot of viaSnapshots) {
           snapshotMap.set(normalizeNameKey(snapshot.name), snapshot);

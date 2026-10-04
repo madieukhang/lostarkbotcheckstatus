@@ -12,7 +12,6 @@ const { t } = await import('../bot/services/i18n/index.js');
 const altResult = {
   totalEligibleInGuild: 8,
   checkedCandidates: 3,
-  scannedCandidates: 3,
   attemptedCandidates: 4,
   failedCandidates: 1,
   scannedNames: ['Memberone'],

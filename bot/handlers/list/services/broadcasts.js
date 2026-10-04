@@ -12,6 +12,7 @@ import config from '../../../config.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
 import { upsertRosterSnapshots } from '../../../services/roster/rosterSnapshots.js';
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
@@ -511,7 +512,7 @@ export function createBroadcastServices({ client }) {
     let snapshots = [];
     try {
       snapshots = await RosterSnapshot.find({ name: { $in: lookupNames } })
-        .collation({ locale: 'en', strength: 2 })
+        .collation(CASE_INSENSITIVE_COLLATION)
         .lean();
     } catch (err) {
       console.warn('[list] Snapshot lookup for broadcast failed (non-fatal):', err.message);
@@ -568,7 +569,7 @@ export function createBroadcastServices({ client }) {
     if (allBulkNames.length > 0) {
       try {
         const snaps = await RosterSnapshot.find({ name: { $in: allBulkNames } })
-          .collation({ locale: 'en', strength: 2 })
+          .collation(CASE_INSENSITIVE_COLLATION)
           .lean();
         snapshotMap = new Map(snaps.map((snapshot) => [normalizeNameKey(snapshot.name), snapshot]));
       } catch (err) {

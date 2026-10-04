@@ -11,6 +11,7 @@ import { createArtistEmbed } from '../../utils/artistVoice.js';
 
 import { connectDB } from '../../db.js';
 import config from '../../config.js';
+import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
 import UserPreference from '../../models/UserPreference.js';
 import { COLORS } from '../../utils/ui.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
@@ -66,7 +67,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
         })
       : [];
 
-    const visFilteredCount = visGuildMembers.filter((m) => m.name !== name && m.ilvl >= 1700).length;
+    const visFilteredCount = visGuildMembers.filter((m) => m.name !== name && m.ilvl >= MIN_TRACKED_ITEM_LEVEL).length;
     const visCap = deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit;
     // Single progress embed during the scan; the caller's final edit
     // replaces it with the roster card and this scan's result card.

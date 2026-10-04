@@ -21,7 +21,8 @@ import {
 } from '../../utils/names.js';
 import { createNameSuggestionContext } from '../roster/search.js';
 import { enrichListCheckResults } from './enrichment.js';
-import { LIST_LOOKUP_COLLATION, loadListLookup } from './lookup.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
+import { loadListLookup } from './lookup.js';
 import {
   buildListMatchCandidates,
   didListCheckNameChange,
@@ -47,7 +48,7 @@ export {
 async function loadInitialListData(names, guildId) {
   const [lookup, snapshots] = await Promise.all([
     loadListLookup(names, { guildId }),
-    RosterSnapshot.find({ name: { $in: names } }).collation(LIST_LOOKUP_COLLATION).lean(),
+    RosterSnapshot.find({ name: { $in: names } }).collation(CASE_INSENSITIVE_COLLATION).lean(),
   ]);
   return {
     maps: lookup.maps,
@@ -159,7 +160,7 @@ async function resolveTrustedRosterMatches(results) {
 
   const startedAt = Date.now();
   const entries = await TrustedUser.find(buildNameRosterQuery([...namesByKey.values()]))
-    .collation(LIST_LOOKUP_COLLATION)
+    .collation(CASE_INSENSITIVE_COLLATION)
     .lean();
   const elapsedMs = Date.now() - startedAt;
   if (entries.length === 0) return elapsedMs;

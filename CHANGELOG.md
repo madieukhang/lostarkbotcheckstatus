@@ -62,6 +62,9 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - Visible `/la-roster` results now check watchlist entries, including roster aliases, and show the shared warning card even when no evidence image is attached. Cards follow blacklist, watchlist, then whitelist priority; trusted status remains visible.
 - `/la-search` offers report details for blacklist, watchlist and whitelist hits without requiring an image. Details reuse the check card, reload the current entry with blacklist scope checks, and preserve the recorded primary character when the searched name is an alt.
 
+### Changed (internal)
+- One case-insensitive collation constant (`models/collation.js`) serves every list lookup and unique index, `MIN_TRACKED_ITEM_LEVEL` holds the 1700 floor, one `parseRetryAfterMs` reads Retry-After for OCR and character meta, and scan results and progress count `checkedCandidates` / `attemptedCandidates` without the old `scannedCandidates` alias. No behavior change.
+
 ### Changed
 - `/la-roster` no longer stacks a full report card above the roster for each blacklist, watchlist or whitelist hit. The roster card names each hit in one line at the top (`⚠️ **Watchlist:** **Name** · *reason*`) and keeps the severity color, and a **View evidence** button per hit opens the full report, image included, only for whoever clicks it. The click reloads the entry under the clicker's server scope, and the button keeps working after a restart. It replaces the separate 📎 evidence button.
 - Removed the evidence card's roster headline mode (`headline`, `viaName`, `attachImage: false`) and its `headlineVia` line, which only the old `/la-roster` card used.

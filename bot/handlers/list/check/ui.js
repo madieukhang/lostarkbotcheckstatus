@@ -6,6 +6,7 @@
 
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { t } from '../../../services/i18n/index.js';
+import { parsePositiveNumber } from '../../../services/roster/parsers.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { isLegacyEvidence } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
@@ -14,11 +15,6 @@ import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../u
 import { getListContext } from '../helpers.js';
 import { appendFieldLine, buildNoteCountLine } from '../notes/entryNotes.js';
 import { renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
-
-function parsePositiveNumber(value) {
-  const parsed = Number(String(value ?? '').replace(/,/g, ''));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
 
 function getSnapshotClassName(snapshot) {
   if (!snapshot) return '';

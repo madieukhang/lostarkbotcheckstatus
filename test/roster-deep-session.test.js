@@ -17,7 +17,7 @@ test('hidden and visible roster continuations project the same cumulative scan c
     altResult: {
       scannedNames: ['Memberone'],
       alts: [{ name: 'Altone' }],
-      scannedCandidates: 12,
+      checkedCandidates: 12,
       attemptedCandidates: 10,
       failedCandidates: 2,
       rateLimitRetries: 3,
@@ -48,7 +48,7 @@ test('roster continuation keeps legacy defaults and registers the projected sess
     meta: { guildName: 'Test Guild' },
     guildMembers: [],
     altResult: {
-      scannedCandidates: 7,
+      checkedCandidates: 7,
       attemptedCandidates: 0,
     },
     cap: 0,

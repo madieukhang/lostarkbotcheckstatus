@@ -7,6 +7,7 @@ import { connectDB } from '../../../db.js';
 import config from '../../../config.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import UserPreference from '../../../models/UserPreference.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import {
   extractNamesFromImage,
   checkNamesAgainstLists,
@@ -127,7 +128,7 @@ export async function loadCheckDetailStatMap(entry, {
 
   try {
     const snapshots = await RosterSnapshotModel.find({ name: { $in: names } }, LIST_VIEW_SNAPSHOT_PROJECTION)
-      .collation({ locale: 'en', strength: 2 })
+      .collation(CASE_INSENSITIVE_COLLATION)
       .lean();
     return statMapFromRosterCharacters(snapshots);
   } catch (err) {

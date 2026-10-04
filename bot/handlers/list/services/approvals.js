@@ -27,6 +27,7 @@ import { AlertSeverity, buildAlertEmbed } from '../../../utils/alertEmbed.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import UserPreference from '../../../models/UserPreference.js';
+import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { truncateInlineText } from '../../../utils/discordText.js';
@@ -321,7 +322,7 @@ export function createApprovalServices({
         // Only the class icon comes from the snapshot, so a failed read
         // must not cost the requester their notice.
         RosterSnapshotModel.findOne({ name: payload.name })
-          .collation({ locale: 'en', strength: 2 })
+          .collation(CASE_INSENSITIVE_COLLATION)
           .lean()
           .catch(() => null),
       ]);

@@ -10,6 +10,7 @@ import { EmbedBuilder } from 'discord.js';
 
 import { connectDB } from '../../db.js';
 import UserPreference from '../../models/UserPreference.js';
+import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { deferUpdate, replyAlert, replyEmbed } from '../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
@@ -58,7 +59,7 @@ function countContinuationCandidates(session) {
   );
   return (session.guildMembers || []).filter((member) => (
     member.name !== session.targetName
-    && member.ilvl >= 1700
+    && member.ilvl >= MIN_TRACKED_ITEM_LEVEL
     && !excluded.has(String(member.name).toLowerCase())
   )).length;
 }
@@ -116,16 +117,15 @@ export function mergeContinuationScanResult(session, result) {
   session.scannedNames = scannedNames;
   session.scanStats = {
     ...(session.scanStats || {}),
-    scanned: (session.scanStats?.scanned ?? 0) + (result.scannedCandidates || 0),
+    scanned: (session.scanStats?.scanned ?? 0) + (result.checkedCandidates || 0),
     attempted: (session.scanStats?.attempted ?? 0)
-      + (result.attemptedCandidates ?? result.scannedCandidates ?? 0),
+      + (result.attemptedCandidates ?? 0),
     failed: (session.scanStats?.failed ?? 0) + (result.failedCandidates || 0),
     rateLimitRetries: (session.scanStats?.rateLimitRetries ?? 0) + (result.rateLimitRetries || 0),
   };
 
   return {
     ...result,
-    scannedCandidates: session.scanStats.scanned ?? scannedNames.length,
     checkedCandidates: session.scanStats.scanned ?? scannedNames.length,
     attemptedCandidates: session.scanStats.attempted ?? scannedNames.length,
     failedCandidates: session.scanStats.failed,

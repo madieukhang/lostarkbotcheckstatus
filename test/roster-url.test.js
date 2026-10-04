@@ -367,7 +367,6 @@ test('detectAltsViaStronghold pauses early on candidate failure storms and retri
     assert.equal(result.abortLabel, 'Bible rejected candidate profiles');
     assert.equal(result.attemptedCandidates, 1);
     assert.equal(result.checkedCandidates, 0);
-    assert.equal(result.scannedCandidates, 0);
     assert.equal(result.failedCandidates, 1);
     assert.deepEqual(result.scannedNames, []);
     assert.deepEqual(result.failedNames, ['Failone']);
