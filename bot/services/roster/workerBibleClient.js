@@ -66,6 +66,7 @@ function sanitizeOptions(options = {}) {
  * @param {number} [deps.pollIntervalMs=500] - response-poll cadence
  * @param {number} [deps.defaultTimeoutMs=30000] - per-job ceiling
  * @param {number} [deps.backpressureThreshold] - max pending queue
+ * @param {number} [deps.maxPendingAdmissions=backpressureThreshold] - max local admission waiters
  * @param {Function} [deps.now=Date.now]
  * @returns {{fetch: Function}} worker-routed fetch shim
  */
@@ -75,21 +76,49 @@ export function createWorkerBibleClient({
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
   defaultTimeoutMs = DEFAULT_TIMEOUT_MS,
   backpressureThreshold = DEFAULT_BACKPRESSURE_THRESHOLD,
+  maxPendingAdmissions = backpressureThreshold,
   now = () => Date.now(),
 } = {}) {
-  let admissionTail = Promise.resolve();
+  if (!Number.isInteger(maxPendingAdmissions) || maxPendingAdmissions < 0) {
+    throw new RangeError('maxPendingAdmissions must be a non-negative integer');
+  }
+  let admissionActive = false;
+  const pendingAdmissions = [];
+
+  function dispatchAdmission() {
+    if (admissionActive || pendingAdmissions.length === 0) return;
+    const waiter = pendingAdmissions.shift();
+    waiter.detach();
+    admissionActive = true;
+    Promise.resolve().then(waiter.admit).finally(() => {
+      admissionActive = false;
+      dispatchAdmission();
+    }).then(waiter.resolve, waiter.reject);
+  }
 
   function createAdmittedJob(payload, signal, deadline, timeoutMs) {
-    const admission = admissionTail.then(async () => {
+    const timeoutError = () => new Error(
+      `Worker fetch timed out before queue admission after ${timeoutMs}ms.`,
+    );
+    const remainingMs = deadline - now();
+    signal?.throwIfAborted();
+    if (remainingMs <= 0) return Promise.reject(timeoutError());
+    if (admissionActive && pendingAdmissions.length >= maxPendingAdmissions) {
+      return Promise.reject(new Error(
+        `Scraping service overloaded: ${pendingAdmissions.length} requests waiting for queue admission ` +
+        `(>= ${maxPendingAdmissions} threshold). Try again in a minute.`,
+      ));
+    }
+
+    const admit = async () => {
       signal?.throwIfAborted();
+      if (now() >= deadline) throw timeoutError();
       const pendingCount = await ScrapeJob.countDocuments({
         status: 'pending',
         ...buildUnexpiredJobFilter(new Date(now())),
       });
       signal?.throwIfAborted();
-      if (now() >= deadline) {
-        throw new Error(`Worker fetch timed out before queue admission after ${timeoutMs}ms.`);
-      }
+      if (now() >= deadline) throw timeoutError();
       if (pendingCount >= backpressureThreshold) {
         throw new Error(
           `Scraping service overloaded: ${pendingCount} pending jobs ` +
@@ -98,12 +127,34 @@ export function createWorkerBibleClient({
         );
       }
       return ScrapeJob.create(payload);
-    });
+    };
 
     // The count and insert are one process-local admission window. MongoDB's
     // count still observes other producers, but separate bot replicas can race.
-    admissionTail = admission.catch(() => {});
-    return admission;
+    // Remove cancelled/expired waiters immediately; an active Mongo operation
+    // keeps its slot until completion so inserts remain serial and cancellable.
+    return new Promise((resolve, reject) => {
+      const waiter = {
+        admit, resolve, reject,
+        detach: () => {
+          clearTimeout(waiter.timer);
+          signal?.removeEventListener('abort', abort);
+        },
+      };
+      const remove = error => {
+        const index = pendingAdmissions.indexOf(waiter);
+        if (index < 0) return;
+        pendingAdmissions.splice(index, 1);
+        waiter.detach();
+        reject(error);
+      };
+      const abort = () => remove(signal.reason);
+      signal?.addEventListener('abort', abort, { once: true });
+      waiter.timer = setTimeout(() => remove(timeoutError()), remainingMs);
+      waiter.timer.unref?.();
+      pendingAdmissions.push(waiter);
+      dispatchAdmission();
+    });
   }
 
   async function cancelJob(jobId, error) {
