@@ -44,7 +44,7 @@ function heldAdmission(t, options = {}) {
     release();
     await Promise.allSettled(requests);
   });
-  return { fetch, firstCount, release, jobs, count: () => counts };
+  return { fetch, firstCount, release, jobs, ScrapeJob, count: () => counts };
 }
 
 test('worker admission rejects an aborted waiter while an earlier Mongo count is still blocked', async t => {
@@ -139,4 +139,43 @@ test('failed worker admission releases its slot for the next waiter', async t =>
   await assert.rejects(first, { name: 'AbortError' });
   assert.equal((await next).status, 200);
   assert.deepEqual(held.jobs.map(job => job.url), ['https://lostark.bible/next']);
+});
+
+test('worker admission rechecks the deadline after dispatch before starting another Mongo count', async t => {
+  let now = 0;
+  const held = heldAdmission(t, { defaultTimeoutMs: 25, now: () => now });
+  held.fetch('first');
+  await held.firstCount;
+  const controller = new AbortController();
+  const queued = held.fetch('expired-after-dispatch', { signal: controller.signal });
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 1);
+  held.release();
+  for (let turn = 0; turn < 50 && getEventListeners(controller.signal, 'abort').length; turn++) {
+    await Promise.resolve();
+  }
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+  assert.equal(held.count(), 1);
+  now = 25;
+  await assert.rejects(queued, /timed out before queue admission after 25ms/);
+  assert.equal(held.count(), 1);
+  assert.deepEqual(held.jobs.map(job => job.url), ['https://lostark.bible/first']);
+});
+
+test('a Mongo insert failure releases worker admission for the next queued request', async t => {
+  const held = heldAdmission(t);
+  const create = held.ScrapeJob.create;
+  const failure = new Error('Mongo insert failed');
+  let inserts = 0;
+  t.mock.method(held.ScrapeJob, 'create', payload => {
+    if (++inserts === 1) throw failure;
+    return create(payload);
+  });
+  const first = held.fetch('failed');
+  await held.firstCount;
+  const next = held.fetch('survivor');
+  held.release();
+  await assert.rejects(first, error => error === failure);
+  assert.equal((await next).status, 200);
+  assert.equal(held.count(), 2);
+  assert.deepEqual(held.jobs.map(job => job.url), ['https://lostark.bible/survivor']);
 });
