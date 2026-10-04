@@ -6,6 +6,15 @@ import { getUserOcrMode, setUserOcrMode } from '../../../services/list-check/pre
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, editAlert } from '../../../utils/interactionReplies.js';
 
+/**
+ * Whether an explicit Analysis request has no enabled model to run on.
+ * @param {string|null} mode - the mode the user asked for, or null
+ * @returns {boolean} true when the request gets the "mode unavailable" notice
+ */
+export function isAnalysisModeUnavailable(mode) {
+  return mode === 'analysis' && config.geminiAnalysisModels.length === 0;
+}
+
 /** Build the private per-user OCR mode command; omission only reads the mode. */
 export function createOcrModeCommandHandler({
   connectDBFn = connectDB,
@@ -18,7 +27,7 @@ export function createOcrModeCommandHandler({
     await connectDBFn();
     const lang = await getUserLanguageFn(interaction.user.id, { UserPreferenceModel: UserPreference });
     const requested = interaction.options.getString('mode');
-    if (requested === 'analysis' && config.geminiAnalysisModels.length === 0) {
+    if (isAnalysisModeUnavailable(requested)) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.modeUnavailable', lang),

@@ -39,6 +39,7 @@ import { buildNoteHistoryRows } from '../notes/entryNotes.js';
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 import { LIST_VIEW_SNAPSHOT_PROJECTION } from '../view/pageData.js';
 import { buildCheckEntryDetailsEmbed } from './ui.js';
+import { isAnalysisModeUnavailable } from './mode.js';
 import { getUserOcrMode } from '../../../services/list-check/preferences.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { resetSelectMenu } from '../../../utils/selectMenu.js';
@@ -221,10 +222,10 @@ export function createCheckHandlers({
     const languagePromise = getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     let lang;
 
-    // Same gate as /la-check-mode: an explicit analysis request must get the
-    // specialized "mode unavailable" notice, not a generic OCR failure after
-    // the OCR boundary throws on the empty analysis model chain.
-    if (requestedMode === 'analysis' && config.geminiAnalysisModels.length === 0) {
+    // An explicit analysis request must get the specialized "mode unavailable"
+    // notice, not a generic OCR failure after the OCR boundary throws on the
+    // empty analysis model chain.
+    if (isAnalysisModeUnavailable(requestedMode)) {
       lang = await languagePromise;
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
@@ -248,10 +249,7 @@ export function createCheckHandlers({
     } catch (err) {
       lang = await languagePromise;
       if (err?.code === OCR_QUEUE_FULL_CODE) {
-        console.warn(
-          `[listcheck] OCR queue full (depth ${err.queueDepth ?? '?'}, limit ${err.limit ?? '?'});`
-          + ' rejecting /la-check without queuing.',
-        );
+        console.warn(`[listcheck] ${err.message} Rejecting /la-check without queuing.`);
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
           ...t('dialogue.check.ocrQueueFull', lang, { limit: err.limit }),

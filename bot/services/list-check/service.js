@@ -35,7 +35,6 @@ import { hasDatabaseListMatch } from './verification.js';
 export { formatCheckResults } from './format.js';
 export {
   extractNamesFromImage,
-  OcrQueueFullError,
   OCR_QUEUE_FULL_CODE,
 } from './ocr.js';
 export {

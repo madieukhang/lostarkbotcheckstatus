@@ -8,11 +8,10 @@
  */
 
 import { createArtistEmbed } from '../../utils/artistVoice.js';
-import config from '../../config.js';
 import { connectDB } from '../../db.js';
-import { AlertSeverity } from '../../utils/alertEmbed.js';
 import { COLORS, ICONS, padInlineRow, relativeTime } from '../../utils/ui.js';
-import { deferEphemeralReply, editAlert, editEmbed } from '../../utils/interactionReplies.js';
+import { deferEphemeralReply, editEmbed } from '../../utils/interactionReplies.js';
+import { rejectNonSenior } from '../../utils/seniorGate.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
@@ -44,17 +43,8 @@ export async function handleStatsCommand(interaction, { connectDBFn = connectDB 
   await connectDBFn();
   const lang = await getUserLanguage(interaction.user?.id, { UserPreferenceModel: UserPreference });
 
-  // /la-stats exposes operator-facing numbers (ScraperAPI usage, guild
-  // counts), so it is senior-only by handler check · owner-guild
-  // registration alone is not a permission.
-  if (!config.seniorApproverIds.includes(interaction.user?.id)) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.system.seniorOnly', lang),
-      lang,
-    });
-    return;
-  }
+  // /la-stats exposes operator-facing numbers (ScraperAPI usage, guild counts).
+  if (await rejectNonSenior(interaction, lang, 'dialogue.system.seniorOnly')) return;
 
   const [blackCount, whiteCount, watchCount, guildConfigCount, recentBlackCount] = await Promise.all([
     Blacklist.countDocuments(),

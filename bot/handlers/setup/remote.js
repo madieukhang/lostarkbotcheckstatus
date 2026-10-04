@@ -17,6 +17,7 @@ import {
   replyAlert,
   updatePayload,
 } from '../../utils/interactionReplies.js';
+import { rejectNonSenior } from '../../utils/seniorGate.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
 import { handleSyncImagesAction } from './syncImages.js';
@@ -301,14 +302,7 @@ async function handleDefaultScope(interaction, guildId, guildName, scope, auditF
 export async function handleSetupRemoteCommand(interaction) {
   await deferEphemeralReply(interaction);
   const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-  if (!config.seniorApproverIds.includes(interaction.user.id)) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
-      ...t('dialogue.remote.seniorOnly', lang),
-      lang,
-    });
-    return;
-  }
+  if (await rejectNonSenior(interaction, lang, 'dialogue.remote.seniorOnly')) return;
 
   const action = interaction.options.getString('action', true);
   const targetGuildId = interaction.options.getString('guild') || '';

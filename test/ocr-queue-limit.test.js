@@ -48,7 +48,6 @@ test('requests past the OCR queue cap are rejected immediately, without queuing 
   setup(t);
   let releaseGate;
   const gate = new Promise((resolve) => { releaseGate = resolve; });
-  let gateOpen = false;
   let downloads = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     const parsed = new URL(url);
@@ -76,10 +75,8 @@ test('requests past the OCR queue cap are rejected immediately, without queuing 
   assert.equal(error.name, 'OcrQueueFullError');
   assert.equal(error.limit, 2);
   assert.equal(error.queueDepth, 2);
-  assert.equal(gateOpen, false, 'the rejection must not wait for the busy slot');
   assert.equal(downloads, 1, 'the rejected request must not download anything');
 
-  gateOpen = true;
   releaseGate();
   assert.deepEqual(
     await Promise.all([active, ...queued]),
@@ -156,7 +153,7 @@ test('/la-check answers an OCR queue-full rejection with the busy notice, not th
     user: {},
     options: {
       getAttachment: () => image('busy'),
-      getString: (name) => (name === 'mode' ? null : null),
+      getString: () => null,
     },
     deferReply: async () => {},
     editReply: async (payload) => { replays.push(payload); },

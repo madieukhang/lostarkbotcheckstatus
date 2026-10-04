@@ -47,6 +47,12 @@ const AUTO_CHECK_MAX_IMAGE_REQUESTS = 8;
 const AUTO_CHECK_MAX_COOLDOWN_RETRY_AFTER_MS = 60_000;
 const AUTO_CHECK_COOLDOWN_WAIT_BUFFER_MS = 250;
 const AUTO_CHECK_QUEUE_FULL_CODE = 'AUTO_CHECK_IMAGE_QUEUE_FULL';
+// Full queues are busy signals, not failures: the message is not remembered,
+// so the same screenshot can be sent again once the line moves.
+const BUSY_REJECTION_NOTICE_KEYS = Object.freeze({
+  [AUTO_CHECK_QUEUE_FULL_CODE]: 'dialogue.check.imageQueueFull',
+  [OCR_QUEUE_FULL_CODE]: 'dialogue.check.ocrQueueFull',
+});
 
 // Gemini OCR is intentionally serialized. A burst of two or three screenshots
 // should become visible queued work instead of concurrent requests that compete
@@ -257,6 +263,11 @@ export function createAutoCheckMessageHandler({
 
   async function removeSearchReaction(message) {
     await message.reactions.cache.get('🔍')?.users.remove(client.user.id).catch(() => {});
+  }
+
+  async function sendRequestOutcome(message, requestUi, payload) {
+    if (requestUi.progressMsg) await requestUi.progressMsg.edit(payload).catch(() => {});
+    else await message.reply(payload).catch(() => {});
   }
 
   async function rejectInvalidTextRequest(message, textRequest, lang) {
@@ -592,50 +603,27 @@ export function createAutoCheckMessageHandler({
       }
       await processAutoCheckRequest(message, request, requestUi, lang);
     } catch (err) {
-      if (err?.code === AUTO_CHECK_QUEUE_FULL_CODE) {
+      const busyNoticeKey = BUSY_REJECTION_NOTICE_KEYS[err?.code];
+      if (busyNoticeKey) {
         shouldRememberMessage = false;
-        console.warn(`[auto-check] Screenshot queue full at ${err.limit} requests; rejecting ${message.id}.`);
+        console.warn(`[auto-check] ${err.message} Rejecting ${message.id}.`);
         await removeSearchReaction(message);
         await message.react('⚠️').catch(() => {});
-        await message.reply({
+        await sendRequestOutcome(message, requestUi, {
           content: null,
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
-            ...t('dialogue.check.imageQueueFull', lang, { limit: err.limit }),
+            ...t(busyNoticeKey, lang, { limit: err.limit }),
             lang,
           })],
           components: [],
-        }).catch(() => {});
-        return;
-      }
-      if (err?.code === OCR_QUEUE_FULL_CODE) {
-        shouldRememberMessage = false;
-        console.warn(
-          `[auto-check] OCR slot queue full (depth ${err.queueDepth ?? '?'},`
-          + ` limit ${err.limit ?? '?'}); rejecting ${message.id}.`,
-        );
-        await removeSearchReaction(message);
-        await message.react('⚠️').catch(() => {});
-        const ocrQueueFullPayload = {
-          content: null,
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            ...t('dialogue.check.ocrQueueFull', lang, { limit: err.limit }),
-            lang,
-          })],
-          components: [],
-        };
-        if (requestUi.progressMsg) {
-          await requestUi.progressMsg.edit(ocrQueueFullPayload).catch(() => {});
-        } else {
-          await message.reply(ocrQueueFullPayload).catch(() => {});
-        }
+        });
         return;
       }
       console.error('[auto-check] Error processing request:', err.message);
       await removeSearchReaction(message);
       await message.react('❌').catch(() => {});
-      const errorPayload = {
+      await sendRequestOutcome(message, requestUi, {
         content: null,
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
@@ -644,12 +632,7 @@ export function createAutoCheckMessageHandler({
           lang,
         })],
         components: [],
-      };
-      if (requestUi.progressMsg) {
-        await requestUi.progressMsg.edit(errorPayload).catch(() => {});
-      } else {
-        await message.reply(errorPayload).catch(() => {});
-      }
+      });
     } finally {
       completeAutoCheckMessage(message.id, { processed: shouldRememberMessage });
     }
