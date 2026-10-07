@@ -32,8 +32,8 @@ function recordingServices(calls) {
   };
 }
 
-function modalSubmit(typedType, replies) {
-  const values = { quickadd_type: typedType, quickadd_reason: 'Left mid-raid', quickadd_raid: '' };
+function modalSubmit(typedType, replies, typedRaid = '') {
+  const values = { quickadd_type: typedType, quickadd_reason: 'Left mid-raid', quickadd_raid: typedRaid };
   return {
     customId: 'quickadd_modal:Mokoko',
     fields: { getTextInputValue: (id) => values[id] },
@@ -80,6 +80,36 @@ test('a member quick add sent for approval reads like the /la-list add card', as
   for (const expected of ['📒 List', '🗡️ Raid', '🌐 Scope', '📝 Reason']) assert.ok(names.includes(expected), `missing ${expected}`);
   assert.ok(!names.some((name) => /Requested by/.test(name)));
   assert.equal(embed.footer.text, '⏳ Waiting on an approver');
+});
+
+test('quick add rejects a custom raid label outside the watchlist, like /la-list add', async (t) => {
+  stubEnglishViewer(t);
+  const calls = [];
+  const replies = [];
+  const { handleQuickAddModal } = createQuickAddHandlers({ services: recordingServices(calls) });
+
+  await handleQuickAddModal(modalSubmit('black', replies, 'Some custom raid'));
+
+  assert.deepEqual(calls, []);
+  const embed = replies.at(-1).embeds[0].toJSON();
+  assert.equal(embed.color, COLORS.danger);
+  assert.match(embed.description, /`Some custom raid`/);
+});
+
+test('quick add stores the standard spelling of a typed raid', async (t) => {
+  stubEnglishViewer(t);
+  const raids = [];
+  const { handleQuickAddModal } = createQuickAddHandlers({ services: {
+    sendListAddApprovalToApprovers: async (_guild, payload) => {
+      raids.push(payload.raid);
+      return { success: false, reason: 'No approver available' };
+    },
+    executeListAddToDatabase: async () => assert.fail('a member add waits for an approver'),
+  } });
+
+  await handleQuickAddModal(modalSubmit('black', [], 'act4 hard'));
+
+  assert.deepEqual(raids, ['Act4 Hard']);
 });
 
 test('quick add submits a valid type after trimming and lowercasing it', async (t) => {

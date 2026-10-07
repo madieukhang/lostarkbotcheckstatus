@@ -31,6 +31,13 @@ test('tracked alts renderer preserves comma-formatted item levels', () => {
   assert.match(field.value, /`4501\.38 CP`/);
 });
 
+test('a stored alt name cannot open a second link inside its roster link', () => {
+  const field = renderTrackedAltsField({ names: ['Main', 'X](https://evil.test)'], primaryName: 'Main' });
+  const linkTargets = [...field.value.matchAll(/(?<!\\)\]\(([^)\s]*)/g)].map((match) => match[1]);
+  assert.equal(linkTargets.length, 1);
+  assert.ok(linkTargets[0].startsWith('https://lostark.bible/'));
+});
+
 test('tracked alts renderer defaults to the "🧬 Tracked alts" field label', () => {
   const field = renderTrackedAltsField({ names: ['Main', 'Altone'], primaryName: 'Main' });
   assert.equal(field.name, '🧬 Tracked alts (1)');

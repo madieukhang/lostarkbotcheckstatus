@@ -27,9 +27,15 @@ test('buildNameKeyMap indexes records with the same Unicode identity contract', 
 });
 
 test('parseAdditionalNames returns empty result for falsy input', () => {
-  assert.deepEqual(parseAdditionalNames(''), { added: [], duplicates: [] });
-  assert.deepEqual(parseAdditionalNames(null), { added: [], duplicates: [] });
-  assert.deepEqual(parseAdditionalNames(undefined), { added: [], duplicates: [] });
+  assert.deepEqual(parseAdditionalNames(''), { added: [], duplicates: [], invalid: [] });
+  assert.deepEqual(parseAdditionalNames(null), { added: [], duplicates: [], invalid: [] });
+  assert.deepEqual(parseAdditionalNames(undefined), { added: [], duplicates: [], invalid: [] });
+});
+
+test('parseAdditionalNames sets aside pieces that are not character names', () => {
+  const result = parseAdditionalNames('Goodalt, X](https://evil.test), A, Bad.name');
+  assert.deepEqual(result.added, ['Goodalt']);
+  assert.deepEqual(result.invalid, ['X](https://evil.test)', 'A', 'Bad.name']);
 });
 
 test('parseAdditionalNames splits, trims, and title-cases each name', () => {
@@ -85,9 +91,9 @@ test('parseAdditionalNames returns empty when all names are duplicates', () => {
 });
 
 test('parseAdditionalNames handles non-string input gracefully', () => {
-  assert.deepEqual(parseAdditionalNames(123), { added: [], duplicates: [] });
-  assert.deepEqual(parseAdditionalNames({}), { added: [], duplicates: [] });
-  assert.deepEqual(parseAdditionalNames([]), { added: [], duplicates: [] });
+  assert.deepEqual(parseAdditionalNames(123), { added: [], duplicates: [], invalid: [] });
+  assert.deepEqual(parseAdditionalNames({}), { added: [], duplicates: [], invalid: [] });
+  assert.deepEqual(parseAdditionalNames([]), { added: [], duplicates: [], invalid: [] });
 });
 
 test('normalizeCharacterName canonicalizes detached diaeresis marks from OCR', () => {

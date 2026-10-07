@@ -1,4 +1,5 @@
 import { getClassEmoji, isSupportClass } from '../../models/Class.js';
+import { escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { t } from '../i18n/index.js';
@@ -18,7 +19,7 @@ function linkName(name, item) {
   // snapClassName.
   const className = item?.relatedClasses?.[normalizeNameKey(trimmed)] || '';
   const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
-  return `${classPrefix}[${trimmed}](${rosterUrl(trimmed)})`;
+  return `${classPrefix}[${escapeLinkBrackets(trimmed)}](${rosterUrl(trimmed)})`;
 }
 
 const LIST_ENTRY_BRANCHES = [

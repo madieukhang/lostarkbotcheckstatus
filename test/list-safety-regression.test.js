@@ -125,6 +125,38 @@ test('owner cannot add a Trusted character through additional_names', async t =>
   assert.equal(write, undefined);
 });
 
+test('owner additional_names with a non-character name is refused before any write', async t => {
+  clearUserLanguageCache();
+  invalidateGuildConfig('edit-guild');
+  t.mock.method(mongoose, 'connect', async () => mongoose);
+  t.after(async () => { clearUserLanguageCache(); invalidateGuildConfig('edit-guild'); await disconnectDB(); });
+  const entry = {
+    _id: 'd'.repeat(24), name: 'Original', reason: 'Original report', scope: 'global',
+    addedByUserId: 'original-owner', allCharacters: ['Original'],
+  };
+  let write;
+  let reply;
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ defaultBlacklistScope: 'global' }) }));
+  t.mock.method(Blacklist, 'find', () => ({ collation: async () => [entry] }));
+  t.mock.method(Whitelist, 'findOne', () => ({ collation: async () => null }));
+  t.mock.method(Watchlist, 'findOne', () => ({ collation: async () => null }));
+  t.mock.method(TrustedUser, 'findOne', () => ({ collation() { return this; }, lean: async () => null }));
+  t.mock.method(Blacklist, 'updateOne', async (_filter, update) => { write = update; return { modifiedCount: 1 }; });
+  await createListEditCommandHandler({
+    client: {}, broadcastListChange: async () => {},
+    sendListAddApprovalToApprovers: () => assert.fail('Current owner route does not ask for approval'),
+  })({
+    user: { id: 'original-owner', username: 'Owner' }, guild: { id: 'edit-guild' },
+    options: { getString: key => ({ name: 'Original', additional_names: 'Newalt, X](https://evil.test)' })[key] || null, getAttachment: () => null },
+    deferReply: async () => {}, editReply: async payload => { reply = payload; },
+  });
+  assert.equal(write, undefined);
+  const description = reply.embeds[0].data.description;
+  assert.match(description, /evil\.test/);
+  assert.doesNotMatch(description, /(?<!\\)\]\(/);
+});
+
 for (const currentType of ['black', 'white']) {
   test(`approval rechecks newly Trusted alts before a ${currentType}-to-black edit`, async t => {
     const existing = { _id: 'd'.repeat(24), name: 'Original', allCharacters: ['Originalalt'], scope: 'server' };

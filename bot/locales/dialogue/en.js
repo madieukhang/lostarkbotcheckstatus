@@ -447,6 +447,7 @@ export default {
     command: {
       notFound: { title: 'Entry not found', description: '**{name}** is not in blacklist, whitelist, or watchlist.', footer: 'Use `/la-list view` to browse existing entries.' },
       additionalRestricted: { title: 'This option is restricted', description: 'Only officers and the entry owner can use `additional_names`.', footer: 'Ask an officer to append the alts for you.' },
+      invalidNames: { title: 'Not a character name', description: 'Every name in `additional_names` must be 2-20 letters or digits and start with a letter. These do not fit: {names}' },
       noChanges: { title: 'No changes provided', description: 'None of the optional edit fields were set.', footer: 'Set at least one of: reason / type / raid / logs / image / scope / additional_names.' },
       scopeNotApplicable: { title: 'Scope does not apply here', description: 'The `scope` option only applies to blacklist. {list} entries are always global.', footer: 'Remove `scope`, or change to `type:black` for a server-scoped entry.' },
       scopeBlockedGlobal: 'A global blacklist entry with this name already exists.', scopeBlockedServer: 'A server-scoped blacklist entry with this name already exists in this server.',

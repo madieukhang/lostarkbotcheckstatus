@@ -18,8 +18,7 @@
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",
     "jsdom": "^24.0.0",
-    "mongoose": "^9.8.1",
-    "node-fetch": "^3.3.2"
+    "mongoose": "^9.8.1"
   },
   "devDependencies": {
     "mongodb-memory-server": "^11.1.0"

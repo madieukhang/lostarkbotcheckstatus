@@ -16,6 +16,7 @@ import {
 
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
+import { resolveListAddRaidLabel } from '../../../models/Raid.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
@@ -88,27 +89,33 @@ export function createQuickAddHandlers({ services }) {
     const name = interaction.customId.split(':')[1];
     const type = interaction.fields.getTextInputValue('quickadd_type').trim().toLowerCase();
     const reason = interaction.fields.getTextInputValue('quickadd_reason').trim();
-    const raid = interaction.fields.getTextInputValue('quickadd_raid')?.trim() || '';
+    const raidInput = interaction.fields.getTextInputValue('quickadd_raid')?.trim() || '';
+    const raid = resolveListAddRaidLabel(type, raidInput);
 
     await deferEphemeralReply(interaction);
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
-    if (!['black', 'white', 'watch'].includes(type)) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.quickAdd.invalidType', lang, { type }),
-        lang,
-      });
-      return;
-    }
-
-    if (!reason) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.listAdd.command.reasonRequired', lang),
-        lang,
-      });
+    const rules = [
+      {
+        invalid: () => !['black', 'white', 'watch'].includes(type),
+        alert: () => t('dialogue.quickAdd.invalidType', lang, { type }),
+      },
+      {
+        invalid: () => !reason,
+        alert: () => t('dialogue.listAdd.command.reasonRequired', lang),
+      },
+      {
+        invalid: () => raid === null,
+        alert: () => t('dialogue.listAdd.command.invalidRaid', lang, {
+          raid: raidInput,
+          list: type === 'black' ? 'blacklist' : 'whitelist',
+        }),
+      },
+    ];
+    const violation = rules.find(({ invalid }) => invalid());
+    if (violation) {
+      await editAlert(interaction, { severity: AlertSeverity.ERROR, ...violation.alert(), lang });
       return;
     }
 

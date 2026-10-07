@@ -26,9 +26,9 @@
  *   (no modifier) → offline
  */
 
-import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
 import config from '../config.js';
+import { readBodyWithin } from '../utils/responseBody.js';
 
 // ─── Status constants ─────────────────────────────────────────────────────────
 
@@ -38,6 +38,9 @@ export const STATUS = {
   MAINTENANCE: 'maintenance',
   UNKNOWN: 'unknown',
 };
+
+// The live page is about 94 KB decompressed and sends no Content-Length.
+const STATUS_PAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 // Exact class name prefixes from the live page – kept as constants so a
 // single change here updates every selector in the file.
@@ -211,7 +214,7 @@ export async function getMultiServerStatus(serverNames) {
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
     }
 
-    html = await response.text();
+    html = (await readBodyWithin(response, STATUS_PAGE_MAX_BYTES)).toString('utf8');
   } catch (err) {
     throw new Error(`Failed to fetch server status page: ${err.message}`);
   }

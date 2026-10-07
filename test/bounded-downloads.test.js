@@ -5,6 +5,7 @@ import GuildConfig from '../bot/models/GuildConfig.js';
 import { invalidateGuildConfig } from '../bot/utils/scope.js';
 import { rehostImage } from '../bot/utils/imageRehost.js';
 import { readBodyWithin } from '../bot/utils/responseBody.js';
+import { getMultiServerStatus } from '../bot/monitor/serverStatus.js';
 import { extractNamesFromImage, clearOcrCache, clearGeminiModelCooldowns } from '../bot/services/list-check/ocr.js';
 
 const MIB = 1024 * 1024;
@@ -49,6 +50,14 @@ test('rehost stops reading an oversized body at its 24 MiB ceiling and sets a do
   );
   assert.ok(pulls.count <= 26, `pulled ${pulls.count} MiB`);
   assert.ok(signal instanceof AbortSignal);
+});
+
+test('the server status monitor stops reading an oversized status page', async t => {
+  const pulls = { count: 0 };
+  t.mock.method(globalThis, 'fetch', async () => streamedBody(pulls));
+
+  await assert.rejects(getMultiServerStatus(['Thaemine']), /larger than/);
+  assert.ok(pulls.count <= 4, `pulled ${pulls.count} MiB`);
 });
 
 test('OCR stops reading a body without Content-Length before base64 would exceed Gemini inline limit', async t => {

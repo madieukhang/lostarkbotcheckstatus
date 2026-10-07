@@ -24,6 +24,7 @@ import {
 } from '../../../utils/listEntryMap.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { escapeLinkBrackets } from '../../../utils/discordText.js';
 import {
   deferReply,
   editAlert,
@@ -120,6 +121,16 @@ async function rejectInvalidListEditInput({
       alert: () => ({
         severity: AlertSeverity.TRUSTED,
         ...t('dialogue.listEdit.command.additionalRestricted', lang),
+        lang,
+      }),
+    },
+    {
+      invalid: () => plan.additionalNamesParsed.invalid.length > 0,
+      alert: () => ({
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.listEdit.command.invalidNames', lang, {
+          names: plan.additionalNamesParsed.invalid.map(escapeLinkBrackets).join(', '),
+        }),
         lang,
       }),
     },

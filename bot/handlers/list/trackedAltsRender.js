@@ -10,6 +10,7 @@
 
 import { getClassEmoji, getClassName } from '../../models/Class.js';
 import { parsePositiveNumber } from '../../services/roster/parsers.js';
+import { escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 
@@ -44,7 +45,7 @@ export function formatRosterStatBadges(record) {
 export function formatLinkedCharacter(name, record, { bold = true } = {}) {
   const className = classNameFromRecord(record);
   const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
-  const linkedName = `[${name}](${rosterUrl(name)})`;
+  const linkedName = `[${escapeLinkBrackets(name)}](${rosterUrl(name)})`;
   return `${classPrefix}${bold ? `**${linkedName}**` : linkedName}`;
 }
 

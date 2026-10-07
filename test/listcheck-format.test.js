@@ -48,6 +48,21 @@ test('formatCheckResults renders roster-match branch context', () => {
   assert.match(lines[0], /`90000 CP`/);
 });
 
+test('formatCheckResults keeps stored alt names inside their roster links', () => {
+  const [line] = formatCheckResults([{
+    name: 'Mainchar',
+    blackEntry: {
+      name: 'Mainchar',
+      reason: 'bad',
+      scope: 'global',
+      allCharacters: ['Mainchar', 'X](https://evil.test)'],
+    },
+  }]);
+  const linkTargets = [...line.matchAll(/(?<!\\)\]\(([^)\s]*)/g)].map((match) => match[1]);
+  assert.ok(linkTargets.length > 0);
+  assert.ok(linkTargets.every((url) => url.startsWith('https://lostark.bible/')));
+});
+
 test('formatCheckResults does not add a via line for a direct list hit', () => {
   const [line] = formatCheckResults([{
     name: 'Mainchar',

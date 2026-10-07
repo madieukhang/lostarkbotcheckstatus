@@ -122,6 +122,9 @@ export function getAddedByDisplay(entry) {
  *   - `duplicates` : names already on the entry (primary or alt). The
  *                    success message surfaces these so the officer
  *                    knows which ones were no-ops.
+ *   - `invalid`    : pieces that fail isValidCharacterName. Manual alts
+ *                    skip the Bible lookup and render inside roster
+ *                    links, so /la-list edit refuses the whole edit.
  *
  * Comparison is case-insensitive (lowercase keys); the persisted form
  * uses the title-cased version returned by normalizeCharacterName.
@@ -129,10 +132,10 @@ export function getAddedByDisplay(entry) {
  * @param {string} raw
  * @param {string[]} [existing] - allCharacters already on the entry.
  * @param {string} [primaryName] - The entry's primary name field.
- * @returns {{ added: string[], duplicates: string[] }}
+ * @returns {{ added: string[], duplicates: string[], invalid: string[] }}
  */
 export function parseAdditionalNames(raw, existing = [], primaryName = '') {
-  if (!raw || typeof raw !== 'string') return { added: [], duplicates: [] };
+  if (!raw || typeof raw !== 'string') return { added: [], duplicates: [], invalid: [] };
   const existingSet = new Set(
     [...existing, primaryName]
       .map(normalizeNameKey)
@@ -141,17 +144,20 @@ export function parseAdditionalNames(raw, existing = [], primaryName = '') {
   const seen = new Set();
   const added = [];
   const duplicates = [];
+  const invalid = [];
   for (const part of raw.split(',')) {
     const normalized = normalizeCharacterName(part);
     if (!normalized) continue;
     const lower = normalizeNameKey(normalized);
     if (seen.has(lower)) continue;
     seen.add(lower);
-    if (existingSet.has(lower)) {
+    if (!isValidCharacterName(normalized)) {
+      invalid.push(normalized);
+    } else if (existingSet.has(lower)) {
       duplicates.push(normalized);
     } else {
       added.push(normalized);
     }
   }
-  return { added, duplicates };
+  return { added, duplicates, invalid };
 }
