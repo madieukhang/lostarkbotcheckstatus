@@ -99,42 +99,15 @@ export function createSystemHandlers({ checkStatus, resetState, client, connectD
         count: health.count,
       });
 
-      const fields = [];
-
-      // Stats summary badge as a single field row when the count is
-      // worth surfacing (more than one bucket non-zero). Discord renders
-      // 3 inline fields on one line which gives a quick visual grid
-      // before the per-server detail block kicks in.
-      const stats = [
-        [onlineCount, '🟢', 'online'],
-        [maintenanceCount, '🟡', 'maintenance'],
-        [offlineCount, '🔴', 'offline'],
-        [unknownCount, '❓', 'unknown'],
-      ].filter(([count]) => count > 0).map(([count, icon, key]) => ({
-        name: `${icon} ${t(`dialogue.system.status.labels.${key}`, lang)}`,
-        value: String(count),
-        inline: true,
-      }));
-      fields.push(...stats);
-
-      // Per-server status grid follows. Sorted by status priority so
-      // problem servers float to the top of the field list.
+      // The headline already carries the count, so the fields list the
+      // servers only, sorted so problem servers float to the top.
       const PRIORITY = { [STATUS.OFFLINE]: 0, [STATUS.MAINTENANCE]: 1, [STATUS.ONLINE]: 2 };
       const sortedServers = [...statusMap.entries()].sort((a, b) => {
         const pa = PRIORITY[a[1]] ?? 3;
         const pb = PRIORITY[b[1]] ?? 3;
         return pa - pb;
       });
-      // Pad the summary badges out to a whole row so the per-server grid
-      // starts on a line of its own instead of inheriting leftover
-      // columns from the counts above it.
-      //
-      // Deliberately NOT padInlineRow: that helper leaves a single row
-      // alone, which is right when the only goal is an even grid. Here
-      // the padding is structural · it forces the row break, so it has
-      // to run even when there are just two badges above.
-      while (fields.length % 3 !== 0) fields.push({ name: '​', value: '​', inline: true });
-
+      const fields = [];
       for (const [server, status] of sortedServers) {
         // The status glyph leads the label, as every other card in the
         // bot does · a bare server name was the one unlabelled field

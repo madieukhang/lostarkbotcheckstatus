@@ -79,6 +79,11 @@ test('system status uses a public deferred embed reply', async (t) => {
   assert.deepEqual(calls[0], { method: 'deferReply', args: [] });
   assert.equal(calls[1].method, 'editReply');
   assert.equal(calls[1].payload.embeds.length, 1);
+  // The headline already carries the count, so the fields list servers only.
+  assert.deepEqual(
+    calls[1].payload.embeds[0].toJSON().fields.map((field) => field.name),
+    ['🟡 Una', '🟢 Azena'],
+  );
 });
 
 test('system reset uses the shared alert edit path after public defer', async (t) => {
