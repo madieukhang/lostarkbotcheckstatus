@@ -33,7 +33,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `/la-list remove` lists every entry that matches the name, one button each, so a global entry is no longer hidden behind a server entry of the same name; server entries from another guild show that guild's id. Officers and seniors can remove legacy entries that predate ownership tracking.
 
 ### Fixed
-- `/la-list edit additional_names` refuses any name that is not a character name (2-20 letters or digits, starting with a letter) and lists the refused names. Such a name used to be saved as an alt without a roster lookup, and a name like `X](https://…)` could put its own link on list cards.
+- `/la-list edit additional_names` refuses any name that is not a character name (2-20 letters or digits, starting with a letter) and lists the refused names, shortened when very long. Such a name used to be saved as an alt without a roster lookup, and a name like `X](https://…)` could put its own link on list cards.
 - Tracked alts and the `/la-check` alt preview escape brackets in stored names, so a name already saved can no longer close its roster link early and add a link of its own.
 - Quick Add checks the raid like `/la-list add`: a standard raid typed in any case is stored with its standard spelling, and a custom label outside the watchlist is refused.
 - The server status monitor stops reading the status page after 2 MiB (the page is about 94 KB) and uses Node's built-in `fetch`; the `node-fetch` dependency is gone.

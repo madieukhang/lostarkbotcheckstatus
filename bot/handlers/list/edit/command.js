@@ -24,7 +24,7 @@ import {
 } from '../../../utils/listEntryMap.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
-import { escapeLinkBrackets } from '../../../utils/discordText.js';
+import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import {
   deferReply,
   editAlert,
@@ -45,6 +45,10 @@ import {
   shouldApplyListEditImmediately,
 } from './plan.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
+
+// additional_names accepts up to 6000 characters; escaping can double the
+// echoed part, and the alert description must stay under 4096.
+const REFUSED_NAMES_ECHO_LIMIT = 1000;
 
 function readListEditInput(interaction) {
   const newScopeRaw = interaction.options.getString('scope') || '';
@@ -129,7 +133,10 @@ async function rejectInvalidListEditInput({
       alert: () => ({
         severity: AlertSeverity.ERROR,
         ...t('dialogue.listEdit.command.invalidNames', lang, {
-          names: plan.additionalNamesParsed.invalid.map(escapeLinkBrackets).join(', '),
+          names: escapeLinkBrackets(truncateInlineText(
+            plan.additionalNamesParsed.invalid.join(', '),
+            REFUSED_NAMES_ECHO_LIMIT,
+          )),
         }),
         lang,
       }),

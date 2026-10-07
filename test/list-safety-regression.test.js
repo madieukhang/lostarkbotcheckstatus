@@ -125,7 +125,7 @@ test('owner cannot add a Trusted character through additional_names', async t =>
   assert.equal(write, undefined);
 });
 
-test('owner additional_names with a non-character name is refused before any write', async t => {
+async function runOwnerAdditionalNamesEdit(t, additionalNames) {
   clearUserLanguageCache();
   invalidateGuildConfig('edit-guild');
   t.mock.method(mongoose, 'connect', async () => mongoose);
@@ -148,13 +148,23 @@ test('owner additional_names with a non-character name is refused before any wri
     sendListAddApprovalToApprovers: () => assert.fail('Current owner route does not ask for approval'),
   })({
     user: { id: 'original-owner', username: 'Owner' }, guild: { id: 'edit-guild' },
-    options: { getString: key => ({ name: 'Original', additional_names: 'Newalt, X](https://evil.test)' })[key] || null, getAttachment: () => null },
+    options: { getString: key => ({ name: 'Original', additional_names: additionalNames })[key] || null, getAttachment: () => null },
     deferReply: async () => {}, editReply: async payload => { reply = payload; },
   });
+  return { write, description: reply.embeds[0].data.description };
+}
+
+test('owner additional_names with a non-character name is refused before any write', async t => {
+  const { write, description } = await runOwnerAdditionalNamesEdit(t, 'Newalt, X](https://evil.test)');
   assert.equal(write, undefined);
-  const description = reply.embeds[0].data.description;
   assert.match(description, /evil\.test/);
   assert.doesNotMatch(description, /(?<!\\)\]\(/);
+});
+
+test('a refused additional_names value at the 6000-character option limit still fits its alert', async t => {
+  const { write, description } = await runOwnerAdditionalNamesEdit(t, `Newalt, ${'x.'.repeat(2996)}`);
+  assert.equal(write, undefined);
+  assert.ok(description.length <= 4096, `description is ${description.length} characters`);
 });
 
 for (const currentType of ['black', 'white']) {
