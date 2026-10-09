@@ -485,3 +485,41 @@ test('fetchGuildMembers isolates policy-distinct in-flight requests', async () =
     clearGuildMembersCache();
   }
 });
+
+async function buildWithResponses(t, statusFor) {
+  clearMetaCache();
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    clearMetaCache();
+  });
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    const status = statusFor(requestedUrl);
+    return status === 200
+      ? new Response('<html><body><h1>Hidden roster</h1></body></html>', { status })
+      : new Response('', { status });
+  };
+  return buildRosterCharacters('Ainslinn', { hiddenRosterFallback: true });
+}
+
+test('buildRosterCharacters reads a 404 roster page as a missing roster, not a failed request', async (t) => {
+  const result = await buildWithResponses(t, () => 404);
+
+  assert.equal(result.hasValidRoster, false);
+  assert.equal(result.failReason, null);
+});
+
+test('buildRosterCharacters reports a failed profile read behind a hidden roster', async (t) => {
+  const result = await buildWithResponses(t, (url) => (url.endsWith('/roster') ? 200 : 403));
+
+  assert.equal(result.hasValidRoster, false);
+  assert.equal(result.failReason, 'HTTP 403');
+});
+
+test('buildRosterCharacters reads a 404 profile behind a hidden roster as a missing character', async (t) => {
+  const result = await buildWithResponses(t, (url) => (url.endsWith('/roster') ? 200 : 404));
+
+  assert.equal(result.hasValidRoster, false);
+  assert.equal(result.failReason, null);
+});

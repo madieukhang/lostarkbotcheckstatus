@@ -53,7 +53,7 @@ export async function sendListEditApprovalRequest({
   const existingObj = existing.toObject?.() || existing;
 
   // Image fields for the approval payload: prefer rehosted refs over URL.
-  // The newImageRehost was already attempted at the top of the handler.
+  // The command handler attempts newImageRehost once the edit passes its checks.
   const editImageFields = newImageUrl
     ? (newImageRehost
         ? { imageUrl: newImageRehost.freshUrl || '', imageMessageId: newImageRehost.messageId, imageChannelId: newImageRehost.channelId }

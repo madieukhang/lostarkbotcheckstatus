@@ -21,6 +21,23 @@ import { parseCharacterMetaFromHtml, parseItemLevelValue, parseRosterCharactersF
 
 const virtualConsole = createRosterVirtualConsole();
 
+// Bible answers 404 for a name it does not know, so that status means no
+// roster rather than a failed request.
+const FAILED_BIBLE_STATUS_REASONS = Object.freeze({
+  404: null,
+  429: 'Rate limited - try again later',
+});
+
+function describeFailedBibleStatus(status) {
+  return Object.hasOwn(FAILED_BIBLE_STATUS_REASONS, status)
+    ? FAILED_BIBLE_STATUS_REASONS[status]
+    : `HTTP ${status}`;
+}
+
+function describeFetchError(err) {
+  return err?.name === 'TimeoutError' ? 'timeout' : err?.message || String(err);
+}
+
 export function stampRosterWorld(characters, world) {
   const normalizedWorld = String(world || '').trim();
   return normalizedWorld
@@ -72,7 +89,7 @@ export async function buildRosterCharacters(name, options = {}) {
     const response = await bibleClient.fetch(targetUrl, fetchOptions);
 
     if (!response.ok) {
-      failReason = response.status === 429 ? 'Rate limited - try again later' : `HTTP ${response.status}`;
+      failReason = describeFailedBibleStatus(response.status);
     } else {
       const html = await response.text();
       const { document } = new JSDOM(html, { virtualConsole }).window;
@@ -111,7 +128,18 @@ export async function buildRosterCharacters(name, options = {}) {
         // bible) collapse to one.
         allCharacters = [...new Set(rosterChars.map((c) => c.name))];
       } else if (hiddenRosterFallback) {
-        const meta = await fetchCharacterMeta(name, options);
+        // fetchCharacterMeta returns null both for an unknown name and for a
+        // failed read; its per-request results tell the two apart.
+        let metaFailure = null;
+        const meta = await fetchCharacterMeta(name, {
+          ...options,
+          onMetaFetchResult: (result) => {
+            options.onMetaFetchResult?.(result);
+            if (result.error) metaFailure = describeFetchError(result.error);
+            else metaFailure = result.ok ? null : describeFailedBibleStatus(result.status);
+          },
+        });
+        if (!meta) failReason = metaFailure;
         if (meta) {
           hasValidRoster = true;
           rosterVisibility = 'hidden';
@@ -144,7 +172,7 @@ export async function buildRosterCharacters(name, options = {}) {
       }
     }
   } catch (err) {
-    failReason = err.name === 'TimeoutError' ? 'timeout' : err.message;
+    failReason = describeFetchError(err);
     console.warn('[list] Failed to fetch roster characters:', err.message);
   }
 

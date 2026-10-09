@@ -190,7 +190,7 @@ export async function buildUnusableRosterResult(name, roster, lang, {
 } = {}) {
   if (roster.hasValidRoster) return null;
   // failReason marks a request that broke (403, 429, 5xx, timeout); a name
-  // with no character comes back as an empty roster instead.
+  // Bible does not know (404 or an empty roster) carries none.
   if (roster.failReason) return buildBibleUnavailableResult(lang);
   const suggestions = await fetchSuggestions(name) || [];
   return buildMissingRosterResult(name, suggestions, lang);

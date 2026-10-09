@@ -442,7 +442,7 @@ export default {
     },
   },
   roster: {
-    deepRestricted: { title: 'Officer 限定ですの', description: '`/la-roster deep:true` は residential worker を使う長い Stronghold scan です。Officer / senior のみ利用可能で、通常 roster は `deep:true` なしでご覧くださいませ。' }, title: '{name} の roster · {count} {word}', characterOne: 'character', characterMany: 'characters', server: 'Server', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`', trusted: '**{name}** は trusted user ですの。', fetchFailed: { title: 'Roster を取得できませんでしたの', description: 'lostark.bible から roster を取得できませんでしたわ。' }, hiddenTitle: 'Hidden roster · {name}', hiddenLine: { variants: [
+    deepRestricted: { title: 'Officer 限定ですの', description: '`/la-roster deep:true` は residential worker を使う長い Stronghold scan です。Officer / senior のみ利用可能で、通常 roster は `deep:true` なしでご覧くださいませ。' }, title: '{name} の roster · {count} {word}', characterOne: 'character', characterMany: 'characters', server: 'Server', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`', trusted: '**{name}** は trusted user ですの。', fetchFailed: { title: 'Roster を取得できませんでしたの', description: 'lostark.bible から roster を取得できませんでしたわ。' }, listCheckFailed: { title: 'List の照合に失敗しましたの', description: 'roster は取得できましたが、list と照合できませんでしたわ。もう一度お試しくださいませ。' }, hiddenTitle: 'Hidden roster · {name}', hiddenLine: { variants: [
       'この roster は非公開ですので、character を一人も読めませんの。でも guild は開いていますから、そちらから探りましたわ。',
       'roster を隠していらっしゃるので character は見えませんの。幸い guild は公開でしたから、これだけ拾えましたわ。',
       'roster が閉じていて character が見えませんの。guild 側から分かったのはこれで全部ですわ。',

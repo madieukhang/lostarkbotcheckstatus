@@ -467,7 +467,7 @@ export default {
     },
   },
   roster: {
-    deepRestricted: { title: 'Chỉ officer mới dùng được', description: '`/la-roster deep:true` chạy Stronghold scan dài qua residential worker. Officer và senior có thể dùng; bỏ `deep:true` để xem roster cơ bản.' }, title: 'Roster của {name} · {count} {word}', characterOne: 'character', characterMany: 'character', server: 'Server', topCharacter: 'Character cao nhất: {class} **{name}** · `{ilvl}`', trusted: '**{name}** là trusted user.', fetchFailed: { title: 'Tải roster thất bại', description: 'Tớ chưa tải được roster từ lostark.bible.' }, hiddenTitle: 'Roster ẩn · {name}', hiddenLine: { variants: [
+    deepRestricted: { title: 'Chỉ officer mới dùng được', description: '`/la-roster deep:true` chạy Stronghold scan dài qua residential worker. Officer và senior có thể dùng; bỏ `deep:true` để xem roster cơ bản.' }, title: 'Roster của {name} · {count} {word}', characterOne: 'character', characterMany: 'character', server: 'Server', topCharacter: 'Character cao nhất: {class} **{name}** · `{ilvl}`', trusted: '**{name}** là trusted user.', fetchFailed: { title: 'Tải roster thất bại', description: 'Tớ chưa tải được roster từ lostark.bible.' }, listCheckFailed: { title: 'Kiểm tra list thất bại', description: 'Tớ tải được roster rồi nhưng chưa đối chiếu được với các list. Cậu thử lại nhé.' }, hiddenTitle: 'Roster ẩn · {name}', hiddenLine: { variants: [
       'Roster này khoá rồi, tớ không đọc được character nào cả. Nhưng guild thì vẫn mở, nên tớ soi từ đó ra.',
       'Người này giấu roster nên tớ chịu, không thấy character nào. Được cái guild còn công khai, tớ moi được chừng này.',
       'Roster đóng, tớ nhìn không ra character. Đây là tất cả những gì còn moi được từ phía guild.',

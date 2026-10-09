@@ -90,7 +90,6 @@ export function buildApprovalMoveData(payload, existingEntry) {
 async function rejectBlockedTypeChange({
   interaction,
   payload,
-  requestId,
   existingEntry,
   newModel,
   lang,
@@ -281,7 +280,6 @@ async function finishApprovedEdit({
  * @param {import('discord.js').Interaction} args.interaction - the
  *   approver's acknowledged button interaction
  * @param {object} args.payload - saved edit fields and source entry identity
- * @param {string} args.requestId - PendingApproval request identifier
  * @param {Function} args.syncApproverDmMessages - approver DM sync
  * @param {Function} args.broadcastListChange - guild broadcast
  * @param {Function} args.notifyRequesterAboutDecision - requester DM
@@ -292,7 +290,6 @@ async function finishApprovedEdit({
 export async function handleApprovedEditRequest({
   interaction,
   payload,
-  requestId,
   syncApproverDmMessages,
   broadcastListChange,
   notifyRequesterAboutDecision,
@@ -323,7 +320,7 @@ export async function handleApprovedEditRequest({
     return;
   }
 
-  const args = { interaction, payload, requestId, existingEntry, oldModel, newModel, lang, completeApproval, beforeWrite };
+  const args = { interaction, payload, existingEntry, oldModel, newModel, lang, completeApproval, beforeWrite };
   const isTypeChange = payload.currentType && payload.currentType !== payload.type;
   const isScopeChange = payload.type === 'black' && payload.scope
     && payload.scope !== (existingEntry.scope || 'global');

@@ -444,7 +444,12 @@ function filterAndDeduplicateNames(parsed, normalizeName = normalizeOcrCharacter
     if (typeof item !== 'string') continue;
     const name = normalizeName(item);
     const key = normalizeNameKey(name);
-    if (!isValidCharacterName(name) || SERVER_NAMES.has(key) || seen.has(key)) continue;
+    if (SERVER_NAMES.has(key)) {
+      // Logged because a real character named like a server is dropped here too.
+      console.log(`[listcheck] OCR dropped server name "${name}"`);
+      continue;
+    }
+    if (!isValidCharacterName(name) || seen.has(key)) continue;
     seen.add(key);
     unique.push(name);
   }

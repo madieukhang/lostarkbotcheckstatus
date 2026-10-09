@@ -78,7 +78,6 @@ export function createListAddApprovalButtonHandler({
         await handleApprovedEditRequest({
           interaction,
           payload,
-          requestId,
           syncApproverDmMessages,
           broadcastListChange,
           notifyRequesterAboutDecision,

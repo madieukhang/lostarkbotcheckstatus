@@ -125,7 +125,10 @@ test('/la-roster refreshes snapshots even when a parallel list read fails', asyn
   await handleRosterCommand(interaction);
   await turn();
   assert.ok(events.includes('snapshot-write'));
-  assert.ok(interaction.edits[0].embeds[0].toJSON().fields[0].value.includes('list unavailable'));
+  const card = interaction.edits[0].embeds[0].toJSON();
+  assert.ok(card.fields[0].value.includes('list unavailable'));
+  // The roster arrived, so the warning names the list lookup, not lostark.bible.
+  assert.equal(card.description, t('dialogue.roster.listCheckFailed', 'en').description);
 });
 
 test('/la-roster reports early Bible failures in the resolved user language', async context => {

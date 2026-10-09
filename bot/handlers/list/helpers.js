@@ -45,7 +45,7 @@ export function getListContext(type) {
 }
 
 export function listTypeIcon(type) {
-  return (LIST_CONTEXTS[type] || LIST_CONTEXTS.watch).icon;
+  return (Object.hasOwn(LIST_CONTEXTS, type) ? LIST_CONTEXTS[type] : LIST_CONTEXTS.watch).icon;
 }
 
 /**

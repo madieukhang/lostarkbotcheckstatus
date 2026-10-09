@@ -35,7 +35,9 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `/la-list remove` lists every entry that matches the name, one button each, so a global entry is no longer hidden behind a server entry of the same name; server entries from another guild show that guild's id. Officers and seniors can remove legacy entries that predate ownership tracking.
 
 ### Fixed
-- `/la-list edit image:` refuses a file Discord reports as something other than an image, as `/la-list add` does, and rehosts the image only after the edit passes its checks, so a refused edit leaves no copy in the evidence channel.
+- `/la-list add` and the trusted roster backfill read a lostark.bible 404 as "no roster" again, and a failed profile read behind a hidden roster as Bible being unavailable instead of "no roster".
+- `/la-roster` says the list check failed, not that lostark.bible failed, when a list lookup errors after the roster loaded.
+- `/la-list edit image:` refuses a file Discord reports as something other than an image, as `/la-list add` does, and rehosts the image only after the edit passes its checks, so an edit its checks refuse leaves no copy in the evidence channel.
 - `/la-check` detail cards escape brackets in the entry name, as the tracked alts list does, so a stored name cannot close its roster link early.
 - A `/la-list remove` picker left unanswered for 30 seconds says it expired and drops its buttons, instead of "Removal failed" with a raw error and buttons that no longer work.
 - `/la-roster deep` no longer DMs "scan finished" after a first pass that stopped at the candidate limit with a **Continue** button.
@@ -85,6 +87,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `/la-search` offers report details for blacklist, watchlist and whitelist hits without requiring an image. Details reuse the check card, reload the current entry with blacklist scope checks, and preserve the recorded primary character when the searched name is an alt.
 
 ### Changed (internal)
+- Screenshot OCR logs a name it drops for matching a server name; the filter stays, since Gemini can read the server label in a small room as a player. `handleApprovedEditRequest` no longer takes the unused `requestId`.
 - `handleApprovedEditRequest` takes `completeApproval` and `beforeWrite` from every caller instead of test-only defaults, the bulk approval color and `listTypeIcon` use lookups instead of `if` chains, and em-dashes are gone from the README and a utility comment. No behavior change.
 - One case-insensitive collation constant (`models/collation.js`) serves every list lookup and unique index, `MIN_TRACKED_ITEM_LEVEL` holds the 1700 floor, one `parseRetryAfterMs` reads Retry-After for OCR and character meta, and scan results and progress count `checkedCandidates` / `attemptedCandidates` without the old `scannedCandidates` alias. No behavior change.
 - `/la-stats`, `/la-reset` and `/la-remote` share one senior check (`utils/seniorGate.js`), auto-check answers both full-queue rejections through one notice table, and `/la-check` and `/la-check-mode` share the Analysis availability check. No behavior change.

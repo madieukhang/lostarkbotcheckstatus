@@ -259,7 +259,10 @@ async function handleVisibleRosterResult({ interaction, replyEditor, name, deep,
   });
   const [previousSnapshots, matches] = await Promise.all([
     previousSnapshotsPromise,
-    loadVisibleRosterMatches(characters, interaction.guild?.id),
+    loadVisibleRosterMatches(characters, interaction.guild?.id).catch((err) => {
+      err.rosterStage = 'list-check';
+      throw err;
+    }),
   ]);
   const presentation = buildVisibleRosterPresentation({
     characters,
@@ -287,6 +290,12 @@ async function handleVisibleRosterResult({ interaction, replyEditor, name, deep,
   });
   notifyVisibleDeepCompletion({ interaction, replyEditor, visibleDeep, name, lang });
 }
+
+// Alert copy by the stage tagged on a failure; an untagged failure happened
+// while fetching the roster from lostark.bible.
+const ROSTER_FAILURE_ALERT_KEYS = Object.freeze({
+  'list-check': 'dialogue.roster.listCheckFailed',
+});
 
 /**
  * Handle the /la-roster slash command.
@@ -368,7 +377,7 @@ export async function handleRosterCommand(interaction) {
     await replyEditor.edit({
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
-        ...t('dialogue.roster.fetchFailed', lang),
+        ...t(ROSTER_FAILURE_ALERT_KEYS[err?.rosterStage] || 'dialogue.roster.fetchFailed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
         lang,
       })],

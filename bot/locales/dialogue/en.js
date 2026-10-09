@@ -625,6 +625,7 @@ export default {
     title: '{name} roster · {count} {word}', characterOne: 'character', characterMany: 'characters', server: 'Server', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`',
     trusted: '**{name}** is trusted.',
     fetchFailed: { title: 'Roster fetch failed', description: 'I could not fetch the roster from lostark.bible.' },
+    listCheckFailed: { title: 'List check failed', description: 'I fetched the roster but could not check it against the lists. Please try again.' },
     hiddenTitle: 'Hidden roster · {name}', hiddenLine: { variants: [
       'This roster is locked, so I cannot read a single character off it. The guild is still open though, so I worked from there.',
       'They hid the roster, so no characters for me. The guild page is public at least, and this is what it gave up.',
