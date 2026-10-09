@@ -751,8 +751,22 @@ async function handleSetupRepin(interaction, lang) {
   );
 }
 
-async function handleSetupLanguage(interaction) {
+async function handleSetupLanguage(interaction, lang) {
   const requested = interaction.options.getString('language', true);
+  // The option is autocomplete-only, so Discord accepts any typed text, and
+  // setGuildLanguage would store an unknown code as the default language.
+  const supported = getSupportedLanguages();
+  if (!supported.some((entry) => entry.code === requested.toLowerCase())) {
+    await editAlert(interaction, {
+      severity: AlertSeverity.WARNING,
+      ...t('dialogue.setup.unknownLanguage', lang, {
+        language: requested,
+        choices: supported.map((entry) => `\`${entry.code}\``).join(', '),
+      }),
+      lang,
+    });
+    return;
+  }
   await connectDB();
 
   const language = await setGuildLanguage(interaction.guild.id, requested, {
@@ -860,7 +874,7 @@ export const SETUP_ACTION_HANDLERS = {
   'show': (interaction, lang) => handleSetupView(interaction, lang),
   'set-auto-channel': (interaction, lang) => handleSetupAutoChannel(interaction, lang),
   'set-notify-channel': (interaction, lang) => handleSetupNotifyChannel(interaction, lang),
-  'set-language': (interaction) => handleSetupLanguage(interaction),
+  'set-language': (interaction, lang) => handleSetupLanguage(interaction, lang),
   'set-default-scope': (interaction, lang) => handleSetupDefaultScope(interaction, lang),
   'cleanup-on': (interaction, lang) => handleSetupCleanup(interaction, lang, true),
   'cleanup-off': (interaction, lang) => handleSetupCleanup(interaction, lang, false),
@@ -897,7 +911,7 @@ export async function handleSetupCommand(interaction) {
 
   // The action option is autocomplete-only, so Discord accepts any typed text.
   const action = interaction.options.getString('action', true);
-  const handler = SETUP_ACTION_HANDLERS[action];
+  const handler = Object.hasOwn(SETUP_ACTION_HANDLERS, action) ? SETUP_ACTION_HANDLERS[action] : null;
   if (!handler) {
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,

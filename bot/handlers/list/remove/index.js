@@ -12,6 +12,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
+  DiscordjsErrorCodes,
 } from 'discord.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
@@ -402,13 +403,23 @@ export function createRemoveHandlers({ services }) {
         components: [],
       });
     } catch (err) {
+      // The picker's collector rejects this way when it ends without a click
+      // (the 30 s limit, or the message was deleted); nothing was removed.
+      if (err?.code === DiscordjsErrorCodes.InteractionCollectorError) {
+        await editAlert(interaction, {
+          severity: AlertSeverity.INFO,
+          ...t('dialogue.remove.pickerExpired', lang),
+          lang,
+        }, { components: [] });
+        return;
+      }
       console.error('[list] ❌ Remove failed:', err.message);
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.remove.failed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
         lang,
-      });
+      }, { components: [] });
     }
   }
 

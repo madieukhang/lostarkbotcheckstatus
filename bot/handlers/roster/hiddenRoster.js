@@ -225,9 +225,9 @@ function buildHiddenReply({ interaction, name, meta, guildMembers, deepOptions, 
   const components = [];
   if (errorEmbed) {
     embeds.push(errorEmbed);
-    return { embeds, components };
+    return { embeds, components, resumable: false };
   }
-  if (!altResult) return { embeds, components };
+  if (!altResult) return { embeds, components, resumable: false };
 
   const result = buildRosterDeepScanResult({
     callerId: interaction.user.id,
@@ -241,11 +241,11 @@ function buildHiddenReply({ interaction, name, meta, guildMembers, deepOptions, 
     lang,
   });
   embeds.push(result.embed);
-  return { embeds, components: result.components };
+  return { embeds, components: result.components, resumable: result.resumable };
 }
 
-function notifyHiddenScanCompletion({ interaction, replyEditor, name, meta, altResult, lang }) {
-  const outcome = resolveRosterScanOutcome(altResult);
+function notifyHiddenScanCompletion({ interaction, replyEditor, name, meta, altResult, resumable, lang }) {
+  const outcome = resolveRosterScanOutcome(altResult, { hasRemaining: resumable });
   if (!outcome) return;
   sendScanCompletionDm({
     user: interaction.user,
@@ -354,7 +354,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
     lang,
     statMap: hitStatMap,
   });
-  const payload = buildHiddenReply({
+  const { resumable, ...payload } = buildHiddenReply({
     interaction,
     name,
     meta,
@@ -372,6 +372,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
     name,
     meta,
     altResult: scan.result,
+    resumable,
     lang,
   });
 }

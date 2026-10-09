@@ -15,15 +15,20 @@ const { default: UserPreference } = await import('../bot/models/UserPreference.j
 const { default: RosterSnapshot } = await import('../bot/models/RosterSnapshot.js');
 const { createRemoveHandlers } = await import('../bot/handlers/list/remove/index.js');
 
-function createRemoveInteraction({ userId = 'user-1', name = 'Mainchar', pickCustomId = null } = {}) {
+function createRemoveInteraction({
+  userId = 'user-1',
+  name = 'Mainchar',
+  pickCustomId = null,
+  awaitMessageComponent = null,
+} = {}) {
   const replies = [];
   const updates = [];
   const reply = {
-    awaitMessageComponent: async () => ({
+    awaitMessageComponent: awaitMessageComponent ?? (async () => ({
       customId: pickCustomId,
       user: { id: userId },
       update: async (payload) => { updates.push(payload); },
-    }),
+    })),
   };
   return {
     replies,
@@ -159,4 +164,33 @@ test('a single owned entry still removes directly without a picker', async (t) =
   assert.deepEqual(deletes, [{ _id: serverEntry._id }]);
   assert.equal(replies.length, 1);
   assert.equal(replies[0].components, undefined);
+});
+
+test('a picker left unanswered expires quietly and drops its buttons', async (t) => {
+  const { DiscordjsError, DiscordjsErrorCodes } = await import('discord.js');
+  const serverEntry = {
+    _id: 'b'.repeat(24), name: 'Mainchar', reason: 'Server report',
+    scope: 'server', guildId: 'guild-1', addedByUserId: 'owner-a', addedByTag: 'OwnerA',
+  };
+  const globalEntry = {
+    _id: 'c'.repeat(24), name: 'Mainchar', reason: 'Global report',
+    scope: 'global', addedByUserId: 'owner-a', addedByTag: 'OwnerA',
+  };
+  mockListModels(t, { blackEntries: [serverEntry, globalEntry] });
+  const { deletes, handlers } = trackRemovals(t);
+
+  const { replies, interaction } = createRemoveInteraction({
+    userId: 'owner-a',
+    awaitMessageComponent: async () => {
+      throw new DiscordjsError(DiscordjsErrorCodes.InteractionCollectorError, 'time');
+    },
+  });
+  await handlers.handleListRemoveCommand(interaction);
+
+  assert.deepEqual(deletes, []);
+  assert.equal(replies.length, 2);
+  const notice = replies[1];
+  assert.match(notice.embeds[0].toJSON().title, /expired/i);
+  assert.equal(notice.embeds[0].toJSON().fields, undefined, 'no raw error field');
+  assert.deepEqual(notice.components, []);
 });

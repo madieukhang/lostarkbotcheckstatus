@@ -32,6 +32,7 @@ for (const lang of ['vi', 'en', 'jp']) {
       assert.match(customId, /^roster-deep:continue:/);
       const sessionId = customId.slice('roster-deep:continue:'.length);
       try {
+        assert.equal(output.resumable, true, 'a partial pass with a Continue session is not finished');
         const card = output.embed.toJSON();
         const kindLabel = t(`dialogue.scan.result.kinds.${isHidden ? 'hidden' : 'deep'}`, lang);
         assert.ok(card.title.includes(`${kindLabel} · Targetname`), card.title);
@@ -65,6 +66,7 @@ test('visible results keep the no-guild copy and suppress Continue without membe
       primaryEmbed: { toJSON: () => assert.fail('a non-resumable scan must not capture a session') },
     });
     assert.deepEqual(output.components, []);
+    assert.equal(output.resumable, false);
     const summary = meta?.guildName
       ? t('dialogue.enrich.summary', 'en', { guild: meta.guildName, name: 'Targetname', resumed: '' })
       : t('dialogue.enrich.noGuild.description', 'en', { name: 'Targetname' });
@@ -77,8 +79,12 @@ test('empty and complete scans never capture a continuation snapshot', () => {
     name: 'Targetname', isHidden: false, meta: { guildName: 'Test Guild' }, lang: 'en',
     primaryEmbed: { toJSON: () => assert.fail('no remaining candidates means no session') },
   };
-  assert.deepEqual(buildRosterDeepScanResult({ ...options, altResult: null }), { embed: null, components: [] });
+  assert.deepEqual(
+    buildRosterDeepScanResult({ ...options, altResult: null }),
+    { embed: null, components: [], resumable: false }
+  );
   const completed = buildRosterDeepScanResult({ ...options, altResult: { ...altResult, checkedCandidates: 8 } });
   assert.ok(completed.embed);
   assert.deepEqual(completed.components, []);
+  assert.equal(completed.resumable, false);
 });

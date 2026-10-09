@@ -34,6 +34,10 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `/la-list remove` lists every entry that matches the name, one button each, so a global entry is no longer hidden behind a server entry of the same name; server entries from another guild show that guild's id. Officers and seniors can remove legacy entries that predate ownership tracking.
 
 ### Fixed
+- A `/la-list remove` picker left unanswered for 30 seconds says it expired and drops its buttons, instead of "Removal failed" with a raw error and buttons that no longer work.
+- `/la-roster deep` no longer DMs "scan finished" after a first pass that stopped at the candidate limit with a **Continue** button.
+- `/la-setup` answers action text such as `constructor` as an unknown action instead of never replying, and `action:set-language` refuses a language it does not support instead of saving English with a success reply.
+- A typed name keeps a grave accent next to an `i` (`Nhìu` used to become `Nhü`); only names read from a screenshot get the lobby-font `ü` repair.
 - `/la-roster` shows the fetch-failed warning when the blacklist or whitelist lookup errors, instead of a card that reads as "not listed".
 - `/la-list add` says lostark.bible did not answer when the roster request fails (403, 429, timeout), instead of "no roster found" with name suggestions.
 - The boot backfill of trusted entries skips an entry when lostark.bible fails, so a later boot retries it, instead of saving it for good as a primary-only link.

@@ -43,6 +43,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
   // Returned to the caller, which sends the completion DM from them.
   let visibleDeepResult = null;
   let visibleDeepMeta = null;
+  let visibleDeepResumable = false;
   // Components added by the deep-scan path (Continue button when
   // remaining > 0). Empty when deep was off or fully scanned.
   const deepScanComponents = [];
@@ -125,6 +126,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
     });
     deepScanResultEmbed = rendered.embed;
     deepScanComponents.push(...rendered.components);
+    visibleDeepResumable = rendered.resumable;
   } catch (err) {
     deepScanResultEmbed = createArtistEmbed()
       .setTitle(`❌ ${t('dialogue.scan.failed.title', lang, { name })}`)
@@ -138,5 +140,6 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
     components: deepScanComponents,
     result: visibleDeepResult,
     meta: visibleDeepMeta,
+    resumable: visibleDeepResumable,
   };
 }

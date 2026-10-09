@@ -6,6 +6,7 @@ import {
   normalizeCharacterName,
   normalizeNameKey,
   normalizeNameList,
+  normalizeOcrCharacterName,
   parseAdditionalNames,
 } from '../bot/utils/names.js';
 
@@ -102,12 +103,22 @@ test('normalizeCharacterName canonicalizes detached diaeresis marks from OCR', (
   assert.equal(normalizeCharacterName('zoe \u0308'), 'Zoë');
 });
 
-test('normalizeCharacterName repairs Lost Ark umlaut OCR split artifacts', () => {
-  assert.equal(normalizeCharacterName('b\u00E1nhcanhci\u00F9a'), 'B\u00E1nhcanhc\u00FCa');
-  assert.equal(normalizeCharacterName('B\u00E1nhcanhci\u00F9a'), 'B\u00E1nhcanhc\u00FCa');
-  assert.equal(normalizeCharacterName('b\u00E1nhcanhc\u00ECua'), 'B\u00E1nhcanhc\u00FCa');
+test('normalizeOcrCharacterName repairs Lost Ark umlaut OCR split artifacts', () => {
+  assert.equal(normalizeOcrCharacterName('b\u00E1nhcanhci\u00F9a'), 'B\u00E1nhcanhc\u00FCa');
+  assert.equal(normalizeOcrCharacterName('B\u00E1nhcanhci\u00F9a'), 'B\u00E1nhcanhc\u00FCa');
+  assert.equal(normalizeOcrCharacterName('b\u00E1nhcanhc\u00ECua'), 'B\u00E1nhcanhc\u00FCa');
+  assert.equal(normalizeOcrCharacterName('hailiu\u0300a'), 'Hail\u00FCa');
+});
+
+test('normalizeCharacterName repairs the observed full-name stem on any source', () => {
   assert.equal(normalizeCharacterName('b\u00E1nhcanhc\u00F9a'), 'B\u00E1nhcanhc\u00FCa');
   assert.equal(normalizeCharacterName('b\u00E1nhcanh\u00F9a'), 'B\u00E1nhcanhc\u00FCa');
+});
+
+test('normalizeCharacterName keeps a typed grave accent beside an i', () => {
+  assert.equal(normalizeCharacterName('Nh\u00ECu'), 'Nh\u00ECu');
+  assert.equal(normalizeCharacterName('D\u00ECuxinh'), 'D\u00ECuxinh');
+  assert.equal(normalizeCharacterName('Li\u00F9na'), 'Li\u00F9na');
 });
 
 test('normalizeCharacterName removes OCR-inserted spaces inside character names', () => {

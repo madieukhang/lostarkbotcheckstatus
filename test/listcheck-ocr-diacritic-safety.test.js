@@ -147,3 +147,12 @@ test('unusable Bible search leaves the visual OCR spelling untouched', async () 
   assert.deepEqual(result, ['Zoë']);
   assert.equal(counters.gemini, 1);
 });
+
+test('a lobby-font umlaut split in the OCR read comes back as the umlaut', async () => {
+  const { result } = await runScenario({
+    id: 'umlaut-split',
+    firstRead: 'Hailiùa',
+  });
+
+  assert.deepEqual(result, ['Hailüa']);
+});

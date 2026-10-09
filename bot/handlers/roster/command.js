@@ -232,7 +232,7 @@ export function buildVisibleRosterPresentation({ characters, previousSnapshots, 
 }
 
 function notifyVisibleDeepCompletion({ interaction, replyEditor, visibleDeep, name, lang }) {
-  const outcome = resolveRosterScanOutcome(visibleDeep.result);
+  const outcome = resolveRosterScanOutcome(visibleDeep.result, { hasRemaining: visibleDeep.resumable });
   if (!outcome) return;
 
   sendScanCompletionDm({

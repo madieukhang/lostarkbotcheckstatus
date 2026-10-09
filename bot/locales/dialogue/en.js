@@ -260,6 +260,10 @@ export default {
       title: 'Unknown setup action',
       description: '`{action}` is not a `/la-setup` action. Pick one from the list that appears as you type in `action`.',
     },
+    unknownLanguage: {
+      title: 'Unknown language',
+      description: '`{language}` is not a language I support. Pick one from the list that appears as you type in `language` ({choices}).',
+    },
     defaultScopeSet: 'Default blacklist scope set to **{scope}**.\nWhen `/la-list add type:black` omits scope, I will use **{scope}**.',
   },
   evidence: {
@@ -535,6 +539,7 @@ export default {
     more: '+{count} more',
     footerBlocked: 'Inspect it with `/la-list view`; use `/la-list edit` for legacy entries.',
     pickerTitle: 'Found · {name}', pickerDescription: '**{name}** is in {count} lists. Choose what to remove:', pickerFooter: 'Expires in 30 seconds · only you can use this picker.',
+    pickerExpired: { title: 'Picker expired', description: 'Nothing was removed. Run `/la-list remove` again to choose.' },
     failed: { title: 'Removal failed', description: 'I could not remove the entry.' }, unknown: 'unknown',
   },
   check: {

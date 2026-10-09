@@ -22,7 +22,9 @@ import { buildScanResultEmbed, buildScanResultButtons } from '../../utils/scanRe
  * @param {boolean} [args.canContinue=true] - render without registering a
  *   Continue session when false (e.g. the caller lacks guild context).
  * @param {string} args.lang - locale for UI strings.
- * @returns {{embed: import('discord.js').EmbedBuilder|null, components: Array}}
+ * @returns {{embed: import('discord.js').EmbedBuilder|null, components: Array, resumable: boolean}}
+ *   resumable is true when candidates remain and a Continue session holds them,
+ *   so the pass is not finished.
  */
 export function buildRosterDeepScanResult({
   callerId,
@@ -36,7 +38,7 @@ export function buildRosterDeepScanResult({
   canContinue = true,
   lang,
 }) {
-  if (!altResult) return { embed: null, components: [] };
+  if (!altResult) return { embed: null, components: [], resumable: false };
 
   const { embed, state } = buildScanResultEmbed({
     target: { name, isHidden, guildName: meta?.guildName, profileUrl: rosterUrl(name) },
@@ -47,7 +49,7 @@ export function buildRosterDeepScanResult({
       : t('dialogue.enrich.noGuild.description', lang, { name }),
     lang,
   });
-  if (!state.hasRemaining || !canContinue) return { embed, components: [] };
+  if (!state.hasRemaining || !canContinue) return { embed, components: [], resumable: false };
 
   const session = createRosterContinuationSession({
     callerId,
@@ -66,5 +68,5 @@ export function buildRosterDeepScanResult({
     hasRemaining: true,
     lang,
   });
-  return { embed, components: buttonRow ? [buttonRow] : [] };
+  return { embed, components: buttonRow ? [buttonRow] : [], resumable: true };
 }

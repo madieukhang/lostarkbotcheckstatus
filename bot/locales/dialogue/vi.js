@@ -201,7 +201,7 @@ export default {
       pinFailed: 'Đã đổi ngôn ngữ nhưng chưa làm mới được bảng {surface} trong <#{channel}>. Còn thiếu: {missing}.', pinResult: '**{surface}:** {outcome} trong <#{channel}>.',
     },
     manageGuildRequired: { title: 'Cần quyền Manage Server', description: 'Cậu cần quyền **Manage Server** để đổi cấu hình của tớ ở đây.' },
-    unknownAction: { title: 'Tớ không biết action này', description: '`{action}` không phải action của `/la-setup`. Cậu chọn một action trong danh sách gợi ý hiện ra khi gõ vào ô `action` nhé.' },
+    unknownAction: { title: 'Tớ không biết action này', description: '`{action}` không phải action của `/la-setup`. Cậu chọn một action trong danh sách gợi ý hiện ra khi gõ vào ô `action` nhé.' }, unknownLanguage: { title: 'Tớ không biết ngôn ngữ này', description: '`{language}` không phải ngôn ngữ tớ hỗ trợ. Cậu chọn một mục trong danh sách gợi ý hiện ra khi gõ vào ô `language` nhé ({choices}).' },
     defaultScopeSet: 'Đã đặt scope blacklist mặc định thành **{scope}**.\nKhi `/la-list add type:black` bỏ trống scope, tớ sẽ dùng **{scope}**.',
   },
   evidence: {
@@ -409,7 +409,7 @@ export default {
     ] },
     removedBy: 'Người gỡ', removedAt: 'Gỡ lúc',
     failedSection: 'Không thể xóa', legacy: '**{list}**: entry legacy này không có metadata chủ sở hữu. Dùng `/la-list edit` để chỉnh.', ownerOnly: '**{list}**: chỉ **{owner}**, người đã thêm entry, mới xóa được.', more: '+{count} tên khác',
-    footerBlocked: 'Kiểm tra bằng `/la-list view`; dùng `/la-list edit` cho entry legacy.', pickerTitle: 'Đã tìm thấy · {name}', pickerDescription: '**{name}** nằm trong {count} list. Chọn mục cần xóa:', pickerFooter: 'Hết hạn sau 30 giây · chỉ cậu dùng được picker này.', failed: { title: 'Xóa thất bại', description: 'Tớ chưa xóa được entry.' }, unknown: 'không xác định',
+    footerBlocked: 'Kiểm tra bằng `/la-list view`; dùng `/la-list edit` cho entry legacy.', pickerTitle: 'Đã tìm thấy · {name}', pickerDescription: '**{name}** nằm trong {count} list. Chọn mục cần xóa:', pickerFooter: 'Hết hạn sau 30 giây · chỉ cậu dùng được picker này.', pickerExpired: { title: 'Picker đã hết hạn', description: 'Tớ chưa xóa gì cả. Cậu chạy lại `/la-list remove` để chọn nhé.' }, failed: { title: 'Xóa thất bại', description: 'Tớ chưa xóa được entry.' }, unknown: 'không xác định',
   },
   check: {
     modeSaved: { title: 'Đã lưu chế độ đọc ảnh', description: 'Chế độ của cậu là **{mode}**. Áp dụng cho ảnh cậu thả vào kênh và `/la-check` khi không chọn mode.', footer: 'Về Daily bằng /la-check-mode mode:daily; mode trong /la-check chỉ đổi cho một ảnh.' },

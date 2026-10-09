@@ -7,6 +7,7 @@ import {
   isValidCharacterName,
   normalizeCharacterName,
   normalizeNameKey,
+  normalizeOcrCharacterName,
 } from '../../utils/names.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 import { createLruTtlCache } from '../../utils/cache/lruTtlCache.js';
@@ -436,12 +437,12 @@ async function requestGeminiWithFallback({
   return { ok: false, type: 'exhausted', failures };
 }
 
-function filterAndDeduplicateNames(parsed) {
+function filterAndDeduplicateNames(parsed, normalizeName = normalizeOcrCharacterName) {
   const seen = new Set();
   const unique = [];
   for (const item of parsed || []) {
     if (typeof item !== 'string') continue;
-    const name = normalizeCharacterName(item);
+    const name = normalizeName(item);
     const key = normalizeNameKey(name);
     if (!isValidCharacterName(name) || SERVER_NAMES.has(key) || seen.has(key)) continue;
     seen.add(key);
@@ -783,8 +784,9 @@ export async function extractNamesFromImage(image, options = {}) {
       }
       // Two distinct OCR strings may converge on the same Bible-confirmed name.
       // Collapse them before caching so the shared check pipeline never repeats
-      // Mongo/enrichment/render work for one character.
-      names = filterAndDeduplicateNames(names);
+      // Mongo/enrichment/render work for one character. The OCR repair already
+      // ran on the first read; a Bible-confirmed spelling must not get it.
+      names = filterAndDeduplicateNames(names, normalizeCharacterName);
     }
     ocrCache.set(cacheKey, names);
     timing.status = 'ok';

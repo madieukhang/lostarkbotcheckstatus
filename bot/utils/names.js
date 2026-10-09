@@ -1,13 +1,19 @@
-function normalizeNameGlyphs(raw) {
-  return String(raw ?? '')
-    .normalize('NFKC')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/(\p{L})\s*\u00A8/gu, '$1\u0308')
-    // Lost Ark lobby font can make Gemini split "ü" into "iù".
+// Lost Ark lobby font can make Gemini split "ü" into "iù". Only OCR output
+// gets this repair: a typed or Bible name with "iù" or "ìu" is a real spelling.
+function repairOcrUmlautSplits(value) {
+  return value
     .replace(/i(?:\u00F9|u\u0300)/g, '\u00FC')
     .replace(/(?:\u00EC|i\u0300)u/g, '\u00FC')
     .replace(/I(?:\u00D9|U\u0300)/g, '\u00DC')
-    .replace(/(?:\u00CC|I\u0300)U/g, '\u00DC')
+    .replace(/(?:\u00CC|I\u0300)U/g, '\u00DC');
+}
+
+function normalizeNameGlyphs(raw, { repairOcrSplits = false } = {}) {
+  const value = String(raw ?? '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/(\p{L})\s*\u00A8/gu, '$1\u0308');
+  return (repairOcrSplits ? repairOcrUmlautSplits(value) : value)
     .replace(/(\p{L})\s+([\u0300-\u036f])/gu, '$1$2')
     // Lost Ark character names are single tokens. OCR sometimes inserts
     // spaces before repeated tail letters, e.g. "Gunlancer rrrrr".
@@ -74,10 +80,23 @@ export function isValidCharacterName(value) {
   return CHARACTER_NAME_RE.test(String(value || '').normalize('NFC'));
 }
 
-export function normalizeCharacterName(raw) {
-  const value = normalizeNameGlyphs(raw);
+function capitalizeName(value) {
   if (!value) return '';
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+export function normalizeCharacterName(raw) {
+  return capitalizeName(normalizeNameGlyphs(raw));
+}
+
+/**
+ * Normalize a name read from a screenshot: normalizeCharacterName plus the
+ * repair of the "ü" splits the lobby font causes in OCR output.
+ * @param {unknown} raw - one name from the OCR response
+ * @returns {string} normalized name, or '' when nothing is left
+ */
+export function normalizeOcrCharacterName(raw) {
+  return capitalizeName(normalizeNameGlyphs(raw, { repairOcrSplits: true }));
 }
 
 export function normalizeRosterNames(primaryName, rosterNames = []) {
