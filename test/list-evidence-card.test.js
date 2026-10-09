@@ -40,7 +40,7 @@ test('evidence card renders ilvl and CP when a stat map is supplied', () => {
   });
 
   assert.equal(fieldValue(embed, 'ilvl'), '`1755.00`');
-  assert.equal(fieldValue(embed, 'CP'), '`≈4820.12`');
+  assert.equal(fieldValue(embed, 'CP'), '`≈4820.12 CP`');
   // Alt rows inherit the same class + ilvl + CP shape /la-check renders.
   assert.match(fieldValue(embed, 'Danh sách roster'), /Bard \[Hanako\]\(\S+\) · `1730\.83` · `≈3311\.40 CP`/u);
 });

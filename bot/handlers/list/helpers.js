@@ -45,9 +45,7 @@ export function getListContext(type) {
 }
 
 export function listTypeIcon(type) {
-  if (type === 'black') return LIST_CONTEXTS.black.icon;
-  if (type === 'white') return LIST_CONTEXTS.white.icon;
-  return LIST_CONTEXTS.watch.icon;
+  return (LIST_CONTEXTS[type] || LIST_CONTEXTS.watch).icon;
 }
 
 /**

@@ -4,19 +4,19 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 
 ## Features
 
-- **Server monitoring** — polls Thaemine only, posts `@here` on offline-to-online transitions, `/la-status` for live check
-- **Roster lookup** — `/la-roster` scrapes `lostark.bible`, tracks iLvl progression, cross-checks every list; `deep:true` runs Stronghold alt detection
-- **List management** — blacklist / whitelist / watchlist (`⛔` / `✅` / `⚠️`), global or server-scoped, trusted users protected from any list
-- **Bulk add** — `/la-list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast
-- **Screenshot OCR** — `/la-check` extracts ≤ 8 names from one image; auto-check accepts up to 3 images and scales to 8 names each (24 total). Corrected names are re-matched against their final canonical/roster identities and the card shows the `OCR → resolved name → list entry` path
-- **Text checks** — in an auto-check channel, `check NameOne NameTwo` and `check NameOne, NameTwo` both cross-check up to 8 names in one request; listed hits open a broadcast-style detail card with cached ilvl/CP, attribution, tracked alts, and inline evidence
-- **Quick Add** — after auto-check, dropdown adds unflagged names straight to blacklist/watchlist via modal
-- **Approval flow** — members submit, officers instant-approve; senior approver always receives the DM
-- **Evidence rehosting** — images uploaded with an entry are rehosted into a pinned evidence channel so Discord's 24h CDN expiry doesn't rot the reference
-- **Direct evidence lookup** — `/la-evidence name` with autocomplete jumps straight to a single entry's evidence embed, no list-view paging needed; officers can broadcast publicly with `public:true`
-- **ScraperAPI fallback** — direct fetch to `lostark.bible` first, auto-fallback through up to 3 ScraperAPI keys on 403/503; high-fanout roster/list/OCR paths keep ScraperAPI off by default
-- **ScraperAPI usage visibility** — `/la-stats` shows process-lifetime ScraperAPI request totals, success/failure split, network errors, and per-key counts
-- **Guild-only commands** — `setDMPermission(false)` on every slash command; nothing runs in DMs
+- **Server monitoring**: polls Thaemine only, posts `@here` on offline-to-online transitions, `/la-status` for live check
+- **Roster lookup**: `/la-roster` scrapes `lostark.bible`, tracks iLvl progression, cross-checks every list; `deep:true` runs Stronghold alt detection
+- **List management**: blacklist / whitelist / watchlist (`⛔` / `✅` / `⚠️`), global or server-scoped, trusted users protected from any list
+- **Bulk add**: `/la-list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast
+- **Screenshot OCR**: `/la-check` extracts ≤ 8 names from one image; auto-check accepts up to 3 images and scales to 8 names each (24 total). Corrected names are re-matched against their final canonical/roster identities and the card shows the `OCR → resolved name → list entry` path
+- **Text checks**: in an auto-check channel, `check NameOne NameTwo` and `check NameOne, NameTwo` both cross-check up to 8 names in one request; listed hits open a broadcast-style detail card with cached ilvl/CP, attribution, tracked alts, and inline evidence
+- **Quick Add**: after auto-check, dropdown adds unflagged names straight to blacklist/watchlist via modal
+- **Approval flow**: members submit, officers instant-approve; senior approver always receives the DM
+- **Evidence rehosting**: images uploaded with an entry are rehosted into a pinned evidence channel so Discord's 24h CDN expiry doesn't rot the reference
+- **Direct evidence lookup**: `/la-evidence name` with autocomplete jumps straight to a single entry's evidence embed, no list-view paging needed; officers can broadcast publicly with `public:true`
+- **ScraperAPI fallback**: direct fetch to `lostark.bible` first, auto-fallback through up to 3 ScraperAPI keys on 403/503; high-fanout roster/list/OCR paths keep ScraperAPI off by default
+- **ScraperAPI usage visibility**: `/la-stats` shows process-lifetime ScraperAPI request totals, success/failure split, network errors, and per-key counts
+- **Guild-only commands**: `setDMPermission(false)` on every slash command; nothing runs in DMs
 
 ## Commands
 
@@ -54,7 +54,7 @@ image may need fallback or a correction pass. Settings do not create new quota.
 | `/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` | Edit existing entry. The entry owner and approvers edit directly; everyone else routes through the approval flow. Server-to-global promotion and moves into global blacklist always require approval unless the requester has auto-approval rights. `additional_names` appends alts manually for hidden-roster + no-guild cases and stays pending with any edit that requires approval. |
 | `/la-list remove name` | Remove an entry (ownership check). When one name exists on several entries/scopes, the picker lists each match (server entries of the requesting guild first) instead of only the preferred one. Legacy entries from before ownership tracking have no owner: officers/seniors act as fallback custodians and may remove them |
 | `/la-list view type [scope]` | View entries. `scope`: `all` / `global` / `server` |
-| `/la-list trust action name [reason]` | Manage trusted list — `add` / `remove` (officer/senior only) |
+| `/la-list trust action name [reason]` | Manage trusted list: `add` / `remove` (officer/senior only) |
 | `/la-list enrich name [deep_limit]` | Stronghold deep-scan an existing entry and append discovered alts. **Restricted to officers/seniors** (depends on the bot owner's residential-IP worker; ~10-15 min wall clock) |
 | `/la-list multiadd action [file]` | Bulk add via Excel template (≤ 30 rows). `action:template` downloads, `action:file` uploads |
 | `/la-check image [mode]` | OCR a screenshot → cross-check names against all lists; optional mode overrides the saved preference for this image |
@@ -141,7 +141,7 @@ erDiagram
     }
 ```
 
-Blacklist / Whitelist / Watchlist share the same shape; only the collection name and the list-semantics icon differ. TrustedUser is a subset (no scope, no raid/logs — just name + reason). `allCharacters[]` on every list entry holds the known alt names from a Stronghold-based roster scan, indexed for fast `$in` cross-checks during `/la-check` and auto-check.
+Blacklist / Whitelist / Watchlist share the same shape; only the collection name and the list-semantics icon differ. TrustedUser is a subset (no scope, no raid/logs; just name + reason). `allCharacters[]` on every list entry holds the known alt names from a Stronghold-based roster scan, indexed for fast `$in` cross-checks during `/la-check` and auto-check.
 
 Sample blacklist document:
 
@@ -261,7 +261,7 @@ Server monitor runs out-of-band: `bot/monitor/monitor.js` polls `bot/monitor/ser
 - Node.js ≥ 20.19.0
 - MongoDB (Atlas or a self-hosted replica set/sharded cluster)
 - Discord bot token + channel ID
-- Gemini API key (optional — only needed for `/la-check` + auto-check)
+- Gemini API key (optional, only needed for `/la-check` + auto-check)
 - Discord Privileged Intent: **Message Content Intent** (needed for auto-check)
 
 ## Environment Variables
@@ -281,11 +281,11 @@ Copy `.env.example` to `.env` and fill in values.
 | Var | Default | Notes |
 |---|---|---|
 | `CHECK_INTERVAL` | `30` | Status check interval in seconds (min 10) |
-| `GEMINI_API_KEY` | — | Gemini API key for OCR |
+| `GEMINI_API_KEY` | - | Gemini API key for OCR |
 | `GEMINI_MAX_OUTPUT_TOKENS` | `768` | OCR response ceiling, including visible output and thinking tokens; configurable for repeatable A/B benchmarks |
 | `GEMINI_DAILY_MODELS` | `gemini-3.1-flash-lite,gemini-3.5-flash-lite` | Daily OCR chain; only these two Lite models are accepted |
 | `GEMINI_ANALYSIS_MODELS` | `gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash` | Opt-in analysis chain; accepts these Flash models and never spills into Lite |
-| `GEMINI_MODELS` / `GEMINI_MODEL` | — | Legacy mixed catalog, partitioned when the matching profile override is absent; a missing group uses that profile's defaults. `GEMINI_MODELS` takes precedence over the singular alias |
+| `GEMINI_MODELS` / `GEMINI_MODEL` | - | Legacy mixed catalog, partitioned when the matching profile override is absent; a missing group uses that profile's defaults. `GEMINI_MODELS` takes precedence over the singular alias |
 | `GEMINI_MODEL_WAITLIST` | `none` | Explicit exclusions apply to both profiles. Remove an old `gemini-3.8-flash` waitlist value to restore 3.8 in analysis. Excluding all daily models stops startup; excluding all analysis models disables that mode |
 | `GEMINI_PRIMARY_TIMEOUT_MS` | model-aware | Per-model cap for the preferred model; restored 3.8 defaults to 8s and the current 3.7 cap is 30s before the fallback reserve is applied |
 | `GEMINI_FALLBACK_RESERVE_MS` | `10000` | Time protected inside the shared 30s OCR deadline for another model after quick recoverable failures; after a true timeout, the next model receives the remainder |
@@ -308,15 +308,15 @@ Copy `.env.example` to `.env` and fill in values.
 | `STRONGHOLD_DEEP_USE_SCRAPERAPI` | `false` | Low-level default for detector callers that do not override it; command handlers keep high-fanout scans off |
 | `STRONGHOLD_DEEP_FAILURE_GUARD_MIN_CANDIDATES` | `25` | Candidate-attempt sample before auto-pausing a scan with extreme fetch failures |
 | `STRONGHOLD_DEEP_FAILURE_GUARD_RATE` | `0.85` | Failed-attempt ratio that triggers the auto-pause guard (`0.85` = 85%) |
-| `AUTO_CHECK_CHANNEL_IDS` | — | Global fallback for auto-check (prefer per-server `/la-setup`) |
-| `LIST_NOTIFY_CHANNEL_IDS` | — | Global fallback for list notifications |
-| `OFFICER_APPROVER_IDS` | — | Officer Discord user IDs (instant approval on `/la-list add`) |
-| `SENIOR_APPROVER_IDS` | — | Senior approvers (always receive approval DMs) |
-| `MEMBER_APPROVER_IDS` | — | Member approvers |
-| `OWNER_GUILD_ID` | — | Owner/admin Discord server ID — can view every server-scoped blacklist entry |
-| `SCRAPERAPI_KEY` | — | Primary ScraperAPI key (fallback proxy on 403/503) |
-| `SCRAPERAPI_KEY_2` | — | Secondary key (used when primary hits 429 or invalid) |
-| `SCRAPERAPI_KEY_3` | — | Tertiary key (final fallback) |
+| `AUTO_CHECK_CHANNEL_IDS` | - | Global fallback for auto-check (prefer per-server `/la-setup`) |
+| `LIST_NOTIFY_CHANNEL_IDS` | - | Global fallback for list notifications |
+| `OFFICER_APPROVER_IDS` | - | Officer Discord user IDs (instant approval on `/la-list add`) |
+| `SENIOR_APPROVER_IDS` | - | Senior approvers (always receive approval DMs) |
+| `MEMBER_APPROVER_IDS` | - | Member approvers |
+| `OWNER_GUILD_ID` | - | Owner/admin Discord server ID; can view every server-scoped blacklist entry |
+| `SCRAPERAPI_KEY` | - | Primary ScraperAPI key (fallback proxy on 403/503) |
+| `SCRAPERAPI_KEY_2` | - | Secondary key (used when primary hits 429 or invalid) |
+| `SCRAPERAPI_KEY_3` | - | Tertiary key (final fallback) |
 
 ## Run Locally
 
@@ -351,7 +351,7 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 4. Railway builds from `Dockerfile` (node:20-slim, `npm ci --omit=dev`) and starts via `node bot.js`.
 5. Flip **Message Content Intent** on in Discord Developer Portal if using auto-check channels, otherwise auto-check won't fire.
 
-Slash commands register through Discord's global endpoint on boot (`ClientReady` handler), so a Railway redeploy is enough to push schema changes — no separate CLI step.
+Slash commands register through Discord's global endpoint on boot (`ClientReady` handler), so a Railway redeploy is enough to push schema changes, with no separate CLI step.
 
 ## Known Limitations
 

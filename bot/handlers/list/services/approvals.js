@@ -221,10 +221,11 @@ export function createApprovalServices({
     // Color follows the largest list type: blacklist red (it also wins
     // ties), watchlist yellow (over whitelist on a tie), whitelist green.
     // Approvers reading a stack of DMs scan colors first.
-    let color;
-    if (typeCounts.black >= typeCounts.white && typeCounts.black >= typeCounts.watch) color = COLORS.danger;
-    else if (typeCounts.watch >= typeCounts.white) color = COLORS.warning;
-    else color = COLORS.success;
+    const { color } = [
+      { matches: typeCounts.black >= typeCounts.white && typeCounts.black >= typeCounts.watch, color: COLORS.danger },
+      { matches: typeCounts.watch >= typeCounts.white, color: COLORS.warning },
+      { matches: true, color: COLORS.success },
+    ].find((rule) => rule.matches);
 
     const buildBulkEmbed = (lang) => {
       const breakdownParts = [

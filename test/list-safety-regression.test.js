@@ -16,7 +16,6 @@ import TrustedUser from '../bot/models/TrustedUser.js';
 import GuildConfig from '../bot/models/GuildConfig.js';
 import { buildScopedListQuery, invalidateGuildConfig } from '../bot/utils/scope.js';
 import { createListEditCommandHandler } from '../bot/handlers/list/edit/command.js';
-import PendingApproval from '../bot/models/PendingApproval.js';
 import { handleApprovedEditRequest } from '../bot/handlers/list/add/editApproval.js';
 import { createEnrichHandlers } from '../bot/handlers/list/enrich/index.js';
 import { createEnrichSession, clearEnrichSession } from '../bot/handlers/list/enrich/state.js';
@@ -181,12 +180,13 @@ for (const currentType of ['black', 'white']) {
     t.mock.method(Blacklist, 'create', () => assert.fail('Blocked approval must not create blacklist'));
     t.mock.method(oldModel, 'deleteOne', () => assert.fail('Blocked approval must preserve the source'));
     let closed = false;
-    t.mock.method(PendingApproval, 'deleteOne', async () => { closed = true; });
     let response;
     await handleApprovedEditRequest({
       interaction: { editReply: async payload => { response = payload; } },
       payload: { existingEntryId: existing._id, currentType, type: 'black', scope: 'global', additionalNames: ['Newalt'] },
       requestId: 'pending',
+      completeApproval: async () => { closed = true; },
+      beforeWrite: async () => {},
       broadcastListChange: () => assert.fail('No broadcast on a blocked edit'),
       lang: 'en',
     });

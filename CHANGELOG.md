@@ -18,6 +18,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - Other servers get a `Blacklist · New note · Name` card. `/la-list edit` still overwrites the latest note, and stops without writing if a note lands while the edit is being saved.
 
 ### Changed
+- The CP field on `/la-check` detail cards and `/la-list view` evidence cards reads `N CP`, like the add, edit and broadcast cards.
 - `/la-status` no longer shows a count row (such as **🟢 Online · 1**) above the servers. The headline already gives the count and the bot monitors only Thaemine, so the card lists the servers right after it.
 - **Evidence kept as a Discord link opens inside Discord**: entries whose screenshot never went into the evidence archive get the same **View evidence** button as archived ones instead of a link out to the browser. A click asks Discord for a fresh link and shows the image only to the clicker; when Discord no longer has the file, the reply says the screenshot was only a Discord link from outside the archive (which started on 11 Apr 2026). `/la-check` and `/la-list view` say the same in place of "Image link expired". Removal cards and decided approval DMs keep the plain link, since there is no entry left to look up.
 - **Duplicate approvals add a note instead of overwriting**: when a member's add matches a listed entry, the approver's **Overwrite** button is now **Add to history**. The request becomes the entry's latest note (the entry keeps its name and earlier notes), the requester is told their report went into the history, and the approver's DM records "Added to history".
@@ -34,6 +35,8 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `/la-list remove` lists every entry that matches the name, one button each, so a global entry is no longer hidden behind a server entry of the same name; server entries from another guild show that guild's id. Officers and seniors can remove legacy entries that predate ownership tracking.
 
 ### Fixed
+- `/la-list edit image:` refuses a file Discord reports as something other than an image, as `/la-list add` does, and rehosts the image only after the edit passes its checks, so a refused edit leaves no copy in the evidence channel.
+- `/la-check` detail cards escape brackets in the entry name, as the tracked alts list does, so a stored name cannot close its roster link early.
 - A `/la-list remove` picker left unanswered for 30 seconds says it expired and drops its buttons, instead of "Removal failed" with a raw error and buttons that no longer work.
 - `/la-roster deep` no longer DMs "scan finished" after a first pass that stopped at the candidate limit with a **Continue** button.
 - `/la-setup` answers action text such as `constructor` as an unknown action instead of never replying, and `action:set-language` refuses a language it does not support instead of saving English with a success reply.
@@ -82,6 +85,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `/la-search` offers report details for blacklist, watchlist and whitelist hits without requiring an image. Details reuse the check card, reload the current entry with blacklist scope checks, and preserve the recorded primary character when the searched name is an alt.
 
 ### Changed (internal)
+- `handleApprovedEditRequest` takes `completeApproval` and `beforeWrite` from every caller instead of test-only defaults, the bulk approval color and `listTypeIcon` use lookups instead of `if` chains, and em-dashes are gone from the README and a utility comment. No behavior change.
 - One case-insensitive collation constant (`models/collation.js`) serves every list lookup and unique index, `MIN_TRACKED_ITEM_LEVEL` holds the 1700 floor, one `parseRetryAfterMs` reads Retry-After for OCR and character meta, and scan results and progress count `checkedCandidates` / `attemptedCandidates` without the old `scannedCandidates` alias. No behavior change.
 - `/la-stats`, `/la-reset` and `/la-remote` share one senior check (`utils/seniorGate.js`), auto-check answers both full-queue rejections through one notice table, and `/la-check` and `/la-check-mode` share the Analysis availability check. No behavior change.
 

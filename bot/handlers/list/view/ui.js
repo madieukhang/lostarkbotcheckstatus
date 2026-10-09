@@ -25,7 +25,12 @@ import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, COLORS, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { truncateInlineText } from '../../../utils/discordText.js';
 import { t } from '../../../services/i18n/index.js';
-import { formatLinkedCharacter, renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
+import {
+  formatLinkedCharacter,
+  formatRosterStatBadges,
+  renderTrackedAltsField,
+  resolveRosterWorld,
+} from '../trackedAltsRender.js';
 import { getListContext } from '../helpers.js';
 import { appendFieldLine, buildNoteCountLine } from '../notes/entryNotes.js';
 
@@ -308,7 +313,7 @@ function buildEvidenceInlineMeta(entry, snapshot, {
   statMap,
 }) {
   const itemLevel = Number(String(snapshot?.itemLevel ?? '').replace(/,/g, ''));
-  const combatScore = String(snapshot?.combatScore || '').trim();
+  const { combatPower } = formatRosterStatBadges(snapshot);
   const addedByDisplay = getAddedByDisplay(entry);
   // Read across the roster, not just this character's own row · the
   // server belongs to the roster, so a sibling answers for a name whose
@@ -328,8 +333,8 @@ function buildEvidenceInlineMeta(entry, snapshot, {
     // ilvl and CP only appear when the caller supplied a stat snapshot.
     // Rendering them as "N/A" would cost two slots on every surface that
     // has no roster data to give, which is most of them.
-    combatScore && combatScore !== '?'
-      ? { name: t('listView.evidence.combatPower', lang), value: `\`${combatScore}\``, inline: true }
+    combatPower
+      ? { name: t('listView.evidence.combatPower', lang), value: combatPower, inline: true }
       : null,
     Number.isFinite(itemLevel) && itemLevel > 0
       ? { name: t('listView.evidence.itemLevel', lang), value: `\`${itemLevel.toFixed(2)}\``, inline: true }

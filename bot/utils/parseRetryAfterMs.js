@@ -1,8 +1,8 @@
 /**
  * Parse an HTTP `Retry-After` header value into a delay in milliseconds.
  *
- * Accepts both RFC 9110 forms — delay-seconds (`"120"`) and HTTP-date
- * (`"Wed, 21 Oct 2026 07:28:00 GMT"`) — and returns `fallbackMs` when the
+ * Accepts both RFC 9110 forms, delay-seconds (`"120"`) and HTTP-date
+ * (`"Wed, 21 Oct 2026 07:28:00 GMT"`), and returns `fallbackMs` when the
  * value is missing or unparseable. An optional `capMs` bounds the parsed
  * delay so a far-future server date cannot stall the caller.
  *

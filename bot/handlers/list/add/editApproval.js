@@ -4,7 +4,6 @@
  * cross-list moves, then update approvers and notify the requester.
  */
 
-import PendingApproval from '../../../models/PendingApproval.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
@@ -298,8 +297,8 @@ export async function handleApprovedEditRequest({
   broadcastListChange,
   notifyRequesterAboutDecision,
   lang = 'en',
-  completeApproval = () => PendingApproval.deleteOne({ requestId }),
-  beforeWrite = async () => {},
+  completeApproval,
+  beforeWrite,
 }) {
   const { model: oldModel } = getListContext(payload.currentType || payload.type);
   const { model: newModel } = getListContext(payload.type);

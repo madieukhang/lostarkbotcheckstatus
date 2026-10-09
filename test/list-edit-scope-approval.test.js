@@ -101,7 +101,6 @@ test('approval promotes scope and appends requested alts without replacing newer
     });
     return { acknowledged: true, matchedCount: 1, modifiedCount: 1 };
   });
-  t.mock.method(PendingApproval, 'deleteOne', async () => { events.push('close'); });
   await handleApprovedEditRequest({
     interaction: {
       user: { id: 'officer', tag: 'Officer' }, message: { id: 'dm' },
@@ -109,6 +108,8 @@ test('approval promotes scope and appends requested alts without replacing newer
       editReply: async () => { events.push('reply'); },
     },
     payload, requestId: 'request',
+    completeApproval: async () => { events.push('close'); },
+    beforeWrite: async () => {},
     syncApproverDmMessages: async () => {},
     broadcastListChange: async (_action, result, _meta, options) => {
       assert.equal(result.scope, 'global');
@@ -137,6 +138,7 @@ for (const matchedCount of [0, 1]) {
         client: { guilds: { cache: new Map() } }, editReply: async reply => replies.push(reply),
       },
       completeApproval: async () => { completed++; },
+      beforeWrite: async () => {},
       syncApproverDmMessages: async () => {},
       broadcastListChange: async (...args) => broadcasts.push(args),
       notifyRequesterAboutDecision: async (_payload, notice) => notices.push(notice),

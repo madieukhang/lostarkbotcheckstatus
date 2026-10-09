@@ -101,6 +101,7 @@ async function rejectInvalidListEditInput({
   plan,
   newRaidInput,
   additionalNamesRaw,
+  imageContentType,
   lang,
 }) {
   // Manual alt append: officer/senior or entry owner only. It fills the gap
@@ -117,6 +118,14 @@ async function rejectInvalidListEditInput({
           raid: newRaidInput,
           list: plan.targetType === 'black' ? 'blacklist' : 'whitelist',
         }),
+        lang,
+      }),
+    },
+    {
+      invalid: () => imageContentType && !imageContentType.startsWith('image/'),
+      alert: () => ({
+        severity: AlertSeverity.ERROR,
+        ...t('dialogue.listAdd.command.invalidImage', lang, { type: imageContentType }),
         lang,
       }),
     },
@@ -300,12 +309,14 @@ async function dispatchListEdit({
  *   broadcaster (reused from the /la-list add flow; edit piggybacks on
  *   the same approval pipeline)
  * @param {Function} deps.broadcastListChange - guild broadcast
+ * @param {Function} [deps.rehostImageFn] - evidence image rehost
  * @returns {Function} handleListEditCommand(interaction)
  */
 export function createListEditCommandHandler({
   client,
   sendListAddApprovalToApprovers,
   broadcastListChange,
+  rehostImageFn = rehostImage,
 }) {
   async function handleListEditCommand(interaction) {
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
@@ -321,24 +332,10 @@ export function createListEditCommandHandler({
     const input = readListEditInput(interaction);
     const newImageUrl = input.imageAttachment?.url || '';
 
-    // Defer FIRST so the rehost (download + upload, can take 1-3s) does not
-    // cross Discord's 3-second interaction ack window. Discord keeps the
-    // attachment URL valid through the deferred state, so rehost can still
-    // download it after the defer.
+    // Defer FIRST so the lookups and the rehost (download + upload, can take
+    // 1-3s) do not cross Discord's 3-second interaction ack window.
     await deferReply(interaction);
     await connectDB();
-
-    // Rehost the new image NOW (while CDN URL is still valid). Result is used
-    // later in updateFields. Rehost failure or a missing evidence channel
-    // falls back to the legacy URL, which eventually expires.
-    let newImageRehost = null;
-    if (newImageUrl) {
-      newImageRehost = await rehostImage(newImageUrl, client, {
-        entryName: input.name,
-        addedBy: getInteractionDisplayName(interaction),
-        listType: '', // type may change in this edit; leave blank
-      });
-    }
 
     // Find existing entry across all lists (scope-aware for blacklist)
     const editGuildId = interaction.guild.id;
@@ -377,6 +374,7 @@ export function createListEditCommandHandler({
       plan,
       newRaidInput: input.newRaidInput,
       additionalNamesRaw: input.additionalNamesRaw,
+      imageContentType: input.imageAttachment?.contentType || '',
       lang,
     })) return;
 
@@ -387,6 +385,18 @@ export function createListEditCommandHandler({
       editGuildId,
       lang,
     })) return;
+
+    // Rehost only an edit that passed every check, so a refused edit leaves
+    // no copy in the evidence channel. Rehost failure or a missing evidence
+    // channel falls back to the Discord URL, which eventually expires.
+    let newImageRehost = null;
+    if (newImageUrl) {
+      newImageRehost = await rehostImageFn(newImageUrl, client, {
+        entryName: input.name,
+        addedBy: getInteractionDisplayName(interaction),
+        listType: '', // type may change in this edit; leave blank
+      });
+    }
 
     await dispatchListEdit({
       interaction,

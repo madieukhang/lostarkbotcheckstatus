@@ -195,7 +195,7 @@ test('dropdown detail uses broadcast layout with added-by beside CP and evidence
   assert.equal(embed.fields.filter((field) => field.inline).length % 3, 0);
   // ilvl and CP sit side by side, so both read as code values.
   assert.equal(embed.fields[3].value, '`1725.50`');
-  assert.equal(embed.fields[4].value, '`≈3136.08`');
+  assert.equal(embed.fields[4].value, '`≈3136.08 CP`');
   assert.equal(embed.fields[4].inline, true);
   assert.equal(embed.fields[5].value, 'Legacy Officer');
   assert.equal(embed.fields[5].inline, true);
@@ -203,4 +203,16 @@ test('dropdown detail uses broadcast layout with added-by beside CP and evidence
   assert.match(embed.fields[7].value, /`1711\.67` · `≈2981\.11 CP`/u);
   assert.match(embed.fields[7].value, /Rosterprimary/u);
   assert.equal(embed.image.url, 'https://cdn.example.test/evidence.png');
+});
+
+test('check details headline escapes brackets in the stored name like the tracked alts list', () => {
+  const embed = buildCheckEntryDetailsEmbed({
+    name: 'Odd]name',
+    reason: 'Blacklist report',
+    _listType: 'black',
+  }, { lang: 'en' });
+
+  const description = embed.toJSON().description;
+  assert.doesNotMatch(description, /\[Odd\]name\]/);
+  assert.match(description, /\[Odd\\]name\]\(/);
 });

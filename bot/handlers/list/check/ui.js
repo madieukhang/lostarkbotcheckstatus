@@ -4,33 +4,25 @@
  * uses copy that describes a lookup result instead of announcing a new entry.
  */
 
-import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { t } from '../../../services/i18n/index.js';
 import { parsePositiveNumber } from '../../../services/roster/parsers.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { isLegacyEvidence } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
-import { rosterUrl } from '../../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
 import { appendFieldLine, buildNoteCountLine } from '../notes/entryNotes.js';
-import { renderTrackedAltsField, resolveRosterWorld } from '../trackedAltsRender.js';
-
-function getSnapshotClassName(snapshot) {
-  if (!snapshot) return '';
-  return snapshot.className || (snapshot.classId ? getClassName(snapshot.classId) : '');
-}
-
-function formatLinkedCheckName(entry, snapshot) {
-  const className = getSnapshotClassName(snapshot);
-  const classPrefix = className ? `${getClassEmoji(className) || className} ` : '';
-  return `${classPrefix}**[${entry.name}](${rosterUrl(entry.name)})**`;
-}
+import {
+  formatLinkedCharacter,
+  formatRosterStatBadges,
+  renderTrackedAltsField,
+  resolveRosterWorld,
+} from '../trackedAltsRender.js';
 
 function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang, statMap }) {
   const notAvailable = t('dialogue.broadcast.notAvailable', lang);
   const itemLevel = parsePositiveNumber(snapshot?.itemLevel);
-  const combatScore = String(snapshot?.combatScore || '').trim();
+  const { combatPower } = formatRosterStatBadges(snapshot);
   // Read the server across the roster, not just off this one snapshot ·
   // most entries predate the field and the search-only enrichment route
   // never reports one, so the entry's own row is usually blank while a
@@ -54,7 +46,7 @@ function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang, statM
     },
     {
       name: `⚔️ ${t('dialogue.broadcast.fields.combatPower', lang)}`,
-      value: combatScore && combatScore !== '?' ? `\`${combatScore}\`` : notAvailable,
+      value: combatPower || notAvailable,
       inline: true,
     },
     includeAddedBy
@@ -151,7 +143,7 @@ export function buildCheckEntryDetailsEmbed(entry, {
     .setTitle(`🔎 ${t('dialogue.check.details.title', lang, { list: listLabel })}`)
     .setDescription(t('dialogue.check.details.headline', lang, {
       icon,
-      name: formatLinkedCheckName(entry, snapshot),
+      name: formatLinkedCharacter(entry.name, snapshot),
       list: listLabel,
       scope: scopeTag,
     }))
