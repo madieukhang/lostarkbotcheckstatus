@@ -75,6 +75,24 @@ test('trusted roster backfill stores roster alts for legacy trusted entries', as
   assert.ok(model.updates[0].update.$set.enrichedAt instanceof Date);
 });
 
+test('trusted roster backfill leaves an entry for a later boot when Bible fails', async () => {
+  const model = createTrustedUserModel([
+    { _id: 'trusted-3', name: 'Rateduk', addedAt: new Date('2026-04-08T12:00:00Z') },
+  ]);
+
+  const stats = await backfillTrustedRosterLinks({
+    TrustedUserModel: model,
+    buildRosterCharactersFn: async () => ({
+      hasValidRoster: false,
+      allCharacters: [],
+      failReason: 'HTTP 403',
+    }),
+  });
+
+  assert.deepEqual(stats, { scanned: 1, updated: 0, failed: 1 });
+  assert.equal(model.updates.length, 0);
+});
+
 test('trusted roster backfill marks missing rosters as manual primary-only links', async () => {
   const model = createTrustedUserModel([
     { _id: 'trusted-2', name: 'Hiddenmain', addedAt: new Date('2026-04-08T11:00:00Z') },

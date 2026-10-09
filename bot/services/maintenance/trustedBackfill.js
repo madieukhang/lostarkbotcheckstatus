@@ -31,6 +31,13 @@ export async function backfillTrustedRosterLinks({
         hiddenRosterFallback: true,
         timeoutMs: 10000,
       });
+      // A Bible failure (403, 429, timeout) says nothing about the roster,
+      // and any write takes the entry out of MISSING_TRUSTED_ROSTER_QUERY for good.
+      if (!roster?.hasValidRoster && roster?.failReason) {
+        stats.failed += 1;
+        console.warn(`[maintenance] trusted roster backfill skipped ${entry.name}: ${roster.failReason}`);
+        continue;
+      }
       const allCharacters = normalizeRosterNames(
         entry.name,
         roster?.hasValidRoster ? roster.allCharacters : []

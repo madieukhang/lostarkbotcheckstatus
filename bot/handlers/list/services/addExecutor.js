@@ -167,6 +167,35 @@ function buildMissingRosterResult(name, suggestions, lang) {
   };
 }
 
+function buildBibleUnavailableResult(lang) {
+  const { title, description } = t('dialogue.search.bibleUnavailable', lang);
+  return {
+    ok: false,
+    content: description,
+    embeds: [buildAlertEmbed({ severity: AlertSeverity.WARNING, title, description })],
+  };
+}
+
+/**
+ * Build the early result for a roster lookup the add cannot use.
+ * @param {string} name - normalized target name
+ * @param {object} roster - buildRosterCharacters result
+ * @param {string} lang - viewer language
+ * @param {object} [deps]
+ * @param {Function} [deps.fetchSuggestions] - name-suggestion lookup for a missing roster
+ * @returns {Promise<object|null>} the rejection result, or null when the roster is usable
+ */
+export async function buildUnusableRosterResult(name, roster, lang, {
+  fetchSuggestions = fetchNameSuggestions,
+} = {}) {
+  if (roster.hasValidRoster) return null;
+  // failReason marks a request that broke (403, 429, 5xx, timeout); a name
+  // with no character comes back as an empty roster instead.
+  if (roster.failReason) return buildBibleUnavailableResult(lang);
+  const suggestions = await fetchSuggestions(name) || [];
+  return buildMissingRosterResult(name, suggestions, lang);
+}
+
 async function saveRosterSnapshotsBestEffort(rosterCharacters, name) {
   try {
     await upsertRosterSnapshots(rosterCharacters, name);
@@ -548,10 +577,8 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     const hiddenRosterMeta = roster.rosterVisibility === 'hidden'
       ? await fetchCharacterMeta(name)
       : null;
-    if (!roster.hasValidRoster) {
-      const suggestions = await fetchNameSuggestions(name) || [];
-      return buildMissingRosterResult(name, suggestions, lang);
-    }
+    const unusableRoster = await buildUnusableRosterResult(name, roster, lang);
+    if (unusableRoster) return unusableRoster;
 
     await saveRosterSnapshotsBestEffort(roster.rosterCharacters, name);
     const itemLevelRejection = buildItemLevelRejection({

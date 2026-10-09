@@ -50,18 +50,25 @@ export function shapeRosterListHit(entry) {
  * Fetches every matching row, then applies the shared deterministic priority:
  * requesting guild Server > another owner-visible Server > Global/legacy;
  * exact primary > roster alias inside one scope tier.
+ * A lookup error is rethrown: a null here reads as "not blacklisted".
  * @param {string[]} names - character names from the OCR/roster
- * @param {{guildId?: string}} [options] - scope filter
- * @returns {Promise<object|null>} shaped hit or null on no match / error
+ * @param {object} [options]
+ * @param {string} [options.guildId] - scope filter
+ * @param {object} [options.BlacklistModel] - Blacklist model
+ * @param {Function} [options.connectDBFn] - database connector
+ * @returns {Promise<object|null>} shaped hit, or null on no match
  */
-export async function handleRosterBlackListCheck(names, options = {}) {
+export async function handleRosterBlackListCheck(names, {
+  guildId,
+  BlacklistModel = Blacklist,
+  connectDBFn = connectDB,
+} = {}) {
   try {
-    await connectDB();
+    await connectDBFn();
 
-    const { guildId } = options;
     const nameQuery = buildNameRosterQuery(names);
 
-    const entries = await Blacklist.find(buildBlacklistQuery(nameQuery, guildId))
+    const entries = await BlacklistModel.find(buildBlacklistQuery(nameQuery, guildId))
       .collation(CASE_INSENSITIVE_COLLATION)
       .lean();
     const entry = pickPreferredListEntry(entries, names, {
@@ -78,16 +85,28 @@ export async function handleRosterBlackListCheck(names, options = {}) {
     return null;
   } catch (err) {
     console.error('[blacklist] Check failed:', err.message, '| code:', err.code, '| name:', err.name);
-    return null;
+    throw err;
   }
 }
 
-export async function handleRosterWhiteListCheck(names) {
+/**
+ * Look up a roster's names against the Whitelist collection.
+ * A lookup error is rethrown, as for the blacklist check.
+ * @param {string[]} names - character names from the OCR/roster
+ * @param {object} [options]
+ * @param {object} [options.WhitelistModel] - Whitelist model
+ * @param {Function} [options.connectDBFn] - database connector
+ * @returns {Promise<object|null>} shaped hit, or null on no match
+ */
+export async function handleRosterWhiteListCheck(names, {
+  WhitelistModel = Whitelist,
+  connectDBFn = connectDB,
+} = {}) {
   try {
     console.log(`[whitelist] Checking ${names.length} character(s):`, names.join(', '));
-    await connectDB();
+    await connectDBFn();
 
-    const entry = await Whitelist.findOne(buildNameRosterQuery(names))
+    const entry = await WhitelistModel.findOne(buildNameRosterQuery(names))
       .collation(CASE_INSENSITIVE_COLLATION)
       .lean();
 
@@ -100,6 +119,6 @@ export async function handleRosterWhiteListCheck(names) {
     return null;
   } catch (err) {
     console.error('[whitelist] Check failed:', err.message, '| code:', err.code, '| name:', err.name);
-    return null;
+    throw err;
   }
 }

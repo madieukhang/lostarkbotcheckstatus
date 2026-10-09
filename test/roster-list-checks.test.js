@@ -5,7 +5,40 @@ process.env.DISCORD_TOKEN ||= 'test';
 process.env.CHANNEL_ID ||= 'test';
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
-const { shapeRosterListHit } = await import('../bot/services/roster/listChecks.js');
+const {
+  handleRosterBlackListCheck,
+  handleRosterWhiteListCheck,
+  shapeRosterListHit,
+} = await import('../bot/services/roster/listChecks.js');
+
+function failingQuery() {
+  const query = {
+    collation: () => query,
+    lean: async () => { throw new Error('connection reset'); },
+  };
+  return query;
+}
+
+test('/la-roster blacklist check fails closed when the lookup errors', async () => {
+  await assert.rejects(
+    handleRosterBlackListCheck(['Main'], {
+      guildId: 'guild-1',
+      BlacklistModel: { find: failingQuery },
+      connectDBFn: async () => {},
+    }),
+    /connection reset/
+  );
+});
+
+test('/la-roster whitelist check fails closed when the lookup errors', async () => {
+  await assert.rejects(
+    handleRosterWhiteListCheck(['Main'], {
+      WhitelistModel: { findOne: failingQuery },
+      connectDBFn: async () => {},
+    }),
+    /connection reset/
+  );
+});
 
 test('/la-roster list-hit evidence payload keeps roster metadata', () => {
   const addedAt = new Date('2026-05-17T00:00:00Z');
