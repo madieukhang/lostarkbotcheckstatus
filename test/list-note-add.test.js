@@ -57,13 +57,58 @@ test('a duplicate from a direct add renders with the note controls', async () =>
   assert.match(addKeyOf(rendered[0]), /^listnote_add:/);
 });
 
+function submitMemberServerAdd(existingEntry) {
+  const calls = { rendered: [], sent: [], persisted: [] };
+  const submission = submitListMutation({
+    interaction: { guild: { id: 'guild' } },
+    payload: { ...payload, scope: 'server', requestedByUserId: 'member' },
+    lang: 'en',
+    isRequesterAutoApproverFn: () => false,
+    executeListAddToDatabase: async () => ({ ...duplicate(), existingEntry }),
+    renderExecutionResultFn: async (_interaction, result) => calls.rendered.push(result),
+    sendListAddApprovalToApprovers: async (_guild, sentPayload) => {
+      calls.sent.push(sentPayload);
+      return { success: true, deliveredApproverIds: ['approver'], deliveredDmMessages: [] };
+    },
+    PendingApprovalModel: { create: async doc => calls.persisted.push(doc) },
+    connectDBFn: async () => {},
+  });
+  return { calls, submission };
+}
+
+test('a member server-scoped add that finds an entry outside their server goes to approval, with no note button', async () => {
+  const outside = [
+    { ...existing, scope: 'global' },
+    { ...existing, scope: undefined },
+    { ...existing, scope: 'server', guildId: 'other-guild' },
+  ];
+  for (const entry of outside) {
+    const { calls, submission } = submitMemberServerAdd(entry);
+    assert.equal((await submission).status, 'queued', `scope ${entry.scope}`);
+    assert.equal(calls.rendered.length, 0, 'no duplicate card with a note button');
+    assert.equal(calls.sent.length, 1);
+    assert.equal(calls.sent[0].scope, 'server', 'the approver sees the scope the member asked for');
+    assert.equal(calls.persisted.length, 1);
+  }
+});
+
+test('a member server-scoped add that finds their own server entry keeps the note button', async () => {
+  const { calls, submission } = submitMemberServerAdd({ ...existing, scope: 'server', guildId: 'guild' });
+  assert.equal((await submission).status, 'executed');
+  assert.equal(calls.sent.length, 0);
+  assert.match(addKeyOf(calls.rendered[0]), /^listnote_add:/);
+});
+
 function setup(t) {
   t.mock.method(mongoose, 'connect', async () => mongoose);
   t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
   clearUserLanguageCache();
   t.after(async () => { clearUserLanguageCache(); await disconnectDB(); });
   const broadcasts = [];
-  const handlers = createNoteHandlers({ services: { broadcastListChange: async (...args) => { broadcasts.push(args); } } });
+  const handlers = createNoteHandlers({
+    services: { broadcastListChange: async (...args) => { broadcasts.push(args); } },
+    isRequesterAutoApproverFn: userId => userId === 'owner',
+  });
   return { broadcasts, handlers };
 }
 
@@ -146,6 +191,32 @@ test('an entry removed before the click is not recreated', async t => {
   await handlers.handleListNoteAddButton(owner.interaction);
   assert.match(owner.calls.edits[0].embeds[0].toJSON().title, /original entry is gone/);
   assert.equal(broadcasts.length, 0);
+});
+
+test('a member card refuses the note when its entry left the member server after the card opened', async t => {
+  const { handlers, broadcasts } = setup(t);
+  const ownEntry = { ...existing, scope: 'server', guildId: 'guild' };
+  const memberPayload = { ...payload, scope: 'server', requestedByUserId: 'member' };
+  const key = addKeyOf(attachNoteControls({ ...duplicate(), existingEntry: ownEntry }, memberPayload, 'en'));
+  t.mock.method(Blacklist, 'findById', () => ({ lean: async () => ({ ...ownEntry, scope: 'global', guildId: '' }) }));
+  t.mock.method(Blacklist, 'findOneAndUpdate', () => assert.fail('a member note on a global entry needs approval'));
+  const member = click(key, 'member');
+  await handlers.handleListNoteAddButton(member.interaction);
+  assert.match(member.calls.edits[0].embeds[0].toJSON().title, /needs approval/);
+  assert.deepEqual(member.calls.edits[0].components, []);
+  assert.equal(broadcasts.length, 0);
+});
+
+test('a member still adds a note to their own server entry', async t => {
+  const { handlers } = setup(t);
+  const ownEntry = { ...existing, scope: 'server', guildId: 'guild' };
+  const memberPayload = { ...payload, scope: 'server', requestedByUserId: 'member' };
+  let writes = 0;
+  t.mock.method(Blacklist, 'findById', () => ({ lean: async () => ownEntry }));
+  t.mock.method(Blacklist, 'findOneAndUpdate', () => { writes += 1; return { lean: async () => ({ ...ownEntry, notes: [] }) }; });
+  const key = addKeyOf(attachNoteControls({ ...duplicate(), existingEntry: ownEntry }, memberPayload, 'en'));
+  await handlers.handleListNoteAddButton(click(key, 'member').interaction);
+  assert.equal(writes, 1);
 });
 
 test('an unknown or expired key answers that the card expired', async t => {

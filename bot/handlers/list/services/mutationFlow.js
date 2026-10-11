@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { connectDB } from '../../../db.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editEmbed, editNotice } from '../../../utils/interactionReplies.js';
-import { isRequesterAutoApprover } from '../helpers.js';
+import { canChangeEntryWithoutApproval, isRequesterAutoApprover } from '../helpers.js';
 import { attachNoteControls } from '../notes/pendingNotes.js';
 
 export function buildListMutationPayload({
@@ -67,6 +67,8 @@ export async function renderListAddExecutionResult(
  *
  * Officers and server-scoped blacklist writes execute immediately. Every other
  * request must be delivered to at least one approver before it is persisted.
+ * A server-scoped request that finds a duplicate outside its own server also
+ * goes to approval, since its note controls would change that entry.
  * Surface-specific copy remains in callbacks so slash-add and Quick Add can
  * keep their own UI without duplicating the approval contract.
  */
@@ -89,8 +91,12 @@ export async function submitListMutation({
 
   if (autoApproved) {
     const result = await executeListAddToDatabase(payload);
-    await renderExecutionResultFn(interaction, attachNoteControls(result, payload, lang), lang);
-    return { status: 'executed', result };
+    const needsApproval = result.isDuplicate
+      && !canChangeEntryWithoutApproval(payload, result.existingEntry, isRequesterAutoApproverFn);
+    if (!needsApproval) {
+      await renderExecutionResultFn(interaction, attachNoteControls(result, payload, lang), lang);
+      return { status: 'executed', result };
+    }
   }
 
   const delivery = await sendListAddApprovalToApprovers(interaction.guild, payload);

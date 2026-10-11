@@ -10,7 +10,7 @@ import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, deferUpdate, editAlert, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
-import { getListContext } from '../helpers.js';
+import { canChangeEntryWithoutApproval, getListContext, isRequesterAutoApprover } from '../helpers.js';
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 import { buildNoteAddedPayload } from './addedCard.js';
 import { appendEntryNote, listAddedAlts } from './appendNote.js';
@@ -40,13 +40,14 @@ async function renderHistory(interaction, lang) {
 /**
  * @param {object} deps
  * @param {object} deps.services - shared list services (broadcastListChange)
+ * @param {Function} [deps.isRequesterAutoApproverFn]
  * @returns {{
  *   handleListNoteHistoryButton: Function,
  *   handleListNotePageButton: Function,
  *   handleListNoteAddButton: Function,
  * }}
  */
-export function createNoteHandlers({ services }) {
+export function createNoteHandlers({ services, isRequesterAutoApproverFn = isRequesterAutoApprover }) {
   const languageOf = interaction => getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
   async function handleListNoteHistoryButton(interaction) {
@@ -75,16 +76,23 @@ export function createNoteHandlers({ services }) {
     const { model } = getListContext(payload.type);
     let entry;
     let saved;
+    let allowed = true;
     // Taken above so a second click cannot save the report twice; given back
     // when the save fails, which the card key on the note makes safe to retry.
     try {
       await deferUpdate(interaction);
       await connectDB();
       entry = await model.findById(entryId).lean();
-      saved = entry ? await appendEntryNote({ model, entry, payload, rosterNames, requestId: key }) : null;
+      // The entry may have changed scope since the card was offered.
+      allowed = !entry || canChangeEntryWithoutApproval(payload, entry, isRequesterAutoApproverFn);
+      saved = entry && allowed ? await appendEntryNote({ model, entry, payload, rosterNames, requestId: key }) : null;
     } catch (err) {
       restorePendingNote(key, pending);
       throw err;
+    }
+    if (!allowed) {
+      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.notes.needsApproval', lang), lang }, { components: [] });
+      return;
     }
     if (!saved) {
       await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang), lang }, { components: [] });

@@ -440,6 +440,7 @@ export default {
     },
     pendingExpired: { title: 'This card has expired', description: 'I no longer hold the report from this card. Run `/la-list add` again to add it as a note.' },
     notYours: { title: 'This card is not yours', description: 'Only the member who ran this `/la-list add` can add its report to the history.' },
+    needsApproval: { title: 'This note needs approval', description: 'The entry is no longer one of this server\'s own entries, so a note on it goes through an approver. Run `/la-list add` again to send it for approval.' },
   },
   listEdit: {
     originalMissing: { title: 'The original entry is gone', description: 'The entry was removed or moved to another list before these changes could be saved.' },

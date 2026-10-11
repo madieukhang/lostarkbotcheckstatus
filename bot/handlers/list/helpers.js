@@ -579,6 +579,20 @@ export function isRequesterAutoApprover(userId) {
 }
 
 /**
+ * Whether a requester may change an existing entry without approval. A
+ * server-scoped request only covers that server's own blacklist entries; a
+ * global, legacy unscoped, or other-server entry needs an auto-approver.
+ * @param {object} payload - list mutation payload (requestedByUserId, guildId)
+ * @param {object} entry - the stored entry the mutation would change
+ * @param {Function} [isRequesterAutoApproverFn]
+ * @returns {boolean}
+ */
+export function canChangeEntryWithoutApproval(payload, entry, isRequesterAutoApproverFn = isRequesterAutoApprover) {
+  if (isRequesterAutoApproverFn(payload.requestedByUserId)) return true;
+  return entry?.scope === 'server' && Boolean(payload.guildId) && entry.guildId === payload.guildId;
+}
+
+/**
  * Stricter variant used by /la-list multiadd auto-approve check.
  * Only senior + officer can bypass bulk approval; MEMBER_APPROVER_IDS
  * (which gives bypass rights on single /la-list add for legacy reasons)

@@ -321,6 +321,7 @@ export default {
     },
     pendingExpired: { title: 'このカードは期限切れですわ', description: 'このカードの報告はもう保持しておりませんの。メモとして追加するには、もう一度 `/la-list add` を実行してくださいませ。' },
     notYours: { title: 'あなたのカードではありませんわ', description: 'この `/la-list add` を実行した方だけが、報告を履歴に追加できますの。' },
+    needsApproval: { title: 'このメモには承認が必要ですわ', description: 'この entry はもうこの server 専用の entry ではありませんので、メモは approver の承認を通りますの。承認に送るには、もう一度 `/la-list add` を実行してくださいませ。' },
   },
   listEdit: {
     originalMissing: { title: '元の entry がありませんの', description: '変更を保存する前に、entry が削除されたか別の list に移されましたわ。' },

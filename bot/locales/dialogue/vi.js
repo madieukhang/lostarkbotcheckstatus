@@ -346,6 +346,7 @@ export default {
     },
     pendingExpired: { title: 'Card này hết hạn rồi', description: 'Tớ không còn giữ lần report của card này nữa. Cậu chạy lại `/la-list add` để ghi nó vào lịch sử nhé.' },
     notYours: { title: 'Card này không phải của cậu', description: 'Chỉ người chạy lệnh `/la-list add` này mới ghi được lần report vào lịch sử.' },
+    needsApproval: { title: 'Note này cần được duyệt', description: 'Entry này không còn là entry riêng của server nữa, nên note trên nó phải qua approver. Cậu chạy lại `/la-list add` để gửi đi duyệt nhé.' },
   },
   listEdit: {
     originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry đã bị xóa hoặc chuyển sang list khác trước khi thay đổi được lưu.' },

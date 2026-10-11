@@ -1,5 +1,6 @@
 # Changelog
 
+- A member's server-scoped `/la-list add` that finds a global, unscoped or other-server blacklist entry now goes to the approvers instead of offering **Add to history**, so a member can no longer replace a global entry's reason without approval. A card opened on the member's own server entry refuses the note if that entry has become global since.
 - The `/la-check` and auto-check details dropdown includes **Select none**, allowing the same character to be selected again.
 - Owning a blacklist entry no longer bypasses approval when promoting it from server to global scope or moving another list entry into global blacklist. Alts submitted with the edit remain pending until approval.
 
