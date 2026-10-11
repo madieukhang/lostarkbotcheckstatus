@@ -102,9 +102,12 @@ export function shouldRunScheduledCheck(now = new Date(), recoveryPending = fals
  *   4. Save updated state
  *
  * @param {import('discord.js').Client} client
+ * @param {{undelivered?: Set<string>}} [options] - undelivered collects the
+ *   servers that are online while their recovery alert is still owed under
+ *   another worker's claim; the status map keeps showing them online.
  * @returns {Promise<Map<string, string>>} Map of server name → STATUS
  */
-export async function checkStatus(client) {
+export async function checkStatus(client, { undelivered = new Set() } = {}) {
   const servers = config.targetServers;
   let statusMap;
 
@@ -134,6 +137,8 @@ export async function checkStatus(client) {
         // above, so the next poll can retry safely.
         statusMap.set(server, STATUS.UNKNOWN);
       }
+    } else if (transition.deliveryPending) {
+      undelivered.add(server);
     }
   }
 
@@ -162,8 +167,9 @@ export function startMonitor(client) {
 
     checkInFlight = true;
     try {
-      const statusMap = await checkStatus(client);
-      recoveryPending = needsRecoveryPolling(statusMap);
+      const undelivered = new Set();
+      const statusMap = await checkStatus(client, { undelivered });
+      recoveryPending = needsRecoveryPolling(statusMap) || undelivered.size > 0;
     } catch (err) {
       // A request failure during maintenance must not let the scheduler stop at
       // the fixed window boundary. Preserve an existing recovery wait as well.

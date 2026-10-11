@@ -10,6 +10,10 @@ const DEFAULT_ALERT_CLAIM_MS = 2 * 60 * 1000;
  * notification. Mongo is the source of truth so Railway restarts cannot erase
  * a maintenance -> online transition and overlapping containers cannot both
  * send the same alert.
+ * @param {object} options - server, status, and injectable model/clock/claim settings
+ * @returns {Promise<{previousStatus: string|null, shouldNotify: boolean, claimId: string|null, deliveryPending?: boolean}>}
+ *   deliveryPending is true when the server is online but the recovery alert
+ *   is still owed under another worker's claim, so polling must continue.
  */
 export async function observeServerStatus({
   server,
@@ -106,6 +110,9 @@ export async function observeServerStatus({
     previousStatus: previous?.lastStatus ?? null,
     shouldNotify: false,
     claimId: null,
+    // The claim filter missed while recovery is still pending: another
+    // worker's lease holds it, possibly one that stopped before sending.
+    deliveryPending: previous?.recoveryPending === true,
   };
 }
 

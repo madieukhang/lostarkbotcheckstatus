@@ -1,5 +1,6 @@
 # Changelog
 
+- The server monitor keeps checking after a restart while a recovery alert is still owed under another container's claim, so an online notice that the stopped container never sent goes out once its claim expires, instead of waiting for the next maintenance window. `/la-status` still shows such a server as online.
 - Refreshing a trusted character with `/la-list trust action:add` keeps its saved alts when lostark.bible does not list the roster (the site is down or the roster is hidden), instead of shrinking the entry to the main alone. A new reason is still saved, and the reply says the roster was not refreshed.
 - Evidence downloads (multiadd rows, `/la-list add`, image sync) refuse a URL whose host or any redirect target is a loopback, private or link-local address, and archive only image bodies. A member-typed multiadd URL can no longer make the bot fetch an internal address or post a non-image response into the evidence channel; the row keeps its link as before.
 - A member's server-scoped `/la-list add` that finds a global, unscoped or other-server blacklist entry now goes to the approvers instead of offering **Add to history**, so a member can no longer replace a global entry's reason without approval. A card opened on the member's own server entry refuses the note if that entry has become global since.
