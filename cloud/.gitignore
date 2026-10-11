@@ -1,0 +1,3 @@
+# Local Wrangler state and local secrets (BOT_TOKEN for wrangler dev)
+.wrangler/
+.dev.vars*

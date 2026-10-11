@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "loalogs-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Reached only through the lostark-web Service Binding. A public URL would let
+  // anyone forge the x-web-user identity header, so both public routes stay off.
+  "workers_dev": false,
+  "preview_urls": false
+}
