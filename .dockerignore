@@ -17,6 +17,7 @@ data/
 .playwright-mcp/
 docs/
 test/
+cloud/
 exports/
 scripts/
 dusk-check.js

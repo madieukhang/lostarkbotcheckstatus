@@ -87,6 +87,7 @@ This changelog focuses on user-visible changes, important backend fixes, and str
 - `/la-search` offers report details for blacklist, watchlist and whitelist hits without requiring an image. Details reuse the check card, reload the current entry with blacklist scope checks, and preserve the recorded primary character when the searched name is an alt.
 
 ### Changed (internal)
+- Railway skips the deploy when a push only touches `cloud/` or root Markdown files (`watchPatterns` in `railway.toml`), and the Docker image leaves `cloud/` out, so web API changes never restart the bot.
 - New `cloud/` folder: `loalogs-api`, the Cloudflare Worker behind the upcoming web version. It lists the guilds the bot is in (kept five minutes) and returns the signed-in web user; it has no public URL, and only the web gateway reaches it. It keeps its own `package.json` and tests (`cd cloud && npm test`); the bot never loads it.
 - Screenshot OCR logs a name it drops for matching a server name; the filter stays, since Gemini can read the server label in a small room as a player. `handleApprovedEditRequest` no longer takes the unused `requestId`.
 - `handleApprovedEditRequest` takes `completeApproval` and `beforeWrite` from every caller instead of test-only defaults, the bulk approval color and `listTypeIcon` use lookups instead of `if` chains, and em-dashes are gone from the README and a utility comment. No behavior change.

@@ -2,6 +2,10 @@
 # Use the existing Dockerfile for the build
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+# Deploy only when the bot image can change. cloud/ is a separate Cloudflare Worker, and
+# root Markdown files never reach the image (.dockerignore). Gitignore syntax: a negation
+# applies only after the including "**".
+watchPatterns = ["**", "!/*.md", "!/cloud/**"]
 
 [deploy]
 # Discord bot – no HTTP server, so no healthcheck needed
