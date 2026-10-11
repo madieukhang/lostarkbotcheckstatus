@@ -20,6 +20,8 @@
  * If unset, the bot falls back to legacy direct-URL storage with a warning.
  */
 
+import dns from 'node:dns';
+import net from 'node:net';
 import { AttachmentBuilder } from 'discord.js';
 import config from '../config.js';
 import { getGuildConfig } from './scope.js';
@@ -31,6 +33,61 @@ const REHOST_MAX_BYTES = 24 * 1024 * 1024;
 // Multiadd rows can name any image host, so a stalled server must not hold
 // the confirm flow open.
 const REHOST_DOWNLOAD_TIMEOUT_MS = 30_000;
+const REHOST_MAX_REDIRECTS = 3;
+
+// Multiadd rows carry member-typed URLs, so the download must not reach the
+// bot's own network: loopback, private, link-local, shared (CGNAT),
+// benchmark, multicast and reserved ranges. BlockList also matches
+// IPv4-mapped IPv6 forms such as ::ffff:127.0.0.1.
+const NON_PUBLIC_ADDRESSES = new net.BlockList();
+for (const [prefix, bits] of [
+  ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16],
+  ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 3],
+]) NON_PUBLIC_ADDRESSES.addSubnet(prefix, bits, 'ipv4');
+for (const [prefix, bits] of [['::', 127], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]]) {
+  NON_PUBLIC_ADDRESSES.addSubnet(prefix, bits, 'ipv6');
+}
+
+// Why a URL may not be downloaded, or '' when its host resolves only to
+// public addresses. A name is resolved here and again by fetch, so a DNS
+// answer that changes between the two lookups is not covered.
+async function refuseNonPublicTarget(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return 'invalid URL';
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return `unsupported protocol ${parsed.protocol}`;
+  const host = parsed.hostname.replace(/^\[(.*)\]$/, '$1');
+  let addresses;
+  try {
+    addresses = net.isIP(host)
+      ? [{ address: host, family: net.isIP(host) }]
+      : await dns.promises.lookup(host, { all: true, verbatim: true });
+  } catch (err) {
+    return `cannot resolve ${host}: ${err.code || err.message}`;
+  }
+  const blocked = addresses.some(({ address, family }) =>
+    NON_PUBLIC_ADDRESSES.check(address, family === 6 ? 'ipv6' : 'ipv4'));
+  return blocked ? `${host} resolves to a non-public address` : '';
+}
+
+// Follow redirects by hand so every hop's target is checked before the request.
+async function fetchPublicUrl(url) {
+  const signal = AbortSignal.timeout(REHOST_DOWNLOAD_TIMEOUT_MS);
+  let target = url;
+  for (let hop = 0; hop <= REHOST_MAX_REDIRECTS; hop++) {
+    const refusal = await refuseNonPublicTarget(target);
+    if (refusal) return { refusal };
+    const response = await fetch(target, { redirect: 'manual', signal });
+    const location = response.status >= 300 && response.status < 400 ? response.headers.get('location') : null;
+    if (!location) return { response };
+    await response.body?.cancel().catch(() => {});
+    target = new URL(location, target).href;
+  }
+  return { refusal: `more than ${REHOST_MAX_REDIRECTS} redirects` };
+}
 
 const EVIDENCE_LIST_ICON = Object.freeze({
   black: '⛔',
@@ -51,7 +108,9 @@ async function getEvidenceChannelId() {
 
 /**
  * Download an image URL and re-upload it to the evidence channel for
- * permanent storage. Returns metadata for the rehosted message.
+ * permanent storage. Returns metadata for the rehosted message. A URL whose
+ * host (or any redirect target) resolves to a non-public address, or whose
+ * body is not an image, is refused and nothing is uploaded.
  *
  * @param {string} originalUrl - The Discord CDN URL (or any image URL) to rehost
  * @param {Client} client - The Discord.js client (used to fetch evidence channel)
@@ -92,15 +151,24 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   // inside one try block doesn't get re-caught by an outer catch and
   // double-wrapped into "download fetch threw: download HTTP 404" style
   // nonsense messages.
-  let response;
+  let download;
   try {
-    response = await fetch(originalUrl, { signal: AbortSignal.timeout(REHOST_DOWNLOAD_TIMEOUT_MS) });
+    download = await fetchPublicUrl(originalUrl);
   } catch (err) {
     return fail(`download fetch threw: ${err.message}`);
   }
+  if (download.refusal) return fail(`download refused: ${download.refusal}`);
+  const { response } = download;
 
   if (!response.ok) {
     return fail(`download HTTP ${response.status}${response.statusText ? ` (${response.statusText})` : ''}`);
+  }
+
+  // Only an image goes into the archive; other bodies are not read.
+  const contentType = response.headers.get('content-type') || '';
+  if (!/^image\//i.test(contentType)) {
+    await response.body?.cancel().catch(() => {});
+    return fail(`download is not an image (${contentType || 'no content type'})`);
   }
 
   let buffer;

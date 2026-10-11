@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import dns from 'node:dns';
 import config from '../bot/config.js';
 import GuildConfig from '../bot/models/GuildConfig.js';
 import { invalidateGuildConfig } from '../bot/utils/scope.js';
@@ -37,6 +38,7 @@ test('rehost stops reading an oversized body at its 24 MiB ceiling and sets a do
   t.after(() => { config.ownerGuildId = ownerGuildId; invalidateGuildConfig('bounded-download-owner'); });
   t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ evidenceChannelId: 'evidence' }) }));
   t.mock.method(console, 'warn', () => {});
+  t.mock.method(dns.promises, 'lookup', async () => [{ address: '93.184.215.14', family: 4 }]);
   const pulls = { count: 0 };
   let signal;
   t.mock.method(globalThis, 'fetch', async (_url, options) => {
