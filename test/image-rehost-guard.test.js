@@ -55,12 +55,36 @@ test('a loopback, private or link-local address is refused before any request', 
     'http://[::1]/a.png',
     'http://[fd12::1]/a.png',
     'http://[::ffff:127.0.0.1]/a.png',
+    'http://[::127.0.0.1]/a.png',
+    'http://[64:ff9b::7f00:1]/a.png',
+    'http://[2002:7f00:1::1]/a.png',
+    'http://[fec0::1]/a.png',
   ]) {
     assert.equal(await rehostImage(url, client), null, url);
-    await assert.rejects(rehostImage(url, client, { throwOnError: true }), /non-public address/, url);
+    await assert.rejects(rehostImage(url, client, { throwOnError: true }), /^Error: download refused/, url);
   }
   assert.deepEqual(fetched, []);
   assert.equal(uploads.length, 0);
+});
+
+test('an unresolvable host and an internal one get the same refusal, so the reply reveals no internal names', async t => {
+  const { client } = setup(t);
+  const refusalFor = async url => (await rehostImage(url, client, { throwOnError: true }).catch(err => err)).message;
+  const internal = await refusalFor('http://10.0.0.5/a.png');
+  t.mock.method(dns.promises, 'lookup', async () => { throw Object.assign(new Error('not found'), { code: 'ENOTFOUND' }); });
+  const unresolvable = await refusalFor('https://missing.example/a.png');
+  assert.equal(unresolvable, internal);
+  assert.doesNotMatch(internal, /10\.0\.0\.5|missing\.example|ENOTFOUND/);
+});
+
+test('an untyped body is archived only when it starts with an image signature', async t => {
+  const untyped = bytes => new Response(new Uint8Array(bytes), { headers: { 'content-type': 'application/octet-stream' } });
+  const png = setup(t, { responses: [untyped([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])] });
+  assert.equal((await rehostImage('https://cdn.example/screenshot', png.client)).messageId, 'archived');
+
+  const text = setup(t, { responses: [untyped([...Buffer.from('internal status')])] });
+  await assert.rejects(rehostImage('https://cdn.example/screenshot', text.client, { throwOnError: true }), /not an image/);
+  assert.equal(text.uploads.length, 0);
 });
 
 test('a host name that resolves to a private address is refused', async t => {

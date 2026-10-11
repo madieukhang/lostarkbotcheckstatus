@@ -21,6 +21,16 @@ async function resolveDownloadUrl(entry, interaction, stats) {
   return null;
 }
 
+// rehostImage refuses these the same way on every attempt, so a retry cannot
+// help.
+const PERMANENT_DOWNLOAD_FAILURES = ['download refused', 'download is not an image'];
+const DEAD_LINK_FAILURES = [
+  'download HTTP',
+  'download fetch threw',
+  'download read body',
+  ...PERMANENT_DOWNLOAD_FAILURES,
+];
+
 async function rehostWithRetry(downloadUrl, entry, type, interaction, stats) {
   let firstAttemptError = null;
 
@@ -33,17 +43,15 @@ async function rehostWithRetry(downloadUrl, entry, type, interaction, stats) {
         throwOnError: true,
       });
     } catch (err) {
-      if (attempt === 1) {
-        firstAttemptError = err.message;
+      const errMsg = err.message;
+      const isPermanent = PERMANENT_DOWNLOAD_FAILURES.some((prefix) => errMsg.startsWith(prefix));
+      if (attempt === 1 && !isPermanent) {
+        firstAttemptError = errMsg;
         await sleep(2000);
         continue;
       }
 
-      const errMsg = err.message;
-      const isDownloadFailure =
-        errMsg.startsWith('download HTTP')
-        || errMsg.startsWith('download fetch threw')
-        || errMsg.startsWith('download read body');
+      const isDownloadFailure = DEAD_LINK_FAILURES.some((prefix) => errMsg.startsWith(prefix));
 
       if (isDownloadFailure) {
         stats.skippedDead += 1;

@@ -38,15 +38,23 @@ const REHOST_MAX_REDIRECTS = 3;
 // Multiadd rows carry member-typed URLs, so the download must not reach the
 // bot's own network: loopback, private, link-local, shared (CGNAT),
 // benchmark, multicast and reserved ranges. BlockList also matches
-// IPv4-mapped IPv6 forms such as ::ffff:127.0.0.1.
+// IPv4-mapped IPv6 forms such as ::ffff:127.0.0.1. The IPv6 forms that embed
+// or translate to an IPv4 address (IPv4-compatible, NAT64, 6to4, Teredo) and
+// deprecated site-local addresses are refused whole.
 const NON_PUBLIC_ADDRESSES = new net.BlockList();
 for (const [prefix, bits] of [
   ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16],
   ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 3],
 ]) NON_PUBLIC_ADDRESSES.addSubnet(prefix, bits, 'ipv4');
-for (const [prefix, bits] of [['::', 127], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]]) {
-  NON_PUBLIC_ADDRESSES.addSubnet(prefix, bits, 'ipv6');
-}
+for (const [prefix, bits] of [
+  ['::', 96], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['100::', 64], ['2001::', 32], ['2002::', 16],
+  ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
+]) NON_PUBLIC_ADDRESSES.addSubnet(prefix, bits, 'ipv6');
+
+// A refusal can reach a channel through the multiadd summary, so a host that
+// does not resolve gets the same text as an internal one; otherwise the reply
+// would tell which internal names exist. The detail goes to the log only.
+const NOT_PUBLIC = 'not a public address';
 
 // Why a URL may not be downloaded, or '' when its host resolves only to
 // public addresses. A name is resolved here and again by fetch, so a DNS
@@ -66,11 +74,30 @@ async function refuseNonPublicTarget(url) {
       ? [{ address: host, family: net.isIP(host) }]
       : await dns.promises.lookup(host, { all: true, verbatim: true });
   } catch (err) {
-    return `cannot resolve ${host}: ${err.code || err.message}`;
+    console.warn(`[imageRehost] cannot resolve ${host}: ${err.code || err.message}`);
+    return NOT_PUBLIC;
   }
   const blocked = addresses.some(({ address, family }) =>
     NON_PUBLIC_ADDRESSES.check(address, family === 6 ? 'ipv6' : 'ipv4'));
-  return blocked ? `${host} resolves to a non-public address` : '';
+  if (!blocked) return '';
+  console.warn(`[imageRehost] ${host} resolves to a non-public address`);
+  return NOT_PUBLIC;
+}
+
+// Image types recognised by their first bytes, for a body served without a
+// specific content type.
+const UNTYPED_CONTENT_TYPE = /^(?:(?:application|binary)\/octet-stream)?\s*(?:;|$)/i;
+const IMAGE_SIGNATURES = Object.freeze([
+  { ext: 'png', parts: [[0, '89504e470d0a1a0a']] },
+  { ext: 'jpg', parts: [[0, 'ffd8ff']] },
+  { ext: 'gif', parts: [[0, '47494638']] },
+  { ext: 'webp', parts: [[0, '52494646'], [8, '57454250']] },
+]);
+
+function imageSignatureExtension(buffer) {
+  const matches = ({ parts }) => parts.every(([offset, hex]) =>
+    buffer.toString('hex', offset, offset + hex.length / 2) === hex);
+  return IMAGE_SIGNATURES.find(matches)?.ext || '';
 }
 
 // Follow redirects by hand so every hop's target is checked before the request.
@@ -164,11 +191,15 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     return fail(`download HTTP ${response.status}${response.statusText ? ` (${response.statusText})` : ''}`);
   }
 
-  // Only an image goes into the archive; other bodies are not read.
+  // Only an image goes into the archive. A body without a specific type is
+  // read and kept only when it starts with an image signature; any other
+  // type is not read.
   const contentType = response.headers.get('content-type') || '';
-  if (!/^image\//i.test(contentType)) {
+  const typedImage = /^image\//i.test(contentType);
+  const notAnImage = `download is not an image (${contentType || 'no content type'})`;
+  if (!typedImage && !UNTYPED_CONTENT_TYPE.test(contentType)) {
     await response.body?.cancel().catch(() => {});
-    return fail(`download is not an image (${contentType || 'no content type'})`);
+    return fail(notAnImage);
   }
 
   let buffer;
@@ -179,10 +210,12 @@ export async function rehostImage(originalUrl, client, meta = {}) {
       ? 'file too large to rehost (> 24 MB limit)'
       : `download read body failed: ${err.message}`);
   }
+  const sniffedExt = typedImage ? '' : imageSignatureExtension(buffer);
+  if (!typedImage && !sniffedExt) return fail(notAnImage);
 
   // Try to extract a sensible filename from the URL path. Failure is
-  // non-fatal · falls back to 'evidence.png'.
-  let filename = 'evidence.png';
+  // non-fatal · falls back to 'evidence' with the sniffed type, or png.
+  let filename = `evidence.${sniffedExt || 'png'}`;
   try {
     const urlPath = new URL(originalUrl).pathname;
     const lastSegment = urlPath.split('/').pop() || '';
