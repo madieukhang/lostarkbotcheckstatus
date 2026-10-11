@@ -97,7 +97,7 @@ async function rejectBlacklistedTrust(interaction, name, allCharacters, lang) {
   return true;
 }
 
-async function persistTrustedRoster({ existing, name, reason, allCharacters, rosterResult, interaction }) {
+async function persistTrustedRoster({ existing, name, reason, allCharacters, rosterResult, rosterKept, interaction }) {
   const source = rosterResult?.hasValidRoster ? 'bible' : 'manual';
   if (!existing) {
     await TrustedUser.create({
@@ -111,6 +111,10 @@ async function persistTrustedRoster({ existing, name, reason, allCharacters, ros
     });
     return;
   }
+  if (rosterKept) {
+    if (reason) await TrustedUser.updateOne({ _id: existing._id }, { $set: { reason } });
+    return;
+  }
   await TrustedUser.updateOne(
     { _id: existing._id },
     { $set: {
@@ -122,7 +126,7 @@ async function persistTrustedRoster({ existing, name, reason, allCharacters, ros
   );
 }
 
-function buildTrustSuccessFields({ existing, name, reason, allCharacters, rosterResult, interaction, lang }) {
+function buildTrustSuccessFields({ existing, name, reason, allCharacters, rosterResult, rosterKept, interaction, lang }) {
   const fields = [...padInlineRow([
     { name: `🧬 ${t('dialogue.trust.success.character', lang)}`, value: `[${name}](${rosterUrl(name)})`, inline: true },
     { name: `👤 ${t(`dialogue.trust.success.${existing ? 'refreshedBy' : 'addedBy'}`, lang)}`, value: interaction.user.tag, inline: true },
@@ -141,6 +145,13 @@ function buildTrustSuccessFields({ existing, name, reason, allCharacters, roster
     overflowTemplate: t('dialogue.broadcast.more', lang),
   });
   if (altsField) fields.push(altsField);
+  if (rosterKept) {
+    fields.push({
+      name: `⚠️ ${t('dialogue.trust.success.rosterKept.title', lang)}`,
+      value: t('dialogue.trust.success.rosterKept.description', lang),
+      inline: false,
+    });
+  }
   return fields;
 }
 
@@ -168,10 +179,11 @@ async function handleTrustAddition(interaction, name, reason, lang) {
   }
 
   const rosterResult = await buildRosterCharacters(name, { hiddenRosterFallback: true });
-  const allCharacters = normalizeRosterNames(
-    name,
-    rosterResult?.hasValidRoster ? rosterResult.allCharacters : []
-  );
+  // Only a roster lostark.bible actually listed replaces a stored one: an
+  // outage or a hidden roster says nothing about the alts already trusted.
+  const rosterKept = Boolean(existing) && rosterResult?.rosterVisibility !== 'visible';
+  const listedNames = rosterResult?.hasValidRoster ? rosterResult.allCharacters : [];
+  const allCharacters = normalizeRosterNames(name, rosterKept ? existing.allCharacters : listedNames);
   const conflict = await findRosterTrustConflict(existing, allCharacters);
   if (conflict) {
     await replyExistingTrust(interaction, name, conflict, lang);
@@ -185,6 +197,7 @@ async function handleTrustAddition(interaction, name, reason, lang) {
     reason,
     allCharacters,
     rosterResult,
+    rosterKept,
     interaction,
   });
   await editEmbed(interaction, buildTrustSuccessEmbed({
@@ -193,6 +206,7 @@ async function handleTrustAddition(interaction, name, reason, lang) {
     reason,
     allCharacters,
     rosterResult,
+    rosterKept,
     interaction,
     lang,
   }));

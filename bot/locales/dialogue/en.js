@@ -682,7 +682,7 @@ export default {
     already: { title: 'Already trusted', direct: '**{name}** is already in the trusted list.', via: '**{name}** is already trusted through roster match **{matched}**.' },
     blacklisted: { title: 'This character is blacklisted', description: '**{name}** currently matches blacklist entry **{matched}**.', footer: 'Remove the blacklist entry before marking this character trusted.' },
     actionAdded: 'Added', actionRefreshed: 'Refreshed',
-    success: { title: 'Trusted · {action} · {name}', description: '**{name}** and its linked roster alts can no longer be added to blacklist, whitelist, or watchlist.', character: 'Character', reason: 'Reason', addedBy: 'Added by', refreshedBy: 'Refreshed by', onlyCharacter: 'Only this character is linked on this trusted entry.', trackedAlts: 'Tracked alts', footer: 'Use `/la-list view type:trusted` to browse the trusted roster.' },
+    success: { title: 'Trusted · {action} · {name}', description: '**{name}** and its linked roster alts can no longer be added to blacklist, whitelist, or watchlist.', character: 'Character', reason: 'Reason', addedBy: 'Added by', refreshedBy: 'Refreshed by', onlyCharacter: 'Only this character is linked on this trusted entry.', trackedAlts: 'Tracked alts', rosterKept: { title: 'Roster not refreshed', description: 'lostark.bible did not list this roster (it is hidden or the site did not answer), so the trusted alts already saved were kept. Run this again later to refresh them.' }, footer: 'Use `/la-list view type:trusted` to browse the trusted roster.' },
   },
   multiadd: {
     template: {
