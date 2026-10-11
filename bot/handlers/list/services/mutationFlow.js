@@ -71,6 +71,18 @@ export async function renderListAddExecutionResult(
  * goes to approval, since its note controls would change that entry.
  * Surface-specific copy remains in callbacks so slash-add and Quick Add can
  * keep their own UI without duplicating the approval contract.
+ *
+ * @param {object} options
+ * @param {object} options.interaction - the deferred interaction to answer
+ * @param {object} options.payload - list-add payload from buildListMutationPayload
+ * @param {string} options.lang - reply language
+ * @param {Function} options.executeListAddToDatabase - writes the entry and
+ *   reports isDuplicate and existingEntry
+ * @param {Function} options.sendListAddApprovalToApprovers - DMs the approvers
+ * @param {Function} [options.onDeliveryFailed] - called when no approver got the DM
+ * @param {Function} [options.onQueued] - called after the pending approval is saved
+ * @returns {Promise<{status: 'executed', result: object}|{status: 'delivery-failed'|'queued', delivery: object}>}
+ *   the remaining options are injectable dependencies for tests
  */
 export async function submitListMutation({
   interaction,

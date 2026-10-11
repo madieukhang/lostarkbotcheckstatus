@@ -297,7 +297,7 @@ const en = {
         {
           name: '📒 Lists',
           lines: [
-            '`/la-list add type name reason [raid] [logs] [image] [scope]` - Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only). If the character is already listed, **Add to history** saves your reason and raid as a new note on that entry.',
+            '`/la-list add type name reason [raid] [logs] [image] [scope]` - Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only). If the character is already listed, **Add to history** saves your reason and raid as a new note on that entry; a note on an entry outside your server goes to the approvers first.',
             '`/la-list edit name [reason] [type] [raid] [logs] [image] [scope] [additional_names]` - Edit an existing entry. `additional_names` appends alts manually for hidden-roster/no-guild edges.',
             '`/la-list remove name` - Remove an entry from a list',
             '`/la-list view type [scope]` - View entries (type: all/black/white/watch/trusted, scope: all/global/server)',

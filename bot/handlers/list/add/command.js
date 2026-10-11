@@ -3,8 +3,9 @@
  * /la-list add: slash entry that opens the approval flow for adding
  * a character to the blacklist, whitelist or watchlist. Performs bible
  * roster scrape for `allCharacters` and resolves evidence image rehost.
- * Server-scoped entries and requests from any configured approver are
- * written at once; the rest go to the approvers via DM.
+ * Requests from any configured approver are written at once, and so are
+ * server-scoped entries unless they find a duplicate outside the
+ * requester's server; the rest go to the approvers via DM.
  */
 
 import { connectDB } from '../../../db.js';
