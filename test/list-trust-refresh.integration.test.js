@@ -68,6 +68,17 @@ test('a refresh that finds the roster hidden keeps the stored alts', async t => 
   assert.match(reply, /Roster not refreshed/);
 });
 
+test('a refresh for a roster lostark.bible cannot find keeps the stored alts and does not claim a refresh', async t => {
+  const { after, reply } = await refreshTrust(t, {
+    name: 'Trustmissing', stored: ['Trustmissing', 'Trustmissingalt'],
+    bible: () => new Response('Not found', { status: 404 }),
+  });
+  assert.deepEqual(after.allCharacters, ['Trustmissing', 'Trustmissingalt']);
+  const embed = JSON.parse(reply).embeds[0];
+  assert.match(embed.title, /Roster kept/);
+  assert.match(reply, /not found/);
+});
+
 test('a refresh with a listed roster still replaces the stored alts', async t => {
   const { after } = await refreshTrust(t, {
     name: 'Trustlisted', stored: ['Trustlisted', 'Trustlistedold'],

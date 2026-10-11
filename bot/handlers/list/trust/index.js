@@ -155,9 +155,16 @@ function buildTrustSuccessFields({ existing, name, reason, allCharacters, roster
   return fields;
 }
 
+// A refresh that kept the stored roster did not refresh it, so the title
+// says so instead of "Refreshed".
+function trustActionKey({ existing, rosterKept }) {
+  if (!existing) return 'actionAdded';
+  return rosterKept ? 'actionKept' : 'actionRefreshed';
+}
+
 function buildTrustSuccessEmbed(args) {
-  const { existing, name, lang } = args;
-  const actionLabel = t(`dialogue.trust.${existing ? 'actionRefreshed' : 'actionAdded'}`, lang);
+  const { name, lang } = args;
+  const actionLabel = t(`dialogue.trust.${trustActionKey(args)}`, lang);
   return buildAlertEmbed({
     severity: AlertSeverity.SUCCESS,
     titleIcon: '',
