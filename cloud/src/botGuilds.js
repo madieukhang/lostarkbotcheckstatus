@@ -24,7 +24,11 @@ async function fetchPage(env, after, fetchImpl) {
   try {
     const res = await fetchImpl(url, { headers: { Authorization: `Bot ${env.BOT_TOKEN}` } });
     if (!res.ok) throw new Error(`Discord answered HTTP ${res.status}`);
-    return await res.json();
+    const page = await res.json();
+    if (!Array.isArray(page) || !page.every((guild) => typeof guild?.id === "string")) {
+      throw new Error("Discord sent a guild page that is not a list of guilds");
+    }
+    return page;
   } catch (err) {
     throw discordUnavailable(err);
   }

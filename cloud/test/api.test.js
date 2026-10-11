@@ -62,6 +62,15 @@ describe("GET /internal/bot-guilds", () => {
     ]);
   });
 
+  it("maps a malformed Discord page to 503", async () => {
+    for (const body of [{ message: "x" }, null, "str", [{ name: "no id" }]]) {
+      network.use(http.get(DISCORD_GUILDS_URL, () => HttpResponse.json(body)));
+      const res = await exports.default.fetch(`${BASE}/internal/bot-guilds`);
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ ok: false, error: { code: "discordUnavailable" } });
+    }
+  });
+
   it("maps a Discord failure to 503", async () => {
     const failures = [
       () => new HttpResponse(null, { status: 502 }),
