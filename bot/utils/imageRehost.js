@@ -3,7 +3,7 @@
  *
  * Solves the Discord CDN expiry problem for evidence images.
  *
- * Background: as of 2024, Discord CDN attachment URLs include signed expiry
+ * Background: Discord CDN attachment URLs include signed expiry
  * tokens (`?ex=...&hm=...`) that invalidate after ~24 hours. Storing the URL
  * directly can produce a 404 after a day or two, violating the evidence
  * retention requirement for the lifetime of the entry.
@@ -34,6 +34,9 @@ const REHOST_MAX_BYTES = 24 * 1024 * 1024;
 // the confirm flow open.
 const REHOST_DOWNLOAD_TIMEOUT_MS = 30_000;
 const REHOST_MAX_REDIRECTS = 3;
+// A viewer waits on each of the two small requests that re-sign a stored
+// link, so each gets a shorter budget than a download.
+const LEGACY_REFRESH_TIMEOUT_MS = REHOST_DOWNLOAD_TIMEOUT_MS / 2;
 
 // Multiadd rows carry member-typed URLs, so the download must not reach the
 // bot's own network: loopback, private, link-local, shared (CGNAT),
@@ -326,6 +329,8 @@ function isDiscordCdnUrl(url) {
  * @param {Client} client - the bot client; its token signs the request
  * @returns {Promise<{url: string, error: string}>} url is '' when Discord
  *   no longer serves the file, and error then says what Discord answered
+ * @throws {Error} when a request fails or Discord does not answer within
+ *   LEGACY_REFRESH_TIMEOUT_MS
  */
 export async function refreshLegacyImageUrl(url, client) {
   if (!isDiscordCdnUrl(url)) return { url, error: '' };
@@ -337,6 +342,7 @@ export async function refreshLegacyImageUrl(url, client) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ attachment_urls: [url] }),
+    signal: AbortSignal.timeout(LEGACY_REFRESH_TIMEOUT_MS),
   });
   if (!response.ok) return { url: '', error: `refresh API returned ${response.status}` };
 
@@ -345,7 +351,10 @@ export async function refreshLegacyImageUrl(url, client) {
 
   // Discord re-signs links to ephemeral attachments it has already deleted,
   // so only a request for the file itself shows whether it is still there.
-  const file = await fetch(refreshed, { method: 'HEAD' });
+  const file = await fetch(refreshed, {
+    method: 'HEAD',
+    signal: AbortSignal.timeout(LEGACY_REFRESH_TIMEOUT_MS),
+  });
   return file.ok ? { url: refreshed, error: '' } : { url: '', error: `file returned ${file.status}` };
 }
 

@@ -1,5 +1,8 @@
 # Changelog
 
+- Opening evidence kept as a Discord link no longer hangs when Discord does not answer the link refresh or file check; after 15 seconds the card falls back to the stored link.
+- The `/la-roster` deep-scan progress card lists alts like the result card: numbered, and a name containing `]` no longer breaks its link.
+- A failed read of a stored language is logged instead of falling back to English silently.
 - Character names shaped like a markdown link show as plain text in approval DMs, `/la-list multiadd` previews, bulk summaries and broadcasts, and approval and decision card titles, and multiadd rejects such rows as invalid names.
 - When Discord fails to show the confirmation card after a saved `/la-list edit`, `/la-list add`, Quick Add or `/la-list remove`, or after an add request goes to the approvers, the action is no longer reported as failed, and the edit and remove broadcasts still go out.
 - `/la-list remove` on an entry that was deleted in the meantime says there is nothing to remove and sends no broadcast.

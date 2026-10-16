@@ -145,7 +145,10 @@ async function getStoredLanguage(id, { cache, pending, Model, idField }) {
       if (pending.get(id) === loads) cache.set(id, lang);
       return lang;
     })
-    .catch(() => request.replacement || DEFAULT_LANGUAGE)
+    .catch((err) => {
+      console.warn(`[i18n] Stored language read by ${idField} failed:`, err?.message);
+      return request.replacement || DEFAULT_LANGUAGE;
+    })
     .finally(() => {
       loads.delete(Model);
       if (loads.size === 0 && pending.get(id) === loads) pending.delete(id);

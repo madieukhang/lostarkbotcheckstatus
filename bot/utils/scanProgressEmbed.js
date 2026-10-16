@@ -5,23 +5,15 @@
 
 import { buildAlertEmbed, AlertSeverity } from './alertEmbed.js';
 import { truncateInlineText } from './discordText.js';
-import { rosterUrl } from './rosterLink.js';
 import { ICONS, buildProgressBar, relativeTime } from './ui.js';
-import { getClassEmoji } from '../models/Class.js';
+import { formatAltLine } from '../handlers/list/trackedAltsRender.js';
 import { t } from '../services/i18n/index.js';
 
 function buildAltsBlock(alts, lang) {
   if (!Array.isArray(alts) || alts.length === 0) return '';
   const visible = alts.slice(0, 12);
-  const lines = visible.map((alt) => {
-    const cls = alt.className || alt.classId || t('dialogue.scan.progressUi.unknown', lang);
-    const classPrefix = getClassEmoji(cls) || cls;
-    const ilvl = typeof alt.itemLevel === 'number'
-      ? alt.itemLevel.toFixed(2)
-      : (alt.itemLevel || '?');
-    const link = rosterUrl(alt.name);
-    return `- ${classPrefix} **[${alt.name}](${link})** - \`${ilvl}\``;
-  });
+  const lines = visible.map((alt, i) =>
+    formatAltLine(alt.name, i, { ...alt, className: alt.className || alt.classId || '' }));
   const extra = alts.length > visible.length
     ? `\n*${t('dialogue.scan.progressUi.more', lang, { count: alts.length - visible.length })}*`
     : '';

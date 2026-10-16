@@ -63,3 +63,44 @@ test('scan progress embed surfaces the latest bible failure reason', () => {
 
   assert.match(embed.toJSON().description, /Last error: `HTML HTTP 403`/);
 });
+
+const scanProgress = alts => ({
+  attemptedCandidates: 20,
+  checkedCandidates: 20,
+  totalCandidates: 437,
+  failedCandidates: 0,
+  altsFound: alts.length,
+  currentBackoffMs: 8000,
+  alts,
+});
+
+test('scan progress embed escapes a closing bracket in an alt name', () => {
+  const embed = buildScanProgressEmbed({
+    title: 'Stronghold scan in progress - Ainslinn',
+    progress: scanProgress([{ name: 'Odd]Name', itemLevel: 1710 }]),
+  });
+
+  assert.ok(embed.toJSON().description.includes(String.raw`[Odd\]Name](`));
+});
+
+test('scan progress embed shows the CP badge on an alt row', () => {
+  const embed = buildScanProgressEmbed({
+    title: 'Stronghold scan in progress - Ainslinn',
+    progress: scanProgress([{ name: 'Strongalt', itemLevel: 1710, combatScore: '2500' }]),
+  });
+
+  assert.ok(embed.toJSON().description.includes('`1710.00` · `2500 CP`'));
+});
+
+test('scan progress embed lists at most 12 alt rows', () => {
+  const alts = Array.from({ length: 13 }, (_, i) => ({ name: `Alt${i}`, itemLevel: 1700 + i }));
+  const embed = buildScanProgressEmbed({
+    title: 'Stronghold scan in progress - Ainslinn',
+    progress: scanProgress(alts),
+  });
+
+  const { description } = embed.toJSON();
+  assert.equal(description.match(/\]\(/g).length, 12);
+  assert.ok(description.includes('Alt11'));
+  assert.ok(!description.includes('Alt12'));
+});

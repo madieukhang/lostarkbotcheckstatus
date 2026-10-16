@@ -54,6 +54,15 @@ for (const scope of scopes) {
     assert.equal(reads, 2);
   });
 
+  test(`${scope.name} locale logs a failed read once and still falls back`, async t => {
+    scope.clear();
+    const warn = t.mock.method(console, 'warn', () => {});
+    const Model = { findOne: () => ({ lean: () => Promise.reject(new Error('mongo down')) }) };
+    assert.deepEqual(await Promise.all([scope.get('logged', Model), scope.get('logged', Model)]), ['en', 'en']);
+    assert.equal(warn.mock.callCount(), 1);
+    assert.match(String(warn.mock.calls[0].arguments.at(-1)), /mongo down/);
+  });
+
   test(`${scope.name} locale does not let a pending read undo a saved language`, async () => {
     scope.clear();
     const gate = deferred();
