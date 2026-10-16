@@ -64,11 +64,26 @@ function readTargetStats(targetRecord) {
   };
 }
 
+// Builds of one roster that overlap (two users checking one name) share one
+// fetch. Separate fetches would queue in the worker's one-at-a-time line,
+// where the second can time out and fall back to a slower route with a
+// thinner result.
+const inFlightRosterBuilds = new Map();
+
+// Options that are all plain values can be shared; a signal or callback
+// belongs to one caller, so that caller gets its own fetch.
+function rosterBuildShareKey(name, options) {
+  const entries = Object.entries(options).sort(([a], [b]) => a.localeCompare(b));
+  const callerOwned = entries.some(([, value]) => typeof value === 'function' || (value !== null && typeof value === 'object'));
+  return callerOwned ? null : JSON.stringify([String(name).trim().normalize('NFC'), entries]);
+}
+
 /**
  * Resolve a character's roster (siblings) via lostark.bible. Tries the
  * direct roster page first, then falls back to hidden-roster
  * inference. Always returns a result object (never throws) so callers
- * don't have to wrap.
+ * don't have to wrap. Overlapping calls with the same name and plain
+ * options share one fetch; each caller gets its own copy of the result.
  * @param {string} name - target character name
  * @param {object} [options]
  * @param {boolean} [options.hiddenRosterFallback=false]
@@ -76,6 +91,19 @@ function readTargetStats(targetRecord) {
  * @returns {Promise<{allCharacters: string[], hasValidRoster: boolean, failReason: string|null, targetItemLevel: number|null, targetClassName: string|null, targetCombatScore: number|null, rosterVisibility: string, rosterCharacters: object[]}>}
  */
 export async function buildRosterCharacters(name, options = {}) {
+  const key = rosterBuildShareKey(name, options);
+  if (key === null) return buildRosterCharactersOnce(name, options);
+  let shared = inFlightRosterBuilds.get(key);
+  if (!shared) {
+    shared = buildRosterCharactersOnce(name, options).finally(() => {
+      if (inFlightRosterBuilds.get(key) === shared) inFlightRosterBuilds.delete(key);
+    });
+    inFlightRosterBuilds.set(key, shared);
+  }
+  return structuredClone(await shared);
+}
+
+async function buildRosterCharactersOnce(name, options) {
   const { hiddenRosterFallback = false } = options;
   const fetchOptions = buildBibleFetchOptions(options);
 

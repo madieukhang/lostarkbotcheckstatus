@@ -53,8 +53,23 @@ const SEVERITY_CONFIG = Object.freeze({
   trusted: { color: COLORS.trusted, icon: ICONS.shield },
 });
 
+// Discord's embed text limits. EmbedBuilder throws past them, and error cards
+// carry raw error text, so an over-long error would break the card that
+// reports it and leave the previous card (a progress card) on screen.
+const EMBED_LIMITS = Object.freeze({ title: 256, description: 4096, fieldName: 256, fieldValue: 1024, footer: 2048 });
+
+// Cut text to a limit with an ellipsis, closing an inline code span the cut
+// would leave open.
+function fitEmbedText(value, limit) {
+  const text = String(value);
+  if (text.length <= limit) return text;
+  const codeSpan = text.length > 1 && text.startsWith('`') && text.endsWith('`') ? '`' : '';
+  return `${text.slice(0, limit - 1 - codeSpan.length)}…${codeSpan}`;
+}
+
 /**
- * Build a standardized alert embed.
+ * Build a standardized alert embed. Text past Discord's embed limits is cut
+ * to them, so the embed always builds.
  *
  * @param {Object} options
  * @param {string} options.severity - One of AlertSeverity.*
@@ -96,13 +111,20 @@ export function buildAlertEmbed({
     (field) => field.value !== undefined
       && field.value !== null
       && String(field.value).trim() !== ''
-  );
+  ).map((field) => ({
+    ...field,
+    name: fitEmbedText(field.name, EMBED_LIMITS.fieldName),
+    value: fitEmbedText(field.value, EMBED_LIMITS.fieldValue),
+  }));
   const mutations = [
     { enabled: Boolean(author), apply: () => embed.setAuthor({ name: String(author).slice(0, 256) }) },
-    { enabled: Boolean(title), apply: () => embed.setTitle(finalIcon ? `${finalIcon}  ${title}` : title) },
-    { enabled: Boolean(description), apply: () => embed.setDescription(description) },
+    {
+      enabled: Boolean(title),
+      apply: () => embed.setTitle(fitEmbedText(finalIcon ? `${finalIcon}  ${title}` : title, EMBED_LIMITS.title)),
+    },
+    { enabled: Boolean(description), apply: () => embed.setDescription(fitEmbedText(description, EMBED_LIMITS.description)) },
     { enabled: cleanFields.length > 0, apply: () => embed.addFields(cleanFields) },
-    { enabled: Boolean(footer), apply: () => embed.setFooter({ text: footer }) },
+    { enabled: Boolean(footer), apply: () => embed.setFooter({ text: fitEmbedText(footer, EMBED_LIMITS.footer) }) },
     { enabled: timestamp, apply: () => embed.setTimestamp(new Date()) },
   ];
   mutations.filter(({ enabled }) => enabled).forEach(({ apply }) => apply());
