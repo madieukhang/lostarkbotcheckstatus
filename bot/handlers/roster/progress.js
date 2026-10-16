@@ -8,6 +8,7 @@
 
 import { COLORS } from '../../utils/ui.js';
 import { buildScanProgressEmbed } from '../../utils/scanProgressEmbed.js';
+import { SCAN_ABORT_REASONS } from '../../utils/scanAbortReasons.js';
 import {
   buildStopButtonRow,
   newScanSessionId,
@@ -112,7 +113,7 @@ export function createRosterScanRuntime({
 function abortForProgressEditFailures(cancelFlag) {
   if (!cancelFlag || cancelFlag.cancelled) return;
   cancelFlag.cancelled = true;
-  cancelFlag.reason = 'discord-progress-update-failed';
+  cancelFlag.reason = SCAN_ABORT_REASONS.discordProgressUpdateFailed;
 }
 
 /**

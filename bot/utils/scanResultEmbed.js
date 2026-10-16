@@ -30,6 +30,7 @@ import { COLORS, ICONS, padInlineRow } from './ui.js';
 import { createArtistEmbed } from './artistVoice.js';
 import { truncateInlineText } from './discordText.js';
 import { normalizeNameKey } from './names.js';
+import { SCAN_ABORT_REASONS } from './scanAbortReasons.js';
 import { formatAltLine } from '../handlers/list/trackedAltsRender.js';
 import { t } from '../services/i18n/index.js';
 
@@ -63,7 +64,7 @@ export function deriveScanState(result) {
   const scanned = result?.checkedCandidates ?? 0;
   const cancelled = result?.cancelled === true;
   const pausedForFailureStorm = result?.pausedForFailureStorm === true;
-  const abortedBySystem = Boolean(result?.abortReason && result.abortReason !== 'user-stopped');
+  const abortedBySystem = Boolean(result?.abortReason && result.abortReason !== SCAN_ABORT_REASONS.userStopped);
 
   const remaining = Math.max(0, totalEligible - scanned);
   const hasRemaining = remaining > 0;
@@ -90,15 +91,15 @@ const KIND_LOCALE_KEYS = {
 // Locale key under dialogue.scan.result.abortReasons for each abortReason code
 // the detector and the scan handlers set.
 const ABORT_REASON_LOCALE_KEYS = Object.freeze({
-  'user-stopped': 'userStopped',
-  'discord-progress-update-failed': 'discordUpdateFailed',
-  'bible-failure-storm': 'bibleFailureStorm',
+  [SCAN_ABORT_REASONS.userStopped]: 'userStopped',
+  [SCAN_ABORT_REASONS.discordProgressUpdateFailed]: 'discordUpdateFailed',
+  [SCAN_ABORT_REASONS.bibleFailureStorm]: 'bibleFailureStorm',
 });
 
 // The user-stop and failure-storm codes render through the stopped and
 // failure-storm hints, and the completion DM shows only the label, so only
 // this code is explained on the aborted hint.
-const ABORT_REASONS_WITH_DETAIL = new Set(['discord-progress-update-failed']);
+const ABORT_REASONS_WITH_DETAIL = new Set([SCAN_ABORT_REASONS.discordProgressUpdateFailed]);
 
 function formatLastError(result, lang) {
   const lastError = truncateInlineText(result.lastFailureReason, 140);

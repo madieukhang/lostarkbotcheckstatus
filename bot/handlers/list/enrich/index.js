@@ -86,6 +86,7 @@ import {
   scanLimitAlertOptions,
 } from '../../../utils/strongholdScanGate.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../../utils/scanCompletionDm.js';
+import { SCAN_ABORT_REASONS } from '../../../utils/scanAbortReasons.js';
 import { createLongRunningReplyEditor } from '../../../utils/longRunningReply.js';
 import { mergeAltsByName } from '../../../utils/alts.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
@@ -280,7 +281,7 @@ function createEnrichProgressHandler({
       progressEditFailures += 1;
       console.warn('[enrich] Progress edit failed:', err?.message || err);
       if (progressEditFailures < PROGRESS_EDIT_FAILURE_LIMIT || cancelFlag.cancelled) return;
-      Object.assign(cancelFlag, { cancelled: true, reason: 'discord-progress-update-failed' });
+      Object.assign(cancelFlag, { cancelled: true, reason: SCAN_ABORT_REASONS.discordProgressUpdateFailed });
     });
   };
 }
@@ -960,7 +961,7 @@ export function createEnrichHandlers({ services }) {
     if (!canCancel) return;
 
     scan.cancelFlag.cancelled = true;
-    scan.cancelFlag.reason = 'user-stopped';
+    scan.cancelFlag.reason = SCAN_ABORT_REASONS.userStopped;
 
     await replyAlert(interaction, {
       severity: AlertSeverity.INFO,

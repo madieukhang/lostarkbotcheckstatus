@@ -14,6 +14,7 @@ import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
 import { getClassName } from '../../models/Class.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { sleep } from '../../utils/async.js';
+import { SCAN_ABORT_REASONS } from '../../utils/scanAbortReasons.js';
 import {
   getCurrentScraperApiUsageScopeSnapshot,
   runWithScraperApiUsageScope,
@@ -222,7 +223,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   function shouldStopWorker() {
     if (cancelFlag.cancelled) {
       cancelledByFlag = true;
-      abortReason = cancelFlag.reason || 'user-stopped';
+      abortReason = cancelFlag.reason || SCAN_ABORT_REASONS.userStopped;
       return true;
     }
     return pausedForFailureStorm;
@@ -289,7 +290,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   function pauseForFailureStorm() {
     if (!shouldPauseForFailureStorm()) return false;
     pausedForFailureStorm = true;
-    abortReason = 'bible-failure-storm';
+    abortReason = SCAN_ABORT_REASONS.bibleFailureStorm;
     console.warn(
       `[alt-detect] Pausing ${name}: high failure rate ` +
       `${failedCandidates}/${attemptedCandidates} (${Math.round((failedCandidates / attemptedCandidates) * 100)}%).`
