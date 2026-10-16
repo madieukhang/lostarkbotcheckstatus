@@ -30,7 +30,7 @@ import UserPreference from '../../../models/UserPreference.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
-import { truncateInlineText } from '../../../utils/discordText.js';
+import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 
 /**
  * Update the clicked approval message before syncing the other approver DMs.
@@ -72,7 +72,7 @@ function buildDecisionEmbed(payload, decision, lang, snapshot) {
     title: t('dialogue.approval.public.title', lang, {
       list: labelCap,
       decision: t(`dialogue.approval.public.decisions.${decision}`, lang),
-      name: payload.name,
+      name: escapeLinkBrackets(payload.name),
     }),
     description: t(`dialogue.approval.public.${payload.action === 'edit' ? 'edit' : 'add'}.${decision}`, lang, {
       name: formatLinkedCharacter(payload.name, snapshot),
@@ -241,7 +241,7 @@ export function createApprovalServices({
         const reasonShort = truncateInlineText(row.reason, 40);
         const scopeTag = row.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
         const raidTag = row.raid ? ` \`${row.raid}\`` : '';
-        return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${row.name}**${scopeTag}${raidTag} · ${reasonShort}`;
+        return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${escapeLinkBrackets(row.name)}**${scopeTag}${raidTag} · ${reasonShort}`;
       });
       if (pending.rows.length > 20) {
         previewLines.push(`*${t('dialogue.approval.bulk.more', lang, { count: pending.rows.length - 20 })}*`);

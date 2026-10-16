@@ -11,6 +11,7 @@
 import { inflateRawSync } from 'node:zlib';
 
 import { RAIDS } from '../../models/Raid.js';
+import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
 import {
   EXAMPLE_REASON_PREFIX,
   MULTIADD_MAX_ROWS,
@@ -147,6 +148,10 @@ const ROW_VALIDATION_RULES = [
   {
     invalid: (row) => !row.name,
     message: (row) => `Row ${row.rowNum}: missing required field "name".`,
+  },
+  {
+    invalid: (row) => !isValidCharacterName(normalizeCharacterName(row.name)),
+    message: (row) => `Row ${row.rowNum}: "name" is not a valid character name.`,
   },
   {
     invalid: (row) => !row.type,

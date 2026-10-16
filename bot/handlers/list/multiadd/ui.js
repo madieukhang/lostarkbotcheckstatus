@@ -12,7 +12,7 @@ import {
 } from '../../../services/multiadd/index.js';
 import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { truncateInlineText } from '../../../utils/discordText.js';
+import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import { t } from '../../../services/i18n/index.js';
 import { listTypeIcon } from '../helpers.js';
 
@@ -66,11 +66,22 @@ export function buildNoValidRowsEmbed(errors, lang = 'en') {
   });
 }
 
+/**
+ * Build the multiadd preview: the first 20 parsed rows, any validation
+ * errors, and the confirm and cancel buttons.
+ * @param {{rows: object[], errors: string[]}} parsed - the parsed sheet
+ * @param {string} requestId - ID the confirm and cancel buttons carry
+ * @param {string} [lang='en'] - reply language
+ * @returns {{
+ *   embeds: import('discord.js').EmbedBuilder[],
+ *   components: import('discord.js').ActionRowBuilder[],
+ * }} the preview message
+ */
 export function buildPreviewReply(parsed, requestId, lang = 'en') {
   const previewLines = parsed.rows.slice(0, 20).map((row, index) => {
     const reasonShort = truncateInlineText(row.reason, 50);
     const scopeTag = row.scope === 'server' ? ' `[S]`' : '';
-    return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${row.name}**${scopeTag} · ${reasonShort}`;
+    return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${escapeLinkBrackets(row.name)}**${scopeTag} · ${reasonShort}`;
   });
   if (parsed.rows.length > 20) {
     previewLines.push(`*${t('dialogue.multiadd.preview.more', lang, { count: parsed.rows.length - 20 })}*`);

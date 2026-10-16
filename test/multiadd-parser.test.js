@@ -105,3 +105,15 @@ test('parseMultiaddFile rejects a row whose field is longer than /la-list add ac
   assert.deepEqual(result.rows.map(({ name }) => name), ['Beta']);
   assert.deepEqual(result.errors, [`Row 2: "reason" is longer than ${MULTIADD_MAX_FIELD_LENGTH} characters.`]);
 });
+
+test('parseMultiaddFile rejects a name that is not a character name without echoing it', async () => {
+  const result = await parseMultiaddFile(await entriesWorkbook(
+    ['[Free Gold](https://evil.example)', 'black', 'reason', '', '', '', ''],
+    ['Free Gold', 'black', 'spaces collapse like /la-list add', '', '', '', ''],
+    ['Alpha', 'black', 'reason', '', '', '', ''],
+  ));
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.rows.map(({ name }) => name), ['Free Gold', 'Alpha']);
+  assert.deepEqual(result.errors, ['Row 2: "name" is not a valid character name.']);
+});

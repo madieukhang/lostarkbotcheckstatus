@@ -18,6 +18,7 @@ import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, COLORS, ICONS } from '../../utils/ui.js';
+import { escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { t } from '../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField } from './trackedAltsRender.js';
@@ -343,11 +344,11 @@ const APPROVAL_CARD_VIEWS = Object.freeze({
   approver: {
     title: ({ isEdit, listIcon, payload, lang }) => t(`dialogue.approval.${isEdit ? 'titleEdit' : 'titleAdd'}`, lang, {
       icon: listIcon,
-      name: payload.name,
+      name: escapeLinkBrackets(payload.name),
     }),
     hero: ({ isEdit, guild, payload, listLabel, scopeTag, lang }) => t(`dialogue.approval.${isEdit ? 'heroEdit' : 'heroAdd'}`, lang, {
       guild: guild.name,
-      name: payload.name,
+      name: escapeLinkBrackets(payload.name),
       list: listLabel,
       scope: scopeTag,
     }),
@@ -358,7 +359,7 @@ const APPROVAL_CARD_VIEWS = Object.freeze({
   requester: {
     title: ({ payload, listLabel, lang }) => t('dialogue.approval.requester.title', lang, {
       list: listLabel,
-      name: payload.name,
+      name: escapeLinkBrackets(payload.name),
     }),
     hero: ({ payload, listLabel, scopeTag, lang }) => t('dialogue.approval.requester.hero', lang, {
       name: formatLinkedCharacter(payload.name, null),
@@ -394,6 +395,13 @@ const APPROVAL_CARD_VIEWS = Object.freeze({
  * With `options.forRequester`, the same request renders as the requester's
  * own copy: a "sent for approval" title, hero and footer, and no
  * Requested by field.
+ * @param {{name: string}} guild - the origin guild, named in the approver hero line
+ * @param {object} payload - the pending add or edit request
+ * @param {object} [options]
+ * @param {boolean} [options.forRequester=false] - render the requester's copy
+ * @param {string} [options.lang='en'] - language of the card
+ * @param {string} [options.title] - replaces the title of the chosen view
+ * @returns {import('discord.js').EmbedBuilder} the approval card
  */
 export function buildListAddApprovalEmbed(guild, payload, options = {}) {
   const view = APPROVAL_CARD_VIEWS[options.forRequester ? 'requester' : 'approver'];
@@ -513,7 +521,7 @@ function buildDecidedApprovalEmbed({ client, payload, outcome, approver, result 
   const { icon, color } = DECIDED_APPROVAL_STYLES[outcome];
   const guild = client.guilds.cache.get(payload.guildId) ?? { name: payload.guildId };
   const title = t('dialogue.approval.decided.title', lang, {
-    title: t(`dialogue.approval.${payload.action === 'edit' ? 'titleEdit' : 'titleAdd'}`, lang, { icon, name: payload.name }),
+    title: t(`dialogue.approval.${payload.action === 'edit' ? 'titleEdit' : 'titleAdd'}`, lang, { icon, name: escapeLinkBrackets(payload.name) }),
     outcome: t(`dialogue.approval.decided.outcomes.${outcome}`, lang),
   });
   const embed = buildListAddApprovalEmbed(guild, payload, { lang, title });

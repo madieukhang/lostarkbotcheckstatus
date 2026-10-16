@@ -13,6 +13,7 @@ import { sleep } from '../../../utils/async.js';
 import { connectDB } from '../../../db.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
+import { escapeLinkBrackets } from '../../../utils/discordText.js';
 import { COLORS } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { listTypeIcon } from '../helpers.js';
@@ -177,28 +178,28 @@ export function createBulkServices({ client, executeListAddToDatabase }) {
       buildBulkDetailField({
         items: results.added,
         limit: 15,
-        formatLine: (row, index) => `${index + 1}. ${listTypeIcon(row.type)} **${row.name}**`,
+        formatLine: (row, index) => `${index + 1}. ${listTypeIcon(row.type)} **${escapeLinkBrackets(row.name)}**`,
         name: `✅ ${t('dialogue.multiadd.summary.added', lang, { count: results.added.length })}`,
         lang,
       }),
       buildBulkDetailField({
         items: results.skipped,
         limit: 10,
-        formatLine: (row) => `• **${row.name}** · ${row.reason}`,
+        formatLine: (row) => `• **${escapeLinkBrackets(row.name)}** · ${row.reason}`,
         name: `⚠️ ${t('dialogue.multiadd.summary.skipped', lang, { count: results.skipped.length })}`,
         lang,
       }),
       buildBulkDetailField({
         items: results.failed,
         limit: 10,
-        formatLine: (row) => `• **${row.name}** · ${row.error}`,
+        formatLine: (row) => `• **${escapeLinkBrackets(row.name)}** · ${row.error}`,
         name: `❌ ${t('dialogue.multiadd.summary.failed', lang, { count: results.failed.length })}`,
         lang,
       }),
       buildBulkDetailField({
         items: results.rehostWarnings,
         limit: 10,
-        formatLine: (row) => `• **${row.name}** · ${row.error}`,
+        formatLine: (row) => `• **${escapeLinkBrackets(row.name)}** · ${row.error}`,
         name: `🖼️ ${t('dialogue.multiadd.summary.imageFailed', lang, { count: results.rehostWarnings?.length || 0 })}`,
         lang,
         tail: `\n*${t('dialogue.multiadd.summary.imageLegacy', lang)}*`,

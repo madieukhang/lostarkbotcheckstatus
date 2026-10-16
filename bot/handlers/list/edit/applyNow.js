@@ -143,7 +143,7 @@ export function buildInPlaceUpdatePlan({
   return { updateFields, updateOps };
 }
 
-async function renderEditSuccess({
+async function sendEditSuccess({
   interaction,
   client,
   entry,
@@ -181,6 +181,16 @@ async function renderEditSuccess({
     }),
     { content: null, components: buildNoteHistoryRows(type, entry, lang) }
   );
+}
+
+// The write is already committed when the card renders, so a render failure
+// must neither read as a failed edit nor skip the broadcast.
+async function renderEditSuccess(options) {
+  try {
+    await sendEditSuccess(options);
+  } catch (err) {
+    console.warn('[list] Edit success card failed after the write:', err.message);
+  }
 }
 
 async function applyTypeChange(args) {

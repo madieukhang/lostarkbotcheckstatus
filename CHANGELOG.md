@@ -1,5 +1,8 @@
 # Changelog
 
+- Character names shaped like a markdown link show as plain text in approval DMs, `/la-list multiadd` previews, bulk summaries and broadcasts, and approval and decision card titles, and multiadd rejects such rows as invalid names.
+- When Discord fails to show the confirmation card after a saved `/la-list edit`, `/la-list add`, Quick Add or `/la-list remove`, or after an add request goes to the approvers, the action is no longer reported as failed, and the edit and remove broadcasts still go out.
+- `/la-list remove` on an entry that was deleted in the meantime says there is nothing to remove and sends no broadcast.
 - Screenshot reads (`/la-check` with an image, auto-check) try the next Gemini model when one returns an empty or blocked reply, and report a failed read when every model does, instead of saying the screenshot held no names. A reply that lists no names still means no names.
 - A roster lookup that joins a lostark.bible profile request already in flight now gets that request's outage or HTTP failure instead of treating the character as unknown, and the alt scan's rate-limit retry count includes the shared request's retries.
 - The server monitor keeps checking after a restart while a recovery alert is still owed under another container's claim, so an online notice that the stopped container never sent goes out once its claim expires, instead of waiting for the next maintenance window. `/la-status` still shows such a server as online.

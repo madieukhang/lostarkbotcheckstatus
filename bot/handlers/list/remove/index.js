@@ -42,6 +42,7 @@ import {
   deferReply,
   editAlert,
   editEmbed,
+  updateAlert,
   updateEmbed,
 } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t, tPick } from '../../../services/i18n/index.js';
@@ -206,6 +207,28 @@ export function buildRemoveResultCard(outcomes, {
 }
 
 /**
+ * Render the outcomes of a remove. An outcome whose delete matched nothing is
+ * left out: a concurrent remove already took the entry. When nothing is left
+ * to report, render the not-found alert instead of a result card. A render
+ * failure after a committed delete is logged, not rethrown, so it cannot read
+ * as a failed remove.
+ * @param {Array<{ok: boolean, reason?: string}>} outcomes - envelopes from removeOne
+ * @param {object} renderers
+ * @param {Function} renderers.renderCard - receives the reported outcomes
+ * @param {Function} renderers.renderNotFound - renders the not-found alert
+ * @returns {Promise<void>}
+ */
+async function renderRemoveOutcomes(outcomes, { renderCard, renderNotFound }) {
+  const reported = outcomes.filter((outcome) => outcome.reason !== 'missing');
+  try {
+    await (reported.length > 0 ? renderCard(reported) : renderNotFound());
+  } catch (err) {
+    if (!reported.some((outcome) => outcome.ok)) throw err;
+    console.warn('[list] Remove result card failed after the delete:', err.message);
+  }
+}
+
+/**
  * Build the /la-list remove handler bag.
  * @param {object} deps
  * @param {object} deps.services - shared services
@@ -259,12 +282,13 @@ export function createRemoveHandlers({ services }) {
         watchEntry ? { entry: watchEntry, type: 'watch' } : null,
       ].filter(Boolean);
 
+      const notFoundAlert = {
+        severity: AlertSeverity.WARNING,
+        ...t('dialogue.remove.notFound', lang, { name }),
+        lang,
+      };
       if (found.length === 0) {
-        await editAlert(interaction, {
-          severity: AlertSeverity.WARNING,
-          ...t('dialogue.remove.notFound', lang, { name }),
-          lang,
-        });
+        await editAlert(interaction, notFoundAlert);
         return;
       }
 
@@ -289,7 +313,7 @@ export function createRemoveHandlers({ services }) {
       // can render it as an embed.
       //
       // Outcome shapes:
-      //   { ok: false, reason: 'legacy' | 'not-owner', entry, type }
+      //   { ok: false, reason: 'legacy' | 'not-owner' | 'missing', entry, type }
       //   { ok: true, entry, type }
       const removeOne = async (entry, type) => {
         const { model, icon } = getListContext(type);
@@ -305,7 +329,8 @@ export function createRemoveHandlers({ services }) {
           return { ok: false, reason: 'not-owner', entry, type, label, icon };
         }
 
-        await model.deleteOne({ _id: entry._id });
+        const { deletedCount } = await model.deleteOne({ _id: entry._id });
+        if (deletedCount === 0) return { ok: false, reason: 'missing', entry, type, label, icon };
 
         broadcastListChange('removed', entry, {
           type,
@@ -328,7 +353,10 @@ export function createRemoveHandlers({ services }) {
       // Single entry · remove directly, render as embed.
       if (found.length === 1) {
         const outcome = await removeOne(found[0].entry, found[0].type);
-        await editEmbed(interaction, buildRemoveResultEmbed([outcome]), { content: '' });
+        await renderRemoveOutcomes([outcome], {
+          renderCard: (reported) => editEmbed(interaction, buildRemoveResultEmbed(reported), { content: '' }),
+          renderNotFound: () => editAlert(interaction, notFoundAlert),
+        });
         return;
       }
 
@@ -398,9 +426,12 @@ export function createRemoveHandlers({ services }) {
           : [{ ok: false, reason: 'unknown-selection', entry: { name }, type: 'black', label: t('dialogue.remove.unknown', lang), icon: '⚠️' }];
       }
 
-      await updateEmbed(button, buildRemoveResultEmbed(outcomes), {
-        content: '',
-        components: [],
+      await renderRemoveOutcomes(outcomes, {
+        renderCard: (reported) => updateEmbed(button, buildRemoveResultEmbed(reported), {
+          content: '',
+          components: [],
+        }),
+        renderNotFound: () => updateAlert(button, notFoundAlert, { components: [] }),
       });
     } catch (err) {
       // The picker's collector rejects this way when it ends without a click

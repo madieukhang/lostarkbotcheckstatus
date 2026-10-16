@@ -3,8 +3,8 @@
  * Cross-guild broadcast helpers · posts list-change notifications to
  * the per-guild notify channel (configured via /la-setup config action:set-notify-channel
  * or LIST_NOTIFY_CHANNEL_IDS env fallback). Also exports the tracked-
- * alts field builder and roster stat-record merge helpers reused by
- * the multiadd reject/summary embeds.
+ * alts field builder and roster stat-record merge helpers used by the
+ * broadcast cards in this file.
  */
 
 import { ActionRowBuilder } from 'discord.js';
@@ -20,7 +20,7 @@ import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { mapWithConcurrency } from '../../../utils/async.js';
 import { normalizeNameKey } from '../../../utils/names.js';
-import { truncateInlineText } from '../../../utils/discordText.js';
+import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import {
   describeListEntryEdit,
   formatListEditSummary,
@@ -577,20 +577,20 @@ export function createBroadcastServices({ client }) {
       }
     }
 
-    const renderBulkLine = (i, t, r) => {
+    const renderBulkLine = (i, type, r) => {
       const name = r.entry?.name || r.name;
       const snap = snapshotMap.get(normalizeNameKey(name));
       const cls = snap?.classId ? getClassName(snap.classId) : '';
       const classPrefix = cls ? `${getClassEmoji(cls) || cls} ` : '';
       const reasonShort = truncateInlineText(r.entry?.reason, 60);
-      return `${i + 1}. ${listTypeIcon(t)} ${classPrefix}**${name}** · ${reasonShort}`;
+      return `${i + 1}. ${listTypeIcon(type)} ${classPrefix}**${escapeLinkBrackets(name)}** · ${reasonShort}`;
     };
 
     const buildBulkEmbed = (entries, isLocal, lang) => {
       const grouped = { black: [], white: [], watch: [] };
       for (const r of entries) {
-        const t = r.type || r.entry?.type || 'black';
-        if (grouped[t]) grouped[t].push(r);
+        const type = r.type || r.entry?.type || 'black';
+        if (grouped[type]) grouped[type].push(r);
       }
 
       const embed = createArtistEmbed()

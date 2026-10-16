@@ -71,6 +71,9 @@ export async function renderListAddExecutionResult(
  * goes to approval, since its note controls would change that entry.
  * Surface-specific copy remains in callbacks so slash-add and Quick Add can
  * keep their own UI without duplicating the approval contract.
+ * After the write succeeds, or the request is saved for approval, a failure
+ * to show the confirmation card, or of `onQueued`, is logged and does not
+ * throw.
  *
  * @param {object} options
  * @param {object} options.interaction - the deferred interaction to answer
@@ -106,7 +109,14 @@ export async function submitListMutation({
     const needsApproval = result.isDuplicate
       && !canChangeEntryWithoutApproval(payload, result.existingEntry, isRequesterAutoApproverFn);
     if (!needsApproval) {
-      await renderExecutionResultFn(interaction, attachNoteControls(result, payload, lang), lang);
+      try {
+        await renderExecutionResultFn(interaction, attachNoteControls(result, payload, lang), lang);
+      } catch (err) {
+        // The entry is already written, so only a render failure of a
+        // refusal still counts as a failed submission.
+        if (!result.ok) throw err;
+        console.warn('[list] Add result card failed after the write:', err.message);
+      }
       return { status: 'executed', result };
     }
   }
@@ -119,6 +129,11 @@ export async function submitListMutation({
 
   await connectDBFn();
   await persistDeliveredApproval(PendingApprovalModel, payload, delivery);
-  await onQueued?.(delivery);
+  try {
+    await onQueued?.(delivery);
+  } catch (err) {
+    // The approvers were messaged and the request is saved; the request stays queued.
+    console.warn('[list] Queued card failed after the request was saved:', err.message);
+  }
   return { status: 'queued', delivery };
 }
