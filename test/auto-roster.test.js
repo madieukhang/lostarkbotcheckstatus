@@ -238,7 +238,7 @@ function stubListQueries(context) {
   context.mock.method(RosterSnapshot, 'bulkWrite', async () => ({}));
 }
 
-test('hidden deep scan names a failed guild member fetch instead of reporting Done', async context => {
+test('hidden deep scan names a failed guild member fetch instead of reporting a run', async context => {
   mockBibleProfile(context, { meta: () => metaDataResponse() });
   stubListQueries(context);
   const edits = [];

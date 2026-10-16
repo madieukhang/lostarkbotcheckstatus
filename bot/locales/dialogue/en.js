@@ -638,7 +638,7 @@ export default {
       'This roster is locked, so I cannot read a single character off it. The guild is still open though, so I worked from there.',
       'They hid the roster, so no characters for me. The guild page is public at least, and this is what it gave up.',
       'Roster closed, no characters visible. Here is everything the guild side still shows.',
-    ] }, guildField: 'Guild', membersField: 'Members', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: 'Not run', deepDone: 'Done', deepNotRunNotice: { title: 'Deep scan could not run', description: 'I could not run the deep scan for **{name}** this time.', footer: 'Nothing was scanned. Try again in a few minutes.' }, hiddenFooter: 'Source: lostark.bible{stats} · deep:true to look for same-account alts', blackGuild: 'Blacklisted guild members ({count})', whiteGuild: 'Whitelisted guild members ({count})', noReason: 'no reason',
+    ] }, guildField: 'Guild', membersField: 'Members', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: 'Not run', deepDone: 'Ran', deepNotRunNotice: { title: 'Deep scan could not run', description: 'I could not run the deep scan for **{name}** this time.', footer: 'Nothing was scanned. Try again in a few minutes.' }, hiddenFooter: 'Source: lostark.bible{stats} · deep:true to look for same-account alts', blackGuild: 'Blacklisted guild members ({count})', whiteGuild: 'Whitelisted guild members ({count})', noReason: 'no reason',
   },
   enrich: {
     noEntry: { title: 'No list entry', description: '**{name}** is not in any list.', footer: 'Create the entry with `/la-list add` first; enrich only appends to existing entries.' },

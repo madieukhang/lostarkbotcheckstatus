@@ -101,7 +101,7 @@ test('/la-roster hidden card omits the server slot when metadata has no world', 
   assert.equal(fields.some((f) => f.name.includes('Server')), false);
   // Five left, so the grid pads rather than stretching a lone field.
   assert.equal(fields.filter((f) => f.inline).length % 3, 0);
-  assert.equal(fields.find((f) => f.name.includes('Deep scan')).value, '`Done`');
+  assert.equal(fields.find((f) => f.name.includes('Deep scan')).value, '`Ran`');
 });
 
 test('/la-roster hidden hits carry class, ilvl and a badged raid', () => {

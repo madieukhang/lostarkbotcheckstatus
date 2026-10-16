@@ -1,5 +1,6 @@
 # Changelog
 
+- The hidden-roster card's **Deep scan** field says the scan ran instead of "Done", since it also shows for a stopped, paused or capped scan; the result card below it gives the outcome.
 - `/la-roster deep:true`, and a deep lookup of a hidden roster, no longer reports the deep scan as done, or says nothing, when it could not run; it now says why: the character has no guild, the guild member list could not be read, the character's details are missing, or the scan could not run this time. A lostark.bible outage on a hidden roster shows the Bible-unavailable notice instead of the spelling suggestions, and the hidden-roster card shows **Members** as Unknown, not 0, when the guild member list could not be read.
 - When a saved list change (add, Quick Add, edit or remove) cannot show its confirmation card, a short notice says the change was saved, or that the request is waiting for approval, instead of leaving the request looking failed.
 - Scan stop reasons on the result card and the completion DM follow the user's language instead of showing English.
