@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { connectDB } from '../../../db.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
-import { editEmbed, editNotice } from '../../../utils/interactionReplies.js';
+import { editEmbed, editNotice, editNoticeAfterSavedWrite } from '../../../utils/interactionReplies.js';
+import { t } from '../../../services/i18n/index.js';
 import { canChangeEntryWithoutApproval, isRequesterAutoApprover } from '../helpers.js';
 import { attachNoteControls } from '../notes/pendingNotes.js';
 
@@ -72,8 +73,9 @@ export async function renderListAddExecutionResult(
  * Surface-specific copy remains in callbacks so slash-add and Quick Add can
  * keep their own UI without duplicating the approval contract.
  * After the write succeeds, or the request is saved for approval, a failure
- * to show the confirmation card, or of `onQueued`, is logged and does not
- * throw. A failure to show a refused write (`result.ok` false) still throws.
+ * to show the confirmation card, or of `onQueued`, is logged and answered with
+ * a plain notice that the write is saved, and does not throw. A failure to show
+ * a refused write (`result.ok` false) still throws.
  *
  * @param {object} options - the `...Fn` options are injectable dependencies
  *   for tests
@@ -118,6 +120,7 @@ export async function submitListMutation({
         // refusal still counts as a failed submission.
         if (!result.ok) throw err;
         console.warn('[list] Add result card failed after the write:', err.message);
+        await editNoticeAfterSavedWrite(interaction, t('dialogue.common.savedCardFailed', lang), { lang });
       }
       return { status: 'executed', result };
     }
@@ -136,6 +139,10 @@ export async function submitListMutation({
   } catch (err) {
     // The approvers were messaged and the request is saved; the request stays queued.
     console.warn('[list] Queued card failed after the request was saved:', err.message);
+    await editNoticeAfterSavedWrite(interaction, t('dialogue.common.queuedCardFailed', lang), {
+      severity: AlertSeverity.INFO,
+      lang,
+    });
   }
   return { status: 'queued', delivery };
 }

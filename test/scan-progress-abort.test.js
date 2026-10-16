@@ -42,9 +42,7 @@ test('roster progress callback aborts scan after repeated message edit failures'
   callback({ ...progress, attemptedCandidates: 15, failedCandidates: 15 });
   await new Promise((resolve) => setTimeout(resolve, 10));
 
-  assert.equal(cancelFlag.cancelled, true);
-  assert.equal(cancelFlag.reason, 'discord-progress-update-failed');
-  assert.equal(cancelFlag.label, 'Discord update failed');
+  assert.deepEqual(cancelFlag, { cancelled: true, reason: 'discord-progress-update-failed' });
 });
 
 test('scan progress embed surfaces the latest bible failure reason', () => {

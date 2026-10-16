@@ -207,7 +207,7 @@ async function loadEnrichTarget({ name, guildId, existingSession, lang, replyEdi
     cacheKey: meta.guildName,
     viaWorker: true,
   });
-  if (guildMembers.length > 0) {
+  if (guildMembers?.length > 0) {
     return { found, meta, guildMembers, targetIsHidden: visibility.targetIsHidden };
   }
   await editEnrichError(replyEditor, 'dialogue.enrich.guildUnavailable', lang, { name });
@@ -284,12 +284,7 @@ function createEnrichProgressHandler({
       progressEditFailures += 1;
       console.warn('[enrich] Progress edit failed:', err?.message || err);
       if (progressEditFailures < PROGRESS_EDIT_FAILURE_LIMIT || cancelFlag.cancelled) return;
-      Object.assign(cancelFlag, {
-        cancelled: true,
-        reason: 'discord-progress-update-failed',
-        label: 'Discord update failed',
-        detail: 'Could not update the scan card repeatedly.',
-      });
+      Object.assign(cancelFlag, { cancelled: true, reason: 'discord-progress-update-failed' });
     });
   };
 }
@@ -980,8 +975,6 @@ export function createEnrichHandlers({ services }) {
 
     scan.cancelFlag.cancelled = true;
     scan.cancelFlag.reason = 'user-stopped';
-    scan.cancelFlag.label = 'Stopped by user';
-    scan.cancelFlag.detail = 'Stop button clicked.';
 
     await replyAlert(interaction, {
       severity: AlertSeverity.INFO,

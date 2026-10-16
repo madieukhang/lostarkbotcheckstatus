@@ -32,12 +32,13 @@ import {
   fetchGuildMembers,
   fetchNameSuggestions,
   formatSuggestionLines,
+  isBibleRequestFailure,
 } from '../../services/roster/index.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { profileUrl as bibleProfileUrl } from '../../utils/rosterLink.js';
 import { createRosterScanRuntime, formatDeepScanStats } from './progress.js';
 import { resolveRosterScanOutcome } from './completion.js';
-import { buildRosterDeepScanResult } from './deepResult.js';
+import { buildDeepScanNotRunNotice, buildRosterDeepScanResult } from './deepResult.js';
 
 async function loadGuildListHits(guildMembers, guildId) {
   const memberNames = guildMembers.map((member) => member.name);
@@ -145,13 +146,17 @@ function buildHitField(entries, icon, noReason, lang, statMap) {
  * @param {object} options
  * @param {{guildName: string, strongholdName: string, strongholdLevel: number, rosterLevel: number, world?: string}} options.meta
  * @param {Array<object>} options.guildMembers - the scanned guild roster
+ * @param {boolean} [options.guildMembersUnavailable=false] - the guild member
+ *   fetch failed, so the member count is unknown rather than 0
  * @param {{black: Array<object>, white: Array<object>}} options.hits
- * @param {boolean} options.deep - whether a Stronghold deep scan ran
+ * @param {boolean} options.deep - whether a Stronghold deep scan produced a result
  * @param {string} options.lang - locale for every label
  * @param {Map<string, object>} [options.statMap] - snapshots for hit rows
  * @returns {Array<object>} embed fields, inline ones on whole rows
  */
-export function buildHiddenFields({ meta, guildMembers, hits, deep, lang, statMap = new Map() }) {
+export function buildHiddenFields({
+  meta, guildMembers, guildMembersUnavailable = false, hits, deep, lang, statMap = new Map(),
+}) {
   const noReason = t('dialogue.roster.noReason', lang);
   const world = String(meta.world || '').trim();
   const inlineFields = padInlineRow([
@@ -162,7 +167,7 @@ export function buildHiddenFields({ meta, guildMembers, hits, deep, lang, statMa
     } : null,
     {
       name: `👥 ${t('dialogue.roster.membersField', lang)}`,
-      value: `\`${guildMembers.length}\``,
+      value: `\`${guildMembersUnavailable ? t('dialogue.common.unknown', lang) : guildMembers.length}\``,
       inline: true,
     },
     world ? {
@@ -200,7 +205,7 @@ function hiddenRosterColor(hits) {
   return COLORS.warning;
 }
 
-function buildHiddenPrimaryEmbed({ name, meta, guildMembers, hits, deep, altResult, lang, statMap }) {
+function buildHiddenPrimaryEmbed({ name, meta, guildMembers, guildMembersUnavailable, hits, altResult, lang, statMap }) {
   const deepStats = formatDeepScanStats(altResult, lang);
   return createArtistEmbed()
     .setTitle(`🔒 ${t('dialogue.roster.hiddenTitle', lang, { name })}`)
@@ -209,7 +214,9 @@ function buildHiddenPrimaryEmbed({ name, meta, guildMembers, hits, deep, altResu
     // and it makes the grid below read as "here is what I got anyway"
     // rather than as an ordinary information table.
     .setDescription(tPick('dialogue.roster.hiddenLine', lang))
-    .addFields(buildHiddenFields({ meta, guildMembers, hits, deep, lang, statMap }))
+    .addFields(buildHiddenFields({
+      meta, guildMembers, guildMembersUnavailable, hits, deep: Boolean(altResult), lang, statMap,
+    }))
     .setColor(hiddenRosterColor(hits))
     .setFooter({
       text: t('dialogue.roster.hiddenFooter', lang, {
@@ -219,14 +226,19 @@ function buildHiddenPrimaryEmbed({ name, meta, guildMembers, hits, deep, altResu
     .setTimestamp();
 }
 
-function buildHiddenReply({ interaction, name, meta, guildMembers, deepOptions, altResult, errorEmbed, primaryEmbed, lang }) {
+function buildHiddenReply({
+  interaction, name, meta, guildMembers, guildMembersUnavailable, deep, deepOptions, altResult, errorEmbed, primaryEmbed, lang,
+}) {
   const embeds = [primaryEmbed];
   const components = [];
   if (errorEmbed) {
     embeds.push(errorEmbed);
     return { embeds, components, resumable: false };
   }
-  if (!altResult) return { embeds, components, resumable: false };
+  if (!altResult) {
+    if (deep) embeds.push(buildDeepScanNotRunNotice({ name, meta, guildMembersUnavailable, lang }));
+    return { embeds, components, resumable: false };
+  }
 
   const result = buildRosterDeepScanResult({
     callerId: interaction.user.id,
@@ -257,6 +269,16 @@ function notifyHiddenScanCompletion({ interaction, replyEditor, name, meta, altR
     result: altResult,
     lang,
   }).catch(() => {});
+}
+
+async function replyWithBibleUnavailable(replyEditor, lang) {
+  await replyEditor.edit({
+    embeds: [buildAlertEmbed({
+      severity: AlertSeverity.WARNING,
+      ...t('dialogue.search.bibleUnavailable', lang),
+      lang,
+    })],
+  });
 }
 
 async function replyWithHiddenRosterSuggestions(replyEditor, name, lang) {
@@ -298,27 +320,39 @@ async function replyWithHiddenRosterSuggestions(replyEditor, name, lang) {
  * @param {boolean} args.deep - whether the caller passed deep:true
  * @param {{candidateLimit?: number, useScraperApiForCandidates: boolean}} args.deepOptions -
  *   forwarded to detectAltsViaStronghold
- * @returns {Promise<boolean|void>} `false` when Bible has no profile for the
- *   name and the no-roster card was shown; otherwise nothing.
+ * @returns {Promise<boolean|void>} `false` when no roster card was shown:
+ *   Bible has no profile for the name, or the profile request failed;
+ *   otherwise nothing.
  */
 export async function handleHiddenRosterResult({ interaction, guildId, replyEditor, name, deep, deepOptions, lang }) {
   await connectDB();
+  // fetchCharacterMeta returns null both for an unknown name (Bible answers
+  // 404) and for a failed read; its last request result tells the two apart.
+  let bibleFailed = false;
   const meta = await fetchCharacterMeta(name, {
     timeoutMs: config.strongholdDeepCandidateTimeoutMs,
     viaWorker: true,
+    onMetaFetchResult: (result) => {
+      bibleFailed = isBibleRequestFailure(result);
+    },
   });
   if (!meta?.guildName) {
-    await replyWithHiddenRosterSuggestions(replyEditor, name, lang);
+    if (bibleFailed) await replyWithBibleUnavailable(replyEditor, lang);
+    else await replyWithHiddenRosterSuggestions(replyEditor, name, lang);
     return false;
   }
 
-  const guildMembers = await fetchGuildMembers(name, {
+  const fetchedMembers = await fetchGuildMembers(name, {
     timeoutMs: config.strongholdDeepCandidateTimeoutMs,
     cacheKey: meta.guildName,
     viaWorker: true,
   });
+  const guildMembersUnavailable = fetchedMembers === null;
+  const guildMembers = fetchedMembers ?? [];
   const hits = await loadGuildListHits(guildMembers, guildId);
-  const scan = deep
+  // A failed guild fetch has no member list to scan; the reply then carries
+  // the guild-unavailable notice instead of a scan over an empty list.
+  const scan = deep && !guildMembersUnavailable
     ? await runHiddenDeepScan({
       interaction,
       replyEditor,
@@ -349,8 +383,8 @@ export async function handleHiddenRosterResult({ interaction, guildId, replyEdit
     name,
     meta,
     guildMembers,
+    guildMembersUnavailable,
     hits,
-    deep,
     altResult: scan.result,
     lang,
     statMap: hitStatMap,
@@ -360,6 +394,8 @@ export async function handleHiddenRosterResult({ interaction, guildId, replyEdit
     name,
     meta,
     guildMembers,
+    guildMembersUnavailable,
+    deep,
     deepOptions,
     altResult: scan.result,
     errorEmbed: scan.errorEmbed,

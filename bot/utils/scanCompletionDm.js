@@ -22,6 +22,7 @@ import { COLORS, ICONS } from './ui.js';
 import { createArtistEmbed } from './artistVoice.js';
 import { formatAltLine } from '../handlers/list/trackedAltsRender.js';
 import { t } from '../services/i18n/index.js';
+import { describeScanAbort } from './scanResultEmbed.js';
 
 /**
  * @typedef ScanDmOptions
@@ -124,9 +125,9 @@ export async function sendScanCompletionDm(opts) {
     } : null,
     // Abort details deserve a full-width line because the explanation can
     // run long ("Bible 503 storm: 78% failure across 120 attempts").
-    result.abortLabel ? {
+    result.abortReason ? {
       name: `🛑 ${t('dialogue.scan.dm.fields.stopReason', lang)}`,
-      value: String(result.abortLabel).slice(0, 1024),
+      value: describeScanAbort(result, lang).label.slice(0, 1024),
       inline: false,
     } : null,
   ].filter(Boolean);

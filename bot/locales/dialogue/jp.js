@@ -1,6 +1,8 @@
 export default {
   common: {
     errorField: 'エラー', missingField: '不足', unknown: '不明',
+    savedCardFailed: '保存しましたわ。確認 card を表示できませんでしたの。',
+    queuedCardFailed: 'ご依頼は保存され、承認待ちですわ。確認 card を表示できませんでしたの。',
     unexpected: {
       title: 'その操作がすり抜けてしまいましたの',
       description: '今回は最後まで完了できませんでしたわ。もう一度お試しいただき、続くようでしたら officer へお知らせくださいませ。',
@@ -432,10 +434,11 @@ export default {
     stopped: { title: 'Deep scan 停止 · {name}', description: '理由: **{reason}**', retry: '問題解消後に Continue を再試行できますの。', rosterStillShown: 'Roster card は残っています。Deep scan だけ未完了ですわ。' }, unexpectedError: '予期しない detector error', failed: { title: 'Deep scan 失敗 · {name}', description: 'Detector error: `{error}`' },
     sessionExpired: { title: 'Scan session の期限切れですの', description: 'この deep-scan session は5分を過ぎていますわ。', footer: '`/la-roster deep:true` を再実行してくださいませ。' }, notYourSession: { title: 'あなたの scan ではありませんの', description: 'Scan を開始した人だけが続行できますわ。' }, continueRunning: { title: 'Scan は実行中ですの', description: 'この結果では Continue pass がすでに動いています。完了を待ってね♪' },
     stats: { checked: 'checked {count}', attempted: 'attempted {count}', skipped: 'limit で {count} skip', failed: 'failed {count}', concurrency: 'concurrency {count}', scraper: 'ScraperAPI {state}', on: 'on', off: 'off' },
-    progressUi: { unknown: 'Unknown', more: '...ほか {count} 名', matches: '現在の一致 ({count}):', started: '{time} に開始', lastError: '最後の error: `{error}`', backoff: 'Backoff {ms}ms', retries: '429 retry {count}', interval: '15秒ごとに更新', checked: '**{checked}** / {total} candidates を確認', attempts: 'Attempts **{count}**', found: '**{count}** match を発見', failed: 'Failed **{count}**' },
+    progressUi: { more: '...ほか {count} 名', matches: '現在の一致 ({count}):', started: '{time} に開始', lastError: '最後の error: `{error}`', backoff: 'Backoff {ms}ms', retries: '429 retry {count}', interval: '15秒ごとに更新', checked: '**{checked}** / {total} candidates を確認', attempts: 'Attempts **{count}**', found: '**{count}** match を発見', failed: 'Failed **{count}**' },
     result: {
       states: { completed: 'Scan 完了', capHit: 'Candidate limit で scan 一時停止', failureStorm: 'Bible が profile を拒否したため一時停止', aborted: 'Issue 検出で scan 停止', stopped: 'Scan を早めに停止' }, kinds: { enrich: 'Enrich 結果', hidden: 'Hidden roster scan', deep: 'Deep scan 結果' }, hiddenNotice: 'Target roster は hidden です。Alt は Stronghold fingerprint で一致しましたわ。',
       stoppedHint: '早めに停止しました。残り eligible candidates は **{remaining}** 件; **scan 続行** で再開できますの。', abortedHint: '停止: **{label}**。{detail} 解消後に **scan 続行** をお使いくださいませ。', issue: 'Issue detected', failureHint: 'Bible が {failed}/{attempted} profiles ({rate}%) を拒否したため一時停止しましたわ。{lastError} Continue で failed candidates を再試行しますの。', lastError: ' 最後の error: `{error}`。', capHint: 'Candidate cap {cap} に到達。残り **{remaining}** 件; **scan 続行** で残りを確認できますの。', configured: 'configured limit', newTag: 'new', more: '...ほか {count} 名', altsFound: '発見 alts ({count}):',
+      abortReasons: { userStopped: { label: 'ユーザーが停止しましたの' }, discordUpdateFailed: { label: 'Discord の更新に失敗しましたの', detail: 'scan card を何度も更新できませんでしたわ。' }, bibleFailureStorm: { label: 'Bible が candidate profile を拒否しましたの' } },
       fields: { checked: 'Checked', found: 'Found', failed: 'Failed', remaining: 'Remaining', attempts: 'Attempts', retries: '429 retries', scraper: 'ScraperAPI' }, footer: { guild: 'Guild {guild}', members: '{count} members', cap: 'Cap {count}', excluded: '前 pass から {count} 件除外' },
     },
     dm: {
@@ -451,7 +454,7 @@ export default {
       'この roster は非公開ですので、character を一人も読めませんの。でも guild は開いていますから、そちらから探りましたわ。',
       'roster を隠していらっしゃるので character は見えませんの。幸い guild は公開でしたから、これだけ拾えましたわ。',
       'roster が閉じていて character が見えませんの。guild 側から分かったのはこれで全部ですわ。',
-    ] }, guildField: 'Guild', membersField: 'メンバー', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: '未実行', deepDone: '実行済み', hiddenFooter: 'Source: lostark.bible{stats} · deep:true で同一 account の alt を探せますの', blackGuild: 'Blacklist guild members ({count})', whiteGuild: 'Whitelist guild members ({count})', noReason: '理由なし',
+    ] }, guildField: 'Guild', membersField: 'メンバー', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: '未実行', deepDone: '実行済み', deepNotRunNotice: { title: 'Deep scan を実行できませんの', description: '**{name}** の deep scan を今回は実行できませんでしたわ。', footer: 'まだ何も scan していませんの。数分後に再試行してくださいませ。' }, hiddenFooter: 'Source: lostark.bible{stats} · deep:true で同一 account の alt を探せますの', blackGuild: 'Blacklist guild members ({count})', whiteGuild: 'Whitelist guild members ({count})', noReason: '理由なし',
   },
   enrich: {
     noEntry: { title: 'List entry がありませんの', description: '**{name}** はどの list にもいませんわ。', footer: '先に `/la-list add` で entry を作成してくださいませ。Enrich は既存 entry に alt を追加するだけですの。' }, profileMissing: { title: 'Profile が見つかりませんの', description: '**{name}** の lostark.bible profile を読み込めませんでしたわ。', footer: 'Profile が private、名前違い、または Bible が一時 unavailable の可能性がありますの。' }, metaMissing: { title: 'Character metadata を取得できませんの', description: '**{name}** の metadata を lostark.bible から取得できませんでしたわ。', footer: 'Profile hidden または Bible が一時 unavailable の可能性がありますの。' },

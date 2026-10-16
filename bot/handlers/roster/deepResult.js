@@ -1,7 +1,42 @@
+import { AlertSeverity, buildAlertEmbed } from '../../utils/alertEmbed.js';
 import { t } from '../../services/i18n/index.js';
 import { createRosterContinuationSession } from '../../utils/rosterDeepSession.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { buildScanResultEmbed, buildScanResultButtons } from '../../utils/scanResultEmbed.js';
+
+// The first rule that applies names the cause; each key carries a title,
+// description and footer for the notice. The no-guild footer points at
+// `/la-list edit additional_names`, which has no entry to act on from a
+// roster card, so that rule leaves its footer out.
+const DEEP_NOT_RUN_NOTICE_RULES = [
+  { applies: ({ meta }) => Boolean(meta) && !meta.guildName, key: 'dialogue.enrich.noGuild', omitFooter: true },
+  { applies: ({ guildMembersUnavailable }) => guildMembersUnavailable, key: 'dialogue.enrich.guildUnavailable' },
+  { applies: ({ meta }) => !meta, key: 'dialogue.enrich.metaMissing' },
+  { applies: () => true, key: 'dialogue.roster.deepNotRunNotice' },
+];
+
+/**
+ * Build the notice for a deep scan that was asked for and produced no result,
+ * so the reply never reads as a scan that ran clean.
+ * @param {object} args
+ * @param {string} args.name - queried character name.
+ * @param {object|null} args.meta - target metadata the caller fetched, or null
+ *   when that fetch found none.
+ * @param {boolean} [args.guildMembersUnavailable=false] - the guild member
+ *   fetch failed.
+ * @param {string} args.lang - locale for UI strings.
+ * @returns {import('discord.js').EmbedBuilder}
+ */
+export function buildDeepScanNotRunNotice({ name, meta, guildMembersUnavailable = false, lang }) {
+  const { key, omitFooter } = DEEP_NOT_RUN_NOTICE_RULES.find(({ applies }) => applies({ meta, guildMembersUnavailable }));
+  const { footer, ...copy } = t(key, lang, { name });
+  return buildAlertEmbed({
+    severity: AlertSeverity.WARNING,
+    ...copy,
+    footer: omitFooter ? undefined : footer,
+    lang,
+  });
+}
 
 /**
  * Render a roster deep-scan result and register its Continue session if allowed.
@@ -40,13 +75,12 @@ export function buildRosterDeepScanResult({
 }) {
   if (!altResult) return { embed: null, components: [], resumable: false };
 
+  const guildName = meta?.guildName ?? altResult.target?.guildName;
   const { embed, state } = buildScanResultEmbed({
-    target: { name, isHidden, guildName: meta?.guildName, profileUrl: rosterUrl(name) },
+    target: { name, isHidden, guildName, profileUrl: rosterUrl(name) },
     result: altResult,
     kind: isHidden ? 'roster-hidden' : 'roster-visible',
-    summaryLine: isHidden || meta?.guildName
-      ? t('dialogue.enrich.summary', lang, { guild: meta?.guildName, name, resumed: '' })
-      : t('dialogue.enrich.noGuild.description', lang, { name }),
+    summaryLine: t('dialogue.enrich.summary', lang, { guild: guildName, name, resumed: '' }),
     lang,
   });
   if (!state.hasRemaining || !canContinue) return { embed, components: [], resumable: false };

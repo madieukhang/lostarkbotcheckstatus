@@ -10,7 +10,7 @@
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
-import { editAlert, editEmbed } from '../../../utils/interactionReplies.js';
+import { editAlert, editEmbed, editNoticeAfterSavedWrite } from '../../../utils/interactionReplies.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import { loadCheckDetailStatMap } from '../check/index.js';
@@ -190,6 +190,9 @@ async function renderEditSuccess(options) {
     await sendEditSuccess(options);
   } catch (err) {
     console.warn('[list] Edit success card failed after the write:', err.message);
+    await editNoticeAfterSavedWrite(options.interaction, t('dialogue.common.savedCardFailed', options.lang), {
+      lang: options.lang,
+    });
   }
 }
 

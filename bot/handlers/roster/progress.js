@@ -113,8 +113,6 @@ function abortForProgressEditFailures(cancelFlag) {
   if (!cancelFlag || cancelFlag.cancelled) return;
   cancelFlag.cancelled = true;
   cancelFlag.reason = 'discord-progress-update-failed';
-  cancelFlag.label = 'Discord update failed';
-  cancelFlag.detail = 'Could not update the scan card repeatedly.';
 }
 
 /**

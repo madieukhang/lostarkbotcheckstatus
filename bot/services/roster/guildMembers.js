@@ -77,15 +77,25 @@ async function fetchGuildMembersUncached(name, options = {}) {
     }
 
     const htmlRes = await bibleClient.fetch(htmlUrl, buildBibleFetchOptions(options));
-    if (!htmlRes.ok) return [];
+    if (!htmlRes.ok) return null;
     const html = await htmlRes.text();
     return parseGuildMembersFromHtml(html);
   } catch (err) {
     console.warn('[alt-detect] Failed to fetch guild members:', err.message);
-    return [];
+    return null;
   }
 }
 
+/**
+ * Fetch a character's guild member list, caching non-empty lists by guild.
+ * A failed fetch (non-ok response, exception, timeout) is never cached.
+ * @param {string} name - a character in the guild
+ * @param {object} [options] - Transport and policy forwarded to the Bible client
+ * @param {string} [options.cacheKey] - cache key; defaults to `options.guildName`, then `name`
+ * @param {boolean} [options.useCache=true] - read and write the cache and share in-flight requests
+ * @returns {Promise<Array<object>|null>} the members, [] when the fetched page lists
+ *   no one, or null when the fetch failed
+ */
 export async function fetchGuildMembers(name, options = {}) {
   const cacheKey = options.cacheKey || options.guildName || name;
   const useCache = options.useCache !== false;

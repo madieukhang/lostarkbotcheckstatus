@@ -42,6 +42,7 @@ import {
   deferReply,
   editAlert,
   editEmbed,
+  editNoticeAfterSavedWrite,
   updateAlert,
   updateEmbed,
 } from '../../../utils/interactionReplies.js';
@@ -210,21 +211,24 @@ export function buildRemoveResultCard(outcomes, {
  * Render the outcomes of a remove. An outcome whose delete matched nothing is
  * left out: a concurrent remove already took the entry. When nothing is left
  * to report, render the not-found alert instead of a result card. A render
- * failure after a committed delete is logged, not rethrown, so it cannot read
- * as a failed remove.
+ * failure after a committed delete is logged and answered with a plain notice,
+ * not rethrown, so it cannot read as a failed remove.
  * @param {Array<{ok: boolean, reason?: string}>} outcomes - envelopes from removeOne
  * @param {object} renderers
  * @param {Function} renderers.renderCard - receives the reported outcomes
  * @param {Function} renderers.renderNotFound - renders the not-found alert
+ * @param {Function} renderers.renderSavedNotice - answers with the saved-write
+ *   notice when the card of a committed delete failed
  * @returns {Promise<void>}
  */
-async function renderRemoveOutcomes(outcomes, { renderCard, renderNotFound }) {
+async function renderRemoveOutcomes(outcomes, { renderCard, renderNotFound, renderSavedNotice }) {
   const reported = outcomes.filter((outcome) => outcome.reason !== 'missing');
   try {
     await (reported.length > 0 ? renderCard(reported) : renderNotFound());
   } catch (err) {
     if (!reported.some((outcome) => outcome.ok)) throw err;
     console.warn('[list] Remove result card failed after the delete:', err.message);
+    await renderSavedNotice();
   }
 }
 
@@ -350,12 +354,19 @@ export function createRemoveHandlers({ services }) {
         removedBy: getInteractionDisplayName(interaction),
       });
 
+      const renderSavedNotice = () => editNoticeAfterSavedWrite(
+        interaction,
+        t('dialogue.common.savedCardFailed', lang),
+        { lang },
+      );
+
       // Single entry · remove directly, render as embed.
       if (found.length === 1) {
         const outcome = await removeOne(found[0].entry, found[0].type);
         await renderRemoveOutcomes([outcome], {
           renderCard: (reported) => editEmbed(interaction, buildRemoveResultEmbed(reported), { content: '' }),
           renderNotFound: () => editAlert(interaction, notFoundAlert),
+          renderSavedNotice,
         });
         return;
       }
@@ -432,6 +443,7 @@ export function createRemoveHandlers({ services }) {
           components: [],
         }),
         renderNotFound: () => updateAlert(button, notFoundAlert, { components: [] }),
+        renderSavedNotice,
       });
     } catch (err) {
       // The picker's collector rejects this way when it ends without a click

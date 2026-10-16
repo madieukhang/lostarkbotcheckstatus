@@ -3,6 +3,8 @@ export default {
     errorField: 'Error',
     missingField: 'Missing',
     unknown: 'Unknown',
+    savedCardFailed: 'Saved. I could not show the confirmation card.',
+    queuedCardFailed: 'Your request is saved and waiting for approval. I could not show the confirmation card.',
     unexpected: {
       title: 'That action slipped away',
       description: 'I could not finish it this time. Please try again; if it keeps happening, let an officer know.',
@@ -605,11 +607,12 @@ export default {
     notYourSession: { title: 'This is not your scan', description: 'Only the person who started this scan can continue it.' },
     continueRunning: { title: 'The scan is already running', description: 'A Continue pass is already active for this result. Wait until it finishes.' },
     stats: { checked: 'checked {count}', attempted: 'attempted {count}', skipped: 'skipped {count} by limit', failed: 'failed {count}', concurrency: 'concurrency {count}', scraper: 'ScraperAPI {state}', on: 'on', off: 'off' },
-    progressUi: { unknown: 'Unknown', more: '... and {count} more', matches: 'Matches so far ({count}):', started: 'Started {time}', lastError: 'Last error: `{error}`', backoff: 'Backoff {ms}ms', retries: '429 retries {count}', interval: '15s update interval', checked: 'Checked **{checked}** / {total} candidates', attempts: 'Attempts **{count}**', found: 'Found **{count}** match', failed: 'Failed **{count}**' },
+    progressUi: { more: '... and {count} more', matches: 'Matches so far ({count}):', started: 'Started {time}', lastError: 'Last error: `{error}`', backoff: 'Backoff {ms}ms', retries: '429 retries {count}', interval: '15s update interval', checked: 'Checked **{checked}** / {total} candidates', attempts: 'Attempts **{count}**', found: 'Found **{count}** match', failed: 'Failed **{count}**' },
     result: {
       states: { completed: 'Scan complete', capHit: 'Scan paused at candidate limit', failureStorm: 'Scan paused because Bible is rejecting profiles', aborted: 'Scan stopped after an issue', stopped: 'Scan stopped early' },
       kinds: { enrich: 'Enrich result', hidden: 'Hidden roster scan', deep: 'Deep scan result' }, hiddenNotice: 'The target roster is hidden; these alts come from a Stronghold fingerprint match.',
       stoppedHint: 'Stopped early. **{remaining}** eligible candidates remain; use **Continue scan** to resume.', abortedHint: 'Stopped: **{label}**. {detail} Use **Continue scan** after the issue clears.', issue: 'Issue detected',
+      abortReasons: { userStopped: { label: 'Stopped by user' }, discordUpdateFailed: { label: 'Discord update failed', detail: 'I could not update the scan card several times in a row.' }, bibleFailureStorm: { label: 'Bible rejected candidate profiles' } },
       failureHint: 'Bible rejected {failed}/{attempted} profiles ({rate}%), so I paused the scan.{lastError} Continue will retry failed candidates.', lastError: ' Last error: `{error}`.',
       capHint: 'Reached candidate cap {cap}. **{remaining}** eligible candidates remain; use **Continue scan** to walk the rest.', configured: 'configured limit', newTag: 'new', more: '... and {count} more', altsFound: 'Alts found ({count}):',
       fields: { checked: 'Checked', found: 'Found', failed: 'Failed', remaining: 'Remaining', attempts: 'Attempts', retries: '429 retries', scraper: 'ScraperAPI' },
@@ -635,7 +638,7 @@ export default {
       'This roster is locked, so I cannot read a single character off it. The guild is still open though, so I worked from there.',
       'They hid the roster, so no characters for me. The guild page is public at least, and this is what it gave up.',
       'Roster closed, no characters visible. Here is everything the guild side still shows.',
-    ] }, guildField: 'Guild', membersField: 'Members', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: 'Not run', deepDone: 'Done', hiddenFooter: 'Source: lostark.bible{stats} · deep:true to look for same-account alts', blackGuild: 'Blacklisted guild members ({count})', whiteGuild: 'Whitelisted guild members ({count})', noReason: 'no reason',
+    ] }, guildField: 'Guild', membersField: 'Members', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: 'Not run', deepDone: 'Done', deepNotRunNotice: { title: 'Deep scan could not run', description: 'I could not run the deep scan for **{name}** this time.', footer: 'Nothing was scanned. Try again in a few minutes.' }, hiddenFooter: 'Source: lostark.bible{stats} · deep:true to look for same-account alts', blackGuild: 'Blacklisted guild members ({count})', whiteGuild: 'Whitelisted guild members ({count})', noReason: 'no reason',
   },
   enrich: {
     noEntry: { title: 'No list entry', description: '**{name}** is not in any list.', footer: 'Create the entry with `/la-list add` first; enrich only appends to existing entries.' },

@@ -66,8 +66,8 @@ function matchedAlt(candidate, candidateMeta, targetMeta) {
 /**
  * Detect alt characters via the target's stronghold name. Runs inside a
  * scraperapi-usage scope so per-call counters surface in the audit
- * trail. Returns null when the target has no guild / no stronghold or
- * the meta lookup fails.
+ * trail. Returns null when the target has no guild / no stronghold, the
+ * meta lookup fails, or the guild has no member list to scan.
  * @param {string} name - target character name
  * @param {object} [options] - see options destructure inside (mode,
  *   concurrency, viaWorker, candidateLimit, target/guild meta overrides)
@@ -139,7 +139,7 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
         cacheKey: meta.guildName,
         viaWorker,
       });
-  if (members.length === 0) {
+  if (!members?.length) {
     console.log('[alt-detect] No guild members found.');
     return null;
   }
@@ -185,8 +185,6 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
   let rateLimitRetries = 0;
   let pausedForFailureStorm = false;
   let abortReason = '';
-  let abortLabel = '';
-  let abortDetail = '';
 
   console.log(`[alt-detect] Scanning ${limitedCandidates.length} candidate(s)...`);
 
@@ -225,8 +223,6 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     if (cancelFlag.cancelled) {
       cancelledByFlag = true;
       abortReason = cancelFlag.reason || 'user-stopped';
-      abortLabel = cancelFlag.label || 'Stopped by user';
-      abortDetail = cancelFlag.detail || 'Stop button clicked.';
       return true;
     }
     return pausedForFailureStorm;
@@ -294,9 +290,6 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     if (!shouldPauseForFailureStorm()) return false;
     pausedForFailureStorm = true;
     abortReason = 'bible-failure-storm';
-    abortLabel = 'Bible rejected candidate profiles';
-    abortDetail = `${failedCandidates}/${attemptedCandidates} candidate attempts failed.` +
-      (lastFailureReason ? ` Last error: ${lastFailureReason}.` : '');
     console.warn(
       `[alt-detect] Pausing ${name}: high failure rate ` +
       `${failedCandidates}/${attemptedCandidates} (${Math.round((failedCandidates / attemptedCandidates) * 100)}%).`
@@ -406,8 +399,6 @@ async function detectAltsViaStrongholdInScope(name, options = {}) {
     retryOnRateLimit,
     pausedForFailureStorm,
     abortReason,
-    abortLabel,
-    abortDetail,
     cancelled: cancelledByFlag,
   };
 }

@@ -87,26 +87,57 @@ const KIND_LOCALE_KEYS = {
   'roster-hidden': 'hidden',
 };
 
+// Locale key under dialogue.scan.result.abortReasons for each abortReason code
+// the detector and the scan handlers set.
+const ABORT_REASON_LOCALE_KEYS = Object.freeze({
+  'user-stopped': 'userStopped',
+  'discord-progress-update-failed': 'discordUpdateFailed',
+  'bible-failure-storm': 'bibleFailureStorm',
+});
+
+// The user-stop and failure-storm codes render through the stopped and
+// failure-storm hints, and the completion DM shows only the label, so only
+// this code is explained on the aborted hint.
+const ABORT_REASONS_WITH_DETAIL = new Set(['discord-progress-update-failed']);
+
+function formatLastError(result, lang) {
+  const lastError = truncateInlineText(result.lastFailureReason, 140);
+  return lastError ? t('dialogue.scan.result.lastError', lang, { error: lastError }) : '';
+}
+
+/**
+ * Localized label and detail for why a scan stopped, from the result's
+ * abortReason code. Only a code in ABORT_REASONS_WITH_DETAIL has a detail; an
+ * unknown or missing code gets the generic issue label and no detail.
+ *
+ * @param {object} result - Result envelope from detectAltsViaStronghold.
+ * @param {string} [lang='en']
+ * @returns {{label: string, detail: string}}
+ */
+export function describeScanAbort(result, lang = 'en') {
+  const localeKey = ABORT_REASON_LOCALE_KEYS[result?.abortReason];
+  if (!localeKey) return { label: t('dialogue.scan.result.issue', lang), detail: '' };
+  const base = `dialogue.scan.result.abortReasons.${localeKey}`;
+  return {
+    label: t(`${base}.label`, lang),
+    detail: ABORT_REASONS_WITH_DETAIL.has(result.abortReason) ? t(`${base}.detail`, lang) : '',
+  };
+}
+
 const STOP_HINT_BUILDERS = {
   stopped: ({ state, lang }) => (
     t('dialogue.scan.result.stoppedHint', lang, { remaining: state.remaining })
   ),
-  'scan-aborted': ({ result, lang }) => t('dialogue.scan.result.abortedHint', lang, {
-    label: result.abortLabel || t('dialogue.scan.result.issue', lang),
-    detail: result.abortDetail || '',
-  }),
+  'scan-aborted': ({ result, lang }) => t('dialogue.scan.result.abortedHint', lang, describeScanAbort(result, lang)),
   'failure-storm': ({ result, lang }) => {
     const attempted = result.attemptedCandidates ?? 0;
     const failed = result.failedCandidates ?? 0;
     const rate = attempted > 0 ? Math.round((failed / attempted) * 100) : 0;
-    const lastError = truncateInlineText(result.lastFailureReason, 140);
     return t('dialogue.scan.result.failureHint', lang, {
       failed,
       attempted,
       rate,
-      lastError: lastError
-        ? t('dialogue.scan.result.lastError', lang, { error: lastError })
-        : '',
+      lastError: formatLastError(result, lang),
     });
   },
   'cap-hit': ({ state, result, lang }) => t('dialogue.scan.result.capHint', lang, {

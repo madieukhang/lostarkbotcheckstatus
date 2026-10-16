@@ -42,6 +42,7 @@ import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { handleHiddenRosterResult } from './hiddenRoster.js';
+import { buildDeepScanNotRunNotice } from './deepResult.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
 import { resolveRosterScanOutcome } from './completion.js';
 import { buildRosterEvidenceRows } from './evidenceButton.js';
@@ -282,7 +283,16 @@ async function handleVisibleRosterResult({ interaction, guildId, replyEditor, na
     })
     : { resultEmbed: null, components: [], result: null, meta: null };
 
-  if (visibleDeep.resultEmbed) presentation.embeds.push(visibleDeep.resultEmbed);
+  if (visibleDeep.resultEmbed) {
+    presentation.embeds.push(visibleDeep.resultEmbed);
+  } else if (deep) {
+    presentation.embeds.push(buildDeepScanNotRunNotice({
+      name,
+      meta: visibleDeep.meta,
+      guildMembersUnavailable: visibleDeep.guildMembersUnavailable,
+      lang,
+    }));
+  }
   await replyEditor.edit({
     content: null,
     embeds: presentation.embeds,
@@ -316,7 +326,7 @@ const ROSTER_FAILURE_ALERT_KEYS = Object.freeze({
  * @param {Function} [deps.fetchRoster] - `(name, deep) => {characters, world}`
  * @param {Function} [deps.renderVisible] - renders a roster with characters
  * @param {Function} [deps.renderHidden] - renders a roster without characters;
- *   resolving to `false` reports that Bible has no profile for the name
+ *   resolving to `false` reports that no profile card was shown for the name
  * @returns {Promise<boolean>} false when the lookup failed or Bible has no
  *   profile for the name; true otherwise
  */

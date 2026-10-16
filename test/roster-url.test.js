@@ -8,7 +8,7 @@ import {
   fetchGuildMembers,
 } from '../bot/services/roster/index.js';
 import { fetchWithFallback } from '../bot/services/roster/bibleFetch.js';
-import { stampRosterWorld } from '../bot/services/roster/buildRosterCharacters.js';
+import { isBibleRequestFailure, stampRosterWorld } from '../bot/services/roster/buildRosterCharacters.js';
 import { clearGuildMembersCache } from '../bot/services/roster/guildMembers.js';
 import { extractCharacterItemLevelFromHtml } from '../bot/services/roster/parsers.js';
 import config from '../bot/config.js';
@@ -365,7 +365,8 @@ test('detectAltsViaStronghold pauses early on candidate failure storms and retri
 
     assert.equal(result.pausedForFailureStorm, true);
     assert.equal(result.abortReason, 'bible-failure-storm');
-    assert.equal(result.abortLabel, 'Bible rejected candidate profiles');
+    assert.equal(Object.hasOwn(result, 'abortLabel'), false);
+    assert.equal(Object.hasOwn(result, 'abortDetail'), false);
     assert.equal(result.attemptedCandidates, 1);
     assert.equal(result.checkedCandidates, 0);
     assert.equal(result.failedCandidates, 1);
@@ -487,6 +488,58 @@ test('fetchGuildMembers isolates policy-distinct in-flight requests', async () =
   }
 });
 
+function emptyGuildMembersResponse() {
+  return Response.json({ nodes: [{ data: [{ guild: 1 }, { members: 2 }, []] }] });
+}
+
+test('fetchGuildMembers returns null for a failed fetch and [] for a page that lists no one', async (t) => {
+  clearGuildMembersCache();
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    clearGuildMembersCache();
+  });
+
+  globalThis.fetch = async () => new Response('busy', { status: 503 });
+  assert.equal(await fetchGuildMembers('Ainslinn', { cacheKey: 'DownGuild', allowScraperApi: false }), null);
+
+  globalThis.fetch = async () => { throw new Error('socket hang up'); };
+  assert.equal(await fetchGuildMembers('Ainslinn', { cacheKey: 'DownGuild', allowScraperApi: false }), null);
+
+  globalThis.fetch = async () => createGuildMembersResponse('Recovered');
+  const recovered = await fetchGuildMembers('Ainslinn', { cacheKey: 'DownGuild', allowScraperApi: false });
+  assert.deepEqual(recovered.map(({ name }) => name), ['Recovered'], 'a failure must not be cached as the guild list');
+
+  globalThis.fetch = async () => emptyGuildMembersResponse();
+  assert.deepEqual(await fetchGuildMembers('Ainslinn', { cacheKey: 'EmptyGuild', allowScraperApi: false }), []);
+});
+
+test('detectAltsViaStronghold returns null when the guild member list could not be fetched', async (t) => {
+  clearGuildMembersCache();
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    clearGuildMembersCache();
+  });
+  globalThis.fetch = async () => new Response('busy', { status: 503 });
+
+  const result = await detectAltsViaStronghold('Ainslinn', {
+    targetMeta: {
+      rosterLevel: 300,
+      strongholdLevel: 70,
+      strongholdName: 'AinsHome',
+      guildName: 'DetectDownGuild',
+      guildGrade: 'Member',
+      classId: 'bard',
+      itemLevel: 1790,
+    },
+    useScraperApiForCandidates: false,
+    allowScraperApiForGuild: false,
+  });
+
+  assert.equal(result, null);
+});
+
 async function buildWithResponses(t, statusFor) {
   clearMetaCache();
   const originalFetch = globalThis.fetch;
@@ -523,6 +576,20 @@ test('buildRosterCharacters reads a 404 profile behind a hidden roster as a miss
 
   assert.equal(result.hasValidRoster, false);
   assert.equal(result.failReason, null);
+});
+
+test('isBibleRequestFailure tells failed Bible requests from the 404 that means no such name', () => {
+  const cases = [
+    { label: 'thrown error', result: { error: new Error('timeout') }, failed: true },
+    { label: '200', result: { ok: true, status: 200 }, failed: false },
+    { label: '404', result: { ok: false, status: 404 }, failed: false },
+    { label: '429', result: { ok: false, status: 429 }, failed: true },
+    { label: '503', result: { ok: false, status: 503 }, failed: true },
+    { label: 'missing status', result: { ok: false }, failed: true },
+  ];
+  for (const { label, result, failed } of cases) {
+    assert.equal(isBibleRequestFailure(result), failed, label);
+  }
 });
 
 function createMetaDataResponse() {

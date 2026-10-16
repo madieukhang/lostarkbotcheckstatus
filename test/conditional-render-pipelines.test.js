@@ -1,17 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { ENGLISH_ABORT_TEXT } from './helpers/english-abort-text.js';
+
 process.env.DISCORD_TOKEN ||= 'test';
 process.env.CHANNEL_ID ||= 'test';
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const { buildEnrichSuccessEmbed } = await import('../bot/handlers/list/enrich/ui.js');
-const { resolveScanCancelState } = await import('../bot/handlers/list/enrich/index.js');
+const { createEnrichHandlers, resolveScanCancelState } = await import('../bot/handlers/list/enrich/index.js');
 const { resolveMultiaddConfirmState } = await import('../bot/handlers/list/multiadd/confirmButton.js');
 const { findDuplicateEntry } = await import('../bot/handlers/list/add/overwriteButton.js');
 const { formatDeepScanStats } = await import('../bot/handlers/roster/progress.js');
 const { sendScanCompletionDm } = await import('../bot/utils/scanCompletionDm.js');
 const { getClassEmoji } = await import('../bot/models/Class.js');
+const { t } = await import('../bot/services/i18n/index.js');
 
 test('multiadd confirmation policy preserves expiry, ownership, and action priority', () => {
   const pending = { requesterId: 'requester' };
@@ -183,7 +186,7 @@ test('scan completion field pipeline includes each enabled optional block once',
       attemptedCandidates: 4,
       failedCandidates: 1,
       scraperApiRequests: 3,
-      abortLabel: 'manual stop',
+      abortReason: 'user-stopped',
       alts: [],
     },
     lang: 'en',
@@ -195,8 +198,67 @@ test('scan completion field pipeline includes each enabled optional block once',
   assert.equal(embed.fields.length, 6);
   assert.equal(embed.fields.filter((field) => field.value === '4').length, 1);
   assert.equal(embed.fields.filter((field) => field.value === '3').length, 1);
-  assert.equal(embed.fields.filter((field) => field.value === 'manual stop').length, 1);
+  assert.equal(embed.fields.filter((field) => field.value === 'Stopped by user').length, 1);
   assert.equal(payloads[0].components.length, 1);
+});
+
+for (const [abortReason, key] of [
+  ['user-stopped', 'userStopped'],
+  ['discord-progress-update-failed', 'discordUpdateFailed'],
+  ['bible-failure-storm', 'bibleFailureStorm'],
+  ['unmapped-code', null],
+]) {
+  test(`vi scan completion DM names the stop reason for ${abortReason} without English text`, async () => {
+    const payloads = [];
+    await sendScanCompletionDm({
+      user: { id: 'user-1', send: async (payload) => { payloads.push(payload); } },
+      commandLabel: '/la-roster deep',
+      scanTargetName: 'Ainslinn',
+      outcome: 'stopped-no-alts',
+      result: { checkedCandidates: 2, failedCandidates: 1, abortReason, alts: [] },
+      lang: 'vi',
+    });
+
+    const embed = payloads[0].embeds[0].toJSON();
+    const stopField = embed.fields.find((field) => field.name.includes(t('dialogue.scan.dm.fields.stopReason', 'vi')));
+    const expected = key
+      ? t(`dialogue.scan.result.abortReasons.${key}.label`, 'vi')
+      : t('dialogue.scan.result.issue', 'vi');
+    assert.equal(stopField.value, expected);
+    for (const english of ENGLISH_ABORT_TEXT) assert.ok(!stopField.value.includes(english), english);
+  });
+}
+
+test('a scan completion DM without an abort reason has no stop reason field', async () => {
+  const payloads = [];
+  await sendScanCompletionDm({
+    user: { id: 'user-1', send: async (payload) => { payloads.push(payload); } },
+    commandLabel: '/la-roster deep',
+    scanTargetName: 'Ainslinn',
+    outcome: 'completed',
+    result: { checkedCandidates: 2, abortReason: '', alts: [] },
+    lang: 'en',
+  });
+
+  const { fields } = payloads[0].embeds[0].toJSON();
+  assert.equal(fields.some((field) => field.name.includes('Stop reason')), false);
+});
+
+test('the Stop button flags the scan with a reason code and no English text', async (context) => {
+  const { registerScan, unregisterScan } = await import('../bot/utils/scanSession.js');
+  const { default: UserPreference } = await import('../bot/models/UserPreference.js');
+  context.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  const cancelFlag = { cancelled: false };
+  registerScan('stop-flag-scan', { cancelFlag, callerId: 'caller-1', startedAt: Date.now(), label: 'scan' });
+  context.after(() => unregisterScan('stop-flag-scan'));
+
+  await createEnrichHandlers({ services: {} }).handleScanCancelButton({
+    customId: 'scan-cancel:stop-flag-scan',
+    user: { id: 'caller-1' },
+    reply: async () => {},
+  });
+
+  assert.deepEqual(cancelFlag, { cancelled: true, reason: 'user-stopped' });
 });
 
 test('scan completion DM names the class of an alt that has only a classId', async () => {

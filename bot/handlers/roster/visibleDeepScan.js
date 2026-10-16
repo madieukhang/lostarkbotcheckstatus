@@ -35,7 +35,9 @@ import { buildRosterDeepScanResult } from './deepResult.js';
  * @param {import('discord.js').EmbedBuilder} args.embed - the base
  *   embed the caller already started (visible-roster card); this
  *   function appends the deep-scan section.
- * @returns {Promise<object>} Result card, continuation controls, and scan context.
+ * @returns {Promise<object>} Result card (null when the detector returned no
+ *   result), continuation controls, and scan context. `guildMembersUnavailable`
+ *   is true when the guild member fetch failed.
  */
 export async function runVisibleRosterDeepScan({ interaction, replyEditor, name, deepOptions, embed }) {
   await connectDB();
@@ -43,6 +45,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
   // Returned to the caller, which sends the completion DM from them.
   let visibleDeepResult = null;
   let visibleDeepMeta = null;
+  let visibleGuildMembersUnavailable = false;
   let visibleDeepResumable = false;
   // Components added by the deep-scan path (Continue button when
   // remaining > 0). Empty when deep was off or fully scanned.
@@ -60,13 +63,15 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
       timeoutMs: config.strongholdDeepCandidateTimeoutMs,
       viaWorker: true,
     });
-    const visGuildMembers = visMeta?.guildName
+    const visFetchedMembers = visMeta?.guildName
       ? await fetchGuildMembers(name, {
           timeoutMs: config.strongholdDeepCandidateTimeoutMs,
           cacheKey: visMeta.guildName,
           viaWorker: true,
         })
       : [];
+    visibleGuildMembersUnavailable = visFetchedMembers === null;
+    const visGuildMembers = visFetchedMembers ?? [];
 
     const visFilteredCount = visGuildMembers.filter((m) => m.name !== name && m.ilvl >= MIN_TRACKED_ITEM_LEVEL).length;
     const visCap = deepOptions.candidateLimit ?? config.strongholdDeepCandidateLimit;
@@ -111,7 +116,8 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
     visibleDeepResult = altResult;
     visibleDeepMeta = visMeta;
 
-    // A visible scan without guild members can render but cannot resume.
+    // A scan whose meta or guild members the detector fetched itself renders,
+    // but Continue needs the snapshot taken here, so it cannot resume.
     const rendered = buildRosterDeepScanResult({
       callerId: interaction.user.id,
       name,
@@ -140,6 +146,7 @@ export async function runVisibleRosterDeepScan({ interaction, replyEditor, name,
     components: deepScanComponents,
     result: visibleDeepResult,
     meta: visibleDeepMeta,
+    guildMembersUnavailable: visibleGuildMembersUnavailable,
     resumable: visibleDeepResumable,
   };
 }

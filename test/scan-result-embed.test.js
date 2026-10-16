@@ -5,8 +5,11 @@ import {
   buildScanResultButtons,
   buildScanResultEmbed,
   deriveScanState,
+  describeScanAbort,
 } from '../bot/utils/scanResultEmbed.js';
 import { getClassEmoji } from '../bot/models/Class.js';
+import { t } from '../bot/services/i18n/index.js';
+import { ENGLISH_ABORT_TEXT } from './helpers/english-abort-text.js';
 
 test('deriveScanState treats failure storm as paused and leaves failed attempts retryable', () => {
   const state = deriveScanState({
@@ -30,7 +33,6 @@ test('deriveScanState exposes system aborts distinctly from manual stops', () =>
     checkedCandidates: 10,
     attemptedCandidates: 10,
     abortReason: 'discord-progress-update-failed',
-    abortLabel: 'Discord update failed',
   });
 
   assert.deepEqual(state, {
@@ -72,6 +74,87 @@ test('deriveScanState preserves the ordered terminal-state matrix', () => {
   for (const { result, stopReason } of cases) {
     assert.equal(deriveScanState(result).stopReason, stopReason);
   }
+});
+
+// A real result reaches the aborted hint only with a system abort code; the
+// user-stop and failure-storm codes render their own hints on the card. The
+// detector sets the failure-storm code together with `pausedForFailureStorm`.
+const ABORT_CODE_CASES = [
+  { abortReason: 'user-stopped', extra: { cancelled: true } },
+  { abortReason: 'discord-progress-update-failed', extra: { cancelled: true }, key: 'discordUpdateFailed' },
+  { abortReason: 'bible-failure-storm', extra: { pausedForFailureStorm: true } },
+  { abortReason: 'unmapped-code', extra: { cancelled: true }, fallback: true },
+];
+
+for (const { abortReason, extra, key, fallback } of ABORT_CODE_CASES) {
+  test(`vi scan card for ${abortReason}${extra.pausedForFailureStorm ? ' (paused)' : ''} carries no English abort text`, () => {
+    const { embed } = buildScanResultEmbed({
+      target: { name: 'Ainslinn', isHidden: false, guildName: 'Bullet Shell' },
+      result: {
+        totalEligibleInGuild: 40,
+        checkedCandidates: 10,
+        attemptedCandidates: 14,
+        failedCandidates: 4,
+        lastFailureReason: 'HTML HTTP 503',
+        abortReason,
+        ...extra,
+      },
+      kind: 'roster-visible',
+      lang: 'vi',
+    });
+
+    const { description } = embed.toJSON();
+    for (const english of ENGLISH_ABORT_TEXT) assert.ok(!description.includes(english), english);
+    if (key) {
+      const base = `dialogue.scan.result.abortReasons.${key}`;
+      assert.ok(description.includes(t(`${base}.label`, 'vi')), description);
+    }
+    if (fallback) assert.ok(description.includes(t('dialogue.scan.result.issue', 'vi')), description);
+  });
+}
+
+for (const lang of ['en', 'vi', 'jp']) {
+  test(`describeScanAbort explains only the Discord update failure with a detail in ${lang}`, () => {
+    const reasons = 'dialogue.scan.result.abortReasons';
+    for (const [abortReason, key] of [['user-stopped', 'userStopped'], ['bible-failure-storm', 'bibleFailureStorm']]) {
+      assert.deepEqual(describeScanAbort({ abortReason }, lang), {
+        label: t(`${reasons}.${key}.label`, lang),
+        detail: '',
+      }, abortReason);
+    }
+
+    const discord = describeScanAbort({ abortReason: 'discord-progress-update-failed' }, lang);
+    assert.equal(discord.label, t(`${reasons}.discordUpdateFailed.label`, lang));
+    assert.equal(discord.detail, t(`${reasons}.discordUpdateFailed.detail`, lang));
+    assert.notEqual(discord.detail, '');
+
+    for (const result of [{ abortReason: 'unmapped-code' }, {}]) {
+      assert.deepEqual(describeScanAbort(result, lang), {
+        label: t('dialogue.scan.result.issue', lang),
+        detail: '',
+      }, JSON.stringify(result));
+    }
+  });
+}
+
+test('the failure-storm hint carries the attempt counts, rate and last error', () => {
+  const { embed } = buildScanResultEmbed({
+    target: { name: 'Ainslinn', isHidden: false },
+    result: {
+      totalEligibleInGuild: 40,
+      checkedCandidates: 10,
+      attemptedCandidates: 14,
+      failedCandidates: 4,
+      lastFailureReason: 'HTML HTTP 503',
+      abortReason: 'bible-failure-storm',
+      pausedForFailureStorm: true,
+    },
+    kind: 'roster-visible',
+  });
+
+  const { description } = embed.toJSON();
+  assert.ok(description.includes('Bible rejected 4/14 profiles (29%)'), description);
+  assert.ok(description.includes('Last error: `HTML HTTP 503`.'), description);
 });
 
 test('scan result embeds surface the latest bible failure reason', () => {

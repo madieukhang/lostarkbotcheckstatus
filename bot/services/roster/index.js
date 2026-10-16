@@ -13,6 +13,7 @@ export {
 
 export {
   buildRosterCharacters,
+  isBibleRequestFailure,
   stampRosterWorld,
 } from './buildRosterCharacters.js';
 

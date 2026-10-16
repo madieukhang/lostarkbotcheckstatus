@@ -32,6 +32,16 @@ function describeFailedBibleStatus(status) {
     : `HTTP ${status}`;
 }
 
+/**
+ * Whether one `onMetaFetchResult` request result is a Bible failure: a thrown
+ * error, or a non-ok status other than the 404 Bible answers for an unknown name.
+ * @param {{ok?: boolean, status?: number, error?: Error}} result - one request attempt
+ * @returns {boolean}
+ */
+export function isBibleRequestFailure({ ok, status, error }) {
+  return Boolean(error) || (!ok && describeFailedBibleStatus(status) !== null);
+}
+
 function describeFetchError(err) {
   return err?.name === 'TimeoutError' ? 'timeout' : err?.message || String(err);
 }
@@ -129,8 +139,8 @@ export async function buildRosterCharacters(name, options = {}) {
           ...options,
           onMetaFetchResult: (result) => {
             options.onMetaFetchResult?.(result);
-            if (result.error) metaFailure = describeFetchError(result.error);
-            else metaFailure = result.ok ? null : describeFailedBibleStatus(result.status);
+            if (!isBibleRequestFailure(result)) metaFailure = null;
+            else metaFailure = result.error ? describeFetchError(result.error) : describeFailedBibleStatus(result.status);
           },
         });
         if (!meta) failReason = metaFailure;

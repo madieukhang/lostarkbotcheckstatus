@@ -3,6 +3,8 @@ export default {
     errorField: 'Lỗi',
     missingField: 'Còn thiếu',
     unknown: 'Không rõ',
+    savedCardFailed: 'Đã lưu. Tớ chưa hiển thị được card xác nhận.',
+    queuedCardFailed: 'Yêu cầu của cậu đã được lưu và đang chờ duyệt. Tớ chưa hiển thị được card xác nhận.',
     unexpected: {
       title: 'Thao tác này vừa trượt mất rồi',
       description: 'Tớ chưa thể hoàn tất lần này. Cậu thử lại nhé; nếu vẫn lặp lại, báo cho officer giúp tớ.',
@@ -457,10 +459,11 @@ export default {
     stopped: { title: 'Deep scan đã dừng · {name}', description: 'Lý do: **{reason}**', retry: 'Có thể bấm Continue lại sau khi lỗi được giải quyết.', rosterStillShown: 'Card roster vẫn được giữ; chỉ deep scan chưa hoàn tất.' }, unexpectedError: 'lỗi detector ngoài dự kiến', failed: { title: 'Deep scan thất bại · {name}', description: 'Detector gặp lỗi: `{error}`' },
     sessionExpired: { title: 'Session scan đã hết hạn', description: 'Session deep-scan này đã quá năm phút.', footer: 'Chạy lại `/la-roster deep:true` để bắt đầu lượt mới nhé.' }, notYourSession: { title: 'Đây không phải scan của cậu', description: 'Chỉ người bắt đầu scan mới tiếp tục được.' }, continueRunning: { title: 'Scan đang chạy rồi', description: 'Đã có một lượt Continue chạy cho kết quả này. Chờ nó xong nhé.' },
     stats: { checked: 'đã kiểm tra {count}', attempted: 'đã thử {count}', skipped: 'bỏ qua {count} do giới hạn', failed: 'lỗi {count}', concurrency: 'đồng thời {count}', scraper: 'ScraperAPI {state}', on: 'bật', off: 'tắt' },
-    progressUi: { unknown: 'Không rõ', more: '... và {count} tên khác', matches: 'Kết quả khớp hiện tại ({count}):', started: 'Bắt đầu {time}', lastError: 'Lỗi gần nhất: `{error}`', backoff: 'Backoff {ms}ms', retries: 'Thử lại 429: {count}', interval: 'Cập nhật mỗi 15 giây', checked: 'Đã kiểm tra **{checked}** / {total} candidate', attempts: 'Đã thử **{count}**', found: 'Tìm thấy **{count}** kết quả', failed: 'Lỗi **{count}**' },
+    progressUi: { more: '... và {count} tên khác', matches: 'Kết quả khớp hiện tại ({count}):', started: 'Bắt đầu {time}', lastError: 'Lỗi gần nhất: `{error}`', backoff: 'Backoff {ms}ms', retries: 'Thử lại 429: {count}', interval: 'Cập nhật mỗi 15 giây', checked: 'Đã kiểm tra **{checked}** / {total} candidate', attempts: 'Đã thử **{count}**', found: 'Tìm thấy **{count}** kết quả', failed: 'Lỗi **{count}**' },
     result: {
       states: { completed: 'Scan hoàn tất', capHit: 'Scan tạm dừng ở giới hạn candidate', failureStorm: 'Scan tạm dừng vì Bible từ chối profile', aborted: 'Scan dừng sau khi phát hiện lỗi', stopped: 'Scan được dừng sớm' }, kinds: { enrich: 'Kết quả enrich', hidden: 'Scan roster ẩn', deep: 'Kết quả deep scan' }, hiddenNotice: 'Roster đích đang ẩn; các alt này được khớp bằng fingerprint Stronghold.',
       stoppedHint: 'Đã dừng sớm. Còn **{remaining}** candidate hợp lệ; dùng **Quét tiếp** để tiếp tục.', abortedHint: 'Đã dừng: **{label}**. {detail} Dùng **Quét tiếp** sau khi lỗi được giải quyết.', issue: 'Đã phát hiện lỗi', failureHint: 'Bible từ chối {failed}/{attempted} profile ({rate}%) nên tớ tạm dừng.{lastError} Lượt tiếp theo sẽ thử lại candidate lỗi.', lastError: ' Lỗi gần nhất: `{error}`.', capHint: 'Đã chạm giới hạn candidate {cap}. Còn **{remaining}** candidate; dùng **Quét tiếp** để quét phần còn lại.', configured: 'đã cấu hình', newTag: 'mới', more: '... và {count} tên khác', altsFound: 'Alt tìm thấy ({count}):',
+      abortReasons: { userStopped: { label: 'Cậu đã dừng scan' }, discordUpdateFailed: { label: 'Discord cập nhật thất bại', detail: 'Tớ không cập nhật được card scan nhiều lần liên tiếp.' }, bibleFailureStorm: { label: 'Bible từ chối profile của candidate' } },
       fields: { checked: 'Đã kiểm tra', found: 'Tìm thấy', failed: 'Thất bại', remaining: 'Còn lại', attempts: 'Số lần thử', retries: 'Thử lại 429', scraper: 'ScraperAPI' }, footer: { guild: 'Guild {guild}', members: '{count} thành viên', cap: 'Giới hạn {count}', excluded: 'Bỏ qua {count} tên từ lượt trước' },
     },
     dm: {
@@ -476,7 +479,7 @@ export default {
       'Roster này khoá rồi, tớ không đọc được character nào cả. Nhưng guild thì vẫn mở, nên tớ soi từ đó ra.',
       'Người này giấu roster nên tớ chịu, không thấy character nào. Được cái guild còn công khai, tớ moi được chừng này.',
       'Roster đóng, tớ nhìn không ra character. Đây là tất cả những gì còn moi được từ phía guild.',
-    ] }, guildField: 'Guild', membersField: 'Thành viên', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: 'Chưa chạy', deepDone: 'Đã chạy', hiddenFooter: 'Nguồn: lostark.bible{stats} · deep:true để tìm alt cùng account', blackGuild: 'Thành viên guild trong blacklist ({count})', whiteGuild: 'Thành viên guild trong whitelist ({count})', noReason: 'chưa có lý do',
+    ] }, guildField: 'Guild', membersField: 'Thành viên', strongholdField: 'Stronghold', rosterLevelField: 'Roster', deepField: 'Deep scan', deepNotRun: 'Chưa chạy', deepDone: 'Đã chạy', deepNotRunNotice: { title: 'Deep scan chưa chạy được', description: 'Tớ chưa chạy được deep scan cho **{name}** lần này.', footer: 'Chưa quét gì cả. Thử lại sau vài phút nhé.' }, hiddenFooter: 'Nguồn: lostark.bible{stats} · deep:true để tìm alt cùng account', blackGuild: 'Thành viên guild trong blacklist ({count})', whiteGuild: 'Thành viên guild trong whitelist ({count})', noReason: 'chưa có lý do',
   },
   enrich: {
     noEntry: { title: 'Chưa có entry trong list', description: '**{name}** không nằm trong list nào.', footer: 'Tạo entry bằng `/la-list add` trước; enrich chỉ nối alt vào entry có sẵn.' }, profileMissing: { title: 'Không tìm thấy profile', description: 'Tớ chưa tải được profile lostark.bible của **{name}**.', footer: 'Profile có thể đang private, tên bị sai hoặc Bible tạm thời không phản hồi.' }, metaMissing: { title: 'Không lấy được metadata character', description: 'Tớ chưa tải được metadata của **{name}** từ lostark.bible.', footer: 'Profile có thể đang ẩn hoặc Bible tạm thời không phản hồi.' },

@@ -304,7 +304,7 @@ Copy `.env.example` to `.env` and fill in values.
 | `GUILD_MEMBERS_CACHE_TTL_MS` | `900000` | Cache guild member lists for Stronghold deep/enrich scans |
 | `GUILD_MEMBERS_CACHE_MAX_SIZE` | `200` | Max cached guild member lists |
 | `STRONGHOLD_DEEP_CANDIDATE_LIMIT` | `300` | Max guild candidates checked by `/la-roster deep:true` |
-| `STRONGHOLD_DEEP_CONCURRENCY` | `3` | Parallel candidate profile fetches in Stronghold deep scans |
+| `STRONGHOLD_DEEP_CONCURRENCY` | `3` | Parallel candidate profile fetches, read only by the opt-in `mode: 'fast'` detector preset; commands run the gentle preset, one candidate at a time |
 | `STRONGHOLD_DEEP_CANDIDATE_TIMEOUT_MS` | `8000` | Timeout per Stronghold candidate lookup |
 | `STRONGHOLD_DEEP_USE_SCRAPERAPI` | `false` | Low-level default for detector callers that do not override it; command handlers keep high-fanout scans off |
 | `STRONGHOLD_DEEP_FAILURE_GUARD_MIN_CANDIDATES` | `25` | Candidate-attempt sample before auto-pausing a scan with extreme fetch failures |

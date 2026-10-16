@@ -5,7 +5,7 @@ process.env.DISCORD_TOKEN ||= 'test';
 process.env.CHANNEL_ID ||= 'test';
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
-const { buildRosterDeepScanResult } = await import('../bot/handlers/roster/deepResult.js');
+const { buildDeepScanNotRunNotice, buildRosterDeepScanResult } = await import('../bot/handlers/roster/deepResult.js');
 const { clearRosterDeepSession, getRosterDeepSession } = await import('../bot/utils/rosterDeepSession.js');
 const { t } = await import('../bot/services/i18n/index.js');
 
@@ -58,21 +58,61 @@ for (const lang of ['vi', 'en', 'jp']) {
   }
 }
 
-test('visible results keep the no-guild copy and suppress Continue without member context', () => {
-  for (const meta of [null, {}, { guildName: 'Guild with unavailable members' }]) {
-    const output = buildRosterDeepScanResult({
-      callerId: 'caller-1', name: 'Targetname', isHidden: false, meta, guildMembers: [],
-      altResult, canContinue: false, lang: 'en',
-      primaryEmbed: { toJSON: () => assert.fail('a non-resumable scan must not capture a session') },
-    });
-    assert.deepEqual(output.components, []);
-    assert.equal(output.resumable, false);
-    const summary = meta?.guildName
-      ? t('dialogue.enrich.summary', 'en', { guild: meta.guildName, name: 'Targetname', resumed: '' })
-      : t('dialogue.enrich.noGuild.description', 'en', { name: 'Targetname' });
-    assert.ok(output.embed.toJSON().description.includes(summary));
-  }
+test('visible results keep the summary and suppress Continue without member context', () => {
+  const meta = { guildName: 'Guild with unavailable members' };
+  const output = buildRosterDeepScanResult({
+    callerId: 'caller-1', name: 'Targetname', isHidden: false, meta, guildMembers: [],
+    altResult, canContinue: false, lang: 'en',
+    primaryEmbed: { toJSON: () => assert.fail('a non-resumable scan must not capture a session') },
+  });
+  assert.deepEqual(output.components, []);
+  assert.equal(output.resumable, false);
+  const summary = t('dialogue.enrich.summary', 'en', { guild: meta.guildName, name: 'Targetname', resumed: '' });
+  assert.ok(output.embed.toJSON().description.includes(summary));
 });
+
+test('the summary names the scanned guild when the caller had no meta of its own', () => {
+  const output = buildRosterDeepScanResult({
+    callerId: 'caller-1', name: 'Targetname', isHidden: false, meta: null, guildMembers: [],
+    altResult: { ...altResult, target: { guildName: 'Detected Guild' } }, canContinue: false, lang: 'en',
+    primaryEmbed: { toJSON: () => assert.fail('a non-resumable scan must not capture a session') },
+  });
+  const summary = t('dialogue.enrich.summary', 'en', { guild: 'Detected Guild', name: 'Targetname', resumed: '' });
+  const card = output.embed.toJSON();
+  assert.ok(card.description.includes(summary));
+  assert.ok(card.footer.text.includes(t('dialogue.scan.result.footer.guild', 'en', { guild: 'Detected Guild' })), card.footer.text);
+});
+
+// The no-guild footer points at `/la-list edit additional_names`, which has
+// no entry to act on from a roster card, so that notice carries no footer.
+const NOT_RUN_CASES = [
+  { cause: 'a target without a guild', input: { meta: {} }, key: 'dialogue.enrich.noGuild', omitsFooter: true },
+  {
+    cause: 'a target without a guild whose member list also failed',
+    input: { meta: {}, guildMembersUnavailable: true },
+    key: 'dialogue.enrich.noGuild',
+    omitsFooter: true,
+  },
+  {
+    cause: 'a failed guild member fetch',
+    input: { meta: { guildName: 'Test Guild' }, guildMembersUnavailable: true },
+    key: 'dialogue.enrich.guildUnavailable',
+  },
+  { cause: 'missing target metadata', input: { meta: null }, key: 'dialogue.enrich.metaMissing' },
+  { cause: 'no cause the caller knows', input: { meta: { guildName: 'Test Guild' } }, key: 'dialogue.roster.deepNotRunNotice' },
+];
+
+for (const lang of ['en', 'vi', 'jp']) {
+  for (const { cause, input, key, omitsFooter } of NOT_RUN_CASES) {
+    test(lang + ' deep scan notice for ' + cause + ' uses ' + key, () => {
+      const card = buildDeepScanNotRunNotice({ name: 'Targetname', lang, ...input }).toJSON();
+      const copy = t(key, lang, { name: 'Targetname' });
+      assert.ok(card.title.includes(copy.title), card.title);
+      assert.equal(card.description, copy.description);
+      assert.equal(card.footer?.text, omitsFooter ? undefined : copy.footer);
+    });
+  }
+}
 
 test('empty and complete scans never capture a continuation snapshot', () => {
   const options = {

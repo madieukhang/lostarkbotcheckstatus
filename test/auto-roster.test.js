@@ -14,7 +14,14 @@ const { handleHiddenRosterResult } = await import('../bot/handlers/roster/hidden
 const { bibleClient } = await import('../bot/services/roster/bibleClient.js');
 const { clearNameSuggestionCache } = await import('../bot/services/roster/search.js');
 const { disconnectDB } = await import('../bot/db.js');
-const { t } = await import('../bot/services/i18n/index.js');
+const { clearMetaCache } = await import('../bot/utils/cache/metaCache.js');
+const { clearGuildMembersCache } = await import('../bot/services/roster/guildMembers.js');
+const { setUserLanguage, clearUserLanguageCache, t } = await import('../bot/services/i18n/index.js');
+const { default: Blacklist } = await import('../bot/models/Blacklist.js');
+const { default: Whitelist } = await import('../bot/models/Whitelist.js');
+const { default: Watchlist } = await import('../bot/models/Watchlist.js');
+const { default: TrustedUser } = await import('../bot/models/TrustedUser.js');
+const { default: RosterSnapshot } = await import('../bot/models/RosterSnapshot.js');
 
 function fixture({ content = 'roster Alpha', active = true, lookup, lang = 'en' } = {}) {
   resetAutoCheckDedupeForTest();
@@ -188,6 +195,191 @@ test('hidden roster flow returns false when Bible has no profile for the name', 
   assert.equal(edits.length, 1);
   assert.equal(edits[0].embeds[0].toJSON().description,
     t('dialogue.listAdd.noRoster.withoutSuggestions', 'en', { name: 'Nobodyhere' }));
+});
+
+function metaDataResponse({ guild = true } = {}) {
+  return Response.json({ nodes: [{ data: [
+    { header: 1 },
+    { rosterLevel: 2, stronghold: 3, guild: guild ? 6 : -1, class: 9, ilvl: 10 },
+    300, { level: 4, name: 5 }, 70, 'DeepHome', { name: 7, grade: 8 }, 'DeepGuild', 'Member', 'bard', 1725.55,
+  ] }] });
+}
+
+// The meta profile answers as given; the guild member pages fail unless a
+// response is supplied.
+function mockBibleProfile(context, { meta, guild = () => ({ ok: false, status: 503 }) }) {
+  clearMetaCache();
+  clearGuildMembersCache();
+  clearNameSuggestionCache();
+  context.mock.method(mongoose, 'connect', async () => mongoose);
+  context.mock.method(bibleClient, 'fetch', async url => {
+    const target = String(url);
+    if (target.includes('/_app/remote/ngsbie/search')) {
+      return { ok: true, status: 200, json: async () => ({ type: 'result', data: [[]] }) };
+    }
+    return target.endsWith('/guild/__data.json') || target.endsWith('/guild') ? guild() : meta();
+  });
+  context.after(async () => {
+    clearMetaCache();
+    clearGuildMembersCache();
+    clearNameSuggestionCache();
+    await disconnectDB();
+  });
+}
+
+function stubListQueries(context) {
+  const query = value => ({ collation: () => ({ lean: async () => value }) });
+  context.mock.method(Blacklist, 'find', () => query([]));
+  context.mock.method(Whitelist, 'find', () => query([]));
+  context.mock.method(Whitelist, 'findOne', () => query(null));
+  context.mock.method(Watchlist, 'findOne', () => query(null));
+  context.mock.method(TrustedUser, 'findOne', () => query(null));
+  context.mock.method(RosterSnapshot, 'find', () => query([]));
+  context.mock.method(RosterSnapshot, 'bulkWrite', async () => ({}));
+}
+
+test('hidden deep scan names a failed guild member fetch instead of reporting Done', async context => {
+  mockBibleProfile(context, { meta: () => metaDataResponse() });
+  stubListQueries(context);
+  const edits = [];
+  await handleHiddenRosterResult({
+    interaction: { user: { id: 'officer' } }, guildId: 'guild', lang: 'en', name: 'Guilddown', deep: true,
+    deepOptions: { useScraperApiForCandidates: false },
+    replyEditor: { edit: async payload => edits.push(payload), getMessage: () => null },
+  });
+  const [primary, notice, ...rest] = edits.at(-1).embeds.map(embed => embed.toJSON());
+  assert.deepEqual(rest, []);
+  const deepField = primary.fields.find(field => field.name.includes(t('dialogue.roster.deepField', 'en')));
+  assert.equal(deepField.value, `\`${t('dialogue.roster.deepNotRun', 'en')}\``);
+  assert.equal(notice.description, t('dialogue.enrich.guildUnavailable', 'en', { name: 'Guilddown' }).description);
+});
+
+test('hidden deep scan with a failed guild member fetch sends no progress card and shows the guild-unavailable notice', async context => {
+  mockBibleProfile(context, { meta: () => metaDataResponse() });
+  stubListQueries(context);
+  const edits = [];
+  await handleHiddenRosterResult({
+    interaction: { user: { id: 'officer' } }, guildId: 'guild', lang: 'en', name: 'Guildgone', deep: true,
+    deepOptions: { useScraperApiForCandidates: false },
+    replyEditor: { edit: async payload => edits.push(payload), getMessage: () => null },
+  });
+  assert.equal(edits.length, 1, 'only the final card is sent, no progress card before it');
+  const progressSubtitle = t('dialogue.scan.guildMembers', 'en', { guild: 'DeepGuild', count: 0 });
+  assert.ok(!JSON.stringify(edits[0]).includes(progressSubtitle), progressSubtitle);
+  const [, notice, ...rest] = edits[0].embeds.map(embed => embed.toJSON());
+  assert.deepEqual(rest, []);
+  assert.equal(notice.description, t('dialogue.enrich.guildUnavailable', 'en', { name: 'Guildgone' }).description);
+});
+
+test('hidden deep scan on a fetched guild that lists no one still sends the progress card before the final card', async context => {
+  mockBibleProfile(context, {
+    meta: () => metaDataResponse(),
+    guild: () => Response.json({ nodes: [{ data: [{ guild: 1 }, { members: 2 }, []] }] }),
+  });
+  stubListQueries(context);
+  const edits = [];
+  await handleHiddenRosterResult({
+    interaction: { user: { id: 'officer' } }, guildId: 'guild', lang: 'en', name: 'Guildvacant', deep: true,
+    deepOptions: { useScraperApiForCandidates: false },
+    replyEditor: { edit: async payload => edits.push(payload), getMessage: () => null },
+  });
+  assert.equal(edits.length, 2, 'the progress card, then the final card');
+  const progressSubtitle = t('dialogue.scan.guildMembers', 'en', { guild: 'DeepGuild', count: 0 });
+  assert.ok(JSON.stringify(edits[0]).includes(progressSubtitle), progressSubtitle);
+  const [, notice, ...rest] = edits[1].embeds.map(embed => embed.toJSON());
+  assert.deepEqual(rest, []);
+  assert.equal(notice.description, t('dialogue.roster.deepNotRunNotice', 'en', { name: 'Guildvacant' }).description);
+});
+
+async function renderHiddenCard(context, { guild, name }) {
+  mockBibleProfile(context, { meta: () => metaDataResponse(), guild });
+  stubListQueries(context);
+  const edits = [];
+  await handleHiddenRosterResult({
+    guildId: 'guild', lang: 'en', name,
+    replyEditor: { edit: async payload => edits.push(payload), getMessage: () => null },
+  });
+  return edits.at(-1).embeds[0].toJSON();
+}
+
+const membersField = card => card.fields.find(field => field.name.includes(t('dialogue.roster.membersField', 'en')));
+
+test('hidden roster card shows the member count as unknown, not 0, when the guild fetch failed', async context => {
+  const card = await renderHiddenCard(context, { name: 'Guilddown' });
+  assert.equal(membersField(card).value, `\`${t('dialogue.common.unknown', 'en')}\``);
+});
+
+test('hidden roster card shows 0 members for a fetched guild page that lists no one', async context => {
+  const card = await renderHiddenCard(context, {
+    name: 'Guildempty',
+    guild: () => Response.json({ nodes: [{ data: [{ guild: 1 }, { members: 2 }, []] }] }),
+  });
+  assert.equal(membersField(card).value, '`0`');
+});
+
+test('hidden roster flow shows Bible-unavailable, not the suggestions card, when the profile read fails', async context => {
+  mockBibleProfile(context, {
+    meta: () => ({ ok: false, status: 503, headers: { get: () => '0' } }),
+  });
+  const edits = [];
+  const rendered = await handleHiddenRosterResult({
+    guildId: 'guild', lang: 'en', name: 'Bibledown',
+    replyEditor: { edit: async payload => edits.push(payload) },
+  });
+  assert.equal(rendered, false, 'the auto-check reacts with a warning');
+  assert.equal(edits.length, 1);
+  const card = edits[0].embeds[0].toJSON();
+  const unavailable = t('dialogue.search.bibleUnavailable', 'en');
+  assert.equal(card.description, unavailable.description);
+  assert.ok(card.title.includes(unavailable.title), card.title);
+});
+
+test('visible deep scan on a character without a guild shows the no-guild notice', async context => {
+  mockBibleProfile(context, { meta: () => metaDataResponse({ guild: false }) });
+  stubListQueries(context);
+  clearUserLanguageCache();
+  await setUserLanguage('officer', 'en');
+  context.after(() => clearUserLanguageCache());
+  const edits = [];
+  const ok = await runRosterLookup({
+    interaction: { user: { id: 'officer' }, channelId: 'channel' },
+    guildId: 'guild', lang: 'en', name: 'Noguildchar', deep: true,
+    deepOptions: { useScraperApiForCandidates: false },
+    replyEditor: { edit: async payload => edits.push(payload), getMessage: () => null },
+  }, {
+    fetchRoster: async () => ({
+      characters: [{ name: 'Noguildchar', itemLevel: '1700', combatScore: '1', className: 'Bard', classId: 'bard' }],
+      world: '',
+    }),
+  });
+  assert.equal(ok, true);
+  const embeds = edits.at(-1).embeds.map(embed => embed.toJSON());
+  assert.equal(embeds.length, 2, 'the roster card and the deep scan notice');
+  assert.equal(embeds[1].description, t('dialogue.enrich.noGuild', 'en', { name: 'Noguildchar' }).description);
+});
+
+test('visible deep scan names a failed guild member fetch instead of reporting a clean scan', async context => {
+  mockBibleProfile(context, { meta: () => metaDataResponse() });
+  stubListQueries(context);
+  clearUserLanguageCache();
+  await setUserLanguage('officer', 'en');
+  context.after(() => clearUserLanguageCache());
+  const edits = [];
+  const ok = await runRosterLookup({
+    interaction: { user: { id: 'officer' }, channelId: 'channel' },
+    guildId: 'guild', lang: 'en', name: 'Visibledown', deep: true,
+    deepOptions: { useScraperApiForCandidates: false },
+    replyEditor: { edit: async payload => edits.push(payload), getMessage: () => null },
+  }, {
+    fetchRoster: async () => ({
+      characters: [{ name: 'Visibledown', itemLevel: '1700', combatScore: '1', className: 'Bard', classId: 'bard' }],
+      world: '',
+    }),
+  });
+  assert.equal(ok, true);
+  const embeds = edits.at(-1).embeds.map(embed => embed.toJSON());
+  assert.equal(embeds.length, 2, 'the roster card and the deep scan notice');
+  assert.equal(embeds[1].description, t('dialogue.enrich.guildUnavailable', 'en', { name: 'Visibledown' }).description);
 });
 
 test('the text cooldown expires after its 10 second window', async context => {

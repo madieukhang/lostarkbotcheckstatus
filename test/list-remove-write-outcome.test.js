@@ -12,6 +12,7 @@ const { default: Watchlist } = await import('../bot/models/Watchlist.js');
 const { default: UserPreference } = await import('../bot/models/UserPreference.js');
 const { default: RosterSnapshot } = await import('../bot/models/RosterSnapshot.js');
 const { createRemoveHandlers } = await import('../bot/handlers/list/remove/index.js');
+const { t: translate } = await import('../bot/services/i18n/index.js');
 
 const OWNER = 'owner-a';
 const serverEntry = {
@@ -75,7 +76,8 @@ test('a failed result card after a single delete is not reported as a failed rem
     blackEntries: [globalEntry], failFirstCard: true,
   });
   await handleListRemoveCommand(interaction);
-  assert.equal(replies.length, 1, 'no remove-failed alert follows the rejected card');
+  assert.equal(replies.length, 2, 'only the saved notice follows the rejected card');
+  assert.ok(titleOf(replies[1]).includes(translate('dialogue.common.savedCardFailed', 'en')));
   assert.equal(broadcasts.length, 1);
 });
 
@@ -85,7 +87,9 @@ test('a failed result card after a picked delete is not reported as a failed rem
   });
   await handleListRemoveCommand(interaction);
   assert.equal(updates.length, 1);
-  assert.equal(replies.length, 1, 'only the picker was sent, no remove-failed alert');
+  assert.equal(replies.length, 2, 'the picker, then only the saved notice');
+  assert.ok(titleOf(replies[1]).includes(translate('dialogue.common.savedCardFailed', 'en')));
+  assert.deepEqual(replies[1].components, [], 'the notice clears the picker buttons');
   assert.equal(broadcasts.length, 1);
 });
 
