@@ -622,6 +622,10 @@ export default {
     },
   },
   roster: {
+    text: {
+      invalid: { title: 'Enter exactly one character name', description: 'Use `roster NameOne` or `roster: NameOne`. Multiple names, links and mentions are not accepted.' },
+      progress: 'Looking up the roster for **{name}**…',
+    },
     deepRestricted: { title: 'Officer access only', description: '`/la-roster deep:true` runs a long Stronghold scan through the residential worker. Officers and seniors may use it; run without `deep:true` for the basic roster.' },
     title: '{name} roster · {count} {word}', characterOne: 'character', characterMany: 'characters', server: 'Server', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`',
     trusted: '**{name}** is trusted.',

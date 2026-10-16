@@ -248,7 +248,7 @@ function notifyVisibleDeepCompletion({ interaction, replyEditor, visibleDeep, na
   }).catch(() => {});
 }
 
-async function handleVisibleRosterResult({ interaction, replyEditor, name, deep, deepOptions, characters, lang, world = '' }) {
+async function handleVisibleRosterResult({ interaction, guildId, replyEditor, name, deep, deepOptions, characters, lang, world = '' }) {
   await connectDB();
   const previousSnapshotsPromise = loadPreviousSnapshotMap(characters).then(previousSnapshots => {
     // Capture old stats before writing; list lookup failure must not prevent
@@ -259,7 +259,7 @@ async function handleVisibleRosterResult({ interaction, replyEditor, name, deep,
   });
   const [previousSnapshots, matches] = await Promise.all([
     previousSnapshotsPromise,
-    loadVisibleRosterMatches(characters, interaction.guild?.id).catch((err) => {
+    loadVisibleRosterMatches(characters, guildId).catch((err) => {
       err.rosterStage = 'list-check';
       throw err;
     }),
@@ -296,6 +296,67 @@ async function handleVisibleRosterResult({ interaction, replyEditor, name, deep,
 const ROSTER_FAILURE_ALERT_KEYS = Object.freeze({
   'list-check': 'dialogue.roster.listCheckFailed',
 });
+
+/**
+ * Run the shared roster lookup after the slash or channel request is
+ * acknowledged. Fetch and list failures are reported on `replyEditor`, not thrown.
+ * @param {object} request
+ * @param {import('discord.js').Interaction} [request.interaction] - slash
+ *   command; supplies the language and guild when `lang` and `guildId` are
+ *   not given, and is required for a deep scan
+ * @param {string} [request.guildId] - scope for the list lookup; defaults to
+ *   the interaction's guild
+ * @param {{edit: Function}} request.replyEditor - receives the result card or failure notice
+ * @param {string} request.name - normalized character name
+ * @param {boolean} [request.deep=false] - opt into the Stronghold alt scan
+ * @param {object} [request.deepOptions] - forwarded to the deep scan
+ * @param {string} [request.lang] - resolved locale; read from the interaction
+ *   user's preference when omitted
+ * @param {object} [deps] - replaceable steps for tests
+ * @param {Function} [deps.fetchRoster] - `(name, deep) => {characters, world}`
+ * @param {Function} [deps.renderVisible] - renders a roster with characters
+ * @param {Function} [deps.renderHidden] - renders a roster without characters;
+ *   resolving to `false` reports that Bible has no profile for the name
+ * @returns {Promise<boolean>} false when the lookup failed or Bible has no
+ *   profile for the name; true otherwise
+ */
+export async function runRosterLookup({
+  interaction,
+  guildId = interaction?.guild?.id,
+  replyEditor,
+  name,
+  deep = false,
+  deepOptions = {},
+  lang: requestedLang,
+}, {
+  fetchRoster = fetchRosterCharacters,
+  renderVisible = handleVisibleRosterResult,
+  renderHidden = handleHiddenRosterResult,
+} = {}) {
+  const languagePromise = requestedLang
+    ? Promise.resolve(requestedLang)
+    : getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+  try {
+    const [lang, { characters, world }] = await Promise.all([
+      languagePromise,
+      fetchRoster(name, deep),
+    ]);
+    const render = characters.length === 0 ? renderHidden : renderVisible;
+    const rendered = await render({ interaction, guildId, replyEditor, name, deep, deepOptions, characters, lang, world });
+    return rendered !== false;
+  } catch (err) {
+    const lang = await languagePromise;
+    await replyEditor.edit({
+      embeds: [buildAlertEmbed({
+        severity: AlertSeverity.WARNING,
+        ...t(ROSTER_FAILURE_ALERT_KEYS[err?.rosterStage] || 'dialogue.roster.fetchFailed', lang),
+        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        lang,
+      })],
+    });
+    return false;
+  }
+}
 
 /**
  * Handle the /la-roster slash command.
@@ -348,40 +409,8 @@ export async function handleRosterCommand(interaction) {
     throw err;
   });
   const replyEditor = createLongRunningReplyEditor(interaction);
-  let lang;
-  const languagePromise = getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-
   try {
-    const [resolvedLang, { characters, world }] = await Promise.all([
-      languagePromise,
-      fetchRosterCharacters(name, deep),
-    ]);
-    lang = resolvedLang;
-
-    if (characters.length === 0) {
-      await handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions });
-      return;
-    }
-    await handleVisibleRosterResult({
-      interaction,
-      replyEditor,
-      name,
-      deep,
-      deepOptions,
-      characters,
-      lang,
-      world,
-    });
-  } catch (err) {
-    lang = await languagePromise;
-    await replyEditor.edit({
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        ...t(ROSTER_FAILURE_ALERT_KEYS[err?.rosterStage] || 'dialogue.roster.fetchFailed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
-      })],
-    });
+    await runRosterLookup({ interaction, replyEditor, name, deep, deepOptions });
   } finally {
     scanReservation?.release();
   }

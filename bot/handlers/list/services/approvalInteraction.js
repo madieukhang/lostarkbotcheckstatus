@@ -2,9 +2,9 @@ import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { AlertSeverity } from '../../../utils/alertEmbed.js';
-import { followUpAlert, replyAlert } from '../../../utils/interactionReplies.js';
+import { followUpAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
-import { PENDING_APPROVAL_ACCESS, acknowledgeAndClaimApproval, runClaimedApproval } from './pendingApprovalAccess.js';
+import { PENDING_APPROVAL_ACCESS, claimApproval, runClaimedApproval } from './pendingApprovalAccess.js';
 
 /**
  * Build the same access notice for decision buttons and the read-only
@@ -39,18 +39,19 @@ export function buildApprovalAccessAlert(status, lang, { evidence = false } = {}
 export function createApprovalDecisionHandler(handleDecision, { filters = {} } = {}) {
   return async function handleApprovalDecision(interaction) {
     const [action, requestId] = interaction.customId.split(':');
+    await interaction.deferUpdate();
     await connectDB();
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-    const access = await acknowledgeAndClaimApproval({
+    const languagePromise = getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+    const access = await claimApproval({
       interaction, PendingApprovalModel: PendingApproval, requestId,
       approverId: interaction.user.id, filters,
     });
     if (!access.payload) {
-      await (access.acknowledged ? followUpAlert : replyAlert)(interaction, buildApprovalAccessAlert(access.status, lang));
+      await followUpAlert(interaction, buildApprovalAccessAlert(access.status, await languagePromise));
       return;
     }
-    return runClaimedApproval(access.claim, () => handleDecision({
-      interaction, action, requestId, lang, payload: access.payload, claim: access.claim,
+    return runClaimedApproval(access.claim, async () => handleDecision({
+      interaction, action, requestId, lang: await languagePromise, payload: access.payload, claim: access.claim,
     }));
   };
 }

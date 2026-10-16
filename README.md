@@ -9,7 +9,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 - **List management**: blacklist / whitelist / watchlist (`⛔` / `✅` / `⚠️`), global or server-scoped, trusted users protected from any list
 - **Bulk add**: `/la-list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast
 - **Screenshot OCR**: `/la-check` extracts ≤ 8 names from one image; auto-check accepts up to 3 images and scales to 8 names each (24 total). Corrected names are re-matched against their final canonical/roster identities and the card shows the `OCR → resolved name → list entry` path
-- **Text checks**: in an auto-check channel, `check NameOne NameTwo` and `check NameOne, NameTwo` both cross-check up to 8 names in one request; listed hits open a broadcast-style detail card with cached ilvl/CP, attribution, tracked alts, and inline evidence
+- **Text checks**: in an auto-check channel, `check NameOne NameTwo` and `check NameOne, NameTwo` both cross-check up to 8 names in one request; listed hits open a broadcast-style detail card with cached ilvl/CP, attribution, tracked alts, and inline evidence; `roster NameOne` looks up one roster like `/la-roster`, without the deep scan
 - **Quick Add**: after auto-check, dropdown adds unflagged names straight to blacklist/watchlist via modal
 - **Approval flow**: members submit, officers instant-approve; senior approver always receives the DM
 - **Evidence rehosting**: images uploaded with an entry are rehosted into a pinned evidence channel so Discord's 24h CDN expiry doesn't rot the reference
@@ -60,6 +60,7 @@ image may need fallback or a correction pass. Settings do not create new quota.
 | `/la-check image [mode]` | OCR a screenshot → cross-check names against all lists; optional mode overrides the saved preference for this image |
 | `/la-check-mode [mode]` | Privately view or save your Daily/Analysis preference for screenshot uploads |
 | `check NameOne NameTwo` / `check NameOne, NameTwo` | In the configured auto-check channel, cross-check multiple typed names (space, comma, semicolon, or newline separated; max 8) |
+| `roster NameOne` / `roster: NameOne` | In the configured auto-check channel, look up a roster and cross-check lists, as with plain `/la-roster`. Accepts exactly one name; no deep scan. Shares the text-check cooldown and works without OCR enabled |
 | `/la-help` | Show all commands |
 | `/la-setup config action:<action>` | All setup runs through one command (Manage Server). Actions below |
 | `action:show` | View the current server config |

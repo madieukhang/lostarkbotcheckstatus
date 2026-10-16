@@ -1,5 +1,10 @@
 # Changelog
 
+- `roster NameOne` (or `roster: NameOne`) in the configured auto-check channel shows that one character's roster checked against the lists, like `/la-roster` without a deep scan. It posts a working card first, reacts ⚠️ when the lookup fails or lostark.bible has no profile for the name, and is listed in `/la-help`, the welcome pin and the README.
+- List approval buttons (add, edit, bulk and duplicate decisions) answer the click before waiting on the database, and the decision claims the request in one database step without reading it first.
+- `/la-list edit` in a server answers at once, then reads the language, the server settings and the entry together.
+- `/la-list view`, trusted included, shows its first card sooner: the language loads with the list, and the list no longer carries each entry's note history (opening an entry still shows all of it).
+- `/la-setup action` suggestions reuse the server's saved setup between keystrokes, refreshed within 60 seconds and at once after a setup change.
 - Opening evidence kept as a Discord link no longer hangs when Discord does not answer the link refresh or file check; after 15 seconds the card falls back to the stored link.
 - The `/la-roster` deep-scan progress card lists alts like the result card: numbered, and a name containing `]` no longer breaks its link.
 - A failed read of a stored language is logged instead of falling back to English silently.

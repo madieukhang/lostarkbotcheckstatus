@@ -85,6 +85,19 @@ export function buildBlacklistViewQuery(context) {
   return rules.find(({ matches }) => matches()).build();
 }
 
+/**
+ * Load the entries of the requested list type, newest first, without their
+ * note history. Each entry carries `_listType`, `_label`, `_color` and `_icon`.
+ * @param {object} filters
+ * @param {boolean} filters.isOwnerGuild - viewing guild is the owner guild
+ * @param {string} [filters.scopeFilter] - `global`, `server` or `all`; narrows the blacklist
+ * @param {string} filters.type - `black`, `white`, `watch` or `all`
+ * @param {string} [filters.viewGuildId] - viewing guild, used for blacklist visibility;
+ *   without it the blacklist is not filtered by visibility
+ * @param {object} [deps]
+ * @param {Function} [deps.resolveListContext] - maps a list type to its model and display tokens
+ * @returns {Promise<object[]>} decorated entries
+ */
 export async function loadListEntries(
   { isOwnerGuild, scopeFilter, type, viewGuildId },
   { resolveListContext = getListContext } = {}
@@ -96,7 +109,8 @@ export async function loadListEntries(
     const query = listType === 'black' && viewGuildId
       ? buildBlacklistViewQuery({ isOwnerGuild, scopeFilter, viewGuildId })
       : {};
-    const entries = await model.find(query).sort({ addedAt: -1 }).lean();
+    // History is loaded on demand by loadListViewEvidenceEntry.
+    const entries = await model.find(query, { notes: 0 }).sort({ addedAt: -1 }).lean();
     return entries.map((entry) => ({
       ...entry,
       _listType: listType,
@@ -157,20 +171,25 @@ export function createViewHandlers({
     let lang = getCachedUserLanguage(interaction.user.id);
     const type = interaction.options.getString('type', true);
     const scopeFilter = interaction.options.getString('scope') || '';
+    const viewGuildId = interaction.guild.id;
+    const isOwnerGuild = viewGuildId === config.ownerGuildId;
+    const languagePromise = getLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     try {
-      const [resolvedLang] = await Promise.all([
-        getLanguage(interaction.user.id, { UserPreferenceModel: UserPreference }),
-        connectDatabase(),
+      const [resolvedLang, initialData] = await Promise.all([
+        languagePromise,
+        connectDatabase().then(() => Promise.all([
+          type === 'trusted'
+            ? TrustedUser.find({}).sort({ addedAt: -1 }).lean()
+            : loadEntries({ isOwnerGuild, scopeFilter, type, viewGuildId }),
+          loadStatMap(),
+        ])),
       ]);
       lang = resolvedLang || lang;
+      let [allEntries, statMap] = initialData;
 
       if (type === 'trusted') {
-        const [trustedEntries, statMap] = await Promise.all([
-          TrustedUser.find({}).sort({ addedAt: -1 }).lean(),
-          loadStatMap(),
-        ]);
-        if (trustedEntries.length === 0) {
+        if (allEntries.length === 0) {
           await editAlert(interaction, {
             severity: AlertSeverity.INFO,
             titleIcon: '🛡️',
@@ -180,19 +199,12 @@ export function createViewHandlers({
           });
           return;
         }
-        await editEmbed(interaction, buildTrustedListEmbed(trustedEntries, lang, statMap));
+        await editEmbed(interaction, buildTrustedListEmbed(allEntries, lang, statMap));
         console.log(
-          `[list-view] rendered type=trusted entries=${trustedEntries.length} snapshots=${statMap.size} ackMs=${acknowledgedAt - startedAt} openMs=${Number(now()) - startedAt}`
+          `[list-view] rendered type=trusted entries=${allEntries.length} snapshots=${statMap.size} ackMs=${acknowledgedAt - startedAt} openMs=${Number(now()) - startedAt}`
         );
         return;
       }
-
-      const viewGuildId = interaction.guild.id;
-      const isOwnerGuild = viewGuildId === config.ownerGuildId;
-      let [allEntries, statMap] = await Promise.all([
-        loadEntries({ isOwnerGuild, scopeFilter, type, viewGuildId }),
-        loadStatMap(),
-      ]);
 
       if (allEntries.length === 0) {
         const ctx = type === 'all' ? null : getListContext(type);
@@ -356,6 +368,7 @@ export function createViewHandlers({
       });
     } catch (err) {
       console.error('[list] View failed:', err.message);
+      lang = (await languagePromise.catch(() => lang)) || lang;
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.listView.failed', lang),

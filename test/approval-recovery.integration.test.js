@@ -5,7 +5,7 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import PendingApproval from '../bot/models/PendingApproval.js';
 import Blacklist from '../bot/models/Blacklist.js';
 import Whitelist from '../bot/models/Whitelist.js';
-import { acknowledgeAndClaimApproval, runClaimedApproval } from '../bot/handlers/list/services/pendingApprovalAccess.js';
+import { claimApproval, runClaimedApproval } from '../bot/handlers/list/services/pendingApprovalAccess.js';
 import { moveListEntry } from '../bot/handlers/list/services/moveEntry.js';
 import { applyListEditNow } from '../bot/handlers/list/edit/applyNow.js';
 import { handleApprovedEditRequest } from '../bot/handlers/list/add/editApproval.js';
@@ -24,11 +24,24 @@ test.beforeEach(async () => {
 async function seedRequest() {
   await PendingApproval.create({ requestId: 'request', guildId: 'guild', channelId: 'channel', type: 'black', name: 'Example', requestedByUserId: 'requester', approverIds: ['a', 'b'] });
 }
+
+test('atomic claim cannot grant access to another recipient or a different request kind', async () => {
+  await seedRequest();
+  const denied = await acquire('approve', Date.now(), 'outsider');
+  assert.equal(denied.status, 'not_authorized');
+  assert.equal(denied.payload, null);
+  const wrongKind = await acquire('approve', Date.now(), 'a', { filters: { action: 'bulk' } });
+  assert.equal(wrongKind.status, 'expired');
+  assert.equal(wrongKind.payload, null);
+  const current = await PendingApproval.findOne({ requestId: 'request' }).lean();
+  assert.equal(current.processingToken, '');
+  assert.equal(current.processingAction, '');
+});
 function acquire(action = 'approve', now = Date.now(), approverId = 'a', overrides = {}) {
-  return acknowledgeAndClaimApproval({
+  return claimApproval({
     PendingApprovalModel: PendingApproval, requestId: 'request', approverId,
     now: () => now, leaseMs: 1000, renewIntervalMs: 0,
-    interaction: { customId: `listadd_${action}:request`, deferUpdate: async () => {} },
+    interaction: { customId: `listadd_${action}:request` },
     ...overrides,
   });
 }
@@ -92,16 +105,6 @@ test('duplicate detection releases the original decision for the overwrite or ke
   const next = await acquire('overwrite');
   assert.equal(next.payload.duplicateEntryId, 'original');
   await next.claim.complete();
-});
-
-test('failed acknowledgement never claims or deletes the request', async () => {
-  await seedRequest();
-  await assert.rejects(acquire('approve', Date.now(), 'a', {
-    interaction: { customId: 'listadd_approve:request', deferUpdate: async () => { throw new Error('Unknown interaction'); } },
-  }), /Unknown interaction/);
-  const current = await PendingApproval.findOne({ requestId: 'request' }).lean();
-  assert.equal(current.processingAction, '');
-  assert.equal(current.processingToken, '');
 });
 
 async function seedSource() {

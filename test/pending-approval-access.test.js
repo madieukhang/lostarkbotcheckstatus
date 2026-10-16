@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   PENDING_APPROVAL_ACCESS,
   resolvePendingApprovalAccess,
+  claimApproval,
 } from '../bot/handlers/list/services/pendingApprovalAccess.js';
 
 function makePendingApprovalStub({ payload = null, exists = false } = {}) {
@@ -24,6 +25,28 @@ function makePendingApprovalStub({ payload = null, exists = false } = {}) {
     },
   };
 }
+
+test('approval claim authorizes atomically without a redundant payload read', async () => {
+  const result = await claimApproval({
+    interaction: { customId: 'approve:req' },
+    PendingApprovalModel: {
+      findOne: () => assert.fail('successful claims do not need a separate read'),
+      findOneAndUpdate: (filter, _update, options) => ({ lean: async () => {
+        assert.equal(filter.approverIds, 'a');
+        assert.equal(filter.requestId, 'req');
+        assert.equal(filter.action, 'bulk');
+        assert.ok(filter.$or);
+        assert.deepEqual(filter.processingAction.$in, [null, '', 'approve']);
+        assert.equal(options.new, true);
+        return { requestId: 'req' };
+      } }),
+      updateOne: async () => ({ matchedCount: 1 }),
+    },
+    requestId: 'req', approverId: 'a', filters: { action: 'bulk' }, renewIntervalMs: 0,
+  });
+  assert.equal(result.status, PENDING_APPROVAL_ACCESS.authorized);
+  await result.claim.release();
+});
 
 test('pending approval access returns an authorized payload without probing existence', async () => {
   const payload = { requestId: 'req-1' };

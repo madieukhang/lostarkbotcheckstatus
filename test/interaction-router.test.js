@@ -136,3 +136,31 @@ test('interaction router command table dispatches top-level and la-list subcomma
 
   assert.deepEqual(calls, ['trust', 'check']);
 });
+
+test('/la-setup autocomplete reuses guild config until setup invalidates it', async (t) => {
+  const { default: GuildConfig } = await import('../bot/models/GuildConfig.js');
+  const { invalidateGuildConfig } = await import('../bot/utils/scope.js');
+  const { createAutocompleteRoutes } = await import('../bot/app/interaction-router.js');
+  const guildId = 'setup-autocomplete-cache';
+  t.after(() => invalidateGuildConfig(guildId));
+  let reads = 0;
+  let config = { autoCheckChannelId: 'channel', autoCheckCleanupEnabled: false };
+  t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => { reads++; return config; } }));
+  const route = createAutocompleteRoutes()['la-setup'];
+  let choices;
+  const interaction = {
+    guild: { id: guildId }, options: { getFocused: () => ({ name: 'action', value: 'cleanup' }) },
+    respond: async (value) => { choices = value.map((choice) => choice.value); },
+  };
+  await Promise.all(Array.from({ length: 5 }, () => route(interaction)));
+  assert.ok(choices.includes('cleanup-on'));
+  assert.ok(!choices.includes('cleanup-off'));
+  await route(interaction);
+  assert.equal(reads, 1, 'typing should share pending reads and reuse the existing cache');
+  config = { ...config, autoCheckCleanupEnabled: true };
+  invalidateGuildConfig(guildId);
+  await route(interaction);
+  assert.equal(reads, 2);
+  assert.ok(choices.includes('cleanup-off'));
+  assert.ok(!choices.includes('cleanup-on'));
+});

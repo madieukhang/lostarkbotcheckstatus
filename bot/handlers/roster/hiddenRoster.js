@@ -25,8 +25,7 @@ import {
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
-import UserPreference from '../../models/UserPreference.js';
-import { getUserLanguage, t, tPick } from '../../services/i18n/index.js';
+import { t, tPick } from '../../services/i18n/index.js';
 import {
   detectAltsViaStronghold,
   fetchCharacterMeta,
@@ -287,9 +286,11 @@ async function replyWithHiddenRosterSuggestions(replyEditor, name, lang) {
 }
 
 /**
- * Render the hidden-roster card for /la-roster.
+ * Render the hidden-roster card for slash and auto-check channel lookups.
  * @param {object} args
- * @param {import('discord.js').Interaction} args.interaction
+ * @param {import('discord.js').Interaction} [args.interaction] - required for a deep scan
+ * @param {string} args.guildId - scope for the list lookup
+ * @param {string} args.lang - resolved user or channel locale
  * @param {{edit: Function, getMessage: Function}} args.replyEditor - the
  *   createLongRunningReplyEditor object passed by command.js so this module
  *   doesn't need to know whether the reply has been deferred or not.
@@ -297,18 +298,18 @@ async function replyWithHiddenRosterSuggestions(replyEditor, name, lang) {
  * @param {boolean} args.deep - whether the caller passed deep:true
  * @param {{candidateLimit?: number, useScraperApiForCandidates: boolean}} args.deepOptions -
  *   forwarded to detectAltsViaStronghold
- * @returns {Promise<void>}
+ * @returns {Promise<boolean|void>} `false` when Bible has no profile for the
+ *   name and the no-roster card was shown; otherwise nothing.
  */
-export async function handleHiddenRosterResult({ interaction, replyEditor, name, deep, deepOptions }) {
+export async function handleHiddenRosterResult({ interaction, guildId, replyEditor, name, deep, deepOptions, lang }) {
   await connectDB();
-  const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
   const meta = await fetchCharacterMeta(name, {
     timeoutMs: config.strongholdDeepCandidateTimeoutMs,
     viaWorker: true,
   });
   if (!meta?.guildName) {
     await replyWithHiddenRosterSuggestions(replyEditor, name, lang);
-    return;
+    return false;
   }
 
   const guildMembers = await fetchGuildMembers(name, {
@@ -316,7 +317,7 @@ export async function handleHiddenRosterResult({ interaction, replyEditor, name,
     cacheKey: meta.guildName,
     viaWorker: true,
   });
-  const hits = await loadGuildListHits(guildMembers, interaction.guild?.id);
+  const hits = await loadGuildListHits(guildMembers, guildId);
   const scan = deep
     ? await runHiddenDeepScan({
       interaction,

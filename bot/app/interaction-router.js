@@ -10,7 +10,7 @@ import { InteractionType, MessageFlags } from 'discord.js';
 import { checkStatus, resetState } from '../monitor/monitor.js';
 import { AlertSeverity, buildAlertEmbed } from '../utils/alertEmbed.js';
 import { getCachedUserLanguage, t, getSupportedLanguages } from '../services/i18n/index.js';
-import GuildConfig from '../models/GuildConfig.js';
+import { getGuildConfig } from '../utils/scope.js';
 import { buildSetupActionChoices } from '../handlers/setup/setupActions.js';
 import { resolveAutoCheckCleanupEnabled } from '../services/setup/autoCheckCleanupPolicy.js';
 import { createSystemHandlers } from '../handlers/system/index.js';
@@ -109,11 +109,11 @@ export function createAutocompleteRoutes() {
         );
         return;
       }
-      // action field: read the guild's current state so toggles hide correctly.
+      // Setup writes invalidate this cache, including reads still in flight.
       let cfg;
       try {
         cfg = interaction.guild
-          ? await GuildConfig.findOne({ guildId: interaction.guild.id }).lean()
+          ? await getGuildConfig(interaction.guild.id)
           : null;
       } catch {
         cfg = null;

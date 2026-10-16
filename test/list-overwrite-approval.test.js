@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
+import { MessageFlags } from 'discord.js';
 import PendingApproval from '../bot/models/PendingApproval.js';
 import UserPreference from '../bot/models/UserPreference.js';
 import Blacklist from '../bot/models/Blacklist.js';
@@ -32,7 +33,8 @@ test('keep-existing rejects an unassigned user without consuming the approver re
     user: { id: 'outsider' },
     message: { id: 'dm-1' },
     client: { guilds: { cache: new Map() } },
-    reply: async payload => replies.push(payload),
+    reply: async () => assert.fail('Approval buttons acknowledge before sending a private followup'),
+    followUp: async payload => replies.push(payload),
     editReply: async payload => edits.push(payload),
     deferUpdate: async () => { deferred += 1; },
   };
@@ -40,18 +42,20 @@ test('keep-existing rejects an unassigned user without consuming the approver re
   await handler(interaction);
   await handler({ ...interaction, customId: 'listadd_overwrite:approval-1' });
   assert.ok(pending.get(), 'An unassigned click must leave the pending approval intact');
+  assert.equal(pending.get().processingToken, undefined, 'Denied atomic claims must not obtain a lease');
   assert.equal(replies.length, 2);
-  assert.equal(deferred, 0);
+  assert.ok(replies.every(payload => payload.flags === MessageFlags.Ephemeral));
+  assert.equal(deferred, 2);
   assert.equal(edits.length, 0);
   assert.equal(notifications.length, 0);
 
   await handler({ ...interaction, user: { id: 'approver' } });
   assert.equal(pending.get(), null);
-  assert.equal(deferred, 1);
+  assert.equal(deferred, 3);
   assert.equal(notifications.length, 1);
   assert.deepEqual(notifications[0][1], { ok: false, isDuplicate: true });
   assert.equal(notifications[0][2], true);
-  assert.deepEqual(pending.calls.claims.map(filter => filter.approverIds), ['approver']);
+  assert.deepEqual(pending.calls.claims.map(filter => filter.approverIds), ['outsider', 'outsider', 'approver']);
   assert.deepEqual(edits[0].components[0].toJSON(), buildApprovalResultRow('Kept Existing', 'en').toJSON());
   assert.deepEqual(synced[0].components[0].toJSON(), buildApprovalResultRow('Kept Existing', 'jp').toJSON());
 

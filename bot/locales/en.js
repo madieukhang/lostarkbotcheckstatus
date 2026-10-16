@@ -185,6 +185,7 @@ const en = {
     title: '🎨 Hi everyone~ Artist is keeping an eye on this channel',
     description: [
       'Drop up to 3 screenshots in one message, or type `check NameOne NameTwo` / `check NameOne, NameTwo` - I read up to 8 character names per image and cross-check them against this server\'s lists.',
+      'Type `roster NameOne` and I look up that one character\'s roster and cross-check it against the same lists.',
       '',
       'New here? The fields below walk through exactly what I do with a check and how to read the result.',
     ],
@@ -230,6 +231,7 @@ const en = {
       '`/la-check image:<screenshot>` - run a check manually',
       '`/la-check-mode mode:daily|analysis` - change your image mode; defaults to Daily',
       '`check <name>` - check a typed character name in this channel',
+      '`roster <name>` - inspect a roster; enter exactly one character name',
       '`/la-roster name:<character>` - inspect a roster + progression',
       '`/la-search name:<character>` - fuzzy Bible search + filters',
       '`/la-help` - open the full command guide',
@@ -317,6 +319,7 @@ const en = {
             '`/la-check image` - Check names from screenshot against all lists',
             '`/la-check-mode mode:daily|analysis` - Save your image mode (default Daily). Omit mode to view it; `/la-check mode:analysis` overrides one image.',
             '`check abcxyz` in the configured auto-check channel - Check a typed character name',
+            '`roster abcxyz` in the configured auto-check channel - Look up the roster of one typed character name',
           ],
         },
         {

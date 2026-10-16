@@ -2,13 +2,86 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MessageFlags } from 'discord.js';
 import Blacklist from '../bot/models/Blacklist.js';
+import TrustedUser from '../bot/models/TrustedUser.js';
 import { buildScopedListQuery } from '../bot/utils/scope.js';
+import { t as translate } from '../bot/services/i18n/index.js';
 
 import {
   buildBlacklistViewQuery,
   createViewHandlers,
   loadListEntries,
 } from '../bot/handlers/list/view/index.js';
+
+for (const type of ['black', 'trusted']) {
+  test(`/la-list view ${type} overlaps locale with data after connecting`, async (t) => {
+    let resolveLanguage;
+    let resolveConnection;
+    const language = new Promise((resolve) => { resolveLanguage = resolve; });
+    const connection = new Promise((resolve) => { resolveConnection = resolve; });
+    const reads = [];
+    const replies = [];
+    const entries = [{ name: 'Visible', reason: 'Current report', _listType: 'black', _icon: '⛔', _color: 0xed4245 }];
+    if (type === 'trusted') {
+      t.mock.method(TrustedUser, 'find', () => ({ sort: () => ({ lean: async () => {
+        reads.push('trusted');
+        return entries;
+      } }) }));
+    }
+    const pending = createViewHandlers({
+      connectDatabase: () => connection,
+      getLanguage: () => language,
+      loadEntries: async () => { reads.push('black'); return entries; },
+      loadStatMap: async () => { reads.push('stats'); return new Map(); },
+    }).handleListViewCommand({
+      guild: { id: 'locale-overlap-guild' }, user: { id: 'locale-overlap-viewer' },
+      options: { getString: (key) => key === 'type' ? type : null },
+      deferReply: async () => {},
+      editReply: async (payload) => {
+        replies.push(payload);
+        return { createMessageComponentCollector: () => ({ on() {} }) };
+      },
+    });
+    try {
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.deepEqual(reads, [], 'list queries must wait for the connection');
+      resolveConnection();
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.deepEqual([...reads], [type, 'stats'], 'data must not wait for the locale query');
+      assert.equal(replies.length, 0, 'the complete card still waits for the chosen language');
+    } finally {
+      resolveConnection();
+      resolveLanguage('vi');
+      await pending;
+    }
+    assert.equal(replies.length, 1);
+    assert.match(JSON.stringify(replies[0].embeds[0].toJSON()), /Visible/);
+  });
+}
+
+test('/la-list view keeps the caller locale when list loading fails before language resolves', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  let resolveLanguage;
+  const language = new Promise((resolve) => { resolveLanguage = resolve; });
+  let reply;
+  const pending = createViewHandlers({
+    connectDatabase: async () => {}, getLanguage: () => language,
+    loadEntries: async () => { throw new Error('list unavailable'); },
+    loadStatMap: async () => new Map(),
+  }).handleListViewCommand({
+    guild: { id: 'error-guild' }, user: { id: 'error-locale-viewer' },
+    options: { getString: (key) => key === 'type' ? 'black' : null },
+    deferReply: async () => {}, editReply: async (payload) => { reply = payload; },
+  });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(reply, undefined);
+  } finally {
+    resolveLanguage('jp');
+    await pending;
+  }
+  assert.ok(reply.embeds[0].toJSON().title.includes(translate('dialogue.listView.failed', 'jp').title));
+  assert.match(JSON.stringify(reply.embeds[0].toJSON()), /list unavailable/);
+});
 
 for (const revoked of [true, false]) {
   test(`list-view evidence rechecks scope after refresh (revoked=${revoked})`, async t => {

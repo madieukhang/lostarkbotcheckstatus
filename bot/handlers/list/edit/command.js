@@ -319,8 +319,8 @@ export function createListEditCommandHandler({
   rehostImageFn = rehostImage,
 }) {
   async function handleListEditCommand(interaction) {
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     if (!interaction.guild) {
+      const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.common.serverOnly', lang),
@@ -339,13 +339,12 @@ export function createListEditCommandHandler({
 
     // Find existing entry across all lists (scope-aware for blacklist)
     const editGuildId = interaction.guild.id;
-    const editGuildConfig = await getGuildConfig(editGuildId);
+    const [lang, editGuildConfig, { existing, currentType }] = await Promise.all([
+      getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference }),
+      getGuildConfig(editGuildId),
+      findListEditTarget({ name: input.name, guildId: editGuildId }),
+    ]);
     const editGuildDefaultScope = editGuildConfig?.defaultBlacklistScope || 'global';
-
-    const { existing, currentType } = await findListEditTarget({
-      name: input.name,
-      guildId: editGuildId,
-    });
     if (!existing) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,

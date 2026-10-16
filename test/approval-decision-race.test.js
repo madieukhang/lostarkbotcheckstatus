@@ -59,7 +59,10 @@ for (const [customId, factory, action] of [
       customId, user: { id: 'a' },
       deferUpdate: async () => { throw new Error('Unknown interaction'); },
     }), /Unknown interaction/);
-    assert.ok(getPending());
+    const pending = getPending();
+    assert.ok(pending);
+    assert.equal(pending.processingAction, undefined, 'a failed acknowledgement must not claim the request');
+    assert.equal(pending.processingToken, undefined);
   });
 }
 

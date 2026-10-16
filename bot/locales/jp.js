@@ -41,6 +41,7 @@ const jp = {
     title: '🎨 皆さん、こんにちは～ この channel は Artist が見ておりますわ',
     description: [
       '1つの message に最大3枚の screenshot を投げるか、`check NameOne NameTwo` / `check NameOne, NameTwo` と入力してくださいませ - 画像1枚につき最大8名の character 名を読み取り、この server の list と照らし合わせますわ。',
+      '`roster NameOne` と入力してくだされば、character 1名の roster を表示し、同じ list と照らし合わせますわ。',
       '',
       '初めての方は、下の field で check の流れと結果の読み方をご確認くださいませ。',
     ],
@@ -86,6 +87,7 @@ const jp = {
       '`/la-check image:<screenshot>` - 手動で画像を check',
       '`/la-check-mode mode:daily|analysis` - 自分の画像モードを変更（既定は Daily）',
       '`check <name>` - この channel で character 名を直接 check',
+      '`roster <name>` - この channel で roster を表示（character 名は1つだけ）',
       '`/la-roster name:<character>` - roster と進捗を確認',
       '`/la-search name:<character>` - Bible の fuzzy search と filter',
       '`/la-help` - 全コマンド guide',
@@ -173,6 +175,7 @@ const jp = {
             '`/la-check image` - スクリーンショットから名前を抽出し、すべての list と照合',
             '`/la-check-mode mode:daily|analysis` - 自分のモードを保存（既定は Daily）。省略で確認、`/la-check mode:analysis` は1枚だけ変更。',
             '設定済み auto-check channel の `check abcxyz` - 入力した character 名を直接照合',
+            '設定済み auto-check channel の `roster abcxyz` - 入力した character 名1つの roster を確認',
           ],
         },
         {

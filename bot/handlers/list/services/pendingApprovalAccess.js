@@ -48,30 +48,30 @@ export async function resolvePendingApprovalAccess({
 }
 
 /**
- * Acknowledge the component interaction first, then atomically claim a
- * durable, renewable lease for one chosen decision. The lease token lives on
+ * Atomically claim a durable, renewable lease for one chosen decision. The
+ * caller has already acknowledged the interaction. The lease token lives on
  * the PendingApproval document; all further writes must go through the
  * returned claim (assertOwned/complete/release) so an approval interrupted
  * after some writes is recognized instead of re-applied.
  * @param {object} options - resolvePendingApprovalAccess options
  *   (PendingApprovalModel, requestId, approverId, filters) plus:
- * @param {object} options.interaction - button interaction to defer-update.
+ * @param {object} options.interaction - button interaction; the part of its
+ *   custom id before `:` names the decision.
  * @param {Function} [options.now=Date.now] - test clock.
  * @param {number} [options.leaseMs=APPROVAL_LEASE_MS] - lease duration per renewal.
  * @param {number} [options.renewIntervalMs=60000] - auto-renew cadence; 0 disables.
- * @returns {Promise<object>} `{status, payload, acknowledged}` plus `claim`
+ * @returns {Promise<object>} `{status, payload}` plus `claim`
  *   (assertOwned/complete/release) when payload is non-null; without payload,
  *   status says why (not authorized, expired or already processing).
  */
-export async function acknowledgeAndClaimApproval({
+export async function claimApproval({
   interaction, now = Date.now, leaseMs = APPROVAL_LEASE_MS, renewIntervalMs = 60_000, ...options
 }) {
-  const access = await resolvePendingApprovalAccess(options);
-  if (!access.payload) return { ...access, acknowledged: false };
-  await interaction.deferUpdate();
   const { PendingApprovalModel, requestId, approverId, filters = {} } = options;
   const action = interaction.customId.split(':')[0];
   const token = randomUUID();
+  // The conditional claim checks recipient access and lease state together.
+  // Only unsuccessful claims need another read to explain the denial.
   const payload = await PendingApprovalModel.findOneAndUpdate({
     ...filters, requestId, approverIds: approverId,
     processingAction: { $in: [null, '', action] },
@@ -81,7 +81,7 @@ export async function acknowledgeAndClaimApproval({
   } }, { new: true }).lean();
   if (!payload) {
     const current = await resolvePendingApprovalAccess(options);
-    return { ...current, payload: null, acknowledged: true,
+    return { ...current, payload: null,
       status: current.payload ? PENDING_APPROVAL_ACCESS.processing : current.status };
   }
 
@@ -132,7 +132,7 @@ export async function acknowledgeAndClaimApproval({
     }, renewIntervalMs);
     timer.unref?.();
   }
-  return { status: PENDING_APPROVAL_ACCESS.authorized, payload, claim, acknowledged: true };
+  return { status: PENDING_APPROVAL_ACCESS.authorized, payload, claim };
 }
 
 /** Release unfinished decisions for retry; preserve their chosen action after partial writes. */

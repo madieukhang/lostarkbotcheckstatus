@@ -7,6 +7,7 @@ import Whitelist from '../bot/models/Whitelist.js';
 import Watchlist from '../bot/models/Watchlist.js';
 import TrustedUser from '../bot/models/TrustedUser.js';
 import { loadListLookup } from '../bot/services/list-check/lookup.js';
+import { loadListEntries, loadListViewEvidenceEntry } from '../bot/handlers/list/view/index.js';
 
 let mongo;
 test.before(async () => {
@@ -56,4 +57,27 @@ test('summary projection keeps current-server precedence and hides another serve
   assert.equal(maps.black.has('hidden'), false);
   const external = await loadListLookup(['Alias'], { guildId: 'external' });
   assert.equal(String(external.maps.black.get('alias')._id), String(global._id));
+});
+
+test('list browsing omits histories while evidence still loads them under current scope', async (t) => {
+  const report = {
+    name: 'Visible', allCharacters: ['Visible', 'Alt'], reason: 'Latest report', raid: 'Kazeros Hard',
+    imageMessageId: 'evidence', imageChannelId: 'archive', addedAt: new Date('2026-10-10T00:00:00Z'),
+    notes: Array.from({ length: 120 }, (_, index) => ({ reason: `${index}: ${'x'.repeat(800)}` })),
+  };
+  await Promise.all([Blacklist, Whitelist, Watchlist].map((model) => model.create(report)));
+  await Blacklist.create({ ...report, name: 'Hidden', scope: 'server', guildId: 'other' });
+  const entries = await loadListEntries({ type: 'all', viewGuildId: 'current', isOwnerGuild: false });
+  assert.equal(entries.length, 3);
+  for (const entry of entries) {
+    assert.equal(Object.hasOwn(entry, 'notes'), false);
+    assert.equal(entry.name, report.name);
+    assert.equal(entry.reason, report.reason);
+    assert.deepEqual(entry.allCharacters, report.allCharacters);
+    assert.equal(entry.imageMessageId, report.imageMessageId);
+    const detail = await loadListViewEvidenceEntry(`${entry._listType}:${entry._id}`, 'current');
+    assert.equal(detail.notes.length, report.notes.length);
+  }
+  const full = await Blacklist.findOne({ name: 'Visible' }).lean();
+  t.diagnostic(`history fixture bytes: full=${Buffer.byteLength(JSON.stringify(full))}, list=${Buffer.byteLength(JSON.stringify(entries[0]))}`);
 });

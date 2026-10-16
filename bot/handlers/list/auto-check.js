@@ -1,6 +1,6 @@
 /**
  * handlers/list/auto-check.js
- * Listens for image attachments or explicit `check <name>` messages in
+ * Listens for images, `check <names>`, or `roster <name>` messages in
  * designated channels and runs the shared blacklist/whitelist/watchlist check.
  *
  * Channel resolution (per message):
@@ -32,6 +32,7 @@ import {
 } from '../../utils/names.js';
 import { getGuildLanguage, t, tPick } from '../../services/i18n/index.js';
 import { buildAutoCheckEvidenceRow } from './check/index.js';
+import { runRosterLookup } from '../roster/command.js';
 
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);
@@ -92,6 +93,23 @@ export function parseAutoCheckText(content) {
   }
 
   return { names, invalidTokens };
+}
+
+/**
+ * Parse an explicit auto-check roster request (`roster NameOne` or
+ * `roster: NameOne`). The raw payload is validated before normalization,
+ * which would otherwise join `Alpha Beta` into one name.
+ * @param {string} content - message text
+ * @returns {null|{name: string|null}} null when the text is not a roster
+ *   request; `name` is null unless the payload is exactly one valid name
+ */
+export function parseAutoRosterText(content) {
+  const raw = String(content || '').trim();
+  if (!/^roster(?=$|[\s:])/iu.test(raw)) return null;
+  const payload = raw.slice('roster'.length).replace(/^\s*:\s*/u, '').trim();
+  return {
+    name: isValidCharacterName(payload) ? normalizeCharacterName(payload) : null,
+  };
 }
 
 function pruneProcessedMessages(now = Date.now()) {
@@ -231,6 +249,29 @@ async function isAutoCheckChannel(channelId, guildId) {
   return envChannelSet.has(channelId);
 }
 
+/**
+ * Build the MessageCreate handler for auto-check channels. Every `*Fn`
+ * option replaces a service call so tests can run the handler offline.
+ * @param {object} [deps]
+ * @param {import('discord.js').Client} deps.client - bot client; its user id
+ *   identifies the bot's own reactions
+ * @param {Function} [deps.isAutoCheckChannelFn] - `(channelId, guildId) => Promise<boolean>`
+ * @param {Function} [deps.getGuildLanguageFn] - resolves the guild's locale
+ * @param {Function} [deps.getUserOcrModeFn] - resolves the sender's OCR mode
+ * @param {Function} [deps.extractNamesFromImageFn] - OCR for one screenshot
+ * @param {Function} [deps.checkNamesAgainstListsFn] - list check for typed or OCR names
+ * @param {Function} [deps.formatCheckResultsFn] - formats results for the card
+ * @param {Function} [deps.buildListCheckEmbedFn] - builds the result card
+ * @param {Function} [deps.buildAutoCheckEvidenceRowFn] - builds the evidence button row
+ * @param {Function} [deps.runRosterLookupFn] - runs a `roster <name>` request
+ *   with `{name, guildId, lang, replyEditor}`; resolving to true marks the
+ *   message ✅, false marks it ⚠️
+ * @param {number} [deps.maxNames] - names checked per image or text request
+ * @param {boolean} [deps.imageChecksEnabled] - whether screenshots are processed
+ * @param {Function} [deps.waitFn] - `(delayMs) => Promise<void>` used while
+ *   Gemini models cool down
+ * @returns {(message: import('discord.js').Message) => Promise<void>} handler for one message
+ */
 export function createAutoCheckMessageHandler({
   client,
   isAutoCheckChannelFn = isAutoCheckChannel,
@@ -241,11 +282,14 @@ export function createAutoCheckMessageHandler({
   formatCheckResultsFn = formatCheckResults,
   buildListCheckEmbedFn = buildListCheckEmbed,
   buildAutoCheckEvidenceRowFn = buildAutoCheckEvidenceRow,
+  runRosterLookupFn = runRosterLookup,
   maxNames = config.listcheckMaxNames,
   imageChecksEnabled = Boolean(config.geminiApiKey),
   waitFn = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
 } = {}) {
   function resolveRequest(message) {
+    const rosterRequest = parseAutoRosterText(message.content);
+    if (rosterRequest) return { images: [], rosterRequest };
     const imageAttachments = message.attachments.filter(
       (attachment) => attachment.contentType?.startsWith('image/')
     );
@@ -401,6 +445,26 @@ export function createAutoCheckMessageHandler({
   }
 
   async function processAutoCheckRequest(message, request, requestUi, lang) {
+    if (request.rosterRequest) {
+      const { name } = request.rosterRequest;
+      if (!name) {
+        await message.reply({ embeds: [buildAlertEmbed({
+          severity: AlertSeverity.WARNING,
+          ...t('dialogue.roster.text.invalid', lang),
+          lang,
+        })] });
+        return;
+      }
+      await setProgressMessage(message, requestUi, [t('dialogue.roster.text.progress', lang, { name })], lang);
+      const succeeded = await runRosterLookupFn({
+        name,
+        guildId: message.guild.id,
+        lang,
+        replyEditor: { edit: (payload) => requestUi.progressMsg.edit(payload) },
+      });
+      await message.react(succeeded ? '✅' : '⚠️').catch(() => {});
+      return;
+    }
     const startedAt = requestUi.startedAt;
     const inputKind = request.images.length > 0 ? 'image' : 'text';
     const attachmentDetail = request.images.length > 0

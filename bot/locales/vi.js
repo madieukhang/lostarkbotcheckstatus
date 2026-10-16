@@ -41,6 +41,7 @@ const vi = {
     title: '🎨 Chào các cậu~ Artist ngồi trông channel này nhé',
     description: [
       'Cứ thả tối đa 3 screenshot trong một tin nhắn vào đây, hoặc gõ `check TênMột TênHai` / `check TênMột, TênHai` - tớ sẽ đọc tối đa 8 tên mỗi ảnh rồi đối chiếu với các list của server này nha~',
+      'Gõ `roster TênMột` thì tớ tra roster của đúng một character rồi đối chiếu với các list đó nha.',
       '',
       'Mới vào? Mấy field bên dưới nói rõ tớ làm gì với một lượt check và cách đọc kết quả.',
     ],
@@ -86,6 +87,7 @@ const vi = {
       '`/la-check image:<screenshot>` - kiểm tra ảnh thủ công',
       '`/la-check-mode mode:daily|analysis` - đổi chế độ ảnh của riêng cậu; mặc định Daily',
       '`check <name>` - kiểm tra tên character ngay trong channel',
+      '`roster <name>` - tra roster ngay trong channel; chỉ nhập một tên character',
       '`/la-roster name:<character>` - xem roster + tiến độ',
       '`/la-search name:<character>` - tìm mờ Bible + bộ lọc',
       '`/la-help` - mở hướng dẫn đầy đủ',
@@ -173,6 +175,7 @@ const vi = {
             '`/la-check image` - Trích tên từ ảnh chụp rồi check với tất cả list',
             '`/la-check-mode mode:daily|analysis` - Lưu chế độ ảnh của cậu (mặc định Daily). Bỏ mode để xem; `/la-check mode:analysis` chỉ đổi cho một ảnh.',
             '`check abcxyz` trong auto-check channel - Check trực tiếp tên character đã gõ',
+            '`roster abcxyz` trong auto-check channel - Tra roster của một tên character đã gõ',
           ],
         },
         {
