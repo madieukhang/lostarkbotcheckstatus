@@ -47,7 +47,7 @@ test('multiadd requester notice centralizes mention, locale, notice, and extra e
       {
         kind: 'notice',
         copy: 'approved:vi:3',
-        options: { severity: 'success', lang: 'vi' },
+        options: { severity: 'success' },
       },
       { kind: 'summary', lang: 'vi' },
     ],

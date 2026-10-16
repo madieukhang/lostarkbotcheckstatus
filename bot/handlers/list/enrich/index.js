@@ -118,21 +118,18 @@ async function settleScanCancelState({ state, interaction, lang }) {
       await replyAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.enrich.scanFinished', lang),
-        lang,
       });
       return false;
     case 'restricted':
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.enrich.stopRestricted', lang),
-        lang,
       });
       return false;
     case 'already-stopping':
       await replyNotice(interaction, t('dialogue.enrich.alreadyStopping', lang), {
         severity: AlertSeverity.INFO,
         titleIcon: '🛑',
-        lang,
       });
       return false;
     default:
@@ -145,7 +142,6 @@ async function editEnrichError(replyEditor, key, lang, values = {}, { clearConte
     embeds: [buildAlertEmbed({
       severity: AlertSeverity.ERROR,
       ...t(key, lang, values),
-      lang,
     })],
     components: [],
   };
@@ -706,7 +702,6 @@ export function createEnrichHandlers({ services }) {
     await replyAlert(interaction, {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.enrich.restricted', lang, { command: commandLabel }),
-      lang,
     });
     return true;
   }
@@ -723,7 +718,6 @@ export function createEnrichHandlers({ services }) {
     if (cooldownWait > 0) {
       await replyNotice(interaction, cooldownMessage(cooldownWait), {
         severity: AlertSeverity.WARNING,
-        lang: await resolveInteractionLang(interaction),
       });
       return;
     }
@@ -751,7 +745,6 @@ export function createEnrichHandlers({ services }) {
       await replyAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.enrich.sessionExpired', lang),
-        lang,
       });
       return null;
     }
@@ -759,7 +752,6 @@ export function createEnrichHandlers({ services }) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.enrich.notYourSession', lang, { action: t(`dialogue.enrich.${actionLabel}`, lang) }),
-        lang,
       });
       return null;
     }
@@ -801,7 +793,6 @@ export function createEnrichHandlers({ services }) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.enrich.invalidButton', lang),
-        lang,
       });
       return;
     }
@@ -850,7 +841,6 @@ export function createEnrichHandlers({ services }) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.enrich.nothing', lang),
-        lang,
       }, { components: [] });
       clearEnrichSession(sessionId);
       return;
@@ -861,7 +851,6 @@ export function createEnrichHandlers({ services }) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.enrich.noEntry', lang, { name: session.entryName }),
-        lang,
       }, { components: [] });
       clearEnrichSession(sessionId);
       return;
@@ -933,7 +922,6 @@ export function createEnrichHandlers({ services }) {
       await updateAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.enrich.sessionExpired', lang),
-        lang,
       }, { content: '', components: [] });
       return;
     }
@@ -941,7 +929,6 @@ export function createEnrichHandlers({ services }) {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.enrich.notYourSession', lang, { action: t('dialogue.enrich.actionCancel', lang) }),
-        lang,
       });
       return;
     }
@@ -951,7 +938,6 @@ export function createEnrichHandlers({ services }) {
     await updateNotice(interaction, t('dialogue.enrich.cancelled', lang), {
       severity: AlertSeverity.INFO,
       titleIcon: '✖️',
-      lang,
       components: [],
     });
   }
@@ -980,7 +966,6 @@ export function createEnrichHandlers({ services }) {
       severity: AlertSeverity.INFO,
       titleIcon: '🛑',
       ...t('dialogue.enrich.stopSent', lang),
-      lang,
     });
   }
 

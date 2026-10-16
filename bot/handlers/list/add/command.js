@@ -154,7 +154,6 @@ export function createListAddCommandHandler({
           value: delivery.reason || t('dialogue.common.unknown', lang),
           inline: false,
         }],
-        lang,
       }),
       onQueued: () => editEmbed(
         interaction,
@@ -175,7 +174,6 @@ export function createListAddCommandHandler({
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...validation,
-        lang,
       });
       return;
     }
@@ -192,7 +190,6 @@ export function createListAddCommandHandler({
         severity: AlertSeverity.WARNING,
         ...t('dialogue.listAdd.command.proposalFailed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       });
     }
   }

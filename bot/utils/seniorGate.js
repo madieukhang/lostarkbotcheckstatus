@@ -21,7 +21,6 @@ export async function rejectNonSenior(interaction, lang, noticeKey) {
   await editAlert(interaction, {
     severity: AlertSeverity.ERROR,
     ...t(noticeKey, lang),
-    lang,
   });
   return true;
 }

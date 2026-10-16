@@ -160,7 +160,6 @@ async function handleViewAction(interaction, lang) {
       await replyAlert(buttonInteraction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.common.notYourSession', clickerLang),
-        lang: clickerLang,
       });
       return;
     }
@@ -178,7 +177,7 @@ function evidenceChannelValidation(channel, lang) {
   const context = { channel };
   const failedRule = EVIDENCE_CHANNEL_RULES.find(({ invalid }) => invalid(context));
   if (failedRule) {
-    return { ...t(failedRule.key, lang, failedRule.vars?.(context)), lang };
+    return t(failedRule.key, lang, failedRule.vars?.(context));
   }
   const member = channel.guild?.members?.me;
   if (!member) return null;
@@ -189,7 +188,6 @@ function evidenceChannelValidation(channel, lang) {
   return {
     ...t('dialogue.common.missingPermissions', lang, { channel: channel.id }),
     fields: [{ name: t('dialogue.common.missingField', lang), value: missing.join(', '), inline: false }],
-    lang,
   };
 }
 
@@ -273,7 +271,6 @@ async function handleDefaultScope(interaction, guildId, guildName, scope, auditF
     await editAlert(interaction, {
       severity: AlertSeverity.ERROR,
       ...t('dialogue.remote.scopeRequired', lang),
-      lang,
     });
     return;
   }

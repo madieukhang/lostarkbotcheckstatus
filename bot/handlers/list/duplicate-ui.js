@@ -86,6 +86,5 @@ export function buildDuplicateApprovalEmbed(existing, payload, lang = 'en') {
     ],
     footer: t('dialogue.approval.flow.comparisonFooter', lang),
     timestamp: false,
-    lang,
   });
 }

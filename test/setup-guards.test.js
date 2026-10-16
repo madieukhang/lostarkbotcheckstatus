@@ -38,7 +38,6 @@ test('setup text-channel guard returns valid channels and preserves the wrong-ch
     {
       severity: AlertSeverity.ERROR,
       ...t('dialogue.common.wrongTextChannel', 'vi'),
-      lang: 'vi',
     },
   ]);
 });
@@ -65,7 +64,6 @@ test('setup permission guard keeps the shared localized missing-permission paylo
         value: '• Send Messages\n• Embed Links',
         inline: false,
       }],
-      lang: 'jp',
     },
   ]);
 });

@@ -46,7 +46,6 @@ export async function handleRosterEvidenceButton(interaction) {
   if (!ref) {
     await editNotice(interaction, t('dialogue.check.malformed', lang), {
       severity: AlertSeverity.WARNING,
-      lang,
     });
     return;
   }

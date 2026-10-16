@@ -60,7 +60,6 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.approval.flow.noEvidence', lang),
-        lang,
       });
       return;
     }

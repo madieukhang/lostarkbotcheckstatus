@@ -160,7 +160,6 @@ export function createViewHandlers({
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.common.serverOnly', lang),
-        lang,
       });
       return;
     }
@@ -299,7 +298,6 @@ export function createViewHandlers({
           await replyAlert(componentInteraction, {
             severity: AlertSeverity.ERROR,
             ...t('dialogue.listView.session', clickerLang),
-            lang: clickerLang,
           });
           return;
         }
@@ -332,7 +330,6 @@ export function createViewHandlers({
               await editAlert(componentInteraction, {
                 severity: AlertSeverity.WARNING,
                 ...t('dialogue.check.entryRemoved', lang),
-                lang,
               });
               return;
             }
@@ -355,7 +352,6 @@ export function createViewHandlers({
             await editAlert(componentInteraction, {
               severity: AlertSeverity.WARNING,
               ...t('dialogue.listView.failed', lang),
-              lang,
             });
           }
         }
@@ -373,7 +369,6 @@ export function createViewHandlers({
         severity: AlertSeverity.WARNING,
         ...t('dialogue.listView.failed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       });
     }
   }

@@ -86,7 +86,6 @@ export function createBroadcastEvidenceButtonHandler({
       await editEmbed(interaction, buildAlertEmbed({
         severity: AlertSeverity.WARNING,
         ...t('dialogue.evidence.missing', lang),
-        lang,
       }));
       return;
     }
@@ -95,7 +94,6 @@ export function createBroadcastEvidenceButtonHandler({
       severity: AlertSeverity.INFO,
       titleIcon: ICONS.evidence,
       ...t('dialogue.evidence.archive', lang),
-      lang,
     }).setImage(displayUrl);
 
     await editEmbed(interaction, embed);

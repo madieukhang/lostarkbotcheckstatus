@@ -15,13 +15,13 @@ import { PENDING_APPROVAL_ACCESS, claimApproval, runClaimedApproval } from './pe
  * @param {object} [options]
  * @param {boolean} [options.evidence=false] - use the evidence-specific
  *   denial copy for unauthorized clicks.
- * @returns {{severity: AlertSeverity, title: string, description: string, lang: string}}
+ * @returns {{severity: AlertSeverity, title: string, description: string}}
  */
 export function buildApprovalAccessAlert(status, lang, { evidence = false } = {}) {
   const denied = status === PENDING_APPROVAL_ACCESS.notAuthorized;
   const key = denied ? (evidence ? 'evidenceNotAuthorized' : 'notAuthorized')
     : status === PENDING_APPROVAL_ACCESS.processing ? 'processing' : 'expired';
-  return { severity: denied ? AlertSeverity.ERROR : AlertSeverity.WARNING, ...t(`dialogue.approval.flow.${key}`, lang), lang };
+  return { severity: denied ? AlertSeverity.ERROR : AlertSeverity.WARNING, ...t(`dialogue.approval.flow.${key}`, lang) };
 }
 
 /**

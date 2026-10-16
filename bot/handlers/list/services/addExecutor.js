@@ -162,7 +162,6 @@ function buildMissingRosterResult(name, suggestions, lang) {
         `dialogue.listAdd.noRoster.${hasSuggestions ? 'suggestionFooter' : 'spellingFooter'}`,
         lang
       ),
-      lang,
     })],
   };
 }
@@ -223,7 +222,6 @@ function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang }) {
         buildInlineSpacer(),
       ],
       footer: t('dialogue.listAdd.itemLevel.footer', lang),
-      lang,
     })],
   };
 }
@@ -327,7 +325,6 @@ export function buildDuplicateListAddResult({
       fields,
       footer: t('dialogue.listAdd.duplicate.footer', lang, { type }),
       timestamp: false,
-      lang,
     })],
   };
 }
@@ -456,7 +453,6 @@ function buildListAddSuccessEmbed({
       user: requesterName,
       source: t(`dialogue.listAdd.success.${sourceKey}`, lang),
     })}`,
-    lang,
   });
 }
 

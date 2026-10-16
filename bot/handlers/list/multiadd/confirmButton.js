@@ -47,7 +47,6 @@ async function settleMultiaddConfirmState({
       await updateAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.multiadd.confirm.expired', lang),
-        lang,
       }, {
         content: '',
         components: [],
@@ -57,7 +56,6 @@ async function settleMultiaddConfirmState({
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.multiadd.confirm.notYours', lang),
-        lang,
       });
       return false;
     case 'cancel':
@@ -68,7 +66,6 @@ async function settleMultiaddConfirmState({
           severity: AlertSeverity.INFO,
           titleIcon: '✖️',
           ...t('dialogue.multiadd.confirm.cancelled', lang),
-          lang,
         })],
         components: [],
       });
@@ -120,7 +117,6 @@ export function createMultiaddConfirmButtonHandler(deps) {
     }), {
       severity: AlertSeverity.INFO,
       titleIcon: '⏳',
-      lang,
       components: [],
     });
 
@@ -134,7 +130,6 @@ export function createMultiaddConfirmButtonHandler(deps) {
           }), {
             severity: AlertSeverity.INFO,
             titleIcon: '⏳',
-            lang,
           });
         } catch { /* ignore progress errors */ }
       };
@@ -173,7 +168,6 @@ export function createMultiaddConfirmButtonHandler(deps) {
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
             ...t('dialogue.multiadd.confirm.routing', lang),
-            lang,
           })],
           components: [],
         });
@@ -247,7 +241,6 @@ export function createMultiaddConfirmButtonHandler(deps) {
             severity: AlertSeverity.WARNING,
             ...t('dialogue.multiadd.confirm.delivery', lang),
             fields: [{ name: t('dialogue.broadcast.fields.reason', lang), value: sent.reason || t('dialogue.common.unknown', lang), inline: false }],
-            lang,
           })],
           components: [],
         });
@@ -286,7 +279,6 @@ export function createMultiaddConfirmButtonHandler(deps) {
           severity: AlertSeverity.WARNING,
           ...t('dialogue.multiadd.confirm.requestFailed', lang),
           fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-          lang,
         })],
         components: [],
       }).catch(() => {});

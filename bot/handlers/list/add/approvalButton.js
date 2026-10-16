@@ -48,7 +48,7 @@ export function createListAddApprovalButtonHandler({
       content: null,
       embeds: [buildNoticeEmbed(
         t(`dialogue.approval.flow.${isApproveAction ? 'processingApprove' : 'processingReject'}`, targetLang, { user: interaction.user.tag }),
-        { severity: AlertSeverity.INFO, titleIcon: '⏳', lang: targetLang }
+        { severity: AlertSeverity.INFO, titleIcon: '⏳' }
       )],
       components: [buildApprovalRetryRow(action, requestId, targetLang)],
     });
@@ -139,7 +139,6 @@ export function createListAddApprovalButtonHandler({
           severity: AlertSeverity.WARNING,
           ...t('dialogue.approval.flow.retryFailed', targetLang),
           fields: [{ name: t('dialogue.common.errorField', targetLang), value: `\`${err.message}\``, inline: false }],
-          lang: targetLang,
         })],
         components: [buildApprovalRetryRow(action, requestId, targetLang)],
       });

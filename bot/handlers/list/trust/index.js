@@ -42,7 +42,6 @@ function buildRemovedTrustEmbed(deleted, interaction, lang) {
       { name: `👤 ${t('dialogue.trust.removed.removedBy', lang)}`, value: interaction.user.tag, inline: false },
     ],
     footer: t('dialogue.trust.removed.footer', lang),
-    lang,
   });
 }
 
@@ -53,7 +52,6 @@ async function handleTrustRemoval(interaction, name, lang) {
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.trust.notTrusted', lang, { name }),
-      lang,
     });
     return;
   }
@@ -68,7 +66,6 @@ async function replyExistingTrust(interaction, name, existing, lang) {
     description: normalizeNameKey(existing.name) === normalizeNameKey(name)
       ? t('dialogue.trust.already.direct', lang, { name: existing.name })
       : t('dialogue.trust.already.via', lang, { name, matched: existing.name }),
-    lang,
   });
 }
 
@@ -92,7 +89,6 @@ async function rejectBlacklistedTrust(interaction, name, allCharacters, lang) {
   await editAlert(interaction, {
     severity: AlertSeverity.WARNING,
     ...t('dialogue.trust.blacklisted', lang, { name, matched: blacklisted.name }),
-    lang,
   });
   return true;
 }
@@ -173,7 +169,6 @@ function buildTrustSuccessEmbed(args) {
     description: t('dialogue.trust.success.description', lang, { name }),
     fields: buildTrustSuccessFields(args),
     footer: t('dialogue.trust.success.footer', lang),
-    lang,
   });
 }
 
@@ -229,7 +224,6 @@ export function createTrustHandlers() {
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.trust.officerOnly', lang),
-        lang,
       });
       return;
     }

@@ -12,12 +12,18 @@ export function reserveStrongholdScanForInteraction(interaction, label) {
   });
 }
 
+/**
+ * Alert options for a Stronghold scan refused because another scan is running.
+ *
+ * @param {object|null} active - the running scan's reservation, read for its `label`
+ * @param {string} [lang] - language of the alert text
+ * @returns {object} options for buildAlertEmbed or replyAlert
+ */
 export function scanLimitAlertOptions(active, lang = 'en') {
   return {
     severity: AlertSeverity.WARNING,
     ...t('dialogue.scan.limit', lang, { label: active?.label || '' }),
     footer: active?.label ? t('dialogue.scan.limit.active', lang, { label: active.label }) : undefined,
-    lang,
   };
 }
 

@@ -145,6 +145,5 @@ export function buildEnrichSuccessEmbed(session, updateResult, lang = 'en', { tr
       total: trackedTotal || newCount,
       type: session.type,
     }),
-    lang,
   });
 }

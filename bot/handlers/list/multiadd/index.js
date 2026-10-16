@@ -52,7 +52,6 @@ export function createMultiaddHandlers({ client, services }) {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.multiadd.errors.template', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       });
     }
   }
@@ -65,7 +64,6 @@ export function createMultiaddHandlers({ client, services }) {
         severity: AlertSeverity.ERROR,
         title: t('dialogue.multiadd.errors.invalidAttachment', lang),
         description: validationError,
-        lang,
       });
       return;
     }
@@ -76,7 +74,6 @@ export function createMultiaddHandlers({ client, services }) {
         severity: AlertSeverity.ERROR,
         title: t('dialogue.multiadd.errors.download', lang),
         description: download.content,
-        lang,
       });
       return;
     }
@@ -87,7 +84,6 @@ export function createMultiaddHandlers({ client, services }) {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.multiadd.errors.parse', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: parsed.error || t('dialogue.common.unknown', lang), inline: false }],
-        lang,
       });
       return;
     }
@@ -132,7 +128,6 @@ export function createMultiaddHandlers({ client, services }) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.common.serverOnly', lang),
-        lang,
       });
       return;
     }

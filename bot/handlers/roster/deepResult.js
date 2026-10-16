@@ -34,7 +34,6 @@ export function buildDeepScanNotRunNotice({ name, meta, guildMembersUnavailable 
     severity: AlertSeverity.WARNING,
     ...copy,
     footer: omitFooter ? undefined : footer,
-    lang,
   });
 }
 

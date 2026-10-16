@@ -31,7 +31,6 @@ export function createOcrModeCommandHandler({
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.modeUnavailable', lang),
-        lang,
       });
       return;
     }
@@ -43,7 +42,6 @@ export function createOcrModeCommandHandler({
       ...t(requested ? 'dialogue.check.modeSaved' : 'dialogue.check.modeCurrent', lang, {
         mode: t(`dialogue.check.modes.${mode}`, lang),
       }),
-      lang,
     });
   };
 }

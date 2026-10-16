@@ -99,7 +99,6 @@ export function createListAddOverwriteButtonHandler({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
             ...t('dialogue.approval.flow.originalMissing', lang),
-            lang,
           })],
           components: [buildApprovalResultRow('Failed', lang)],
         });
@@ -137,7 +136,7 @@ export function createListAddOverwriteButtonHandler({
       if (!saved) {
         await editPayload(interaction, {
           content: '',
-          embeds: [buildAlertEmbed({ severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang), lang })],
+          embeds: [buildAlertEmbed({ severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang) })],
           components: [buildApprovalResultRow('Failed', lang)],
         });
         return;
@@ -171,7 +170,6 @@ export function createListAddOverwriteButtonHandler({
           severity: AlertSeverity.WARNING,
           ...t('dialogue.approval.flow.retryFailed', lang),
           fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-          lang,
         })],
         components: [buildApprovalRetryRow('listadd_overwrite', requestId, lang)],
       });

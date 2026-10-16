@@ -39,18 +39,18 @@ export function createEntryEvidenceButtonHandler({ client }) {
       buildScopedListQuery(type, { _id: entryId }, interaction.guild?.id || interaction.guildId || ''),
     ).lean();
     if (!entry) {
-      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.check.entryRemoved', lang), lang });
+      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.check.entryRemoved', lang) });
       return;
     }
 
     const copy = EVIDENCE_COPY[isLegacyEvidence(entry) ? 'link' : 'archive'];
     const displayUrl = await resolveDisplayImageUrl(entry, client);
     if (!displayUrl) {
-      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t(copy.gone, lang), lang });
+      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t(copy.gone, lang) });
       return;
     }
     await editEmbed(interaction, buildAlertEmbed({
-      severity: AlertSeverity.INFO, titleIcon: ICONS.evidence, ...t(copy.shown, lang), lang,
+      severity: AlertSeverity.INFO, titleIcon: ICONS.evidence, ...t(copy.shown, lang),
     }).setImage(displayUrl));
   };
 }

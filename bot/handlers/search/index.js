@@ -99,7 +99,6 @@ export async function handleSearchCommand(interaction) {
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.search.bibleUnavailable', lang),
-        lang,
       });
       return;
     }
@@ -109,7 +108,6 @@ export async function handleSearchCommand(interaction) {
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.search.noResults', lang, { name }),
-        lang,
       });
       return;
     }
@@ -127,7 +125,6 @@ export async function handleSearchCommand(interaction) {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.search.noFilteredResults', lang, { name }),
         fields: [{ name: t('dialogue.search.noFilteredResults.filters', lang), value: filterDesc.join(', '), inline: false }],
-        lang,
       });
       return;
     }
@@ -202,7 +199,6 @@ export async function handleSearchCommand(interaction) {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.search.failed', lang),
       fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-      lang,
     });
   } finally {
     const stats = suggestionContext.stats;

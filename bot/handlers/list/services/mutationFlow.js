@@ -40,10 +40,19 @@ export async function persistDeliveredApproval(PendingApprovalModel, payload, de
   });
 }
 
+/**
+ * Show a list-add result on the deferred reply: its embeds when it has any,
+ * otherwise its content as a success or warning notice.
+ *
+ * @param {object} interaction - the deferred interaction to answer
+ * @param {object} result - executor result with `ok`, `content`, `embeds`
+ *   and `components`
+ * @param {object} [deps] - injectable reply helpers for tests
+ * @returns {Promise<unknown>} the reply helper's result
+ */
 export async function renderListAddExecutionResult(
   interaction,
   result,
-  lang,
   {
     editEmbedFn = editEmbed,
     editNoticeFn = editNotice,
@@ -58,7 +67,6 @@ export async function renderListAddExecutionResult(
 
   return editNoticeFn(interaction, result.content, {
     severity: result.ok ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
-    lang,
     components: result.components ?? [],
   });
 }
@@ -114,13 +122,13 @@ export async function submitListMutation({
       && !canChangeEntryWithoutApproval(payload, result.existingEntry, isRequesterAutoApproverFn);
     if (!needsApproval) {
       try {
-        await renderExecutionResultFn(interaction, attachNoteControls(result, payload, lang), lang);
+        await renderExecutionResultFn(interaction, attachNoteControls(result, payload, lang));
       } catch (err) {
         // The entry is already written, so only a render failure of a
         // refusal still counts as a failed submission.
         if (!result.ok) throw err;
         console.warn('[list] Add result card failed after the write:', err.message);
-        await editNoticeAfterSavedWrite(interaction, t('dialogue.common.savedCardFailed', lang), { lang });
+        await editNoticeAfterSavedWrite(interaction, t('dialogue.common.savedCardFailed', lang));
       }
       return { status: 'executed', result };
     }
@@ -141,7 +149,6 @@ export async function submitListMutation({
     console.warn('[list] Queued card failed after the request was saved:', err.message);
     await editNoticeAfterSavedWrite(interaction, t('dialogue.common.queuedCardFailed', lang), {
       severity: AlertSeverity.INFO,
-      lang,
     });
   }
   return { status: 'queued', delivery };

@@ -39,15 +39,15 @@ function getSessionAccessAlert(session, userId, lang) {
   const rules = [
     {
       denied: () => !session,
-      alert: () => ({ severity: AlertSeverity.WARNING, ...t('dialogue.scan.sessionExpired', lang), lang }),
+      alert: () => ({ severity: AlertSeverity.WARNING, ...t('dialogue.scan.sessionExpired', lang) }),
     },
     {
       denied: () => session.callerId !== userId,
-      alert: () => ({ severity: AlertSeverity.ERROR, ...t('dialogue.scan.notYourSession', lang), lang }),
+      alert: () => ({ severity: AlertSeverity.ERROR, ...t('dialogue.scan.notYourSession', lang) }),
     },
     {
       denied: () => session.inProgress,
-      alert: () => ({ severity: AlertSeverity.INFO, ...t('dialogue.scan.continueRunning', lang), lang }),
+      alert: () => ({ severity: AlertSeverity.INFO, ...t('dialogue.scan.continueRunning', lang) }),
     },
   ];
   return rules.find(({ denied }) => denied())?.alert() || null;
@@ -236,7 +236,6 @@ export async function handleRosterDeepContinueButton(interaction) {
               reason: scan.error.message || t('dialogue.scan.unexpectedError', lang),
             }),
             footer: t('dialogue.scan.stopped.retry', lang),
-            lang,
           }),
         ],
         components: [],

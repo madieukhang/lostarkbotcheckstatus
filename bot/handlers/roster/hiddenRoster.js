@@ -62,7 +62,6 @@ function buildHiddenScanError(err, name, lang) {
       reason: err.message || t('dialogue.scan.unexpectedError', lang),
     }),
     footer: t('dialogue.scan.stopped.rosterStillShown', lang),
-    lang,
   });
 }
 
@@ -276,7 +275,6 @@ async function replyWithBibleUnavailable(replyEditor, lang) {
     embeds: [buildAlertEmbed({
       severity: AlertSeverity.WARNING,
       ...t('dialogue.search.bibleUnavailable', lang),
-      lang,
     })],
   });
 }
@@ -295,14 +293,12 @@ async function replyWithHiddenRosterSuggestions(replyEditor, name, lang) {
         inline: false,
       }],
       footer: t('dialogue.listAdd.noRoster.suggestionFooter', lang),
-      lang,
     }
     : {
       severity: AlertSeverity.ERROR,
       title: t('dialogue.listAdd.noRoster.title', lang),
       description: t('dialogue.listAdd.noRoster.withoutSuggestions', lang, { name }),
       footer: t('dialogue.listAdd.noRoster.spellingFooter', lang),
-      lang,
     };
   await replyEditor.edit({ embeds: [buildAlertEmbed(alert)] });
 }

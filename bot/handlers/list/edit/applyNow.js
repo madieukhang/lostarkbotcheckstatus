@@ -190,9 +190,7 @@ async function renderEditSuccess(options) {
     await sendEditSuccess(options);
   } catch (err) {
     console.warn('[list] Edit success card failed after the write:', err.message);
-    await editNoticeAfterSavedWrite(options.interaction, t('dialogue.common.savedCardFailed', options.lang), {
-      lang: options.lang,
-    });
+    await editNoticeAfterSavedWrite(options.interaction, t('dialogue.common.savedCardFailed', options.lang));
   }
 }
 
@@ -207,7 +205,6 @@ async function applyTypeChange(args) {
     await editAlert(args.interaction, {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.listEdit.moveBlocked', args.lang, { name: args.existing.name }),
-      lang: args.lang,
     });
     return null;
   }
@@ -259,7 +256,6 @@ async function applyInPlaceEdit(args) {
       await editAlert(args.interaction, {
         severity: AlertSeverity.WARNING,
         ...t(`dialogue.listEdit.${stillListed ? 'entryChanged' : 'originalMissing'}`, args.lang),
-        lang: args.lang,
       });
       return null;
     }
@@ -268,7 +264,6 @@ async function applyInPlaceEdit(args) {
     await editAlert(args.interaction, {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.listEdit.scopeRaced', args.lang),
-      lang: args.lang,
     });
     return null;
   }
@@ -382,7 +377,6 @@ export async function applyListEditNow({
       severity: AlertSeverity.WARNING,
       ...t('dialogue.listEdit.applyFailed', lang),
       fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-      lang,
     });
   }
 }

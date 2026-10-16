@@ -160,7 +160,6 @@ export async function editWithListEntryDetails(interaction, { listType, id }, { 
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.check.entryRemoved', lang),
-      lang,
     });
     return;
   }
@@ -191,7 +190,6 @@ function createAutoCheckEvidenceHandler({ client }) {
     if (!parsed) {
       await editNotice(interaction, t('dialogue.check.malformed', lang), {
         severity: AlertSeverity.WARNING,
-        lang,
       });
       return;
     }
@@ -230,7 +228,6 @@ export function createCheckHandlers({
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.modeUnavailable', lang),
-        lang,
       });
       return;
     }
@@ -253,7 +250,6 @@ export function createCheckHandlers({
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
           ...t('dialogue.check.ocrQueueFull', lang, { limit: err.limit }),
-          lang,
         });
         return;
       }
@@ -261,7 +257,6 @@ export function createCheckHandlers({
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.ocrFailed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       });
       return;
     }
@@ -270,7 +265,6 @@ export function createCheckHandlers({
       await editAlert(interaction, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.noNames', lang),
-        lang,
       });
       return;
     }
@@ -283,7 +277,6 @@ export function createCheckHandlers({
     ].filter(Boolean).join('\n'), {
       severity: AlertSeverity.INFO,
       titleIcon: '🔍',
-      lang,
     });
 
     try {
@@ -300,7 +293,6 @@ export function createCheckHandlers({
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
           ...t('dialogue.check.noVerifiedNames', lang, { count: unverified.length }),
-          lang,
         });
         return;
       }
@@ -332,7 +324,6 @@ export function createCheckHandlers({
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.failed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       });
     }
   }

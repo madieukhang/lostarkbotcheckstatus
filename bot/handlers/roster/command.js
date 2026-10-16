@@ -361,7 +361,6 @@ export async function runRosterLookup({
         severity: AlertSeverity.WARNING,
         ...t(ROSTER_FAILURE_ALERT_KEYS[err?.rosterStage] || 'dialogue.roster.fetchFailed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       })],
     });
     return false;
@@ -392,7 +391,6 @@ export async function handleRosterCommand(interaction) {
     await replyAlert(interaction, {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.roster.deepRestricted', lang),
-      lang,
     });
     return;
   }

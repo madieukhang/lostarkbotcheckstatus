@@ -41,7 +41,7 @@ export async function notifyMultiaddRequester({
       content: mention,
       allowedMentions: { users: [payload.requestedByUserId] },
       embeds: [
-        buildNoticeEmbedFn(copy.replace(mention, '').trim(), { severity, lang }),
+        buildNoticeEmbedFn(copy.replace(mention, '').trim(), { severity }),
         ...buildExtraEmbeds(lang),
       ],
     });
@@ -132,7 +132,6 @@ export function createMultiaddApprovalButtonHandler(deps) {
       }), {
         severity: AlertSeverity.INFO,
         titleIcon: '⏳',
-        lang,
         components: [buildApprovalRetryRow(prefix, requestId, lang)],
       }).catch(() => {});
 
@@ -187,7 +186,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
     } catch (err) {
       if (await handleApprovalClaimError({ claim, interaction, error: err, lang, label: 'Bulk decision' })) return;
       await editNotice(interaction, t('dialogue.approval.flow.retryFailed.description', lang), {
-        severity: AlertSeverity.WARNING, lang,
+        severity: AlertSeverity.WARNING,
         components: [buildApprovalRetryRow(prefix, requestId, lang)],
       });
     }

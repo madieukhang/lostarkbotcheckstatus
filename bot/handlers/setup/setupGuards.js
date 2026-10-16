@@ -20,7 +20,6 @@ export async function requireSetupGuildTextChannel(
   await editAlertFn(interaction, {
     severity: AlertSeverity.ERROR,
     ...t('dialogue.common.wrongTextChannel', lang),
-    lang,
   });
   return null;
 }
@@ -40,7 +39,6 @@ export async function reportMissingChannelPermissions(
       value: missing.map((entry) => `• ${entry}`).join('\n'),
       inline: false,
     }],
-    lang,
   });
 }
 

@@ -56,7 +56,6 @@ async function replyOrEdit(interaction) {
     embeds: [buildAlertEmbed({
       severity: AlertSeverity.ERROR,
       ...t('dialogue.common.unexpected', lang),
-      lang,
     })],
   };
   if (interaction.deferred || interaction.replied) {

@@ -324,20 +324,18 @@ export function createAutoCheckMessageHandler({
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.text.invalid', lang, { tokens }),
-        lang,
       })],
     });
     await removeSearchReaction(message);
     return true;
   }
 
-  async function setProgressMessage(message, requestUi, lines, lang) {
+  async function setProgressMessage(message, requestUi, lines) {
     const payload = {
       content: null,
       embeds: [buildNoticeEmbed(lines.filter(Boolean).join('\n'), {
         severity: AlertSeverity.INFO,
         titleIcon: '⏳',
-        lang,
       })],
       components: [],
     };
@@ -366,7 +364,6 @@ export function createAutoCheckMessageHandler({
         count: request.images.length,
       }),
       timestamp: false,
-      lang,
     });
   }
 
@@ -380,7 +377,6 @@ export function createAutoCheckMessageHandler({
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
         ...alert,
-        lang,
       }), partialWarning].filter(Boolean),
       components: [],
     };
@@ -436,7 +432,6 @@ export function createAutoCheckMessageHandler({
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.WARNING,
         ...t('dialogue.check.noVerifiedNames', lang, { count: unverifiedCount }),
-        lang,
       }), partialWarning].filter(Boolean),
       components: [],
     });
@@ -451,11 +446,10 @@ export function createAutoCheckMessageHandler({
         await message.reply({ embeds: [buildAlertEmbed({
           severity: AlertSeverity.WARNING,
           ...t('dialogue.roster.text.invalid', lang),
-          lang,
         })] });
         return;
       }
-      await setProgressMessage(message, requestUi, [t('dialogue.roster.text.progress', lang, { name })], lang);
+      await setProgressMessage(message, requestUi, [t('dialogue.roster.text.progress', lang, { name })]);
       const succeeded = await runRosterLookupFn({
         name,
         guildId: message.guild.id,
@@ -494,7 +488,7 @@ export function createAutoCheckMessageHandler({
             }),
             t('dialogue.check.modeProgress', lang, { mode: t(`dialogue.check.modes.${request.mode}`, lang) }),
             imageLimitLine(request, lang),
-          ], lang);
+          ]);
           try {
             let extractedNames;
             while (true) {
@@ -531,7 +525,7 @@ export function createAutoCheckMessageHandler({
                     seconds: retrySeconds,
                   }),
                   imageLimitLine(request, lang),
-                ], lang);
+                ]);
                 await waitFn(waitMs);
                 await setProgressMessage(message, requestUi, [
                   t('dialogue.check.imageProgress', lang, {
@@ -539,7 +533,7 @@ export function createAutoCheckMessageHandler({
                     count: request.images.length,
                   }),
                   imageLimitLine(request, lang),
-                ], lang);
+                ]);
               }
             }
             mergeUniqueNames(names, extractedNames, seenNames);
@@ -559,7 +553,7 @@ export function createAutoCheckMessageHandler({
         await setProgressMessage(message, requestUi, [
           t('dialogue.check.imageQueued', lang, { count: waitingAhead }),
           imageLimitLine(request, lang),
-        ], lang);
+        ]);
       });
     } else {
       mergeUniqueNames(names, request.textRequest.names, new Set());
@@ -593,7 +587,7 @@ export function createAutoCheckMessageHandler({
         word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang),
       }),
       imageLimitLine(request, lang),
-    ], lang);
+    ]);
     const checkedResults = await checkNamesAgainstListsFn(limitedNames, {
       guildId: message.guild.id,
       inputSource: request.images.length > 0 ? 'ocr' : 'text',
@@ -678,7 +672,6 @@ export function createAutoCheckMessageHandler({
           embeds: [buildAlertEmbed({
             severity: AlertSeverity.WARNING,
             ...t(busyNoticeKey, lang, { limit: err.limit }),
-            lang,
           })],
           components: [],
         });
@@ -693,7 +686,6 @@ export function createAutoCheckMessageHandler({
           severity: AlertSeverity.ERROR,
           ...t('dialogue.check.autoFailed', lang),
           fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-          lang,
         })],
         components: [],
       });

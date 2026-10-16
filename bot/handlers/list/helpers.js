@@ -111,7 +111,6 @@ export function buildTrustedBlockEmbed(name, reason, { via, lang = 'en' } = {}) 
       // Reason is prose, so it takes a full row instead of a third of the card.
       { name: `📝 ${t('dialogue.trustedBlock.reason', lang)}`, value: reason || t('dialogue.broadcast.notAvailable', lang), inline: false },
     ],
-    lang,
   });
 }
 
@@ -285,7 +284,6 @@ export function buildListEditSuccessEmbed(entry, options = {}) {
     }),
     fields,
     footer: `${ICONS.shield} ${t('dialogue.listEdit.success.footer', lang, { user: editorName })}`,
-    lang,
   });
 
   if (freshDisplayUrl) {
@@ -332,7 +330,6 @@ export function buildListEditSuccessEmbeds(entry, options = {}) {
       ? t('dialogue.listEdit.evidence.download', lang, { url: freshDisplayUrl })
       : unavailable,
     timestamp: false,
-    lang,
   });
   if (freshDisplayUrl) after.setImage(freshDisplayUrl);
   return [main, after];
@@ -474,7 +471,6 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     description: heroLine,
     fields,
     footer: view.footer(lang),
-    lang,
   });
 
   if (payload.imageUrl) {

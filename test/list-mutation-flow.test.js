@@ -112,13 +112,11 @@ test('renderListAddExecutionResult preserves rich-embed and notice projections',
   await renderListAddExecutionResult(
     interaction,
     { ok: true, embeds: [{ title: 'Added' }], components: [{ id: 'enrich' }] },
-    'vi',
     deps,
   );
   await renderListAddExecutionResult(
     interaction,
     { ok: false, content: 'Skipped', components: [{ id: 'retry' }] },
-    'vi',
     deps,
   );
 
@@ -137,7 +135,6 @@ test('renderListAddExecutionResult preserves rich-embed and notice projections',
       'Skipped',
       {
         severity: AlertSeverity.WARNING,
-        lang: 'vi',
         components: [{ id: 'retry' }],
       },
     ],

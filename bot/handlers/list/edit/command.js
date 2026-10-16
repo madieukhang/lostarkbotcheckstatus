@@ -118,7 +118,6 @@ async function rejectInvalidListEditInput({
           raid: newRaidInput,
           list: plan.targetType === 'black' ? 'blacklist' : 'whitelist',
         }),
-        lang,
       }),
     },
     {
@@ -126,7 +125,6 @@ async function rejectInvalidListEditInput({
       alert: () => ({
         severity: AlertSeverity.ERROR,
         ...t('dialogue.listAdd.command.invalidImage', lang, { type: imageContentType }),
-        lang,
       }),
     },
     {
@@ -134,7 +132,6 @@ async function rejectInvalidListEditInput({
       alert: () => ({
         severity: AlertSeverity.TRUSTED,
         ...t('dialogue.listEdit.command.additionalRestricted', lang),
-        lang,
       }),
     },
     {
@@ -147,7 +144,6 @@ async function rejectInvalidListEditInput({
             REFUSED_NAMES_ECHO_LIMIT,
           )),
         }),
-        lang,
       }),
     },
     {
@@ -155,7 +151,6 @@ async function rejectInvalidListEditInput({
       alert: () => ({
         severity: AlertSeverity.WARNING,
         ...t('dialogue.listEdit.command.noChanges', lang),
-        lang,
       }),
     },
     {
@@ -165,7 +160,6 @@ async function rejectInvalidListEditInput({
         ...t('dialogue.listEdit.command.scopeNotApplicable', lang, {
           list: t(`dialogue.broadcast.list.${plan.targetType}`, lang),
         }),
-        lang,
       }),
     },
   ];
@@ -197,7 +191,6 @@ async function rejectInvalidListEditState({
       title: t('dialogue.listEdit.command.scopeBlocked.title', lang),
       description: t(descriptionKey, lang),
       footer: t('dialogue.listEdit.command.scopeBlocked.footer', lang),
-      lang,
     });
     return true;
   }
@@ -206,7 +199,6 @@ async function rejectInvalidListEditState({
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.listEdit.command.noEffective', lang),
-      lang,
     });
     return true;
   }
@@ -324,7 +316,6 @@ export function createListEditCommandHandler({
       await replyAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.common.serverOnly', lang),
-        lang,
       });
       return;
     }
@@ -349,7 +340,6 @@ export function createListEditCommandHandler({
       await editAlert(interaction, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.listEdit.command.notFound', lang, { name: input.name }),
-        lang,
       });
       return;
     }

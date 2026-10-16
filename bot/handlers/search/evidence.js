@@ -94,7 +94,6 @@ export function createSearchDetailSelectHandler({
       await replyAlert(sel, {
         severity: AlertSeverity.ERROR,
         ...t('dialogue.search.session', clickerLang),
-        lang: clickerLang,
       });
       return;
     }
@@ -111,7 +110,6 @@ export function createSearchDetailSelectHandler({
     if (!detail) {
       await editNotice(sel, t('dialogue.check.malformed', lang), {
         severity: AlertSeverity.WARNING,
-        lang,
       });
       return;
     }
@@ -122,7 +120,6 @@ export function createSearchDetailSelectHandler({
         await editAlert(sel, {
           severity: AlertSeverity.WARNING,
           ...t('dialogue.check.entryRemoved', lang),
-          lang,
         });
         return;
       }
@@ -144,7 +141,6 @@ export function createSearchDetailSelectHandler({
       await editAlert(sel, {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.search.failed', lang),
-        lang,
       });
     }
   };

@@ -133,7 +133,6 @@ export function createSystemHandlers({ checkStatus, resetState, client, connectD
         severity: AlertSeverity.WARNING,
         ...t('dialogue.system.status.failed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       });
     }
   }
@@ -148,7 +147,6 @@ export function createSystemHandlers({ checkStatus, resetState, client, connectD
     await editAlert(interaction, {
       severity: AlertSeverity.SUCCESS,
       ...t('dialogue.system.reset', lang),
-      lang,
     });
   }
 

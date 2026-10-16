@@ -62,7 +62,6 @@ export function buildNoValidRowsEmbed(errors, lang = 'en') {
       ? errors.slice(0, 15).join('\n').slice(0, 4000)
       : t('dialogue.multiadd.errors.noRows.empty', lang),
     footer: t('dialogue.multiadd.errors.noRows.footer', lang),
-    lang,
   });
 }
 

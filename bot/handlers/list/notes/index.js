@@ -31,7 +31,7 @@ async function loadHistoryEntry(interaction) {
 async function renderHistory(interaction, lang) {
   const { type, entry, page } = await loadHistoryEntry(interaction);
   if (!entry) {
-    await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.check.entryRemoved', lang), lang });
+    await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.check.entryRemoved', lang) });
     return;
   }
   await editPayload(interaction, buildNoteHistoryPayload({ entry, type, page, lang }));
@@ -68,7 +68,7 @@ export function createNoteHandlers({ services, isRequesterAutoApproverFn = isReq
       : pending.payload.requestedByUserId !== interaction.user.id ? 'notYours'
         : null;
     if (refusal) {
-      await replyAlert(interaction, { severity: AlertSeverity.WARNING, ...t(`dialogue.notes.${refusal}`, lang), lang });
+      await replyAlert(interaction, { severity: AlertSeverity.WARNING, ...t(`dialogue.notes.${refusal}`, lang) });
       return;
     }
     takePendingNote(key);
@@ -91,11 +91,11 @@ export function createNoteHandlers({ services, isRequesterAutoApproverFn = isReq
       throw err;
     }
     if (!allowed) {
-      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.notes.needsApproval', lang), lang }, { components: [] });
+      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.notes.needsApproval', lang) }, { components: [] });
       return;
     }
     if (!saved) {
-      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang), lang }, { components: [] });
+      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang) }, { components: [] });
       return;
     }
     const addedAlts = listAddedAlts(entry, saved);

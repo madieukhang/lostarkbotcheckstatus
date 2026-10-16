@@ -115,7 +115,7 @@ export function createQuickAddHandlers({ services }) {
     ];
     const violation = rules.find(({ invalid }) => invalid());
     if (violation) {
-      await editAlert(interaction, { severity: AlertSeverity.ERROR, ...violation.alert(), lang });
+      await editAlert(interaction, { severity: AlertSeverity.ERROR, ...violation.alert() });
       return;
     }
 
@@ -151,7 +151,6 @@ export function createQuickAddHandlers({ services }) {
           severity: AlertSeverity.WARNING,
           title: t('dialogue.quickAdd.deliveryFailed.title', lang),
           description: delivery.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
-          lang,
         }),
         onQueued: () => editEmbed(
           interaction,
@@ -164,7 +163,6 @@ export function createQuickAddHandlers({ services }) {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.quickAdd.failed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       });
     }
   }

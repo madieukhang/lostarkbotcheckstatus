@@ -176,7 +176,6 @@ export async function handleSyncImagesAction(interaction, lang = 'en') {
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.ERROR,
         ...t('dialogue.syncImages.missingChannel', lang),
-        lang,
       })],
     });
     return;

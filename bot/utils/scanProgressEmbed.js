@@ -68,6 +68,5 @@ export function buildScanProgressEmbed({
     ).slice(0, 4096),
     footer: footerParts.join(' - '),
     timestamp: false,
-    lang,
   });
 }

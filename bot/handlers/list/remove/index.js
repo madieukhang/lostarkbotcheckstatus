@@ -289,7 +289,6 @@ export function createRemoveHandlers({ services }) {
       const notFoundAlert = {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.remove.notFound', lang, { name }),
-        lang,
       };
       if (found.length === 0) {
         await editAlert(interaction, notFoundAlert);
@@ -357,7 +356,6 @@ export function createRemoveHandlers({ services }) {
       const renderSavedNotice = () => editNoticeAfterSavedWrite(
         interaction,
         t('dialogue.common.savedCardFailed', lang),
-        { lang },
       );
 
       // Single entry · remove directly, render as embed.
@@ -452,7 +450,6 @@ export function createRemoveHandlers({ services }) {
         await editAlert(interaction, {
           severity: AlertSeverity.INFO,
           ...t('dialogue.remove.pickerExpired', lang),
-          lang,
         }, { components: [] });
         return;
       }
@@ -461,7 +458,6 @@ export function createRemoveHandlers({ services }) {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.remove.failed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       }, { components: [] });
     }
   }

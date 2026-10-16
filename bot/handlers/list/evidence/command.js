@@ -223,7 +223,6 @@ export function createEvidenceHandlers({ client }) {
         await editAlert(interaction, {
           severity: AlertSeverity.WARNING,
           ...t('dialogue.evidenceCommand.nameRequired', lang),
-          lang,
         });
         return;
       }
@@ -233,7 +232,6 @@ export function createEvidenceHandlers({ client }) {
         await editAlert(interaction, {
           severity: AlertSeverity.INFO,
           ...t('dialogue.evidenceCommand.notListed', lang, { name: displayName }),
-          lang,
         });
         return;
       }
@@ -257,7 +255,6 @@ export function createEvidenceHandlers({ client }) {
         embeds.unshift(buildAlertEmbed({
           severity: AlertSeverity.INFO,
           ...t('dialogue.evidenceCommand.publicRestricted', lang),
-          lang,
         }));
       }
 
@@ -268,7 +265,6 @@ export function createEvidenceHandlers({ client }) {
         severity: AlertSeverity.WARNING,
         ...t('dialogue.evidenceCommand.failed', lang),
         fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
-        lang,
       });
     }
   }

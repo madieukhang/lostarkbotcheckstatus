@@ -84,7 +84,6 @@ export function updateAlert(interaction, alertOptions, extras = {}) {
 function resolveNotice(content, options = {}) {
   const {
     severity = AlertSeverity.INFO,
-    lang = 'en',
     title,
     titleIcon,
     color,
@@ -95,7 +94,6 @@ function resolveNotice(content, options = {}) {
   return {
     embed: buildNoticeEmbed(content, {
       severity,
-      lang,
       title,
       titleIcon,
       color,

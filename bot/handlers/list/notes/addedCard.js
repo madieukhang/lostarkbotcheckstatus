@@ -52,7 +52,6 @@ export function buildNoteAddedPayload({ entry, type, addedAlts, statMap, lang })
         altWord: t(`dialogue.broadcast.${addedAlts.length === 1 ? 'altOne' : 'altMany'}`, lang),
       })
       : t('dialogue.notes.added.footerNoAlts', lang),
-    lang,
   });
   const buttons = [buildNoteHistoryButton(type, entry, lang), buildBroadcastEvidenceButton(entry, { type, lang })].filter(Boolean);
   return {

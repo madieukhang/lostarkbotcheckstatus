@@ -172,7 +172,7 @@ async function handleSetupAutoChannel(interaction, lang) {
         channel: channel.id,
         welcome: welcomeOutcomeText(welcome, lang),
       })}`,
-      { severity: AlertSeverity.ERROR, lang }
+      { severity: AlertSeverity.ERROR }
     );
     return;
   }
@@ -241,7 +241,7 @@ async function handleSetupNotifyChannel(interaction, lang) {
         channel: channel.id,
         welcome: welcomeOutcomeText(welcome, lang),
       })}`,
-      { severity: AlertSeverity.ERROR, lang }
+      { severity: AlertSeverity.ERROR }
     );
     return;
   }
@@ -283,13 +283,11 @@ async function handleSetupOff(interaction, lang, targetEnabled) {
     await editNotice(interaction, `🔔 ${t('dialogue.setup.notificationsEnabled', lang)}\n${t('dialogue.setup.showHint', lang)}`, {
       severity: AlertSeverity.SUCCESS,
       titleIcon: '🔔',
-      lang,
     });
   } else {
     await editNotice(interaction, `🔕 ${t('dialogue.setup.notificationsDisabled', lang)}\n${t('dialogue.setup.showHint', lang)}`, {
       severity: AlertSeverity.INFO,
       titleIcon: '🔕',
-      lang,
     });
   }
 
@@ -313,7 +311,7 @@ async function handleSetupCleanup(interaction, lang, enabled) {
     await editNotice(
       interaction,
       `⚠️ ${t('dialogue.setup.autoCleanup.noChannel', lang)}`,
-      { severity: AlertSeverity.WARNING, lang }
+      { severity: AlertSeverity.WARNING }
     );
     return;
   }
@@ -370,7 +368,6 @@ async function handleSetupCleanup(interaction, lang, enabled) {
     buildCleanupToggleMessage('autoCleanup', enabled, guideLine, lang),
     {
       severity: enabled ? AlertSeverity.SUCCESS : AlertSeverity.INFO,
-      lang,
     }
   );
 
@@ -396,7 +393,7 @@ async function handleSetupListNotifyCleanupToggle(interaction, lang, enabled) {
     await editNotice(
       interaction,
       `⚠️ ${t('dialogue.setup.listNotifyCleanup.noChannel', lang)}`,
-      { severity: AlertSeverity.WARNING, lang }
+      { severity: AlertSeverity.WARNING }
     );
     return;
   }
@@ -452,7 +449,6 @@ async function handleSetupListNotifyCleanupToggle(interaction, lang, enabled) {
     buildCleanupToggleMessage('listNotifyCleanup', enabled, guideLine, lang),
     {
       severity: enabled ? AlertSeverity.SUCCESS : AlertSeverity.INFO,
-      lang,
     }
   );
 
@@ -474,7 +470,7 @@ async function handleSetupListNotifyCleanupNow(interaction, lang) {
     await editNotice(
       interaction,
       `⚠️ ${t('dialogue.setup.listNotifyCleanup.noChannel', lang)}`,
-      { severity: AlertSeverity.WARNING, lang }
+      { severity: AlertSeverity.WARNING }
     );
     return;
   }
@@ -502,7 +498,7 @@ async function handleSetupListNotifyCleanupNow(interaction, lang) {
         channel: channel.id,
         count: outcome.deleted,
       })}`,
-      { severity: AlertSeverity.SUCCESS, lang }
+      { severity: AlertSeverity.SUCCESS }
     );
   } catch (err) {
     console.error('[la-setup] list notify manual cleanup failed:', err?.message || err);
@@ -512,7 +508,7 @@ async function handleSetupListNotifyCleanupNow(interaction, lang) {
         channel: channel.id,
         count: Number(err?.cleanup?.deleted) || 0,
       })}`,
-      { severity: AlertSeverity.ERROR, lang }
+      { severity: AlertSeverity.ERROR }
     );
   }
 }
@@ -528,7 +524,7 @@ async function handleSetupListNotifyRepin(interaction, lang) {
     await editNotice(
       interaction,
       `⚠️ ${t('dialogue.setup.listNotifyRepin.noChannel', lang)}`,
-      { severity: AlertSeverity.WARNING, lang }
+      { severity: AlertSeverity.WARNING }
     );
     return;
   }
@@ -539,7 +535,7 @@ async function handleSetupListNotifyRepin(interaction, lang) {
         channel: channel.id,
         missing: permissions.missing.join(', '),
       })}`,
-      { severity: AlertSeverity.WARNING, lang }
+      { severity: AlertSeverity.WARNING }
     );
     return;
   }
@@ -558,7 +554,6 @@ async function handleSetupListNotifyRepin(interaction, lang) {
       severity: welcome.pinned && welcome.persisted
         ? AlertSeverity.SUCCESS
         : AlertSeverity.WARNING,
-      lang,
     }
   );
 }
@@ -713,7 +708,7 @@ async function handleSetupRepin(interaction, lang) {
     await editNotice(
       interaction,
       `⚠️ ${t('dialogue.setup.repin.noChannel', lang)}`,
-      { severity: AlertSeverity.WARNING, lang }
+      { severity: AlertSeverity.WARNING }
     );
     return;
   }
@@ -726,7 +721,7 @@ async function handleSetupRepin(interaction, lang) {
         channel: channel.id,
         missing: missing.join(', '),
       })}`,
-      { severity: AlertSeverity.WARNING, lang }
+      { severity: AlertSeverity.WARNING }
     );
     return;
   }
@@ -746,7 +741,6 @@ async function handleSetupRepin(interaction, lang) {
     }),
     {
       severity: fullySuccessful ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
-      lang,
     }
   );
 }
@@ -763,7 +757,6 @@ async function handleSetupLanguage(interaction, lang) {
         language: requested,
         choices: supported.map((entry) => `\`${entry.code}\``).join(', '),
       }),
-      lang,
     });
     return;
   }
@@ -818,7 +811,7 @@ async function handleSetupLanguage(interaction, lang) {
     await editNotice(
       interaction,
       `${prefix}\n${t('dialogue.setup.language.noChannel', language)}`,
-      { severity: AlertSeverity.WARNING, titleIcon: '🌐', lang: language }
+      { severity: AlertSeverity.WARNING, titleIcon: '🌐' }
     );
     return;
   }
@@ -862,7 +855,6 @@ async function handleSetupLanguage(interaction, lang) {
     {
       severity: hasWarning ? AlertSeverity.WARNING : AlertSeverity.SUCCESS,
       titleIcon: '🌐',
-      lang: language,
     }
   );
 }
@@ -894,7 +886,6 @@ export async function handleSetupCommand(interaction) {
     await editAlert(interaction, {
       severity: AlertSeverity.ERROR,
       ...t('dialogue.common.serverOnly', lang),
-      lang,
     });
     return;
   }
@@ -904,7 +895,6 @@ export async function handleSetupCommand(interaction) {
     await editAlert(interaction, {
       severity: AlertSeverity.ERROR,
       ...t('dialogue.setup.manageGuildRequired', lang),
-      lang,
     });
     return;
   }
@@ -916,7 +906,6 @@ export async function handleSetupCommand(interaction) {
     await editAlert(interaction, {
       severity: AlertSeverity.WARNING,
       ...t('dialogue.setup.unknownAction', lang, { action }),
-      lang,
     });
     return;
   }
@@ -947,7 +936,6 @@ async function handleSetupDefaultScope(interaction, lang) {
   await editNotice(interaction, `${emoji} ${t('dialogue.setup.defaultScopeSet', lang, { scope })}`, {
     severity: AlertSeverity.SUCCESS,
     titleIcon: emoji,
-    lang,
   });
 
   invalidateGuildConfig(interaction.guild.id);

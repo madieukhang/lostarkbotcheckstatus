@@ -89,7 +89,6 @@ export async function sendListEditApprovalRequest({
       title: t('dialogue.listEdit.approval.deliveryFailed.title', lang),
       description: sent.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
       footer: t('dialogue.listEdit.approval.deliveryFailed.footer', lang),
-      lang,
     });
     return;
   }
@@ -106,6 +105,5 @@ export async function sendListEditApprovalRequest({
       value: changes.map((c) => `• ${c}`).join('\n').slice(0, 1024),
       inline: false,
     }],
-    lang,
   });
 }

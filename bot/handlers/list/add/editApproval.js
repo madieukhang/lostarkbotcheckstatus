@@ -43,7 +43,6 @@ function buildLocalizedAlert(key, lang, values = {}) {
   return buildAlertEmbed({
     severity: AlertSeverity.WARNING,
     ...t(key, lang, values),
-    lang,
   });
 }
 
