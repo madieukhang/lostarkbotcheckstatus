@@ -17,8 +17,7 @@ const DEFAULT_POLL_INTERVAL_MS = 500;
 const DEFAULT_TIMEOUT_MS = 30_000;
 // Backpressure threshold: if pending queue grows beyond this, reject
 // new inserts with an explicit overload error. Tunable via env so prod
-// can raise/lower without redeploy. 100 is a guess; revisit after real
-// /la-list enrich runs surface actual queue depth distributions.
+// can raise/lower without redeploy.
 const DEFAULT_BACKPRESSURE_THRESHOLD = (() => {
   const raw = parseInt(process.env.WORKER_QUEUE_BACKPRESSURE_THRESHOLD, 10);
   return Number.isFinite(raw) && raw > 0 ? raw : 100;

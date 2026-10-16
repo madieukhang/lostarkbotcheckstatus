@@ -34,7 +34,7 @@ import {
 import { getListContext } from '../helpers.js';
 import { appendFieldLine, buildNoteCountLine } from '../notes/entryNotes.js';
 
-export const LIST_VIEW_ALT_PREVIEW_LIMIT = 3;
+const LIST_VIEW_ALT_PREVIEW_LIMIT = 3;
 const EMBED_DESCRIPTION_LIMIT = 4096;
 const ALT_PREVIEW_FIT_LEVELS = Object.freeze([LIST_VIEW_ALT_PREVIEW_LIMIT, 2, 1, 0]);
 
@@ -76,7 +76,7 @@ function buildEntryMetaLine({ entry, lang = 'en' }) {
  * description hard cap is 4096 chars. Showing every alt inline can exceed
  * that budget on deep rosters; the detail view and DM expose the full list.
  */
-export function pickListViewAlts(entry, limit = LIST_VIEW_ALT_PREVIEW_LIMIT) {
+function pickListViewAlts(entry, limit = LIST_VIEW_ALT_PREVIEW_LIMIT) {
   const safeLimit = Math.max(0, Math.floor(Number(limit) || 0));
   if (safeLimit === 0) return [];
   const primaryKey = normalizeNameKey(entry.name);

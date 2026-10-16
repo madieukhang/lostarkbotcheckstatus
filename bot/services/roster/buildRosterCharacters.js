@@ -1,9 +1,8 @@
 /**
  * services/roster/buildRosterCharacters.js
  * One-shot roster fetcher used by /la-list add + multiadd. Parses the
- * bible roster page, falls back to hidden-roster inference (search
- * API) when the page is gated, and optionally fans out to
- * detectAltsViaStronghold. Returns a normalised shape with all
+ * bible roster page and falls back to hidden-roster inference (search
+ * API) when the page is gated. Returns a normalised shape with all
  * possible failure reasons surfaced as `failReason` so the caller
  * can render a single embed without try/catch sprawl.
  */
@@ -15,7 +14,6 @@ import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
 import { fetchCharacterMeta } from './characterMeta.js';
 import { inferHiddenRosterItemLevel } from './search.js';
-import { detectAltsViaStronghold } from './altDetection.js';
 import { createRosterVirtualConsole } from './dom.js';
 import { parseCharacterMetaFromHtml, parseItemLevelValue, parseRosterCharactersFromHtml } from './parsers.js';
 
@@ -59,20 +57,16 @@ function readTargetStats(targetRecord) {
 /**
  * Resolve a character's roster (siblings) via lostark.bible. Tries the
  * direct roster page first, then falls back to hidden-roster
- * inference + optional stronghold-based alt detection. Always returns
- * a result object (never throws) so callers don't have to wrap.
+ * inference. Always returns a result object (never throws) so callers
+ * don't have to wrap.
  * @param {string} name - target character name
  * @param {object} [options]
  * @param {boolean} [options.hiddenRosterFallback=false]
- * @param {boolean} [options.includeHiddenRosterAlts=false]
  * @param {boolean} [options.viaWorker] - forwarded to bibleClient
  * @returns {Promise<{allCharacters: string[], hasValidRoster: boolean, failReason: string|null, targetItemLevel: number|null, targetClassName: string|null, targetCombatScore: number|null, rosterVisibility: string, rosterCharacters: object[]}>}
  */
 export async function buildRosterCharacters(name, options = {}) {
-  const {
-    hiddenRosterFallback = false,
-    includeHiddenRosterAlts = false,
-  } = options;
+  const { hiddenRosterFallback = false } = options;
   const fetchOptions = buildBibleFetchOptions(options);
 
   let allCharacters = [name];
@@ -152,21 +146,6 @@ export async function buildRosterCharacters(name, options = {}) {
             combatScore: '',
           }];
 
-          if (includeHiddenRosterAlts && meta.guildName) {
-            const altResult = await detectAltsViaStronghold(name, {
-              targetMeta: meta,
-              targetItemLevel,
-              useScraperApiForCandidates: options.useScraperApiForCandidates,
-              allowScraperApiForGuild: options.allowScraperApi,
-              viaWorker: options.viaWorker === true,
-            });
-            const altNames = altResult?.alts?.map((alt) => alt.name).filter(Boolean) ?? [];
-            allCharacters = [...new Set([name, ...altNames])];
-            rosterCharacters = [
-              ...rosterCharacters,
-              ...(altResult?.alts || []).filter((alt) => alt?.name),
-            ];
-          }
           rosterCharacters = stampRosterWorld(rosterCharacters, meta.world);
         }
       }

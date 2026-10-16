@@ -18,8 +18,7 @@ import { t } from '../../services/i18n/index.js';
 
 // Discord webhook edits are rate-limited (5 per 5s). 15s throttle gives
 // ~40-60 progress updates over a typical 10-15 minute gentle-mode
-// scan; well under the rate-limit ceiling. Tightened from 30s after
-// users reported the embed felt frozen between ticks.
+// scan; well under the rate-limit ceiling.
 // Shared with the /la-list enrich progress card so both scan surfaces
 // throttle identically.
 export const PROGRESS_EDIT_THROTTLE_MS = 15 * 1000;

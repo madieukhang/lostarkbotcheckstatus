@@ -154,8 +154,9 @@ async function recoverViaPrefixCandidates(name, predicate, options = {}) {
 
 /**
  * Levenshtein edit distance · O(m·n) DP with rolling rows. Returns the
- * minimum number of single-character insertions / deletions / swaps to
- * turn `a` into `b`. Used to recover from Gemini OCR mistakes like
+ * minimum number of single-character insertions / deletions /
+ * substitutions to turn `a` into `b`; swapping two adjacent characters
+ * costs two edits. Used to recover from Gemini OCR mistakes like
  * doubled letters ("Trùmffighter" vs "Trùmfighter" → distance 1) when
  * an exact / diacritic-tolerant match against bible's search results
  * doesn't land.

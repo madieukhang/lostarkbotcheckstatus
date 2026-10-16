@@ -1,8 +1,9 @@
 /**
  * db.js
  * Manages a single shared Mongoose connection to MongoDB.
- * Uses a lazy-connect pattern so the connection is established
- * on first use rather than at startup.
+ * connectDB() is idempotent: the ready handler in app/lifecycle.js opens
+ * the connection at startup, and handlers call it again before database
+ * work to reuse the live connection or reconnect after a drop.
  */
 
 import mongoose from 'mongoose';

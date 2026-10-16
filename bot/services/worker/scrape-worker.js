@@ -157,5 +157,5 @@ export async function claimAndProcessOne({ logger = console } = {}) {
   const job = await claimNextJob();
   if (!job) return { state: 'idle' };
   const outcome = await executeJob(job, { logger });
-  return { state: outcome.state, jobId: job._id, ...outcome };
+  return { jobId: job._id, ...outcome };
 }

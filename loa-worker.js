@@ -3,8 +3,8 @@
  * loa-worker.js
  *
  * Residential-IP sidecar for LoaLogs. The bot on Railway hits Cloudflare
- * 403 when calling lostark.bible from a datacenter IP (verified 2026-05-04:
- * 25/25 fail in prod, 10/10 pass from a home IP with the same headers).
+ * 403 when calling lostark.bible from a datacenter IP, while the same
+ * requests and headers pass from a home IP.
  * This worker runs on Traine's PC, polls scrape_jobs in Mongo, fetches
  * bible from the residential IP, and writes the result back. The bot's
  * workerBibleClient picks up the result by jobId.

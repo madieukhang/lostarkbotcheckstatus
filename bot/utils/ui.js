@@ -32,12 +32,8 @@ export const COLORS = Object.freeze({
 /**
  * Icon vocabulary. Three buckets:
  *   - severity : single-glyph indicators paired with COLORS above.
- *   - status   : multi-state stoplights for "where is this entity?"
- *                (e.g. enrich-preview rows; matches RaidManage's gate
- *                icons so users moving between bots see the same
- *                visual language).
+ *   - status   : state glyphs for "where is this entity?".
  *   - action   : verb glyphs used in titles/buttons.
- *   - expression: fox icon for selected public bot messages.
  */
 export const ICONS = Object.freeze({
   // severity
@@ -46,25 +42,14 @@ export const ICONS = Object.freeze({
   error: '❌',
   info: 'ℹ️',
   shield: '🛡️',
-  // status (RaidManage parity)
-  ready: '🟢',
-  partial: '🟡',
-  pending: '⚪',
+  // status
   locked: '🔒',
   // action
   search: '🔍',
-  link: '🔗',
   evidence: '📎',
   refresh: '🔄',
-  bulk: '📦',
-  dm: '📩',
-  edit: '✏️',
-  add: '➕',
-  remove: '➖',
   prev: '◀',
   next: '▶',
-  // bot expression
-  fox: '🦊',
 });
 
 /**

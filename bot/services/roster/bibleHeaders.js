@@ -1,15 +1,12 @@
-// Bible request headers, extracted to a config-free module so loa-worker
-// (which only needs MONGODB_URI) can import them without dragging in
-// bot/config.js and its DISCORD_TOKEN/CHANNEL_ID validation. Keep this
-// header set intentionally small: extra browser-client hints have caused
-// more upstream rate-limit challenges without improving compatibility.
+// Bible request headers, kept in a config-free module so loa-worker (which
+// only needs MONGODB_URI) can import them without bot/config.js and its
+// DISCORD_TOKEN/CHANNEL_ID validation. The set is intentionally small: extra
+// browser-client hints raise the number of upstream rate-limit challenges
+// without improving compatibility.
 //
-// Referer is set to the bible homepage. A request to `/character/NA/X/__data.json`
-// without any Referer at all stands out from real browser traffic (browsers
-// always set Referer when navigating from another page). Using the homepage
-// is a generic "just landed" approximation; the alternative (the specific
-// character page) is hard to set correctly per-request and offers little
-// extra compatibility.
+// Referer is the bible homepage. A request with no Referer stands out from
+// browser navigation traffic, and the homepage is a generic value that needs
+// no per-request character URL.
 export const FETCH_HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +

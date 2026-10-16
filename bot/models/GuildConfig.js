@@ -11,7 +11,7 @@ const guildConfigSchema = new mongoose.Schema({
   /** Discord guild (server) ID · one config per guild */
   guildId: { type: String, required: true, unique: true },
 
-  /** Per-guild locale for future public responses/announcements */
+  /** Per-guild locale for public guild output; read through getGuildLanguage */
   language: { type: String, default: 'en' },
 
   /** Channel ID where screenshots are auto-checked (OCR → list check) */

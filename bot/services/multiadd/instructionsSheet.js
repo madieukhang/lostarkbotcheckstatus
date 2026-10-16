@@ -6,6 +6,8 @@
  * in template.js stay readable.
  */
 
+import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
+
 /**
  * Append an 'Instructions' worksheet to the workbook with formatted
  * usage docs · target audience is whoever opens the template in Excel
@@ -191,7 +193,7 @@ export function buildInstructionsSheet(wb, options) {
       ['File size', '1 MB max'],
       ['File type', '.xlsx only'],
       ['Preview TTL', '5 minutes, then you must re-upload'],
-      ['ilvl gate', 'Characters below ilvl 1700 are rejected'],
+      ['ilvl gate', `Characters below ilvl ${MIN_TRACKED_ITEM_LEVEL} are rejected`],
       ['Trusted', 'Trusted users (/la-list trust) are auto-skipped'],
       ['Duplicates', 'Existing entries are reported as Skipped, not re-added'],
     ]

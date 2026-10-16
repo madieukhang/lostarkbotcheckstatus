@@ -10,7 +10,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { t } from '../../../services/i18n/index.js';
 import { FIELD_VALUE_LIMIT } from '../entryCardFields.js';
 
-export const NOTE_HISTORY_PREFIX = 'listnote_history';
+const NOTE_HISTORY_PREFIX = 'listnote_history';
 export const NOTE_PAGE_PREFIX = 'listnote_page';
 
 // Dates sit in embed field names, where Discord does not render <t:...>
