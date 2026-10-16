@@ -1,4 +1,5 @@
 import { getClassName } from '../../models/Class.js';
+import { normalizeNameKey } from '../../utils/names.js';
 
 export function parseItemLevelValue(value) {
   const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
@@ -50,6 +51,44 @@ function extractRosterClassMapFromHtml(html) {
   return rosterClassMap;
 }
 
+// One character of the page's `roster:[...]` data payload, in the key order
+// lostark.bible serialises it. If that order changes, nothing matches and the
+// parser falls back to the rendered cards alone.
+const ROSTER_PAYLOAD_ENTRY = /\{id:\d+,name:"([^"]+)",class:"([^"]*)",ilvl:([\d.]+),combatPower:(?:null|\{id:\d+,score:([\d.]+)\}),combatPowerIsEstimate:(true|false)/g;
+
+// The cards print item level and CP rounded to two decimals, trailing zeros
+// dropped ("1722.5"); payload records are formatted the same way.
+function formatPayloadNumber(value) {
+  return String(Number(Number(value).toFixed(2)));
+}
+
+function extractRosterPayloadFromHtml(html) {
+  const start = html.indexOf('roster:[');
+  if (start < 0) return [];
+  // Entries hold objects but no arrays, so the first ']' closes the list.
+  const end = html.indexOf(']', start);
+  const payload = html.slice(start, end < 0 ? html.length : end);
+  return [...payload.matchAll(ROSTER_PAYLOAD_ENTRY)].map(([, name, classId, ilvl, score, estimate]) => ({
+    name,
+    itemLevel: formatPayloadNumber(ilvl),
+    combatScore: score ? `${estimate === 'true' ? '≈' : ''}${formatPayloadNumber(score)}` : '?',
+    classId,
+    className: getClassName(classId),
+  }));
+}
+
+/**
+ * Read a roster page's characters: the rendered character cards, plus the
+ * characters only the page's data payload lists. lostark.bible renders a
+ * card only for characters it updated recently, so an alt not refreshed for
+ * a few weeks is in the payload alone; it is inserted by item level, where
+ * its card would have been. A page with no cards (a hidden or missing
+ * roster) stays empty.
+ * @param {string} html - the roster page
+ * @param {Document} document - the same page parsed into a DOM
+ * @returns {Promise<Array<{name: string, itemLevel: string, combatScore: string, classId: string, className: string}>>}
+ *   characters in item level order, highest first
+ */
 export async function parseRosterCharactersFromHtml(html, document) {
   const rosterClassMap = extractRosterClassMapFromHtml(html);
   const characters = [];
@@ -77,6 +116,17 @@ export async function parseRosterCharactersFromHtml(html, document) {
     const className = getClassName(classId);
 
     if (charName) characters.push({ name: charName, itemLevel, combatScore, classId, className });
+  }
+  if (characters.length === 0) return characters;
+
+  const listed = new Set(characters.map((character) => normalizeNameKey(character.name)));
+  for (const record of extractRosterPayloadFromHtml(html)) {
+    const key = normalizeNameKey(record.name);
+    if (listed.has(key)) continue;
+    listed.add(key);
+    const itemLevel = parseItemLevelValue(record.itemLevel);
+    const at = characters.findIndex((character) => parseItemLevelValue(character.itemLevel) < itemLevel);
+    characters.splice(at < 0 ? characters.length : at, 0, record);
   }
 
   return characters;
