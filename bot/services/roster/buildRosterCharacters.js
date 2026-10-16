@@ -75,7 +75,7 @@ const inFlightRosterBuilds = new Map();
 function rosterBuildShareKey(name, options) {
   const entries = Object.entries(options).sort(([a], [b]) => a.localeCompare(b));
   const callerOwned = entries.some(([, value]) => typeof value === 'function' || (value !== null && typeof value === 'object'));
-  return callerOwned ? null : JSON.stringify([String(name).trim().normalize('NFC'), entries]);
+  return callerOwned ? null : JSON.stringify([String(name), entries]);
 }
 
 /**
@@ -83,7 +83,8 @@ function rosterBuildShareKey(name, options) {
  * direct roster page first, then falls back to hidden-roster
  * inference. Always returns a result object (never throws) so callers
  * don't have to wrap. Overlapping calls with the same name and plain
- * options share one fetch; each caller gets its own copy of the result.
+ * options share one fetch, and with it the first caller's deadline; each
+ * caller gets its own copy of the result.
  * @param {string} name - target character name
  * @param {object} [options]
  * @param {boolean} [options.hiddenRosterFallback=false]
@@ -190,7 +191,7 @@ async function buildRosterCharactersOnce(name, options) {
     }
   } catch (err) {
     failReason = describeFetchError(err);
-    console.warn('[list] Failed to fetch roster characters:', err.message);
+    console.warn('[list] Failed to fetch roster characters:', err?.message || String(err));
   }
 
   return {

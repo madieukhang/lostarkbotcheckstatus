@@ -52,6 +52,34 @@ test('roster builds with their own signals do not share a fetch', async (t) => {
   assert.equal(requests.length, 2);
 });
 
+test('roster builds for different names do not share a fetch', async (t) => {
+  const requests = mockBible(t);
+  await Promise.all([
+    buildRosterCharacters('Alpha', { viaWorker: true }),
+    buildRosterCharacters('Beta', { viaWorker: true }),
+  ]);
+  assert.equal(requests.length, 2);
+});
+
+test('roster builds with their own callbacks do not share a fetch', async (t) => {
+  const requests = mockBible(t);
+  await Promise.all([
+    buildRosterCharacters('Alpha', { viaWorker: true, onMetaFetchResult() {} }),
+    buildRosterCharacters('Alpha', { viaWorker: true, onMetaFetchResult() {} }),
+  ]);
+  assert.equal(requests.length, 2);
+});
+
+test('a roster build whose request throws a bare value still answers with a failure reason', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  t.mock.method(bibleClient, 'fetch', async () => { throw undefined; });
+
+  const roster = await buildRosterCharacters('Alpha', { viaWorker: true });
+
+  assert.equal(roster.hasValidRoster, false);
+  assert.equal(typeof roster.failReason, 'string');
+});
+
 test('roster builds with different options do not share a fetch', async (t) => {
   const requests = mockBible(t);
   await Promise.all([

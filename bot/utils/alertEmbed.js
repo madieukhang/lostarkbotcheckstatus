@@ -59,17 +59,20 @@ const SEVERITY_CONFIG = Object.freeze({
 const EMBED_LIMITS = Object.freeze({ title: 256, description: 4096, fieldName: 256, fieldValue: 1024, footer: 2048 });
 
 // Cut text to a limit with an ellipsis, closing an inline code span the cut
-// would leave open.
+// would leave open. Non-text values pass through, so the builder still
+// rejects a caller's wrong type.
 function fitEmbedText(value, limit) {
-  const text = String(value);
-  if (text.length <= limit) return text;
-  const codeSpan = text.length > 1 && text.startsWith('`') && text.endsWith('`') ? '`' : '';
-  return `${text.slice(0, limit - 1 - codeSpan.length)}…${codeSpan}`;
+  if (typeof value !== 'string' || value.length <= limit) return value;
+  const codeSpan = value.startsWith('`') && value.endsWith('`') ? '`' : '';
+  let end = limit - 1 - codeSpan.length;
+  // Never end on the first half of a two-unit character such as an emoji.
+  if (/[\uD800-\uDBFF]/.test(value[end - 1])) end -= 1;
+  return `${value.slice(0, end)}…${codeSpan}`;
 }
 
 /**
- * Build a standardized alert embed. Text past Discord's embed limits is cut
- * to them, so the embed always builds.
+ * Build a standardized alert embed. Text past Discord's per-element limits
+ * (title, description, field name and value, footer) is cut to them.
  *
  * @param {Object} options
  * @param {string} options.severity - One of AlertSeverity.*

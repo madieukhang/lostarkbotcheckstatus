@@ -310,8 +310,10 @@ export function createAutoCheckMessageHandler({
   }
 
   async function sendRequestOutcome(message, requestUi, payload) {
-    if (requestUi.progressMsg) await requestUi.progressMsg.edit(payload).catch(() => {});
-    else await message.reply(payload).catch(() => {});
+    const send = requestUi.progressMsg ? requestUi.progressMsg.edit(payload) : message.reply(payload);
+    // The outcome is the last card the user sees; when Discord refuses it the
+    // progress card stays up, so the refusal is logged rather than dropped.
+    await send.catch((err) => console.warn('[auto-check] outcome card could not be shown:', err?.message || String(err)));
   }
 
   async function rejectInvalidTextRequest(message, textRequest, lang) {
@@ -677,7 +679,8 @@ export function createAutoCheckMessageHandler({
         });
         return;
       }
-      console.error('[auto-check] Error processing request:', err.message);
+      const errorText = err?.message || String(err);
+      console.error('[auto-check] Error processing request:', errorText);
       await removeSearchReaction(message);
       await message.react('❌').catch(() => {});
       await sendRequestOutcome(message, requestUi, {
@@ -685,7 +688,7 @@ export function createAutoCheckMessageHandler({
         embeds: [buildAlertEmbed({
           severity: AlertSeverity.ERROR,
           ...t('dialogue.check.autoFailed', lang),
-          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${errorText}\``, inline: false }],
         })],
         components: [],
       });
