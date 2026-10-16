@@ -122,6 +122,37 @@ test('disabled or invalid analysis requests fail before any network access', asy
   assert.deepEqual(calls, []);
 });
 
+const EMPTY_GEMINI_REPLIES = {
+  'a SAFETY finish without content': () => Response.json({ candidates: [{ finishReason: 'SAFETY' }] }),
+  'a blocked prompt': () => Response.json({ promptFeedback: { blockReason: 'PROHIBITED_CONTENT' } }),
+  'a candidate without parts': () => Response.json({ candidates: [{ finishReason: 'OTHER', content: { parts: [] } }] }),
+};
+
+for (const [label, emptyReply] of Object.entries(EMPTY_GEMINI_REPLIES)) {
+  test(`an empty Gemini reply (${label}) falls over to the next model`, async (t) => {
+    const calls = mockOcr(t, model => model === GEMINI_MODEL_PROFILES.daily[0]
+      ? emptyReply()
+      : response('["Alice"]'));
+    assert.deepEqual(await extractNamesFromImage(image), ['Alice']);
+    assert.deepEqual(calls, GEMINI_MODEL_PROFILES.daily);
+  });
+
+  test(`an empty Gemini reply (${label}) from every model is an OCR failure and is not cached`, async (t) => {
+    const calls = mockOcr(t, () => emptyReply());
+    await assert.rejects(extractNamesFromImage(image), /empty response/);
+    assert.deepEqual(calls, GEMINI_MODEL_PROFILES.daily);
+    await assert.rejects(extractNamesFromImage(image), /empty response/);
+    assert.equal(calls.length, GEMINI_MODEL_PROFILES.daily.length * 2, 'the failure must not be cached as "no names"');
+  });
+}
+
+test('a "[]" Gemini reply is a genuine empty lobby after one call and is cached', async (t) => {
+  const calls = mockOcr(t, () => response('[]'));
+  assert.deepEqual(await extractNamesFromImage(image), []);
+  assert.deepEqual(await extractNamesFromImage(image), []);
+  assert.deepEqual(calls, [GEMINI_MODEL_PROFILES.daily[0]]);
+});
+
 test('/la-check exposes optional Daily and Analysis choices', () => {
   const command = buildCommands().find(command => command.name === 'la-check');
   const option = command.options.find(option => option.name === 'mode');

@@ -13,6 +13,7 @@ import { clearGuildMembersCache } from '../bot/services/roster/guildMembers.js';
 import { extractCharacterItemLevelFromHtml } from '../bot/services/roster/parsers.js';
 import config from '../bot/config.js';
 import { clearMetaCache } from '../bot/utils/cache/metaCache.js';
+import { sleep } from '../bot/utils/async.js';
 
 function createGuildMembersResponse(memberName = 'Guildmate') {
   return Response.json({
@@ -522,4 +523,118 @@ test('buildRosterCharacters reads a 404 profile behind a hidden roster as a miss
 
   assert.equal(result.hasValidRoster, false);
   assert.equal(result.failReason, null);
+});
+
+function createMetaDataResponse() {
+  return Response.json({
+    nodes: [
+      {
+        data: [
+          { header: 1 },
+          { rosterLevel: 2, stronghold: 3, guild: 6, class: 9, ilvl: 10 },
+          300,
+          { level: 4, name: 5 },
+          70,
+          'JoinHome',
+          { name: 7, grade: 8 },
+          'JoinGuild',
+          'Member',
+          'bard',
+          1725.55,
+        ],
+      },
+    ],
+  });
+}
+
+// The mocked fetch waits so the second caller always arrives while the first
+// caller's request is still in flight.
+function mockMetaFetch(t, respond) {
+  clearMetaCache();
+  const originalFetch = globalThis.fetch;
+  const state = { calls: 0 };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    clearMetaCache();
+  });
+  globalThis.fetch = async (url) => {
+    state.calls += 1;
+    await sleep(10);
+    return respond(String(url));
+  };
+  return state;
+}
+
+const SHARED_META_OPTIONS = { allowScraperApi: false, retryOnRateLimit: false, timeoutMs: 5000 };
+
+test('fetchCharacterMeta replays a failed shared fetch to the caller that joined it', async (t) => {
+  const fetchState = mockMetaFetch(t, () => new Response('busy', { status: 503 }));
+  const ownerResults = [];
+  const joinerResults = [];
+
+  const [ownerMeta, joinerMeta] = await Promise.all([
+    fetchCharacterMeta('JoinOutage', { ...SHARED_META_OPTIONS, onMetaFetchResult: (r) => ownerResults.push(r) }),
+    fetchCharacterMeta('JoinOutage', { ...SHARED_META_OPTIONS, onMetaFetchResult: (r) => joinerResults.push(r) }),
+  ]);
+
+  assert.equal(ownerMeta, null);
+  assert.equal(joinerMeta, null);
+  assert.equal(fetchState.calls, 2, 'the joining caller must share the first caller\'s requests');
+  assert.deepEqual(ownerResults.map(({ phase, status, ok }) => ({ phase, status, ok })), [
+    { phase: '__data.json', status: 503, ok: false },
+    { phase: 'HTML', status: 503, ok: false },
+  ]);
+  assert.deepEqual(joinerResults, ownerResults);
+});
+
+test('fetchCharacterMeta replays a successful shared fetch to the caller that joined it', async (t) => {
+  const fetchState = mockMetaFetch(t, () => createMetaDataResponse());
+  const joinerResults = [];
+
+  const [ownerMeta, joinerMeta, silentMeta] = await Promise.all([
+    fetchCharacterMeta('JoinOk', SHARED_META_OPTIONS),
+    fetchCharacterMeta('JoinOk', { ...SHARED_META_OPTIONS, onMetaFetchResult: (r) => joinerResults.push(r) }),
+    fetchCharacterMeta('JoinOk', SHARED_META_OPTIONS),
+  ]);
+
+  assert.equal(fetchState.calls, 1);
+  assert.equal(ownerMeta.rosterLevel, 300);
+  assert.deepEqual(joinerMeta, ownerMeta);
+  assert.deepEqual(silentMeta, ownerMeta);
+  assert.deepEqual(joinerResults, [{ name: 'JoinOk', phase: '__data.json', status: 200, ok: true, attempt: 1 }]);
+});
+
+test('fetchCharacterMeta replays retryable statuses of a shared fetch to the caller that joined it', async (t) => {
+  const fetchState = mockMetaFetch(t, () => (fetchState.calls === 1
+    ? new Response('slow down', { status: 429 })
+    : createMetaDataResponse()));
+  const options = { ...SHARED_META_OPTIONS, retryOnRateLimit: true, rateLimitRetryDelayMs: 1, suppressRetryWarnings: true };
+  const ownerRetries = [];
+  const joinerRetries = [];
+
+  const [ownerMeta, joinerMeta] = await Promise.all([
+    fetchCharacterMeta('JoinRetry', { ...options, onRetryableStatus: (r) => ownerRetries.push(r) }),
+    fetchCharacterMeta('JoinRetry', { ...options, onRetryableStatus: (r) => joinerRetries.push(r) }),
+  ]);
+
+  assert.equal(fetchState.calls, 2, 'one 429 attempt and one successful retry, shared by both callers');
+  assert.equal(ownerMeta.rosterLevel, 300);
+  assert.deepEqual(joinerMeta, ownerMeta);
+  assert.equal(ownerRetries.length, 1);
+  assert.equal(ownerRetries[0].status, 429);
+  assert.deepEqual(joinerRetries, ownerRetries);
+});
+
+test('concurrent buildRosterCharacters calls both report a failed profile read behind a hidden roster', async (t) => {
+  mockMetaFetch(t, (url) => (url.endsWith('/roster')
+    ? new Response('<html><body><h1>Hidden roster</h1></body></html>', { status: 200 })
+    : new Response('busy', { status: 503 })));
+  const options = { ...SHARED_META_OPTIONS, hiddenRosterFallback: true };
+
+  const results = await Promise.all([
+    buildRosterCharacters('Outagetest', options),
+    buildRosterCharacters('Outagetest', options),
+  ]);
+
+  assert.deepEqual(results.map((result) => result.failReason), ['HTTP 503', 'HTTP 503']);
 });

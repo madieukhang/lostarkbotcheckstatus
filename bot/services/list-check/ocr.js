@@ -45,6 +45,7 @@ const GEMINI_FAILURE_FORMATTERS = {
   'response:non-JSON response': () => 'Gemini did not return a JSON array.',
   'response:invalid JSON': () => 'Gemini returned invalid JSON.',
   'response:max output tokens': () => 'Gemini output was truncated at the token limit.',
+  'response:empty response': () => 'Gemini returned an empty response.',
   cooldown: (result) => (
     `All Gemini models are temporarily cooling down; retry in ${Math.ceil(result.retryAfterMs / 1000)}s.`
   ),
@@ -743,7 +744,12 @@ export async function extractNamesFromImage(image, options = {}) {
           return { retry: true, reason: 'max output tokens' };
         }
 
-        if (!text) return { value: { parsed: [], emptyResponse: true } };
+        // JSON mode returns the text "[]" for a lobby without names, so empty text
+        // is a blocked or truncated reply that the next model may still answer.
+        if (!text) {
+          console.warn(`[listcheck] Gemini (${model}) returned an empty response.`);
+          return { retry: true, reason: 'empty response' };
+        }
 
         const jsonMatch = text.match(/\[[\s\S]*\]/);
         if (!jsonMatch) {
@@ -759,7 +765,7 @@ export async function extractNamesFromImage(image, options = {}) {
           return { retry: true, reason: 'invalid JSON' };
         }
         if (!Array.isArray(parsed)) throw new Error('Gemini output is not an array.');
-        return { value: { parsed, emptyResponse: false } };
+        return { value: parsed };
       },
     });
 
@@ -767,13 +773,7 @@ export async function extractNamesFromImage(image, options = {}) {
       throw createGeminiFailureError(geminiResult, models);
     }
 
-    if (geminiResult.value.emptyResponse) {
-      timing.status = 'ok';
-      ownedFlight?.resolve([]);
-      return [];
-    }
-
-    let names = filterAndDeduplicateNames(geminiResult.value.parsed);
+    let names = filterAndDeduplicateNames(geminiResult.value);
     if (refineAmbiguousDiacritics) {
       const refineStartedAt = Date.now();
       try {
