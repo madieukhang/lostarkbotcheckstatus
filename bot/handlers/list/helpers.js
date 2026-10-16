@@ -600,18 +600,7 @@ export function canChangeEntryWithoutApproval(payload, entry, isRequesterAutoApp
   return entry?.scope === 'server' && Boolean(payload.guildId) && entry.guildId === payload.guildId;
 }
 
-/**
- * Stricter variant used by /la-list multiadd auto-approve check.
- * Only senior + officer can bypass bulk approval; MEMBER_APPROVER_IDS
- * (which gives bypass rights on single /la-list add for legacy reasons)
- * does NOT confer bulk-add auto-approval. This matches the README claim
- * that only officers/seniors auto-approve multiadd batches.
- */
-export function isOfficerOrSenior(userId) {
-  if (!userId) return false;
-  if (SENIOR_APPROVER_IDS.includes(userId)) return true;
-  return OFFICER_APPROVER_IDS.includes(userId);
-}
+export { isOfficerOrSenior } from '../../utils/approverRoles.js';
 
 /**
  * Senior-only recipient list for /la-list multiadd bulk approval DMs.

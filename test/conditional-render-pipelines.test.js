@@ -11,6 +11,7 @@ const { resolveMultiaddConfirmState } = await import('../bot/handlers/list/multi
 const { findDuplicateEntry } = await import('../bot/handlers/list/add/overwriteButton.js');
 const { formatDeepScanStats } = await import('../bot/handlers/roster/progress.js');
 const { sendScanCompletionDm } = await import('../bot/utils/scanCompletionDm.js');
+const { getClassEmoji } = await import('../bot/models/Class.js');
 
 test('multiadd confirmation policy preserves expiry, ownership, and action priority', () => {
   const pending = { requesterId: 'requester' };
@@ -196,4 +197,20 @@ test('scan completion field pipeline includes each enabled optional block once',
   assert.equal(embed.fields.filter((field) => field.value === '3').length, 1);
   assert.equal(embed.fields.filter((field) => field.value === 'manual stop').length, 1);
   assert.equal(payloads[0].components.length, 1);
+});
+
+test('scan completion DM names the class of an alt that has only a classId', async () => {
+  const payloads = [];
+  await sendScanCompletionDm({
+    user: { id: 'user-1', send: async (payload) => { payloads.push(payload); } },
+    commandLabel: '/la-roster deep',
+    scanTargetName: 'Ainslinn',
+    outcome: 'completed',
+    result: { alts: [{ name: 'Idonly', classId: 'berserker_female', itemLevel: 1710 }] },
+    lang: 'en',
+  });
+
+  const { description } = payloads[0].embeds[0].toJSON();
+  assert.ok(description.includes(`${getClassEmoji('Slayer') || 'Slayer'} [Idonly](`));
+  assert.ok(!description.includes('berserker_female'));
 });

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { makeRosterScanProgressCallback } from '../bot/handlers/roster/progress.js';
+import { getClassEmoji } from '../bot/models/Class.js';
 import { buildScanProgressEmbed } from '../bot/utils/scanProgressEmbed.js';
 
 test('roster progress callback aborts scan after repeated message edit failures', async () => {
@@ -90,6 +91,17 @@ test('scan progress embed shows the CP badge on an alt row', () => {
   });
 
   assert.ok(embed.toJSON().description.includes('`1710.00` · `2500 CP`'));
+});
+
+test('scan progress embed names the class of an alt that has only a classId', () => {
+  const embed = buildScanProgressEmbed({
+    title: 'Stronghold scan in progress - Ainslinn',
+    progress: scanProgress([{ name: 'Idonly', classId: 'berserker_female', itemLevel: 1710 }]),
+  });
+
+  const { description } = embed.toJSON();
+  assert.ok(description.includes(`${getClassEmoji('Slayer') || 'Slayer'} [Idonly](`));
+  assert.ok(!description.includes('berserker_female'));
 });
 
 test('scan progress embed lists at most 12 alt rows', () => {

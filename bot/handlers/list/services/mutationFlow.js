@@ -73,19 +73,21 @@ export async function renderListAddExecutionResult(
  * keep their own UI without duplicating the approval contract.
  * After the write succeeds, or the request is saved for approval, a failure
  * to show the confirmation card, or of `onQueued`, is logged and does not
- * throw.
+ * throw. A failure to show a refused write (`result.ok` false) still throws.
  *
- * @param {object} options
+ * @param {object} options - the `...Fn` options are injectable dependencies
+ *   for tests
  * @param {object} options.interaction - the deferred interaction to answer
  * @param {object} options.payload - list-add payload from buildListMutationPayload
  * @param {string} options.lang - reply language
+ * @param {object} options.PendingApprovalModel - the model the delivered
+ *   approval is saved to
  * @param {Function} options.executeListAddToDatabase - writes the entry and
  *   reports isDuplicate and existingEntry
  * @param {Function} options.sendListAddApprovalToApprovers - DMs the approvers
  * @param {Function} [options.onDeliveryFailed] - called when no approver got the DM
  * @param {Function} [options.onQueued] - called after the pending approval is saved
  * @returns {Promise<{status: 'executed', result: object}|{status: 'delivery-failed'|'queued', delivery: object}>}
- *   the remaining options are injectable dependencies for tests
  */
 export async function submitListMutation({
   interaction,

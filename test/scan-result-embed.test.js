@@ -6,6 +6,7 @@ import {
   buildScanResultEmbed,
   deriveScanState,
 } from '../bot/utils/scanResultEmbed.js';
+import { getClassEmoji } from '../bot/models/Class.js';
 
 test('deriveScanState treats failure storm as paused and leaves failed attempts retryable', () => {
   const state = deriveScanState({
@@ -94,6 +95,23 @@ test('scan result embeds surface the latest bible failure reason', () => {
   });
 
   assert.match(embed.toJSON().description, /Last error: `HTML HTTP 429`/);
+});
+
+test('scan result embeds name the class of an alt that has only a classId', () => {
+  const { embed } = buildScanResultEmbed({
+    target: { name: 'Ainslinn', isHidden: false, guildName: 'Bullet Shell' },
+    result: {
+      totalEligibleInGuild: 1,
+      checkedCandidates: 1,
+      attemptedCandidates: 1,
+      alts: [{ name: 'Idonly', classId: 'berserker_female', itemLevel: 1710 }],
+    },
+    kind: 'roster-visible',
+  });
+
+  const { description } = embed.toJSON();
+  assert.ok(description.includes(`${getClassEmoji('Slayer') || 'Slayer'} [Idonly](`));
+  assert.ok(!description.includes('berserker_female'));
 });
 
 test('scan result button matrix keeps only the actions valid for each state', () => {

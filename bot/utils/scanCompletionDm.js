@@ -62,8 +62,7 @@ function buildAltLines(alts = [], lang = 'en') {
   // Rendered through the shared row formatter rather than a local copy ·
   // the copy is why this list never picked up later changes to the row,
   // the CP badge being the most recent one.
-  const lines = visible.map((alt, i) =>
-    formatAltLine(alt.name, i, { ...alt, className: alt.className || alt.classId || '' }));
+  const lines = visible.map((alt, i) => formatAltLine(alt.name, i, alt));
   const extra = alts.length > visible.length
     ? `\n*${t('dialogue.scan.dm.more', lang, { count: alts.length - visible.length })}*`
     : '';

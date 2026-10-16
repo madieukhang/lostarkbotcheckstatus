@@ -12,8 +12,7 @@ import { t } from '../services/i18n/index.js';
 function buildAltsBlock(alts, lang) {
   if (!Array.isArray(alts) || alts.length === 0) return '';
   const visible = alts.slice(0, 12);
-  const lines = visible.map((alt, i) =>
-    formatAltLine(alt.name, i, { ...alt, className: alt.className || alt.classId || '' }));
+  const lines = visible.map((alt, i) => formatAltLine(alt.name, i, alt));
   const extra = alts.length > visible.length
     ? `\n*${t('dialogue.scan.progressUi.more', lang, { count: alts.length - visible.length })}*`
     : '';

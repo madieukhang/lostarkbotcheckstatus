@@ -1,5 +1,6 @@
 # Changelog
 
+- Scan result, progress and completion-DM rows show the class name of an alt known only by its class id, instead of the raw id.
 - `roster NameOne` (or `roster: NameOne`) in the configured auto-check channel shows that one character's roster checked against the lists, like `/la-roster` without a deep scan. It posts a working card first, reacts ⚠️ when the lookup fails or lostark.bible has no profile for the name, and is listed in `/la-help`, the welcome pin and the README.
 - List approval buttons (add, edit, bulk and duplicate decisions) answer the click before waiting on the database, and the decision claims the request in one database step without reading it first.
 - `/la-list edit` in a server answers at once, then reads the language, the server settings and the entry together.

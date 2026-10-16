@@ -135,8 +135,7 @@ function buildAltList(alts, { newAltsSet, lang = 'en' } = {}) {
   // here because it belongs to this card alone.
   const lines = visible.map((alt, i) => {
     const isNewMark = newAltsSet?.has(normalizeNameKey(alt.name)) ? ` \`${t('dialogue.scan.result.newTag', lang)}\`` : '';
-    const record = { ...alt, className: alt.className || alt.classId || '' };
-    return `${formatAltLine(alt.name, i, record)}${isNewMark}`;
+    return `${formatAltLine(alt.name, i, alt)}${isNewMark}`;
   });
   const extra = alts.length > visible.length
     ? `\n*${t('dialogue.scan.result.more', lang, { count: alts.length - visible.length })}*`
