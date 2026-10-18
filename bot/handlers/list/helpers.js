@@ -585,9 +585,10 @@ export function isRequesterAutoApprover(userId) {
 /**
  * Whether a requester may change an existing entry without approval. Besides
  * an auto-approver, only the member who added a server-scoped entry may change
- * it, from that same server: the rule /la-list edit applies, since a note
- * replaces the entry's evidence and merges roster names into it. A global,
- * legacy unscoped, other-server or other member's entry needs approval.
+ * it, from that same server. This follows the owner check of /la-list edit,
+ * since a note replaces the entry's evidence and merges roster names into it,
+ * but unlike edit an owner's global entry also needs approval. A legacy
+ * unscoped, other-server or other member's entry needs approval too.
  * @param {object} payload - list mutation payload (requestedByUserId, guildId)
  * @param {object} entry - the stored entry the mutation would change
  * @param {Function} [isRequesterAutoApproverFn]

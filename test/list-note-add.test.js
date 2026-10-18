@@ -9,6 +9,7 @@ import { attachNoteControls } from '../bot/handlers/list/notes/pendingNotes.js';
 import { createNoteHandlers } from '../bot/handlers/list/notes/index.js';
 import { submitListMutation } from '../bot/handlers/list/services/mutationFlow.js';
 import { buildDuplicateListAddResult } from '../bot/handlers/list/services/addExecutor.js';
+import { canChangeEntryWithoutApproval } from '../bot/handlers/list/helpers.js';
 
 const AT = new Date('2026-07-02T00:00:00Z');
 const existing = {
@@ -112,6 +113,13 @@ test('a member server-scoped add that finds another member\'s server entry goes 
     assert.equal(calls.rendered.length, 0, 'no duplicate card with a note button');
     assert.equal(calls.sent.length, 1);
   }
+});
+
+test('a blank requester id never counts as the owner of an ownerless server entry', () => {
+  // Stored entries default addedByUserId to '', so '' must not match ''.
+  const ownerless = { ...existing, scope: 'server', guildId: 'guild', addedByUserId: '' };
+  const blankRequester = { ...payload, scope: 'server', requestedByUserId: '' };
+  assert.equal(canChangeEntryWithoutApproval(blankRequester, ownerless, () => false), false);
 });
 
 function setup(t) {
