@@ -80,7 +80,7 @@ test('Mordum is hidden from new choices while historical raid values still norma
 });
 
 test('normal raids are hidden from selectors but remain valid historical values', () => {
-  const normalRaids = ['Act4 Nor', 'Kazeros Nor', 'Secra Nor'];
+  const normalRaids = ['Act4 Nor', 'Kazeros Nor', 'Secra Nor', 'Belgardin Nor'];
   const selectableValues = getSelectableRaidValues();
 
   for (const raid of normalRaids) {
@@ -94,6 +94,17 @@ test('normal raids are hidden from selectors but remain valid historical values'
     selectableValues.filter((raid) => raid.startsWith('Horizon ')),
     ['Horizon Lv1', 'Horizon Lv2', 'Horizon Lv3'],
   );
+});
+
+test('Belgardin Hard and NM are offered right after Horizon', () => {
+  const selectableValues = getSelectableRaidValues();
+  const horizonEnd = selectableValues.indexOf('Horizon Lv3');
+  assert.deepEqual(selectableValues.slice(horizonEnd + 1, horizonEnd + 3), ['Belgardin Hard', 'Belgardin NM']);
+  assert.deepEqual(getRaidAutocompleteChoices('belg'), [
+    { name: 'Belgardin Hard', value: 'Belgardin Hard' },
+    { name: 'Belgardin NM', value: 'Belgardin NM' },
+  ]);
+  assert.equal(resolveRaidLabel('  belgardin nm  '), 'Belgardin NM');
 });
 
 test('Brel autocomplete hides at the cutoff but keeps the selected storage label', () => {
