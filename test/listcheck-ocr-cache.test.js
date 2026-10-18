@@ -329,7 +329,9 @@ test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', 
   config.geminiModels = ['fake-model'];
   config.listcheckMaxNames = 8;
   config.listcheckRosterLookupConcurrency = 3;
-  config.listcheckRosterLookupTimeoutMs = 500;
+  // Long enough that a slow test run never ends the phase early; deadline
+  // expiry has its own test with a short deadline below.
+  config.listcheckRosterLookupTimeoutMs = 5000;
 
   globalThis.fetch = async (url, init = {}) => {
     const requestedUrl = String(url);
@@ -353,9 +355,9 @@ test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', 
     if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
       searchCalls += 1;
       searchSignals.push(init.signal);
-      // Read when the search starts: the 500 ms phase deadline may expire
-      // later in a loaded test run, after every search has finished.
-      searchAbortedAtStart.push(Boolean(init.signal?.aborted));
+      // Read when the search starts: the phase deadline may expire later in
+      // a loaded test run, after every search has finished.
+      searchAbortedAtStart.push(init.signal?.aborted);
       activeSearches += 1;
       maxActiveSearches = Math.max(maxActiveSearches, activeSearches);
       await new Promise((resolve) => setTimeout(resolve, 15));
