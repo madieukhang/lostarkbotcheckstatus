@@ -93,10 +93,25 @@ test('a member server-scoped add that finds an entry outside their server goes t
 });
 
 test('a member server-scoped add that finds their own server entry keeps the note button', async () => {
-  const { calls, submission } = submitMemberServerAdd({ ...existing, scope: 'server', guildId: 'guild' });
+  const { calls, submission } = submitMemberServerAdd({ ...existing, scope: 'server', guildId: 'guild', addedByUserId: 'member' });
   assert.equal((await submission).status, 'executed');
   assert.equal(calls.sent.length, 0);
   assert.match(addKeyOf(calls.rendered[0]), /^listnote_add:/);
+});
+
+test('a member server-scoped add that finds another member\'s server entry goes to approval, like /la-list edit', async () => {
+  // A note replaces the entry's evidence and merges roster names, which
+  // /la-list edit allows only the entry owner or an approver to do.
+  const entries = [
+    { ...existing, scope: 'server', guildId: 'guild', addedByUserId: 'someone-else' },
+    { ...existing, scope: 'server', guildId: 'guild' },
+  ];
+  for (const entry of entries) {
+    const { calls, submission } = submitMemberServerAdd(entry);
+    assert.equal((await submission).status, 'queued', `owner ${entry.addedByUserId}`);
+    assert.equal(calls.rendered.length, 0, 'no duplicate card with a note button');
+    assert.equal(calls.sent.length, 1);
+  }
 });
 
 function setup(t) {
@@ -207,9 +222,22 @@ test('a member card refuses the note when its entry left the member server after
   assert.equal(broadcasts.length, 0);
 });
 
+test('a member card refuses the note on another member\'s server entry', async t => {
+  const { handlers, broadcasts } = setup(t);
+  const othersEntry = { ...existing, scope: 'server', guildId: 'guild', addedByUserId: 'someone-else' };
+  const memberPayload = { ...payload, scope: 'server', requestedByUserId: 'member' };
+  const key = addKeyOf(attachNoteControls({ ...duplicate(), existingEntry: othersEntry }, memberPayload, 'en'));
+  t.mock.method(Blacklist, 'findById', () => ({ lean: async () => othersEntry }));
+  t.mock.method(Blacklist, 'findOneAndUpdate', () => assert.fail('a note on another member\'s entry needs approval'));
+  const member = click(key, 'member');
+  await handlers.handleListNoteAddButton(member.interaction);
+  assert.match(member.calls.edits[0].embeds[0].toJSON().title, /needs approval/);
+  assert.equal(broadcasts.length, 0);
+});
+
 test('a member still adds a note to their own server entry', async t => {
   const { handlers } = setup(t);
-  const ownEntry = { ...existing, scope: 'server', guildId: 'guild' };
+  const ownEntry = { ...existing, scope: 'server', guildId: 'guild', addedByUserId: 'member' };
   const memberPayload = { ...payload, scope: 'server', requestedByUserId: 'member' };
   let writes = 0;
   t.mock.method(Blacklist, 'findById', () => ({ lean: async () => ownEntry }));

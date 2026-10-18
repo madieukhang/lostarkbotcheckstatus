@@ -583,9 +583,11 @@ export function isRequesterAutoApprover(userId) {
 }
 
 /**
- * Whether a requester may change an existing entry without approval. A
- * server-scoped request only covers that server's own blacklist entries; a
- * global, legacy unscoped, or other-server entry needs an auto-approver.
+ * Whether a requester may change an existing entry without approval. Besides
+ * an auto-approver, only the member who added a server-scoped entry may change
+ * it, from that same server: the rule /la-list edit applies, since a note
+ * replaces the entry's evidence and merges roster names into it. A global,
+ * legacy unscoped, other-server or other member's entry needs approval.
  * @param {object} payload - list mutation payload (requestedByUserId, guildId)
  * @param {object} entry - the stored entry the mutation would change
  * @param {Function} [isRequesterAutoApproverFn]
@@ -593,7 +595,9 @@ export function isRequesterAutoApprover(userId) {
  */
 export function canChangeEntryWithoutApproval(payload, entry, isRequesterAutoApproverFn = isRequesterAutoApprover) {
   if (isRequesterAutoApproverFn(payload.requestedByUserId)) return true;
-  return entry?.scope === 'server' && Boolean(payload.guildId) && entry.guildId === payload.guildId;
+  return entry?.scope === 'server'
+    && Boolean(payload.guildId) && entry.guildId === payload.guildId
+    && Boolean(payload.requestedByUserId) && entry.addedByUserId === payload.requestedByUserId;
 }
 
 export { isOfficerOrSenior } from '../../utils/approverRoles.js';

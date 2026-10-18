@@ -1,5 +1,6 @@
 # Changelog
 
+- A member's note on another member's server entry now goes to the approvers, like `/la-list edit` of that entry. Before, any member of the server could save a note on it at once, and a note replaces the entry's screenshot and logs link and adds roster names to its tracked alts. A note on an entry you added yourself in this server still saves at once.
 - `/la-list add`, `/la-list edit` and multiadd offer the new raid Belgardin as `Belgardin Nor`, `Belgardin Hard` and `Belgardin NM`. Unlike the older Normal raids, `Belgardin Nor` stays offered while the raid is new.
 - Two people checking the same name at the same moment now share one roster lookup. Before, the second lookup queued behind the first in the scrape worker, could time out there and fell back to a slower route, so the person whose lookup queued second waited longer and got a card without CP or alts.
 - An error card no longer fails to appear when the error text is longer than Discord allows; alert text past Discord's embed limits is cut to them. Before, a check that failed with a long error stayed on its progress card ("Reading 1 name against the lists…") with no answer. An error card Discord refuses to show is now logged instead of dropped silently.

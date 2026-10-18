@@ -76,8 +76,9 @@ export async function renderListAddExecutionResult(
  *
  * Officers and server-scoped blacklist writes execute immediately. Every other
  * request must be delivered to at least one approver before it is persisted.
- * A server-scoped request that finds a duplicate outside its own server also
- * goes to approval, since its note controls would change that entry.
+ * A server-scoped request that finds a duplicate the requester did not add in
+ * this server also goes to approval, since its note controls would change
+ * that entry.
  * Surface-specific copy remains in callbacks so slash-add and Quick Add can
  * keep their own UI without duplicating the approval contract.
  * After the write succeeds, or the request is saved for approval, a failure
