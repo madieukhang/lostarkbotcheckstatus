@@ -323,6 +323,7 @@ test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', 
   let activeSearches = 0;
   let maxActiveSearches = 0;
   const searchSignals = [];
+  const searchAbortedAtStart = [];
 
   config.geminiApiKey = 'fake-gemini-key';
   config.geminiModels = ['fake-model'];
@@ -352,6 +353,9 @@ test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', 
     if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
       searchCalls += 1;
       searchSignals.push(init.signal);
+      // Read when the search starts: the 500 ms phase deadline may expire
+      // later in a loaded test run, after every search has finished.
+      searchAbortedAtStart.push(Boolean(init.signal?.aborted));
       activeSearches += 1;
       maxActiveSearches = Math.max(maxActiveSearches, activeSearches);
       await new Promise((resolve) => setTimeout(resolve, 15));
@@ -379,7 +383,7 @@ test('extractNamesFromImage bounds and parallelizes ambiguous-name refinement', 
     assert.ok(maxActiveSearches > 1, 'refinement searches should overlap');
     assert.ok(maxActiveSearches <= 3, 'refinement must respect configured concurrency');
     assert.ok(searchSignals.every((signal) => signal === searchSignals[0]));
-    assert.equal(searchSignals[0]?.aborted, false, 'all searches should share one live phase deadline');
+    assert.ok(searchAbortedAtStart.every((aborted) => aborted === false), 'all searches should share one live phase deadline');
   } finally {
     globalThis.fetch = originalFetch;
     config.geminiApiKey = originalKey;
