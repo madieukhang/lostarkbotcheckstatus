@@ -80,14 +80,16 @@ test('Mordum is hidden from new choices while historical raid values still norma
 });
 
 test('normal raids are hidden from selectors but remain valid historical values', () => {
-  const normalRaids = ['Act4 Nor', 'Kazeros Nor', 'Secra Nor', 'Belgardin Nor'];
+  const normalRaids = ['Act4 Nor', 'Kazeros Nor', 'Secra Nor'];
   const selectableValues = getSelectableRaidValues();
 
   for (const raid of normalRaids) {
     assert.equal(selectableValues.includes(raid), false);
     assert.equal(resolveRaidLabel(raid), raid);
   }
-  assert.deepEqual(getRaidAutocompleteChoices('Nor'), []);
+  assert.deepEqual(getRaidAutocompleteChoices('Nor'), [
+    { name: 'Belgardin Nor', value: 'Belgardin Nor' },
+  ]);
   assert.equal(selectableValues.includes('Secra Hard'), true);
   assert.equal(selectableValues.includes('Secra NM'), true);
   assert.deepEqual(
@@ -96,11 +98,15 @@ test('normal raids are hidden from selectors but remain valid historical values'
   );
 });
 
-test('Belgardin Hard and NM are offered right after Horizon', () => {
+test('Belgardin Nor, Hard and NM are offered right after Horizon', () => {
   const selectableValues = getSelectableRaidValues();
   const horizonEnd = selectableValues.indexOf('Horizon Lv3');
-  assert.deepEqual(selectableValues.slice(horizonEnd + 1, horizonEnd + 3), ['Belgardin Hard', 'Belgardin NM']);
+  assert.deepEqual(
+    selectableValues.slice(horizonEnd + 1, horizonEnd + 4),
+    ['Belgardin Nor', 'Belgardin Hard', 'Belgardin NM'],
+  );
   assert.deepEqual(getRaidAutocompleteChoices('belg'), [
+    { name: 'Belgardin Nor', value: 'Belgardin Nor' },
     { name: 'Belgardin Hard', value: 'Belgardin Hard' },
     { name: 'Belgardin NM', value: 'Belgardin NM' },
   ]);

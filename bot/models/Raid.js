@@ -23,7 +23,7 @@ const RAID_CATALOG = [
   { value: 'Horizon Lv1' },
   { value: 'Horizon Lv2' },
   { value: 'Horizon Lv3' },
-  { value: 'Belgardin Nor', selectable: false },
+  { value: 'Belgardin Nor' },
   { value: 'Belgardin Hard' },
   { value: 'Belgardin NM' },
   { value: 'Guardian Raid' },
