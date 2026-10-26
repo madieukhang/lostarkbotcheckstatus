@@ -30,6 +30,8 @@ import { buildNoteHistoryButton } from '../notes/entryNotes.js';
  * @param {Function} deps.broadcastListChange - guild-broadcast notifier
  * @param {Function} deps.notifyRequesterAboutDecision - notify the origin channel
  *   with the final outcome (approved / rejected / edited)
+ * @param {Function} [deps.findRosterSnapshot] - roster snapshot by name, for
+ *   the class icon on the decided card; without it the card has no icon
  * @returns {Function} handleListAddApprovalButton(interaction)
  */
 export function createListAddApprovalButtonHandler({
@@ -37,6 +39,7 @@ export function createListAddApprovalButtonHandler({
   executeListAddToDatabase,
   broadcastListChange,
   notifyRequesterAboutDecision,
+  findRosterSnapshot = async () => null,
 }) {
   return createApprovalDecisionHandler(async ({ interaction, action, requestId, lang, payload, claim }) => {
     const isApproveAction = action === 'listadd_approve';
@@ -63,8 +66,9 @@ export function createListAddApprovalButtonHandler({
     if (!isApproveAction) {
       await claim.complete();
 
+      const snapshot = await findRosterSnapshot(payload.name);
       const buildRejectedPayload = (targetLang) => buildDecidedApprovalPayload({
-        client: interaction.client, payload, outcome: 'rejected', approver: interaction.user.tag, lang: targetLang,
+        client: interaction.client, payload, outcome: 'rejected', approver: interaction.user.tag, snapshot, lang: targetLang,
       });
       await updateApprovers(buildRejectedPayload);
 
@@ -81,6 +85,7 @@ export function createListAddApprovalButtonHandler({
           syncApproverDmMessages,
           broadcastListChange,
           notifyRequesterAboutDecision,
+          findRosterSnapshot,
           completeApproval: () => claim.complete(),
           beforeWrite: () => claim.assertOwned(),
           lang,
@@ -119,12 +124,15 @@ export function createListAddApprovalButtonHandler({
       // Success or non-duplicate error · clean up
       await claim.complete();
 
+      // Read after the executor, which saves the roster it fetched.
+      const snapshot = await findRosterSnapshot(payload.name);
       const buildCompletedPayload = (targetLang) => buildDecidedApprovalPayload({
         client: interaction.client,
         payload,
         outcome: result.ok ? 'approved' : 'returned',
         approver: interaction.user.tag,
         result: result.content,
+        snapshot,
         lang: targetLang,
       });
       await updateApprovers(buildCompletedPayload);

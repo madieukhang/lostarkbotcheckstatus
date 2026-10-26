@@ -20,7 +20,7 @@ import { createListAddOverwriteButtonHandler } from './overwriteButton.js';
  * @param {object} deps.services - shared approval-flow services
  *   (sendListAddApprovalToApprovers, syncApproverDmMessages,
  *   executeListAddToDatabase, broadcastListChange,
- *   notifyRequesterAboutDecision)
+ *   notifyRequesterAboutDecision, findRosterSnapshot)
  * @returns {{
  *   handleListAddCommand: Function,
  *   handleListAddApprovalButton: Function,
@@ -35,6 +35,7 @@ export function createAddHandlers({ client, services }) {
     executeListAddToDatabase,
     broadcastListChange,
     notifyRequesterAboutDecision,
+    findRosterSnapshot,
   } = services;
 
   return {
@@ -48,12 +49,14 @@ export function createAddHandlers({ client, services }) {
       executeListAddToDatabase,
       broadcastListChange,
       notifyRequesterAboutDecision,
+      findRosterSnapshot,
     }),
     handleListAddViewEvidenceButton: createListAddViewEvidenceButtonHandler({ client }),
     handleListAddOverwriteButton: createListAddOverwriteButtonHandler({
       syncApproverDmMessages,
       broadcastListChange,
       notifyRequesterAboutDecision,
+      findRosterSnapshot,
     }),
   };
 }

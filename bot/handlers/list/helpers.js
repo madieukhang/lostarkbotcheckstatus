@@ -343,9 +343,9 @@ const APPROVAL_CARD_VIEWS = Object.freeze({
       icon: listIcon,
       name: escapeLinkBrackets(payload.name),
     }),
-    hero: ({ isEdit, guild, payload, listLabel, scopeTag, lang }) => t(`dialogue.approval.${isEdit ? 'heroEdit' : 'heroAdd'}`, lang, {
+    hero: ({ isEdit, guild, payload, snapshot, listLabel, scopeTag, lang }) => t(`dialogue.approval.${isEdit ? 'heroEdit' : 'heroAdd'}`, lang, {
       guild: guild.name,
-      name: escapeLinkBrackets(payload.name),
+      name: formatLinkedCharacter(payload.name, snapshot),
       list: listLabel,
       scope: scopeTag,
     }),
@@ -358,8 +358,8 @@ const APPROVAL_CARD_VIEWS = Object.freeze({
       list: listLabel,
       name: escapeLinkBrackets(payload.name),
     }),
-    hero: ({ payload, listLabel, scopeTag, lang }) => t('dialogue.approval.requester.hero', lang, {
-      name: formatLinkedCharacter(payload.name, null),
+    hero: ({ payload, snapshot, listLabel, scopeTag, lang }) => t('dialogue.approval.requester.hero', lang, {
+      name: formatLinkedCharacter(payload.name, snapshot),
       list: listLabel,
       scope: scopeTag,
     }),
@@ -398,6 +398,8 @@ const APPROVAL_CARD_VIEWS = Object.freeze({
  * @param {boolean} [options.forRequester=false] - render the requester's copy
  * @param {string} [options.lang='en'] - language of the card
  * @param {string} [options.title] - replaces the title of the chosen view
+ * @param {object|null} [options.snapshot] - the character's roster snapshot,
+ *   for the class icon in front of its name
  * @returns {import('discord.js').EmbedBuilder} the approval card
  */
 export function buildListAddApprovalEmbed(guild, payload, options = {}) {
@@ -417,7 +419,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     : payload.scope === 'global'
       ? ` \`[${t('dialogue.approval.scopeTag.global', lang)}]\``
       : '';
-  const context = { guild, payload, isEdit, listIcon, listLabel, scopeTag, lang };
+  const context = { guild, payload, snapshot: options.snapshot || null, isEdit, listIcon, listLabel, scopeTag, lang };
 
   const title = options.title || view.title(context);
   const heroLine = view.hero(context);
@@ -510,17 +512,19 @@ const DECIDED_APPROVAL_STYLES = Object.freeze({
  * @param {keyof typeof DECIDED_APPROVAL_STYLES} options.outcome - what happened
  * @param {string} options.approver - tag of the approver who decided
  * @param {string} [options.result=''] - why the executor refused, for 'returned'
+ * @param {object|null} [options.snapshot] - the character's roster snapshot,
+ *   for the class icon in front of its name
  * @param {string} options.lang - the approver's language
  * @returns {import('discord.js').EmbedBuilder} the decided card
  */
-function buildDecidedApprovalEmbed({ client, payload, outcome, approver, result = '', lang }) {
+function buildDecidedApprovalEmbed({ client, payload, outcome, approver, result = '', snapshot = null, lang }) {
   const { icon, color } = DECIDED_APPROVAL_STYLES[outcome];
   const guild = client.guilds.cache.get(payload.guildId) ?? { name: payload.guildId };
   const title = t('dialogue.approval.decided.title', lang, {
     title: t(`dialogue.approval.${payload.action === 'edit' ? 'titleEdit' : 'titleAdd'}`, lang, { icon, name: escapeLinkBrackets(payload.name) }),
     outcome: t(`dialogue.approval.decided.outcomes.${outcome}`, lang),
   });
-  const embed = buildListAddApprovalEmbed(guild, payload, { lang, title });
+  const embed = buildListAddApprovalEmbed(guild, payload, { lang, title, snapshot });
   const evidenceHeading = t('listView.evidence.attached', lang);
   return embed
     .setColor(color)

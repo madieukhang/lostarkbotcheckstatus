@@ -243,8 +243,8 @@ export default {
   },
   approval: {
     titleAdd: '{icon} 追加承認 · {name}', titleEdit: '{icon} 編集承認 · {name}',
-    heroAdd: '**{guild}** のメンバーが **{name}** を {list}{scope} へ追加したいそうですわ。',
-    heroEdit: '**{guild}** のメンバーが {list}{scope} の **{name}** を編集したいそうですの。',
+    heroAdd: '**{guild}** のメンバーが {name} を {list}{scope} へ追加したいそうですわ。',
+    heroEdit: '**{guild}** のメンバーが {list}{scope} の {name} を編集したいそうですの。',
     scopeTag: { local: 'サーバー内', global: 'グローバル' },
     fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: '理由', requestedBy: '申請者', requestId: 'Request ID', server: 'サーバー', total: '合計', trackedAlts: '追跡中の alt' },
     footer: '下のボタンで承認または却下してくださいませ。結果は申請者のチャンネルでお知らせしますわ。',

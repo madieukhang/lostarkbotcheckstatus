@@ -353,8 +353,8 @@ export default {
   approval: {
     titleAdd: '{icon} Add approval · {name}',
     titleEdit: '{icon} Edit approval · {name}',
-    heroAdd: 'A member of **{guild}** asked to add **{name}** to the {list}{scope}.',
-    heroEdit: 'A member of **{guild}** asked to edit **{name}** on the {list}{scope}.',
+    heroAdd: 'A member of **{guild}** asked to add {name} to the {list}{scope}.',
+    heroEdit: 'A member of **{guild}** asked to edit {name} on the {list}{scope}.',
     scopeTag: { local: 'Local', global: 'Global' },
     fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Reason', requestedBy: 'Requested by', requestId: 'Request ID', server: 'Server', total: 'Total', trackedAlts: 'Tracked alts' },
     footer: 'Approve or reject below. The requester hears back in their channel.',

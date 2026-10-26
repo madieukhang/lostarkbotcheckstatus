@@ -268,8 +268,8 @@ export default {
   },
   approval: {
     titleAdd: '{icon} Duyệt thêm · {name}', titleEdit: '{icon} Duyệt chỉnh sửa · {name}',
-    heroAdd: 'Một thành viên ở **{guild}** muốn thêm **{name}** vào {list}{scope}.',
-    heroEdit: 'Một thành viên ở **{guild}** muốn sửa **{name}** trong {list}{scope}.',
+    heroAdd: 'Một thành viên ở **{guild}** muốn thêm {name} vào {list}{scope}.',
+    heroEdit: 'Một thành viên ở **{guild}** muốn sửa {name} trong {list}{scope}.',
     scopeTag: { local: 'Nội bộ server', global: 'Toàn cục' },
     fields: { list: 'List', raid: 'Raid', scope: 'Scope', reason: 'Lý do', requestedBy: 'Người yêu cầu', requestId: 'Request ID', server: 'Server', total: 'Tổng cộng', trackedAlts: 'Alt đang track' },
     footer: 'Duyệt hoặc từ chối ở các nút bên dưới. Người yêu cầu sẽ nhận kết quả trong channel của họ.',

@@ -59,12 +59,15 @@ export async function findDuplicateEntry(model, payload) {
  * @param {Function} deps.syncApproverDmMessages - approver DM sync
  * @param {Function} deps.broadcastListChange - guild broadcast
  * @param {Function} deps.notifyRequesterAboutDecision - origin-channel decision notice
+ * @param {Function} [deps.findRosterSnapshot] - roster snapshot by name, for
+ *   the class icon on the decided card; without it the card has no icon
  * @returns {Function} handleListAddOverwriteButton(interaction)
  */
 export function createListAddOverwriteButtonHandler({
   syncApproverDmMessages,
   broadcastListChange,
   notifyRequesterAboutDecision,
+  findRosterSnapshot = async () => null,
   buildRosterCharactersFn = buildRosterCharacters,
 }) {
   return createApprovalDecisionHandler(async ({ interaction, action, requestId, lang, payload, claim }) => {
@@ -76,8 +79,9 @@ export function createListAddOverwriteButtonHandler({
     if (!isAddToHistory) {
       await claim.complete();
       // Keep the existing entry and explain the duplicate to the requester.
+      const snapshot = await findRosterSnapshot(payload.name);
       const buildKeptPayload = (targetLang) => buildDecidedApprovalPayload({
-        client: interaction.client, payload, outcome: 'kept', approver: interaction.user.tag, lang: targetLang,
+        client: interaction.client, payload, outcome: 'kept', approver: interaction.user.tag, snapshot, lang: targetLang,
       });
       await updateApprovers(buildKeptPayload);
 
@@ -144,8 +148,9 @@ export function createListAddOverwriteButtonHandler({
 
       console.log(`[list] Note added: ${payload.type} entry ${saved.name}`);
 
+      const snapshot = await findRosterSnapshot(payload.name);
       await updateApprovers(targetLang => buildDecidedApprovalPayload({
-        client: interaction.client, payload, outcome: 'noted', approver: interaction.user.tag, lang: targetLang,
+        client: interaction.client, payload, outcome: 'noted', approver: interaction.user.tag, snapshot, lang: targetLang,
       }));
 
       // Server-scoped entries announce to the owner server only.

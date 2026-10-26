@@ -102,6 +102,7 @@ function buildDecisionEmbed(payload, decision, lang, snapshot) {
  *   sendBulkApprovalToApprovers: Function,
  *   syncApproverDmMessages: Function,
  *   notifyRequesterAboutDecision: Function,
+ *   findRosterSnapshot: Function,
  * }}
  */
 export function createApprovalServices({
@@ -114,6 +115,19 @@ export function createApprovalServices({
   GuildConfigModel = GuildConfig,
   RosterSnapshotModel = RosterSnapshot,
 }) {
+  /**
+   * Read a character's roster snapshot for the class icon on its cards.
+   * Only the icon depends on it, so a failed read renders without one.
+   * @param {string} name - character name
+   * @returns {Promise<object|null>} the snapshot, or null
+   */
+  function findRosterSnapshot(name) {
+    return RosterSnapshotModel.findOne({ name })
+      .collation(CASE_INSENSITIVE_COLLATION)
+      .lean()
+      .catch(() => null);
+  }
+
   async function deliverApprovalDms({ approverIds, buildMessage, logPrefix }) {
     const deliveredApproverIds = [];
     const deliveredDmMessages = [];
@@ -177,11 +191,12 @@ export function createApprovalServices({
       return new ActionRowBuilder().addComponents(buttons);
     };
 
+    const snapshot = await findRosterSnapshot(payload.name);
     return deliverApprovalDms({
       approverIds,
       logPrefix: '[list]',
       buildMessage: (lang) => ({
-        embeds: [buildListAddApprovalEmbed(guild, payload, { ...options, lang })],
+        embeds: [buildListAddApprovalEmbed(guild, payload, { ...options, snapshot, lang })],
         components: [buildRow(lang)],
       }),
     });
@@ -320,12 +335,7 @@ export function createApprovalServices({
 
       const [lang, snapshot] = await Promise.all([
         getGuildLanguageFn(guild.id, { GuildConfigModel }),
-        // Only the class icon comes from the snapshot, so a failed read
-        // must not cost the requester their notice.
-        RosterSnapshotModel.findOne({ name: payload.name })
-          .collation(CASE_INSENSITIVE_COLLATION)
-          .lean()
-          .catch(() => null),
+        findRosterSnapshot(payload.name),
       ]);
       const decision = rejected
         ? (result?.isDuplicate ? 'duplicate' : 'rejected')
@@ -361,5 +371,6 @@ export function createApprovalServices({
     sendBulkApprovalToApprovers,
     syncApproverDmMessages,
     notifyRequesterAboutDecision,
+    findRosterSnapshot,
   };
 }

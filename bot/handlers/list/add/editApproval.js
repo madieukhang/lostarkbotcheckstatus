@@ -243,12 +243,13 @@ function broadcastApprovedEdit({ payload, existingEntry, broadcastListChange }) 
   }).catch((err) => console.warn('[list] Broadcast failed:', err.message));
 }
 
-function buildApprovedPayload(interaction, payload, targetLang) {
+function buildApprovedPayload(interaction, payload, snapshot, targetLang) {
   return buildDecidedApprovalPayload({
     client: interaction.client,
     payload,
     outcome: 'editApproved',
     approver: interaction.user.tag,
+    snapshot,
     lang: targetLang,
   });
 }
@@ -258,14 +259,16 @@ async function finishApprovedEdit({
   payload,
   syncApproverDmMessages,
   notifyRequesterAboutDecision,
+  findRosterSnapshot,
   lang,
   completeApproval,
 }) {
   await completeApproval();
-  await editPayload(interaction, buildApprovedPayload(interaction, payload, lang));
+  const snapshot = await findRosterSnapshot(payload.name);
+  await editPayload(interaction, buildApprovedPayload(interaction, payload, snapshot, lang));
   await syncApproverDmMessages(
     payload,
-    (targetLang) => buildApprovedPayload(interaction, payload, targetLang),
+    (targetLang) => buildApprovedPayload(interaction, payload, snapshot, targetLang),
     { excludeMessageId: interaction.message.id }
   );
   await notifyRequesterAboutDecision(payload, { ok: true }, false);
@@ -282,6 +285,8 @@ async function finishApprovedEdit({
  * @param {Function} args.syncApproverDmMessages - approver DM sync
  * @param {Function} args.broadcastListChange - guild broadcast
  * @param {Function} args.notifyRequesterAboutDecision - requester DM
+ * @param {Function} [args.findRosterSnapshot] - roster snapshot by name, for
+ *   the class icon on the decided card; without it the card has no icon
  * @param {Function} args.completeApproval - finalize the current approval lease
  * @param {Function} args.beforeWrite - verify lease ownership before each write
  * @returns {Promise<void>}
@@ -292,6 +297,7 @@ export async function handleApprovedEditRequest({
   syncApproverDmMessages,
   broadcastListChange,
   notifyRequesterAboutDecision,
+  findRosterSnapshot = async () => null,
   lang = 'en',
   completeApproval,
   beforeWrite,
@@ -306,7 +312,7 @@ export async function handleApprovedEditRequest({
     if (moved && moved.name === payload.name) {
       await finishApprovedEdit({
         interaction, payload, syncApproverDmMessages,
-        notifyRequesterAboutDecision, lang, completeApproval,
+        notifyRequesterAboutDecision, findRosterSnapshot, lang, completeApproval,
       });
       return;
     }
@@ -346,6 +352,7 @@ export async function handleApprovedEditRequest({
     completeApproval,
     syncApproverDmMessages,
     notifyRequesterAboutDecision,
+    findRosterSnapshot,
     lang,
   });
 }
