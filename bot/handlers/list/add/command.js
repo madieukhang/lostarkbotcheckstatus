@@ -155,9 +155,9 @@ export function createListAddCommandHandler({
           inline: false,
         }],
       }),
-      onQueued: () => editEmbed(
+      onQueued: (delivery) => editEmbed(
         interaction,
-        buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang })
+        buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang, snapshot: delivery.snapshot })
       ),
     });
     if (submission.status === 'queued') {

@@ -152,9 +152,9 @@ export function createQuickAddHandlers({ services }) {
           title: t('dialogue.quickAdd.deliveryFailed.title', lang),
           description: delivery.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
         }),
-        onQueued: () => editEmbed(
+        onQueued: (delivery) => editEmbed(
           interaction,
-          buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang }),
+          buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang, snapshot: delivery.snapshot }),
         ),
       });
     } catch (err) {

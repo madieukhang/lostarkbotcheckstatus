@@ -192,7 +192,7 @@ export function createApprovalServices({
     };
 
     const snapshot = await findRosterSnapshot(payload.name);
-    return deliverApprovalDms({
+    const delivery = await deliverApprovalDms({
       approverIds,
       logPrefix: '[list]',
       buildMessage: (lang) => ({
@@ -200,6 +200,8 @@ export function createApprovalServices({
         components: [buildRow(lang)],
       }),
     });
+    // The requester's sent-for-approval card reuses this read.
+    return { ...delivery, snapshot };
   }
 
   async function sendBulkApprovalToApprovers(guild, pending) {
