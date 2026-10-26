@@ -8,6 +8,20 @@ import RosterSnapshot from '../../models/RosterSnapshot.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
 import { parsePositiveNumber } from './parsers.js';
 
+/**
+ * Read one character's snapshot for the class icon on a card. Only the icon
+ * depends on it, so a failed read returns null instead of failing the card.
+ * @param {string} name - character name
+ * @param {{RosterSnapshotModel?: object}} [options]
+ * @returns {Promise<object|null>} the snapshot, or null
+ */
+export function findRosterSnapshot(name, { RosterSnapshotModel = RosterSnapshot } = {}) {
+  return RosterSnapshotModel.findOne({ name })
+    .collation(CASE_INSENSITIVE_COLLATION)
+    .lean()
+    .catch(() => null);
+}
+
 function normalizeCombatScore(value) {
   const text = String(value ?? '').trim();
   return text && text !== '?' ? text : '';

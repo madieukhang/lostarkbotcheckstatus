@@ -40,7 +40,7 @@ export function buildDuplicateReasonFields(existed, typedReason, lang, { forAppr
   ].filter(Boolean);
 }
 
-function buildComparisonMetadata(entry, lang, isRequest = false) {
+function buildComparisonMetadata(entry, lang, isRequest = false, statMap = new Map()) {
   const fallback = t('dialogue.broadcast.notAvailable', lang);
   const scope = t(`dialogue.approval.scopeTag.${entry.scope === 'server' ? 'local' : 'global'}`, lang);
   const by = isRequest
@@ -52,7 +52,7 @@ function buildComparisonMetadata(entry, lang, isRequest = false) {
   return {
     name: `${isRequest ? '🆕' : '📌'} ${t(`dialogue.approval.flow.${isRequest ? 'newRequest' : 'existingEntry'}`, lang)}`,
     value: [
-      `${formatLinkedCharacter(entry.name)} \`${scope}\``,
+      `${formatLinkedCharacter(entry.name, statMap.get(normalizeNameKey(entry.name)))} \`${scope}\``,
       `🗡️ ${t('dialogue.approval.flow.compareRaid', lang)}: ${raid}`,
       `👤 ${t('dialogue.approval.flow.compareBy', lang)}: ${truncateInlineText(by, 180) || fallback}`,
       !isRequest ? `🕐 ${t('dialogue.approval.flow.compareAdded', lang)}: ${relativeTime(entry.addedAt) || fallback}` : null,
@@ -66,23 +66,24 @@ function buildComparisonMetadata(entry, lang, isRequest = false) {
  * @param {object} existing Stored duplicate entry.
  * @param {object} payload Pending add request.
  * @param {string} lang Approver language.
+ * @param {Map<string, object>} [statMap] Roster snapshots by name key, for class icons.
  * @returns {import('discord.js').EmbedBuilder} Comparison with reasons before metadata.
  */
-export function buildDuplicateApprovalEmbed(existing, payload, lang = 'en') {
+export function buildDuplicateApprovalEmbed(existing, payload, lang = 'en', statMap = new Map()) {
   const isRosterMatch = normalizeNameKey(existing.name) !== normalizeNameKey(payload.name);
   return buildAlertEmbed({
     severity: AlertSeverity.WARNING,
     author: `⚠️ ${t('dialogue.approval.flow.duplicateTitle', lang)}`,
     description: t(`dialogue.approval.flow.${isRosterMatch ? 'duplicateRoster' : 'duplicateDirect'}`, lang, {
       icon: getListContext(payload.type).icon,
-      name: formatLinkedCharacter(payload.name),
-      matched: formatLinkedCharacter(existing.name),
+      name: formatLinkedCharacter(payload.name, statMap.get(normalizeNameKey(payload.name))),
+      matched: formatLinkedCharacter(existing.name, statMap.get(normalizeNameKey(existing.name))),
       list: t(`dialogue.broadcast.list.${payload.type}`, lang),
     }),
     fields: [
       ...buildDuplicateReasonFields(existing, payload.reason, lang, { forApproval: true }),
-      buildComparisonMetadata(existing, lang),
-      buildComparisonMetadata(payload, lang, true),
+      buildComparisonMetadata(existing, lang, false, statMap),
+      buildComparisonMetadata(payload, lang, true, statMap),
     ],
     footer: t('dialogue.approval.flow.comparisonFooter', lang),
     timestamp: false,

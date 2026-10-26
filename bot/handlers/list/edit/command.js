@@ -39,6 +39,7 @@ import {
 import { applyListEditNow } from './applyNow.js';
 import { sendListEditApprovalRequest } from './approvalRequest.js';
 import { findTrustedEditConflict } from './trustedGuard.js';
+import { findRosterSnapshot } from '../../../services/roster/index.js';
 import {
   buildListEditPlan,
   buildScopeConflictQuery,
@@ -211,12 +212,13 @@ async function rejectInvalidListEditState({
   if (!trustedCheck) return false;
 
   const isSelf = normalizeNameKey(trustedCheck.name) === normalizeNameKey(existing.name);
+  const record = await findRosterSnapshot(existing.name);
   await editEmbed(
     interaction,
     buildTrustedBlockEmbed(
       existing.name,
       trustedCheck.reason,
-      isSelf ? { lang } : { via: trustedCheck.name, lang }
+      isSelf ? { lang, record } : { via: trustedCheck.name, lang, record }
     )
   );
   return true;

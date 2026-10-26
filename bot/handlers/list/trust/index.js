@@ -1,10 +1,9 @@
 import { connectDB } from '../../../db.js';
-import { rosterUrl } from '../../../utils/rosterLink.js';
 import Blacklist from '../../../models/Blacklist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
-import { buildRosterCharacters } from '../../../services/roster/index.js';
+import { buildRosterCharacters, findRosterSnapshot } from '../../../services/roster/index.js';
 import {
   normalizeCharacterName,
   normalizeNameKey,
@@ -20,12 +19,13 @@ import { deferReply, editAlert, editEmbed, replyAlert } from '../../../utils/int
 import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
+  formatLinkedCharacter,
   renderTrackedAltsField,
   statMapFromRosterCharacters,
 } from '../trackedAltsRender.js';
 import { isOfficerOrSenior } from '../helpers.js';
 
-function buildRemovedTrustEmbed(deleted, interaction, lang) {
+function buildRemovedTrustEmbed(deleted, interaction, lang, record) {
   const trustedSince = deleted.createdAt
     ? relativeTime(deleted.createdAt)
     : t('dialogue.trust.removed.unknown', lang);
@@ -36,7 +36,7 @@ function buildRemovedTrustEmbed(deleted, interaction, lang) {
     title: `🛡️ ${t('dialogue.trust.removed.title', lang, { name: deleted.name })}`,
     description: t('dialogue.trust.removed.description', lang, { name: deleted.name }),
     fields: [
-      { name: `🧬 ${t('dialogue.trust.removed.character', lang)}`, value: `[${deleted.name}](${rosterUrl(deleted.name)})`, inline: true },
+      { name: `🧬 ${t('dialogue.trust.removed.character', lang)}`, value: formatLinkedCharacter(deleted.name, record, { bold: false }), inline: true },
       { name: `📝 ${t('dialogue.trust.removed.reason', lang)}`, value: (deleted.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false },
       { name: `🕐 ${t('dialogue.trust.removed.since', lang)}`, value: trustedSince, inline: true },
       { name: `👤 ${t('dialogue.trust.removed.removedBy', lang)}`, value: interaction.user.tag, inline: false },
@@ -55,7 +55,7 @@ async function handleTrustRemoval(interaction, name, lang) {
     });
     return;
   }
-  await editEmbed(interaction, buildRemovedTrustEmbed(deleted, interaction, lang));
+  await editEmbed(interaction, buildRemovedTrustEmbed(deleted, interaction, lang, await findRosterSnapshot(deleted.name)));
   console.log(`[list] Trusted user removed: ${deleted.name} by ${interaction.user.tag}`);
 }
 
@@ -123,8 +123,13 @@ async function persistTrustedRoster({ existing, name, reason, allCharacters, ros
 }
 
 function buildTrustSuccessFields({ existing, name, reason, allCharacters, rosterResult, rosterKept, interaction, lang }) {
+  const statMap = statMapFromRosterCharacters(rosterResult?.rosterCharacters || []);
   const fields = [...padInlineRow([
-    { name: `🧬 ${t('dialogue.trust.success.character', lang)}`, value: `[${name}](${rosterUrl(name)})`, inline: true },
+    {
+      name: `🧬 ${t('dialogue.trust.success.character', lang)}`,
+      value: formatLinkedCharacter(name, statMap.get(normalizeNameKey(name)), { bold: false }),
+      inline: true,
+    },
     { name: `👤 ${t(`dialogue.trust.success.${existing ? 'refreshedBy' : 'addedBy'}`, lang)}`, value: interaction.user.tag, inline: true },
   ])];
   fields.push({
@@ -135,7 +140,7 @@ function buildTrustSuccessFields({ existing, name, reason, allCharacters, roster
   const altsField = renderTrackedAltsField({
     names: allCharacters,
     primaryName: name,
-    statMap: statMapFromRosterCharacters(rosterResult?.rosterCharacters || []),
+    statMap,
     emptySentinel: `_${t('dialogue.trust.success.onlyCharacter', lang)}_`,
     label: `🧬 ${t('dialogue.trust.success.trackedAlts', lang)}`,
     overflowTemplate: t('dialogue.broadcast.more', lang),

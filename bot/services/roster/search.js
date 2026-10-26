@@ -9,7 +9,7 @@
  */
 
 import config from '../../config.js';
-import { getClassName } from '../../models/Class.js';
+import { getClassEmoji, getClassName } from '../../models/Class.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
@@ -282,6 +282,9 @@ export async function inferHiddenRosterItemLevel(name, options = {}) {
 
 export function formatSuggestionLines(suggestions) {
   return suggestions
-    .map((s) => `[${s.name}](${rosterUrl(s.name)}) · \`${Number(s.itemLevel).toFixed(2)}\` · ${getClassName(s.cls)}`)
+    .map((s) => {
+      const className = getClassName(s.cls);
+      return `[${s.name}](${rosterUrl(s.name)}) · \`${Number(s.itemLevel).toFixed(2)}\` · ${getClassEmoji(className) || className}`;
+    })
     .join('\n');
 }

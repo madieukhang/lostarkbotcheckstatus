@@ -20,6 +20,7 @@ import { handleApprovedEditRequest } from './editApproval.js';
 import { createApprovalMessageUpdater } from '../services/approvals.js';
 import { buildDuplicateApprovalEmbed } from '../duplicate-ui.js';
 import { buildNoteHistoryButton } from '../notes/entryNotes.js';
+import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 
 /**
  * Build the Approve / Reject handler for single add and edit requests.
@@ -31,7 +32,8 @@ import { buildNoteHistoryButton } from '../notes/entryNotes.js';
  * @param {Function} deps.notifyRequesterAboutDecision - notify the origin channel
  *   with the final outcome (approved / rejected / edited)
  * @param {Function} [deps.findRosterSnapshot] - roster snapshot by name, for
- *   the class icon on the decided card; without it the card has no icon
+ *   the class icons on the duplicate and decided cards; without it they
+ *   have none
  * @returns {Function} handleListAddApprovalButton(interaction)
  */
 export function createListAddApprovalButtonHandler({
@@ -98,6 +100,10 @@ export function createListAddApprovalButtonHandler({
       // Duplicate found · show the comparison with the Add to history option
       if (!result.ok && result.isDuplicate) {
         const existing = result.existingEntry;
+        const statMap = statMapFromRosterCharacters(await Promise.all([
+          findRosterSnapshot(payload.name),
+          findRosterSnapshot(existing.name),
+        ]));
         const buildDuplicatePayload = (targetLang) => {
           // The custom id keeps its old name: the approval lease stores the
           // action string, and requests claimed under it must still resume.
@@ -108,7 +114,7 @@ export function createListAddApprovalButtonHandler({
           ].filter(Boolean));
           return {
             content: null,
-            embeds: [buildDuplicateApprovalEmbed(existing, payload, targetLang)],
+            embeds: [buildDuplicateApprovalEmbed(existing, payload, targetLang, statMap)],
             components: [overwriteRow],
           };
         };

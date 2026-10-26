@@ -16,7 +16,6 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
-import { rosterUrl } from '../../utils/rosterLink.js';
 import { BLANK_FIELD_VALUE, COLORS, ICONS } from '../../utils/ui.js';
 import { escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
@@ -97,9 +96,16 @@ export function parseListEntryRef(raw) {
  * Build a standardized embed for trusted user block messages.
  * Wraps the shared buildAlertEmbed with severity:'trusted' so trusted
  * blocks have consistent styling with the rest of the bot's alerts.
+ * @param {string} name - the blocked character
+ * @param {string} reason - why the Trusted entry exists
+ * @param {object} [options]
+ * @param {string} [options.via] - the trusted roster name that caused the block
+ * @param {string} [options.lang='en'] - card language
+ * @param {object|null} [options.record] - the blocked character's roster
+ *   record or snapshot, for its class icon
+ * @returns {import('discord.js').EmbedBuilder} the block card
  */
-export function buildTrustedBlockEmbed(name, reason, { via, lang = 'en' } = {}) {
-  const rosterLink = rosterUrl(name);
+export function buildTrustedBlockEmbed(name, reason, { via, lang = 'en', record = null } = {}) {
   const description = t(`dialogue.trustedBlock.${via ? 'via' : 'direct'}`, lang, { name, via });
 
   return buildAlertEmbed({
@@ -107,7 +113,7 @@ export function buildTrustedBlockEmbed(name, reason, { via, lang = 'en' } = {}) 
     title: t('dialogue.trustedBlock.title', lang),
     description,
     fields: [
-      { name: `👤 ${t('dialogue.trustedBlock.name', lang)}`, value: `[${name}](${rosterLink})`, inline: true },
+      { name: `👤 ${t('dialogue.trustedBlock.name', lang)}`, value: formatLinkedCharacter(name, record, { bold: false }), inline: true },
       // Reason is prose, so it takes a full row instead of a third of the card.
       { name: `📝 ${t('dialogue.trustedBlock.reason', lang)}`, value: reason || t('dialogue.broadcast.notAvailable', lang), inline: false },
     ],

@@ -335,7 +335,10 @@ export async function handleApprovedEditRequest({
     if (trustedNow) {
       await closeApprovalWithAlert({
         interaction, lang, status: 'Blocked', completeApproval,
-        embed: buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason, { lang }),
+        embed: buildTrustedBlockEmbed(existingEntry.name, trustedNow.reason, {
+          lang,
+          record: await findRosterSnapshot(existingEntry.name),
+        }),
       });
       return;
     }

@@ -38,6 +38,7 @@ import {
   fetchGuildMembers,
   detectAltsViaStronghold,
   buildRosterCharacters,
+  findRosterSnapshot,
 } from '../../../services/roster/index.js';
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../../utils/scanPermissions.js';
@@ -861,7 +862,7 @@ export function createEnrichHandlers({ services }) {
     const trusted = await findTrustedEditConflict(currentEntry, altNames);
     if (trusted) {
       await editEmbed(interaction, buildTrustedBlockEmbed(currentEntry.name, trusted.reason, {
-        via: trusted.name, lang,
+        via: trusted.name, lang, record: await findRosterSnapshot(currentEntry.name),
       }), { components: [] });
       clearEnrichSession(sessionId);
       return;

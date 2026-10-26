@@ -30,6 +30,7 @@ for (const protectedAlt of [true, false]) {
     });
     t.after(async () => { clearEnrichSession(session.sessionId); clearUserLanguageCache(); await disconnectDB(); });
     t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+    t.mock.method(RosterSnapshot, 'findOne', () => ({ collation() { return this; }, lean: async () => null }));
     t.mock.method(Blacklist, 'findById', () => ({ lean: async () => ({ name: 'Original', allCharacters: ['Original'] }) }));
     t.mock.method(TrustedUser, 'findOne', query => {
       assert.match(JSON.stringify(query), /Trustedalt/);
@@ -106,6 +107,7 @@ test('owner cannot add a Trusted character through additional_names', async t =>
   let trustedReads = 0;
   let write;
   t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  t.mock.method(RosterSnapshot, 'findOne', () => ({ collation() { return this; }, lean: async () => null }));
   t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ defaultBlacklistScope: 'global' }) }));
   t.mock.method(Blacklist, 'find', () => ({ collation: async () => [entry] }));
   t.mock.method(Whitelist, 'findOne', () => ({ collation: async () => null }));

@@ -22,6 +22,7 @@ import {
   buildRosterCharacters,
   fetchCharacterMeta,
   fetchNameSuggestions,
+  findRosterSnapshot,
   upsertRosterSnapshots,
 } from '../../../services/roster/index.js';
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
@@ -106,7 +107,7 @@ export function buildListAddSuccessHeader({
 // exported for callers and tests that import it from here.
 export { buildListEntryRostersField as buildListAddTrackedRostersField } from '../entryCardFields.js';
 
-function buildTrustedRejection(name, trustedEntry, lang, { viaRoster = false } = {}) {
+function buildTrustedRejection(name, trustedEntry, lang, { viaRoster = false, record = null } = {}) {
   const trustedName = trustedEntry.name;
   const via = normalizeNameKey(trustedName) === normalizeNameKey(name)
     ? {}
@@ -116,7 +117,7 @@ function buildTrustedRejection(name, trustedEntry, lang, { viaRoster = false } =
     content: viaRoster
       ? t('dialogue.trustedBlock.via', lang, { name, via: trustedName })
       : t('dialogue.trustedBlock.direct', lang, { name }),
-    embeds: [buildTrustedBlockEmbed(name, trustedEntry.reason, { ...via, lang })],
+    embeds: [buildTrustedBlockEmbed(name, trustedEntry.reason, { ...via, lang, record })],
   };
 }
 
@@ -203,7 +204,18 @@ async function saveRosterSnapshotsBestEffort(rosterCharacters, name) {
   }
 }
 
-function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang }) {
+/**
+ * Refuse a character below the tracked item level floor.
+ * @param {object} options
+ * @param {string} options.name - character name
+ * @param {number|null} options.targetItemLevel - its item level, null when unknown
+ * @param {string} options.labelCap - target list label
+ * @param {string} options.lang - viewer language
+ * @param {object|null} [options.record] - the character's roster record, for
+ *   its class icon
+ * @returns {object|null} the rejection result, or null when the level passes
+ */
+export function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang, record = null }) {
   if (targetItemLevel === null || targetItemLevel >= MIN_TRACKED_ITEM_LEVEL) return null;
   const formattedLevel = targetItemLevel.toFixed(2);
   return {
@@ -214,7 +226,7 @@ function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang }) {
       title: t('dialogue.listAdd.itemLevel.title', lang),
       description: t('dialogue.listAdd.itemLevel.description', lang, { name }),
       fields: [
-        { name: `🎯 ${t('dialogue.listAdd.itemLevel.character', lang)}`, value: `[${name}](${rosterUrl(name)})`, inline: true },
+        { name: `🎯 ${t('dialogue.listAdd.itemLevel.character', lang)}`, value: formatLinkedCharacter(name, record, { bold: false }), inline: true },
         { name: `📊 ${t('dialogue.listAdd.itemLevel.itemLevel', lang)}`, value: `\`${formattedLevel}\``, inline: true },
         { name: `📉 ${t('dialogue.listAdd.itemLevel.minimum', lang)}`, value: `\`${MIN_TRACKED_ITEM_LEVEL.toFixed(2)}\``, inline: true },
         { name: `📒 ${t('dialogue.listAdd.itemLevel.targetList', lang)}`, value: labelCap, inline: true },
@@ -566,7 +578,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
 
     const trustedExact = await findTrustedEntry(name);
     if (trustedExact) {
-      return buildTrustedRejection(name, trustedExact, lang);
+      return buildTrustedRejection(name, trustedExact, lang, { record: await findRosterSnapshot(name) });
     }
 
     const roster = await buildRosterCharacters(name, { hiddenRosterFallback: true });
@@ -577,11 +589,13 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     if (unusableRoster) return unusableRoster;
 
     await saveRosterSnapshotsBestEffort(roster.rosterCharacters, name);
+    const record = statMapFromRosterCharacters(roster.rosterCharacters).get(normalizeNameKey(name)) || null;
     const itemLevelRejection = buildItemLevelRejection({
       name,
       targetItemLevel: roster.targetItemLevel,
       labelCap,
       lang,
+      record,
     });
     if (itemLevelRejection) return itemLevelRejection;
 
@@ -589,7 +603,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
       ? await findTrustedEntry(roster.allCharacters)
       : null;
     if (trustedAlt) {
-      return buildTrustedRejection(name, trustedAlt, lang, { viaRoster: true });
+      return buildTrustedRejection(name, trustedAlt, lang, { viaRoster: true, record });
     }
 
     const entryScope = resolveEntryScope(payload);

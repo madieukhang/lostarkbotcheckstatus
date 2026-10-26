@@ -18,6 +18,7 @@ export {
 } from './buildRosterCharacters.js';
 
 export {
+  findRosterSnapshot,
   upsertRosterSnapshots,
 } from './rosterSnapshots.js';
 

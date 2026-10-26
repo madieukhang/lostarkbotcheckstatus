@@ -27,7 +27,7 @@ import { AlertSeverity, buildAlertEmbed } from '../../../utils/alertEmbed.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
+import { findRosterSnapshot as findSnapshot } from '../../../services/roster/rosterSnapshots.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
@@ -115,18 +115,7 @@ export function createApprovalServices({
   GuildConfigModel = GuildConfig,
   RosterSnapshotModel = RosterSnapshot,
 }) {
-  /**
-   * Read a character's roster snapshot for the class icon on its cards.
-   * Only the icon depends on it, so a failed read renders without one.
-   * @param {string} name - character name
-   * @returns {Promise<object|null>} the snapshot, or null
-   */
-  function findRosterSnapshot(name) {
-    return RosterSnapshotModel.findOne({ name })
-      .collation(CASE_INSENSITIVE_COLLATION)
-      .lean()
-      .catch(() => null);
-  }
+  const findRosterSnapshot = (name) => findSnapshot(name, { RosterSnapshotModel });
 
   async function deliverApprovalDms({ approverIds, buildMessage, logPrefix }) {
     const deliveredApproverIds = [];

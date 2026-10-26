@@ -10,7 +10,7 @@
 
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
-import { normalizeCharacterName } from '../../../utils/names.js';
+import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
@@ -26,6 +26,7 @@ import { findTrustedEditConflict } from '../edit/trustedGuard.js';
 import { createApprovalDecisionHandler, handleApprovalClaimError } from '../services/approvalInteraction.js';
 import { createApprovalMessageUpdater } from '../services/approvals.js';
 import { appendEntryNote, listAddedAlts } from '../notes/appendNote.js';
+import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 
 function buildDuplicateLookupQuery(payload) {
   const nameMatch = buildNameRosterQuery(normalizeCharacterName(payload.name));
@@ -124,7 +125,10 @@ export function createListAddOverwriteButtonHandler({
         await claim.complete();
         await updateApprovers(targetLang => ({
           content: null,
-          embeds: [buildTrustedBlockEmbed(typedName, trustedNow.reason, { lang: targetLang })],
+          embeds: [buildTrustedBlockEmbed(typedName, trustedNow.reason, {
+            lang: targetLang,
+            record: statMapFromRosterCharacters(rosterResult?.rosterCharacters).get(normalizeNameKey(typedName)),
+          })],
           components: [buildApprovalResultRow('Blocked', targetLang)],
         }));
         await notifyRequesterAboutDecision(payload, { ok: false }, false);
