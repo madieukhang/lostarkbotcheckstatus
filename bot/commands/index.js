@@ -97,12 +97,6 @@ function listCommand(name) {
             .setMaxLength(100)
             .setAutocomplete(true);
         })
-        .addStringOption((opt) =>
-          opt
-            .setName('logs')
-            .setDescription(commandText('list.subcommands.add.options.logs'))
-            .setRequired(false)
-        )
         .addAttachmentOption((opt) =>
           opt
             .setName('image')
@@ -155,12 +149,6 @@ function listCommand(name) {
             .setMaxLength(100)
             .setAutocomplete(true);
         })
-        .addStringOption((opt) =>
-          opt
-            .setName('logs')
-            .setDescription(commandText('list.subcommands.edit.options.logs'))
-            .setRequired(false)
-        )
         .addAttachmentOption((opt) =>
           opt
             .setName('image')

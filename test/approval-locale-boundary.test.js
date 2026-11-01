@@ -73,6 +73,7 @@ test('single approval delivery localizes each DM and skips bots or failed recipi
       'approver-failed',
     ],
     RosterSnapshotModel: { findOne: () => ({ collation() { return this; }, lean: async () => null }) },
+    buildRosterCharactersFn: async () => ({ hasValidRoster: false }),
   });
 
   const result = await services.sendListAddApprovalToApprovers(

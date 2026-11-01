@@ -27,7 +27,11 @@ import { AlertSeverity, buildAlertEmbed } from '../../../utils/alertEmbed.js';
 import GuildConfig from '../../../models/GuildConfig.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { findRosterSnapshot as findSnapshot } from '../../../services/roster/rosterSnapshots.js';
+import {
+  findRosterSnapshot as findSnapshot,
+  upsertRosterSnapshots,
+} from '../../../services/roster/rosterSnapshots.js';
+import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
@@ -45,6 +49,9 @@ export function createApprovalMessageUpdater({ interaction, payload, lang, syncA
     });
   };
 }
+
+// The add is waiting on this read, so it gets a short budget.
+const SUBMIT_ROSTER_READ_TIMEOUT_MS = 8000;
 
 const DECISION_SEVERITY = Object.freeze({
   approved: AlertSeverity.SUCCESS,
@@ -114,8 +121,28 @@ export function createApprovalServices({
   UserPreferenceModel = UserPreference,
   GuildConfigModel = GuildConfig,
   RosterSnapshotModel = RosterSnapshot,
+  buildRosterCharactersFn = buildRosterCharacters,
+  upsertRosterSnapshotsFn = upsertRosterSnapshots,
 }) {
   const findRosterSnapshot = (name) => findSnapshot(name, { RosterSnapshotModel });
+
+  // A name the bot never looked up has no saved class. One bounded roster
+  // read at submit gives the requester card and the approver DMs its class
+  // icon and saves it for later cards; a failed or slow read only drops the icon.
+  async function findOrReadRosterSnapshot(name) {
+    const saved = await findRosterSnapshot(name);
+    if (saved) return saved;
+    try {
+      const roster = await buildRosterCharactersFn(name, { timeoutMs: SUBMIT_ROSTER_READ_TIMEOUT_MS });
+      if (!roster?.hasValidRoster) return null;
+      await upsertRosterSnapshotsFn(roster.rosterCharacters, name);
+      const key = name.toLowerCase();
+      return roster.rosterCharacters.find((record) => String(record?.name || '').toLowerCase() === key) || null;
+    } catch (err) {
+      console.warn('[list] Roster read for the approval card failed (non-fatal):', err.message);
+      return null;
+    }
+  }
 
   async function deliverApprovalDms({ approverIds, buildMessage, logPrefix }) {
     const deliveredApproverIds = [];
@@ -180,7 +207,7 @@ export function createApprovalServices({
       return new ActionRowBuilder().addComponents(buttons);
     };
 
-    const snapshot = await findRosterSnapshot(payload.name);
+    const snapshot = await findOrReadRosterSnapshot(payload.name);
     const delivery = await deliverApprovalDms({
       approverIds,
       logPrefix: '[list]',

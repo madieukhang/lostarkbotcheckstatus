@@ -39,35 +39,70 @@ function snapshotModel(lean) {
 test('the approver DM shows the class of the requested character', async () => {
   const sent = [];
   const RosterSnapshotModel = snapshotModel(async () => ({ name: 'Burgerxucxich', classId: 'berserker' }));
+  const rosterReads = [];
   const services = createApprovalServices({
     client: { users: { fetch: async (id) => ({ id, send: async (message) => { sent.push(message); return { channelId: 'dm', id: 'msg' }; } }) } },
     getUserLanguageFn: async () => 'en',
     getApproverRecipientIdsFn: () => ['approver'],
     RosterSnapshotModel,
+    buildRosterCharactersFn: async (name) => { rosterReads.push(name); return { hasValidRoster: false }; },
   });
 
   const result = await services.sendListAddApprovalToApprovers({ id: 'origin-guild', name: 'Guild' }, PAYLOAD);
 
   assert.equal(result.success, true);
+  assert.equal(rosterReads.length, 0, 'a saved snapshot needs no roster read');
   assert.deepEqual(RosterSnapshotModel.calls, [{ name: 'Burgerxucxich' }]);
   assert.ok(sent[0].embeds[0].toJSON().description.includes(CLASSED_NAME));
   // The requester's own copy reuses this read instead of a second one.
   assert.deepEqual(result.snapshot, { name: 'Burgerxucxich', classId: 'berserker' });
 });
 
-test('the approver DM still goes out when the snapshot read fails', async () => {
+test('the approver DM still goes out when the snapshot read and the roster read both fail', async () => {
   const sent = [];
   const services = createApprovalServices({
     client: { users: { fetch: async (id) => ({ id, send: async (message) => { sent.push(message); return { channelId: 'dm', id: 'msg' }; } }) } },
     getUserLanguageFn: async () => 'en',
     getApproverRecipientIdsFn: () => ['approver'],
     RosterSnapshotModel: snapshotModel(async () => { throw new Error('db down'); }),
+    buildRosterCharactersFn: async () => { throw new Error('bible down'); },
   });
 
   const result = await services.sendListAddApprovalToApprovers({ id: 'origin-guild', name: 'Guild' }, PAYLOAD);
 
   assert.equal(result.success, true);
   assert.ok(sent[0].embeds[0].toJSON().description.includes('**[Burgerxucxich]('));
+  assert.ok(!sent[0].embeds[0].toJSON().description.includes(CLASSED_NAME));
+});
+
+test('a name never looked up gets its class from one roster read at submit, saved for later cards', async () => {
+  const sent = [];
+  const rosterReads = [];
+  const saved = [];
+  const roster = {
+    hasValidRoster: true,
+    rosterCharacters: [
+      { name: 'Altbard', classId: 'bard', itemLevel: 1700 },
+      { name: 'Burgerxucxich', classId: 'berserker', itemLevel: 1720 },
+    ],
+  };
+  const services = createApprovalServices({
+    client: { users: { fetch: async (id) => ({ id, send: async (message) => { sent.push(message); return { channelId: 'dm', id: 'msg' }; } }) } },
+    getUserLanguageFn: async () => 'en',
+    getApproverRecipientIdsFn: () => ['approver'],
+    RosterSnapshotModel: snapshotModel(async () => null),
+    buildRosterCharactersFn: async (name, options) => { rosterReads.push({ name, options }); return roster; },
+    upsertRosterSnapshotsFn: async (characters, rosterName) => { saved.push({ characters, rosterName }); },
+  });
+
+  const result = await services.sendListAddApprovalToApprovers({ id: 'origin-guild', name: 'Guild' }, { ...PAYLOAD, name: 'burgerxucxich' });
+
+  assert.equal(result.success, true);
+  assert.equal(rosterReads.length, 1);
+  assert.ok(rosterReads[0].options.timeoutMs > 0, 'the submit read is bounded');
+  assert.deepEqual(saved, [{ characters: roster.rosterCharacters, rosterName: 'burgerxucxich' }]);
+  assert.ok(sent[0].embeds[0].toJSON().description.includes('Berserker **['), sent[0].embeds[0].toJSON().description);
+  assert.equal(result.snapshot.classId, 'berserker');
 });
 
 function stubEnglishViewer(t) {

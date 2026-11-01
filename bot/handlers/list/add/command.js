@@ -58,7 +58,6 @@ export function createListAddCommandHandler({
       reason: interaction.options.getString('reason', true).trim(),
       raidInput,
       raid: resolveListAddRaidLabel(type, raidInput),
-      logsUrl: interaction.options.getString('logs') ?? '',
       image: interaction.options.getAttachment('image'),
       inputScope: interaction.options.getString('scope') || '',
     };
@@ -118,7 +117,6 @@ export function createListAddCommandHandler({
       name: request.name,
       reason: request.reason,
       raid: request.raid,
-      logsUrl: request.logsUrl,
       imageUrl: rehostResult?.freshUrl || request.image?.url || '',
       imageMessageId: rehostResult?.messageId || '',
       imageChannelId: rehostResult?.channelId || '',

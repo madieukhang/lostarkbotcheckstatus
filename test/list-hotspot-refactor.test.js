@@ -52,7 +52,7 @@ function makeEntry(overrides = {}) {
 }
 
 test('immediate list move keeps blacklist scope boundaries and permanent image references', () => {
-  const existing = makeEntry();
+  const existing = makeEntry({ logsUrl: 'https://lostark.bible/logs/old' });
   assert.deepEqual(buildMovePreflightQuery(existing, 'white', 'guild-1'), {
     $or: [{ name: 'Mainchar' }, { allCharacters: 'Mainchar' }],
   });
@@ -68,9 +68,7 @@ test('immediate list move keeps blacklist scope boundaries and permanent image r
     editGuildId: 'guild-1',
     editGuildDefaultScope: 'global',
     newReason: 'New reason',
-    newRaid: '',
-    newLogs: '',
-    newImageUrl: 'https://cdn.example/new.png',
+    newRaid: '',    newImageUrl: 'https://cdn.example/new.png',
     newImageRehost: { messageId: 'new-message', channelId: 'new-channel' },
     newScope: 'server',
     additionalNamesParsed: { added: ['Manualalt'] },
@@ -80,6 +78,8 @@ test('immediate list move keeps blacklist scope boundaries and permanent image r
   assert.equal(moved.guildId, 'guild-1');
   assert.equal(moved.imageUrl, '');
   assert.equal(moved.imageMessageId, 'new-message');
+  // Edits no longer take a logs link; a move keeps the stored one.
+  assert.equal(moved.logsUrl, 'https://lostark.bible/logs/old');
   assert.deepEqual(moved.allCharacters, ['Knownalt', 'Manualalt']);
   assert.equal(moved.enrichmentSource, 'manual');
   assert.ok(moved.enrichedAt instanceof Date);
@@ -88,9 +88,7 @@ test('immediate list move keeps blacklist scope boundaries and permanent image r
 test('immediate in-place plan keeps image and scope fields atomic while appending alts', () => {
   const { updateFields, updateOps } = buildInPlaceUpdatePlan({
     newReason: 'New reason',
-    newRaid: '',
-    newLogs: '',
-    newImageUrl: 'https://cdn.example/new.png',
+    newRaid: '',    newImageUrl: 'https://cdn.example/new.png',
     newImageRehost: null,
     isScopeChange: true,
     targetScope: 'server',

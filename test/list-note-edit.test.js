@@ -15,7 +15,7 @@ const existing = { _id: 'a'.repeat(24), name: 'Target', reason: 'Second', raid: 
 test('both move paths carry the notes with the new reason on the latest note', () => {
   const moved = buildMovedEntryData({
     existing, targetType: 'white', editGuildId: 'g', editGuildDefaultScope: 'global',
-    newReason: 'Edited', newRaid: '', newLogs: '', newImageUrl: '', newImageRehost: null, newScope: '',
+    newReason: 'Edited', newRaid: '', newImageUrl: '', newImageRehost: null, newScope: '',
     additionalNamesParsed: { added: [] },
   });
   assert.deepEqual(moved.notes.map(note => note.reason), ['First', 'Edited']);

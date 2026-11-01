@@ -28,7 +28,7 @@ import {
  * @param {object} args.existing - the entry being edited
  * @param {'black'|'white'|'watch'} args.currentType
  * @param {string} args.targetType - destination list type
- *   · plus the rewritten payload fields (newReason, newRaid, newLogs,
+ *   · plus the rewritten payload fields (newReason, newRaid,
  *   newScope, newImage, additional_names, etc.)
  * @returns {Promise<void>}
  */
@@ -40,7 +40,6 @@ export async function sendListEditApprovalRequest({
   targetType,
   newReason,
   newRaid,
-  newLogs,
   newImageUrl,
   newImageRehost,
   newScope,
@@ -71,7 +70,7 @@ export async function sendListEditApprovalRequest({
     name: existing.name,
     reason: newReason || existing.reason,
     raid: newRaid || existing.raid,
-    logsUrl: newLogs || existing.logsUrl || '',
+    logsUrl: existing.logsUrl || '',
     additionalNames,
     ...editImageFields,
     // Persist the scope that approval routing evaluated, including list moves.
