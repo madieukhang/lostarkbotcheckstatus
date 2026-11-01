@@ -55,6 +55,22 @@ const CLS = {
 
 // ─── Resolver helpers ─────────────────────────────────────────────────────────
 
+function classTokens(className) {
+  return String(className || '').toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Modifier names on the inner status element, e.g. ["maintenance"].
+ * @param {string} className - Full className of the status element
+ * @returns {string[]}
+ */
+function statusModifiers(className) {
+  const prefix = `${CLS.STATUS_DIV.toLowerCase()}--`;
+  return classTokens(className)
+    .filter((token) => token.startsWith(prefix))
+    .map((token) => token.slice(prefix.length));
+}
+
 /**
  * Determine status from the inner status <div> className string.
  * Only the modifier suffix determines the state; the wrapper has no modifier.
@@ -63,26 +79,22 @@ const CLS = {
  * @returns {string}
  */
 function resolveStatusFromClass(className) {
-  const classTokens = String(className || '').toLowerCase().split(/\s+/).filter(Boolean);
   const baseClass = CLS.STATUS_DIV.toLowerCase();
-  const modifiers = new Set(
-    classTokens.filter((token) => token.startsWith(`${baseClass}--`))
-  );
+  const modifiers = new Set(statusModifiers(className));
 
   const rules = [
     {
-      matches: () => ['good', 'busy', 'full']
-        .some((modifier) => modifiers.has(`${baseClass}--${modifier}`)),
+      matches: () => ['good', 'busy', 'full'].some((modifier) => modifiers.has(modifier)),
       status: STATUS.ONLINE,
     },
     {
-      matches: () => modifiers.has(`${baseClass}--maintenance`),
+      matches: () => modifiers.has('maintenance'),
       status: STATUS.MAINTENANCE,
     },
     // The live page represents offline with the base status class and no
     // modifier. An unfamiliar modifier is schema drift, not proof of offline.
     {
-      matches: () => classTokens.includes(baseClass) && modifiers.size === 0,
+      matches: () => classTokens(className).includes(baseClass) && modifiers.size === 0,
       status: STATUS.OFFLINE,
     },
   ];
@@ -141,10 +153,7 @@ export function parseServerStatuses(html, serverNames, { logger = console } = {}
     // token excludes the similarly named "-wrapper" element.
     const statusEl = row.querySelector(`.${CLS.STATUS_DIV}`);
     const classStatus = statusEl ? resolveStatusFromClass(statusEl.className) : STATUS.UNKNOWN;
-    const modifiers = String(statusEl?.className || '')
-      .split(/\s+/)
-      .filter((token) => token.includes('--'))
-      .map((token) => token.slice(token.indexOf('--')));
+    const modifiers = statusModifiers(statusEl?.className).map((modifier) => `--${modifier}`);
     // The wrench icon is a class modifier, and the aria label may say only
     // online or offline, so a maintenance class wins. Otherwise a definitive
     // label wins, and an unfamiliar phrase falls through to the class.

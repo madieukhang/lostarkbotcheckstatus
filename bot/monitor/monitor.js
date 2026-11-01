@@ -31,9 +31,10 @@ import {
  * @param {number} notice.color
  * @param {string} notice.textKey - dialogue key holding `title` and `description`
  * @param {string} notice.timeFieldKey - dialogue key of the time field label
+ * @param {string} notice.sentLog - console line written once Discord accepts it
  * @returns {Promise<boolean>} true when Discord accepted the message
  */
-async function sendServerNotice(client, { serverName, glyph, color, textKey, timeFieldKey }) {
+async function sendServerNotice(client, { serverName, glyph, color, textKey, timeFieldKey, sentLog }) {
   try {
     const channel = await client.channels.fetch(config.channelId);
     if (!channel || !channel.isTextBased()) {
@@ -64,6 +65,7 @@ async function sendServerNotice(client, { serverName, glyph, color, textKey, tim
       .setTimestamp();
 
     await channel.send({ content: '@here', embeds: [embed] });
+    console.log(`[monitor] ${sentLog}`);
     return true;
   } catch (err) {
     console.error('[monitor] Failed to send notification:', err.message);
@@ -71,16 +73,15 @@ async function sendServerNotice(client, { serverName, glyph, color, textKey, tim
   }
 }
 
-async function sendOnlineNotification(client, serverName) {
-  const sent = await sendServerNotice(client, {
+function sendOnlineNotification(client, serverName) {
+  return sendServerNotice(client, {
     serverName,
     glyph: '🟢',
     color: COLORS.success,
     textKey: 'dialogue.system.onlineNotice',
     timeFieldKey: 'dialogue.system.onlineNotice.onlineAtField',
+    sentLog: `Online notification sent for ${serverName}.`,
   });
-  if (sent) console.log(`[monitor] Online notification sent for ${serverName}.`);
-  return sent;
 }
 
 // The wrench is announced maintenance; a server down without it may have
@@ -90,17 +91,16 @@ const OUTAGE_NOTICE_STYLE = Object.freeze({
   [STATUS.OFFLINE]: { key: 'offline', glyph: '🔴', color: COLORS.danger },
 });
 
-async function sendOutageNotification(client, serverName, status) {
+function sendOutageNotification(client, serverName, status) {
   const style = OUTAGE_NOTICE_STYLE[status];
-  const sent = await sendServerNotice(client, {
+  return sendServerNotice(client, {
     serverName,
     glyph: style.glyph,
     color: style.color,
     textKey: `dialogue.system.outageNotice.${style.key}`,
     timeFieldKey: 'dialogue.system.outageNotice.sinceField',
+    sentLog: `Outage notification sent for ${serverName} (${status}).`,
   });
-  if (sent) console.log(`[monitor] Outage notification sent for ${serverName} (${status}).`);
-  return sent;
 }
 
 // ─── Maintenance window helper ───────────────────────────────────────────────
