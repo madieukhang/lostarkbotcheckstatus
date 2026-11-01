@@ -22,7 +22,7 @@ import { isLegacyEvidence } from '../../../utils/imageRehost.js';
 
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
-import { BLANK_FIELD_VALUE, COLORS, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
+import { COLORS, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { truncateInlineText } from '../../../utils/discordText.js';
 import { t } from '../../../services/i18n/index.js';
 import {
@@ -389,7 +389,7 @@ function applyEvidenceMedia(embed, entry, displayUrl, { lang }) {
     // roster list above it.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: BLANK_FIELD_VALUE,
+      value: t('listView.evidence.caption', lang, { url: displayUrl }),
       inline: false,
     });
     embed.setImage(displayUrl);

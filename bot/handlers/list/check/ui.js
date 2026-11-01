@@ -9,7 +9,7 @@ import { parsePositiveNumber } from '../../../services/roster/parsers.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { isLegacyEvidence } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
-import { BLANK_FIELD_VALUE, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
+import { ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
 import { appendFieldLine, buildNoteCountLine } from '../notes/entryNotes.js';
 import {
@@ -93,13 +93,12 @@ function buildTrackedAltsField(entry, statMap, lang) {
 
 function applyCheckEvidence(embed, entry, displayUrl, lang) {
   if (displayUrl) {
-    // An embedded image has no caption of its own, so it butted straight
-    // up against whichever field came last. A heading field gives it the
-    // same footing as the roster list above it. Cards that put evidence
-    // behind a button need none of this · there is no image to caption.
+    // An embedded image has no caption of its own, so a captioned heading
+    // field sets it apart from the roster list above it. Cards that put
+    // evidence behind a button need none of this · there is no image to caption.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: BLANK_FIELD_VALUE,
+      value: t('listView.evidence.caption', lang, { url: displayUrl }),
       inline: false,
     });
     embed.setImage(displayUrl);

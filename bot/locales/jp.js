@@ -392,6 +392,7 @@ const jp = {
       added: '🕐 Added',
       evidence: 'Evidence',
       attached: '📎 Evidence',
+      caption: 'スクリーンショットは下にありますわ · [元画像をダウンロード]({url})',
       unavailable: '画像 link が期限切れ、または利用できません。`/la-list edit` で evidence を追加し直してください。',
       legacyGone: '画像は Discord の link としてだけ保存され、証拠アーカイブ（2026/04/11 開始）には移されていません。Discord にもうファイルがありません。`/la-list edit` で evidence を追加し直してください。',
       logs: '🔗 Logs',

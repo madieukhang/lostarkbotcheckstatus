@@ -16,7 +16,7 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
-import { BLANK_FIELD_VALUE, COLORS, ICONS } from '../../utils/ui.js';
+import { COLORS, ICONS } from '../../utils/ui.js';
 import { escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { t } from '../../services/i18n/index.js';
@@ -486,7 +486,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     // one inline rather than behind a button.
     embed.addFields({
       name: t('listView.evidence.attached', lang),
-      value: BLANK_FIELD_VALUE,
+      value: t('listView.evidence.caption', lang, { url: payload.imageUrl }),
       inline: false,
     });
     embed.setImage(payload.imageUrl);

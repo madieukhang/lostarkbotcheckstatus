@@ -392,6 +392,7 @@ const vi = {
       added: '🕐 Đã thêm',
       evidence: 'Evidence',
       attached: '📎 Evidence',
+      caption: 'Ảnh evidence ở ngay dưới · [Tải ảnh gốc]({url})',
       unavailable: 'Link ảnh đã hết hạn hoặc không khả dụng. Re-add evidence bằng `/la-list edit`.',
       legacyGone: 'Ảnh chỉ được lưu dưới dạng link Discord, chưa từng được chép vào kho lưu ảnh (có từ 11/04/2026), và Discord đã không còn giữ file. Re-add evidence bằng `/la-list edit`.',
       logs: '🔗 Logs',

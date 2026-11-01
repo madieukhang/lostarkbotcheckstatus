@@ -534,6 +534,7 @@ const en = {
       added: '🕐 Added',
       evidence: 'Evidence',
       attached: '📎 Evidence',
+      caption: 'Screenshot attached below · [Download original]({url})',
       unavailable: 'Image link expired or unavailable. Re-add evidence via `/la-list edit`.',
       legacyGone: 'Saved only as a Discord image link, never copied into the evidence archive (started 11 Apr 2026), and Discord no longer has the file. Re-add evidence via `/la-list edit`.',
       logs: '🔗 Logs',
