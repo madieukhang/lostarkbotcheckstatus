@@ -50,6 +50,17 @@ export default {
       serverField: 'Server', onlineAtField: 'Online từ',
       footer: 'Nguồn: playlostark.com · /la-status để xem trực tiếp',
     },
+    outageNotice: {
+      sinceField: 'Mất từ',
+      maintenance: {
+        title: '{server} đang bảo trì đột xuất',
+        description: 'Trang trạng thái đang hiện cờ lê bảo trì ở **{server}**, ngoài lịch bảo trì hằng tuần. Lúc đăng nhập lại được tớ sẽ báo tiếp nhé.',
+      },
+      offline: {
+        title: '{server} đang không vào được',
+        description: '**{server}** đang tắt trên trang trạng thái mà không có cờ lê, tức chưa có thông báo bảo trì: có thể server bị sập. Lúc đăng nhập lại được tớ sẽ báo tiếp nhé.',
+      },
+    },
   },
   stats: {
     title: 'Thống kê của bot',

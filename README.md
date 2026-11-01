@@ -4,7 +4,7 @@ Discord bot for a small Lost Ark guild. Monitors server status, looks up rosters
 
 ## Features
 
-- **Server monitoring**: polls Thaemine only, posts `@here` on offline-to-online transitions, `/la-status` for live check
+- **Server monitoring**: polls Thaemine only (every check interval during the weekly Wednesday-Thursday maintenance window or while a recovery is pending, every 2 minutes otherwise), posts `@here` on offline-to-online transitions, and outside the weekly schedule also posts `@here` once when Thaemine goes down: "unscheduled maintenance" when the status page shows the maintenance wrench, "down" when it shows none. `/la-status` for live check
 - **Roster lookup**: `/la-roster` scrapes `lostark.bible`, tracks iLvl progression, cross-checks every list; `deep:true` runs Stronghold alt detection
 - **List management**: blacklist / whitelist / watchlist (`⛔` / `✅` / `⚠️`), global or server-scoped, trusted users protected from any list
 - **Bulk add**: `/la-list multiadd` downloads an Excel template (max 30 rows), single aggregated approval DM, single aggregated broadcast

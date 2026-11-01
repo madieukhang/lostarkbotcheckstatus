@@ -65,6 +65,17 @@ export default {
       onlineAtField: 'Came online',
       footer: 'Source: playlostark.com · /la-status for the live view',
     },
+    outageNotice: {
+      sinceField: 'Down since',
+      maintenance: {
+        title: '{server} is in unscheduled maintenance',
+        description: 'The status page shows the maintenance wrench on **{server}** outside the weekly schedule. I will ping again when logins open.',
+      },
+      offline: {
+        title: '{server} is down',
+        description: '**{server}** is down on the status page without the maintenance wrench, so no maintenance is announced yet: it may have crashed. I will ping again when logins open.',
+      },
+    },
   },
   stats: {
     title: 'Bot statistics',

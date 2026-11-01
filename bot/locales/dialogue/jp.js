@@ -30,6 +30,17 @@ export default {
       description: '**{server}** にまたログインできますの。レイドのお時間ですわね〜',
       serverField: 'サーバー', onlineAtField: 'オンライン復帰', footer: 'Source: playlostark.com · /la-status でライブ表示',
     },
+    outageNotice: {
+      sinceField: 'ダウン開始',
+      maintenance: {
+        title: '{server} が臨時メンテナンス中ですわ',
+        description: 'ステータスページで **{server}** にメンテナンスのレンチが表示されていますの。週次メンテナンスの時間外ですわ。ログインできるようになったらまたお知らせしますわね。',
+      },
+      offline: {
+        title: '{server} に接続できませんわ',
+        description: '**{server}** がステータスページでレンチなしで停止していますの。メンテナンスの告知はまだなく、サーバーが落ちたのかもしれませんわ。ログインできるようになったらまたお知らせしますわね。',
+      },
+    },
   },
   stats: {
     title: 'Bot 統計', description: 'データ、キャッシュ、プロセスの現在値を一か所に集めましたわ。',

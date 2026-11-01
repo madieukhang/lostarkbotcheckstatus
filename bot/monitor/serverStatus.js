@@ -135,26 +135,26 @@ export function parseServerStatuses(html, serverNames, { logger = console } = {}
     const targetName = targetByLowerName.get(serverName.toLowerCase());
     if (!targetName) continue;
 
-    // Prefer a definitive human-readable aria label. If the upstream adds a
-    // new phrase, UNKNOWN deliberately falls through to the CSS signal.
     const ariaLabel = nameEl.getAttribute('aria-label') ?? '';
-    if (ariaLabel) {
-      const status = resolveStatusFromAriaLabel(ariaLabel);
-      logger.log?.(`[serverStatus] ${targetName}: "${ariaLabel}" → ${status}`);
-      if (status !== STATUS.UNKNOWN) {
-        statusMap.set(targetName, status);
-        continue;
-      }
-    }
-
+    const ariaStatus = ariaLabel ? resolveStatusFromAriaLabel(ariaLabel) : STATUS.UNKNOWN;
     // The inner status element owns the modifier. Selecting the base class
     // token excludes the similarly named "-wrapper" element.
     const statusEl = row.querySelector(`.${CLS.STATUS_DIV}`);
-    if (statusEl) {
-      const status = resolveStatusFromClass(statusEl.className);
-      logger.log?.(`[serverStatus] ${targetName}: class → ${status}`);
-      if (status !== STATUS.UNKNOWN) statusMap.set(targetName, status);
-    }
+    const classStatus = statusEl ? resolveStatusFromClass(statusEl.className) : STATUS.UNKNOWN;
+    const modifiers = String(statusEl?.className || '')
+      .split(/\s+/)
+      .filter((token) => token.includes('--'))
+      .map((token) => token.slice(token.indexOf('--')));
+    // The wrench icon is a class modifier, and the aria label may say only
+    // online or offline, so a maintenance class wins. Otherwise a definitive
+    // label wins, and an unfamiliar phrase falls through to the class.
+    const status = classStatus === STATUS.MAINTENANCE || ariaStatus === STATUS.UNKNOWN
+      ? classStatus
+      : ariaStatus;
+    logger.log?.(
+      `[serverStatus] ${targetName}: "${ariaLabel}" → ${ariaStatus}, class [${modifiers.join(' ')}] → ${classStatus}`,
+    );
+    if (status !== STATUS.UNKNOWN) statusMap.set(targetName, status);
   }
 
   // Some page variants expose only aria-label nodes, outside the normal row.

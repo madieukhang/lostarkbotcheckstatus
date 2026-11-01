@@ -2,7 +2,8 @@
  * monitor.js
  * Handles the periodic server-status polling loop.
  * Reads/writes monitor state in MongoDB and triggers Discord notifications
- * when the server transitions from offline/maintenance → online.
+ * when the server transitions from offline/maintenance → online, and once
+ * when it goes down outside the weekly maintenance schedule.
  */
 
 import config from '../config.js';
@@ -13,6 +14,7 @@ import GuildConfig from '../models/GuildConfig.js';
 import { getGuildLanguage, t } from '../services/i18n/index.js';
 import { getMultiServerStatus, STATUS } from './serverStatus.js';
 import {
+  finishOutageNotification,
   finishRecoveryNotification,
   observeServerStatus,
 } from './stateStore.js';
@@ -20,10 +22,18 @@ import {
 // ─── Notification builder ─────────────────────────────────────────────────────
 
 /**
- * Build and send the Discord "server is online" embed to the configured channel.
+ * Send one server-watch embed, with an @here ping, to the configured channel.
+ * The author, server field and footer are shared with the online notice.
  * @param {import('discord.js').Client} client
+ * @param {object} notice
+ * @param {string} notice.serverName
+ * @param {string} notice.glyph - status glyph that leads the title
+ * @param {number} notice.color
+ * @param {string} notice.textKey - dialogue key holding `title` and `description`
+ * @param {string} notice.timeFieldKey - dialogue key of the time field label
+ * @returns {Promise<boolean>} true when Discord accepted the message
  */
-async function sendOnlineNotification(client, serverName) {
+async function sendServerNotice(client, { serverName, glyph, color, textKey, timeFieldKey }) {
   try {
     const channel = await client.channels.fetch(config.channelId);
     if (!channel || !channel.isTextBased()) {
@@ -39,28 +49,58 @@ async function sendOnlineNotification(client, serverName) {
         inline: true,
       },
       {
-        name: `🕐 ${t('dialogue.system.onlineNotice.onlineAtField', lang)}`,
+        name: `🕐 ${t(timeFieldKey, lang)}`,
         value: relativeTime(Date.now()),
         inline: true,
       },
     ];
     const embed = createArtistEmbed()
       .setAuthor({ name: t('dialogue.system.onlineNotice.author', lang) })
-      .setTitle(`🟢 ${t('dialogue.system.onlineNotice.title', lang, { server: serverName })}`)
-      .setDescription(t('dialogue.system.onlineNotice.description', lang, { server: serverName }))
+      .setTitle(`${glyph} ${t(`${textKey}.title`, lang, { server: serverName })}`)
+      .setDescription(t(`${textKey}.description`, lang, { server: serverName }))
       .addFields(fields)
-      .setColor(COLORS.success)
+      .setColor(color)
       .setFooter({ text: t('dialogue.system.onlineNotice.footer', lang) })
       .setTimestamp();
 
     await channel.send({ content: '@here', embeds: [embed] });
-
-    console.log(`[monitor] Online notification sent for ${serverName}.`);
     return true;
   } catch (err) {
     console.error('[monitor] Failed to send notification:', err.message);
     return false;
   }
+}
+
+async function sendOnlineNotification(client, serverName) {
+  const sent = await sendServerNotice(client, {
+    serverName,
+    glyph: '🟢',
+    color: COLORS.success,
+    textKey: 'dialogue.system.onlineNotice',
+    timeFieldKey: 'dialogue.system.onlineNotice.onlineAtField',
+  });
+  if (sent) console.log(`[monitor] Online notification sent for ${serverName}.`);
+  return sent;
+}
+
+// The wrench is announced maintenance; a server down without it may have
+// crashed, so the two outages read differently. Glyphs match /la-status.
+const OUTAGE_NOTICE_STYLE = Object.freeze({
+  [STATUS.MAINTENANCE]: { key: 'maintenance', glyph: '🟡', color: COLORS.warning },
+  [STATUS.OFFLINE]: { key: 'offline', glyph: '🔴', color: COLORS.danger },
+});
+
+async function sendOutageNotification(client, serverName, status) {
+  const style = OUTAGE_NOTICE_STYLE[status];
+  const sent = await sendServerNotice(client, {
+    serverName,
+    glyph: style.glyph,
+    color: style.color,
+    textKey: `dialogue.system.outageNotice.${style.key}`,
+    timeFieldKey: 'dialogue.system.outageNotice.sinceField',
+  });
+  if (sent) console.log(`[monitor] Outage notification sent for ${serverName} (${status}).`);
+  return sent;
 }
 
 // ─── Maintenance window helper ───────────────────────────────────────────────
@@ -88,8 +128,32 @@ export function needsRecoveryPolling(statusMap) {
   return [...statusMap.values()].some((status) => status !== STATUS.ONLINE);
 }
 
-export function shouldRunScheduledCheck(now = new Date(), recoveryPending = false) {
-  return isInMaintenanceWindow(now) || recoveryPending;
+/**
+ * True from an hour before the weekly maintenance window until it ends. A
+ * downtime first seen here is the scheduled one, possibly starting early, so
+ * it gets the recovery alert only and no outage alert.
+ * @param {Date} [now]
+ * @returns {boolean}
+ */
+export function isInScheduledDowntime(now = new Date()) {
+  return isInMaintenanceWindow(now) || (now.getUTCDay() === 3 && now.getUTCHours() === 6);
+}
+
+// Outside the weekly window a light check still catches an unscheduled downtime.
+const IDLE_CHECK_INTERVAL_MS = 2 * 60 * 1000;
+
+/**
+ * Whether a scheduler tick checks now: every tick inside the weekly window or
+ * while a recovery is pending, and every IDLE_CHECK_INTERVAL_MS otherwise.
+ * @param {Date} [now]
+ * @param {boolean} [recoveryPending=false]
+ * @param {number} [lastRunAt] - start of the last check in ms; defaults to now
+ * @returns {boolean}
+ */
+export function shouldRunScheduledCheck(now = new Date(), recoveryPending = false, lastRunAt = now.getTime()) {
+  return isInMaintenanceWindow(now)
+    || recoveryPending
+    || now.getTime() - lastRunAt >= IDLE_CHECK_INTERVAL_MS;
 }
 
 // ─── Core check logic ─────────────────────────────────────────────────────────
@@ -118,8 +182,9 @@ export async function checkStatus(client, { undelivered = new Set() } = {}) {
     throw err;
   }
 
+  const announceOutage = !isInScheduledDowntime(new Date());
   for (const [server, currentStatus] of statusMap) {
-    const transition = await observeServerStatus({ server, status: currentStatus });
+    const transition = await observeServerStatus({ server, status: currentStatus, announceOutage });
     const previousStatus = transition.previousStatus ?? STATUS.UNKNOWN;
     console.log(`[monitor] ${server}: ${currentStatus} (was: ${previousStatus})`);
 
@@ -139,6 +204,12 @@ export async function checkStatus(client, { undelivered = new Set() } = {}) {
       }
     } else if (transition.deliveryPending) {
       undelivered.add(server);
+    }
+
+    if (transition.shouldNotifyOutage) {
+      console.log(`[monitor] ${server} is ${currentStatus} outside the schedule - sending outage notification.`);
+      const sent = await sendOutageNotification(client, server, currentStatus);
+      await finishOutageNotification({ server, claimId: transition.outageClaimId, sent });
     }
   }
 
@@ -161,11 +232,13 @@ export function startMonitor(client) {
 
   let recoveryPending = false;
   let checkInFlight = false;
+  let lastRunAt = Date.now();
 
   const runCheck = async (label) => {
     if (checkInFlight) return;
 
     checkInFlight = true;
+    lastRunAt = Date.now();
     try {
       const undelivered = new Set();
       const statusMap = await checkStatus(client, { undelivered });
@@ -184,7 +257,7 @@ export function startMonitor(client) {
   void runCheck('Initial');
 
   return setInterval(() => {
-    if (!shouldRunScheduledCheck(new Date(), recoveryPending)) {
+    if (!shouldRunScheduledCheck(new Date(), recoveryPending, lastRunAt)) {
       return;
     }
 
