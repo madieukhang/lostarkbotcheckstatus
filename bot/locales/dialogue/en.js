@@ -1,6 +1,6 @@
 export default {
   common: {
-    fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details' },
+    fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details', queue: '🚦 Queue', unreadable: '✏️ Not names', unreadImages: '🖼️ Unread images' },
     selectionLost: { title: 'That choice no longer matches', description: 'I could not find the item you picked in this menu.', tip: 'Run the command again for a fresh menu' },
     errorField: 'Error',
     missingField: 'Missing',
@@ -561,21 +561,23 @@ export default {
     failed: { title: 'Removal failed', description: 'I could not remove the entry.' }, unknown: 'unknown',
   },
   check: {
-    modeSaved: { title: 'Screenshot mode saved', description: 'Your mode is **{mode}**. This applies to your uploads and `/la-check` when no mode is selected.', footer: 'Switch back with /la-check-mode mode:daily; a /la-check mode override affects one image only.' },
-    modeCurrent: { title: 'Your screenshot mode', description: 'Your mode is **{mode}**. New users start in Daily. This setting only changes how your own images are read.', footer: 'Use /la-check-mode mode:daily or mode:analysis to change it.' },
-    modeUnavailable: { title: 'Analysis is unavailable', description: 'The bot currently has no enabled Analysis models. Your saved mode was not changed.' },
-    ocrQueueFull: { title: 'The image reader is busy', description: 'I already have {limit} screenshot read(s) waiting in line. Send this image again once the line moves.', footer: 'This request was not kept, so it can be retried right away.' },
+    modeSaved: { title: 'Screenshot mode saved', description: 'Your mode is **{mode}**. This applies to your uploads and `/la-check` when no mode is selected.', tip: 'Switch back with /la-check-mode mode:daily; a /la-check mode override affects one image only' },
+    modeCurrent: { title: 'Your screenshot mode', description: 'Your mode is **{mode}**. New users start in Daily. This setting only changes how your own images are read.', tip: 'Change it with /la-check-mode mode:daily or mode:analysis' },
+    modeUnavailable: { title: 'Analysis is unavailable', description: 'The bot currently has no enabled Analysis models. Your saved mode was not changed.', tip: 'Use Daily mode for now' },
+    ocrQueueFull: { title: 'The image reader is busy', description: 'My line of screenshot reads is full, so I cannot take another one yet.', tip: 'This request was not kept; send the image again once the line moves' },
+    queueValue: '{limit}/{limit} waiting',
+    progressTitles: { queued: 'Waiting in line', reading: 'Reading the screenshot', cooldown: 'The image reader is resting', checking: 'Checking the names', roster: 'Looking up the roster' },
     modeProgress: 'Mode: **{mode}**',
     modes: { daily: 'Daily', analysis: 'Analysis' },
     malformed: 'I could not make sense of that evidence pick. Run the check again and I will start fresh.',
-    entryRemoved: { title: 'That one is gone now', description: 'Someone removed the list entry this evidence belonged to, so there is nothing left for me to show you.' },
-    ocrFailed: { title: 'I could not read that image', description: 'My image reader failed on this one, so no names were checked.', footer: 'Post the same screenshot again in a minute.' },
-    noNames: { title: 'Nothing in there looked like a name', description: 'I read the image fine, but none of it looked like a character name.', footer: 'The raid waiting-room screen is the easiest one for me to read.' },
-    noVerifiedNames: { title: 'No verified characters', description: 'I read {count} candidate name(s), but none matched lostark.bible, a saved roster snapshot, or a visible list record.', footer: 'Unverified OCR/text is hidden and cannot be offered through Quick Add.' },
+    entryRemoved: { title: 'That one is gone now', description: 'Someone removed this list entry, so there is nothing left for me to show you.' },
+    ocrFailed: { title: 'I could not read that image', description: 'My image reader failed on this one, so no names were checked.', tip: 'Post the same screenshot again in a minute' },
+    noNames: { title: 'Nothing in there looked like a name', description: 'I read the image fine, but none of it looked like a character name.', tip: 'Send the raid waiting-room screen; it is the easiest one for me to read' },
+    noVerifiedNames: { title: 'No verified characters', description: 'I read {count} candidate name(s), but none matched lostark.bible, a saved roster snapshot, or a visible list record. Unverified names stay hidden and are not offered through Quick Add.', tip: 'Send a clearer screenshot and check again' },
     details: { title: 'Check result · {list}', headline: '{icon} {name} is on the **{list}**{scope}. Here is everything I have saved about them.' },
     text: {
-      empty: { title: 'You forgot the name~', description: 'Type `check <character>` or `check: <character>` here and I will look them up for you.', footer: 'Several at once is fine - separate them with spaces, commas, or new lines.' },
-      invalid: { title: 'Those do not look like names', description: 'I could not read these as Lost Ark character names: {tokens}', footer: 'Send only character names after "check". A link, mention or other word stops the whole check.' },
+      empty: { title: 'You forgot the name~', description: 'Type `check <character>` or `check: <character>` here and I will look them up for you.', tip: 'Several at once is fine; separate them with spaces, commas, or new lines' },
+      invalid: { title: 'Those do not look like names', description: 'I could not read these as Lost Ark character names, so the whole check stopped.', tip: 'Send only character names after "check"' },
       progress: {
       variants: [
           'Received **{count}** {word} · checking the database lists…',
@@ -592,9 +594,9 @@ export default {
           'Read **{count}** {word} · cross-checking the lists now…',
           '**{count}** {word} out of the screenshot · checking…',
         ],
-    }, imageQueueFull: { title: 'The screenshot queue is full', description: 'I am already holding {limit} screenshot checks. Post this image again after the queue moves.', footer: 'This request was not kept, so it can be retried immediately.' }, imageQueued: 'Screenshot check queued · **{count}** image request(s) ahead…', imageProgress: 'Images received · reading **{current}/{count}**…', imageCooldownWait: 'Gemini is cooling down after an API error · retrying image **{current}/{count}** in **{seconds}s**…', imageIgnored: 'Each check handles up to {limit} images, so I skipped **{count}** extra.', partialImages: { title: 'Some images could not be read', description: 'I skipped **{failed}/{count}** image(s) after OCR errors. The result above uses only the images that succeeded.', footer: 'You can post the failed image again on its own.' }, ignored: 'I skipped **{count}** extra {word} - I can only take {limit} at a time.', nameOne: 'name', nameMany: 'names',
-    failed: { title: 'The check did not finish', description: 'I got the names off the image, but I could not finish checking them against the lists.' },
-    autoFailed: { title: 'I could not finish that check', description: 'Something went wrong partway through this one. Post it again and I will have another go.' },
+    }, imageQueueFull: { title: 'The screenshot queue is full', description: 'My screenshot check queue is full, so I cannot take another one yet.', tip: 'This request was not kept; post the image again once the queue moves' }, imageQueued: 'Screenshot check queued · **{count}** image request(s) ahead…', imageProgress: 'Images received · reading **{current}/{count}**…', imageCooldownWait: 'Gemini is cooling down after an API error · retrying image **{current}/{count}** in **{seconds}s**…', imageIgnored: 'Each check handles up to {limit} images, so I skipped **{count}** extra.', partialImages: { title: 'Some images could not be read', description: 'I skipped **{failed}/{count}** image(s) after OCR errors. The result above uses only the images that succeeded.', tip: 'Post the failed image again on its own to finish the check' }, ignored: 'I skipped **{count}** extra {word} - I can only take {limit} at a time.', nameOne: 'name', nameMany: 'names',
+    failed: { title: 'The check did not finish', description: 'I got the names off the image, but I could not finish checking them against the lists.', tip: 'Try again in a few minutes' },
+    autoFailed: { title: 'I could not finish that check', description: 'Something went wrong partway through this one.', tip: 'Post it again and I will have another go' },
     embed: {
       imageAuthor: 'Here is what I found in your screenshot check.', textAuthor: 'Here is what I found for the names you sent.', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: 'not listed', configured: 'configured', ignored: 'Ignored {count} extra {word} (cap: {limit}).', unverified: 'Skipped {count} unverified candidate(s); Quick Add was disabled for them.',
       flagged: 'FLAGGED {count}', clear: 'CLEAR', elapsed: '⏱️ TOOK {seconds}s', elapsedQuick: { variants: [

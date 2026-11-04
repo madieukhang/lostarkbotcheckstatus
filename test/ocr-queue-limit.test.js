@@ -161,5 +161,5 @@ test('/la-check answers an OCR queue-full rejection with the busy notice, not th
   assert.equal(replays.length, 1);
   const alert = replays[0].embeds[0].toJSON();
   assert.ok(alert.title.endsWith('The image reader is busy'), `unexpected title: ${alert.title}`);
-  assert.ok(alert.description.includes('2'), 'the notice should show the queue limit');
+  assert.deepEqual(alert.fields.map(({ name, value }) => [name, value]), [['🚦 Queue', '2/2 waiting']], 'the notice should show the queue limit');
 });

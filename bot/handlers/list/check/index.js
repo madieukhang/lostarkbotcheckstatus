@@ -17,12 +17,11 @@ import {
 } from '../../../services/list-check/service.js';
 import { didListCheckNameChange } from '../../../services/list-check/matchResolution.js';
 import { createNameSuggestionContext } from '../../../services/roster/search.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
   editAlert,
   editEmbed,
-  editNotice,
 } from '../../../utils/interactionReplies.js';
 import { buildListCheckEmbed } from '../../../utils/listCheckEmbed.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
@@ -158,7 +157,7 @@ export async function editWithListEntryDetails(interaction, { listType, id }, { 
 
   if (!entry) {
     await editAlert(interaction, {
-      severity: AlertSeverity.WARNING,
+      kind: NoticeKind.EXPIRED,
       ...t('dialogue.check.entryRemoved', lang),
     });
     return;
@@ -176,6 +175,22 @@ export async function editWithListEntryDetails(interaction, { listType, id }, { 
   }), { components: buildNoteHistoryRows(listType, entry, lang) });
 }
 
+/**
+ * Build the busy notice for a full screenshot queue: the copy under `key`
+ * plus a queue field showing every slot taken.
+ * @param {string} key - locale key holding the notice's title, description and tip
+ * @param {number} limit - queue capacity reported by the rejection
+ * @param {string} lang - viewer language
+ * @returns {object} buildAlertEmbed options
+ */
+export function buildQueueFullAlert(key, limit, lang) {
+  return {
+    kind: NoticeKind.BUSY,
+    ...t(key, lang),
+    fields: [{ name: t('dialogue.common.fields.queue', lang), value: t('dialogue.check.queueValue', lang, { limit }), inline: true }],
+  };
+}
+
 function createAutoCheckEvidenceHandler({ client }) {
   return async function handleAutoCheckEvidenceSelect(interaction) {
     const raw = interaction.values?.[0] || '';
@@ -188,8 +203,9 @@ function createAutoCheckEvidenceHandler({ client }) {
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     if (!parsed) {
-      await editNotice(interaction, t('dialogue.check.malformed', lang), {
-        severity: AlertSeverity.WARNING,
+      await editAlert(interaction, {
+        kind: NoticeKind.EXPIRED,
+        ...t('dialogue.common.selectionLost', lang),
       });
       return;
     }
@@ -226,7 +242,7 @@ export function createCheckHandlers({
     if (isAnalysisModeUnavailable(requestedMode)) {
       lang = await languagePromise;
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.BUSY,
         ...t('dialogue.check.modeUnavailable', lang),
       });
       return;
@@ -247,23 +263,20 @@ export function createCheckHandlers({
       lang = await languagePromise;
       if (err?.code === OCR_QUEUE_FULL_CODE) {
         console.warn(`[listcheck] ${err.message} Rejecting /la-check without queuing.`);
-        await editAlert(interaction, {
-          severity: AlertSeverity.WARNING,
-          ...t('dialogue.check.ocrQueueFull', lang, { limit: err.limit }),
-        });
+        await editAlert(interaction, buildQueueFullAlert('dialogue.check.ocrQueueFull', err.limit, lang));
         return;
       }
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.check.ocrFailed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       });
       return;
     }
 
     if (names.length === 0) {
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EMPTY,
         ...t('dialogue.check.noNames', lang),
       });
       return;
@@ -271,13 +284,14 @@ export function createCheckHandlers({
 
     const maxNames = config.listcheckMaxNames;
     const limitedNames = names.slice(0, maxNames);
-    await editNotice(interaction, [
-      `🔍 ${tPick('dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) })}`,
-      limitedNames.length < names.length ? t('dialogue.check.ignored', lang, { count: names.length - limitedNames.length, word: t(`dialogue.check.${names.length - limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang), limit: maxNames }) : null,
-    ].filter(Boolean).join('\n'), {
-      severity: AlertSeverity.INFO,
-      titleIcon: '🔍',
-    });
+    await editAlert(interaction, {
+      kind: NoticeKind.PROGRESS,
+      title: t('dialogue.check.progressTitles.checking', lang),
+      description: [
+        tPick('dialogue.check.progress', lang, { count: limitedNames.length, word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang) }),
+        limitedNames.length < names.length ? t('dialogue.check.ignored', lang, { count: names.length - limitedNames.length, word: t(`dialogue.check.${names.length - limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang), limit: maxNames }) : null,
+      ].filter(Boolean).join('\n'),
+    }, { content: null });
 
     try {
       const checkedResults = await checkNamesAgainstLists(limitedNames, {
@@ -291,7 +305,7 @@ export function createCheckHandlers({
       );
       if (results.length === 0) {
         await editAlert(interaction, {
-          severity: AlertSeverity.WARNING,
+          kind: NoticeKind.EMPTY,
           ...t('dialogue.check.noVerifiedNames', lang, { count: unverified.length }),
         });
         return;
@@ -321,9 +335,9 @@ export function createCheckHandlers({
     } catch (err) {
       console.error('[listcheck] ❌ Check failed:', err.message);
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.check.failed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       });
     }
   }

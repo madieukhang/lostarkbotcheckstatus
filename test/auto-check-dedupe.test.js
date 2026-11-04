@@ -239,7 +239,7 @@ test('auto-check message handler keeps image OCR as the priority over a text cap
       extracted += 1;
       assert.equal(input, image);
       assert.equal(replies.length, 1, 'status card must exist before OCR starts');
-      assert.match(replies[0].embeds[0].toJSON().title, /reading 1\/1/i);
+      assert.match(replies[0].embeds[0].toJSON().description, /reading \*\*1\/1\*\*/i);
       extractionOptions = options;
       return ['FromImage'];
     },
@@ -352,7 +352,7 @@ test('auto-check reads up to three attached images sequentially and deduplicates
   assert.equal(maxActiveExtractions, 1);
   assert.deepEqual(checked, [['Alpha', 'Shared', 'Beta', 'Gamma']]);
   assert.equal(replies.length, 1);
-  assert.match(replies[0].embeds[0].toJSON().title, /reading 1\/3/i);
+  assert.match(replies[0].embeds[0].toJSON().description, /reading \*\*1\/3\*\*/i);
   assert.match(replies[0].embeds[0].toJSON().description, /skipped \*\*1\*\* extra/i);
   assert.equal(edits.at(-1).embeds[0].title, 'batch-check');
 });
@@ -420,7 +420,7 @@ test('auto-check waits once for Gemini cooldown and retries the current image be
   assert.deepEqual(checked, [['Recovered', 'Second']]);
   assert.equal(replies.length, 1, 'cooldown retry must reuse the live status card');
   assert.ok(edits.some((payload) => (
-    /retrying image 1\/2 in 30s/i.test(payload.embeds[0].toJSON().title)
+    /retrying image \*\*1\/2\*\* in \*\*30s\*\*/i.test(payload.embeds[0].toJSON().description)
   )));
   assert.equal(edits.at(-1).embeds[0].title, 'cooldown-check');
 });
@@ -557,8 +557,8 @@ test('auto-check queues rapid image messages instead of dropping them to cooldow
 
   assert.deepEqual(extractedOrder, ['queued-image-1']);
   assert.equal(accepted[1].replies.length, 1);
-  assert.match(accepted[1].replies[0].embeds[0].toJSON().title, /queued/i);
-  assert.match(accepted[1].replies[0].embeds[0].toJSON().title, /1 image request/i);
+  assert.match(accepted[1].replies[0].embeds[0].toJSON().description, /queued/i);
+  assert.match(accepted[1].replies[0].embeds[0].toJSON().description, /\*\*1\*\* image request/i);
   assert.equal(rejected.replies.length, 1);
   assert.match(rejected.replies[0].embeds[0].toJSON().title, /queue is full/i);
   assert.equal(claimAutoCheckMessage(rejected.message.id), true,

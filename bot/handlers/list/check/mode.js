@@ -3,7 +3,7 @@ import { connectDB } from '../../../db.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getUserOcrMode, setUserOcrMode } from '../../../services/list-check/preferences.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, editAlert } from '../../../utils/interactionReplies.js';
 
 /**
@@ -29,7 +29,7 @@ export function createOcrModeCommandHandler({
     const requested = interaction.options.getString('mode');
     if (isAnalysisModeUnavailable(requested)) {
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.BUSY,
         ...t('dialogue.check.modeUnavailable', lang),
       });
       return;
@@ -38,7 +38,7 @@ export function createOcrModeCommandHandler({
       ? await setUserOcrModeFn(interaction.user.id, requested)
       : await getUserOcrModeFn(interaction.user.id);
     await editAlert(interaction, {
-      severity: AlertSeverity.SUCCESS,
+      kind: NoticeKind.DONE,
       ...t(requested ? 'dialogue.check.modeSaved' : 'dialogue.check.modeCurrent', lang, {
         mode: t(`dialogue.check.modes.${mode}`, lang),
       }),

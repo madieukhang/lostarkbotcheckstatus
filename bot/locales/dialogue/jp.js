@@ -1,6 +1,6 @@
 export default {
   common: {
-    fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細' },
+    fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細', queue: '🚦 順番待ち', unreadable: '✏️ 名前ではない語', unreadImages: '🖼️ 読めなかった画像' },
     selectionLost: { title: 'その選択はもう一致しませんの', description: 'この menu で選ばれた項目が見つかりませんでしたわ。', tip: 'Command をもう一度実行して、新しい menu を開いてくださいませ' },
     errorField: 'エラー', missingField: '不足', unknown: '不明',
     savedCardFailed: '保存しましたわ。確認 card を表示できませんでしたの。',
@@ -407,15 +407,17 @@ export default {
     footerBlocked: '`/la-list view` で確認し、legacy entry は `/la-list edit` で変更してくださいませ。', pickerTitle: '発見 · {name}', pickerDescription: '**{name}** は {count} lists にいます。削除対象を選んでくださいませ:', pickerFooter: '30秒で期限切れ · この picker はあなた専用ですの。', pickerExpired: { title: 'Picker の期限が切れましたわ', description: '何も削除していませんの。もう一度 `/la-list remove` を実行してくださいませ。' }, failed: { title: '削除に失敗しましたの', description: 'Entry を削除できませんでしたわ。' }, unknown: '不明',
   },
   check: {
-    modeSaved: { title: '画像モードを保存しました', description: 'モードは **{mode}** です。ご自身の画像投稿と、mode を指定しない `/la-check` に適用します。', footer: '/la-check-mode mode:daily で戻せます。/la-check の mode 指定はその画像だけに適用します。' },
-    modeCurrent: { title: '現在の画像モード', description: '現在は **{mode}** です。初期設定は Daily。この設定はご自身の画像だけに適用します。', footer: '/la-check-mode mode:daily または mode:analysis で変更できます。' },
-    modeUnavailable: { title: '詳細分析は利用できません', description: '現在、有効な詳細分析モデルがありません。保存済みの設定は変更していません。' },
-    ocrQueueFull: { title: '画像の読み取りが混雑していますの', description: '現在 {limit} 件の画像読み取りを順番待ちで抱えておりますの。列が進んでから、もう一度画像をお送りくださいませ。', footer: 'この request は保持しておりませんので、すぐに再試行できますわ。' },
+    modeSaved: { title: '画像モードを保存しました', description: 'モードは **{mode}** です。ご自身の画像投稿と、mode を指定しない `/la-check` に適用します。', tip: '/la-check-mode mode:daily で戻せます。/la-check の mode 指定はその画像だけに適用します' },
+    modeCurrent: { title: '現在の画像モード', description: '現在は **{mode}** です。初期設定は Daily。この設定はご自身の画像だけに適用します。', tip: '/la-check-mode mode:daily または mode:analysis で変更できます' },
+    modeUnavailable: { title: '詳細分析は利用できません', description: '現在、有効な詳細分析モデルがありません。保存済みの設定は変更していません。', tip: 'ひとまず Daily モードをお使いくださいませ' },
+    ocrQueueFull: { title: '画像の読み取りが混雑していますの', description: '画像読み取りの順番待ちがいっぱいで、まだお預かりできませんの。', tip: 'この request は保持しておりませんの。列が進んでから画像をもう一度お送りくださいませ' },
+    queueValue: '{limit}/{limit} 件',
+    progressTitles: { queued: '順番待ちですわ', reading: '画像を読み取り中ですの', cooldown: '画像リーダーが小休止中ですの', checking: '名前を照合中ですの', roster: 'Roster を調べておりますの' },
     modeProgress: 'モード: **{mode}**',
     modes: { daily: 'Daily', analysis: '詳細分析' },
-    malformed: 'どの証拠を選ばれたのか読み取れませんでしたの。もう一度 check を実行してくだされば、最初からやり直しますわ。', entryRemoved: { title: 'そちらはもう消えてしまいましたの', description: 'この証拠が結びついていた list entry は、どなたかが消してしまいましたの。もうお見せできるものが残っておりませんわ。' }, ocrFailed: { title: 'その画像を読めませんでしたの', description: '画像の読み取りでエラーが起きたので、まだどの名前も check していませんの。', footer: '1分ほどしてから、同じ screenshot をもう一度送ってくださいませ。' }, noNames: { title: '名前らしきものが見当たりませんの', description: '画像はきちんと読めましたけれど、character の名前らしきものはひとつもありませんでしたわ。', footer: 'raid の待機所の画面が、わたくしには一番読みやすいですの〜' }, noVerifiedNames: { title: '確認済み character がありませんの', description: '{count} 件の candidate を読み取りましたが、lostark.bible、保存済み roster snapshot、または表示可能な list record のどれにも一致しませんでしたわ。', footer: '未確認 OCR/text は表示せず、Quick Add にも出しませんの。' },
+    malformed: 'どの証拠を選ばれたのか読み取れませんでしたの。もう一度 check を実行してくだされば、最初からやり直しますわ。', entryRemoved: { title: 'そちらはもう消えてしまいましたの', description: 'この list entry は、どなたかが消してしまいましたの。もうお見せできるものが残っておりませんわ。' }, ocrFailed: { title: 'その画像を読めませんでしたの', description: '画像の読み取りでエラーが起きたので、まだどの名前も check していませんの。', tip: '1分ほどしてから、同じ screenshot をもう一度送ってくださいませ' }, noNames: { title: '名前らしきものが見当たりませんの', description: '画像はきちんと読めましたけれど、character の名前らしきものはひとつもありませんでしたわ。', tip: 'raid の待機所の画面を送ってくださいませ。わたくしには一番読みやすいですの' }, noVerifiedNames: { title: '確認済み character がありませんの', description: '{count} 件の candidate を読み取りましたが、lostark.bible、保存済み roster snapshot、または表示可能な list record のどれにも一致しませんでしたわ。未確認の名前は表示せず、Quick Add にも出しませんの。', tip: 'もっと鮮明な screenshot で、もう一度 check してくださいませ' },
     details: { title: 'チェック結果 · {list}', headline: '{icon} {name} は **{list}**{scope} にいますわ。控えてあることを、すべて下にまとめましたの。' },
-    text: { empty: { title: '肝心のお名前が抜けておりますわ〜', description: 'ここで `check <character>` か `check: <character>` と入力してくだされば、お調べいたしますわ〜', footer: '何名でもかまいませんの。スペース、カンマ、改行で区切ってくださいませ。' }, invalid: { title: 'そちらは名前には見えませんの', description: 'こちらは Lost Ark の character 名として読み取れませんでしたわ: {tokens}', footer: '"check" のあとは character 名だけを送ってくださいませ。link、mention、ほかの言葉があると check 全体が止まりますの。' }, progress: {
+    text: { empty: { title: '肝心のお名前が抜けておりますわ〜', description: 'ここで `check <character>` か `check: <character>` と入力してくだされば、お調べいたしますわ〜', tip: '何名でもかまいませんの。スペース、カンマ、改行で区切ってくださいませ' }, invalid: { title: 'そちらは名前には見えませんの', description: 'Lost Ark の character 名として読み取れない言葉があったので、check 全体を止めましたわ。', tip: '"check" のあとは character 名だけを送ってくださいませ' }, progress: {
       variants: [
           '**{count}** {word}を受信 · database list を確認中ですの…',
           '**{count}** {word}を承りましたわ · list を照合中ですの…',
@@ -430,7 +432,7 @@ export default {
           '**{count}** {word}を読みましたわ · 今から list を確認いたしますの…',
           'screenshot から **{count}** {word} · 確認しておりますわ…',
         ],
-    }, imageQueueFull: { title: '画像 check の queue がいっぱいですの', description: 'すでに {limit} 件の画像 check をお預かりしておりますの。queue が進んでから、もう一度画像をお送りくださいませ。', footer: 'この request は保持しておりませんので、すぐに再試行できますわ。' }, imageQueued: '画像 check を順番待ちに入れましたわ · 前に **{count}** 件ございますの…', imageProgress: '画像を受け取りましたわ · **{current}/{count}** 枚目を読み取り中ですの…', imageCooldownWait: 'API error のため Gemini が cooldown 中ですの · **{seconds}秒** 後に画像 **{current}/{count}** を再試行いたしますわ…', imageIgnored: '一度に処理できるのは {limit} 枚までですので、あふれた **{count}** 枚は見送りましたわ。', partialImages: { title: '一部の画像を読み取れませんでしたの', description: 'OCR error のため **{failed}/{count}** 枚を見送りましたわ。上の結果は、読み取りに成功した画像だけを使っておりますの。', footer: '失敗した画像だけ、あとでもう一度お送りいただけますわ。' }, ignored: '一度にお預かりできるのは {limit} 名までですので、あふれた **{count}** 名は見送りましたわ。', nameOne: 'name', nameMany: 'names', failed: { title: '確認が最後まで終わりませんでしたの', description: '画像から名前は読み取れましたけれど、list との照合を最後まで終えられませんでしたわ。' }, autoFailed: { title: 'その確認を終えられませんでしたの', description: '途中でつまずいてしまいましたの。もう一度貼っていただければ、また見てみますわ。' },
+    }, imageQueueFull: { title: '画像 check の queue がいっぱいですの', description: '画像 check の queue がいっぱいで、まだお預かりできませんの。', tip: 'この request は保持しておりませんの。queue が進んでから画像をもう一度お送りくださいませ' }, imageQueued: '画像 check を順番待ちに入れましたわ · 前に **{count}** 件ございますの…', imageProgress: '画像を受け取りましたわ · **{current}/{count}** 枚目を読み取り中ですの…', imageCooldownWait: 'API error のため Gemini が cooldown 中ですの · **{seconds}秒** 後に画像 **{current}/{count}** を再試行いたしますわ…', imageIgnored: '一度に処理できるのは {limit} 枚までですので、あふれた **{count}** 枚は見送りましたわ。', partialImages: { title: '一部の画像を読み取れませんでしたの', description: 'OCR error のため **{failed}/{count}** 枚を見送りましたわ。上の結果は、読み取りに成功した画像だけを使っておりますの。', tip: '失敗した画像だけをもう一度お送りくだされば、続きを check いたしますわ' }, ignored: '一度にお預かりできるのは {limit} 名までですので、あふれた **{count}** 名は見送りましたわ。', nameOne: 'name', nameMany: 'names', failed: { title: '確認が最後まで終わりませんでしたの', description: '画像から名前は読み取れましたけれど、list との照合を最後まで終えられませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' }, autoFailed: { title: 'その確認を終えられませんでしたの', description: '途中でつまずいてしまいましたの。', tip: 'もう一度貼っていただければ、また見てみますわ' },
     embed: { imageAuthor: '送ってくれた screenshot の check 結果ですわ。', textAuthor: '送ってくれた名前の check 結果ですわ。', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: '未登録', configured: 'configured', ignored: '上限 {limit} のため {count} {word}を除外しましたの。', unverified: '未確認 candidate {count} 件を除外し、Quick Add を無効にしましたの。', flagged: 'FLAGGED {count}', clear: 'CLEAR', elapsed: '⏱️ 解析 {seconds}s', elapsedQuick: { variants: [
         '⏱️ {seconds}s で終わりましたわ。',
         '⏱️ たった {seconds}s ですの。',

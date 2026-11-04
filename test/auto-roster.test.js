@@ -79,7 +79,7 @@ test('channel roster acknowledges before lookup, uses guild locale/scope, and ru
   assert.equal(args.lang, 'vi');
   assert.equal(args.guildId, 'guild');
   assert.equal(args.deep, undefined);
-  assert.match(f.events[0][1].embeds[0].data.title, /Tớ đang tra roster của Alpha/);
+  assert.match(f.events[0][1].embeds[0].data.description, /Tớ đang tra roster của \*\*Alpha\*\*/);
   assert.equal(f.events.at(-1)[1], '✅');
 });
 

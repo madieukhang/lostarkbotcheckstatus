@@ -23,7 +23,7 @@ import {
 import { createNameSuggestionContext } from '../../services/roster/search.js';
 import { getGuildConfig } from '../../utils/scope.js';
 import { createCooldownStore } from '../../utils/cooldownStore.js';
-import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../utils/alertEmbed.js';
 import { buildListCheckEmbed } from '../../utils/listCheckEmbed.js';
 import {
   isValidCharacterName,
@@ -31,7 +31,7 @@ import {
   normalizeNameKey,
 } from '../../utils/names.js';
 import { getGuildLanguage, t, tPick } from '../../services/i18n/index.js';
-import { buildAutoCheckEvidenceRow } from './check/index.js';
+import { buildAutoCheckEvidenceRow, buildQueueFullAlert } from './check/index.js';
 import { runRosterLookup } from '../roster/command.js';
 
 /** Env-based channel set (global fallback) */
@@ -321,23 +321,27 @@ export function createAutoCheckMessageHandler({
     const tokens = textRequest.invalidTokens
       .slice(0, 5)
       .map((token) => `\`${String(token).slice(0, 40)}\``)
-      .join(', ');
+      .join(' · ');
     await message.reply({
       embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        ...t('dialogue.check.text.invalid', lang, { tokens }),
+        kind: NoticeKind.INPUT,
+        ...t('dialogue.check.text.invalid', lang),
+        fields: [{ name: t('dialogue.common.fields.unreadable', lang), value: tokens, inline: false }],
       })],
     });
     await removeSearchReaction(message);
     return true;
   }
 
-  async function setProgressMessage(message, requestUi, lines) {
+  // `stage` names the step under dialogue.check.progressTitles; the lines
+  // carry the live counts below it.
+  async function setProgressMessage(message, requestUi, lang, stage, lines) {
     const payload = {
       content: null,
-      embeds: [buildNoticeEmbed(lines.filter(Boolean).join('\n'), {
-        severity: AlertSeverity.INFO,
-        titleIcon: '⏳',
+      embeds: [buildAlertEmbed({
+        kind: NoticeKind.PROGRESS,
+        title: t(`dialogue.check.progressTitles.${stage}`, lang),
+        description: lines.filter(Boolean).join('\n'),
       })],
       components: [],
     };
@@ -357,29 +361,31 @@ export function createAutoCheckMessageHandler({
     });
   }
 
-  function buildPartialImageWarning(request, failedImageCount, lang) {
-    if (failedImageCount === 0) return null;
+  function buildPartialImageWarning(request, failedImages, lang) {
+    if (failedImages.length === 0) return null;
     return buildAlertEmbed({
-      severity: AlertSeverity.WARNING,
+      kind: NoticeKind.PARTIAL,
       ...t('dialogue.check.partialImages', lang, {
-        failed: failedImageCount,
+        failed: failedImages.length,
         count: request.images.length,
       }),
-      timestamp: false,
+      fields: [{
+        name: t('dialogue.common.fields.unreadImages', lang),
+        value: failedImages.map(({ index }) => `#${index}`).join(', '),
+        inline: true,
+      }],
     });
   }
 
-  async function rejectEmptyNames(message, request, requestUi, lang, failedImageCount = 0) {
+  async function rejectEmptyNames(message, request, requestUi, lang, failedImages = []) {
+    // Empty text is input to fix; an image with no names is an empty result.
     const alert = request.textRequest
-      ? t('dialogue.check.text.empty', lang)
-      : t('dialogue.check.noNames', lang);
-    const partialWarning = buildPartialImageWarning(request, failedImageCount, lang);
+      ? { kind: NoticeKind.INPUT, ...t('dialogue.check.text.empty', lang) }
+      : { kind: NoticeKind.EMPTY, ...t('dialogue.check.noNames', lang) };
+    const partialWarning = buildPartialImageWarning(request, failedImages, lang);
     const payload = {
       content: null,
-      embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
-        ...alert,
-      }), partialWarning].filter(Boolean),
+      embeds: [buildAlertEmbed(alert), partialWarning].filter(Boolean),
       components: [],
     };
     if (requestUi.progressMsg) await requestUi.progressMsg.edit(payload);
@@ -425,14 +431,14 @@ export function createAutoCheckMessageHandler({
     request,
     progressMsg,
     unverifiedCount,
-    failedImageCount,
+    failedImages,
     lang,
   ) {
-    const partialWarning = buildPartialImageWarning(request, failedImageCount, lang);
+    const partialWarning = buildPartialImageWarning(request, failedImages, lang);
     await progressMsg.edit({
       content: null,
       embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EMPTY,
         ...t('dialogue.check.noVerifiedNames', lang, { count: unverifiedCount }),
       }), partialWarning].filter(Boolean),
       components: [],
@@ -446,12 +452,12 @@ export function createAutoCheckMessageHandler({
       const { name } = request.rosterRequest;
       if (!name) {
         await message.reply({ embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
+          kind: NoticeKind.INPUT,
           ...t('dialogue.roster.text.invalid', lang),
         })] });
         return;
       }
-      await setProgressMessage(message, requestUi, [t('dialogue.roster.text.progress', lang, { name })]);
+      await setProgressMessage(message, requestUi, lang, 'roster', [t('dialogue.roster.text.progress', lang, { name })]);
       const succeeded = await runRosterLookupFn({
         name,
         guildId: message.guild.id,
@@ -483,7 +489,7 @@ export function createAutoCheckMessageHandler({
       await runQueuedImageRequest(async () => {
         const seenNames = new Set();
         for (const [index, image] of request.images.entries()) {
-          await setProgressMessage(message, requestUi, [
+          await setProgressMessage(message, requestUi, lang, 'reading', [
             t('dialogue.check.imageProgress', lang, {
               current: index + 1,
               count: request.images.length,
@@ -520,7 +526,7 @@ export function createAutoCheckMessageHandler({
                   `[auto-check] all Gemini models cooling down; retrying image`
                   + ` ${index + 1}/${request.images.length} in ${retrySeconds}s.`,
                 );
-                await setProgressMessage(message, requestUi, [
+                await setProgressMessage(message, requestUi, lang, 'cooldown', [
                   t('dialogue.check.imageCooldownWait', lang, {
                     current: index + 1,
                     count: request.images.length,
@@ -529,7 +535,7 @@ export function createAutoCheckMessageHandler({
                   imageLimitLine(request, lang),
                 ]);
                 await waitFn(waitMs);
-                await setProgressMessage(message, requestUi, [
+                await setProgressMessage(message, requestUi, lang, 'reading', [
                   t('dialogue.check.imageProgress', lang, {
                     current: index + 1,
                     count: request.images.length,
@@ -552,7 +558,7 @@ export function createAutoCheckMessageHandler({
           + ` failed=${failedImages.length} names=${names.length}.`,
         );
       }, async (waitingAhead) => {
-        await setProgressMessage(message, requestUi, [
+        await setProgressMessage(message, requestUi, lang, 'queued', [
           t('dialogue.check.imageQueued', lang, { count: waitingAhead }),
           imageLimitLine(request, lang),
         ]);
@@ -575,7 +581,7 @@ export function createAutoCheckMessageHandler({
     }
 
     if (names.length === 0) {
-      await rejectEmptyNames(message, request, requestUi, lang, failedImages.length);
+      await rejectEmptyNames(message, request, requestUi, lang, failedImages);
       return;
     }
 
@@ -583,7 +589,7 @@ export function createAutoCheckMessageHandler({
       ? Math.min(maxNames * request.images.length, AUTO_CHECK_MAX_BATCH_NAMES)
       : maxNames;
     const limitedNames = names.slice(0, effectiveMaxNames);
-    await setProgressMessage(message, requestUi, [
+    await setProgressMessage(message, requestUi, lang, 'checking', [
       tPick(request.textRequest ? 'dialogue.check.text.progress' : 'dialogue.check.progress', lang, {
         count: limitedNames.length,
         word: t(`dialogue.check.${limitedNames.length === 1 ? 'nameOne' : 'nameMany'}`, lang),
@@ -603,7 +609,7 @@ export function createAutoCheckMessageHandler({
         request,
         requestUi.progressMsg,
         unverified.length,
-        failedImages.length,
+        failedImages,
         lang,
       );
       return;
@@ -620,7 +626,7 @@ export function createAutoCheckMessageHandler({
       lang,
       elapsedMs: Date.now() - startedAt,
     });
-    const partialWarning = buildPartialImageWarning(request, failedImages.length, lang);
+    const partialWarning = buildPartialImageWarning(request, failedImages, lang);
     await requestUi.progressMsg.edit({
       content: null,
       embeds: [embed, partialWarning].filter(Boolean),
@@ -671,10 +677,7 @@ export function createAutoCheckMessageHandler({
         await message.react('⚠️').catch(() => {});
         await sendRequestOutcome(message, requestUi, {
           content: null,
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            ...t(busyNoticeKey, lang, { limit: err.limit }),
-          })],
+          embeds: [buildAlertEmbed(buildQueueFullAlert(busyNoticeKey, err.limit, lang))],
           components: [],
         });
         return;
@@ -686,9 +689,9 @@ export function createAutoCheckMessageHandler({
       await sendRequestOutcome(message, requestUi, {
         content: null,
         embeds: [buildAlertEmbed({
-          severity: AlertSeverity.ERROR,
+          kind: NoticeKind.FAILURE,
           ...t('dialogue.check.autoFailed', lang),
-          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${errorText}\``, inline: false }],
+          fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${errorText}\``, inline: false }],
         })],
         components: [],
       });
