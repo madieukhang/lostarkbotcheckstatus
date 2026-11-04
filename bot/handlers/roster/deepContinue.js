@@ -11,7 +11,7 @@ import { EmbedBuilder } from 'discord.js';
 import { connectDB } from '../../db.js';
 import UserPreference from '../../models/UserPreference.js';
 import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { NoticeKind } from '../../utils/alertEmbed.js';
 import { deferUpdate, replyAlert, replyEmbed } from '../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { detectAltsViaStronghold } from '../../services/roster/index.js';
@@ -32,6 +32,7 @@ import {
   clearRosterDeepSession,
 } from '../../utils/rosterDeepSession.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
+import { buildDeepScanStoppedNotice } from './deepResult.js';
 import { createRosterScanRuntime } from './progress.js';
 import { resolveRosterScanOutcome } from './completion.js';
 
@@ -39,15 +40,15 @@ function getSessionAccessAlert(session, userId, lang) {
   const rules = [
     {
       denied: () => !session,
-      alert: () => ({ severity: AlertSeverity.WARNING, ...t('dialogue.scan.sessionExpired', lang) }),
+      alert: () => ({ kind: NoticeKind.EXPIRED, ...t('dialogue.scan.sessionExpired', lang) }),
     },
     {
       denied: () => session.callerId !== userId,
-      alert: () => ({ severity: AlertSeverity.ERROR, ...t('dialogue.scan.notYourSession', lang) }),
+      alert: () => ({ kind: NoticeKind.GUARD, ...t('dialogue.scan.notYourSession', lang) }),
     },
     {
       denied: () => session.inProgress,
-      alert: () => ({ severity: AlertSeverity.INFO, ...t('dialogue.scan.continueRunning', lang) }),
+      alert: () => ({ kind: NoticeKind.BUSY, ...t('dialogue.scan.continueRunning', lang) }),
     },
   ];
   return rules.find(({ denied }) => denied())?.alert() || null;
@@ -229,13 +230,11 @@ export async function handleRosterDeepContinueButton(interaction) {
         content: null,
         embeds: [
           primaryEmbed,
-          buildAlertEmbed({
-            severity: AlertSeverity.ERROR,
-            ...t('dialogue.scan.stopped', lang, {
-              name: session.targetName,
-              reason: scan.error.message || t('dialogue.scan.unexpectedError', lang),
-            }),
-            footer: t('dialogue.scan.stopped.retry', lang),
+          buildDeepScanStoppedNotice({
+            name: session.targetName,
+            error: scan.error,
+            lang,
+            tip: t('dialogue.scan.stopped.retry', lang),
           }),
         ],
         components: [],

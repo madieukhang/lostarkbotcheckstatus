@@ -22,7 +22,7 @@ import {
   formatLinkedCharacter,
   statMapFromRosterCharacters,
 } from '../list/trackedAltsRender.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { buildAlertEmbed, AlertSeverity, NoticeKind } from '../../utils/alertEmbed.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import { t, tPick } from '../../services/i18n/index.js';
@@ -38,7 +38,7 @@ import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCom
 import { profileUrl as bibleProfileUrl } from '../../utils/rosterLink.js';
 import { createRosterScanRuntime, formatDeepScanStats } from './progress.js';
 import { resolveRosterScanOutcome } from './completion.js';
-import { buildDeepScanNotRunNotice, buildRosterDeepScanResult } from './deepResult.js';
+import { buildDeepScanNotRunNotice, buildDeepScanStoppedNotice, buildRosterDeepScanResult } from './deepResult.js';
 
 async function loadGuildListHits(guildMembers, guildId) {
   const memberNames = guildMembers.map((member) => member.name);
@@ -55,13 +55,11 @@ async function loadGuildListHits(guildMembers, guildId) {
 }
 
 function buildHiddenScanError(err, name, lang) {
-  return buildAlertEmbed({
-    severity: AlertSeverity.ERROR,
-    ...t('dialogue.scan.stopped', lang, {
-      name,
-      reason: err.message || t('dialogue.scan.unexpectedError', lang),
-    }),
-    footer: t('dialogue.scan.stopped.rosterStillShown', lang),
+  return buildDeepScanStoppedNotice({
+    name,
+    error: err,
+    lang,
+    note: t('dialogue.scan.stopped.rosterStillShown', lang),
   });
 }
 
@@ -273,7 +271,7 @@ function notifyHiddenScanCompletion({ interaction, replyEditor, name, meta, altR
 async function replyWithBibleUnavailable(replyEditor, lang) {
   await replyEditor.edit({
     embeds: [buildAlertEmbed({
-      severity: AlertSeverity.WARNING,
+      kind: NoticeKind.BUSY,
       ...t('dialogue.search.bibleUnavailable', lang),
     })],
   });

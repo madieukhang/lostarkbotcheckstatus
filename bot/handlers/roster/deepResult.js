@@ -34,6 +34,31 @@ export function buildDeepScanNotRunNotice({ name, meta, guildMembersUnavailable 
 }
 
 /**
+ * Build the notice for a deep scan the detector stopped partway. The
+ * Continue pass offers a retry step; the first hidden-roster pass has no
+ * Continue, so it notes that the roster card stays instead.
+ * @param {object} args
+ * @param {string} args.name - scanned character name.
+ * @param {Error|null} args.error - the detector's stop error.
+ * @param {string} args.lang - locale for UI strings.
+ * @param {string} [args.tip] - next step shown as the footer tip.
+ * @param {string} [args.note] - sentence appended to the description.
+ * @returns {import('discord.js').EmbedBuilder}
+ */
+export function buildDeepScanStoppedNotice({ name, error, lang, tip, note }) {
+  const { title, description } = t('dialogue.scan.stopped', lang, {
+    name,
+    reason: error?.message || t('dialogue.scan.unexpectedError', lang),
+  });
+  return buildAlertEmbed({
+    kind: NoticeKind.BUSY,
+    title,
+    description: [description, note].filter(Boolean).join(' '),
+    tip,
+  });
+}
+
+/**
  * Render a roster deep-scan result and register its Continue session if allowed.
  * Callers retain their guild-context gate; the primary card snapshot and scan
  * totals must come from the same pass so Continue can resume without scraping.

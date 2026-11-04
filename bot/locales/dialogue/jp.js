@@ -1,14 +1,14 @@
 export default {
   common: {
     fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細', queue: '🚦 順番待ち', unreadable: '✏️ 名前ではない語', unreadImages: '🖼️ 読めなかった画像', whoCanUse: '👥 使える方' },
-    selectionLost: { title: 'その選択はもう一致しませんの', description: 'この menu で選ばれた項目が見つかりませんでしたわ。', tip: 'Command をもう一度実行して、新しい menu を開いてくださいませ' },
+    selectionLost: { title: 'その選択はもう一致しませんの', description: '選ばれた項目が見つかりませんでしたわ。', tip: 'Command をもう一度実行して、新しい選択肢を開いてくださいませ' },
     errorField: 'エラー', missingField: '不足', unknown: '不明',
     savedCardFailed: { title: '保存しましたわ', description: '変更は保存しましたが、確認 card を表示できませんでしたの。' },
     queuedCardFailed: { title: '承認に回しましたわ', description: 'ご依頼は保存され承認待ちですが、確認 card を表示できませんでしたの。' },
     officerRoles: 'Officer · Senior',
     unexpected: {
       title: 'その操作がすり抜けてしまいましたの',
-      description: '今回は最後まで完了できませんでしたわ。もう一度お試しいただき、続くようでしたら officer へお知らせくださいませ。',
+      description: '今回は最後まで完了できませんでしたわ。', tip: 'もう一度お試しいただき、続くようでしたら officer へお知らせくださいませ',
     },
     serverOnly: { title: 'サーバー内でのみ使えますわ', description: 'このコマンドは Discord サーバー内専用で、DM では使えませんの。', tip: 'サーバーのチャンネルでもう一度実行してくださいませ' },
     notYourSession: { title: 'あなたのセッションではありませんの', description: 'この画面を開いた方だけが操作できますわ。' },
@@ -24,7 +24,7 @@ export default {
         online: '監視中の **{count}** サーバーはすべてオンラインですわ。良いレイドを〜', unknown: '**{count}** サーバーから応答がないため、不明としておきますの。',
       },
       checked: '{time} にもう一度確認しましたわ。', footer: 'Source: playlostark.com · {refresh} /la-status でもう一度確認',
-      failed: { title: 'サーバー状況を読めませんでしたの', description: '今回は状況ソースから返事がありませんでした。少し待ってからお試しくださいませ。' },
+      failed: { title: 'サーバー状況を読めませんでしたの', description: '今回は状況ソースから返事がありませんでしたわ。', tip: '少し待ってからお試しくださいませ' },
     },
     reset: { title: '保存した状況を消しましたわ', description: '保存中のサーバー状態を消しました。次の監視周期から LoaLogs が追跡し直しますの。' },
     seniorOnly: { title: 'Senior 限定ですの', description: 'このコマンドは Senior approver 限定ですわ。' },
@@ -451,9 +451,9 @@ export default {
     format: { via: '**{name}** 経由', correctedOcr: '**{input}** と読み取り、**{name}** に一致', correctedText: '**{input}** と入力、**{name}** に一致', rosterVia: '**{name}** と同じ roster', rosterEntry: '**{name}** と同じ roster、**{entry}** として登録', alts: 'alts', more: '+{count} 名', local: 'サーバー内', trusted: 'trusted' },
   },
   scan: {
-    limit: { title: 'Scan がすでに実行中ですの', description: 'Stronghold scan が実行中です。完了を待つか active card の **scan 停止** を押してくださいませ。', active: '実行中: {label}' }, progress: 'Stronghold scan 実行中 · {name}', resuming: 'Stronghold scan 再開 · {name}', guild: 'Guild **{guild}**', guildMembers: 'Guild **{guild}** ({count} members)', continuePass: 'Continue pass', visibleRoster: 'visible roster', hiddenRoster: 'hidden roster',
-    stopped: { title: 'Deep scan 停止 · {name}', description: '理由: **{reason}**', retry: '問題解消後に Continue を再試行できますの。', rosterStillShown: 'Roster card は残っています。Deep scan だけ未完了ですわ。' }, unexpectedError: '予期しない detector error', failed: { title: 'Deep scan 失敗 · {name}', description: 'Detector error: `{error}`' },
-    sessionExpired: { title: 'Scan session の期限切れですの', description: 'この deep-scan session は5分を過ぎていますわ。', footer: '`/la-roster deep:true` を再実行してくださいませ。' }, notYourSession: { title: 'あなたの scan ではありませんの', description: 'Scan を開始した人だけが続行できますわ。' }, continueRunning: { title: 'Scan は実行中ですの', description: 'この結果では Continue pass がすでに動いています。完了を待ってね♪' },
+    limit: { title: 'Scan がすでに実行中ですの', description: 'Stronghold scan がすでに実行中ですわ。', tip: '完了を待つか active card の scan 停止 を押してくださいませ', runningField: '🔄 実行中' }, progress: 'Stronghold scan 実行中 · {name}', resuming: 'Stronghold scan 再開 · {name}', guild: 'Guild **{guild}**', guildMembers: 'Guild **{guild}** ({count} members)', continuePass: 'Continue pass', visibleRoster: 'visible roster', hiddenRoster: 'hidden roster',
+    stopped: { title: 'Deep scan 停止 · {name}', description: '理由: **{reason}**', retry: '問題が解消したら Continue をもう一度押してくださいませ', rosterStillShown: 'Roster card は残っています。Deep scan だけ未完了ですわ。' }, unexpectedError: '予期しない detector error', failed: { title: 'Deep scan 失敗 · {name}', description: 'Detector error: `{error}`' },
+    sessionExpired: { title: 'Scan session の期限切れですの', description: 'この deep-scan session は5分を過ぎたので、Continue button はもう使えませんわ。', tip: '/la-roster deep:true を再実行してくださいませ' }, notYourSession: { title: 'あなたの scan ではありませんの', description: 'Scan を開始した人だけが続行できますわ。' }, continueRunning: { title: 'Scan は実行中ですの', description: 'この結果では Continue pass がすでに動いています。完了を待ってね♪' },
     stats: { checked: 'checked {count}', attempted: 'attempted {count}', skipped: 'limit で {count} skip', failed: 'failed {count}', concurrency: 'concurrency {count}', scraper: 'ScraperAPI {state}', on: 'on', off: 'off' },
     progressUi: { more: '...ほか {count} 名', matches: '現在の一致 ({count}):', started: '{time} に開始', lastError: '最後の error: `{error}`', backoff: 'Backoff {ms}ms', retries: '429 retry {count}', interval: '15秒ごとに更新', checked: '**{checked}** / {total} candidates を確認', attempts: 'Attempts **{count}**', found: '**{count}** match を発見', failed: 'Failed **{count}**' },
     result: {
@@ -471,7 +471,7 @@ export default {
       invalid: { title: 'Character 名を1つだけ入力してくださいませ', description: '`roster NameOne` または `roster: NameOne` をお使いくださいませ。複数の名前、link、mention は受け付けませんの。' },
       progress: '**{name}** の roster を調べておりますわ…',
     },
-    deepRestricted: { title: 'Officer 限定ですの', description: '`/la-roster deep:true` は residential worker を使う長い Stronghold scan です。Officer / senior のみ利用可能で、通常 roster は `deep:true` なしでご覧くださいませ。' }, title: '{name} の roster · {count} {word}', characterOne: 'character', characterMany: 'characters', server: 'Server', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`', trusted: '**{name}** は trusted user ですの。', fetchFailed: { title: 'Roster を取得できませんでしたの', description: 'lostark.bible から roster を取得できませんでしたわ。' }, listCheckFailed: { title: 'List の照合に失敗しましたの', description: 'roster は取得できましたが、list と照合できませんでしたわ。もう一度お試しくださいませ。' }, hiddenTitle: 'Hidden roster · {name}', hiddenLine: { variants: [
+    deepRestricted: { title: 'Officer 限定ですの', description: '`/la-roster deep:true` は residential worker を使う長い Stronghold scan ですの。', tip: '通常 roster は deep:true なしでご覧くださいませ' }, title: '{name} の roster · {count} {word}', characterOne: 'character', characterMany: 'characters', server: 'Server', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`', trusted: '**{name}** は trusted user ですの。', fetchFailed: { title: 'Roster を取得できませんでしたの', description: 'lostark.bible から roster を取得できませんでしたわ。' }, listCheckFailed: { title: 'List の照合に失敗しましたの', description: 'roster は取得できましたが、list と照合できませんでしたわ。', tip: 'もう一度お試しくださいませ' }, hiddenTitle: 'Hidden roster · {name}', hiddenLine: { variants: [
       'この roster は非公開ですので、character を一人も読めませんの。でも guild は開いていますから、そちらから探りましたわ。',
       'roster を隠していらっしゃるので character は見えませんの。幸い guild は公開でしたから、これだけ拾えましたわ。',
       'roster が閉じていて character が見えませんの。guild 側から分かったのはこれで全部ですわ。',
@@ -547,7 +547,7 @@ export default {
     completeTitle: '画像同期 · 完了', completeDescription: 'Legacy entry **{total}** 件を確認しました。',
     startingTitle: '画像同期 · 開始', startingDescription: '全リストから legacy entry **{count}** 件を見つけました。移行を始めますわ…',
     nothingTitle: '画像同期 · 作業なし', nothingDescription: '画像付き entry はすべて rehost 参照を持っていますの。',
-    missingChannel: { title: 'Evidence チャンネルがありませんの', description: '証拠画像を安全に移す場所がまだありません。', footer: '先に `/la-remote action:evidencechannel channel:#...` を設定してくださいませ。' },
+    missingChannel: { title: 'Evidence チャンネルがありませんの', description: '証拠画像を安全に移す場所がまだありません。', tip: '先に /la-remote action:evidencechannel channel:#... を設定してくださいませ' },
     fields: { synced: '同期済み', dead: '無効 URL', raced: '同期中に変更', failed: '失敗', blacklist: 'Blacklist', whitelist: 'Whitelist', watchlist: 'Watchlist', errors: 'エラー ({count})' },
     summaryFooter: '{user} が移行 · 再実行しても安全ですの', nothingFooter: 'Idempotent · 再実行しても安全',
     startingFooter: '各 entry: URL 更新 → download → rehost · 約1–2秒', moreErrors: '…ほか {count} 件',

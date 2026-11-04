@@ -8,7 +8,7 @@
 import { InteractionType, MessageFlags } from 'discord.js';
 
 import { checkStatus, resetState } from '../monitor/monitor.js';
-import { AlertSeverity, buildAlertEmbed } from '../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../utils/alertEmbed.js';
 import { getCachedUserLanguage, t, getSupportedLanguages } from '../services/i18n/index.js';
 import { getGuildConfig } from '../utils/scope.js';
 import { buildSetupActionChoices } from '../handlers/setup/setupActions.js';
@@ -50,12 +50,13 @@ function logTransientInteraction(scope, err) {
   console.warn(`[bot] Transient on ${scope}: ${label} (${err.code})`);
 }
 
-async function replyOrEdit(interaction) {
+async function replyOrEdit(interaction, err) {
   const lang = getCachedUserLanguage(interaction.user?.id);
   const payload = {
     embeds: [buildAlertEmbed({
-      severity: AlertSeverity.ERROR,
+      kind: NoticeKind.FAILURE,
       ...t('dialogue.common.unexpected', lang),
+      fields: [{ name: t('dialogue.common.fields.details', lang), value: err?.message ? `\`${err.message}\`` : '', inline: false }],
     })],
   };
   if (interaction.deferred || interaction.replied) {
@@ -70,7 +71,7 @@ async function handleRoute(interaction, route) {
     await route.handle(interaction);
   } catch (err) {
     console.error(route.label, err?.message || err);
-    await replyOrEdit(interaction);
+    await replyOrEdit(interaction, err);
   }
 }
 

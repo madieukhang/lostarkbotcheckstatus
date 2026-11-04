@@ -13,8 +13,8 @@ import {
 } from 'discord.js';
 
 import UserPreference from '../../models/UserPreference.js';
-import { AlertSeverity } from '../../utils/alertEmbed.js';
-import { deferEphemeralReply, editNotice } from '../../utils/interactionReplies.js';
+import { NoticeKind } from '../../utils/alertEmbed.js';
+import { deferEphemeralReply, editAlert } from '../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { editWithListEntryDetails } from '../list/check/index.js';
 import { getListContext, parseListEntryRef } from '../list/helpers.js';
@@ -44,9 +44,7 @@ export async function handleRosterEvidenceButton(interaction) {
   const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
   const ref = parseListEntryRef(interaction.customId.slice(ROSTER_EVIDENCE_PREFIX.length));
   if (!ref) {
-    await editNotice(interaction, t('dialogue.check.malformed', lang), {
-      severity: AlertSeverity.WARNING,
-    });
+    await editAlert(interaction, { kind: NoticeKind.EXPIRED, ...t('dialogue.common.selectionLost', lang) });
     return;
   }
   await editWithListEntryDetails(interaction, ref, { client: interaction.client, lang });

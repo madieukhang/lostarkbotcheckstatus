@@ -1,7 +1,7 @@
 export default {
   common: {
     fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details', queue: '🚦 Queue', unreadable: '✏️ Not names', unreadImages: '🖼️ Unread images', whoCanUse: '👥 Who can use it' },
-    selectionLost: { title: 'That choice no longer matches', description: 'I could not find the item you picked in this menu.', tip: 'Run the command again for a fresh menu' },
+    selectionLost: { title: 'That choice no longer matches', description: 'I could not find the item you picked.', tip: 'Run the command again for fresh choices' },
     errorField: 'Error',
     missingField: 'Missing',
     unknown: 'Unknown',
@@ -10,7 +10,7 @@ export default {
     officerRoles: 'Officer · Senior',
     unexpected: {
       title: 'That action slipped away',
-      description: 'I could not finish it this time. Please try again; if it keeps happening, let an officer know.',
+      description: 'I could not finish it this time.', tip: 'Please try again; if it keeps happening, let an officer know',
     },
     serverOnly: {
       title: 'This belongs in a server',
@@ -50,7 +50,7 @@ export default {
       footer: 'Source: playlostark.com · {refresh} re-run /la-status to refresh',
       failed: {
         title: 'I could not read the server status',
-        description: 'The status source did not answer this time. Please try again in a moment.',
+        description: 'The status source did not answer this time.', tip: 'Please try again in a moment',
       },
     },
     reset: {
@@ -619,11 +619,11 @@ export default {
     format: { via: 'via **{name}**', correctedOcr: 'read as **{input}**, matched to **{name}**', correctedText: 'typed as **{input}**, matched to **{name}**', rosterVia: 'same roster as **{name}**', rosterEntry: 'same roster as **{name}**, listed under **{entry}**', alts: 'alts', more: '+{count} more', local: 'Local', trusted: 'trusted' },
   },
   scan: {
-    limit: { title: 'A scan is already running', description: 'You already have a Stronghold scan running. Wait for it, or press **Stop scan** on its active card.', active: 'Active: {label}' },
+    limit: { title: 'A scan is already running', description: 'You already have a Stronghold scan running.', tip: 'Wait for it, or press Stop scan on its active card', runningField: '🔄 Running' },
     progress: 'Stronghold scan in progress · {name}', resuming: 'Stronghold scan resuming · {name}', guild: 'Guild **{guild}**', guildMembers: 'Guild **{guild}** ({count} members)', continuePass: 'Continue pass', visibleRoster: 'visible roster', hiddenRoster: 'hidden roster',
-    stopped: { title: 'Deep scan stopped · {name}', description: 'Reason: **{reason}**', retry: 'Continue can be retried after the issue clears.', rosterStillShown: 'The roster card is still available; only the deep scan was incomplete.' },
+    stopped: { title: 'Deep scan stopped · {name}', description: 'Reason: **{reason}**', retry: 'Press Continue again once the issue clears', rosterStillShown: 'The roster card is still available; only the deep scan was incomplete.' },
     unexpectedError: 'unexpected detector error', failed: { title: 'Deep scan failed · {name}', description: 'The detector failed: `{error}`' },
-    sessionExpired: { title: 'Scan session expired', description: 'This deep-scan session is older than five minutes.', footer: 'Run `/la-roster deep:true` again for a fresh scan.' },
+    sessionExpired: { title: 'Scan session expired', description: 'This deep-scan session is older than five minutes, so its Continue button no longer works.', tip: 'Run /la-roster deep:true again for a fresh scan' },
     notYourSession: { title: 'This is not your scan', description: 'Only the person who started this scan can continue it.' },
     continueRunning: { title: 'The scan is already running', description: 'A Continue pass is already active for this result. Wait until it finishes.' },
     stats: { checked: 'checked {count}', attempted: 'attempted {count}', skipped: 'skipped {count} by limit', failed: 'failed {count}', concurrency: 'concurrency {count}', scraper: 'ScraperAPI {state}', on: 'on', off: 'off' },
@@ -649,11 +649,11 @@ export default {
       invalid: { title: 'Enter exactly one character name', description: 'Use `roster NameOne` or `roster: NameOne`. Multiple names, links and mentions are not accepted.' },
       progress: 'Looking up the roster for **{name}**…',
     },
-    deepRestricted: { title: 'Officer access only', description: '`/la-roster deep:true` runs a long Stronghold scan through the residential worker. Officers and seniors may use it; run without `deep:true` for the basic roster.' },
+    deepRestricted: { title: 'Officer access only', description: '`/la-roster deep:true` runs a long Stronghold scan through the residential worker.', tip: 'Run it without deep:true for the basic roster' },
     title: '{name} roster · {count} {word}', characterOne: 'character', characterMany: 'characters', server: 'Server', topCharacter: 'Top character: {class} **{name}** · `{ilvl}`',
     trusted: '**{name}** is trusted.',
     fetchFailed: { title: 'Roster fetch failed', description: 'I could not fetch the roster from lostark.bible.' },
-    listCheckFailed: { title: 'List check failed', description: 'I fetched the roster but could not check it against the lists. Please try again.' },
+    listCheckFailed: { title: 'List check failed', description: 'I fetched the roster but could not check it against the lists.', tip: 'Please try again' },
     hiddenTitle: 'Hidden roster · {name}', hiddenLine: { variants: [
       'This roster is locked, so I cannot read a single character off it. The guild is still open though, so I worked from there.',
       'They hid the roster, so no characters for me. The guild page is public at least, and this is what it gave up.',
@@ -769,7 +769,7 @@ export default {
     missingChannel: {
       title: 'Evidence channel is missing',
       description: 'I have nowhere safe to move the evidence images yet.',
-      footer: 'Set `/la-remote action:evidencechannel channel:#...` first, then try again.',
+      tip: 'Set /la-remote action:evidencechannel channel:#... first, then try again',
     },
     fields: {
       synced: 'Synced',

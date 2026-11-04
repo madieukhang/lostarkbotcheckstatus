@@ -3,7 +3,7 @@ import { createArtistEmbed } from '../../utils/artistVoice.js';
 
 import config from '../../config.js';
 import { COLORS } from '../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../utils/alertEmbed.js';
 import { editPayload } from '../../utils/interactionReplies.js';
 import { sleep } from '../../utils/async.js';
 import GuildConfig from '../../models/GuildConfig.js';
@@ -174,7 +174,7 @@ export async function handleSyncImagesAction(interaction, lang = 'en') {
   if (!ownerCfg?.evidenceChannelId) {
     await editPayload(interaction, {
       embeds: [buildAlertEmbed({
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.INPUT,
         ...t('dialogue.syncImages.missingChannel', lang),
       })],
     });

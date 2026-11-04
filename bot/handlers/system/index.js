@@ -3,7 +3,7 @@ import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { connectDB } from '../../db.js';
 import { STATUS } from '../../monitor/serverStatus.js';
 import { COLORS, ICONS, relativeTime } from '../../utils/ui.js';
-import { AlertSeverity } from '../../utils/alertEmbed.js';
+import { NoticeKind } from '../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../utils/interactionReplies.js';
 import { rejectNonSenior } from '../../utils/seniorGate.js';
 import UserPreference from '../../models/UserPreference.js';
@@ -130,9 +130,9 @@ export function createSystemHandlers({ checkStatus, resetState, client, connectD
       await editEmbed(interaction, embed);
     } catch (err) {
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.system.status.failed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       });
     }
   }
@@ -145,7 +145,7 @@ export function createSystemHandlers({ checkStatus, resetState, client, connectD
     if (await rejectNonSenior(interaction, lang, 'dialogue.system.seniorOnly')) return;
     await resetState();
     await editAlert(interaction, {
-      severity: AlertSeverity.SUCCESS,
+      kind: NoticeKind.DONE,
       ...t('dialogue.system.reset', lang),
     });
   }

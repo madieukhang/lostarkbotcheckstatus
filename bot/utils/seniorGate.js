@@ -4,7 +4,7 @@
  * command only in OWNER_GUILD_ID is not a permission, so each handler asks.
  */
 
-import { AlertSeverity } from './alertEmbed.js';
+import { NoticeKind } from './alertEmbed.js';
 import { isSeniorApprover } from './approverRoles.js';
 import { editAlert } from './interactionReplies.js';
 import { t } from '../services/i18n/index.js';
@@ -19,7 +19,7 @@ import { t } from '../services/i18n/index.js';
 export async function rejectNonSenior(interaction, lang, noticeKey) {
   if (isSeniorApprover(interaction.user.id)) return false;
   await editAlert(interaction, {
-    severity: AlertSeverity.ERROR,
+    kind: NoticeKind.GUARD,
     ...t(noticeKey, lang),
   });
   return true;

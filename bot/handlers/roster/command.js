@@ -11,7 +11,7 @@ import { JSDOM } from 'jsdom';
 import { createRosterVirtualConsole } from '../../services/roster/dom.js';
 import { connectDB } from '../../db.js';
 import { COLORS } from '../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../utils/alertEmbed.js';
 import { deferReply, replyAlert, replyEmbed } from '../../utils/interactionReplies.js';
 import TrustedUser from '../../models/TrustedUser.js';
 import Watchlist from '../../models/Watchlist.js';
@@ -36,7 +36,7 @@ import {
 } from '../../utils/strongholdScanGate.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
-import { getListContext } from '../list/helpers.js';
+import { buildOfficerOnlyAlert, getListContext } from '../list/helpers.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { getClassEmoji } from '../../models/Class.js';
 import { createLongRunningReplyEditor } from '../../utils/longRunningReply.js';
@@ -358,9 +358,9 @@ export async function runRosterLookup({
     const lang = await languagePromise;
     await replyEditor.edit({
       embeds: [buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.FAILURE,
         ...t(ROSTER_FAILURE_ALERT_KEYS[err?.rosterStage] || 'dialogue.roster.fetchFailed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       })],
     });
     return false;
@@ -388,10 +388,7 @@ export async function handleRosterCommand(interaction) {
   // does a single-page roster fetch with no fan-out.
   if (deep && !isPrivilegedStrongholdScanUser(interaction.user.id)) {
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-    await replyAlert(interaction, {
-      severity: AlertSeverity.WARNING,
-      ...t('dialogue.roster.deepRestricted', lang),
-    });
+    await replyAlert(interaction, buildOfficerOnlyAlert('dialogue.roster.deepRestricted', lang));
     return;
   }
 

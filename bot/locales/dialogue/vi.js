@@ -1,7 +1,7 @@
 export default {
   common: {
     fields: { filter: '🎚️ Bộ lọc', beforeFilter: '📋 Trước khi lọc', details: '🧾 Chi tiết', queue: '🚦 Hàng chờ', unreadable: '✏️ Không đọc được', unreadImages: '🖼️ Ảnh chưa đọc được', whoCanUse: '👥 Ai dùng được' },
-    selectionLost: { title: 'Lựa chọn này không còn khớp', description: 'Tớ không tìm ra mục cậu vừa chọn trong menu này.', tip: 'Chạy lại lệnh để mở menu mới' },
+    selectionLost: { title: 'Lựa chọn này không còn khớp', description: 'Tớ không tìm ra mục cậu vừa chọn nữa.', tip: 'Chạy lại lệnh để lấy lựa chọn mới nhé' },
     errorField: 'Lỗi',
     missingField: 'Còn thiếu',
     unknown: 'Không rõ',
@@ -10,7 +10,7 @@ export default {
     officerRoles: 'Officer · Senior',
     unexpected: {
       title: 'Thao tác này vừa trượt mất rồi',
-      description: 'Tớ chưa thể hoàn tất lần này. Cậu thử lại nhé; nếu vẫn lặp lại, báo cho officer giúp tớ.',
+      description: 'Tớ chưa thể hoàn tất lần này.', tip: 'Cậu thử lại nhé; nếu vẫn lặp lại, báo cho officer giúp tớ',
     },
     serverOnly: {
       title: 'Chỗ này chỉ dùng trong server thôi',
@@ -43,7 +43,7 @@ export default {
       },
       checked: 'Tớ vừa kiểm tra lại {time}.',
       footer: 'Nguồn: playlostark.com · {refresh} chạy lại /la-status để làm mới',
-      failed: { title: 'Tớ chưa đọc được trạng thái server', description: 'Nguồn trạng thái chưa trả lời lần này. Cậu thử lại sau một chút nhé.' },
+      failed: { title: 'Tớ chưa đọc được trạng thái server', description: 'Nguồn trạng thái chưa trả lời lần này.', tip: 'Cậu thử lại sau một chút nhé' },
     },
     reset: { title: 'Đã xóa trạng thái đã nhớ', description: 'Tớ đã xóa trạng thái server đang lưu. LoaLogs sẽ theo dõi lại từ chu kỳ kế tiếp.' },
     seniorOnly: { title: 'Chỉ Senior mới dùng được', description: 'Lệnh này dành riêng cho Senior approver nhé.' },
@@ -477,9 +477,9 @@ export default {
     format: { via: 'via **{name}**', correctedOcr: 'đọc được **{input}**, khớp với **{name}**', correctedText: 'gõ **{input}**, khớp với **{name}**', rosterVia: 'cùng roster với **{name}**', rosterEntry: 'cùng roster với **{name}**, nằm trong list dưới tên **{entry}**', alts: 'alts', more: '+{count} tên khác', local: 'Nội bộ', trusted: 'trusted' },
   },
   scan: {
-    limit: { title: 'Đã có một lượt scan đang chạy', description: 'Cậu đã có Stronghold scan đang chạy. Chờ nó xong hoặc bấm **Dừng quét** trên card hiện tại nhé.', active: 'Đang chạy: {label}' }, progress: 'Đang quét Stronghold · {name}', resuming: 'Đang tiếp tục quét Stronghold · {name}', guild: 'Guild **{guild}**', guildMembers: 'Guild **{guild}** ({count} thành viên)', continuePass: 'Lượt quét tiếp', visibleRoster: 'roster hiển thị', hiddenRoster: 'roster ẩn',
-    stopped: { title: 'Deep scan đã dừng · {name}', description: 'Lý do: **{reason}**', retry: 'Có thể bấm Continue lại sau khi lỗi được giải quyết.', rosterStillShown: 'Card roster vẫn được giữ; chỉ deep scan chưa hoàn tất.' }, unexpectedError: 'lỗi detector ngoài dự kiến', failed: { title: 'Deep scan thất bại · {name}', description: 'Detector gặp lỗi: `{error}`' },
-    sessionExpired: { title: 'Session scan đã hết hạn', description: 'Session deep-scan này đã quá năm phút.', footer: 'Chạy lại `/la-roster deep:true` để bắt đầu lượt mới nhé.' }, notYourSession: { title: 'Đây không phải scan của cậu', description: 'Chỉ người bắt đầu scan mới tiếp tục được.' }, continueRunning: { title: 'Scan đang chạy rồi', description: 'Đã có một lượt Continue chạy cho kết quả này. Chờ nó xong nhé.' },
+    limit: { title: 'Đã có một lượt scan đang chạy', description: 'Cậu đã có một Stronghold scan đang chạy.', tip: 'Chờ nó xong hoặc bấm Dừng quét trên card hiện tại nhé', runningField: '🔄 Đang chạy' }, progress: 'Đang quét Stronghold · {name}', resuming: 'Đang tiếp tục quét Stronghold · {name}', guild: 'Guild **{guild}**', guildMembers: 'Guild **{guild}** ({count} thành viên)', continuePass: 'Lượt quét tiếp', visibleRoster: 'roster hiển thị', hiddenRoster: 'roster ẩn',
+    stopped: { title: 'Deep scan đã dừng · {name}', description: 'Lý do: **{reason}**', retry: 'Bấm Continue lại khi lỗi đã được giải quyết nhé', rosterStillShown: 'Card roster vẫn được giữ; chỉ deep scan chưa hoàn tất.' }, unexpectedError: 'lỗi detector ngoài dự kiến', failed: { title: 'Deep scan thất bại · {name}', description: 'Detector gặp lỗi: `{error}`' },
+    sessionExpired: { title: 'Session scan đã hết hạn', description: 'Session deep-scan này đã quá năm phút, nên nút Continue không còn tác dụng.', tip: 'Chạy lại /la-roster deep:true để bắt đầu lượt mới nhé' }, notYourSession: { title: 'Đây không phải scan của cậu', description: 'Chỉ người bắt đầu scan mới tiếp tục được.' }, continueRunning: { title: 'Scan đang chạy rồi', description: 'Đã có một lượt Continue chạy cho kết quả này. Chờ nó xong nhé.' },
     stats: { checked: 'đã kiểm tra {count}', attempted: 'đã thử {count}', skipped: 'bỏ qua {count} do giới hạn', failed: 'lỗi {count}', concurrency: 'đồng thời {count}', scraper: 'ScraperAPI {state}', on: 'bật', off: 'tắt' },
     progressUi: { more: '... và {count} tên khác', matches: 'Kết quả khớp hiện tại ({count}):', started: 'Bắt đầu {time}', lastError: 'Lỗi gần nhất: `{error}`', backoff: 'Backoff {ms}ms', retries: 'Thử lại 429: {count}', interval: 'Cập nhật mỗi 15 giây', checked: 'Đã kiểm tra **{checked}** / {total} candidate', attempts: 'Đã thử **{count}**', found: 'Tìm thấy **{count}** kết quả', failed: 'Lỗi **{count}**' },
     result: {
@@ -497,7 +497,7 @@ export default {
       invalid: { title: 'Nhập đúng một tên character nhé', description: 'Cậu dùng `roster NameOne` hoặc `roster: NameOne`. Lệnh này không nhận nhiều tên, link hay mention.' },
       progress: 'Tớ đang tra roster của **{name}**…',
     },
-    deepRestricted: { title: 'Chỉ officer mới dùng được', description: '`/la-roster deep:true` chạy Stronghold scan dài qua residential worker. Officer và senior có thể dùng; bỏ `deep:true` để xem roster cơ bản.' }, title: 'Roster của {name} · {count} {word}', characterOne: 'character', characterMany: 'character', server: 'Server', topCharacter: 'Character cao nhất: {class} **{name}** · `{ilvl}`', trusted: '**{name}** là trusted user.', fetchFailed: { title: 'Tải roster thất bại', description: 'Tớ chưa tải được roster từ lostark.bible.' }, listCheckFailed: { title: 'Kiểm tra list thất bại', description: 'Tớ tải được roster rồi nhưng chưa đối chiếu được với các list. Cậu thử lại nhé.' }, hiddenTitle: 'Roster ẩn · {name}', hiddenLine: { variants: [
+    deepRestricted: { title: 'Chỉ officer mới dùng được', description: '`/la-roster deep:true` chạy Stronghold scan dài qua residential worker.', tip: 'Bỏ deep:true để xem roster cơ bản nhé' }, title: 'Roster của {name} · {count} {word}', characterOne: 'character', characterMany: 'character', server: 'Server', topCharacter: 'Character cao nhất: {class} **{name}** · `{ilvl}`', trusted: '**{name}** là trusted user.', fetchFailed: { title: 'Tải roster thất bại', description: 'Tớ chưa tải được roster từ lostark.bible.' }, listCheckFailed: { title: 'Kiểm tra list thất bại', description: 'Tớ tải được roster rồi nhưng chưa đối chiếu được với các list.', tip: 'Cậu thử lại nhé' }, hiddenTitle: 'Roster ẩn · {name}', hiddenLine: { variants: [
       'Roster này khoá rồi, tớ không đọc được character nào cả. Nhưng guild thì vẫn mở, nên tớ soi từ đó ra.',
       'Người này giấu roster nên tớ chịu, không thấy character nào. Được cái guild còn công khai, tớ moi được chừng này.',
       'Roster đóng, tớ nhìn không ra character. Đây là tất cả những gì còn moi được từ phía guild.',
@@ -578,7 +578,7 @@ export default {
     completeTitle: 'Đồng bộ ảnh · Hoàn tất', completeDescription: 'Tớ đã kiểm tra **{total}** entry cũ.',
     startingTitle: 'Đồng bộ ảnh · Bắt đầu', startingDescription: 'Tớ tìm thấy **{count}** entry ảnh cũ trong các danh sách. Bắt đầu chuyển ngay đây…',
     nothingTitle: 'Đồng bộ ảnh · Không có gì cần làm', nothingDescription: 'Mọi entry có ảnh đều đã có tham chiếu rehost.',
-    missingChannel: { title: 'Chưa có evidence channel', description: 'Tớ chưa có nơi an toàn để chuyển các ảnh bằng chứng.', footer: 'Đặt `/la-remote action:evidencechannel channel:#...` trước rồi thử lại nhé.' },
+    missingChannel: { title: 'Chưa có evidence channel', description: 'Tớ chưa có nơi an toàn để chuyển các ảnh bằng chứng.', tip: 'Đặt /la-remote action:evidencechannel channel:#... trước rồi thử lại nhé' },
     fields: { synced: 'Đã đồng bộ', dead: 'URL đã chết', raced: 'Đổi trong lúc sync', failed: 'Thất bại', blacklist: 'Blacklist', whitelist: 'Whitelist', watchlist: 'Watchlist', errors: 'Lỗi ({count})' },
     summaryFooter: 'Chuyển bởi {user} · có thể chạy lại an toàn', nothingFooter: 'Idempotent · chạy lại vẫn an toàn',
     startingFooter: 'Mỗi entry: làm mới URL → tải xuống → rehost · khoảng 1–2 giây', moreErrors: '…và thêm {count} lỗi',

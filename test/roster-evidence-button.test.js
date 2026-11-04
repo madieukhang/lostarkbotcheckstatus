@@ -7,7 +7,7 @@ import Watchlist from '../bot/models/Watchlist.js';
 import UserPreference from '../bot/models/UserPreference.js';
 import RosterSnapshot from '../bot/models/RosterSnapshot.js';
 import { disconnectDB } from '../bot/db.js';
-import { clearUserLanguageCache } from '../bot/services/i18n/index.js';
+import { clearUserLanguageCache, t as translate } from '../bot/services/i18n/index.js';
 import { buildScopedListQuery } from '../bot/utils/scope.js';
 import { handleRosterEvidenceButton } from '../bot/handlers/roster/evidenceButton.js';
 
@@ -76,4 +76,8 @@ test('a malformed /la-roster report button reads no list', async t => {
   await handleRosterEvidenceButton(click);
 
   assert.equal(click.replies.length, 1);
+  const card = click.replies[0].embeds[0].toJSON();
+  const copy = translate('dialogue.common.selectionLost', 'en');
+  assert.equal(card.title, `⌛  ${copy.title}`);
+  assert.equal(card.footer?.text, `💡 ${copy.tip}`);
 });

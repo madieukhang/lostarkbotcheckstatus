@@ -331,7 +331,8 @@ test('hidden roster flow shows Bible-unavailable, not the suggestions card, when
   const card = edits[0].embeds[0].toJSON();
   const unavailable = t('dialogue.search.bibleUnavailable', 'en');
   assert.equal(card.description, unavailable.description);
-  assert.ok(card.title.includes(unavailable.title), card.title);
+  assert.equal(card.title, `🚦  ${unavailable.title}`);
+  assert.equal(card.footer?.text, `💡 ${unavailable.tip}`);
 });
 
 test('visible deep scan on a character without a guild shows the no-guild notice', async context => {
