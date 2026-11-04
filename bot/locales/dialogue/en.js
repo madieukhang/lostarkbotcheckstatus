@@ -1,5 +1,7 @@
 export default {
   common: {
+    fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details' },
+    selectionLost: { title: 'That choice no longer matches', description: 'I could not find the item you picked in this menu.', tip: 'Run the command again for a fresh menu' },
     errorField: 'Error',
     missingField: 'Missing',
     unknown: 'Unknown',
@@ -516,13 +518,15 @@ export default {
   },
   search: {
     moreResults: '… {count} more results. Narrow the name or filters to see them.',
-    bibleUnavailable: { title: 'Bible is unavailable', description: 'lostark.bible did not answer this time. Please try again later.' },
-    noResults: { title: 'No matching characters', description: 'I could not find a character matching **{name}**.' },
-    noFilteredResults: { title: 'No results match those filters', description: 'I found no **{name}** matches after applying these filters.', filters: 'Filters' },
-    failed: { title: 'Search failed', description: 'I could not complete the name search.' },
+    bibleUnavailable: { title: 'Bible is unavailable', description: 'lostark.bible did not answer this time.', tip: 'Try again in a few minutes' },
+    noResults: { title: 'No matching characters', description: 'I could not find a character matching **{name}**.', tip: 'Check the spelling and search again' },
+    noFilteredResults: { title: 'No results match those filters', description: 'I found matches for **{name}**, but none passed the filters.', tip: 'Loosen the filters and search again' },
+    beforeFilterOne: '{count} character', beforeFilterMany: '{count} characters',
+    failed: { title: 'I could not finish the search', description: 'The search for **{name}** stopped partway.', tip: 'Try again in a few minutes' },
+    detailFailed: { title: 'I could not open the details', description: 'I could not load the record for **{name}**.', tip: 'Pick it again from the menu' },
     title: 'Search · "{name}"', notListed: 'not in list DB',
     matchOne: 'match', matchMany: 'matches',
-    session: { title: 'This is not your search', description: 'Only the person who ran this search can open its evidence.' },
+    session: { title: 'This is not your search', description: 'Only the person who ran this search can open its evidence.', tip: 'Run your own /la-search to see the evidence' },
   },
   evidenceCommand: {
     nameRequired: { title: 'A character name is required', description: 'Enter a name, or use autocomplete to choose an existing list entry.' },

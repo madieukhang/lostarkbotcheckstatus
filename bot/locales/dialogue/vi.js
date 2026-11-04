@@ -1,5 +1,7 @@
 export default {
   common: {
+    fields: { filter: '🎚️ Bộ lọc', beforeFilter: '📋 Trước khi lọc', details: '🧾 Chi tiết' },
+    selectionLost: { title: 'Lựa chọn này không còn khớp', description: 'Tớ không tìm ra mục cậu vừa chọn trong menu này.', tip: 'Chạy lại lệnh để mở menu mới' },
     errorField: 'Lỗi',
     missingField: 'Còn thiếu',
     unknown: 'Không rõ',
@@ -398,10 +400,14 @@ export default {
   },
   search: {
     moreResults: '… Còn {count} kết quả. Cậu thu hẹp tên hoặc bộ lọc để xem tiếp nhé.',
-    bibleUnavailable: { title: 'Bible đang không phản hồi', description: 'lostark.bible chưa trả lời lần này. Cậu thử lại sau nhé.' }, noResults: { title: 'Không có character khớp', description: 'Tớ không tìm thấy character nào khớp **{name}**.' },
-    noFilteredResults: { title: 'Không có kết quả hợp bộ lọc', description: 'Không còn kết quả **{name}** nào sau khi áp dụng bộ lọc.', filters: 'Bộ lọc' }, failed: { title: 'Tìm kiếm thất bại', description: 'Tớ chưa hoàn tất được lượt tìm tên.' },
+    bibleUnavailable: { title: 'Bible đang không phản hồi', description: 'lostark.bible chưa trả lời lần này.', tip: 'Thử lại sau ít phút' },
+    noResults: { title: 'Không có character khớp', description: 'Tớ không tìm thấy character nào khớp **{name}**.', tip: 'Kiểm tra lại chính tả rồi tìm lại' },
+    noFilteredResults: { title: 'Không có kết quả hợp bộ lọc', description: 'Có kết quả cho **{name}**, nhưng không ai qua được bộ lọc.', tip: 'Nới bộ lọc rồi tìm lại' },
+    beforeFilterOne: '{count} character', beforeFilterMany: '{count} character',
+    failed: { title: 'Tớ chưa tìm xong', description: 'Lượt tìm **{name}** bị ngắt giữa chừng.', tip: 'Thử lại sau ít phút' },
+    detailFailed: { title: 'Tớ chưa mở được chi tiết', description: 'Tớ chưa tải được record của **{name}**.', tip: 'Chọn lại trong menu nhé' },
     title: 'Tìm kiếm · "{name}"', notListed: 'chưa có trong DB list', matchOne: 'kết quả', matchMany: 'kết quả',
-    session: { title: 'Đây không phải lượt tìm của cậu', description: 'Chỉ người chạy search này mới mở được evidence.' },
+    session: { title: 'Đây không phải lượt tìm của cậu', description: 'Chỉ người chạy search này mới mở được evidence.', tip: 'Chạy /la-search của riêng cậu để xem evidence' },
   },
   evidenceCommand: {
     nameRequired: { title: 'Cần tên character', description: 'Nhập một tên hoặc dùng autocomplete để chọn entry đang có nhé.' }, notListed: { title: 'Không có entry nào cậu được xem', description: '**{name}** không nằm trong list nào hiển thị với server này.', footer: 'Thử `/la-search` để tìm gần đúng trong chỉ mục tên của Bible nhé.' },

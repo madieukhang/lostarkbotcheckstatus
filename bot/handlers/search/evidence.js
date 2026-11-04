@@ -5,8 +5,8 @@ import {
 } from 'discord.js';
 
 import { ICONS } from '../../utils/ui.js';
-import { AlertSeverity } from '../../utils/alertEmbed.js';
-import { deferReply, editAlert, editEmbed, editNotice, editPayload, replyAlert } from '../../utils/interactionReplies.js';
+import { NoticeKind } from '../../utils/alertEmbed.js';
+import { deferReply, editAlert, editEmbed, editPayload, replyAlert } from '../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../utils/scope.js';
 import { resetSelectMenu } from '../../utils/selectMenu.js';
 import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
@@ -92,7 +92,7 @@ export function createSearchDetailSelectHandler({
     if (sel.user.id !== interaction.user.id) {
       const clickerLang = await getLanguage(sel.user.id, { UserPreferenceModel: UserPreference });
       await replyAlert(sel, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.search.session', clickerLang),
       });
       return;
@@ -108,8 +108,9 @@ export function createSearchDetailSelectHandler({
     await deferReply(sel, { ephemeral: true });
     const detail = detailResults.find(({ index }) => String(index) === sel.values?.[0]);
     if (!detail) {
-      await editNotice(sel, t('dialogue.check.malformed', lang), {
-        severity: AlertSeverity.WARNING,
+      await editAlert(sel, {
+        kind: NoticeKind.EXPIRED,
+        ...t('dialogue.common.selectionLost', lang),
       });
       return;
     }
@@ -118,7 +119,7 @@ export function createSearchDetailSelectHandler({
       const entry = await loadEntry(detail, interaction.guild?.id || interaction.guildId || '');
       if (!entry) {
         await editAlert(sel, {
-          severity: AlertSeverity.WARNING,
+          kind: NoticeKind.EXPIRED,
           ...t('dialogue.check.entryRemoved', lang),
         });
         return;
@@ -139,8 +140,9 @@ export function createSearchDetailSelectHandler({
     } catch (err) {
       console.warn('[search] Detail lookup failed:', err.message);
       await editAlert(sel, {
-        severity: AlertSeverity.WARNING,
-        ...t('dialogue.search.failed', lang),
+        kind: NoticeKind.FAILURE,
+        ...t('dialogue.search.detailFailed', lang, { name: detail.result?.name }),
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       });
     }
   };

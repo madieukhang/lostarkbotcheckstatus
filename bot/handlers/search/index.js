@@ -1,6 +1,6 @@
 import { connectDB } from '../../db.js';
 import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
-import { AlertSeverity } from '../../utils/alertEmbed.js';
+import { NoticeKind } from '../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../utils/interactionReplies.js';
 import UserPreference from '../../models/UserPreference.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
@@ -97,7 +97,7 @@ export async function handleSearchCommand(interaction) {
     if (suggestions === null) {
       status = 'bible-unavailable';
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.BUSY,
         ...t('dialogue.search.bibleUnavailable', lang),
       });
       return;
@@ -106,12 +106,13 @@ export async function handleSearchCommand(interaction) {
     if (suggestions.length === 0) {
       status = 'no-results';
       await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.EMPTY,
         ...t('dialogue.search.noResults', lang, { name }),
       });
       return;
     }
 
+    const unfilteredCount = suggestions.length;
     suggestions = filterSearchSuggestions(suggestions, { minIlvl, maxIlvl, classFilter });
 
     if (suggestions.length === 0) {
@@ -121,10 +122,14 @@ export async function handleSearchCommand(interaction) {
         maxIlvl !== null ? `ilvl ≤ ${maxIlvl}` : '',
         classFilter ? `class: ${getClassName(classFilter)}` : '',
       ].filter(Boolean);
+      const countKey = unfilteredCount === 1 ? 'beforeFilterOne' : 'beforeFilterMany';
       await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.EMPTY,
         ...t('dialogue.search.noFilteredResults', lang, { name }),
-        fields: [{ name: t('dialogue.search.noFilteredResults.filters', lang), value: filterDesc.join(', '), inline: false }],
+        fields: [
+          { name: t('dialogue.common.fields.filter', lang), value: filterDesc.join(', '), inline: true },
+          { name: t('dialogue.common.fields.beforeFilter', lang), value: t(`dialogue.search.${countKey}`, lang, { count: unfilteredCount }), inline: true },
+        ],
       });
       return;
     }
@@ -196,9 +201,9 @@ export async function handleSearchCommand(interaction) {
     lang = await languagePromise;
     console.error('[search] ❌ Search failed:', err.message);
     await editAlert(interaction, {
-      severity: AlertSeverity.WARNING,
-      ...t('dialogue.search.failed', lang),
-      fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+      kind: NoticeKind.FAILURE,
+      ...t('dialogue.search.failed', lang, { name }),
+      fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
     });
   } finally {
     const stats = suggestionContext.stats;

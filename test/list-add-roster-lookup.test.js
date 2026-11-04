@@ -6,6 +6,7 @@ process.env.CHANNEL_ID ||= 'test';
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
 const { buildUnusableRosterResult } = await import('../bot/handlers/list/services/addExecutor.js');
+const { COLORS } = await import('../bot/utils/ui.js');
 
 const noSuggestionLookup = () => assert.fail('a Bible failure must not look up name suggestions');
 
@@ -19,7 +20,10 @@ test('list add reports Bible as unavailable when the roster request failed', asy
 
   assert.equal(result.ok, false);
   assert.match(result.content, /lostark\.bible did not answer/);
-  assert.match(result.embeds[0].toJSON().title, /Bible is unavailable/);
+  const card = result.embeds[0].toJSON();
+  assert.equal(card.title, '🚦  Bible is unavailable');
+  assert.equal(card.color, COLORS.warning);
+  assert.equal(card.footer.text, '💡 Try again in a few minutes');
 });
 
 test('list add keeps the missing-roster card when Bible answered with no roster', async () => {

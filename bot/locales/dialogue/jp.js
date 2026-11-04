@@ -1,5 +1,7 @@
 export default {
   common: {
+    fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細' },
+    selectionLost: { title: 'その選択はもう一致しませんの', description: 'この menu で選ばれた項目が見つかりませんでしたわ。', tip: 'Command をもう一度実行して、新しい menu を開いてくださいませ' },
     errorField: 'エラー', missingField: '不足', unknown: '不明',
     savedCardFailed: '保存しましたわ。確認 card を表示できませんでしたの。',
     queuedCardFailed: 'ご依頼は保存され、承認待ちですわ。確認 card を表示できませんでしたの。',
@@ -373,10 +375,14 @@ export default {
   },
   search: {
     moreResults: '… ほかに {count} 件あります。名前や条件を絞り込んでご確認くださいませ。',
-    bibleUnavailable: { title: 'Bible が応答しませんの', description: 'lostark.bible が今回は応答しませんでした。後でもう一度お試しくださいませ。' }, noResults: { title: '一致 character がありませんの', description: '**{name}** に一致する character を見つけられませんでしたわ。' },
-    noFilteredResults: { title: 'Filter に合う結果がありませんの', description: 'Filter 適用後、**{name}** の結果はありませんでしたわ。', filters: 'Filters' }, failed: { title: '検索に失敗しましたの', description: '名前検索を完了できませんでしたわ。' },
+    bibleUnavailable: { title: 'Bible が応答しませんの', description: 'lostark.bible が今回は応答しませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' },
+    noResults: { title: '一致 character がありませんの', description: '**{name}** に一致する character を見つけられませんでしたわ。', tip: 'つづりを確かめて、もう一度検索してくださいませ' },
+    noFilteredResults: { title: 'Filter に合う結果がありませんの', description: '**{name}** の結果はありましたが、filter を通ったものはありませんでしたわ。', tip: 'Filter をゆるめて、もう一度検索してくださいませ' },
+    beforeFilterOne: '{count} character', beforeFilterMany: '{count} character',
+    failed: { title: '検索を終えられませんでしたの', description: '**{name}** の検索が途中で止まってしまいましたわ。', tip: '数分後にもう一度お試しくださいませ' },
+    detailFailed: { title: '詳細を開けませんでしたの', description: '**{name}** の record を読み込めませんでしたわ。', tip: 'Menu からもう一度選んでくださいませ' },
     title: '検索 · "{name}"', notListed: 'list DB 未登録', matchOne: 'match', matchMany: 'matches',
-    session: { title: 'あなたの search ではありませんの', description: 'この search を実行した人だけが evidence を開けますわ。' },
+    session: { title: 'あなたの search ではありませんの', description: 'この search を実行した人だけが evidence を開けますわ。', tip: 'ご自身で /la-search を実行して evidence をご覧くださいませ' },
   },
   evidenceCommand: {
     nameRequired: { title: 'Character 名が必要ですの', description: '名前を入力するか autocomplete で既存 entry を選んでくださいませ。' }, notListed: { title: '表示可能な entry がありませんの', description: '**{name}** はこの server から見える list にいませんわ。', footer: 'Bible name index の fuzzy match は `/la-search` をお試しくださいませ。' },

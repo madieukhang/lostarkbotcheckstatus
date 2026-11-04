@@ -28,7 +28,7 @@ import {
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, AlertSeverity, NoticeKind } from '../../../utils/alertEmbed.js';
 import { ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
@@ -168,11 +168,11 @@ function buildMissingRosterResult(name, suggestions, lang) {
 }
 
 function buildBibleUnavailableResult(lang) {
-  const { title, description } = t('dialogue.search.bibleUnavailable', lang);
+  const { title, description, tip } = t('dialogue.search.bibleUnavailable', lang);
   return {
     ok: false,
     content: description,
-    embeds: [buildAlertEmbed({ severity: AlertSeverity.WARNING, title, description })],
+    embeds: [buildAlertEmbed({ kind: NoticeKind.BUSY, title, description, tip })],
   };
 }
 
