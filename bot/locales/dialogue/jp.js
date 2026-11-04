@@ -1,15 +1,16 @@
 export default {
   common: {
-    fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細', queue: '🚦 順番待ち', unreadable: '✏️ 名前ではない語', unreadImages: '🖼️ 読めなかった画像' },
+    fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細', queue: '🚦 順番待ち', unreadable: '✏️ 名前ではない語', unreadImages: '🖼️ 読めなかった画像', whoCanUse: '👥 使える方' },
     selectionLost: { title: 'その選択はもう一致しませんの', description: 'この menu で選ばれた項目が見つかりませんでしたわ。', tip: 'Command をもう一度実行して、新しい menu を開いてくださいませ' },
     errorField: 'エラー', missingField: '不足', unknown: '不明',
-    savedCardFailed: '保存しましたわ。確認 card を表示できませんでしたの。',
-    queuedCardFailed: 'ご依頼は保存され、承認待ちですわ。確認 card を表示できませんでしたの。',
+    savedCardFailed: { title: '保存しましたわ', description: '変更は保存しましたが、確認 card を表示できませんでしたの。' },
+    queuedCardFailed: { title: '承認に回しましたわ', description: 'ご依頼は保存され承認待ちですが、確認 card を表示できませんでしたの。' },
+    officerRoles: 'Officer · Senior',
     unexpected: {
       title: 'その操作がすり抜けてしまいましたの',
       description: '今回は最後まで完了できませんでしたわ。もう一度お試しいただき、続くようでしたら officer へお知らせくださいませ。',
     },
-    serverOnly: { title: 'サーバー内でのみ使えますわ', description: 'このコマンドは Discord サーバー内専用で、DM では使えませんの。' },
+    serverOnly: { title: 'サーバー内でのみ使えますわ', description: 'このコマンドは Discord サーバー内専用で、DM では使えませんの。', tip: 'サーバーのチャンネルでもう一度実行してくださいませ' },
     notYourSession: { title: 'あなたのセッションではありませんの', description: 'この画面を開いた方だけが操作できますわ。' },
     wrongTextChannel: { title: 'そのチャンネルは使えませんの', description: 'わたくしが読んで返事できる **テキストチャンネル** を選んでくださいませ。' },
     missingPermissions: { title: '権限が少し足りませんわ', description: '<#{channel}> の設定を終えるには、わたくしに次の権限が必要ですの。', footer: 'チャンネル権限を直してから、もう一度お試しくださいませ。' },
@@ -198,7 +199,7 @@ export default {
     missing: {
       title: '証拠の画像が見当たりませんの',
       description: 'しまっておいた screenshot をもう一度開けませんでしたの。消されてしまったか、置いてあった場所へわたくしが入れなくなったのかもしれませんわ。',
-      footer: 'Officer に新しい screenshot をその entry へ付け直してもらえますわ。',
+      tip: 'Officer に新しい screenshot をその entry へ付け直してもらえますわ',
     },
     archive: {
       title: '証拠アーカイブ',
@@ -213,7 +214,7 @@ export default {
     legacyGone: {
       title: 'Discord に証拠が残っていませんの',
       description: 'この screenshot は Discord の画像 link としてだけ保存されていて、わたくしの証拠アーカイブ（2026/04/11 から）には入っていませんでしたの。Discord にもうファイルがないので、お見せできませんわ。',
-      footer: 'Officer に新しい screenshot をその entry へ付け直してもらえますわ。',
+      tip: 'Officer に新しい screenshot をその entry へ付け直してもらえますわ',
     },
   },
   remote: {
@@ -316,7 +317,8 @@ export default {
       executionFailed: { title: '承認を完了できませんでしたの', description: '**{user}** が承認しましたが、保存に失敗しましたわ。', requesterDescription: 'Senior が承認しましたが、LoaLogs は保存できませんでしたの。', footer: 'Entry は作成されていません。再申請するか Senior にご連絡くださいませ。' },
       noEvidence: { title: 'Evidence がありませんの', description: '画像が添付されていないか、保存 message が削除されていますわ。' },
       evidenceFooterLegacy: 'Legacy image · evidence rehost 前の画像なので期限切れの可能性がありますの', evidenceFooterFresh: 'Evidence archive から fresh URL を取得しましたわ',
-      originalMissing: { title: '元の entry がありませんの', description: '操作中に別 session が重複 entry を削除したようですわ。', footer: '`/la-list add` をもう一度実行して新規 entry を作成してくださいませ。' },
+      originalMissing: { title: '元の entry がありませんの', description: '操作中に別 session が重複 entry を削除したようですわ。', tip: '/la-list add をもう一度実行して新規 entry を作成してくださいませ' },
+      processingTitle: '判断を保存中ですの',
     },
   },
   notes: {
@@ -334,29 +336,29 @@ export default {
       footer: 'lostark.bible からロスターを更新 · 新しい {altWord} {count} 名',
       footerNoAlts: 'lostark.bible からロスターを更新しましたわ',
     },
-    pendingExpired: { title: 'このカードは期限切れですわ', description: 'このカードの報告はもう保持しておりませんの。メモとして追加するには、もう一度 `/la-list add` を実行してくださいませ。' },
+    pendingExpired: { title: 'このカードは期限切れですわ', description: 'このカードの報告はもう保持しておりませんの。', tip: 'メモとして追加するには、もう一度 /la-list add を実行してくださいませ' },
     notYours: { title: 'あなたのカードではありませんわ', description: 'この `/la-list add` を実行した方だけが、報告を履歴に追加できますの。' },
-    needsApproval: { title: 'このメモには承認が必要ですわ', description: 'この entry はもうこの server 専用の entry ではありませんので、メモは approver の承認を通りますの。承認に送るには、もう一度 `/la-list add` を実行してくださいませ。' },
+    needsApproval: { title: 'このメモには承認が必要ですわ', description: 'この entry はもうこの server 専用の entry ではありませんので、メモは approver の承認を通りますの。', tip: '承認に送るには、もう一度 /la-list add を実行してくださいませ' },
   },
   listEdit: {
     originalMissing: { title: '元の entry がありませんの', description: '変更を保存する前に、entry が削除されたか別の list に移されましたわ。' },
-    entryChanged: { title: 'この entry に新しいメモが追加されましたわ', description: '編集を保存する前に別のメモが追加されたため、何も変更しておりませんの。最新のメモを編集するには、もう一度 `/la-list edit` を実行してくださいませ。' },
-    moveBlocked: { title: 'List を移動できませんの', description: '**{name}** はすでに移動先 list にいますので、どちらの list も変更していませんわ。', footer: '競合 entry を先に削除してから、もう一度申請してくださいませ。' },
-    scopeRaced: { title: 'Scope が別の場所で変わりましたの', description: '同じ名前の entry が保存前に移動先 scope を取得しましたわ。', footer: '編集を再申請するか、競合 entry を先に削除してくださいませ。' },
+    entryChanged: { title: 'この entry に新しいメモが追加されましたわ', description: '編集を保存する前に別のメモが追加されたため、何も変更しておりませんの。', tip: '最新のメモを編集するには、もう一度 /la-list edit を実行してくださいませ' },
+    moveBlocked: { title: 'List を移動できませんの', description: '**{name}** はすでに移動先 list にいますので、どちらの list も変更していませんわ。', tip: '競合 entry を先に削除してから、もう一度申請してくださいませ' },
+    scopeRaced: { title: 'Scope が別の場所で変わりましたの', description: '同じ名前の entry が保存前に移動先 scope を取得しましたわ。', tip: '編集を再申請するか、競合 entry を先に削除してくださいませ' },
     success: { titleMoved: '{list} · 編集して移動しましたわ · {name}', titleEdited: '{list} · 編集済み · {name}', hero: '**{user}** が **{list}**{scope} の {name} を編集しましたわ{summary}。', summaryChanged: ' · 変更: {fields}', summaryAlts: ' · alt **{count}** 体を追加', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: '{user} が編集' },
     evidence: { before: '変更前', after: '変更後', none: '以前の画像はありません', unavailable: '画像を読み込めません', download: '[元画像をダウンロード]({url})' },
     command: {
-      notFound: { title: 'Entry が見つかりませんの', description: '**{name}** は blacklist / whitelist / watchlist にいませんわ。', footer: '`/la-list view` で既存 entry を確認できますの。' }, additionalRestricted: { title: 'この option は制限されていますの', description: '`additional_names` は officer または entry owner だけが使えますわ。', footer: 'Officer に alt 追加をお願いしてくださいませ。' }, invalidNames: { title: 'キャラクター名ではありませんの', description: '`additional_names` の名前は文字か数字で 2-20 文字、先頭は文字でなければなりませんわ。合わない名前: {names}' }, noChanges: { title: '変更がありませんの', description: '任意 edit field が一つも設定されていませんわ。', footer: 'reason / type / raid / logs / image / scope / additional_names のどれかを設定してくださいませ。' },
-      scopeNotApplicable: { title: 'Scope はここでは使えませんの', description: '`scope` option は blacklist 専用です。{list} entry は常に global ですわ。', footer: '`scope` を外すか、server scope なら `type:black` にしてくださいませ。' }, scopeBlockedGlobal: '同名の global blacklist entry がすでにありますの。', scopeBlockedServer: 'この server に同名の server-scoped blacklist entry がありますわ。', scopeBlocked: { title: 'Scope を変更できませんの', footer: '競合 entry を削除するか、手動で merge してくださいませ。' }, noEffective: { title: '実際の変更はありませんの', description: '入力値は現在の entry と同じですわ。' },
+      notFound: { title: 'Entry が見つかりませんの', description: '**{name}** は blacklist / whitelist / watchlist にいませんわ。', tip: '/la-list view で既存 entry を確認できますの' }, additionalRestricted: { title: 'この option は制限されていますの', description: '`additional_names` は officer または entry owner だけが使えますわ。', tip: 'Officer に alt 追加をお願いしてくださいませ' }, invalidNames: { title: 'キャラクター名ではありませんの', description: '`additional_names` の名前は文字か数字で 2-20 文字、先頭は文字でなければなりませんわ。合わない名前: {names}' }, noChanges: { title: '変更がありませんの', description: '任意 edit field が一つも設定されていませんわ。', tip: 'reason / type / raid / logs / image / scope / additional_names のどれかを設定してくださいませ' },
+      scopeNotApplicable: { title: 'Scope はここでは使えませんの', description: '`scope` option は blacklist 専用です。{list} entry は常に global ですわ。', tip: 'scope を外すか、server scope なら type:black にしてくださいませ' }, scopeBlockedGlobal: '同名の global blacklist entry がすでにありますの。', scopeBlockedServer: 'この server に同名の server-scoped blacklist entry がありますわ。', scopeBlocked: { title: 'Scope を変更できませんの', tip: '競合 entry を削除するか、手動で merge してくださいませ' }, noEffective: { title: '実際の変更はありませんの', description: '入力値は現在の entry と同じですわ。' },
     },
     change: { reason: '📝 **Reason:** `{old}` → `{next}`', list: '📒 **List:** `{old}` → `{next}`', raid: '🗡️ **Raid:** `{old}` → `{next}`', evidence: '📎 **Evidence:** 更新しましたわ', scope: '🌐 **Scope:** `{old}` → `{next}`', append: 'Alt 追加: {names}', appendWithDuplicates: 'Alt 追加: {names} (重複 skip: {duplicates})' },
-    applyFailed: { title: '編集に失敗しましたの', description: '変更を適用できませんでしたわ。' }, approval: { requiredTitle: 'List 編集 · 承認が必要ですの', deliveryFailed: { title: 'その編集をお渡しできませんでしたの', footer: '変更は適用されていません。再試行するか officer にご連絡くださいませ。' }, sent: { title: '編集 request を送りましたわ', description: 'Approver に通知しました。承認後に変更が適用されますの。', pending: '承認待ち変更 ({count})' } },
+    applyFailed: { title: '編集に失敗しましたの', description: '変更を適用できませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' }, approval: { requiredTitle: 'List 編集 · 承認が必要ですの', deliveryFailed: { title: 'その編集をお渡しできませんでしたの', description: 'この編集 request はどの approver にも届きませんでしたわ。', tip: '変更は適用されていません。再試行するか officer にご連絡くださいませ' }, sent: { title: '編集 request を送りましたわ', description: 'Approver に通知しました。承認後に変更が適用されますの。', pending: '承認待ち変更 ({count})' } },
   },
   listAdd: {
     command: {
-      reasonRequired: { title: '理由がまだありませんの', description: 'List entry には理由が必要ですわ。Command を再実行して `reason` を入力してくださいませ。' }, invalidRaid: { title: '自由な raid tag は watchlist 専用ですの', description: '`{raid}` は {list} の標準 raid ではありません。候補から選ぶか、自由入力には `type:watch` を使ってくださいませ。' }, invalidImage: { title: '添付 file は画像ではありませんの', description: '`image` option は画像 file のみです。Discord は `{type}` と判定しましたわ。' },
-      deliveryFailed: { title: '承認してくださる方までお届けできませんでしたわ', description: '指定された approver のどなたにも連絡がつきませんでしたの。', footer: '何も保存されておりませんわ。もう一度お試しになるか、officer に直接ご連絡くださいませ。' },
-      proposalFailed: { title: '提案を作れませんでしたの', description: '承認 request の作成に失敗しましたわ。', footer: 'Entry は作成されていません。再実行し、続く場合は officer にご連絡くださいませ。' },
+      reasonRequired: { title: '理由がまだありませんの', description: 'List entry には理由が必要ですわ。', tip: 'Command を再実行して reason を入力してくださいませ' }, invalidRaid: { title: '自由な raid tag は watchlist 専用ですの', description: '`{raid}` は {list} の標準 raid ではありません。候補から選ぶか、自由入力には `type:watch` を使ってくださいませ。' }, invalidImage: { title: '添付 file は画像ではありませんの', description: '`image` option は画像 file のみです。Discord は `{type}` と判定しましたわ。' },
+      deliveryFailed: { title: '承認してくださる方までお届けできませんでしたわ', description: '指定された approver のどなたにも連絡がつきませんでしたの。', tip: '何も保存されておりませんわ。もう一度お試しになるか、officer に直接ご連絡くださいませ' },
+      proposalFailed: { title: '提案を作れませんでしたの', description: '承認 request の作成に失敗しましたので、entry は作成されていませんわ。', tip: '再実行し、続く場合は officer にご連絡くださいませ' },
     },
     hidden: { title: 'Hidden roster を検出しましたわ', withGuild: '現在は入力した名前だけを track していますの。Bible に guild **{guild}** があるので、`/la-list enrich name:{name}` または **今すぐ enrich** で同じ stronghold の guildmate alt を探せますわ。', withoutGuild: '現在は入力した名前だけを track していますの。Bible は guild member list を公開していないため、`/la-list edit name:{name} additional_names:Alt1, Alt2` で既知 alt を手動追加してくださいませ。' },
     noRoster: {
@@ -371,7 +373,7 @@ export default {
     },
   },
   listView: {
-    failed: { title: 'List を読み込めませんでしたの', description: 'この list view を開けませんでしたわ。' }, session: { title: 'あなたの list view ではありませんの', description: 'この view を開いた人だけが操作できますわ。' },
+    failed: { title: 'List を読み込めませんでしたの', description: 'この list view を開けませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' }, session: { title: 'あなたの list view ではありませんの', description: 'この view を開いた人だけが操作できますわ。', tip: '/la-list view でご自身の view を開いてくださいませ' },
   },
   search: {
     moreResults: '… ほかに {count} 件あります。名前や条件を絞り込んでご確認くださいませ。',
@@ -385,14 +387,14 @@ export default {
     session: { title: 'あなたの search ではありませんの', description: 'この search を実行した人だけが evidence を開けますわ。', tip: 'ご自身で /la-search を実行して evidence をご覧くださいませ' },
   },
   evidenceCommand: {
-    nameRequired: { title: 'Character 名が必要ですの', description: '名前を入力するか autocomplete で既存 entry を選んでくださいませ。' }, notListed: { title: '表示可能な entry がありませんの', description: '**{name}** はこの server から見える list にいませんわ。', footer: 'Bible name index の fuzzy match は `/la-search` をお試しくださいませ。' },
-    publicRestricted: { title: 'Public evidence は制限されていますの', description: 'Evidence を public 投稿できるのは officer / senior だけなので、この view は private にしましたわ。' }, failed: { title: 'Evidence 検索に失敗しましたの', description: 'Evidence record を読み込めませんでしたわ。' },
+    nameRequired: { title: 'Character 名が必要ですの', description: '名前を入力するか autocomplete で既存 entry を選んでくださいませ。' }, notListed: { title: '表示可能な entry がありませんの', description: '**{name}** はこの server から見える list にいませんわ。', tip: 'Bible name index の fuzzy match は /la-search をお試しくださいませ' },
+    publicRestricted: { title: 'Public evidence は制限されていますの', description: 'Evidence を public 投稿できるのは officer / senior だけなので、この view は private にしましたわ。' }, failed: { title: 'Evidence 検索に失敗しましたの', description: 'Evidence record を読み込めませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' },
   },
   quickAdd: {
-    deliveryFailed: { title: 'そちらをお渡しできませんでしたの', fallback: '承認のお願いがどなたにも届きませんでしたわ。少し経ってからもう一度お試しくださいませ。' }, failed: { title: 'その quick add は通りませんでしたの', description: 'お預かりして書き留めている途中で、どこかに引っかかってしまいましたの。もう一度お試しくださいませ。' }, invalidType: { title: 'それは list の種類ではありませんの', description: '`{type}` と読めましたわ。quick add は `black`、`white`、`watch` のどれかでお願いしますの。' },
+    deliveryFailed: { title: 'そちらをお渡しできませんでしたの', description: '承認のお願いがどなたにも届きませんでしたわ。', tip: '少し経ってからもう一度お試しくださいませ' }, failed: { title: 'その quick add は通りませんでしたの', description: 'お預かりして書き留めている途中で、どこかに引っかかってしまいましたの。', tip: 'もう一度お試しくださいませ' }, invalidType: { title: 'それは list の種類ではありませんの', description: '`{type}` と読めましたわ。quick add は `black`、`white`、`watch` のどれかでお願いしますの。' },
   },
   remove: {
-    notFound: { title: '削除するものがありませんの', description: '**{name}** は表示可能な list にいませんわ。', footer: '`/la-list view` で既存 entry を確認できますの。' }, titles: { blocked: '削除できません · {name}', one: '{list} から削除 · {name}', many: '{count} lists から削除 · {name}', mixed: 'Mixed result · {name}' },
+    notFound: { title: '削除するものがありませんの', description: '**{name}** は表示可能な list にいませんわ。', tip: '/la-list view で既存 entry を確認できますの' }, titles: { blocked: '削除できません · {name}', one: '{list} から削除 · {name}', many: '{count} lists から削除 · {name}', mixed: 'Mixed result · {name}' },
     line: { variants: [
       '{name} を削除しましたわ。古い理由は下に控えておきましたの、また必要になるかもしれませんから。',
       '完了ですわ。{name} は list から消えました。理由はここに残しておきますの。',
@@ -404,7 +406,7 @@ export default {
     ] },
     removedBy: '削除者', removedAt: '削除日時',
     failedSection: '削除できません', legacy: '**{list}**: この legacy entry には owner metadata がありません。`/la-list edit` で変更してくださいませ。', ownerOnly: '**{list}**: 追加した **{owner}** だけが削除できますの。', more: '+{count} 名',
-    footerBlocked: '`/la-list view` で確認し、legacy entry は `/la-list edit` で変更してくださいませ。', pickerTitle: '発見 · {name}', pickerDescription: '**{name}** は {count} lists にいます。削除対象を選んでくださいませ:', pickerFooter: '30秒で期限切れ · この picker はあなた専用ですの。', pickerExpired: { title: 'Picker の期限が切れましたわ', description: '何も削除していませんの。もう一度 `/la-list remove` を実行してくださいませ。' }, failed: { title: '削除に失敗しましたの', description: 'Entry を削除できませんでしたわ。' }, unknown: '不明',
+    footerBlocked: '`/la-list view` で確認し、legacy entry は `/la-list edit` で変更してくださいませ。', pickerTitle: '発見 · {name}', pickerDescription: '**{name}** は {count} lists にいます。削除対象を選んでくださいませ:', pickerFooter: '30秒で期限切れ · この picker はあなた専用ですの。', pickerExpired: { title: 'Picker の期限が切れましたわ', description: '何も削除していませんの。', tip: 'もう一度 /la-list remove を実行してくださいませ' }, failed: { title: '削除に失敗しましたの', description: 'Entry を削除できませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' }, unknown: '不明',
   },
   check: {
     modeSaved: { title: '画像モードを保存しました', description: 'モードは **{mode}** です。ご自身の画像投稿と、mode を指定しない `/la-check` に適用します。', tip: '/la-check-mode mode:daily で戻せます。/la-check の mode 指定はその画像だけに適用します' },
@@ -504,9 +506,9 @@ export default {
     title: 'Trusted user · ブロック', direct: '**{name}** は trusted user なので、どの list にも追加できませんの。', via: '**{name}** は trusted user **{via}** と同じ roster なので、どの list にも追加できませんわ。', name: '名前', reason: 'Trust 理由',
   },
   trust: {
-    officerOnly: { title: 'Officer 限定ですの', description: 'Trusted list を管理できるのは officer / senior だけですわ。' }, notTrusted: { title: '削除するものがありませんの', description: '**{name}** は trusted list にいませんわ。' },
+    officerOnly: { title: 'Officer 限定ですの', description: 'Trusted list は officer と senior が管理しておりますの。', tip: 'Officer に実行をお願いしてくださいませ' }, notTrusted: { title: '削除するものがありませんの', description: '**{name}** は trusted list にいませんわ。' },
     removed: { title: 'Trusted · 削除 · {name}', description: '**{name}** と同じ roster の alt は、再び moderation list へ追加可能になりましたわ。', character: 'Character', reason: 'Trust 理由', since: 'Trusted since', removedBy: '削除者', unknown: '不明', footer: '間違いなら `/la-list trust action:add` で trust し直せますの。' },
-    already: { title: 'すでに trusted ですの', direct: '**{name}** はすでに trusted list にいますわ。', via: '**{name}** は roster **{matched}** 経由ですでに trusted ですの。' }, blacklisted: { title: 'Character は blacklist 登録中ですの', description: '**{name}** は blacklist entry **{matched}** に一致しますわ。', footer: 'Trust する前に blacklist entry を削除してくださいませ。' },
+    already: { title: 'すでに trusted ですの', direct: '**{name}** はすでに trusted list にいますわ。', via: '**{name}** は roster **{matched}** 経由ですでに trusted ですの。' }, blacklisted: { title: 'Character は blacklist 登録中ですの', description: '**{name}** は blacklist entry **{matched}** に一致しますわ。', tip: 'Trust する前に blacklist entry を削除してくださいませ' },
     actionAdded: '追加', actionRefreshed: '更新', actionKept: 'roster 維持', success: { title: 'Trusted · {action} · {name}', description: '**{name}** と同じ roster の alt は、これから blacklist / whitelist / watchlist へ追加できませんの。', character: 'Character', reason: '理由', addedBy: '追加者', refreshedBy: '更新者', onlyCharacter: 'この trusted entry は現在この character だけを link していますわ。', trackedAlts: '追跡中の alt', rosterKept: { title: 'Roster は更新されていませんわ', description: 'lostark.bible がこの roster を返しませんでした（非公開か、見つからないか、サイトが応答しませんでしたの）。保存済みの trusted alt はそのまま残しましたわ。後でもう一度実行して更新してくださいませ。' }, footer: '`/la-list view type:trusted` で trusted roster を確認できますの。' },
   },
   multiadd: {

@@ -23,7 +23,7 @@ import {
   pickPreferredListEntry,
 } from '../../../utils/listEntryMap.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import {
   deferReply,
@@ -113,7 +113,7 @@ async function rejectInvalidListEditInput({
     {
       invalid: () => plan.invalidRaid,
       alert: () => ({
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.INPUT,
         ...t('dialogue.listAdd.command.invalidRaid', lang, {
           raid: newRaidInput,
           list: plan.targetType === 'black' ? 'blacklist' : 'whitelist',
@@ -123,21 +123,21 @@ async function rejectInvalidListEditInput({
     {
       invalid: () => imageContentType && !imageContentType.startsWith('image/'),
       alert: () => ({
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.INPUT,
         ...t('dialogue.listAdd.command.invalidImage', lang, { type: imageContentType }),
       }),
     },
     {
       invalid: () => additionalNamesRaw && !mayAppendNames,
       alert: () => ({
-        severity: AlertSeverity.TRUSTED,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.listEdit.command.additionalRestricted', lang),
       }),
     },
     {
       invalid: () => plan.additionalNamesParsed.invalid.length > 0,
       alert: () => ({
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.INPUT,
         ...t('dialogue.listEdit.command.invalidNames', lang, {
           names: escapeLinkBrackets(truncateInlineText(
             plan.additionalNamesParsed.invalid.join(', '),
@@ -149,14 +149,14 @@ async function rejectInvalidListEditInput({
     {
       invalid: () => !plan.hasRequestedChanges,
       alert: () => ({
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.INPUT,
         ...t('dialogue.listEdit.command.noChanges', lang),
       }),
     },
     {
       invalid: () => !plan.scopeApplicable,
       alert: () => ({
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.INPUT,
         ...t('dialogue.listEdit.command.scopeNotApplicable', lang, {
           list: t(`dialogue.broadcast.list.${plan.targetType}`, lang),
         }),
@@ -187,17 +187,17 @@ async function rejectInvalidListEditState({
       ? 'dialogue.listEdit.command.scopeBlockedGlobal'
       : 'dialogue.listEdit.command.scopeBlockedServer';
     await editAlert(interaction, {
-      severity: AlertSeverity.WARNING,
+      kind: NoticeKind.INPUT,
       title: t('dialogue.listEdit.command.scopeBlocked.title', lang),
       description: t(descriptionKey, lang),
-      footer: t('dialogue.listEdit.command.scopeBlocked.footer', lang),
+      tip: t('dialogue.listEdit.command.scopeBlocked.tip', lang),
     });
     return true;
   }
 
   if (plan.changes.length === 0) {
     await editAlert(interaction, {
-      severity: AlertSeverity.WARNING,
+      kind: NoticeKind.INPUT,
       ...t('dialogue.listEdit.command.noEffective', lang),
     });
     return true;
@@ -311,7 +311,7 @@ export function createListEditCommandHandler({
     if (!interaction.guild) {
       const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.common.serverOnly', lang),
       });
       return;
@@ -335,7 +335,7 @@ export function createListEditCommandHandler({
     const editGuildDefaultScope = editGuildConfig?.defaultBlacklistScope || 'global';
     if (!existing) {
       await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.EMPTY,
         ...t('dialogue.listEdit.command.notFound', lang, { name: input.name }),
       });
       return;

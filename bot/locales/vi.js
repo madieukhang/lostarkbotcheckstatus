@@ -383,7 +383,7 @@ const vi = {
       footer: 'Không thể thêm vào bất kỳ list nào · quản lý bằng /la-list trust action:add',
       emptyTitle: 'Trusted list đang trống',
       emptyDescription: 'Chưa có trusted user nào.',
-      emptyFooter: 'Dùng /la-list trust action:add để đánh dấu character trusted (chỉ officer).',
+      emptyTip: 'Dùng /la-list trust action:add để đánh dấu character trusted (chỉ officer)',
     },
     evidence: {
       reason: '📝 Lý do',

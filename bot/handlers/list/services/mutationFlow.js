@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { connectDB } from '../../../db.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
-import { editEmbed, editNotice, editNoticeAfterSavedWrite } from '../../../utils/interactionReplies.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
+import { editAlert, editAlertAfterSavedWrite, editEmbed } from '../../../utils/interactionReplies.js';
 import { t } from '../../../services/i18n/index.js';
 import { canChangeEntryWithoutApproval, isRequesterAutoApprover } from '../helpers.js';
 import { attachNoteControls } from '../notes/pendingNotes.js';
@@ -41,8 +41,28 @@ export async function persistDeliveredApproval(PendingApprovalModel, payload, de
 }
 
 /**
+ * Build the failure notice for a request no approver received.
+ * @param {string} copyKey - locale key holding the title, description and tip
+ * @param {{reason?: string}} delivery - sendListAddApprovalToApprovers result
+ * @param {string} lang - reply language
+ * @returns {object} buildAlertEmbed options; the delivery reason, when known,
+ *   becomes the detail field
+ */
+export function buildDeliveryFailedAlert(copyKey, delivery, lang) {
+  return {
+    kind: NoticeKind.FAILURE,
+    ...t(copyKey, lang),
+    fields: [{
+      name: t('dialogue.common.fields.details', lang),
+      value: delivery?.reason ? `\`${delivery.reason}\`` : '',
+      inline: false,
+    }],
+  };
+}
+
+/**
  * Show a list-add result on the deferred reply: its embeds when it has any,
- * otherwise its content as a success or warning notice.
+ * otherwise its content as a done or input notice.
  *
  * @param {object} interaction - the deferred interaction to answer
  * @param {object} result - executor result with `ok`, `content`, `embeds`
@@ -55,7 +75,7 @@ export async function renderListAddExecutionResult(
   result,
   {
     editEmbedFn = editEmbed,
-    editNoticeFn = editNotice,
+    editAlertFn = editAlert,
   } = {},
 ) {
   if ((result.embeds?.length ?? 0) > 0) {
@@ -65,8 +85,11 @@ export async function renderListAddExecutionResult(
     });
   }
 
-  return editNoticeFn(interaction, result.content, {
-    severity: result.ok ? AlertSeverity.SUCCESS : AlertSeverity.WARNING,
+  return editAlertFn(interaction, {
+    kind: result.ok ? NoticeKind.DONE : NoticeKind.INPUT,
+    description: result.content,
+  }, {
+    content: null,
     components: result.components ?? [],
   });
 }
@@ -129,7 +152,7 @@ export async function submitListMutation({
         // refusal still counts as a failed submission.
         if (!result.ok) throw err;
         console.warn('[list] Add result card failed after the write:', err.message);
-        await editNoticeAfterSavedWrite(interaction, t('dialogue.common.savedCardFailed', lang));
+        await editAlertAfterSavedWrite(interaction, t('dialogue.common.savedCardFailed', lang));
       }
       return { status: 'executed', result };
     }
@@ -148,9 +171,7 @@ export async function submitListMutation({
   } catch (err) {
     // The approvers were messaged and the request is saved; the request stays queued.
     console.warn('[list] Queued card failed after the request was saved:', err.message);
-    await editNoticeAfterSavedWrite(interaction, t('dialogue.common.queuedCardFailed', lang), {
-      severity: AlertSeverity.INFO,
-    });
+    await editAlertAfterSavedWrite(interaction, t('dialogue.common.queuedCardFailed', lang));
   }
   return { status: 'queued', delivery };
 }

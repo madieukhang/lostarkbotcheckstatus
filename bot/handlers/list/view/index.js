@@ -11,7 +11,7 @@ import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { catchListenerErrors, createLatestOnlyQueue } from '../../../utils/async.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
   editAlert,
@@ -158,7 +158,7 @@ export function createViewHandlers({
       await deferReply(interaction, { ephemeral: true });
       const lang = getCachedUserLanguage(interaction.user.id);
       await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.common.serverOnly', lang),
       });
       return;
@@ -190,11 +190,10 @@ export function createViewHandlers({
       if (type === 'trusted') {
         if (allEntries.length === 0) {
           await editAlert(interaction, {
-            severity: AlertSeverity.INFO,
-            titleIcon: '🛡️',
+            kind: NoticeKind.EMPTY,
             title: t('listView.trusted.emptyTitle', lang),
             description: t('listView.trusted.emptyDescription', lang),
-            footer: t('listView.trusted.emptyFooter', lang),
+            tip: t('listView.trusted.emptyTip', lang),
           });
           return;
         }
@@ -208,8 +207,7 @@ export function createViewHandlers({
       if (allEntries.length === 0) {
         const ctx = type === 'all' ? null : getListContext(type);
         await editAlert(interaction, {
-          severity: AlertSeverity.INFO,
-          titleIcon: ctx?.icon,
+          kind: NoticeKind.EMPTY,
           title: type === 'all'
             ? t('listView.empty.allTitle', lang)
             : t('listView.empty.typedTitle', lang, { label: ctx.label }),
@@ -296,7 +294,7 @@ export function createViewHandlers({
         if (componentInteraction.user.id !== interaction.user.id) {
           const clickerLang = await getLanguage(componentInteraction.user.id, { UserPreferenceModel: UserPreference });
           await replyAlert(componentInteraction, {
-            severity: AlertSeverity.ERROR,
+            kind: NoticeKind.GUARD,
             ...t('dialogue.listView.session', clickerLang),
           });
           return;
@@ -328,7 +326,7 @@ export function createViewHandlers({
             const entry = await loadEvidenceEntry(componentInteraction.values?.[0], viewGuildId);
             if (!entry) {
               await editAlert(componentInteraction, {
-                severity: AlertSeverity.WARNING,
+                kind: NoticeKind.EXPIRED,
                 ...t('dialogue.check.entryRemoved', lang),
               });
               return;
@@ -350,8 +348,9 @@ export function createViewHandlers({
           } catch (err) {
             console.warn('[list-view] Evidence lookup failed:', err.message);
             await editAlert(componentInteraction, {
-              severity: AlertSeverity.WARNING,
+              kind: NoticeKind.FAILURE,
               ...t('dialogue.listView.failed', lang),
+              fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
             });
           }
         }
@@ -366,9 +365,9 @@ export function createViewHandlers({
       console.error('[list] View failed:', err.message);
       lang = (await languagePromise.catch(() => lang)) || lang;
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.listView.failed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       });
     }
   }

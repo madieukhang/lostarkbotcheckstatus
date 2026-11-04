@@ -7,7 +7,7 @@
 import { connectDB } from '../../../db.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, deferUpdate, editAlert, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { canChangeEntryWithoutApproval, getListContext, isRequesterAutoApprover } from '../helpers.js';
@@ -16,6 +16,12 @@ import { buildNoteAddedPayload } from './addedCard.js';
 import { appendEntryNote, listAddedAlts } from './appendNote.js';
 import { buildNoteHistoryPayload } from './historyView.js';
 import { NOTE_ADD_PREFIX, peekPendingNote, restorePendingNote, takePendingNote } from './pendingNotes.js';
+
+// Why a "save as note" click is refused, keyed by its dialogue.notes copy.
+const NOTE_REFUSAL_KINDS = Object.freeze({
+  pendingExpired: NoticeKind.EXPIRED,
+  notYours: NoticeKind.GUARD,
+});
 
 // Same visibility as the check details card: a server-scoped entry only
 // opens inside its own server.
@@ -31,7 +37,7 @@ async function loadHistoryEntry(interaction) {
 async function renderHistory(interaction, lang) {
   const { type, entry, page } = await loadHistoryEntry(interaction);
   if (!entry) {
-    await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.check.entryRemoved', lang) });
+    await editAlert(interaction, { kind: NoticeKind.EXPIRED, ...t('dialogue.check.entryRemoved', lang) });
     return;
   }
   await editPayload(interaction, buildNoteHistoryPayload({ entry, type, page, lang }));
@@ -68,7 +74,7 @@ export function createNoteHandlers({ services, isRequesterAutoApproverFn = isReq
       : pending.payload.requestedByUserId !== interaction.user.id ? 'notYours'
         : null;
     if (refusal) {
-      await replyAlert(interaction, { severity: AlertSeverity.WARNING, ...t(`dialogue.notes.${refusal}`, lang) });
+      await replyAlert(interaction, { kind: NOTE_REFUSAL_KINDS[refusal], ...t(`dialogue.notes.${refusal}`, lang) });
       return;
     }
     takePendingNote(key);
@@ -91,11 +97,11 @@ export function createNoteHandlers({ services, isRequesterAutoApproverFn = isReq
       throw err;
     }
     if (!allowed) {
-      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.notes.needsApproval', lang) }, { components: [] });
+      await editAlert(interaction, { kind: NoticeKind.GUARD, ...t('dialogue.notes.needsApproval', lang) }, { components: [] });
       return;
     }
     if (!saved) {
-      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang) }, { components: [] });
+      await editAlert(interaction, { kind: NoticeKind.EXPIRED, ...t('dialogue.approval.flow.originalMissing', lang) }, { components: [] });
       return;
     }
     const addedAlts = listAddedAlts(entry, saved);

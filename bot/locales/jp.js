@@ -383,7 +383,7 @@ const jp = {
       footer: 'どの list にも追加できません · 管理は /la-list trust action:add で',
       emptyTitle: 'Trusted list は空です',
       emptyDescription: 'trusted user はまだいません。',
-      emptyFooter: '/la-list trust action:add で character を trusted にできます (officer only)。',
+      emptyTip: '/la-list trust action:add で character を trusted にできます (officer only)',
     },
     evidence: {
       reason: '📝 Reason',

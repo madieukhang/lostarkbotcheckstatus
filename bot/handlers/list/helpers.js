@@ -15,7 +15,7 @@ import config from '../../config.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
-import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
+import { buildAlertEmbed, AlertSeverity, NoticeKind } from '../../utils/alertEmbed.js';
 import { COLORS, ICONS } from '../../utils/ui.js';
 import { escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
@@ -613,6 +613,22 @@ export function canChangeEntryWithoutApproval(payload, entry, isRequesterAutoApp
 }
 
 export { isOfficerOrSenior } from '../../utils/approverRoles.js';
+
+/**
+ * Build the guard notice for an action only officers and seniors may take,
+ * with a field naming who can.
+ * @param {string} copyKey - locale key holding the title, description and tip
+ * @param {string} lang - reply language
+ * @param {object} [values] - placeholder values for the copy
+ * @returns {object} buildAlertEmbed options
+ */
+export function buildOfficerOnlyAlert(copyKey, lang, values = {}) {
+  return {
+    kind: NoticeKind.GUARD,
+    ...t(copyKey, lang, values),
+    fields: [{ name: t('dialogue.common.fields.whoCanUse', lang), value: t('dialogue.common.officerRoles', lang), inline: true }],
+  };
+}
 
 /**
  * Senior-only recipient list for /la-list multiadd bulk approval DMs.

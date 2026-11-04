@@ -12,7 +12,7 @@ import {
 } from 'discord.js';
 
 import { refreshImageUrl } from '../../../utils/imageRehost.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, AlertSeverity, NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, editEmbed } from '../../../utils/interactionReplies.js';
 import { ICONS } from '../../../utils/ui.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
@@ -84,7 +84,7 @@ export function createBroadcastEvidenceButtonHandler({
 
     if (!displayUrl) {
       await editEmbed(interaction, buildAlertEmbed({
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EXPIRED,
         ...t('dialogue.evidence.missing', lang),
       }));
       return;

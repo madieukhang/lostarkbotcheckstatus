@@ -10,7 +10,7 @@ import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { refreshImageUrl } from '../../../utils/imageRehost.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { buildEvidenceEmbed } from '../view/ui.js';
@@ -58,7 +58,7 @@ export function createListAddViewEvidenceButtonHandler({ client }) {
 
     if (!freshUrl) {
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EMPTY,
         ...t('dialogue.approval.flow.noEvidence', lang),
       });
       return;

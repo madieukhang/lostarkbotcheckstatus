@@ -77,7 +77,7 @@ test('a failed result card after a single delete is not reported as a failed rem
   });
   await handleListRemoveCommand(interaction);
   assert.equal(replies.length, 2, 'only the saved notice follows the rejected card');
-  assert.ok(titleOf(replies[1]).includes(translate('dialogue.common.savedCardFailed', 'en')));
+  assert.ok(titleOf(replies[1]).includes(translate('dialogue.common.savedCardFailed.title', 'en')));
   assert.equal(broadcasts.length, 1);
 });
 
@@ -88,7 +88,7 @@ test('a failed result card after a picked delete is not reported as a failed rem
   await handleListRemoveCommand(interaction);
   assert.equal(updates.length, 1);
   assert.equal(replies.length, 2, 'the picker, then only the saved notice');
-  assert.ok(titleOf(replies[1]).includes(translate('dialogue.common.savedCardFailed', 'en')));
+  assert.ok(titleOf(replies[1]).includes(translate('dialogue.common.savedCardFailed.title', 'en')));
   assert.deepEqual(replies[1].components, [], 'the notice clears the picker buttons');
   assert.equal(broadcasts.length, 1);
 });

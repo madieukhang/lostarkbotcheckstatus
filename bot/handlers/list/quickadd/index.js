@@ -19,7 +19,7 @@ import PendingApproval from '../../../models/PendingApproval.js';
 import { resolveListAddRaidLabel } from '../../../models/Raid.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getGuildConfig } from '../../../utils/scope.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferEphemeralReply,
   editAlert,
@@ -29,6 +29,7 @@ import { buildListAddApprovalEmbed } from '../helpers.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
+  buildDeliveryFailedAlert,
   buildListMutationPayload,
   submitListMutation,
 } from '../services/mutationFlow.js';
@@ -115,7 +116,7 @@ export function createQuickAddHandlers({ services }) {
     ];
     const violation = rules.find(({ invalid }) => invalid());
     if (violation) {
-      await editAlert(interaction, { severity: AlertSeverity.ERROR, ...violation.alert() });
+      await editAlert(interaction, { kind: NoticeKind.INPUT, ...violation.alert() });
       return;
     }
 
@@ -147,11 +148,10 @@ export function createQuickAddHandlers({ services }) {
         PendingApprovalModel: PendingApproval,
         sendListAddApprovalToApprovers,
         executeListAddToDatabase,
-        onDeliveryFailed: (delivery) => editAlert(interaction, {
-          severity: AlertSeverity.WARNING,
-          title: t('dialogue.quickAdd.deliveryFailed.title', lang),
-          description: delivery.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
-        }),
+        onDeliveryFailed: (delivery) => editAlert(
+          interaction,
+          buildDeliveryFailedAlert('dialogue.quickAdd.deliveryFailed', delivery, lang),
+        ),
         onQueued: (delivery) => editEmbed(
           interaction,
           buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang, snapshot: delivery.snapshot }),
@@ -160,9 +160,9 @@ export function createQuickAddHandlers({ services }) {
     } catch (err) {
       console.error('[quickadd] Failed:', err.message);
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.quickAdd.failed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       });
     }
   }

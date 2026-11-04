@@ -5,7 +5,7 @@
  */
 
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { normalizeNameList } from '../../../utils/names.js';
@@ -39,9 +39,9 @@ async function closeApprovalWithAlert({
   await editPayload(interaction, buildApprovalAlertPayload({ embed, status, lang }));
 }
 
-function buildLocalizedAlert(key, lang, values = {}) {
+function buildLocalizedAlert(kind, key, lang, values = {}) {
   return buildAlertEmbed({
-    severity: AlertSeverity.WARNING,
+    kind,
     ...t(key, lang, values),
   });
 }
@@ -109,6 +109,7 @@ async function rejectBlockedTypeChange({
       interaction,
       completeApproval,
       embed: buildLocalizedAlert(
+        NoticeKind.INPUT,
         'dialogue.listEdit.moveBlocked',
         lang,
         { name: existingEntry.name }
@@ -200,7 +201,7 @@ async function applyApprovedInPlaceUpdate(args) {
       await closeApprovalWithAlert({
         interaction: args.interaction,
         completeApproval: args.completeApproval,
-        embed: buildLocalizedAlert(`dialogue.listEdit.${stillListed ? 'entryChanged' : 'originalMissing'}`, args.lang),
+        embed: buildLocalizedAlert(NoticeKind.EXPIRED, `dialogue.listEdit.${stillListed ? 'entryChanged' : 'originalMissing'}`, args.lang),
         lang: args.lang,
       });
       return false;
@@ -211,7 +212,7 @@ async function applyApprovedInPlaceUpdate(args) {
     await closeApprovalWithAlert({
       interaction: args.interaction,
       completeApproval: args.completeApproval,
-      embed: buildLocalizedAlert('dialogue.listEdit.scopeRaced', args.lang),
+      embed: buildLocalizedAlert(NoticeKind.EXPIRED, 'dialogue.listEdit.scopeRaced', args.lang),
       lang: args.lang,
     });
     return false;
@@ -319,7 +320,7 @@ export async function handleApprovedEditRequest({
     await closeApprovalWithAlert({
       interaction,
       completeApproval,
-      embed: buildLocalizedAlert('dialogue.listEdit.originalMissing', lang),
+      embed: buildLocalizedAlert(NoticeKind.EXPIRED, 'dialogue.listEdit.originalMissing', lang),
       lang,
     });
     return;

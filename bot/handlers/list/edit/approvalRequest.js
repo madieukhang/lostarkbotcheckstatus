@@ -9,11 +9,12 @@
  */
 
 import PendingApproval from '../../../models/PendingApproval.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { editAlert } from '../../../utils/interactionReplies.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import {
+  buildDeliveryFailedAlert,
   buildListMutationPayload,
   persistDeliveredApproval,
 } from '../services/mutationFlow.js';
@@ -83,20 +84,14 @@ export async function sendListEditApprovalRequest({
   });
 
   if (!sent.success) {
-    await editAlert(interaction, {
-      severity: AlertSeverity.WARNING,
-      title: t('dialogue.listEdit.approval.deliveryFailed.title', lang),
-      description: sent.reason || t('dialogue.quickAdd.deliveryFailed.fallback', lang),
-      footer: t('dialogue.listEdit.approval.deliveryFailed.footer', lang),
-    });
+    await editAlert(interaction, buildDeliveryFailedAlert('dialogue.listEdit.approval.deliveryFailed', sent, lang));
     return;
   }
 
   await persistDeliveredApproval(PendingApproval, payload, sent);
 
   await editAlert(interaction, {
-    severity: AlertSeverity.INFO,
-    titleIcon: '📨',
+    kind: NoticeKind.DONE,
     title: t('dialogue.listEdit.approval.sent.title', lang),
     description: t('dialogue.listEdit.approval.sent.description', lang),
     fields: [{

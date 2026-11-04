@@ -1,7 +1,7 @@
 import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { followUpAlert } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { PENDING_APPROVAL_ACCESS, claimApproval, runClaimedApproval } from './pendingApprovalAccess.js';
@@ -9,19 +9,23 @@ import { PENDING_APPROVAL_ACCESS, claimApproval, runClaimedApproval } from './pe
 /**
  * Build the same access notice for decision buttons and the read-only
  * evidence button.
- * @param {string} status - a PENDING_APPROVAL_ACCESS value; denial becomes an
- *   error alert, expiry/processing a warning.
+ * @param {string} status - a PENDING_APPROVAL_ACCESS value; denial is a guard
+ *   notice, a request another click is processing is busy, and anything else
+ *   is expired.
  * @param {string} lang - locale for the message lookup.
  * @param {object} [options]
  * @param {boolean} [options.evidence=false] - use the evidence-specific
  *   denial copy for unauthorized clicks.
- * @returns {{severity: AlertSeverity, title: string, description: string}}
+ * @returns {{kind: string, title: string, description: string}}
  */
 export function buildApprovalAccessAlert(status, lang, { evidence = false } = {}) {
   const denied = status === PENDING_APPROVAL_ACCESS.notAuthorized;
-  const key = denied ? (evidence ? 'evidenceNotAuthorized' : 'notAuthorized')
-    : status === PENDING_APPROVAL_ACCESS.processing ? 'processing' : 'expired';
-  return { severity: denied ? AlertSeverity.ERROR : AlertSeverity.WARNING, ...t(`dialogue.approval.flow.${key}`, lang) };
+  if (denied) {
+    return { kind: NoticeKind.GUARD, ...t(`dialogue.approval.flow.${evidence ? 'evidenceNotAuthorized' : 'notAuthorized'}`, lang) };
+  }
+  return status === PENDING_APPROVAL_ACCESS.processing
+    ? { kind: NoticeKind.BUSY, ...t('dialogue.approval.flow.processing', lang) }
+    : { kind: NoticeKind.EXPIRED, ...t('dialogue.approval.flow.expired', lang) };
 }
 
 /**

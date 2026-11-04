@@ -19,7 +19,7 @@ import {
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
   editAlert,
@@ -29,6 +29,7 @@ import {
   buildListAddApprovalEmbed,
 } from '../helpers.js';
 import {
+  buildDeliveryFailedAlert,
   buildListMutationPayload,
   submitListMutation,
 } from '../services/mutationFlow.js';
@@ -67,14 +68,17 @@ export function createListAddCommandHandler({
     const rules = [
       {
         invalid: () => !interaction.guild,
+        kind: NoticeKind.GUARD,
         message: () => t('dialogue.common.serverOnly', lang),
       },
       {
         invalid: () => !request.reason,
+        kind: NoticeKind.INPUT,
         message: () => t('dialogue.listAdd.command.reasonRequired', lang),
       },
       {
         invalid: () => request.raid === null,
+        kind: NoticeKind.INPUT,
         message: () => t('dialogue.listAdd.command.invalidRaid', lang, {
           raid: request.raidInput.trim(),
           list: request.type === 'black' ? 'blacklist' : 'whitelist',
@@ -82,13 +86,14 @@ export function createListAddCommandHandler({
       },
       {
         invalid: () => request.image?.contentType && !request.image.contentType.startsWith('image/'),
+        kind: NoticeKind.INPUT,
         message: () => t('dialogue.listAdd.command.invalidImage', lang, {
           type: request.image.contentType,
         }),
       },
     ];
     const violation = rules.find(({ invalid }) => invalid());
-    return violation?.message() || null;
+    return violation ? { kind: violation.kind, ...violation.message() } : null;
   }
 
   async function resolveListAddScope(request, guildId) {
@@ -144,15 +149,10 @@ export function createListAddCommandHandler({
       PendingApprovalModel: PendingApproval,
       sendListAddApprovalToApprovers,
       executeListAddToDatabase,
-      onDeliveryFailed: (delivery) => editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
-        ...t('dialogue.listAdd.command.deliveryFailed', lang),
-        fields: [{
-          name: t('dialogue.broadcast.fields.reason', lang),
-          value: delivery.reason || t('dialogue.common.unknown', lang),
-          inline: false,
-        }],
-      }),
+      onDeliveryFailed: (delivery) => editAlert(
+        interaction,
+        buildDeliveryFailedAlert('dialogue.listAdd.command.deliveryFailed', delivery, lang),
+      ),
       onQueued: (delivery) => editEmbed(
         interaction,
         buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang, snapshot: delivery.snapshot })
@@ -169,10 +169,7 @@ export function createListAddCommandHandler({
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     const validation = validateListAddRequest(interaction, request, lang);
     if (validation) {
-      await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...validation,
-      });
+      await editAlert(interaction, validation);
       return;
     }
 
@@ -185,9 +182,9 @@ export function createListAddCommandHandler({
     } catch (err) {
       console.error('[list] ❌ Proposal create/send failed:', err.message);
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.listAdd.command.proposalFailed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       });
     }
   }

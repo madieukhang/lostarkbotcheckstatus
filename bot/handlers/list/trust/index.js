@@ -14,7 +14,7 @@ import {
   buildNameRosterQuery,
   pickPreferredListEntry,
 } from '../../../utils/listEntryMap.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, AlertSeverity, NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, replyAlert } from '../../../utils/interactionReplies.js';
 import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
@@ -23,7 +23,7 @@ import {
   renderTrackedAltsField,
   statMapFromRosterCharacters,
 } from '../trackedAltsRender.js';
-import { isOfficerOrSenior } from '../helpers.js';
+import { buildOfficerOnlyAlert, isOfficerOrSenior } from '../helpers.js';
 
 function buildRemovedTrustEmbed(deleted, interaction, lang, record) {
   const trustedSince = deleted.createdAt
@@ -50,7 +50,7 @@ async function handleTrustRemoval(interaction, name, lang) {
     .collation(CASE_INSENSITIVE_COLLATION);
   if (!deleted) {
     await editAlert(interaction, {
-      severity: AlertSeverity.WARNING,
+      kind: NoticeKind.EMPTY,
       ...t('dialogue.trust.notTrusted', lang, { name }),
     });
     return;
@@ -61,7 +61,7 @@ async function handleTrustRemoval(interaction, name, lang) {
 
 async function replyExistingTrust(interaction, name, existing, lang) {
   await editAlert(interaction, {
-    severity: AlertSeverity.WARNING,
+    kind: NoticeKind.INPUT,
     title: t('dialogue.trust.already.title', lang),
     description: normalizeNameKey(existing.name) === normalizeNameKey(name)
       ? t('dialogue.trust.already.direct', lang, { name: existing.name })
@@ -87,7 +87,7 @@ async function rejectBlacklistedTrust(interaction, name, allCharacters, lang) {
   });
   if (!blacklisted) return false;
   await editAlert(interaction, {
-    severity: AlertSeverity.WARNING,
+    kind: NoticeKind.INPUT,
     ...t('dialogue.trust.blacklisted', lang, { name, matched: blacklisted.name }),
   });
   return true;
@@ -226,10 +226,7 @@ export function createTrustHandlers() {
     const lang = await getUserLanguage(userId, { UserPreferenceModel: UserPreference });
 
     if (!isOfficerOrSenior(userId)) {
-      await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
-        ...t('dialogue.trust.officerOnly', lang),
-      });
+      await replyAlert(interaction, buildOfficerOnlyAlert('dialogue.trust.officerOnly', lang));
       return;
     }
 

@@ -36,13 +36,13 @@ import {
   buildNameRosterQuery,
   pickPreferredListEntry,
 } from '../../../utils/listEntryMap.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { truncateInlineText } from '../../../utils/discordText.js';
 import {
   deferReply,
   editAlert,
+  editAlertAfterSavedWrite,
   editEmbed,
-  editNoticeAfterSavedWrite,
   updateAlert,
   updateEmbed,
 } from '../../../utils/interactionReplies.js';
@@ -287,7 +287,7 @@ export function createRemoveHandlers({ services }) {
       ].filter(Boolean);
 
       const notFoundAlert = {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EMPTY,
         ...t('dialogue.remove.notFound', lang, { name }),
       };
       if (found.length === 0) {
@@ -353,7 +353,7 @@ export function createRemoveHandlers({ services }) {
         removedBy: getInteractionDisplayName(interaction),
       });
 
-      const renderSavedNotice = () => editNoticeAfterSavedWrite(
+      const renderSavedNotice = () => editAlertAfterSavedWrite(
         interaction,
         t('dialogue.common.savedCardFailed', lang),
       );
@@ -448,16 +448,16 @@ export function createRemoveHandlers({ services }) {
       // (the 30 s limit, or the message was deleted); nothing was removed.
       if (err?.code === DiscordjsErrorCodes.InteractionCollectorError) {
         await editAlert(interaction, {
-          severity: AlertSeverity.INFO,
+          kind: NoticeKind.EXPIRED,
           ...t('dialogue.remove.pickerExpired', lang),
         }, { components: [] });
         return;
       }
       console.error('[list] ❌ Remove failed:', err.message);
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.remove.failed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       }, { components: [] });
     }
   }

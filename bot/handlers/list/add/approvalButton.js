@@ -9,7 +9,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 
-import { buildAlertEmbed, buildNoticeEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
 import { t } from '../../../services/i18n/index.js';
 import {
   buildApprovalRetryRow,
@@ -51,10 +51,11 @@ export function createListAddApprovalButtonHandler({
 
     const buildProcessingPayload = (targetLang) => ({
       content: null,
-      embeds: [buildNoticeEmbed(
-        t(`dialogue.approval.flow.${isApproveAction ? 'processingApprove' : 'processingReject'}`, targetLang, { user: interaction.user.tag }),
-        { severity: AlertSeverity.INFO, titleIcon: '⏳' }
-      )],
+      embeds: [buildAlertEmbed({
+        kind: NoticeKind.PROGRESS,
+        title: t('dialogue.approval.flow.processingTitle', targetLang),
+        description: t(`dialogue.approval.flow.${isApproveAction ? 'processingApprove' : 'processingReject'}`, targetLang, { user: interaction.user.tag }),
+      })],
       components: [buildApprovalRetryRow(action, requestId, targetLang)],
     });
     try {
@@ -150,9 +151,9 @@ export function createListAddApprovalButtonHandler({
       const buildFailurePayload = (targetLang) => ({
         content: '',
         embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
+          kind: NoticeKind.FAILURE,
           ...t('dialogue.approval.flow.retryFailed', targetLang),
-          fields: [{ name: t('dialogue.common.errorField', targetLang), value: `\`${err.message}\``, inline: false }],
+          fields: [{ name: t('dialogue.common.fields.details', targetLang), value: `\`${err.message}\``, inline: false }],
         })],
         components: [buildApprovalRetryRow(action, requestId, targetLang)],
       });

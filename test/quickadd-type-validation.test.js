@@ -54,8 +54,8 @@ test('quick add rejects an unknown list type instead of filing it as blacklist',
   assert.deepEqual(calls, []);
   assert.equal(replies.length, 1);
   const embed = replies[0].embeds[0].toJSON();
-  assert.equal(embed.color, COLORS.danger);
-  assert.match(embed.title, /That is not a list type/);
+  assert.equal(embed.color, COLORS.warning);
+  assert.match(embed.title, /^✏️ {2}That is not a list type/);
   assert.match(embed.description, /`watchlist`/);
 });
 
@@ -92,7 +92,7 @@ test('quick add rejects a custom raid label outside the watchlist, like /la-list
 
   assert.deepEqual(calls, []);
   const embed = replies.at(-1).embeds[0].toJSON();
-  assert.equal(embed.color, COLORS.danger);
+  assert.equal(embed.color, COLORS.warning);
   assert.match(embed.description, /`Some custom raid`/);
 });
 

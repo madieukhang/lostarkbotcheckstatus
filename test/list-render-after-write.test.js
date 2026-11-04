@@ -34,7 +34,7 @@ function replyRecorder({ rejectAll = false } = {}) {
 }
 
 function assertNotice(payload, key) {
-  assert.ok(payload.embeds[0].toJSON().title.includes(translate(key, 'en')), key);
+  assert.ok(payload.embeds[0].toJSON().title.includes(translate(`${key}.title`, 'en')), key);
 }
 
 function stubEnglishViewer(t) {

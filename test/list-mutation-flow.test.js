@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AlertSeverity } from '../bot/utils/alertEmbed.js';
+import { NoticeKind } from '../bot/utils/alertEmbed.js';
 import {
   buildListMutationPayload,
   persistDeliveredApproval,
@@ -106,7 +106,7 @@ test('renderListAddExecutionResult preserves rich-embed and notice projections',
   const interaction = { id: 'interaction-1' };
   const deps = {
     editEmbedFn: async (...args) => calls.push({ kind: 'embed', args }),
-    editNoticeFn: async (...args) => calls.push({ kind: 'notice', args }),
+    editAlertFn: async (...args) => calls.push({ kind: 'alert', args }),
   };
 
   await renderListAddExecutionResult(
@@ -129,14 +129,11 @@ test('renderListAddExecutionResult preserves rich-embed and notice projections',
     ],
   });
   assert.deepEqual(calls[1], {
-    kind: 'notice',
+    kind: 'alert',
     args: [
       interaction,
-      'Skipped',
-      {
-        severity: AlertSeverity.WARNING,
-        components: [{ id: 'retry' }],
-      },
+      { kind: NoticeKind.INPUT, description: 'Skipped' },
+      { content: null, components: [{ id: 'retry' }] },
     ],
   });
 });

@@ -525,7 +525,7 @@ const en = {
       footer: 'Cannot be added to any list · manage via /la-list trust action:add',
       emptyTitle: 'Trusted List Empty',
       emptyDescription: 'No trusted users yet.',
-      emptyFooter: 'Use /la-list trust action:add to mark a character trusted (officer-only).',
+      emptyTip: 'Use /la-list trust action:add to mark a character trusted (officer-only)',
     },
     evidence: {
       reason: '📝 Reason',

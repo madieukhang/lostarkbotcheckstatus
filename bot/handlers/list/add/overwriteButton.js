@@ -12,7 +12,7 @@ import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { buildRosterCharacters } from '../../../services/roster/index.js';
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { t } from '../../../services/i18n/index.js';
 import {
@@ -102,7 +102,7 @@ export function createListAddOverwriteButtonHandler({
         await editPayload(interaction, {
           content: '',
           embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
+            kind: NoticeKind.EXPIRED,
             ...t('dialogue.approval.flow.originalMissing', lang),
           })],
           components: [buildApprovalResultRow('Failed', lang)],
@@ -144,7 +144,7 @@ export function createListAddOverwriteButtonHandler({
       if (!saved) {
         await editPayload(interaction, {
           content: '',
-          embeds: [buildAlertEmbed({ severity: AlertSeverity.WARNING, ...t('dialogue.approval.flow.originalMissing', lang) })],
+          embeds: [buildAlertEmbed({ kind: NoticeKind.EXPIRED, ...t('dialogue.approval.flow.originalMissing', lang) })],
           components: [buildApprovalResultRow('Failed', lang)],
         });
         return;
@@ -176,9 +176,9 @@ export function createListAddOverwriteButtonHandler({
       await editPayload(interaction, {
         content: '',
         embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
+          kind: NoticeKind.FAILURE,
           ...t('dialogue.approval.flow.retryFailed', lang),
-          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+          fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
         })],
         components: [buildApprovalRetryRow('listadd_overwrite', requestId, lang)],
       });

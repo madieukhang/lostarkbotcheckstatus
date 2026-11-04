@@ -9,7 +9,7 @@
 import { connectDB } from '../../../db.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
-import { AlertSeverity, buildAlertEmbed } from '../../../utils/alertEmbed.js';
+import { AlertSeverity, NoticeKind, buildAlertEmbed } from '../../../utils/alertEmbed.js';
 import { isLegacyEvidence, resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { deferEphemeralReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
@@ -39,14 +39,14 @@ export function createEntryEvidenceButtonHandler({ client }) {
       buildScopedListQuery(type, { _id: entryId }, interaction.guild?.id || interaction.guildId || ''),
     ).lean();
     if (!entry) {
-      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t('dialogue.check.entryRemoved', lang) });
+      await editAlert(interaction, { kind: NoticeKind.EXPIRED, ...t('dialogue.check.entryRemoved', lang) });
       return;
     }
 
     const copy = EVIDENCE_COPY[isLegacyEvidence(entry) ? 'link' : 'archive'];
     const displayUrl = await resolveDisplayImageUrl(entry, client);
     if (!displayUrl) {
-      await editAlert(interaction, { severity: AlertSeverity.WARNING, ...t(copy.gone, lang) });
+      await editAlert(interaction, { kind: NoticeKind.EXPIRED, ...t(copy.gone, lang) });
       return;
     }
     await editEmbed(interaction, buildAlertEmbed({

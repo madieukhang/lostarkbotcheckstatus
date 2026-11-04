@@ -20,7 +20,7 @@
 
 import { connectDB } from '../../../db.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { truncateInlineText } from '../../../utils/discordText.js';
@@ -221,7 +221,7 @@ export function createEvidenceHandlers({ client }) {
         }));
       } else {
         await editAlert(interaction, {
-          severity: AlertSeverity.WARNING,
+          kind: NoticeKind.INPUT,
           ...t('dialogue.evidenceCommand.nameRequired', lang),
         });
         return;
@@ -230,7 +230,7 @@ export function createEvidenceHandlers({ client }) {
       if (!entry) {
         const displayName = name || rawNameOpt;
         await editAlert(interaction, {
-          severity: AlertSeverity.INFO,
+          kind: NoticeKind.EMPTY,
           ...t('dialogue.evidenceCommand.notListed', lang, { name: displayName }),
         });
         return;
@@ -253,7 +253,7 @@ export function createEvidenceHandlers({ client }) {
       const embeds = [evidenceEmbed];
       if (requestedPublic && !isPrivileged) {
         embeds.unshift(buildAlertEmbed({
-          severity: AlertSeverity.INFO,
+          kind: NoticeKind.GUARD,
           ...t('dialogue.evidenceCommand.publicRestricted', lang),
         }));
       }
@@ -262,9 +262,9 @@ export function createEvidenceHandlers({ client }) {
     } catch (err) {
       console.error('[evidence] Lookup failed:', err.message);
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.evidenceCommand.failed', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       });
     }
   }

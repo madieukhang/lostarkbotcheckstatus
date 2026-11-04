@@ -9,8 +9,8 @@
 
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
-import { editAlert, editEmbed, editNoticeAfterSavedWrite } from '../../../utils/interactionReplies.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
+import { editAlert, editAlertAfterSavedWrite, editEmbed } from '../../../utils/interactionReplies.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
 import { loadCheckDetailStatMap } from '../check/index.js';
@@ -183,7 +183,7 @@ async function renderEditSuccess(options) {
     await sendEditSuccess(options);
   } catch (err) {
     console.warn('[list] Edit success card failed after the write:', err.message);
-    await editNoticeAfterSavedWrite(options.interaction, t('dialogue.common.savedCardFailed', options.lang));
+    await editAlertAfterSavedWrite(options.interaction, t('dialogue.common.savedCardFailed', options.lang));
   }
 }
 
@@ -196,7 +196,7 @@ async function applyTypeChange(args) {
 
   if (targetDupe) {
     await editAlert(args.interaction, {
-      severity: AlertSeverity.WARNING,
+      kind: NoticeKind.INPUT,
       ...t('dialogue.listEdit.moveBlocked', args.lang, { name: args.existing.name }),
     });
     return null;
@@ -245,7 +245,7 @@ async function applyInPlaceEdit(args) {
       // read; the edit was meant for the note the editor saw.
       const stillListed = await model.exists({ _id: args.existing._id });
       await editAlert(args.interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EXPIRED,
         ...t(`dialogue.listEdit.${stillListed ? 'entryChanged' : 'originalMissing'}`, args.lang),
       });
       return null;
@@ -253,7 +253,7 @@ async function applyInPlaceEdit(args) {
   } catch (err) {
     if (err.code !== 11000 || !args.isScopeChange) throw err;
     await editAlert(args.interaction, {
-      severity: AlertSeverity.WARNING,
+      kind: NoticeKind.EXPIRED,
       ...t('dialogue.listEdit.scopeRaced', args.lang),
     });
     return null;
@@ -359,9 +359,9 @@ export async function applyListEditNow({
     broadcastAppliedEdit(args, editedEntry);
   } catch (err) {
     await editAlert(interaction, {
-      severity: AlertSeverity.WARNING,
+      kind: NoticeKind.FAILURE,
       ...t('dialogue.listEdit.applyFailed', lang),
-      fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+      fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
     });
   }
 }

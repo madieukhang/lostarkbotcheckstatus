@@ -1,12 +1,13 @@
 export default {
   common: {
-    fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details', queue: '🚦 Queue', unreadable: '✏️ Not names', unreadImages: '🖼️ Unread images' },
+    fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details', queue: '🚦 Queue', unreadable: '✏️ Not names', unreadImages: '🖼️ Unread images', whoCanUse: '👥 Who can use it' },
     selectionLost: { title: 'That choice no longer matches', description: 'I could not find the item you picked in this menu.', tip: 'Run the command again for a fresh menu' },
     errorField: 'Error',
     missingField: 'Missing',
     unknown: 'Unknown',
-    savedCardFailed: 'Saved. I could not show the confirmation card.',
-    queuedCardFailed: 'Your request is saved and waiting for approval. I could not show the confirmation card.',
+    savedCardFailed: { title: 'Saved', description: 'The change is saved; I just could not show the confirmation card.' },
+    queuedCardFailed: { title: 'Sent for approval', description: 'Your request is saved and waiting for approval; I just could not show the confirmation card.' },
+    officerRoles: 'Officer · Senior',
     unexpected: {
       title: 'That action slipped away',
       description: 'I could not finish it this time. Please try again; if it keeps happening, let an officer know.',
@@ -14,6 +15,7 @@ export default {
     serverOnly: {
       title: 'This belongs in a server',
       description: 'I can only use this command inside a Discord server, not in DMs.',
+      tip: 'Run the command again in a server channel',
     },
     notYourSession: {
       title: 'This is not your session',
@@ -285,7 +287,7 @@ export default {
     missing: {
       title: 'Evidence slipped away',
       description: 'I could not reopen this archived screenshot. It may have been deleted, or I may have lost access to the channel it lives in.',
-      footer: 'An officer can attach a fresh screenshot to that entry.',
+      tip: 'Ask an officer to attach a fresh screenshot to that entry',
     },
     archive: {
       title: 'Evidence archive',
@@ -300,7 +302,7 @@ export default {
     legacyGone: {
       title: 'Evidence no longer on Discord',
       description: 'This screenshot was only ever kept as a Discord image link and never made it into my evidence archive, which started on 11 Apr 2026. Discord no longer has the file, so I cannot show it.',
-      footer: 'An officer can attach a fresh screenshot to that entry.',
+      tip: 'Ask an officer to attach a fresh screenshot to that entry',
     },
   },
   remote: {
@@ -435,7 +437,8 @@ export default {
       noEvidence: { title: 'No evidence is available', description: 'This request has no evidence image, or its archived message was removed.' },
       evidenceFooterLegacy: 'Legacy image · it may have expired because it predates evidence rehosting',
       evidenceFooterFresh: 'Fresh URL resolved from the evidence archive just now',
-      originalMissing: { title: 'The original entry is gone', description: 'The duplicate entry was removed by another session before this action completed.', footer: 'Run `/la-list add` again to create a fresh entry.' },
+      originalMissing: { title: 'The original entry is gone', description: 'The duplicate entry was removed by another session before this action completed.', tip: 'Run /la-list add again to create a fresh entry' },
+      processingTitle: 'Saving the decision',
     },
   },
   notes: {
@@ -453,38 +456,38 @@ export default {
       footer: 'Roster refreshed from lostark.bible · {count} new {altWord}',
       footerNoAlts: 'Roster refreshed from lostark.bible',
     },
-    pendingExpired: { title: 'This card has expired', description: 'I no longer hold the report from this card. Run `/la-list add` again to add it as a note.' },
+    pendingExpired: { title: 'This card has expired', description: 'I no longer hold the report from this card.', tip: 'Run /la-list add again to add it as a note' },
     notYours: { title: 'This card is not yours', description: 'Only the member who ran this `/la-list add` can add its report to the history.' },
-    needsApproval: { title: 'This note needs approval', description: 'The entry is no longer one of this server\'s own entries, so a note on it goes through an approver. Run `/la-list add` again to send it for approval.' },
+    needsApproval: { title: 'This note needs approval', description: 'The entry is no longer one of this server\'s own entries, so a note on it goes through an approver.', tip: 'Run /la-list add again to send it for approval' },
   },
   listEdit: {
     originalMissing: { title: 'The original entry is gone', description: 'The entry was removed or moved to another list before these changes could be saved.' },
-    entryChanged: { title: 'This entry just got a new note', description: 'A note was added to this entry before the edit could be saved, so nothing changed. Run `/la-list edit` again to edit the latest note.' },
-    moveBlocked: { title: 'Move blocked', description: '**{name}** already exists in the target list, so I left both lists unchanged.', footer: 'Remove the conflicting target entry first, then submit the edit again.' },
-    scopeRaced: { title: 'Scope changed elsewhere', description: 'Another entry with this name claimed the target scope before this edit could be saved.', footer: 'Submit the edit again, or remove the conflicting entry first.' },
+    entryChanged: { title: 'This entry just got a new note', description: 'A note was added to this entry before the edit could be saved, so nothing changed.', tip: 'Run /la-list edit again to edit the latest note' },
+    moveBlocked: { title: 'Move blocked', description: '**{name}** already exists in the target list, so I left both lists unchanged.', tip: 'Remove the conflicting target entry first, then submit the edit again' },
+    scopeRaced: { title: 'Scope changed elsewhere', description: 'Another entry with this name claimed the target scope before this edit could be saved.', tip: 'Submit the edit again, or remove the conflicting entry first' },
     success: { titleMoved: '{list} · Edited & moved · {name}', titleEdited: '{list} · Edited · {name}', hero: '**{user}** edited {name} in **{list}**{scope}{summary}.', summaryChanged: ' · changed {fields}', summaryAlts: ' · added **{count}** {altWord}', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: 'Edited by {user}' },
     evidence: { before: 'Before the edit', after: 'After the edit', none: 'No previous image', unavailable: 'Image unavailable', download: '[Download original]({url})' },
     command: {
-      notFound: { title: 'Entry not found', description: '**{name}** is not in blacklist, whitelist, or watchlist.', footer: 'Use `/la-list view` to browse existing entries.' },
-      additionalRestricted: { title: 'This option is restricted', description: 'Only officers and the entry owner can use `additional_names`.', footer: 'Ask an officer to append the alts for you.' },
+      notFound: { title: 'Entry not found', description: '**{name}** is not in blacklist, whitelist, or watchlist.', tip: 'Browse existing entries with /la-list view' },
+      additionalRestricted: { title: 'This option is restricted', description: 'Only officers and the entry owner can use `additional_names`.', tip: 'Ask an officer to append the alts for you' },
       invalidNames: { title: 'Not a character name', description: 'Every name in `additional_names` must be 2-20 letters or digits and start with a letter. These do not fit: {names}' },
-      noChanges: { title: 'No changes provided', description: 'None of the optional edit fields were set.', footer: 'Set at least one of: reason / type / raid / logs / image / scope / additional_names.' },
-      scopeNotApplicable: { title: 'Scope does not apply here', description: 'The `scope` option only applies to blacklist. {list} entries are always global.', footer: 'Remove `scope`, or change to `type:black` for a server-scoped entry.' },
+      noChanges: { title: 'No changes provided', description: 'None of the optional edit fields were set.', tip: 'Set at least one of: reason / type / raid / logs / image / scope / additional_names' },
+      scopeNotApplicable: { title: 'Scope does not apply here', description: 'The `scope` option only applies to blacklist. {list} entries are always global.', tip: 'Remove scope, or change to type:black for a server-scoped entry' },
       scopeBlockedGlobal: 'A global blacklist entry with this name already exists.', scopeBlockedServer: 'A server-scoped blacklist entry with this name already exists in this server.',
-      scopeBlocked: { title: 'Scope change blocked', footer: 'Remove the conflicting entry first, or merge them manually.' },
+      scopeBlocked: { title: 'Scope change blocked', tip: 'Remove the conflicting entry first, or merge them manually' },
       noEffective: { title: 'Nothing would change', description: 'The values provided already match the current entry.' },
     },
     change: { reason: '📝 **Reason:** `{old}` → `{next}`', list: '📒 **List:** `{old}` → `{next}`', raid: '🗡️ **Raid:** `{old}` → `{next}`', evidence: '📎 **Evidence:** updated', scope: '🌐 **Scope:** `{old}` → `{next}`', append: 'Append alts: {names}', appendWithDuplicates: 'Append alts: {names} (skipped duplicates: {duplicates})' },
-    applyFailed: { title: 'Edit failed', description: 'I could not apply the edit.' },
-    approval: { requiredTitle: 'List edit · Approval required', deliveryFailed: { title: 'I could not pass that edit on', footer: 'Nothing was changed. Try again, or go straight to an officer.' }, sent: { title: 'Edit request sent', description: 'An approver has been notified. The edit will apply after approval.', pending: 'Pending changes ({count})' } },
+    applyFailed: { title: 'Edit failed', description: 'I could not apply the edit.', tip: 'Try again in a few minutes' },
+    approval: { requiredTitle: 'List edit · Approval required', deliveryFailed: { title: 'I could not pass that edit on', description: 'No approver received this edit request.', tip: 'Nothing was changed; try again, or go straight to an officer' }, sent: { title: 'Edit request sent', description: 'An approver has been notified. The edit will apply after approval.', pending: 'Pending changes ({count})' } },
   },
   listAdd: {
     command: {
-      reasonRequired: { title: 'A reason is still missing', description: 'Every list entry needs a reason. Run the command again and fill in `reason`.' },
+      reasonRequired: { title: 'A reason is still missing', description: 'Every list entry needs a reason.', tip: 'Run the command again and fill in reason' },
       invalidRaid: { title: 'That raid label is only available for watchlist', description: '`{raid}` is not a standard raid for {list}. Choose one of the raid suggestions, or use `type:watch` for a custom label.' },
       invalidImage: { title: 'That attachment is not an image', description: 'The `image` option only accepts image files; Discord reported `{type}`.' },
-      deliveryFailed: { title: 'I could not get that in front of an approver', description: 'None of the assigned approvers could be reached.', footer: 'Nothing was saved. Try again, or go straight to an officer.' },
-      proposalFailed: { title: 'The proposal could not be created', description: 'I could not create the approval request.', footer: 'No entry was created. Try the command again; if this repeats, contact an officer.' },
+      deliveryFailed: { title: 'I could not get that in front of an approver', description: 'None of the assigned approvers could be reached.', tip: 'Nothing was saved; try again, or go straight to an officer' },
+      proposalFailed: { title: 'The proposal could not be created', description: 'I could not create the approval request, so no entry was created.', tip: 'Try the command again; if this repeats, contact an officer' },
     },
     hidden: {
       title: 'Hidden roster detected',
@@ -513,8 +516,8 @@ export default {
     },
   },
   listView: {
-    failed: { title: 'The list could not be loaded', description: 'I could not load this list view.' },
-    session: { title: 'This is not your list view', description: 'Only the person who opened this view can navigate it.' },
+    failed: { title: 'The list could not be loaded', description: 'I could not load this list view.', tip: 'Try again in a few minutes' },
+    session: { title: 'This is not your list view', description: 'Only the person who opened this view can navigate it.', tip: 'Open your own list view with /la-list view' },
   },
   search: {
     moreResults: '… {count} more results. Narrow the name or filters to see them.',
@@ -530,17 +533,17 @@ export default {
   },
   evidenceCommand: {
     nameRequired: { title: 'A character name is required', description: 'Enter a name, or use autocomplete to choose an existing list entry.' },
-    notListed: { title: 'No visible list entry', description: '**{name}** is not in any list visible to this server.', footer: 'Try `/la-search` for a fuzzy match across the Bible name index.' },
+    notListed: { title: 'No visible list entry', description: '**{name}** is not in any list visible to this server.', tip: 'Try /la-search for a fuzzy match across the Bible name index' },
     publicRestricted: { title: 'Public evidence is restricted', description: 'Only officers and seniors can post evidence publicly, so I kept this view private.' },
-    failed: { title: 'Evidence lookup failed', description: 'I could not load the evidence record.' },
+    failed: { title: 'Evidence lookup failed', description: 'I could not load the evidence record.', tip: 'Try again in a few minutes' },
   },
   quickAdd: {
-    deliveryFailed: { title: 'I could not pass that on', fallback: 'The approval request did not reach anyone. Try again in a moment.' },
-    failed: { title: 'That quick add did not go through', description: 'Something went wrong while I was filing that one. Give it another try.' },
+    deliveryFailed: { title: 'I could not pass that on', description: 'The approval request did not reach anyone.', tip: 'Try again in a moment' },
+    failed: { title: 'That quick add did not go through', description: 'Something went wrong while I was filing that one.', tip: 'Give it another try' },
     invalidType: { title: 'That is not a list type', description: 'I read `{type}`. Quick add takes `black`, `white` or `watch`.' },
   },
   remove: {
-    notFound: { title: 'Nothing to remove', description: '**{name}** is not in any visible list.', footer: 'Use `/la-list view` to browse existing entries.' },
+    notFound: { title: 'Nothing to remove', description: '**{name}** is not in any visible list.', tip: 'Browse existing entries with /la-list view' },
     titles: { blocked: 'Removal blocked · {name}', one: 'Removed from {list} · {name}', many: 'Removed from {count} lists · {name}', mixed: 'Mixed result · {name}' },
     line: { variants: [
       'Removed {name}. I copied the old reason below, in case you need it again.',
@@ -557,8 +560,8 @@ export default {
     more: '+{count} more',
     footerBlocked: 'Inspect it with `/la-list view`; use `/la-list edit` for legacy entries.',
     pickerTitle: 'Found · {name}', pickerDescription: '**{name}** is in {count} lists. Choose what to remove:', pickerFooter: 'Expires in 30 seconds · only you can use this picker.',
-    pickerExpired: { title: 'Picker expired', description: 'Nothing was removed. Run `/la-list remove` again to choose.' },
-    failed: { title: 'Removal failed', description: 'I could not remove the entry.' }, unknown: 'unknown',
+    pickerExpired: { title: 'Picker expired', description: 'Nothing was removed.', tip: 'Run /la-list remove again to choose' },
+    failed: { title: 'Removal failed', description: 'I could not remove the entry.', tip: 'Try again in a few minutes' }, unknown: 'unknown',
   },
   check: {
     modeSaved: { title: 'Screenshot mode saved', description: 'Your mode is **{mode}**. This applies to your uploads and `/la-check` when no mode is selected.', tip: 'Switch back with /la-check-mode mode:daily; a /la-check mode override affects one image only' },
@@ -700,11 +703,11 @@ export default {
     name: 'Name', reason: 'Trust reason',
   },
   trust: {
-    officerOnly: { title: 'Officer access only', description: 'Only officers and seniors can manage the trusted list.' },
+    officerOnly: { title: 'Officer access only', description: 'Officers and seniors manage the trusted list.', tip: 'Ask an officer to run it for you' },
     notTrusted: { title: 'Nothing to remove', description: '**{name}** is not in the trusted list.' },
     removed: { title: 'Trusted · Removed · {name}', description: '**{name}** and its linked roster alts may now be added to moderation lists again.', character: 'Character', reason: 'Was trusted for', since: 'Trusted since', removedBy: 'Removed by', unknown: 'unknown', footer: 'Use `/la-list trust action:add` if this removal was a mistake.' },
     already: { title: 'Already trusted', direct: '**{name}** is already in the trusted list.', via: '**{name}** is already trusted through roster match **{matched}**.' },
-    blacklisted: { title: 'This character is blacklisted', description: '**{name}** currently matches blacklist entry **{matched}**.', footer: 'Remove the blacklist entry before marking this character trusted.' },
+    blacklisted: { title: 'This character is blacklisted', description: '**{name}** currently matches blacklist entry **{matched}**.', tip: 'Remove the blacklist entry before marking this character trusted' },
     actionAdded: 'Added', actionRefreshed: 'Refreshed', actionKept: 'Roster kept',
     success: { title: 'Trusted · {action} · {name}', description: '**{name}** and its linked roster alts can no longer be added to blacklist, whitelist, or watchlist.', character: 'Character', reason: 'Reason', addedBy: 'Added by', refreshedBy: 'Refreshed by', onlyCharacter: 'Only this character is linked on this trusted entry.', trackedAlts: 'Tracked alts', rosterKept: { title: 'Roster not refreshed', description: 'lostark.bible did not list this roster (it is hidden, not found, or the site did not answer), so the trusted alts already saved were kept. Run this again later to refresh them.' }, footer: 'Use `/la-list view type:trusted` to browse the trusted roster.' },
   },

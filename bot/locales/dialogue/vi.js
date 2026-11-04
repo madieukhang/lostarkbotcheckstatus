@@ -1,12 +1,13 @@
 export default {
   common: {
-    fields: { filter: '🎚️ Bộ lọc', beforeFilter: '📋 Trước khi lọc', details: '🧾 Chi tiết', queue: '🚦 Hàng chờ', unreadable: '✏️ Không đọc được', unreadImages: '🖼️ Ảnh chưa đọc được' },
+    fields: { filter: '🎚️ Bộ lọc', beforeFilter: '📋 Trước khi lọc', details: '🧾 Chi tiết', queue: '🚦 Hàng chờ', unreadable: '✏️ Không đọc được', unreadImages: '🖼️ Ảnh chưa đọc được', whoCanUse: '👥 Ai dùng được' },
     selectionLost: { title: 'Lựa chọn này không còn khớp', description: 'Tớ không tìm ra mục cậu vừa chọn trong menu này.', tip: 'Chạy lại lệnh để mở menu mới' },
     errorField: 'Lỗi',
     missingField: 'Còn thiếu',
     unknown: 'Không rõ',
-    savedCardFailed: 'Đã lưu. Tớ chưa hiển thị được card xác nhận.',
-    queuedCardFailed: 'Yêu cầu của cậu đã được lưu và đang chờ duyệt. Tớ chưa hiển thị được card xác nhận.',
+    savedCardFailed: { title: 'Đã lưu', description: 'Thay đổi đã được lưu, chỉ là tớ chưa hiển thị được card xác nhận.' },
+    queuedCardFailed: { title: 'Đã gửi đi duyệt', description: 'Yêu cầu của cậu đã được lưu và đang chờ duyệt, chỉ là tớ chưa hiển thị được card xác nhận.' },
+    officerRoles: 'Officer · Senior',
     unexpected: {
       title: 'Thao tác này vừa trượt mất rồi',
       description: 'Tớ chưa thể hoàn tất lần này. Cậu thử lại nhé; nếu vẫn lặp lại, báo cho officer giúp tớ.',
@@ -14,6 +15,7 @@ export default {
     serverOnly: {
       title: 'Chỗ này chỉ dùng trong server thôi',
       description: 'Lệnh này chỉ hoạt động trong Discord server, không dùng được trong DM đâu nhé.',
+      tip: 'Chạy lại lệnh trong một kênh của server',
     },
     notYourSession: {
       title: 'Đây không phải phiên của cậu',
@@ -223,7 +225,7 @@ export default {
     missing: {
       title: 'Ảnh bằng chứng vừa trôi mất rồi',
       description: 'Tớ mở lại tấm ảnh đã cất mà không được. Có thể ảnh bị xóa rồi, hoặc tớ đã mất quyền vào channel đang giữ nó.',
-      footer: 'Nhờ officer gắn một tấm ảnh mới vào chỗ đó nhé.',
+      tip: 'Nhờ officer gắn một tấm ảnh mới vào chỗ đó nhé',
     },
     archive: {
       title: 'Kho ảnh bằng chứng',
@@ -238,7 +240,7 @@ export default {
     legacyGone: {
       title: 'Ảnh bằng chứng không còn trên Discord',
       description: 'Tấm ảnh này chỉ được lưu dưới dạng link Discord, chưa từng được cất vào kho ảnh của tớ (kho có từ 11/04/2026). Discord đã không còn giữ file nên tớ không mở lại được.',
-      footer: 'Nhờ officer gắn một tấm ảnh mới vào chỗ đó nhé.',
+      tip: 'Nhờ officer gắn một tấm ảnh mới vào chỗ đó nhé',
     },
   },
   remote: {
@@ -341,7 +343,8 @@ export default {
       executionFailed: { title: 'Chưa thể hoàn tất lượt duyệt', description: 'Yêu cầu đã được **{user}** duyệt nhưng lúc lưu dữ liệu gặp lỗi.', requesterDescription: 'Senior đã duyệt, nhưng LoaLogs chưa lưu được dữ liệu.', footer: 'Chưa có entry nào được tạo. Gửi lại yêu cầu hoặc liên hệ Senior nhé.' },
       noEvidence: { title: 'Không có bằng chứng để xem', description: 'Yêu cầu này không kèm ảnh, hoặc message lưu ảnh đã bị xóa.' },
       evidenceFooterLegacy: 'Ảnh legacy · có thể đã hết hạn vì được gửi trước cơ chế rehost', evidenceFooterFresh: 'URL mới vừa được lấy từ kho evidence',
-      originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry trùng đã bị một phiên khác xóa trước khi thao tác này hoàn tất.', footer: 'Chạy lại `/la-list add` để tạo entry mới nhé.' },
+      originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry trùng đã bị một phiên khác xóa trước khi thao tác này hoàn tất.', tip: 'Chạy lại /la-list add để tạo entry mới nhé' },
+      processingTitle: 'Đang lưu quyết định',
     },
   },
   notes: {
@@ -359,29 +362,29 @@ export default {
       footer: 'Roster đã làm mới từ lostark.bible · {count} {altWord} mới',
       footerNoAlts: 'Roster đã làm mới từ lostark.bible',
     },
-    pendingExpired: { title: 'Card này hết hạn rồi', description: 'Tớ không còn giữ lần report của card này nữa. Cậu chạy lại `/la-list add` để ghi nó vào lịch sử nhé.' },
+    pendingExpired: { title: 'Card này hết hạn rồi', description: 'Tớ không còn giữ lần report của card này nữa.', tip: 'Chạy lại /la-list add để ghi nó vào lịch sử nhé' },
     notYours: { title: 'Card này không phải của cậu', description: 'Chỉ người chạy lệnh `/la-list add` này mới ghi được lần report vào lịch sử.' },
-    needsApproval: { title: 'Note này cần được duyệt', description: 'Entry này không còn là entry riêng của server nữa, nên note trên nó phải qua approver. Cậu chạy lại `/la-list add` để gửi đi duyệt nhé.' },
+    needsApproval: { title: 'Note này cần được duyệt', description: 'Entry này không còn là entry riêng của server nữa, nên note trên nó phải qua approver.', tip: 'Chạy lại /la-list add để gửi đi duyệt nhé' },
   },
   listEdit: {
     originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry đã bị xóa hoặc chuyển sang list khác trước khi thay đổi được lưu.' },
-    entryChanged: { title: 'Entry vừa có ghi chú mới', description: 'Có người vừa thêm ghi chú vào entry này trước khi edit kịp lưu, nên tớ chưa đổi gì cả. Cậu chạy lại `/la-list edit` để sửa ghi chú mới nhất nhé.' },
-    moveBlocked: { title: 'Không thể chuyển list', description: '**{name}** đã tồn tại trong list đích nên tớ giữ nguyên cả hai list.', footer: 'Xóa entry bị trùng ở list đích rồi gửi lại yêu cầu nhé.' },
-    scopeRaced: { title: 'Scope vừa bị thay đổi ở nơi khác', description: 'Một entry cùng tên đã chiếm scope đích trước khi chỉnh sửa này được lưu.', footer: 'Gửi lại chỉnh sửa hoặc xóa entry bị trùng trước nhé.' },
+    entryChanged: { title: 'Entry vừa có ghi chú mới', description: 'Có người vừa thêm ghi chú vào entry này trước khi edit kịp lưu, nên tớ chưa đổi gì cả.', tip: 'Chạy lại /la-list edit để sửa ghi chú mới nhất nhé' },
+    moveBlocked: { title: 'Không thể chuyển list', description: '**{name}** đã tồn tại trong list đích nên tớ giữ nguyên cả hai list.', tip: 'Xóa entry bị trùng ở list đích rồi gửi lại yêu cầu nhé' },
+    scopeRaced: { title: 'Scope vừa bị thay đổi ở nơi khác', description: 'Một entry cùng tên đã chiếm scope đích trước khi chỉnh sửa này được lưu.', tip: 'Gửi lại chỉnh sửa hoặc xóa entry bị trùng trước nhé' },
     success: { titleMoved: '{list} · Đã sửa và chuyển list · {name}', titleEdited: '{list} · Đã chỉnh sửa · {name}', hero: '**{user}** đã sửa {name} trong **{list}**{scope}{summary}.', summaryChanged: ' · đổi {fields}', summaryAlts: ' · thêm **{count}** alt', summaryFields: { logs: 'Logs', evidence: 'Evidence' }, footer: 'Sửa bởi {user}' },
     evidence: { before: 'Trước khi đổi', after: 'Sau khi đổi', none: 'Chưa có ảnh', unavailable: 'Không tải được ảnh', download: '[Tải ảnh gốc]({url})' },
     command: {
-      notFound: { title: 'Không tìm thấy entry', description: '**{name}** không nằm trong blacklist, whitelist hay watchlist.', footer: 'Dùng `/la-list view` để xem entry hiện có nhé.' }, additionalRestricted: { title: 'Option này được giới hạn', description: 'Chỉ officer và chủ entry mới dùng được `additional_names`.', footer: 'Nhờ officer thêm alt giúp cậu nhé.' }, invalidNames: { title: 'Có tên không phải tên nhân vật', description: 'Mỗi tên trong `additional_names` phải dài 2-20 ký tự, chỉ gồm chữ hoặc số và bắt đầu bằng chữ. Các tên chưa hợp lệ: {names}' }, noChanges: { title: 'Chưa có thay đổi nào', description: 'Cậu chưa đặt field chỉnh sửa tùy chọn nào.', footer: 'Đặt ít nhất một mục: reason / type / raid / logs / image / scope / additional_names.' },
-      scopeNotApplicable: { title: 'Scope không áp dụng ở đây', description: 'Option `scope` chỉ dùng cho blacklist. Entry {list} luôn là global.', footer: 'Bỏ `scope`, hoặc đổi sang `type:black` nếu muốn entry nội bộ server.' }, scopeBlockedGlobal: 'Đã có blacklist entry global cùng tên.', scopeBlockedServer: 'Đã có blacklist entry nội bộ cùng tên trong server này.', scopeBlocked: { title: 'Không thể đổi scope', footer: 'Xóa entry bị trùng trước hoặc tự gộp chúng nhé.' }, noEffective: { title: 'Không có gì thực sự thay đổi', description: 'Các giá trị cậu đưa đã giống entry hiện tại.' },
+      notFound: { title: 'Không tìm thấy entry', description: '**{name}** không nằm trong blacklist, whitelist hay watchlist.', tip: 'Xem các entry hiện có bằng /la-list view nhé' }, additionalRestricted: { title: 'Option này được giới hạn', description: 'Chỉ officer và chủ entry mới dùng được `additional_names`.', tip: 'Nhờ officer thêm alt giúp cậu nhé' }, invalidNames: { title: 'Có tên không phải tên nhân vật', description: 'Mỗi tên trong `additional_names` phải dài 2-20 ký tự, chỉ gồm chữ hoặc số và bắt đầu bằng chữ. Các tên chưa hợp lệ: {names}' }, noChanges: { title: 'Chưa có thay đổi nào', description: 'Cậu chưa đặt field chỉnh sửa tùy chọn nào.', tip: 'Đặt ít nhất một mục: reason / type / raid / logs / image / scope / additional_names' },
+      scopeNotApplicable: { title: 'Scope không áp dụng ở đây', description: 'Option `scope` chỉ dùng cho blacklist. Entry {list} luôn là global.', tip: 'Bỏ scope, hoặc đổi sang type:black nếu muốn entry nội bộ server' }, scopeBlockedGlobal: 'Đã có blacklist entry global cùng tên.', scopeBlockedServer: 'Đã có blacklist entry nội bộ cùng tên trong server này.', scopeBlocked: { title: 'Không thể đổi scope', tip: 'Xóa entry bị trùng trước hoặc tự gộp chúng nhé' }, noEffective: { title: 'Không có gì thực sự thay đổi', description: 'Các giá trị cậu đưa đã giống entry hiện tại.' },
     },
     change: { reason: '📝 **Lý do:** `{old}` → `{next}`', list: '📒 **List:** `{old}` → `{next}`', raid: '🗡️ **Raid:** `{old}` → `{next}`', evidence: '📎 **Evidence:** đã cập nhật', scope: '🌐 **Scope:** `{old}` → `{next}`', append: 'Thêm alt: {names}', appendWithDuplicates: 'Thêm alt: {names} (bỏ qua tên trùng: {duplicates})' },
-    applyFailed: { title: 'Chỉnh sửa thất bại', description: 'Tớ chưa áp dụng được thay đổi.' }, approval: { requiredTitle: 'Chỉnh sửa list · Cần duyệt', deliveryFailed: { title: 'Tớ chưa chuyển được chỉnh sửa đó đi', footer: 'Chưa có gì bị đổi cả. Cậu thử lại, hoặc tìm thẳng officer nhé.' }, sent: { title: 'Đã gửi yêu cầu chỉnh sửa', description: 'Approver đã được thông báo. Thay đổi sẽ áp dụng sau khi duyệt.', pending: 'Thay đổi đang chờ ({count})' } },
+    applyFailed: { title: 'Chỉnh sửa thất bại', description: 'Tớ chưa áp dụng được thay đổi.', tip: 'Thử lại sau ít phút' }, approval: { requiredTitle: 'Chỉnh sửa list · Cần duyệt', deliveryFailed: { title: 'Tớ chưa chuyển được chỉnh sửa đó đi', description: 'Chưa approver nào nhận được yêu cầu chỉnh sửa này.', tip: 'Chưa có gì bị đổi, cậu thử lại hoặc nhờ thẳng officer nhé' }, sent: { title: 'Đã gửi yêu cầu chỉnh sửa', description: 'Approver đã được thông báo. Thay đổi sẽ áp dụng sau khi duyệt.', pending: 'Thay đổi đang chờ ({count})' } },
   },
   listAdd: {
     command: {
-      reasonRequired: { title: 'Cậu còn thiếu lý do', description: 'Mỗi entry đều cần lý do. Chạy lại command và điền `reason` nhé.' }, invalidRaid: { title: 'Raid tùy ý chỉ dùng cho watchlist', description: '`{raid}` không phải raid chuẩn của {list}. Chọn một raid được gợi ý, hoặc dùng `type:watch` để nhập nhãn tùy ý.' }, invalidImage: { title: 'File đính kèm không phải ảnh', description: 'Option `image` chỉ nhận file ảnh; Discord báo loại `{type}`.' },
-      deliveryFailed: { title: 'Tớ chưa đưa được cái này tới người duyệt', description: 'Không approver nào được chỉ định mà tớ liên hệ được.', footer: 'Chưa có gì được lưu cả. Cậu thử lại, hoặc tìm thẳng officer cũng được.' },
-      proposalFailed: { title: 'Chưa tạo được đề xuất', description: 'Tớ chưa tạo được yêu cầu duyệt.', footer: 'Chưa có entry nào được tạo. Chạy lại command; nếu vẫn lỗi thì liên hệ officer nhé.' },
+      reasonRequired: { title: 'Cậu còn thiếu lý do', description: 'Mỗi entry đều cần lý do.', tip: 'Chạy lại lệnh và điền reason nhé' }, invalidRaid: { title: 'Raid tùy ý chỉ dùng cho watchlist', description: '`{raid}` không phải raid chuẩn của {list}. Chọn một raid được gợi ý, hoặc dùng `type:watch` để nhập nhãn tùy ý.' }, invalidImage: { title: 'File đính kèm không phải ảnh', description: 'Option `image` chỉ nhận file ảnh; Discord báo loại `{type}`.' },
+      deliveryFailed: { title: 'Tớ chưa đưa được cái này tới người duyệt', description: 'Không approver nào được chỉ định mà tớ liên hệ được.', tip: 'Chưa có gì được lưu, cậu thử lại hoặc nhờ thẳng officer nhé' },
+      proposalFailed: { title: 'Chưa tạo được đề xuất', description: 'Tớ chưa tạo được yêu cầu duyệt, nên chưa có entry nào được tạo.', tip: 'Chạy lại lệnh; nếu vẫn lỗi thì báo officer nhé' },
     },
     hidden: { title: 'Phát hiện roster đang ẩn', withGuild: 'Hiện mới track tên cậu nhập. Bible hiển thị guild **{guild}**, nên dùng `/la-list enrich name:{name}` hoặc bấm **Enrich ngay** để quét guildmate cùng stronghold.', withoutGuild: 'Hiện mới track tên cậu nhập. Bible không hiển thị danh sách guild, nên dùng `/la-list edit name:{name} additional_names:Alt1, Alt2` để thêm alt đã biết thủ công.' },
     noRoster: {
@@ -396,7 +399,7 @@ export default {
     },
   },
   listView: {
-    failed: { title: 'Chưa tải được list', description: 'Tớ chưa mở được trang list này.' }, session: { title: 'Đây không phải list view của cậu', description: 'Chỉ người mở view này mới điều hướng được.' },
+    failed: { title: 'Chưa tải được list', description: 'Tớ chưa mở được trang list này.', tip: 'Thử lại sau ít phút' }, session: { title: 'Đây không phải list view của cậu', description: 'Chỉ người mở view này mới điều hướng được.', tip: 'Mở list view của riêng cậu bằng /la-list view' },
   },
   search: {
     moreResults: '… Còn {count} kết quả. Cậu thu hẹp tên hoặc bộ lọc để xem tiếp nhé.',
@@ -410,14 +413,14 @@ export default {
     session: { title: 'Đây không phải lượt tìm của cậu', description: 'Chỉ người chạy search này mới mở được evidence.', tip: 'Chạy /la-search của riêng cậu để xem evidence' },
   },
   evidenceCommand: {
-    nameRequired: { title: 'Cần tên character', description: 'Nhập một tên hoặc dùng autocomplete để chọn entry đang có nhé.' }, notListed: { title: 'Không có entry nào cậu được xem', description: '**{name}** không nằm trong list nào hiển thị với server này.', footer: 'Thử `/la-search` để tìm gần đúng trong chỉ mục tên của Bible nhé.' },
-    publicRestricted: { title: 'Evidence public được giới hạn', description: 'Chỉ officer và senior mới đăng evidence công khai được, nên tớ giữ view này ở chế độ riêng.' }, failed: { title: 'Tra evidence thất bại', description: 'Tớ chưa tải được record evidence.' },
+    nameRequired: { title: 'Cần tên character', description: 'Nhập một tên hoặc dùng autocomplete để chọn entry đang có nhé.' }, notListed: { title: 'Không có entry nào cậu được xem', description: '**{name}** không nằm trong list nào hiển thị với server này.', tip: 'Thử /la-search để tìm gần đúng trong chỉ mục tên của Bible nhé' },
+    publicRestricted: { title: 'Evidence public được giới hạn', description: 'Chỉ officer và senior mới đăng evidence công khai được, nên tớ giữ view này ở chế độ riêng.' }, failed: { title: 'Tra evidence thất bại', description: 'Tớ chưa tải được record evidence.', tip: 'Thử lại sau ít phút' },
   },
   quickAdd: {
-    deliveryFailed: { title: 'Tớ chưa chuyển đi được', fallback: 'Yêu cầu duyệt chưa tới được tay ai cả. Lát nữa cậu thử lại nhé.' }, failed: { title: 'Lượt quick add đó chưa trót lọt', description: 'Đang ghi lại giúp cậu thì có gì đó trục trặc. Cậu thử lại lần nữa nhé.' }, invalidType: { title: 'Đó không phải loại list', description: 'Tớ đọc được `{type}`. Quick add chỉ nhận `black`, `white` hoặc `watch` thôi.' },
+    deliveryFailed: { title: 'Tớ chưa chuyển đi được', description: 'Yêu cầu duyệt chưa tới được tay ai cả.', tip: 'Lát nữa cậu thử lại nhé' }, failed: { title: 'Lượt quick add đó chưa trót lọt', description: 'Đang ghi lại giúp cậu thì có gì đó trục trặc.', tip: 'Thử lại lần nữa nhé' }, invalidType: { title: 'Đó không phải loại list', description: 'Tớ đọc được `{type}`. Quick add chỉ nhận `black`, `white` hoặc `watch` thôi.' },
   },
   remove: {
-    notFound: { title: 'Không có gì để xóa', description: '**{name}** không nằm trong list nào cậu nhìn thấy.', footer: 'Dùng `/la-list view` để xem các entry hiện có nhé.' }, titles: { blocked: 'Không thể xóa · {name}', one: 'Đã xóa khỏi {list} · {name}', many: 'Đã xóa khỏi {count} list · {name}', mixed: 'Kết quả hỗn hợp · {name}' },
+    notFound: { title: 'Không có gì để xóa', description: '**{name}** không nằm trong list nào cậu nhìn thấy.', tip: 'Xem các entry hiện có bằng /la-list view nhé' }, titles: { blocked: 'Không thể xóa · {name}', one: 'Đã xóa khỏi {list} · {name}', many: 'Đã xóa khỏi {count} list · {name}', mixed: 'Kết quả hỗn hợp · {name}' },
     line: { variants: [
       'Gỡ {name} rồi nhé. Tớ chép lại lý do cũ ở dưới, phòng khi cậu cần nó lần nữa.',
       'Xong, {name} biến khỏi list rồi. Lý do cũ tớ giữ lại ngay dưới đây.',
@@ -429,7 +432,7 @@ export default {
     ] },
     removedBy: 'Người gỡ', removedAt: 'Gỡ lúc',
     failedSection: 'Không thể xóa', legacy: '**{list}**: entry legacy này không có metadata chủ sở hữu. Dùng `/la-list edit` để chỉnh.', ownerOnly: '**{list}**: chỉ **{owner}**, người đã thêm entry, mới xóa được.', more: '+{count} tên khác',
-    footerBlocked: 'Kiểm tra bằng `/la-list view`; dùng `/la-list edit` cho entry legacy.', pickerTitle: 'Đã tìm thấy · {name}', pickerDescription: '**{name}** nằm trong {count} list. Chọn mục cần xóa:', pickerFooter: 'Hết hạn sau 30 giây · chỉ cậu dùng được picker này.', pickerExpired: { title: 'Picker đã hết hạn', description: 'Tớ chưa xóa gì cả. Cậu chạy lại `/la-list remove` để chọn nhé.' }, failed: { title: 'Xóa thất bại', description: 'Tớ chưa xóa được entry.' }, unknown: 'không xác định',
+    footerBlocked: 'Kiểm tra bằng `/la-list view`; dùng `/la-list edit` cho entry legacy.', pickerTitle: 'Đã tìm thấy · {name}', pickerDescription: '**{name}** nằm trong {count} list. Chọn mục cần xóa:', pickerFooter: 'Hết hạn sau 30 giây · chỉ cậu dùng được picker này.', pickerExpired: { title: 'Picker đã hết hạn', description: 'Tớ chưa xóa gì cả.', tip: 'Chạy lại /la-list remove để chọn nhé' }, failed: { title: 'Xóa thất bại', description: 'Tớ chưa xóa được entry.', tip: 'Thử lại sau ít phút' }, unknown: 'không xác định',
   },
   check: {
     modeSaved: { title: 'Đã lưu chế độ đọc ảnh', description: 'Chế độ của cậu là **{mode}**. Áp dụng cho ảnh cậu thả vào kênh và `/la-check` khi không chọn mode.', tip: 'Về Daily bằng /la-check-mode mode:daily; mode trong /la-check chỉ đổi cho một ảnh' },
@@ -529,9 +532,9 @@ export default {
     title: 'Trusted user · Đã chặn', direct: '**{name}** là trusted user nên không thể thêm vào list nào.', via: '**{name}** chung roster với trusted user **{via}** nên không thể thêm vào list nào.', name: 'Tên', reason: 'Lý do trust',
   },
   trust: {
-    officerOnly: { title: 'Chỉ officer mới dùng được', description: 'Chỉ officer và senior mới quản lý được trusted list.' }, notTrusted: { title: 'Không có gì để xóa', description: '**{name}** không nằm trong trusted list.' },
+    officerOnly: { title: 'Chỉ officer mới dùng được', description: 'Trusted list do officer và senior quản lý.', tip: 'Nhờ một officer chạy giúp cậu' }, notTrusted: { title: 'Không có gì để xóa', description: '**{name}** không nằm trong trusted list.' },
     removed: { title: 'Trusted · Đã gỡ · {name}', description: '**{name}** và các alt cùng roster giờ có thể được thêm lại vào list kiểm duyệt.', character: 'Character', reason: 'Lý do từng được trust', since: 'Được trust từ', removedBy: 'Gỡ bởi', unknown: 'không rõ', footer: 'Dùng `/la-list trust action:add` nếu đây là thao tác nhầm nhé.' },
-    already: { title: 'Đã là trusted', direct: '**{name}** đã nằm trong trusted list.', via: '**{name}** đã được trust qua roster của **{matched}**.' }, blacklisted: { title: 'Character đang bị blacklist', description: '**{name}** hiện khớp entry blacklist **{matched}**.', footer: 'Xóa entry blacklist trước khi đánh dấu character này là trusted nhé.' },
+    already: { title: 'Đã là trusted', direct: '**{name}** đã nằm trong trusted list.', via: '**{name}** đã được trust qua roster của **{matched}**.' }, blacklisted: { title: 'Character đang bị blacklist', description: '**{name}** hiện khớp entry blacklist **{matched}**.', tip: 'Xóa entry blacklist trước khi đánh dấu character này là trusted nhé' },
     actionAdded: 'Đã thêm', actionRefreshed: 'Đã làm mới', actionKept: 'Giữ roster cũ', success: { title: 'Trusted · {action} · {name}', description: '**{name}** và các alt cùng roster từ giờ không thể bị thêm vào blacklist, whitelist hay watchlist.', character: 'Character', reason: 'Lý do', addedBy: 'Thêm bởi', refreshedBy: 'Làm mới bởi', onlyCharacter: 'Trusted entry này hiện chỉ liên kết character vừa nhập.', trackedAlts: 'Alt đang track', rosterKept: { title: 'Roster chưa được làm mới', description: 'lostark.bible không trả về roster này (roster bị ẩn, không tìm thấy, hoặc trang không phản hồi), nên tớ giữ nguyên các alt trusted đã lưu. Cậu chạy lại lệnh này sau để làm mới nhé.' }, footer: 'Dùng `/la-list view type:trusted` để xem trusted roster.' },
   },
   multiadd: {
