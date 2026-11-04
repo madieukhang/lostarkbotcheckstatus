@@ -53,6 +53,37 @@ const SEVERITY_CONFIG = Object.freeze({
   trusted: { color: COLORS.trusted, icon: ICONS.shield },
 });
 
+/**
+ * Kinds of simple notice. Each kind has one icon and one colour, so the same
+ * situation reads the same everywhere; red is kept for real failures.
+ * Rich cards keep `severity` with their own icon and colour.
+ */
+export const NoticeKind = Object.freeze({
+  GUARD: 'guard',         // blocked by permission, wrong user or wrong place
+  EXPIRED: 'expired',     // session, preview, picker or entry no longer there
+  INPUT: 'input',         // input to fix, or a prerequisite missing
+  EMPTY: 'empty',         // a normal empty result
+  BUSY: 'busy',           // an outside service or a limit
+  FAILURE: 'failure',     // something actually broke
+  PROGRESS: 'progress',   // work in flight
+  DONE: 'done',           // saved, changed, cancelled on request
+  PARTIAL: 'partial',     // done in part; a field names what is missing
+});
+
+const KIND_CONFIG = Object.freeze({
+  guard:    { color: COLORS.warning, icon: '🔒' },
+  expired:  { color: COLORS.muted,   icon: '⌛' },
+  input:    { color: COLORS.warning, icon: '✏️' },
+  empty:    { color: COLORS.info,    icon: '🔍' },
+  busy:     { color: COLORS.warning, icon: '🚦' },
+  failure:  { color: COLORS.danger,  icon: ICONS.error },
+  progress: { color: COLORS.info,    icon: '⏳' },
+  done:     { color: COLORS.success, icon: ICONS.done },
+  partial:  { color: COLORS.warning, icon: ICONS.warn },
+});
+
+const TIP_ICON = '💡';
+
 // Discord's embed text limits. EmbedBuilder throws past them, and error cards
 // carry raw error text, so an over-long error would break the card that
 // reports it and leave the previous card (a progress card) on screen.
@@ -75,7 +106,12 @@ function fitEmbedText(value, limit) {
  * (title, description, field name and value, footer) is cut to them.
  *
  * @param {Object} options
- * @param {string} options.severity - One of AlertSeverity.*
+ * @param {string} [options.kind] - One of NoticeKind.*; sets the icon and
+ *   colour of a simple notice and takes precedence over `severity`
+ * @param {string} [options.severity] - One of AlertSeverity.*, for rich cards
+ * @param {string} [options.tip] - Next step for a simple notice, shown as the
+ *   footer behind 💡 with markdown removed (Discord renders none there).
+ *   Never combined with `footer`.
  * @param {string} [options.title] - Short title, shown with severity icon prefix
  * @param {string} [options.description] - Body text, markdown allowed
  * @param {Array<{name: string, value: string, inline?: boolean}>} [options.fields] - Structured data fields
@@ -94,17 +130,21 @@ function fitEmbedText(value, limit) {
  * @returns {EmbedBuilder}
  */
 export function buildAlertEmbed({
+  kind,
   severity,
   title,
   description,
   fields = [],
   footer,
+  tip,
   timestamp = true,
   titleIcon,
   color,
   author,
 }) {
-  const config = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.info;
+  if (tip && footer) throw new Error('[alertEmbed] a notice takes a tip or a footer, not both');
+  const config = KIND_CONFIG[kind] || SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.info;
+  if (tip) footer = `${TIP_ICON} ${stripInlineMarkdown(tip)}`;
   const finalIcon = titleIcon ?? config.icon;
   const finalColor = color ?? config.color;
 

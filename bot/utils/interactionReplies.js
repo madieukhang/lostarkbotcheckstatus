@@ -2,6 +2,7 @@ import { MessageFlags } from 'discord.js';
 
 import {
   AlertSeverity,
+  NoticeKind,
   buildAlertEmbed,
   buildNoticeEmbed,
 } from './alertEmbed.js';
@@ -128,6 +129,25 @@ export function editNotice(interaction, content, options = {}) {
 export async function editNoticeAfterSavedWrite(interaction, content, options = {}) {
   try {
     await editNotice(interaction, content, { severity: AlertSeverity.SUCCESS, components: [], ...options });
+  } catch (err) {
+    console.warn('[interaction] Notice after a saved write failed:', err.message);
+  }
+}
+
+/**
+ * Answer a deferred interaction with a short alert after its write was saved
+ * but the confirmation card could not be shown, so Discord does not report the
+ * request as failed. A failure of this reply is logged and swallowed: the
+ * write is already done and nothing else can be sent.
+ * @param {object} interaction - the deferred interaction
+ * @param {object} alertOptions - buildAlertEmbed options; `kind` defaults to
+ *   done and `components` to none, which clears any picker left on the message
+ * @returns {Promise<void>}
+ */
+export async function editAlertAfterSavedWrite(interaction, alertOptions) {
+  const { components = [], ...options } = alertOptions;
+  try {
+    await editAlert(interaction, { kind: NoticeKind.DONE, ...options }, { content: null, components });
   } catch (err) {
     console.warn('[interaction] Notice after a saved write failed:', err.message);
   }
