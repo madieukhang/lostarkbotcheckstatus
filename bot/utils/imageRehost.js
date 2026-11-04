@@ -25,7 +25,7 @@ import net from 'node:net';
 import { AttachmentBuilder } from 'discord.js';
 import config from '../config.js';
 import { getGuildConfig } from './scope.js';
-import { AlertSeverity, buildNoticeEmbed } from './alertEmbed.js';
+import { AlertSeverity, buildAlertEmbed } from './alertEmbed.js';
 import { readBodyWithin } from './responseBody.js';
 
 // Bot uploads are capped at 25 MB; the margin leaves room for the message.
@@ -245,18 +245,20 @@ export async function rehostImage(originalUrl, client, meta = {}) {
 
     // Audit metadata so a human looking at #evidence-archive can see what each
     // image is for. Mentions remain disabled to avoid archive-channel pings.
+    // The first named line is the title; the upload time stays in the
+    // description because a title shows <t:...> as raw text.
     const auditLines = [];
-    if (meta.entryName) {
-      const icon = EVIDENCE_LIST_ICON[meta.listType] || '📎';
-      auditLines.push(`${icon} **${meta.entryName}**`);
-    }
+    if (meta.entryName) auditLines.push(`${EVIDENCE_LIST_ICON[meta.listType] || '📎'} ${meta.entryName}`);
     if (meta.addedBy) auditLines.push(`Added by: ${meta.addedBy}`);
-    auditLines.push(`<t:${Math.floor(Date.now() / 1000)}:f>`);
+    const [title, ...details] = auditLines;
 
     const sentMessage = await channel.send({
-      embeds: [buildNoticeEmbed(auditLines.join('\n'), {
+      embeds: [buildAlertEmbed({
         severity: AlertSeverity.INFO,
         titleIcon: '📎',
+        title,
+        description: [...details, `<t:${Math.floor(Date.now() / 1000)}:f>`].join('\n'),
+        timestamp: false,
       })],
       files: [attachment],
       allowedMentions: { parse: [] }, // suppress all pings

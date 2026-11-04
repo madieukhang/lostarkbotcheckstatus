@@ -87,6 +87,22 @@ test('an untyped body is archived only when it starts with an image signature', 
   assert.equal(text.uploads.length, 0);
 });
 
+test('the archive post titles the entry with its list icon and keeps the uploader and time below', async t => {
+  const { uploads, client } = setup(t, { responses: [image(), image(), image()] });
+  await rehostImage('https://cdn.example/black.png', client, { entryName: 'Alpha', listType: 'black', addedBy: 'Officer#1' });
+  await rehostImage('https://cdn.example/white.png', client, { entryName: 'Beta', listType: 'white' });
+  await rehostImage('https://cdn.example/bare.png', client, { addedBy: 'Officer#1' });
+
+  const [black, white, bare] = uploads.map(upload => upload.embeds[0].toJSON());
+  assert.equal(black.title, '📎  ⛔ Alpha');
+  assert.match(black.description, /^Added by: Officer#1\n<t:\d+:f>$/);
+  assert.equal(black.timestamp, undefined);
+  assert.equal(white.title, '📎  ✅ Beta');
+  assert.match(white.description, /^<t:\d+:f>$/);
+  assert.equal(bare.title, '📎  Added by: Officer#1');
+  assert.deepEqual(uploads[0].allowedMentions, { parse: [] });
+});
+
 test('a host name that resolves to a private address is refused', async t => {
   const { fetched, uploads, client } = setup(t, {
     lookup: [{ address: '93.184.215.14', family: 4 }, { address: '10.1.2.3', family: 4 }],

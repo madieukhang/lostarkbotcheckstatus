@@ -3,24 +3,18 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-// The alert builders read a fixed set of option keys, and the notice helpers
-// hand every key they do not know to the Discord payload, so a `lang` option at
-// these calls either does nothing or leaks into the reply. The language reaches
-// the text through t(); buildStrongholdScanLimitEmbed(active, lang) is not
-// listed because its language is a positional argument.
+// The alert builders read a fixed set of option keys, so a `lang` option at
+// these calls does nothing. The language reaches the text through t();
+// buildStrongholdScanLimitEmbed(active, lang) is not listed because its
+// language is a positional argument.
 // editAlertFn and buildAlertEmbedFn are the injected stand-ins for
 // editAlert and buildAlertEmbed.
 const CALLEES = [
   'buildAlertEmbed',
-  'buildNoticeEmbed',
   'replyAlert',
   'editAlert',
   'updateAlert',
   'followUpAlert',
-  'replyNotice',
-  'editNotice',
-  'updateNotice',
-  'editNoticeAfterSavedWrite',
   'editAlertAfterSavedWrite',
   'editAlertFn',
   'buildAlertEmbedFn',

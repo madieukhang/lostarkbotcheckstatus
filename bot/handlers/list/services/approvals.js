@@ -35,6 +35,7 @@ import { buildRosterCharacters } from '../../../services/roster/buildRosterChara
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
 import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
+import { normalizeNameKey } from '../../../utils/names.js';
 
 /**
  * Update the clicked approval message before syncing the other approver DMs.
@@ -136,8 +137,8 @@ export function createApprovalServices({
       const roster = await buildRosterCharactersFn(name, { timeoutMs: SUBMIT_ROSTER_READ_TIMEOUT_MS });
       if (!roster?.hasValidRoster) return null;
       await upsertRosterSnapshotsFn(roster.rosterCharacters, name);
-      const key = name.toLowerCase();
-      return roster.rosterCharacters.find((record) => String(record?.name || '').toLowerCase() === key) || null;
+      const key = normalizeNameKey(name);
+      return roster.rosterCharacters.find((record) => normalizeNameKey(record?.name) === key) || null;
     } catch (err) {
       console.warn('[list] Roster read for the approval card failed (non-fatal):', err.message);
       return null;

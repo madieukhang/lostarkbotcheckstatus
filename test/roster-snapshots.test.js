@@ -3,7 +3,18 @@ import assert from 'node:assert/strict';
 
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
-const { upsertRosterSnapshots } = await import('../bot/services/roster/rosterSnapshots.js');
+const { findRosterSnapshot, upsertRosterSnapshots } = await import('../bot/services/roster/rosterSnapshots.js');
+
+test('findRosterSnapshot resolves null on a failed read and leaves one warning', async (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const RosterSnapshotModel = {
+    findOne: () => ({ collation() { return this; }, lean: async () => { throw new Error('db down'); } }),
+  };
+
+  assert.equal(await findRosterSnapshot('Main', { RosterSnapshotModel }), null);
+  assert.equal(warn.mock.callCount(), 1);
+  assert.match(String(warn.mock.calls[0].arguments.join(' ')), /db down/);
+});
 
 test('upsertRosterSnapshots stores one normalized bulk update per roster character', async () => {
   let operations;

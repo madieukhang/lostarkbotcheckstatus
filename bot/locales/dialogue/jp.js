@@ -2,7 +2,7 @@ export default {
   common: {
     fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細', queue: '🚦 順番待ち', unreadable: '✏️ 名前ではない語', unreadImages: '🖼️ 読めなかった画像', whoCanUse: '👥 使える方' },
     selectionLost: { title: 'その選択はもう一致しませんの', description: '選ばれた項目が見つかりませんでしたわ。', tip: 'Command をもう一度実行して、新しい選択肢を開いてくださいませ' },
-    errorField: 'エラー', missingField: '🔑 不足', unknown: '不明',
+    missingField: '🔑 不足', unknown: '不明',
     savedCardFailed: { title: '保存しましたわ', description: '変更は保存しましたが、確認 card を表示できませんでしたの。' },
     queuedCardFailed: { title: '承認に回しましたわ', description: 'ご依頼は保存され承認待ちですが、確認 card を表示できませんでしたの。' },
     officerRoles: 'Officer · Senior',
@@ -493,7 +493,7 @@ export default {
     progressTitles: { queued: '順番待ちですわ', reading: '画像を読み取り中ですの', cooldown: '画像リーダーが小休止中ですの', checking: '名前を照合中ですの', roster: 'Roster を調べておりますの' },
     modeProgress: 'モード: **{mode}**',
     modes: { daily: 'Daily', analysis: '詳細分析' },
-    malformed: 'どの証拠を選ばれたのか読み取れませんでしたの。もう一度 check を実行してくだされば、最初からやり直しますわ。', entryRemoved: { title: 'そちらはもう消えてしまいましたの', description: 'この list entry は、どなたかが消してしまいましたの。もうお見せできるものが残っておりませんわ。' }, ocrFailed: { title: 'その画像を読めませんでしたの', description: '画像の読み取りでエラーが起きたので、まだどの名前も check していませんの。', tip: '1分ほどしてから、同じ screenshot をもう一度送ってくださいませ' }, noNames: { title: '名前らしきものが見当たりませんの', description: '画像はきちんと読めましたけれど、character の名前らしきものはひとつもありませんでしたわ。', tip: 'raid の待機所の画面を送ってくださいませ。わたくしには一番読みやすいですの' }, noVerifiedNames: { title: '確認済み character がありませんの', description: '{count} 件の candidate を読み取りましたが、lostark.bible、保存済み roster snapshot、または表示可能な list record のどれにも一致しませんでしたわ。未確認の名前は表示せず、Quick Add にも出しませんの。', tip: 'もっと鮮明な screenshot で、もう一度 check してくださいませ' },
+    entryRemoved: { title: 'そちらはもう消えてしまいましたの', description: 'この list entry は、どなたかが消してしまいましたの。もうお見せできるものが残っておりませんわ。' }, ocrFailed: { title: 'その画像を読めませんでしたの', description: '画像の読み取りでエラーが起きたので、まだどの名前も check していませんの。', tip: '1分ほどしてから、同じ screenshot をもう一度送ってくださいませ' }, noNames: { title: '名前らしきものが見当たりませんの', description: '画像はきちんと読めましたけれど、character の名前らしきものはひとつもありませんでしたわ。', tip: 'raid の待機所の画面を送ってくださいませ。わたくしには一番読みやすいですの' }, noVerifiedNames: { title: '確認済み character がありませんの', description: '{count} 件の candidate を読み取りましたが、lostark.bible、保存済み roster snapshot、または表示可能な list record のどれにも一致しませんでしたわ。未確認の名前は表示せず、Quick Add にも出しませんの。', tip: 'もっと鮮明な screenshot で、もう一度 check してくださいませ' },
     details: { title: 'チェック結果 · {list}', headline: '{icon} {name} は **{list}**{scope} にいますわ。控えてあることを、すべて下にまとめましたの。' },
     text: { empty: { title: '肝心のお名前が抜けておりますわ〜', description: 'ここで `check <character>` か `check: <character>` と入力してくだされば、お調べいたしますわ〜', tip: '何名でもかまいませんの。スペース、カンマ、改行で区切ってくださいませ' }, invalid: { title: 'そちらは名前には見えませんの', description: 'Lost Ark の character 名として読み取れない言葉があったので、check 全体を止めましたわ。', tip: '"check" のあとは character 名だけを送ってくださいませ' }, progress: {
       variants: [

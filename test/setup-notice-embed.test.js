@@ -6,7 +6,7 @@ import GuildConfig from '../bot/models/GuildConfig.js';
 import { disconnectDB } from '../bot/db.js';
 import { getSupportedLanguages, t } from '../bot/services/i18n/index.js';
 import { COLORS } from '../bot/utils/ui.js';
-import { AlertSeverity, buildAlertEmbed, buildNoticeEmbed } from '../bot/utils/alertEmbed.js';
+import { buildAlertEmbed } from '../bot/utils/alertEmbed.js';
 import {
   SETUP_ACTION_HANDLERS,
   buildChannelSetResult,
@@ -80,14 +80,4 @@ test('a channel set result names the channel in its description and offers the c
   })).toJSON();
   assert.equal(notify.fields[2].value, '`/la-setup config action:notify-cleanup-off`');
   assert.doesNotMatch(notify.description, /⚠️/);
-});
-
-test('a notice whose first line names a channel keeps that line out of the title', () => {
-  const embed = buildNoticeEmbed(
-    '✅ Cleared **3** unpinned messages in <#123> and rebuilt the welcome guide.',
-    { severity: AlertSeverity.SUCCESS },
-  ).toJSON();
-
-  assert.equal(embed.title, undefined);
-  assert.match(embed.description, /in <#123> and/);
 });

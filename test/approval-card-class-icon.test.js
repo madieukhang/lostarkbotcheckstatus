@@ -105,6 +105,30 @@ test('a name never looked up gets its class from one roster read at submit, save
   assert.equal(result.snapshot.classId, 'berserker');
 });
 
+test('a requested name with stray spaces or decomposed accents still finds its roster record', async () => {
+  const sent = [];
+  const roster = {
+    hasValidRoster: true,
+    rosterCharacters: [{ name: 'Élise', classId: 'bard', itemLevel: 1700 }],
+  };
+  const services = createApprovalServices({
+    client: { users: { fetch: async (id) => ({ id, send: async (message) => { sent.push(message); return { channelId: 'dm', id: 'msg' }; } }) } },
+    getUserLanguageFn: async () => 'en',
+    getApproverRecipientIdsFn: () => ['approver'],
+    RosterSnapshotModel: snapshotModel(async () => null),
+    buildRosterCharactersFn: async () => roster,
+    upsertRosterSnapshotsFn: async () => {},
+  });
+
+  const result = await services.sendListAddApprovalToApprovers(
+    { id: 'origin-guild', name: 'Guild' },
+    { ...PAYLOAD, name: 'Élise ' },
+  );
+
+  assert.equal(result.snapshot?.classId, 'bard');
+  assert.ok(sent[0].embeds[0].toJSON().description.includes('Bard **['), sent[0].embeds[0].toJSON().description);
+});
+
 function stubEnglishViewer(t) {
   t.mock.method(mongoose, 'connect', async () => mongoose);
   t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));

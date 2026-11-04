@@ -19,7 +19,10 @@ export function findRosterSnapshot(name, { RosterSnapshotModel = RosterSnapshot 
   return RosterSnapshotModel.findOne({ name })
     .collation(CASE_INSENSITIVE_COLLATION)
     .lean()
-    .catch(() => null);
+    .catch((err) => {
+      console.warn('[roster] Snapshot read failed (card shows no class icon):', err?.message || err);
+      return null;
+    });
 }
 
 function normalizeCombatScore(value) {

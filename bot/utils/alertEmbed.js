@@ -175,16 +175,10 @@ export function buildAlertEmbed({
   return decorateArtistEmbed(embed);
 }
 
-const LEADING_NOTICE_ICON = /^(?:✅|⚠️|❌|ℹ️|🛡️|⏳|🔍|🔔|🔕|🌐|🔒|🛑|✖️)\s*/u;
-// A title shows <#id>, <@id> and <t:unix> as raw text, so a first line
-// that names a channel, member, role or time is never promoted to one.
-const DISCORD_MENTION = /<(?:#|@[!&]?|t:)\d+/u;
-
 /**
- * Discord renders no markdown in an embed title, so bold and code marks
- * promoted from a notice line arrive as literal `**` and backticks. The
- * emphasis is dropped rather than the text: "Read **1** name" would
- * otherwise reach the user with the asterisks showing.
+ * Discord renders no markdown in an embed footer, so bold and code marks in
+ * a tip would arrive as literal `**` and backticks. The emphasis is dropped
+ * rather than the text: "Run `/la-check`" reads as "Run /la-check".
  *
  * @param {string} value
  * @returns {string}
@@ -195,41 +189,4 @@ function stripInlineMarkdown(value) {
     .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/gsu, '$1')
     .replace(/__(.+?)__/gsu, '$1')
     .replace(/`([^`]+)`/gu, '$1');
-}
-
-/**
- * Turn a localized text notice into the same compact embed shape used by
- * RaidManage. The first short line becomes the title; any remaining lines
- * become the description. This keeps simple command results readable without
- * forcing every handler to invent a one-off title/description pair.
- */
-export function buildNoticeEmbed(content, {
-  severity = AlertSeverity.INFO,
-  title,
-  titleIcon,
-  color,
-  footer,
-  timestamp = false,
-} = {}) {
-  const text = String(content ?? '').trim();
-  const lines = text.split(/\r?\n/);
-  const firstLine = (lines[0] || '').replace(LEADING_NOTICE_ICON, '').trim();
-  const canPromoteFirstLine = !title
-    && firstLine.length > 0
-    && firstLine.length <= 256
-    && !DISCORD_MENTION.test(firstLine);
-  const resolvedTitle = title || (canPromoteFirstLine ? stripInlineMarkdown(firstLine) : undefined);
-  const description = canPromoteFirstLine
-    ? lines.slice(1).join('\n').trim()
-    : text;
-
-  return buildAlertEmbed({
-    severity,
-    title: resolvedTitle,
-    description: description || undefined,
-    titleIcon,
-    color,
-    footer,
-    timestamp,
-  });
 }

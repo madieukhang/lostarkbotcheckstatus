@@ -2,7 +2,6 @@ export default {
   common: {
     fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details', queue: '🚦 Queue', unreadable: '✏️ Not names', unreadImages: '🖼️ Unread images', whoCanUse: '👥 Who can use it' },
     selectionLost: { title: 'That choice no longer matches', description: 'I could not find the item you picked.', tip: 'Run the command again for fresh choices' },
-    errorField: 'Error',
     missingField: '🔑 Missing',
     unknown: 'Unknown',
     savedCardFailed: { title: 'Saved', description: 'The change is saved; I just could not show the confirmation card.' },
@@ -638,7 +637,6 @@ export default {
     progressTitles: { queued: 'Waiting in line', reading: 'Reading the screenshot', cooldown: 'The image reader is resting', checking: 'Checking the names', roster: 'Looking up the roster' },
     modeProgress: 'Mode: **{mode}**',
     modes: { daily: 'Daily', analysis: 'Analysis' },
-    malformed: 'I could not make sense of that evidence pick. Run the check again and I will start fresh.',
     entryRemoved: { title: 'That one is gone now', description: 'Someone removed this list entry, so there is nothing left for me to show you.' },
     ocrFailed: { title: 'I could not read that image', description: 'My image reader failed on this one, so no names were checked.', tip: 'Post the same screenshot again in a minute' },
     noNames: { title: 'Nothing in there looked like a name', description: 'I read the image fine, but none of it looked like a character name.', tip: 'Send the raid waiting-room screen; it is the easiest one for me to read' },

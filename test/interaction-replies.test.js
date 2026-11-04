@@ -8,14 +8,12 @@ import {
   editAlert,
   editComponents,
   editEmbed,
-  editNotice,
   replyAlert,
   replyEmbed,
-  replyNotice,
+  updateAlert,
   updateEmbed,
-  updateNotice,
 } from '../bot/utils/interactionReplies.js';
-import { AlertSeverity } from '../bot/utils/alertEmbed.js';
+import { AlertSeverity, NoticeKind } from '../bot/utils/alertEmbed.js';
 
 test('replyEmbed wraps one or many embeds and defaults to ephemeral', async () => {
   const calls = [];
@@ -43,21 +41,6 @@ test('replyEmbed can send public replies without nesting embeds', async () => {
   });
 });
 
-test('replyNotice keeps simple replies inside an ephemeral embed', async () => {
-  const calls = [];
-  const interaction = { reply: async (payload) => calls.push(payload) };
-
-  await replyNotice(interaction, 'No image', {
-    severity: AlertSeverity.WARNING,
-    ephemeral: true,
-  });
-
-  assert.equal(calls[0].content, undefined);
-  assert.equal(calls[0].flags, MessageFlags.Ephemeral);
-  assert.equal(calls[0].embeds.length, 1);
-  assert.match(calls[0].embeds[0].toJSON().title, /No image/);
-});
-
 test('editEmbed and updateEmbed preserve extra payload fields', async () => {
   const editCalls = [];
   const updateCalls = [];
@@ -74,7 +57,7 @@ test('editEmbed and updateEmbed preserve extra payload fields', async () => {
   assert.deepEqual(updateCalls[0], { components: [], embeds: [embed] });
 });
 
-test('editNotice and updateNotice clear legacy content and preserve components', async () => {
+test('editAlert and updateAlert can clear legacy content and replace components', async () => {
   const editCalls = [];
   const updateCalls = [];
   const interaction = {
@@ -82,18 +65,15 @@ test('editNotice and updateNotice clear legacy content and preserve components',
     update: async (payload) => updateCalls.push(payload),
   };
 
-  await editNotice(interaction, 'Working...\nPlease wait.', {
-    titleIcon: '⏳',
+  await editAlert(interaction, { kind: NoticeKind.PROGRESS, title: 'Working', description: 'Please wait.' }, {
+    content: null,
     components: [],
   });
-  await updateNotice(interaction, 'Cancelled', {
-    severity: AlertSeverity.WARNING,
-    components: [],
-  });
+  await updateAlert(interaction, { kind: NoticeKind.DONE, title: 'Cancelled' }, { content: null, components: [] });
 
   assert.equal(editCalls[0].content, null);
   assert.equal(editCalls[0].embeds.length, 1);
-  assert.match(editCalls[0].embeds[0].toJSON().title, /Working/);
+  assert.equal(editCalls[0].embeds[0].toJSON().title, '⏳  Working');
   assert.equal(editCalls[0].embeds[0].toJSON().description, 'Please wait.');
   assert.deepEqual(editCalls[0].components, []);
 

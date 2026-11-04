@@ -2,7 +2,6 @@ export default {
   common: {
     fields: { filter: '🎚️ Bộ lọc', beforeFilter: '📋 Trước khi lọc', details: '🧾 Chi tiết', queue: '🚦 Hàng chờ', unreadable: '✏️ Không đọc được', unreadImages: '🖼️ Ảnh chưa đọc được', whoCanUse: '👥 Ai dùng được' },
     selectionLost: { title: 'Lựa chọn này không còn khớp', description: 'Tớ không tìm ra mục cậu vừa chọn nữa.', tip: 'Chạy lại lệnh để lấy lựa chọn mới nhé' },
-    errorField: 'Lỗi',
     missingField: '🔑 Còn thiếu',
     unknown: 'Không rõ',
     savedCardFailed: { title: 'Đã lưu', description: 'Thay đổi đã được lưu, chỉ là tớ chưa hiển thị được card xác nhận.' },
@@ -518,7 +517,7 @@ export default {
     progressTitles: { queued: 'Đang chờ tới lượt', reading: 'Đang đọc ảnh', cooldown: 'Bộ đọc ảnh đang nghỉ chút', checking: 'Đang đối chiếu tên', roster: 'Đang tra roster' },
     modeProgress: 'Chế độ: **{mode}**',
     modes: { daily: 'Daily', analysis: 'Phân tích sâu' },
-    malformed: 'Tớ không hiểu cậu vừa chọn tấm ảnh nào. Cậu chạy lại lượt check nhé, tớ làm lại từ đầu.', entryRemoved: { title: 'Cái đó không còn nữa rồi', description: 'Entry này đã bị gỡ khỏi list, nên tớ chẳng còn gì để đưa cậu xem.' }, ocrFailed: { title: 'Tớ không đọc nổi tấm ảnh này', description: 'Bộ đọc ảnh của tớ gặp lỗi ở tấm này, nên chưa tên nào được check.', tip: 'Gửi lại đúng tấm ảnh này sau một phút nhé' }, noNames: { title: 'Trong ảnh không có gì giống tên cả', description: 'Ảnh thì tớ đọc được, nhưng không có chữ nào trông giống tên character.', tip: 'Chụp màn hình phòng chờ raid, chỗ đó tớ đọc dễ nhất' }, noVerifiedNames: { title: 'Không xác minh được character', description: 'Tớ đọc được {count} tên candidate, nhưng không tên nào khớp lostark.bible, roster snapshot đã lưu hoặc record list đang hiển thị. Tên chưa xác minh bị ẩn và không vào Quick Add.', tip: 'Gửi ảnh rõ hơn rồi check lại nhé' },
+    entryRemoved: { title: 'Cái đó không còn nữa rồi', description: 'Entry này đã bị gỡ khỏi list, nên tớ chẳng còn gì để đưa cậu xem.' }, ocrFailed: { title: 'Tớ không đọc nổi tấm ảnh này', description: 'Bộ đọc ảnh của tớ gặp lỗi ở tấm này, nên chưa tên nào được check.', tip: 'Gửi lại đúng tấm ảnh này sau một phút nhé' }, noNames: { title: 'Trong ảnh không có gì giống tên cả', description: 'Ảnh thì tớ đọc được, nhưng không có chữ nào trông giống tên character.', tip: 'Chụp màn hình phòng chờ raid, chỗ đó tớ đọc dễ nhất' }, noVerifiedNames: { title: 'Không xác minh được character', description: 'Tớ đọc được {count} tên candidate, nhưng không tên nào khớp lostark.bible, roster snapshot đã lưu hoặc record list đang hiển thị. Tên chưa xác minh bị ẩn và không vào Quick Add.', tip: 'Gửi ảnh rõ hơn rồi check lại nhé' },
     details: { title: 'Kết quả kiểm tra · {list}', headline: '{icon} {name} hiện nằm trong **{list}**{scope}. Tớ gom hết những gì đang lưu về người này ở ngay dưới đây.' },
     text: { empty: { title: 'Cậu quên nhập tên rồi~', description: 'Cậu gõ `check <character>` hoặc `check: <character>` ngay ở đây, tớ tra giúp cho.', tip: 'Nhiều tên một lúc cũng được, cách nhau bằng dấu cách, dấu phẩy hoặc xuống dòng' }, invalid: { title: 'Mấy cái này không giống tên character', description: 'Tớ không đọc được mấy chữ này thành tên Lost Ark, nên cả lượt check dừng lại.', tip: 'Sau "check" chỉ gửi tên character thôi nhé' }, progress: {
       variants: [
