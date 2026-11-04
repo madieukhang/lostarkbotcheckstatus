@@ -94,8 +94,18 @@ test('normal raids are hidden from selectors but remain valid historical values'
   assert.equal(selectableValues.includes('Secra NM'), true);
   assert.deepEqual(
     selectableValues.filter((raid) => raid.startsWith('Horizon ')),
-    ['Horizon Lv1', 'Horizon Lv2', 'Horizon Lv3'],
+    ['Horizon Lv3'],
   );
+});
+
+test('Horizon Lv1 and Lv2 are hidden from new choices but remain valid historical values', () => {
+  assert.deepEqual(getRaidAutocompleteChoices('Horizon'), [
+    { name: 'Horizon Lv3', value: 'Horizon Lv3' },
+  ]);
+  for (const raid of ['Horizon Lv1', 'Horizon Lv2']) {
+    assert.equal(getSelectableRaidValues().includes(raid), false, raid);
+    assert.equal(resolveRaidLabel(raid), raid);
+  }
 });
 
 test('Belgardin Nor, Hard and NM are offered right after Horizon', () => {

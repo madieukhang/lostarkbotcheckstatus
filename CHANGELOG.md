@@ -1,5 +1,6 @@
 # Changelog
 
+- `/la-list add`, `/la-list edit` and the multiadd file no longer offer `Horizon Lv1` and `Horizon Lv2`; `Horizon Lv3` stays. Entries already saved with Lv1 or Lv2 keep showing them, and older multiadd files using them still import.
 - The **📎 Evidence** heading above an inline screenshot (sent-for-approval card, approver DM, `/la-list view` and check detail cards) now reads "Screenshot attached below · Download original" instead of a blank line, like the add confirmation.
 - The sent-for-approval card of `/la-list add` and Quick Add, and the approver DMs, now show the class icon for a character the bot has never looked up: the submit reads its roster once (up to 8 seconds) and saves it for later cards. If the read fails or runs long, the request still goes out, without the icon.
 - `/la-list add` and `/la-list edit` no longer take a `logs` link. Logs links already saved on entries still show, an edit or list move keeps them, and the multiadd file keeps its `logs` column.

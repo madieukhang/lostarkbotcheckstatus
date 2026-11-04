@@ -20,8 +20,10 @@ const RAID_CATALOG = [
   // Horizon ships with three level tiers (Lv1/Lv2/Lv3) instead of
   // Nor/Hard/NM difficulties · mirrors the RaidManage catalog's
   // Horizon Level 1/2/3. Newest permanent content sorts last like in-game.
-  { value: 'Horizon Lv1' },
-  { value: 'Horizon Lv2' },
+  // Lv1 and Lv2 are retired from new selections; their values stay for
+  // existing entries and older multiadd workbooks.
+  { value: 'Horizon Lv1', selectable: false },
+  { value: 'Horizon Lv2', selectable: false },
   { value: 'Horizon Lv3' },
   { value: 'Belgardin Nor' },
   { value: 'Belgardin Hard' },
