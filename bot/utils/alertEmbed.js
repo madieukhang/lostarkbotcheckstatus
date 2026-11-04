@@ -1,31 +1,22 @@
 /**
  * alertEmbed.js
  *
- * Shared helper for building consistent "alert" embeds across the bot, so
- * warning, error and info messages read the same everywhere and severity
- * shows as a color at a glance.
+ * Shared builder for the bot's alert embeds. Two families use it:
+ * - simple notices pass a `kind` (NoticeKind), which sets the title icon and
+ *   colour, and a `tip`, shown as the 💡 footer;
+ * - rich cards pass a `severity` (AlertSeverity) and may override the icon
+ *   and colour; `test/notice-drift-guard.test.js` lists the files allowed to.
  *
- * Tokens live in `bot/utils/ui.js`. This module is the thin builder that
- * pairs a severity with the right color/icon and returns an EmbedBuilder
- * that callers can still chain on.
+ * Tokens live in `bot/utils/ui.js`. The builder returns an EmbedBuilder that
+ * callers can still chain on.
  *
  * Usage:
- *   import { buildAlertEmbed, AlertSeverity } from '../utils/alertEmbed.js';
+ *   import { buildAlertEmbed, NoticeKind } from '../utils/alertEmbed.js';
  *
  *   const embed = buildAlertEmbed({
- *     severity: AlertSeverity.WARNING,
- *     title: 'Already in Blacklist',
- *     description: `**${name}** is already blacklisted via roster match.`,
- *     fields: [
- *       { name: 'Matched name', value: 'Gauchaneqa', inline: true },
- *       { name: 'Scope', value: '[Global]', inline: true },
- *     ],
- *     footer: 'Use /la-list view black to see the full entry',
+ *     kind: NoticeKind.EMPTY,
+ *     ...t('dialogue.search.noResults', lang, { name }),
  *   });
- *
- * For domain-specific embeds (list-type cards, preview dialogs) pass
- * `titleIcon` and/or `color` to override the severity defaults while
- * keeping the rest of the layout consistent.
  */
 
 import { EmbedBuilder } from 'discord.js';
@@ -112,10 +103,11 @@ function fitEmbedText(value, limit) {
  * @param {string} [options.tip] - Next step for a simple notice, shown as the
  *   footer behind 💡 with markdown removed (Discord renders none there).
  *   Never combined with `footer`.
- * @param {string} [options.title] - Short title, shown with severity icon prefix
+ * @param {string} [options.title] - Short title, shown behind the kind or
+ *   severity icon
  * @param {string} [options.description] - Body text, markdown allowed
  * @param {Array<{name: string, value: string, inline?: boolean}>} [options.fields] - Structured data fields
- * @param {string} [options.footer] - Footer hint (e.g. "Use /la-list view ...")
+ * @param {string} [options.footer] - Footer text for a rich card
  * @param {boolean} [options.timestamp=true] - Include a timestamp (default true)
  * @param {string} [options.titleIcon] - Override the severity icon prefix on the title.
  *   Use when the embed has a stronger contextual icon (list-type icon,
