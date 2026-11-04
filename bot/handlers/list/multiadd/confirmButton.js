@@ -4,22 +4,22 @@ import { connectDB } from '../../../db.js';
 import PendingApproval from '../../../models/PendingApproval.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
-import { COLORS } from '../../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { COLORS, buildProgressBar } from '../../../utils/ui.js';
+import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
 import { sleep } from '../../../utils/async.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
+  editAlert,
   editPayload,
-  editNotice,
   replyAlert,
   updateAlert,
-  updateNotice,
   updatePayload,
 } from '../../../utils/interactionReplies.js';
 import {
   getSeniorApproverIds,
   isOfficerOrSenior,
 } from '../helpers.js';
+import { buildDeliveryFailedAlert } from '../services/mutationFlow.js';
 
 const MULTIADD_CONFIRM_STATE_RULES = Object.freeze([
   { state: 'expired', matches: ({ pending }) => !pending },
@@ -45,7 +45,7 @@ async function settleMultiaddConfirmState({
   switch (state) {
     case 'expired':
       await updateAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EXPIRED,
         ...t('dialogue.multiadd.confirm.expired', lang),
       }, {
         content: '',
@@ -54,7 +54,7 @@ async function settleMultiaddConfirmState({
       return false;
     case 'not-yours':
       await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.multiadd.confirm.notYours', lang),
       });
       return false;
@@ -63,8 +63,7 @@ async function settleMultiaddConfirmState({
       await updatePayload(interaction, {
         content: '',
         embeds: [buildAlertEmbed({
-          severity: AlertSeverity.INFO,
-          titleIcon: '✖️',
+          kind: NoticeKind.DONE,
           ...t('dialogue.multiadd.confirm.cancelled', lang),
         })],
         components: [],
@@ -111,26 +110,29 @@ export function createMultiaddConfirmButtonHandler(deps) {
     // Both paths rehost images, write to Mongo and message people before they
     // finish, which outlasts Discord's 3-second window, so the card is
     // acknowledged and its buttons removed before that work starts.
-    await updateNotice(interaction, t('dialogue.multiadd.confirm.processing', lang, {
-      count: pending.rows.length,
-      seconds: Math.ceil(pending.rows.length * 0.7),
-    }), {
-      severity: AlertSeverity.INFO,
-      titleIcon: '⏳',
+    const seconds = Math.ceil(pending.rows.length * 0.7);
+    await updateAlert(interaction, {
+      kind: NoticeKind.PROGRESS,
+      ...t('dialogue.multiadd.confirm.processing', lang, { count: pending.rows.length, seconds }),
+    }, {
+      content: null,
       components: [],
     });
 
     if (isOfficerOrSenior(pending.requesterId)) {
       const onProgress = async (current, total) => {
         if (current % 5 !== 0 && current !== total) return;
+        const percent = Math.round((current / total) * 100);
+        const { title, description, tip } = t('dialogue.multiadd.confirm.progress', lang, { current, total, seconds });
+        // The bar is the scan progress card's, so the two waiting cards match.
+        const bar = `\`${buildProgressBar(percent)}\` ${percent}%`;
         try {
-          await editNotice(interaction, t('dialogue.multiadd.confirm.progress', lang, {
-            current,
-            total,
-          }), {
-            severity: AlertSeverity.INFO,
-            titleIcon: '⏳',
-          });
+          await editAlert(interaction, {
+            kind: NoticeKind.PROGRESS,
+            title,
+            description: [description, bar].join('\n'),
+            tip,
+          }, { content: null });
         } catch { /* ignore progress errors */ }
       };
 
@@ -166,7 +168,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
       if (targetApproverIds.length === 0) {
         await editPayload(interaction, {
           embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
+            kind: NoticeKind.INPUT,
             ...t('dialogue.multiadd.confirm.routing', lang),
           })],
           components: [],
@@ -237,11 +239,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
           console.warn('[multiadd] Failed to clean up placeholder approval:', err.message)
         );
         await editPayload(interaction, {
-          embeds: [buildAlertEmbed({
-            severity: AlertSeverity.WARNING,
-            ...t('dialogue.multiadd.confirm.delivery', lang),
-            fields: [{ name: t('dialogue.broadcast.fields.reason', lang), value: sent.reason || t('dialogue.common.unknown', lang), inline: false }],
-          })],
+          embeds: [buildAlertEmbed(buildDeliveryFailedAlert('dialogue.multiadd.confirm.delivery', sent, lang))],
           components: [],
         });
         return;
@@ -276,9 +274,9 @@ export function createMultiaddConfirmButtonHandler(deps) {
       await PendingApproval.deleteOne({ requestId }).catch(() => {});
       await editPayload(interaction, {
         embeds: [buildAlertEmbed({
-          severity: AlertSeverity.WARNING,
+          kind: NoticeKind.FAILURE,
           ...t('dialogue.multiadd.confirm.requestFailed', lang),
-          fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+          fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
         })],
         components: [],
       }).catch(() => {});

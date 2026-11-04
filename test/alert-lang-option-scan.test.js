@@ -8,8 +8,8 @@ import { join, relative } from 'node:path';
 // these calls either does nothing or leaks into the reply. The language reaches
 // the text through t(); buildStrongholdScanLimitEmbed(active, lang) is not
 // listed because its language is a positional argument.
-// editAlertFn and buildNoticeEmbedFn are the injected stand-ins for
-// editAlert and buildNoticeEmbed.
+// editAlertFn and buildAlertEmbedFn are the injected stand-ins for
+// editAlert and buildAlertEmbed.
 const CALLEES = [
   'buildAlertEmbed',
   'buildNoticeEmbed',
@@ -23,7 +23,7 @@ const CALLEES = [
   'editNoticeAfterSavedWrite',
   'editAlertAfterSavedWrite',
   'editAlertFn',
-  'buildNoticeEmbedFn',
+  'buildAlertEmbedFn',
 ];
 
 const CALL = new RegExp(`(?<![\\w$])(${CALLEES.join('|')})\\s*\\(`, 'g');

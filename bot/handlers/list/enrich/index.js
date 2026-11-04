@@ -42,23 +42,21 @@ import {
 } from '../../../services/roster/index.js';
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../../utils/scanPermissions.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
   deferUpdate,
   editAlert,
   editEmbed,
   replyAlert,
-  replyNotice,
   updateAlert,
-  updateNotice,
 } from '../../../utils/interactionReplies.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
   buildScanResultEmbed,
   buildScanResultButtons,
 } from '../../../utils/scanResultEmbed.js';
-import { buildTrustedBlockEmbed, isOfficerOrSenior } from '../helpers.js';
+import { buildOfficerOnlyAlert, buildTrustedBlockEmbed, isOfficerOrSenior } from '../helpers.js';
 import { findTrustedEditConflict } from '../edit/trustedGuard.js';
 import {
   findEntryByName,
@@ -118,20 +116,20 @@ async function settleScanCancelState({ state, interaction, lang }) {
   switch (state) {
     case 'finished':
       await replyAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EXPIRED,
         ...t('dialogue.enrich.scanFinished', lang),
       });
       return false;
     case 'restricted':
       await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.enrich.stopRestricted', lang),
       });
       return false;
     case 'already-stopping':
-      await replyNotice(interaction, t('dialogue.enrich.alreadyStopping', lang), {
-        severity: AlertSeverity.INFO,
-        titleIcon: '🛑',
+      await replyAlert(interaction, {
+        kind: NoticeKind.PROGRESS,
+        ...t('dialogue.enrich.alreadyStopping', lang),
       });
       return false;
     default:
@@ -139,10 +137,23 @@ async function settleScanCancelState({ state, interaction, lang }) {
   }
 }
 
+// Why an enrich run could not start or finish, by its dialogue key: a name
+// that is not there is empty, Bible trouble is busy, a missing guild leaves
+// nothing to scan, and a detector with no result is a failure.
+const ENRICH_ERROR_KINDS = Object.freeze({
+  'dialogue.enrich.profileMissing': NoticeKind.EMPTY,
+  'dialogue.enrich.noEntry': NoticeKind.EMPTY,
+  'dialogue.enrich.metaMissing': NoticeKind.BUSY,
+  'dialogue.enrich.guildUnavailable': NoticeKind.BUSY,
+  'dialogue.enrich.scanStopped': NoticeKind.BUSY,
+  'dialogue.enrich.noGuild': NoticeKind.EMPTY,
+  'dialogue.enrich.scanFailed': NoticeKind.FAILURE,
+});
+
 async function editEnrichError(replyEditor, key, lang, values = {}, { clearContent = false } = {}) {
   const payload = {
     embeds: [buildAlertEmbed({
-      severity: AlertSeverity.ERROR,
+      kind: ENRICH_ERROR_KINDS[key] ?? NoticeKind.FAILURE,
       ...t(key, lang, values),
     })],
     components: [],
@@ -701,10 +712,7 @@ export function createEnrichHandlers({ services }) {
   async function denyIfNotOfficer(interaction, commandLabel) {
     if (isPrivilegedStrongholdScanUser(interaction.user.id)) return false;
     const lang = await resolveInteractionLang(interaction);
-    await replyAlert(interaction, {
-      severity: AlertSeverity.WARNING,
-      ...t('dialogue.enrich.restricted', lang, { command: commandLabel }),
-    });
+    await replyAlert(interaction, buildOfficerOnlyAlert('dialogue.enrich.restricted', lang, { command: commandLabel }));
     return true;
   }
 
@@ -714,13 +722,11 @@ export function createEnrichHandlers({ services }) {
     reservationLabel,
     deferInteraction = deferReply,
     existingSession = null,
-    cooldownMessage,
+    cooldownCopy,
   }) {
     const cooldownWait = getCooldownWaitSeconds(name);
     if (cooldownWait > 0) {
-      await replyNotice(interaction, cooldownMessage(cooldownWait), {
-        severity: AlertSeverity.WARNING,
-      });
+      await replyAlert(interaction, { kind: NoticeKind.BUSY, ...cooldownCopy(cooldownWait) });
       return;
     }
 
@@ -745,14 +751,14 @@ export function createEnrichHandlers({ services }) {
     const session = getEnrichSession(sessionId);
     if (!session) {
       await replyAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EXPIRED,
         ...t('dialogue.enrich.sessionExpired', lang),
       });
       return null;
     }
     if (session.callerId !== interaction.user.id) {
       await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.enrich.notYourSession', lang, { action: t(`dialogue.enrich.${actionLabel}`, lang) }),
       });
       return null;
@@ -765,7 +771,7 @@ export function createEnrichHandlers({ services }) {
       name,
       cap,
       reservationLabel: `/la-list enrich ${name}`,
-      cooldownMessage: (wait) => `⏳ ${t('dialogue.enrich.cooldown', lang, { seconds: wait, name })}`,
+      cooldownCopy: (wait) => t('dialogue.enrich.cooldown', lang, { seconds: wait, name }),
     });
   }
 
@@ -793,7 +799,7 @@ export function createEnrichHandlers({ services }) {
     const rawName = decodeURIComponent(encoded || '').trim();
     if (!rawName) {
       await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.INPUT,
         ...t('dialogue.enrich.invalidButton', lang),
       });
       return;
@@ -823,7 +829,7 @@ export function createEnrichHandlers({ services }) {
       reservationLabel: `/la-list enrich continue ${session.entryName}`,
       deferInteraction: deferUpdate,
       existingSession: session,
-      cooldownMessage: (wait) => `⏳ ${t('dialogue.enrich.continueCooldown', lang, { seconds: wait, name: session.entryName })}`,
+      cooldownCopy: (wait) => t('dialogue.enrich.continueCooldown', lang, { seconds: wait, name: session.entryName }),
     });
   }
 
@@ -841,7 +847,7 @@ export function createEnrichHandlers({ services }) {
     const altNames = session.newAlts.map((a) => a.name);
     if (altNames.length === 0) {
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EMPTY,
         ...t('dialogue.enrich.nothing', lang),
       }, { components: [] });
       clearEnrichSession(sessionId);
@@ -851,7 +857,7 @@ export function createEnrichHandlers({ services }) {
     const currentEntry = await Model.findById(session.entryId).lean();
     if (!currentEntry) {
       await editAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EMPTY,
         ...t('dialogue.enrich.noEntry', lang, { name: session.entryName }),
       }, { components: [] });
       clearEnrichSession(sessionId);
@@ -922,14 +928,14 @@ export function createEnrichHandlers({ services }) {
     const session = getEnrichSession(sessionId);
     if (!session) {
       await updateAlert(interaction, {
-        severity: AlertSeverity.WARNING,
+        kind: NoticeKind.EXPIRED,
         ...t('dialogue.enrich.sessionExpired', lang),
       }, { content: '', components: [] });
       return;
     }
     if (session.callerId !== interaction.user.id) {
       await replyAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.enrich.notYourSession', lang, { action: t('dialogue.enrich.actionCancel', lang) }),
       });
       return;
@@ -937,11 +943,10 @@ export function createEnrichHandlers({ services }) {
 
     clearEnrichSession(sessionId);
 
-    await updateNotice(interaction, t('dialogue.enrich.cancelled', lang), {
-      severity: AlertSeverity.INFO,
-      titleIcon: '✖️',
-      components: [],
-    });
+    await updateAlert(interaction, {
+      kind: NoticeKind.DONE,
+      ...t('dialogue.enrich.cancelled', lang),
+    }, { content: null, components: [] });
   }
 
   /**
@@ -965,8 +970,7 @@ export function createEnrichHandlers({ services }) {
     scan.cancelFlag.reason = SCAN_ABORT_REASONS.userStopped;
 
     await replyAlert(interaction, {
-      severity: AlertSeverity.INFO,
-      titleIcon: '🛑',
+      kind: NoticeKind.PROGRESS,
       ...t('dialogue.enrich.stopSent', lang),
     });
   }

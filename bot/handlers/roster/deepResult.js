@@ -1,18 +1,18 @@
-import { AlertSeverity, buildAlertEmbed } from '../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../utils/alertEmbed.js';
 import { t } from '../../services/i18n/index.js';
 import { createRosterContinuationSession } from '../../utils/rosterDeepSession.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { buildScanResultEmbed, buildScanResultButtons } from '../../utils/scanResultEmbed.js';
 
 // The first rule that applies names the cause; each key carries a title,
-// description and footer for the notice. The no-guild footer points at
+// description and tip for the notice. The no-guild tip points at
 // `/la-list edit additional_names`, which has no entry to act on from a
-// roster card, so that rule leaves its footer out.
+// roster card, so that rule leaves its tip out.
 const DEEP_NOT_RUN_NOTICE_RULES = [
-  { applies: ({ meta }) => Boolean(meta) && !meta.guildName, key: 'dialogue.enrich.noGuild', omitFooter: true },
-  { applies: ({ guildMembersUnavailable }) => guildMembersUnavailable, key: 'dialogue.enrich.guildUnavailable' },
-  { applies: ({ meta }) => !meta, key: 'dialogue.enrich.metaMissing' },
-  { applies: () => true, key: 'dialogue.roster.deepNotRunNotice' },
+  { applies: ({ meta }) => Boolean(meta) && !meta.guildName, key: 'dialogue.enrich.noGuild', kind: NoticeKind.EMPTY, omitTip: true },
+  { applies: ({ guildMembersUnavailable }) => guildMembersUnavailable, key: 'dialogue.enrich.guildUnavailable', kind: NoticeKind.BUSY },
+  { applies: ({ meta }) => !meta, key: 'dialogue.enrich.metaMissing', kind: NoticeKind.BUSY },
+  { applies: () => true, key: 'dialogue.roster.deepNotRunNotice', kind: NoticeKind.BUSY },
 ];
 
 /**
@@ -28,13 +28,9 @@ const DEEP_NOT_RUN_NOTICE_RULES = [
  * @returns {import('discord.js').EmbedBuilder}
  */
 export function buildDeepScanNotRunNotice({ name, meta, guildMembersUnavailable = false, lang }) {
-  const { key, omitFooter } = DEEP_NOT_RUN_NOTICE_RULES.find(({ applies }) => applies({ meta, guildMembersUnavailable }));
-  const { footer, ...copy } = t(key, lang, { name });
-  return buildAlertEmbed({
-    severity: AlertSeverity.WARNING,
-    ...copy,
-    footer: omitFooter ? undefined : footer,
-  });
+  const { key, kind, omitTip } = DEEP_NOT_RUN_NOTICE_RULES.find(({ applies }) => applies({ meta, guildMembersUnavailable }));
+  const { tip, ...copy } = t(key, lang, { name });
+  return buildAlertEmbed({ kind, ...copy, tip: omitTip ? undefined : tip });
 }
 
 /**

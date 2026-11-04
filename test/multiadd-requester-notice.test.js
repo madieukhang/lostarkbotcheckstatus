@@ -31,23 +31,24 @@ test('multiadd requester notice centralizes mention, locale, notice, and extra e
     payload: makePayload(),
     copyKey: 'approved',
     copyValues: { count: 3 },
-    severity: 'success',
+    kind: 'done',
     buildExtraEmbeds: (lang) => [{ kind: 'summary', lang }],
     failureLabel: 'failed',
     getGuildLanguageFn: async () => 'vi',
-    translate: (key, lang, values) => `<@${values.user}> ${key}:${lang}:${values.count}`,
-    buildNoticeEmbedFn: (copy, options) => ({ kind: 'notice', copy, options }),
+    translate: (key, lang, values) => ({ title: key, description: `${lang}:${values.count}` }),
+    buildAlertEmbedFn: (options) => ({ kind: 'notice', options }),
   });
 
   assert.equal(delivered, true);
+  // The mention lives in the content, where Discord notifies; the card itself
+  // stays neutral copy.
   assert.deepEqual(sent, [{
     content: '<@user-1>',
     allowedMentions: { users: ['user-1'] },
     embeds: [
       {
         kind: 'notice',
-        copy: 'approved:vi:3',
-        options: { severity: 'success' },
+        options: { kind: 'done', title: 'approved', description: 'vi:3' },
       },
       { kind: 'summary', lang: 'vi' },
     ],
@@ -60,7 +61,7 @@ test('multiadd requester notice keeps delivery failures non-fatal', async () => 
     client: { guilds: { fetch: async () => { throw new Error('DM bridge unavailable'); } } },
     payload: makePayload(),
     copyKey: 'approved',
-    severity: 'success',
+    kind: 'done',
     failureLabel: 'notice failed:',
     logger: { warn: (...args) => warnings.push(args) },
   });

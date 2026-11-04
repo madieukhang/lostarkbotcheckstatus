@@ -11,7 +11,7 @@ import {
   MULTIADD_MAX_ROWS,
 } from '../../../services/multiadd/index.js';
 import { COLORS } from '../../../utils/ui.js';
-import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
 import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import { t } from '../../../services/i18n/index.js';
 import { listTypeIcon } from '../helpers.js';
@@ -56,12 +56,12 @@ export async function buildTemplateReply(lang = 'en') {
 
 export function buildNoValidRowsEmbed(errors, lang = 'en') {
   return buildAlertEmbed({
-    severity: AlertSeverity.ERROR,
+    kind: NoticeKind.INPUT,
     title: t('dialogue.multiadd.errors.noRows.title', lang),
     description: errors.length > 0
       ? errors.slice(0, 15).join('\n').slice(0, 4000)
       : t('dialogue.multiadd.errors.noRows.empty', lang),
-    footer: t('dialogue.multiadd.errors.noRows.footer', lang),
+    tip: t('dialogue.multiadd.errors.noRows.tip', lang),
   });
 }
 

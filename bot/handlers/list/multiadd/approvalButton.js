@@ -2,28 +2,43 @@ import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import GuildConfig from '../../../models/GuildConfig.js';
 import { COLORS } from '../../../utils/ui.js';
-import { AlertSeverity, buildNoticeEmbed } from '../../../utils/alertEmbed.js';
+import { NoticeKind, buildAlertEmbed } from '../../../utils/alertEmbed.js';
 import {
+  editAlert,
   editPayload,
   editEmbed,
-  editNotice,
 } from '../../../utils/interactionReplies.js';
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
 import { buildApprovalRetryRow, listTypeIcon } from '../helpers.js';
 import { createApprovalDecisionHandler, handleApprovalClaimError } from '../services/approvalInteraction.js';
 
+/**
+ * Post the decision on a bulk add in the channel it was requested from. The
+ * mention rides in the message content, where Discord notifies; the card is
+ * neutral copy in the guild's language.
+ * @param {object} options - the `...Fn`, `translate` and `logger` options are
+ *   injectable for tests
+ * @param {object} options.payload - pending bulk approval with guildId,
+ *   channelId and requestedByUserId
+ * @param {string} options.copyKey - locale key holding the title and description
+ * @param {object} [options.copyValues] - placeholder values for the copy
+ * @param {string} options.kind - NoticeKind of the decision notice
+ * @param {Function} [options.buildExtraEmbeds] - embeds after the notice, by language
+ * @param {string} options.failureLabel - log prefix when the post fails
+ * @returns {Promise<boolean>} whether the notice was posted
+ */
 export async function notifyMultiaddRequester({
   client,
   payload,
   copyKey,
   copyValues = {},
-  severity,
+  kind,
   buildExtraEmbeds = () => [],
   failureLabel,
   GuildConfigModel = GuildConfig,
   getGuildLanguageFn = getGuildLanguage,
   translate = t,
-  buildNoticeEmbedFn = buildNoticeEmbed,
+  buildAlertEmbedFn = buildAlertEmbed,
   logger = console,
 }) {
   try {
@@ -32,16 +47,11 @@ export async function notifyMultiaddRequester({
     if (!channel?.isTextBased()) return false;
 
     const lang = await getGuildLanguageFn(guild.id, { GuildConfigModel });
-    const mention = `<@${payload.requestedByUserId}>`;
-    const copy = translate(copyKey, lang, {
-      user: payload.requestedByUserId,
-      ...copyValues,
-    });
     await channel.send({
-      content: mention,
+      content: `<@${payload.requestedByUserId}>`,
       allowedMentions: { users: [payload.requestedByUserId] },
       embeds: [
-        buildNoticeEmbedFn(copy.replace(mention, '').trim(), { severity }),
+        buildAlertEmbedFn({ kind, ...translate(copyKey, lang, copyValues) }),
         ...buildExtraEmbeds(lang),
       ],
     });
@@ -119,7 +129,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
           payload,
           copyKey: 'dialogue.multiadd.approval.publicRejected',
           copyValues: { count: payload.bulkRows.length },
-          severity: AlertSeverity.ERROR,
+          kind: NoticeKind.GUARD,
           failureLabel: '[multiadd] Failed to notify requester of rejection:',
         });
         return;
@@ -127,11 +137,11 @@ export function createMultiaddApprovalButtonHandler(deps) {
 
       if (prefix !== 'multiaddapprove_approve') return;
 
-      await editNotice(interaction, t('dialogue.multiadd.approval.processing', lang, {
-        count: payload.bulkRows.length,
-      }), {
-        severity: AlertSeverity.INFO,
-        titleIcon: '⏳',
+      await editAlert(interaction, {
+        kind: NoticeKind.PROGRESS,
+        ...t('dialogue.multiadd.approval.processing', lang, { count: payload.bulkRows.length }),
+      }, {
+        content: null,
         components: [buildApprovalRetryRow(prefix, requestId, lang)],
       }).catch(() => {});
 
@@ -179,14 +189,18 @@ export function createMultiaddApprovalButtonHandler(deps) {
         client,
         payload,
         copyKey: 'dialogue.multiadd.approval.publicApproved',
-        severity: AlertSeverity.SUCCESS,
+        kind: NoticeKind.DONE,
         buildExtraEmbeds: (guildLang) => [buildApprovedSummary(guildLang)],
         failureLabel: '[multiadd] Failed to notify requester of approval:',
       });
     } catch (err) {
       if (await handleApprovalClaimError({ claim, interaction, error: err, lang, label: 'Bulk decision' })) return;
-      await editNotice(interaction, t('dialogue.approval.flow.retryFailed.description', lang), {
-        severity: AlertSeverity.WARNING,
+      await editAlert(interaction, {
+        kind: NoticeKind.FAILURE,
+        ...t('dialogue.approval.flow.retryFailed', lang),
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
+      }, {
+        content: null,
         components: [buildApprovalRetryRow(prefix, requestId, lang)],
       });
     }

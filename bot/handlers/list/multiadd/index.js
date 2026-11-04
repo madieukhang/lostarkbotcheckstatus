@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { connectDB } from '../../../db.js';
 import { parseMultiaddFile } from '../../../services/multiadd/index.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
-import { AlertSeverity } from '../../../utils/alertEmbed.js';
+import { NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferEphemeralReply,
   editAlert,
@@ -49,9 +49,9 @@ export function createMultiaddHandlers({ client, services }) {
     } catch (err) {
       console.error('[multiadd] Template generation failed:', err);
       await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.multiadd.errors.template', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: `\`${err.message}\``, inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
       });
     }
   }
@@ -61,7 +61,7 @@ export function createMultiaddHandlers({ client, services }) {
     const validationError = validateMultiaddAttachment(file, lang);
     if (validationError) {
       await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.INPUT,
         title: t('dialogue.multiadd.errors.invalidAttachment', lang),
         description: validationError,
       });
@@ -71,7 +71,7 @@ export function createMultiaddHandlers({ client, services }) {
     const download = await downloadMultiaddAttachment(file, lang);
     if (!download.ok) {
       await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.FAILURE,
         title: t('dialogue.multiadd.errors.download', lang),
         description: download.content,
       });
@@ -81,9 +81,9 @@ export function createMultiaddHandlers({ client, services }) {
     const parsed = await parseMultiaddFile(download.buffer);
     if (!parsed.ok) {
       await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.FAILURE,
         ...t('dialogue.multiadd.errors.parse', lang),
-        fields: [{ name: t('dialogue.common.errorField', lang), value: parsed.error || t('dialogue.common.unknown', lang), inline: false }],
+        fields: [{ name: t('dialogue.common.fields.details', lang), value: parsed.error ? `\`${parsed.error}\`` : '', inline: false }],
       });
       return;
     }
@@ -126,7 +126,7 @@ export function createMultiaddHandlers({ client, services }) {
 
     if (!interaction.guild) {
       await editAlert(interaction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.common.serverOnly', lang),
       });
       return;
