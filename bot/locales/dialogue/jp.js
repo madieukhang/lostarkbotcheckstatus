@@ -2,7 +2,7 @@ export default {
   common: {
     fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細', queue: '🚦 順番待ち', unreadable: '✏️ 名前ではない語', unreadImages: '🖼️ 読めなかった画像', whoCanUse: '👥 使える方' },
     selectionLost: { title: 'その選択はもう一致しませんの', description: '選ばれた項目が見つかりませんでしたわ。', tip: 'Command をもう一度実行して、新しい選択肢を開いてくださいませ' },
-    errorField: 'エラー', missingField: '不足', unknown: '不明',
+    errorField: 'エラー', missingField: '🔑 不足', unknown: '不明',
     savedCardFailed: { title: '保存しましたわ', description: '変更は保存しましたが、確認 card を表示できませんでしたの。' },
     queuedCardFailed: { title: '承認に回しましたわ', description: 'ご依頼は保存され承認待ちですが、確認 card を表示できませんでしたの。' },
     officerRoles: 'Officer · Senior',
@@ -13,7 +13,7 @@ export default {
     serverOnly: { title: 'サーバー内でのみ使えますわ', description: 'このコマンドは Discord サーバー内専用で、DM では使えませんの。', tip: 'サーバーのチャンネルでもう一度実行してくださいませ' },
     notYourSession: { title: 'あなたのセッションではありませんの', description: 'この画面を開いた方だけが操作できますわ。' },
     wrongTextChannel: { title: 'そのチャンネルは使えませんの', description: 'わたくしが読んで返事できる **テキストチャンネル** を選んでくださいませ。' },
-    missingPermissions: { title: '権限が少し足りませんわ', description: '<#{channel}> の設定を終えるには、わたくしに次の権限が必要ですの。', footer: 'チャンネル権限を直してから、もう一度お試しくださいませ。' },
+    missingPermissions: { title: '権限が少し足りませんわ', description: '<#{channel}> の設定を終えるには、わたくしに次の権限が必要ですの。', tip: 'チャンネル権限を直してから、もう一度お試しくださいませ' },
   },
   system: {
     status: {
@@ -111,8 +111,8 @@ export default {
     welcomeCleaned: 'ガイドを投稿する前に、最初の掃除で未ピン留めメッセージを **{count}** 件削除しましたわ。',
     welcomeCleanupIncomplete: '最初の掃除は **{count}** 件削除したところで未完了でしたの。毎日の cleaner が再試行しますわ。',
     sameChannelWarning: 'ここは {other} チャンネルと同じですの。分けた方が読みやすいですわ。',
-    autoChannelNotSet: '<#{channel}> に welcome pin を作成して保存できなかったため、auto-check チャンネルは変更していませんの。\n{welcome}',
-    notifyChannelNotSet: '<#{channel}> に welcome pin を作成して保存できなかったため、通知チャンネルは変更していませんの。\n{welcome}',
+    autoChannelNotSet: { title: 'Auto-check チャンネルは変更していませんの', description: '<#{channel}> に welcome pin を作成して保存できなかったので、auto-check チャンネルはそのままですわ。' },
+    notifyChannelNotSet: { title: '通知チャンネルは変更していませんの', description: '<#{channel}> に welcome pin を作成して保存できなかったので、通知チャンネルはそのままですわ。' },
     channelSet: {
       pinned: 'ピン留め済み',
       fields: { guide: 'ガイド', cleanup: 'Cleanup', turnCleanup: { on: 'Cleanup をオンにする', off: 'Cleanup をオフにする' } },
@@ -150,27 +150,73 @@ export default {
       notifyOff: 'グローバル通知を OFF',
       repin: 'チャンネルを整理してガイドを再 pin',
     },
-    showHint: '`/la-setup config action:show` ですべての設定を確認できますわ。',
-    notificationsEnabled: 'このサーバーのグローバル通知を **有効** にしました。\n他サーバーのリスト変更をここへ届けますわ。',
-    notificationsDisabled: 'このサーバーのグローバル通知を **無効** にしました。\n他サーバーの変更は静かにしておきますの。\n\n`/la-setup config action:notify-on` をもう一度実行するか、通知チャンネルを設定すると再び有効になりますわ。',
+    notificationsEnabled: {
+      title: 'グローバル通知をオンにしましたわ',
+      description: '**他サーバー** のリスト変更をここへ届けますわ。',
+      tip: '/la-setup config action:show ですべての設定を確認できますわ',
+    },
+    notificationsDisabled: {
+      title: 'グローバル通知をオフにしましたわ',
+      description: '**他サーバー** のリスト変更は静かにしておきますの。',
+      tip: '/la-setup config action:notify-on を実行するか、通知チャンネルを設定すると再び有効になりますわ',
+    },
     autoCleanup: {
-      enabled: 'Auto-cleanup は **この server だけで有効** ですの。00:00 Asia/Ho_Chi_Minh に auto-check channel の pinned 以外を削除しますわ。削除があった時は通常 message を1件残し、5分後に自動削除しますの。`/la-setup config action:cleanup-off` で停止できますの。',
-      disabled: 'Auto-cleanup は **この server では無効** ですの。Auto-check は動きますが、通常の message は削除いたしませんわ。必要なら `/la-setup config action:cleanup-on` で個別に有効化できますの。',
-      noChannel: 'Cleanup を有効にする前に `/la-setup config action:set-auto-channel` で auto-check channel を設定してくださいませ。',
-      guideNotRefreshed: 'Cleanup 設定は安全に変更しましたが、pinned guide を更新できませんでしたの。足りない権限: {missing}。',
+      enabled: {
+        title: 'この server の auto-cleanup をオンにしましたわ',
+        description: '毎日 **00:00**（ベトナム時間）に auto-check channel の未 pin message を削除しますの。削除があった時は通知を1件残し、5分後に自動で消しますわ。',
+        tip: '/la-setup config action:cleanup-off で停止できますの',
+      },
+      disabled: {
+        title: 'この server の auto-cleanup をオフにしましたわ',
+        description: 'Auto-check は動きますが、channel の通常 message は削除いたしませんわ。',
+        tip: '/la-setup config action:cleanup-on で再び有効にできますの',
+      },
+      noChannel: {
+        title: 'Auto-check channel がまだありませんの',
+        description: 'Cleanup には auto-check channel が必要ですが、この server ではまだ設定されていませんわ。',
+        tip: '先に /la-setup config action:set-auto-channel で設定してから cleanup を有効にしてくださいませ',
+      },
+      guideNotRefreshed: '設定は安全に変更しましたが、pinned guide を更新できませんでしたの。',
     },
     listNotifyCleanup: {
-      enabled: 'Notify cleanup は **この server だけで有効** ですの。30分ごとに通知 channel の未 pin message を削除し、welcome guide を作り直しますわ。Cleanup notice は5分後に消えますの。',
-      disabled: 'Notify cleanup は **この server では無効** ですの。Admin が手動 cleanup するまで通知 card は残りますわ。',
-      noChannel: '先に `/la-setup config action:set-notify-channel` で通知 channel を設定してくださいませ。',
-      guideNotRefreshed: '設定は安全に変更しましたが、通知 guide を更新できませんでしたの。足りない権限: {missing}。',
-      manualSuccess: '<#{channel}> の未 pin message を **{count}** 件削除し、welcome guide を作り直しましたわ。',
-      manualFailed: '<#{channel}> の cleanup は **{count}** 件削除したところで完了できませんでしたの。安全に再試行できるよう slot は未完了のままですわ。',
+      enabled: {
+        title: 'この server の notify cleanup をオンにしましたわ',
+        description: '**30分** ごとに通知 channel の未 pin message を削除し、welcome guide を作り直しますわ。Cleanup の通知は5分後に消えますの。',
+        tip: '/la-setup config action:notify-cleanup-off で停止できますの',
+      },
+      disabled: {
+        title: 'この server の notify cleanup をオフにしましたわ',
+        description: 'Admin が手動で片付けるまで、通知 card は残りますわ。',
+        tip: '/la-setup config action:notify-cleanup-on で再び有効にできますの',
+      },
+      noChannel: {
+        title: '通知 channel がまだありませんの',
+        description: '保存済みの通知 channel がないので、作業できませんわ。',
+        tip: '先に /la-setup config action:set-notify-channel で設定してくださいませ',
+      },
+      guideNotRefreshed: '設定は安全に変更しましたが、通知 guide を更新できませんでしたの。',
+      manualSuccess: { title: '通知 channel を片付けましたわ', description: '<#{channel}> の未 pin message を **{count}** 件削除し、welcome guide を作り直しましたわ。' },
+      manualFailed: {
+        title: 'Cleanup が終わりませんでしたの',
+        description: '<#{channel}> の cleanup は **{count}** 件削除したところで止まったので、slot は未完了のままですわ。',
+        tip: '/la-setup config action:notify-cleanup をもう一度実行すると続きを片付けますの',
+      },
     },
     listNotifyRepin: {
-      noChannel: 'アクセスできる保存済み通知 channel が見つかりません。先に `/la-setup config action:set-notify-channel` を実行してくださいませ。',
-      missingPermissions: '<#{channel}> の通知 guide を更新できません。足りない権限: {missing}。',
-      result: '<#{channel}> で {outcome}',
+      noChannel: {
+        title: '通知 channel がまだありませんの',
+        description: 'アクセスできる保存済みの通知 channel が見つかりませんわ。',
+        tip: '先に /la-setup config action:set-notify-channel を実行してくださいませ',
+      },
+      missingPermissions: {
+        title: '通知 guide を更新できませんでしたの',
+        description: '<#{channel}> の通知 guide を更新するには、下の権限が必要ですわ。',
+        tip: '下の権限を付与してから、もう一度お試しくださいませ',
+      },
+      result: {
+        done: { title: '通知 guide を更新しましたわ', description: '<#{channel}> の通知 guide を更新しましたわ。' },
+        partial: { title: '通知 guide の更新が一部だけですの', description: '<#{channel}> の通知 guide を最後まで更新できませんでしたの。' },
+      },
     },
     view: {
       author: '{guild} · Bot 設定', description: 'このサーバーの設定を集めましたわ。変更は `/la-setup config` からどうぞ。',
@@ -183,17 +229,47 @@ export default {
       noPersisted: '保存済み設定なし · 環境変数と既定値を表示中',
     },
     repin: {
-      noChannel: 'アクセスできる保存済み auto-check チャンネルが見つかりません。先に `/la-setup config action:set-auto-channel` を実行してくださいませ。',
-      missingPermissions: '<#{channel}> を整理して Artist ガイドを更新できません。足りない権限: {missing}。', result: '<#{channel}> で {outcome}',
+      noChannel: {
+        title: 'Auto-check チャンネルがまだありませんの',
+        description: 'アクセスできる保存済みの auto-check チャンネルが見つかりませんわ。',
+        tip: '先に /la-setup config action:set-auto-channel を実行してくださいませ',
+      },
+      missingPermissions: {
+        title: 'Artist ガイドを更新できませんでしたの',
+        description: '<#{channel}> を整理して Artist ガイドを更新するには、下の権限が必要ですわ。',
+        tip: '下の権限を付与してから、もう一度お試しくださいませ',
+      },
+      result: {
+        done: { title: 'Artist ガイドを更新しましたわ', description: '<#{channel}> を整理して Artist ガイドを更新しましたわ。' },
+        partial: { title: 'Artist ガイドの更新が一部だけですの', description: '<#{channel}> の整理と Artist ガイドの更新を最後までできませんでしたの。' },
+      },
     },
     language: {
-      set: 'Guild の公開言語を {flag} **{label}** に設定しました。', noChannel: '保存済み auto-check または通知 channel がないため、更新する pin もありませんの。',
-      channelUnavailable: '言語は変更しましたが、保存済み {surface} channel へアクセスできませんの。',
-      pinFailed: '言語は変更しましたが、<#{channel}> の {surface} guide を更新できません。足りない権限: {missing}。', pinResult: '**{surface}:** <#{channel}> で {outcome}',
+      set: '言語を {flag} {label} に設定しましたわ',
+      noChannel: '保存済み auto-check または通知 channel がないため、更新する pin もありませんの。',
+      refreshed: '新しい言語で pinned guide を更新しましたわ。',
+      partial: '言語は変更しましたが、更新できなかった pinned guide がありますの。',
+      boardField: '{surface} guide',
+      channelUnavailable: '保存済み channel へアクセスできませんの。',
+      pinFailed: '<#{channel}> では更新できませんでしたの。足りない権限: {missing}。',
+      pinResult: '<#{channel}>\n{outcome}',
     },
     manageGuildRequired: { title: 'Manage Server 権限が必要ですの', description: 'わたくしの設定を変えるには **Manage Server** 権限が必要ですわ。' },
-    unknownAction: { title: '知らない action ですわ', description: '`{action}` は `/la-setup` の action ではありませんの。`action` 欄に入力すると出る候補から選んでくださいませ。' }, unknownLanguage: { title: '知らない言語ですわ', description: '`{language}` は対応していない言語ですの。`language` 欄に入力すると出る候補から選んでくださいませ（{choices}）。' },
-    defaultScopeSet: 'Blacklist の既定 scope を **{scope}** に設定しました。\n`/la-list add type:black` で scope を省略した場合は **{scope}** を使いますの。',
+    unknownAction: {
+      title: '知らない action ですわ',
+      description: '`{action}` は `/la-setup` の action ではありませんの。',
+      tip: 'action 欄に入力すると出る候補から選んでくださいませ',
+    },
+    unknownLanguage: {
+      title: '知らない言語ですわ',
+      description: '`{language}` は対応していない言語ですの。',
+      tip: 'language 欄に入力すると出る候補から選んでくださいませ',
+      supportedField: '🌐 対応言語',
+    },
+    defaultScopeSet: {
+      title: 'Blacklist の既定 scope を設定しましたわ',
+      description: '`/la-list add type:black` で scope を省略した場合は **{scope}** を使いますの。',
+    },
   },
   evidence: {
     missing: {
@@ -226,8 +302,8 @@ export default {
       evidenceChannel: 'Evidence channel · bot 全体', channel: 'チャンネル', channelId: 'Channel ID', server: 'サーバー', status: '状態',
     },
     state: { enabled: '有効', disabled: '無効', local: 'Server · Local', global: 'Global', receiving: 'Broadcast 受信中', silent: '停止中 · broadcast なし' },
-    configMissing: { title: 'Owner 設定がありませんの', description: '`OWNER_GUILD_ID` が設定されていません。', footer: '環境変数を設定して LoaLogs を再起動後、もう一度お試しくださいませ。' },
-    channelRequired: { title: 'Evidence channel を選んでくださいませ', description: 'この action には `channel:` option が必要ですの。', footer: '証拠画像を保存する非公開 text channel を選んでくださいませ。' },
+    configMissing: { title: 'Owner 設定がありませんの', description: '`OWNER_GUILD_ID` が設定されていません。', tip: '環境変数を設定して LoaLogs を再起動後、もう一度お試しくださいませ' },
+    channelRequired: { title: 'Evidence channel を選んでくださいませ', description: 'この action には `channel:` option が必要ですの。', tip: '証拠画像を保存する非公開 text channel を選んでくださいませ' },
     channelWrongType: { title: 'そのチャンネルは使えませんの', description: '<#{channel}> は text channel ではありません。' },
     evidenceUpdated: { title: 'Evidence channel を更新しましたわ', description: '新しい `/la-list add` 画像は <#{channel}> に rehost して安定保存します。既存 entry は変わりませんの。', footer: '{user} が設定 · bot 全体' },
     missingGuild: {

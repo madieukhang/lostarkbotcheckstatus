@@ -8,7 +8,7 @@ import UserPreference from '../../models/UserPreference.js';
 import { invalidateGuildConfig } from '../../utils/scope.js';
 import { COLORS, relativeTime } from '../../utils/ui.js';
 import { catchListenerErrors } from '../../utils/async.js';
-import { AlertSeverity } from '../../utils/alertEmbed.js';
+import { NoticeKind } from '../../utils/alertEmbed.js';
 import {
   deferEphemeralReply,
   editAlert,
@@ -158,7 +158,7 @@ async function handleViewAction(interaction, lang) {
     if (buttonInteraction.user.id !== interaction.user.id) {
       const clickerLang = await getUserLanguage(buttonInteraction.user.id, { UserPreferenceModel: UserPreference });
       await replyAlert(buttonInteraction, {
-        severity: AlertSeverity.ERROR,
+        kind: NoticeKind.GUARD,
         ...t('dialogue.common.notYourSession', clickerLang),
       });
       return;
@@ -177,7 +177,7 @@ function evidenceChannelValidation(channel, lang) {
   const context = { channel };
   const failedRule = EVIDENCE_CHANNEL_RULES.find(({ invalid }) => invalid(context));
   if (failedRule) {
-    return t(failedRule.key, lang, failedRule.vars?.(context));
+    return { kind: NoticeKind.INPUT, ...t(failedRule.key, lang, failedRule.vars?.(context)) };
   }
   const member = channel.guild?.members?.me;
   if (!member) return null;
@@ -186,6 +186,7 @@ function evidenceChannelValidation(channel, lang) {
   const missing = required.filter((permission) => !permissions?.has(permission));
   if (missing.length === 0) return null;
   return {
+    kind: NoticeKind.GUARD,
     ...t('dialogue.common.missingPermissions', lang, { channel: channel.id }),
     fields: [{ name: t('dialogue.common.missingField', lang), value: missing.join(', '), inline: false }],
   };
@@ -194,7 +195,7 @@ function evidenceChannelValidation(channel, lang) {
 async function handleEvidenceChannelAction(interaction, channel, lang) {
   const validation = evidenceChannelValidation(channel, lang);
   if (validation) {
-    await editAlert(interaction, { severity: AlertSeverity.ERROR, ...validation });
+    await editAlert(interaction, validation);
     return;
   }
   await GuildConfig.findOneAndUpdate(
@@ -269,7 +270,7 @@ async function handleNotifyToggle(interaction, guildId, guildName, auditFields, 
 async function handleDefaultScope(interaction, guildId, guildName, scope, auditFields, lang) {
   if (!scope) {
     await editAlert(interaction, {
-      severity: AlertSeverity.ERROR,
+      kind: NoticeKind.INPUT,
       ...t('dialogue.remote.scopeRequired', lang),
     });
     return;

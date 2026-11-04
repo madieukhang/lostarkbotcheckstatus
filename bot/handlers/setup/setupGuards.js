@@ -5,7 +5,7 @@ import { postListNotifyWelcome } from '../../services/setup/listNotifyWelcome.js
 import { checkBotPermissions } from '../../services/setup/channelPermissions.js';
 import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
 import { channelBelongsToGuild } from '../../services/setup/guildBoundary.js';
-import { AlertSeverity } from '../../utils/alertEmbed.js';
+import { NoticeKind } from '../../utils/alertEmbed.js';
 import { editAlert } from '../../utils/interactionReplies.js';
 import { t } from '../../services/i18n/index.js';
 
@@ -18,10 +18,24 @@ export async function requireSetupGuildTextChannel(
   if (channel.type === ChannelType.GuildText) return channel;
 
   await editAlertFn(interaction, {
-    severity: AlertSeverity.ERROR,
+    kind: NoticeKind.INPUT,
     ...t('dialogue.common.wrongTextChannel', lang),
   });
   return null;
+}
+
+/**
+ * Notice field listing the channel permissions the bot still lacks.
+ * @param {string[]} missing - permission names from checkBotPermissions
+ * @param {string} lang - reply language
+ * @returns {{name: string, value: string, inline: boolean}} embed field
+ */
+export function missingPermissionsField(missing, lang) {
+  return {
+    name: t('dialogue.common.missingField', lang),
+    value: missing.map((entry) => `• ${entry}`).join('\n'),
+    inline: false,
+  };
 }
 
 export async function reportMissingChannelPermissions(
@@ -32,13 +46,9 @@ export async function reportMissingChannelPermissions(
   { editAlertFn = editAlert } = {},
 ) {
   await editAlertFn(interaction, {
-    severity: AlertSeverity.ERROR,
+    kind: NoticeKind.GUARD,
     ...t('dialogue.common.missingPermissions', lang, { channel: channelId }),
-    fields: [{
-      name: t('dialogue.common.missingField', lang),
-      value: missing.map((entry) => `• ${entry}`).join('\n'),
-      inline: false,
-    }],
+    fields: [missingPermissionsField(missing, lang)],
   });
 }
 

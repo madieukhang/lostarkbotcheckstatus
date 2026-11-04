@@ -3,7 +3,7 @@ export default {
     fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details', queue: '🚦 Queue', unreadable: '✏️ Not names', unreadImages: '🖼️ Unread images', whoCanUse: '👥 Who can use it' },
     selectionLost: { title: 'That choice no longer matches', description: 'I could not find the item you picked.', tip: 'Run the command again for fresh choices' },
     errorField: 'Error',
-    missingField: 'Missing',
+    missingField: '🔑 Missing',
     unknown: 'Unknown',
     savedCardFailed: { title: 'Saved', description: 'The change is saved; I just could not show the confirmation card.' },
     queuedCardFailed: { title: 'Sent for approval', description: 'Your request is saved and waiting for approval; I just could not show the confirmation card.' },
@@ -28,7 +28,7 @@ export default {
     missingPermissions: {
       title: 'A few permissions are missing',
       description: 'I cannot finish setting up <#{channel}> until I have the permissions below.',
-      footer: 'Fix the channel permissions, then run the command again.',
+      tip: 'Fix the channel permissions, then run the command again',
     },
   },
   system: {
@@ -167,8 +167,8 @@ export default {
     welcomeCleaned: 'Initial cleanup removed **{count}** non-pinned message(s) before the guide was posted.',
     welcomeCleanupIncomplete: 'Initial cleanup was incomplete after removing **{count}** message(s); the daily cleaner will retry.',
     sameChannelWarning: 'This is also the {other} channel. Separate channels will be easier to read.',
-    autoChannelNotSet: 'Auto-check channel was not changed because I could not create and save a welcome pin in <#{channel}>.\n{welcome}',
-    notifyChannelNotSet: 'Notification channel was not changed because I could not create and save a welcome pin in <#{channel}>.\n{welcome}',
+    autoChannelNotSet: { title: 'Auto-check channel not changed', description: 'I could not create and save the welcome pin in <#{channel}>, so the auto-check channel stays as it was.' },
+    notifyChannelNotSet: { title: 'Notification channel not changed', description: 'I could not create and save the welcome pin in <#{channel}>, so the notification channel stays as it was.' },
     channelSet: {
       pinned: 'Pinned',
       fields: { guide: 'Guide', cleanup: 'Cleanup', turnCleanup: { on: 'Turn cleanup on', off: 'Turn cleanup off' } },
@@ -206,27 +206,73 @@ export default {
       notifyOff: 'Turn global notifications OFF',
       repin: 'Clean and repin the welcome guide',
     },
-    showHint: 'Run `/la-setup config action:show` to review every setting.',
-    notificationsEnabled: 'Global list notifications are **enabled** for this server.\nI will bring list changes from other servers here.',
-    notificationsDisabled: 'Global list notifications are **disabled** for this server.\nI will keep cross-server list changes quiet.\n\nRun `/la-setup config action:notify-on` again, or set a notify channel to enable them.',
+    notificationsEnabled: {
+      title: 'Global notifications on',
+      description: 'I will bring list changes from **other servers** here.',
+      tip: 'Run /la-setup config action:show to review every setting',
+    },
+    notificationsDisabled: {
+      title: 'Global notifications off',
+      description: 'I will keep list changes from **other servers** quiet.',
+      tip: 'Run /la-setup config action:notify-on, or set a notify channel, to turn them back on',
+    },
     autoCleanup: {
-      enabled: 'Auto-cleanup is **enabled for this server only**. At 00:00 Asia/Ho_Chi_Minh, non-pinned messages in its auto-check channel may be deleted. If anything was removed, I leave one plain message that deletes itself after five minutes. Use `/la-setup config action:cleanup-off` to stop it.',
-      disabled: 'Auto-cleanup is **off for this server**. Auto-check remains active, but I will not delete ordinary messages. Use `/la-setup config action:cleanup-on` to opt in.',
-      noChannel: 'Set an auto-check channel with `/la-setup config action:set-auto-channel` before enabling cleanup.',
-      guideNotRefreshed: 'Cleanup was changed safely, but I could not refresh the pinned guide. Missing: {missing}.',
+      enabled: {
+        title: 'Auto-cleanup on for this server',
+        description: 'At **00:00** Vietnam time I clear unpinned messages in the auto-check channel; if anything was removed, I leave one notice that deletes itself after five minutes.',
+        tip: 'Use /la-setup config action:cleanup-off to stop it',
+      },
+      disabled: {
+        title: 'Auto-cleanup off for this server',
+        description: 'Auto-check keeps running, but I will not delete ordinary messages in the channel.',
+        tip: 'Use /la-setup config action:cleanup-on to turn it back on',
+      },
+      noChannel: {
+        title: 'No auto-check channel yet',
+        description: 'Cleanup needs an auto-check channel to clear, and this server has none set.',
+        tip: 'Set one with /la-setup config action:set-auto-channel, then enable cleanup',
+      },
+      guideNotRefreshed: 'The setting changed safely, but I could not refresh the pinned guide.',
     },
     listNotifyCleanup: {
-      enabled: 'Notify cleanup is **enabled for this server only**. Every 30 minutes, unpinned messages in the notification channel are removed; the welcome guide is rebuilt and the cleanup notice disappears after five minutes.',
-      disabled: 'Notify cleanup is **off for this server**. Notification cards remain until an admin runs a manual cleanup.',
-      noChannel: 'Set a notification channel with `/la-setup config action:set-notify-channel` first.',
-      guideNotRefreshed: 'The setting changed safely, but I could not refresh the notification guide. Missing: {missing}.',
-      manualSuccess: 'Cleared **{count}** unpinned messages in <#{channel}> and rebuilt the welcome guide.',
-      manualFailed: 'Cleanup in <#{channel}> did not finish after removing **{count}** messages. I left the slot incomplete so it can be retried safely.',
+      enabled: {
+        title: 'Notify cleanup on for this server',
+        description: 'Every **30 minutes** I clear unpinned messages in the notification channel and rebuild the welcome guide; the cleanup notice disappears after five minutes.',
+        tip: 'Use /la-setup config action:notify-cleanup-off to stop it',
+      },
+      disabled: {
+        title: 'Notify cleanup off for this server',
+        description: 'Notification cards stay until an admin clears them by hand.',
+        tip: 'Use /la-setup config action:notify-cleanup-on to turn it back on',
+      },
+      noChannel: {
+        title: 'No notification channel yet',
+        description: 'I have no saved notification channel to work in.',
+        tip: 'Set one with /la-setup config action:set-notify-channel first',
+      },
+      guideNotRefreshed: 'The setting changed safely, but I could not refresh the notification guide.',
+      manualSuccess: { title: 'Notification channel cleared', description: 'I cleared **{count}** unpinned messages in <#{channel}> and rebuilt the welcome guide.' },
+      manualFailed: {
+        title: 'Cleanup did not finish',
+        description: 'Cleanup in <#{channel}> stopped after removing **{count}** messages, so I left the slot incomplete.',
+        tip: 'Run /la-setup config action:notify-cleanup again to finish it',
+      },
     },
     listNotifyRepin: {
-      noChannel: 'I cannot find an accessible saved notification channel. Run `/la-setup config action:set-notify-channel` first.',
-      missingPermissions: 'I cannot refresh the notification guide in <#{channel}>. Missing: {missing}.',
-      result: '{outcome} in <#{channel}>.',
+      noChannel: {
+        title: 'No notification channel yet',
+        description: 'I cannot find a saved notification channel I can reach.',
+        tip: 'Run /la-setup config action:set-notify-channel first',
+      },
+      missingPermissions: {
+        title: 'Notification guide not refreshed',
+        description: 'I cannot refresh the notification guide in <#{channel}> until I have the permissions below.',
+        tip: 'Grant the permissions below, then run it again',
+      },
+      result: {
+        done: { title: 'Notification guide refreshed', description: 'I refreshed the notification guide in <#{channel}>.' },
+        partial: { title: 'Notification guide only partly refreshed', description: 'I could not fully refresh the notification guide in <#{channel}>.' },
+      },
     },
     view: {
       author: '{guild} · Bot configuration',
@@ -258,16 +304,30 @@ export default {
       noPersisted: 'No saved config yet · showing environment values and defaults',
     },
     repin: {
-      noChannel: 'I cannot find an accessible saved auto-check channel. Run `/la-setup config action:set-auto-channel` first.',
-      missingPermissions: 'I cannot clean the channel and refresh the Artist guide in <#{channel}>. Missing: {missing}.',
-      result: '{outcome} in <#{channel}>.',
+      noChannel: {
+        title: 'No auto-check channel yet',
+        description: 'I cannot find a saved auto-check channel I can reach.',
+        tip: 'Run /la-setup config action:set-auto-channel first',
+      },
+      missingPermissions: {
+        title: 'Artist guide not refreshed',
+        description: 'I cannot clean the channel and refresh the Artist guide in <#{channel}> until I have the permissions below.',
+        tip: 'Grant the permissions below, then run it again',
+      },
+      result: {
+        done: { title: 'Artist guide refreshed', description: 'I cleaned the channel and refreshed the Artist guide in <#{channel}>.' },
+        partial: { title: 'Artist guide only partly refreshed', description: 'I could not fully clean the channel and refresh the Artist guide in <#{channel}>.' },
+      },
     },
     language: {
-      set: 'Public guild language set to {flag} **{label}**.',
+      set: 'Language set to {flag} {label}',
       noChannel: 'No saved auto-check or notification channel is configured, so there is no pin to refresh.',
-      channelUnavailable: 'The language changed, but the saved {surface} channel is unavailable.',
-      pinFailed: 'The language changed, but I could not refresh the {surface} guide in <#{channel}>. Missing: {missing}.',
-      pinResult: '**{surface}:** {outcome} in <#{channel}>.',
+      refreshed: 'I refreshed the pinned guides in the new language.',
+      partial: 'The language changed, but I could not refresh every pinned guide.',
+      boardField: '{surface} guide',
+      channelUnavailable: 'I cannot reach the saved channel.',
+      pinFailed: 'Not refreshed in <#{channel}>. Missing: {missing}.',
+      pinResult: '<#{channel}>\n{outcome}',
     },
     manageGuildRequired: {
       title: 'Manage Server permission required',
@@ -275,13 +335,19 @@ export default {
     },
     unknownAction: {
       title: 'Unknown setup action',
-      description: '`{action}` is not a `/la-setup` action. Pick one from the list that appears as you type in `action`.',
+      description: '`{action}` is not a `/la-setup` action.',
+      tip: 'Pick one from the list that appears as you type in action',
     },
     unknownLanguage: {
       title: 'Unknown language',
-      description: '`{language}` is not a language I support. Pick one from the list that appears as you type in `language` ({choices}).',
+      description: '`{language}` is not a language I support.',
+      tip: 'Pick one from the list that appears as you type in language',
+      supportedField: '🌐 Supported',
     },
-    defaultScopeSet: 'Default blacklist scope set to **{scope}**.\nWhen `/la-list add type:black` omits scope, I will use **{scope}**.',
+    defaultScopeSet: {
+      title: 'Default blacklist scope set',
+      description: 'When `/la-list add type:black` omits scope, I will use **{scope}**.',
+    },
   },
   evidence: {
     missing: {
@@ -319,8 +385,8 @@ export default {
       channel: 'Channel', channelId: 'Channel ID', server: 'Server', status: 'Status',
     },
     state: { enabled: 'Enabled', disabled: 'Disabled', local: 'Server · Local', global: 'Global', receiving: 'Receiving broadcasts', silent: 'Silent · no broadcasts' },
-    configMissing: { title: 'Owner config is missing', description: '`OWNER_GUILD_ID` is not configured.', footer: 'Set it in the environment, restart LoaLogs, then try again.' },
-    channelRequired: { title: 'Choose an evidence channel', description: 'This action needs the `channel:` option.', footer: 'Pick the private text channel where evidence images should be stored.' },
+    configMissing: { title: 'Owner config is missing', description: '`OWNER_GUILD_ID` is not configured.', tip: 'Set it in the environment, restart LoaLogs, then try again' },
+    channelRequired: { title: 'Choose an evidence channel', description: 'This action needs the `channel:` option.', tip: 'Pick the private text channel where evidence images should be stored' },
     channelWrongType: { title: 'That channel will not work', description: '<#{channel}> is not a text channel.' },
     evidenceUpdated: {
       title: 'Evidence channel updated',

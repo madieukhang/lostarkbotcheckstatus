@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ChannelType } from 'discord.js';
 
-import { AlertSeverity } from '../bot/utils/alertEmbed.js';
+import { NoticeKind } from '../bot/utils/alertEmbed.js';
 import { t } from '../bot/services/i18n/index.js';
 import {
   postListNotifySetupWelcome,
@@ -36,7 +36,7 @@ test('setup text-channel guard returns valid channels and preserves the wrong-ch
   assert.deepEqual(alerts[0], [
     invalidInteraction,
     {
-      severity: AlertSeverity.ERROR,
+      kind: NoticeKind.INPUT,
       ...t('dialogue.common.wrongTextChannel', 'vi'),
     },
   ]);
@@ -57,7 +57,7 @@ test('setup permission guard keeps the shared localized missing-permission paylo
   assert.deepEqual(alerts[0], [
     interaction,
     {
-      severity: AlertSeverity.ERROR,
+      kind: NoticeKind.GUARD,
       ...t('dialogue.common.missingPermissions', 'jp', { channel: 'channel-1' }),
       fields: [{
         name: t('dialogue.common.missingField', 'jp'),

@@ -32,7 +32,9 @@ test('/la-setup language renders a localized embed in every supported language',
     });
     const embed = replies[0].embeds[0].toJSON();
 
-    assert.equal(embed.color, COLORS.warning);
+    // The language is saved; having no pinned board to refresh is not a warning.
+    assert.equal(embed.color, COLORS.success);
+    assert.ok(embed.title.startsWith('✅  '), embed.title);
     assert.ok(embed.title.includes(language.flag));
     assert.ok(embed.title.includes(language.label));
     assert.equal(embed.description, t('dialogue.setup.language.noChannel', language.code));
