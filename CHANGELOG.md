@@ -1,5 +1,10 @@
 # Changelog
 
+- Every simple notice (refusals, empty results, waits, failures, progress and confirmations) follows one card design: the title starts with its kind (🔒 blocked, ⌛ expired, ✏️ fix the input, 🔍 nothing found, 🚦 busy or limited, ❌ failed, ⏳ working, ✅ done, ⚠️ done in part), one short sentence follows, and the next step sits under the card as a 💡 tip with the time. Red now means only that something broke: empty results are blue and expired ones grey.
+- Failure cards show the error in a **🧾 Details** field, including an unexpected error after any button or menu click.
+- `/la-setup` results get a short title instead of turning a whole sentence into the title, so a channel mention shows as a link instead of raw text. A cleanup toggle or guide refresh that could not refresh the pinned guide shows ⚠️ and lists the missing permissions.
+- The multiadd progress card shows the same progress bar as the scan card.
+- A requested name with stray spaces or decomposed accents still gets its class icon on approval cards, and a failed roster snapshot read is logged instead of passing silently.
 - `/la-list add`, `/la-list edit` and the multiadd file no longer offer `Horizon Lv1` and `Horizon Lv2`; `Horizon Lv3` stays. Entries already saved with Lv1 or Lv2 keep showing them, and older multiadd files using them still import.
 - The **📎 Evidence** heading above an inline screenshot (sent-for-approval card, approver DM, `/la-list view` and check detail cards) now reads "Screenshot attached below · Download original" instead of a blank line, like the add confirmation.
 - The sent-for-approval card of `/la-list add` and Quick Add, and the approver DMs, now show the class icon for a character the bot has never looked up: the submit reads its roster once (up to 8 seconds) and saves it for later cards. If the read fails or runs long, the request still goes out, without the icon.
