@@ -390,7 +390,6 @@ export default {
       duplicateRoster: '{icon} {name} は、すでに **{list}** に登録されている {matched} と同じ roster にいますの。',
       requestReason: '新しい申請の理由', unchangedValue: '既存の値を保持',
       comparisonFooter: '「履歴に追加」はこの申請を最新のメモとして保存し、新しいスクリーンショットがあれば evidence を差し替えますわ。「既存を維持」は申請を見送りますの。',
-      executionFailed: { title: '承認を完了できませんでしたの', description: '**{user}** が承認しましたが、保存に失敗しましたわ。', requesterDescription: 'Senior が承認しましたが、LoaLogs は保存できませんでしたの。', footer: 'Entry は作成されていません。再申請するか Senior にご連絡くださいませ。' },
       noEvidence: { title: 'Evidence がありませんの', description: '画像が添付されていないか、保存 message が削除されていますわ。' },
       evidenceFooterLegacy: 'Legacy image · evidence rehost 前の画像なので期限切れの可能性がありますの', evidenceFooterFresh: 'Evidence archive から fresh URL を取得しましたわ',
       originalMissing: { title: '元の entry がありませんの', description: '操作中に別 session が重複 entry を削除したようですわ。', tip: '/la-list add をもう一度実行して新規 entry を作成してくださいませ' },
@@ -575,7 +574,6 @@ export default {
       ] },
       newlyTracked: '新しく track', scanned: 'scan 済み', discovered: '発見した alt', rosterState: 'Roster', hiddenValue: '非公開',
       footer: 'entry は現在 {total} character を track · /la-list view type:{type} で全部見られますの',
-      appended: '**{count} new alts** を **{list}** entry に追加しましたの。', source: 'Source: **{guild}** の Stronghold scan', hidden: 'Roster hidden のため Stronghold fingerprint で照合しましたわ。', unknown: 'Unknown',
     },
   },
   trustedBlock: {

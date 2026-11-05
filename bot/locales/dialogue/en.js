@@ -498,7 +498,6 @@ export default {
       duplicateRoster: '{icon} {name} shares a roster with {matched}, who is already in **{list}**.',
       requestReason: 'Reason in the new request', unchangedValue: 'Keep existing value',
       comparisonFooter: 'Add to history saves this request as the latest note; a new screenshot replaces the evidence. Keep existing skips the request.',
-      executionFailed: { title: 'Approval could not be completed', description: 'The request was approved by **{user}**, but saving it failed.', requesterDescription: 'A senior approved the request, but LoaLogs could not save it.', footer: 'No entry was created. Submit it again, or contact a senior.' },
       noEvidence: { title: 'No evidence is available', description: 'This request has no evidence image, or its archived message was removed.' },
       evidenceFooterLegacy: 'Legacy image · it may have expired because it predates evidence rehosting',
       evidenceFooterFresh: 'Fresh URL resolved from the evidence archive just now',
@@ -757,7 +756,6 @@ export default {
       ] },
       newlyTracked: 'Newly tracked', scanned: 'Scanned', discovered: 'Alts found', rosterState: 'Roster', hiddenValue: 'Hidden',
       footer: 'Entry now tracks {total} characters · /la-list view type:{type} for the full list',
-      appended: 'I appended **{count} new alts** to the **{list}** entry.', source: 'Source: Stronghold scan in **{guild}**', hidden: 'The roster was hidden, so matches came from the Stronghold fingerprint.', unknown: 'Unknown',
     },
   },
   trustedBlock: {

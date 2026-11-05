@@ -1,5 +1,6 @@
 # Changelog
 
+- Unused strings are removed: the old approval-failed card copy and four lines of the enrich success card that no card reads since its redesign.
 - The Japanese `/la-search` "📋 Filter 前" count now reads "characters" for more than one character, like the Japanese `/la-roster` title.
 - The notice tests now catch a misspelt notice kind and a shorthand `severity` in a simple notice, and an unused enrich tip string is removed.
 

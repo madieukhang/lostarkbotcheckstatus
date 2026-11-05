@@ -414,7 +414,6 @@ export default {
       duplicateRoster: '{icon} {name} cùng roster với {matched}, đã có trong **{list}**.',
       requestReason: 'Lý do trong yêu cầu mới', unchangedValue: 'Giữ giá trị cũ',
       comparisonFooter: 'Ghi vào lịch sử lưu yêu cầu này thành ghi chú mới nhất; ảnh mới (nếu có) thay evidence. Giữ nguyên thì bỏ qua yêu cầu.',
-      executionFailed: { title: 'Chưa thể hoàn tất lượt duyệt', description: 'Yêu cầu đã được **{user}** duyệt nhưng lúc lưu dữ liệu gặp lỗi.', requesterDescription: 'Senior đã duyệt, nhưng LoaLogs chưa lưu được dữ liệu.', footer: 'Chưa có entry nào được tạo. Gửi lại yêu cầu hoặc liên hệ Senior nhé.' },
       noEvidence: { title: 'Không có bằng chứng để xem', description: 'Yêu cầu này không kèm ảnh, hoặc message lưu ảnh đã bị xóa.' },
       evidenceFooterLegacy: 'Ảnh legacy · có thể đã hết hạn vì được gửi trước cơ chế rehost', evidenceFooterFresh: 'URL mới vừa được lấy từ kho evidence',
       originalMissing: { title: 'Entry gốc không còn nữa', description: 'Entry trùng đã bị một phiên khác xóa trước khi thao tác này hoàn tất.', tip: 'Chạy lại /la-list add để tạo entry mới nhé' },
@@ -599,7 +598,6 @@ export default {
       ] },
       newlyTracked: 'Character mới được track', scanned: 'Đã quét', discovered: 'Alt phát hiện', rosterState: 'Roster', hiddenValue: 'Ẩn',
       footer: 'Entry giờ track {total} character · /la-list view type:{type} để xem hết',
-      appended: 'Tớ đã thêm **{count} alt mới** vào entry **{list}**.', source: 'Nguồn: Stronghold scan trong **{guild}**', hidden: 'Roster đang ẩn nên các tên được khớp bằng fingerprint Stronghold.', unknown: 'Không rõ',
     },
   },
   trustedBlock: {
