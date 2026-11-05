@@ -757,7 +757,7 @@ export default {
       ] },
       newlyTracked: 'Newly tracked', scanned: 'Scanned', discovered: 'Alts found', rosterState: 'Roster', hiddenValue: 'Hidden',
       footer: 'Entry now tracks {total} characters · /la-list view type:{type} for the full list',
-      appended: 'I appended **{count} new alts** to the **{list}** entry.', source: 'Source: Stronghold scan in **{guild}**', hidden: 'The roster was hidden, so matches came from the Stronghold fingerprint.', tip: 'Tip: `/la-list view type:{type}` shows the full list.', unknown: 'Unknown',
+      appended: 'I appended **{count} new alts** to the **{list}** entry.', source: 'Source: Stronghold scan in **{guild}**', hidden: 'The roster was hidden, so matches came from the Stronghold fingerprint.', unknown: 'Unknown',
     },
   },
   trustedBlock: {

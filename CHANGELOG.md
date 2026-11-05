@@ -1,5 +1,8 @@
 # Changelog
 
+- The Japanese `/la-search` "📋 Filter 前" count now reads "characters" for more than one character, like the Japanese `/la-roster` title.
+- The notice tests now catch a misspelt notice kind and a shorthand `severity` in a simple notice, and an unused enrich tip string is removed.
+
 - Every simple notice (refusals, empty results, waits, failures, progress and confirmations) follows one card design: the title starts with its kind (🔒 blocked, ⌛ expired, ✏️ fix the input, 🔍 nothing found, 🚦 busy or limited, ❌ failed, ⏳ working, ✅ done, ⚠️ done in part), one short sentence follows, and the next step sits under the card as a 💡 tip with the time. Red now means only that something broke: empty results are blue and expired ones grey.
 - Failure cards show the error in a **🧾 Details** field, including an unexpected error after any button or menu click.
 - `/la-setup` results get a short title instead of turning a whole sentence into the title, so a channel mention shows as a link instead of raw text. A cleanup toggle or guide refresh that could not refresh the pinned guide shows ⚠️ and lists the missing permissions.

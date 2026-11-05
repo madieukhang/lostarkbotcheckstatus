@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
+import { NoticeKind } from '../bot/utils/alertEmbed.js';
+
 // Simple notices name a kind; only the rich cards left out of the notice
 // redesign keep a raw severity. A new simple notice written with `severity`
 // fails here, so the two families cannot drift apart again.
@@ -26,7 +28,8 @@ const RICH_CARD_FILES = new Set([
 const BUILDER_FILE = 'bot/utils/alertEmbed.js';
 
 const REMOVED_NOTICE_HELPERS = /\b(?:buildNoticeEmbed|replyNotice|editNotice|updateNotice|editNoticeAfterSavedWrite)\b/;
-const SEVERITY_OPTION = /\bseverity\s*:/;
+// `severity: x` or the shorthand `{ severity }` / `, severity,`.
+const SEVERITY_OPTION = /\bseverity\s*:|[{,]\s*severity\s*[,}]/;
 
 function listJsFiles(dir, out = []) {
   for (const entry of readdirSync(dir)) {
@@ -62,6 +65,23 @@ test('a severity option appears only in the rich-card files', () => {
   assert.deepEqual(offenders, []);
   // A rich-card file that no longer sets a severity leaves the list stale.
   assert.deepEqual([...RICH_CARD_FILES].filter((path) => !filesWithSeverity.has(path)), []);
+});
+
+// A misspelt member such as `NoticeKind.FAILUR` is undefined, which the
+// builder cannot tell from "no kind", so the card would fall back to the info
+// look without an error.
+const NOTICE_KIND_REFERENCE = /\bNoticeKind\.(\w+)/g;
+
+test('every NoticeKind member the bot names exists', () => {
+  const unknown = [];
+  for (const { path, lines } of sourceFiles('bot')) {
+    lines.forEach((line, index) => {
+      for (const [, member] of line.matchAll(NOTICE_KIND_REFERENCE)) {
+        if (!Object.hasOwn(NoticeKind, member)) unknown.push(`${path}:${index + 1}: NoticeKind.${member}`);
+      }
+    });
+  }
+  assert.deepEqual(unknown, []);
 });
 
 test('no source or test file uses a retired notice helper', () => {

@@ -456,7 +456,7 @@ export default {
     bibleUnavailable: { title: 'Bible が応答しませんの', description: 'lostark.bible が今回は応答しませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' },
     noResults: { title: '一致 character がありませんの', description: '**{name}** に一致する character を見つけられませんでしたわ。', tip: 'つづりを確かめて、もう一度検索してくださいませ' },
     noFilteredResults: { title: 'Filter に合う結果がありませんの', description: '**{name}** の結果はありましたが、filter を通ったものはありませんでしたわ。', tip: 'Filter をゆるめて、もう一度検索してくださいませ' },
-    beforeFilterOne: '{count} character', beforeFilterMany: '{count} character',
+    beforeFilterOne: '{count} character', beforeFilterMany: '{count} characters',
     failed: { title: '検索を終えられませんでしたの', description: '**{name}** の検索が途中で止まってしまいましたわ。', tip: '数分後にもう一度お試しくださいませ' },
     detailFailed: { title: '詳細を開けませんでしたの', description: '**{name}** の record を読み込めませんでしたわ。', tip: 'Menu からもう一度選んでくださいませ' },
     title: '検索 · "{name}"', notListed: 'list DB 未登録', matchOne: 'match', matchMany: 'matches',
@@ -575,7 +575,7 @@ export default {
       ] },
       newlyTracked: '新しく track', scanned: 'scan 済み', discovered: '発見した alt', rosterState: 'Roster', hiddenValue: '非公開',
       footer: 'entry は現在 {total} character を track · /la-list view type:{type} で全部見られますの',
-      appended: '**{count} new alts** を **{list}** entry に追加しましたの。', source: 'Source: **{guild}** の Stronghold scan', hidden: 'Roster hidden のため Stronghold fingerprint で照合しましたわ。', tip: 'Tip: `/la-list view type:{type}` で full list を確認できますの。', unknown: 'Unknown',
+      appended: '**{count} new alts** を **{list}** entry に追加しましたの。', source: 'Source: **{guild}** の Stronghold scan', hidden: 'Roster hidden のため Stronghold fingerprint で照合しましたわ。', unknown: 'Unknown',
     },
   },
   trustedBlock: {

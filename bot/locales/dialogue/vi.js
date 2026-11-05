@@ -599,7 +599,7 @@ export default {
       ] },
       newlyTracked: 'Character mới được track', scanned: 'Đã quét', discovered: 'Alt phát hiện', rosterState: 'Roster', hiddenValue: 'Ẩn',
       footer: 'Entry giờ track {total} character · /la-list view type:{type} để xem hết',
-      appended: 'Tớ đã thêm **{count} alt mới** vào entry **{list}**.', source: 'Nguồn: Stronghold scan trong **{guild}**', hidden: 'Roster đang ẩn nên các tên được khớp bằng fingerprint Stronghold.', tip: 'Mẹo: `/la-list view type:{type}` để xem toàn bộ list.', unknown: 'Không rõ',
+      appended: 'Tớ đã thêm **{count} alt mới** vào entry **{list}**.', source: 'Nguồn: Stronghold scan trong **{guild}**', hidden: 'Roster đang ẩn nên các tên được khớp bằng fingerprint Stronghold.', unknown: 'Không rõ',
     },
   },
   trustedBlock: {
