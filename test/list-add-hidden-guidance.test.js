@@ -87,14 +87,16 @@ test('duplicate roster result opens with the reason pair, each with its raid, an
       ['✏️ Your new note', 'ninja loot g2', false],
     ]);
 
+    // The entry is global, but the card shows no Scope field: the add was
+    // refused either way, and the scope tag only crowded the grid.
     const grid = fields.slice(2);
     assert.equal(grid.every((field) => field.inline), true);
     assert.deepEqual(grid.map((field) => field.name), [
       '🧬 Matched name',
       '🌍 Server',
-      '🌐 Scope',
       '👤 Added by',
       '🕐 Time added',
+      ZWSP,
       ZWSP,
     ]);
     assert.equal(
@@ -122,7 +124,7 @@ test('duplicate card drops the typed-reason block when the add carried none', ()
   const fields = result.embeds[0].toJSON().fields;
 
   assert.deepEqual(fields.filter((f) => !f.inline).map((f) => f.name), ['📝 Stored reason']);
-  // Direct name match with no scope, raid or server leaves two inline
+  // Direct name match with no raid or server leaves two inline
   // fields, and two split one row evenly, so they stay unpadded.
   assert.deepEqual(fields.filter((f) => f.inline).map((f) => f.name), [
     '👤 Added by',

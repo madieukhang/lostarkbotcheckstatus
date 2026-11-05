@@ -267,11 +267,6 @@ function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap) {
       value: `\`${world}\``,
       inline: true,
     } : null,
-    existed.scope ? {
-      name: `🌐 ${t('dialogue.listAdd.duplicate.scope', lang)}`,
-      value: `[${t(`dialogue.approval.scopeTag.${existed.scope === 'server' ? 'local' : 'global'}`, lang)}]`,
-      inline: true,
-    } : null,
     {
       name: `👤 ${t('dialogue.listAdd.duplicate.addedBy', lang)}`,
       value: existed.addedByDisplayName || existed.addedByTag || fallback,
