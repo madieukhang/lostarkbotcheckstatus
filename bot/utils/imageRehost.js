@@ -27,7 +27,12 @@ import config from '../config.js';
 import { getGuildConfig } from './scope.js';
 import { AlertSeverity, buildAlertEmbed } from './alertEmbed.js';
 import { readBodyWithin } from './responseBody.js';
-import { storeEvidenceImage } from './evidenceStore.js';
+import {
+  findEvidenceImage,
+  recordArchiveCopy,
+  repointEntries,
+  storeEvidenceImage,
+} from './evidenceStore.js';
 
 // Bot uploads are capped at 25 MB; the margin leaves room for the message.
 const REHOST_MAX_BYTES = 24 * 1024 * 1024;
@@ -422,27 +427,38 @@ export function hasEvidence(entry) {
 }
 
 /**
- * Resolve the best display URL for an entry's evidence image. Prefers the
- * rehost-aware path (fresh URL from message) and falls back to the legacy
- * direct URL stored in entry.imageUrl. Returns empty string if no image
- * exists or all paths failed.
+ * Resolve the best display URL for an entry's evidence image: its archive
+ * message, then the database copy when that message is gone (or the entry
+ * has only a database copy), then the legacy direct URL. Returns empty
+ * string if no image exists or all paths failed.
  *
- * @param {Object} entry - A list entry document (must have imageUrl,
- *   imageMessageId, imageChannelId fields)
+ * @param {Object} entry - A list entry (imageUrl, imageMessageId,
+ *   imageChannelId, imageSha256), or the same fields of a broadcast button
  * @param {Client} client
+ * @param {object} [options]
+ * @param {boolean} [options.heal=true] - allow a re-post of the database copy
+ *   to the evidence channel; off for an image shown once and not kept
  * @returns {Promise<string>} URL ready for embed.setImage() or empty string
  */
-export async function resolveDisplayImageUrl(entry, client) {
+export async function resolveDisplayImageUrl(entry, client, { heal = true } = {}) {
   if (!entry) return '';
 
-  // Path 1: rehosted image · fetch fresh URL
+  // Path 1: the entry's own archive message.
+  const goneIds = [];
   if (entry.imageMessageId && entry.imageChannelId) {
-    const fresh = await refreshImageUrl(entry.imageMessageId, entry.imageChannelId, client);
-    if (fresh) return fresh;
-    // Refresh failed (message deleted etc.) · fall through to legacy
+    const own = await probeArchiveImage(entry.imageMessageId, entry.imageChannelId, client);
+    if (own.url) return own.url;
+    if (own.gone) goneIds.push(entry.imageMessageId);
   }
 
-  // Path 2: legacy direct URL · re-signed when it is a Discord link. When
+  // Path 2: the database copy, only when Discord said the archive copy is
+  // gone or there never was one; a failed fetch for now does not heal.
+  if (goneIds.length > 0 || (!entry.imageMessageId && entry.imageSha256)) {
+    const restored = await restoreFromDatabase(entry, goneIds, client, { heal });
+    if (restored) return restored;
+  }
+
+  // Path 3: legacy direct URL · re-signed when it is a Discord link. When
   // Discord cannot be reached, the stored link is still worth a try.
   if (!entry.imageUrl) return '';
   try {
@@ -450,5 +466,84 @@ export async function resolveDisplayImageUrl(entry, client) {
   } catch (err) {
     console.warn('[imageRehost] Legacy link refresh failed:', err.message);
     return entry.imageUrl;
+  }
+}
+
+// One re-post per lost image at a time; concurrent viewers share it. The bot
+// runs as one process, so an in-process map is enough.
+const inFlightRestores = new Map();
+
+async function repointBestEffort(target) {
+  try {
+    await repointEntries(target);
+  } catch (err) {
+    console.warn('[imageRehost] Re-pointing entries to the restored copy failed:', err.message);
+  }
+}
+
+// The newest archive copy of the stored image when it still exists; else,
+// with `heal`, a re-post of the stored bytes. Entries on a gone copy (or
+// with only the hash) are re-pointed to the copy served.
+async function restoreFromDatabase(entry, goneIds, client, { heal }) {
+  let image;
+  try {
+    image = await findEvidenceImage({ sha256: entry.imageSha256 || '', messageId: goneIds[0] || '' });
+  } catch (err) {
+    console.warn('[imageRehost] Database copy lookup failed:', err.message);
+    return '';
+  }
+  if (!image) return '';
+
+  const gone = [...goneIds];
+  if (image.archiveMessageId && !gone.includes(image.archiveMessageId)) {
+    const newest = await probeArchiveImage(image.archiveMessageId, image.archiveChannelId, client);
+    if (newest.url) {
+      await repointBestEffort({
+        sha256: image._id,
+        goneMessageIds: gone,
+        messageId: image.archiveMessageId,
+        channelId: image.archiveChannelId,
+      });
+      return newest.url;
+    }
+    if (!newest.gone) return '';
+    gone.push(image.archiveMessageId);
+  }
+  if (!heal) return '';
+
+  let pending = inFlightRestores.get(image._id);
+  if (!pending) {
+    pending = repostFromDatabase(image._id, gone, entry, client)
+      .finally(() => inFlightRestores.delete(image._id));
+    inFlightRestores.set(image._id, pending);
+  }
+  return pending;
+}
+
+// A lean read returns a BSON Binary; value() is exactly the stored bytes.
+function storedBytes(data) {
+  if (Buffer.isBuffer(data)) return data;
+  return typeof data?.value === 'function' ? Buffer.from(data.value()) : null;
+}
+
+async function repostFromDatabase(sha256, goneIds, entry, client) {
+  try {
+    const channelId = await getEvidenceChannelId();
+    if (!channelId) return '';
+    const image = await findEvidenceImage({ sha256 }, { withData: true });
+    const buffer = storedBytes(image?.data);
+    if (!buffer) return '';
+    const archived = await postToEvidenceChannel(channelId, {
+      buffer,
+      filename: image.filename || 'evidence.png',
+      title: 'Restored from database',
+      details: entry?.name ? [entry.name] : [],
+    }, client);
+    await recordArchiveCopy(sha256, archived);
+    await repointBestEffort({ sha256, goneMessageIds: goneIds, messageId: archived.messageId, channelId: archived.channelId });
+    return archived.freshUrl;
+  } catch (err) {
+    console.warn(`[imageRehost] Re-post of database copy ${sha256} failed:`, err.message);
+    return '';
   }
 }
