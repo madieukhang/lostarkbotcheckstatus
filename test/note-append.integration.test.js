@@ -34,6 +34,22 @@ test('the first note on an entry saved before notes keeps its add as the origina
   assert.equal(saved.enrichmentSource, 'bible');
 });
 
+test('appending a note raises no Mongoose deprecation warning', async () => {
+  const warnings = [];
+  const onWarning = (warning) => { if (warning.code === 'MONGOOSE') warnings.push(warning.message); };
+  process.on('warning', onWarning);
+  try {
+    const created = await Blacklist.create({ name: 'Target', reason: 'First' });
+    const entry = await Blacklist.findById(created._id).lean();
+    await appendEntryNote({ model: Blacklist, entry, payload: payload('Second') });
+    // process.emitWarning delivers on a later tick.
+    await new Promise(resolve => setImmediate(resolve));
+  } finally {
+    process.off('warning', onWarning);
+  }
+  assert.deepEqual(warnings, []);
+});
+
 test('a note saved in between is kept: the stale write re-reads and appends after it', async () => {
   const created = await Blacklist.create({ name: 'Target', reason: 'First' });
   const stale = await Blacklist.findById(created._id).lean();

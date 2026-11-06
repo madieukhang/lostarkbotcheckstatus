@@ -46,7 +46,7 @@ export async function appendEntryNote({ model, entry, payload, rosterNames = [],
   const write = async (current) => {
     const { filter, update } = buildNoteAppend(current, note, { rosterNames, set });
     await beforeWrite();
-    return model.findOneAndUpdate(filter, update, { new: true }).lean();
+    return model.findOneAndUpdate(filter, update, { returnDocument: 'after' }).lean();
   };
   const landed = current => Boolean(requestId) && (current.notes || []).some(stored => stored.requestId === requestId);
 

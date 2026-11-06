@@ -37,7 +37,7 @@ test('approval claim authorizes atomically without a redundant payload read', as
         assert.equal(filter.action, 'bulk');
         assert.ok(filter.$or);
         assert.deepEqual(filter.processingAction.$in, [null, '', 'approve']);
-        assert.equal(options.new, true);
+        assert.deepEqual(options, { returnDocument: 'after' });
         return { requestId: 'req' };
       } }),
       updateOne: async () => ({ matchedCount: 1 }),
@@ -46,6 +46,25 @@ test('approval claim authorizes atomically without a redundant payload read', as
   });
   assert.equal(result.status, PENDING_APPROVAL_ACCESS.authorized);
   await result.claim.release();
+});
+
+test('a claim renewal also reads the renewed request with returnDocument, not the deprecated new option', async () => {
+  const optionsSeen = [];
+  const result = await claimApproval({
+    interaction: { customId: 'approve:req' },
+    PendingApprovalModel: {
+      findOne: () => assert.fail('successful claims do not need a separate read'),
+      findOneAndUpdate: (_filter, _update, options) => ({ lean: async () => {
+        optionsSeen.push(options);
+        return { requestId: 'req' };
+      } }),
+      updateOne: async () => ({ matchedCount: 1 }),
+    },
+    requestId: 'req', approverId: 'a', renewIntervalMs: 0,
+  });
+  await result.claim.assertOwned();
+  await result.claim.release();
+  assert.deepEqual(optionsSeen, [{ returnDocument: 'after' }, { returnDocument: 'after' }]);
 });
 
 test('pending approval access returns an authorized payload without probing existence', async () => {

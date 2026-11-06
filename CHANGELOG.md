@@ -1,5 +1,7 @@
 # Changelog
 
+- Saving a list note and claiming an approval button no longer log a Mongoose warning that the `new` option is deprecated; those writes now ask for the updated document with `returnDocument: 'after'`, which behaves the same.
+
 - The "Already in Blacklist / Whitelist / Watchlist" card from `/la-list add` no longer shows a **🌐 Scope** field.
 - Unused strings are removed: the old approval-failed card copy and four lines of the enrich success card that no card reads since its redesign.
 - The Japanese `/la-search` "📋 Filter 前" count now reads "characters" for more than one character, like the Japanese `/la-roster` title.

@@ -78,7 +78,7 @@ export async function claimApproval({
     $or: [{ processingUntil: null }, { processingUntil: { $lte: new Date(now()) } }],
   }, { $set: {
     processingAction: action, processingToken: token, processingUntil: new Date(now() + leaseMs),
-  } }, { new: true }).lean();
+  } }, { returnDocument: 'after' }).lean();
   if (!payload) {
     const current = await resolvePendingApprovalAccess(options);
     return { ...current, payload: null,
@@ -100,7 +100,7 @@ export async function claimApproval({
       try {
         const renewed = await PendingApprovalModel.findOneAndUpdate({
           ...ownerFilter, processingUntil: { $gt: new Date(now()) },
-        }, { $set: { processingUntil: new Date(now() + leaseMs) } }, { new: true }).lean();
+        }, { $set: { processingUntil: new Date(now() + leaseMs) } }, { returnDocument: 'after' }).lean();
         if (!renewed) throw leaseLost();
       } catch (err) {
         lost = true;
