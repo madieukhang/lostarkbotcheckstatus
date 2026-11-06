@@ -1,5 +1,9 @@
 # Changelog
 
+- Every evidence image the bot archives is also saved in the database. If its message in the evidence channel is deleted, opening the evidence shows the image anyway: the bot posts the saved copy to the evidence channel again and keeps using it.
+- An entry added straight to the database can carry its screenshot; the bot posts it to the evidence channel the first time someone opens it.
+- `/la-remote action:syncimages` now also copies images already in the evidence channel into the database, and shows two new counts: **Copied to database** and **Left for next run** (it stops starting new copies after 12 minutes; run it again to finish).
+
 - Saving a list note and claiming an approval button no longer log a Mongoose warning that the `new` option is deprecated; those writes now ask for the updated document with `returnDocument: 'after'`, which behaves the same.
 
 - The "Already in Blacklist / Whitelist / Watchlist" card from `/la-list add` no longer shows a **🌐 Scope** field.
