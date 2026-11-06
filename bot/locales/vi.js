@@ -310,6 +310,7 @@ const vi = {
               '       External URL -> dùng nguyên URL, không cần refresh',
               '**3.** Download file -> upload vào evidence channel với audit metadata',
               '**4.** Compare-and-swap update DB: clear `imageUrl`, set `imageMessageId/imageChannelId`',
+              '**5.** Sau đó mọi ảnh trong kho evidence chưa có bản sao được tải về và lưu vào MongoDB (12 phút mỗi lần chạy; chạy lại để làm tiếp)',
             ],
           },
           {
@@ -328,6 +329,8 @@ const vi = {
               '**Skipped (dead URLs)** - file gốc bị xoá, không recover được',
               '**Skipped (raced)** - entry vừa bị edit/migrate bởi nguồn khác',
               '**Failed** - lỗi infra (channel down, rate limit, v.v.); retry được',
+              '**Đã chép vào database** - ảnh trong kho evidence giờ có bản sao trong MongoDB, dùng khi tin nhắn gốc bị xoá',
+              '**Để lần chạy sau** - chưa tới lượt trong 12 phút; chạy lại lệnh',
             ],
           },
           {

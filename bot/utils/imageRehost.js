@@ -28,6 +28,7 @@ import { getGuildConfig } from './scope.js';
 import { AlertSeverity, buildAlertEmbed } from './alertEmbed.js';
 import { readBodyWithin } from './responseBody.js';
 import {
+  EVIDENCE_COPY_MAX_BYTES,
   findEvidenceImage,
   recordArchiveCopy,
   repointEntries,
@@ -123,6 +124,16 @@ async function fetchPublicUrl(url) {
     target = new URL(location, target).href;
   }
   return { refusal: `more than ${REHOST_MAX_REDIRECTS} redirects` };
+}
+
+// The last path segment when it names an image file, else the fallback.
+function imageFilenameFromUrl(url, fallback) {
+  try {
+    const lastSegment = new URL(url).pathname.split('/').pop() || '';
+    return /\.(png|jpg|jpeg|webp|gif)$/i.test(lastSegment) ? lastSegment : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 const EVIDENCE_LIST_ICON = Object.freeze({
@@ -222,16 +233,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   const sniffedExt = typedImage ? '' : imageSignatureExtension(buffer);
   if (!typedImage && !sniffedExt) return fail(notAnImage);
 
-  // Try to extract a sensible filename from the URL path. Failure is
-  // non-fatal · falls back to 'evidence' with the sniffed type, or png.
-  let filename = `evidence.${sniffedExt || 'png'}`;
-  try {
-    const urlPath = new URL(originalUrl).pathname;
-    const lastSegment = urlPath.split('/').pop() || '';
-    if (lastSegment && /\.(png|jpg|jpeg|webp|gif)$/i.test(lastSegment)) {
-      filename = lastSegment;
-    }
-  } catch { /* leave default filename */ }
+  const filename = imageFilenameFromUrl(originalUrl, `evidence.${sniffedExt || 'png'}`);
 
   // Steps 2 and 3: upload to the evidence channel, with audit metadata so a
   // human looking at #evidence-archive can see what each image is for.
@@ -321,6 +323,50 @@ async function postToEvidenceChannel(channelId, { buffer, filename, title, detai
  */
 export async function refreshImageUrl(messageId, channelId, client) {
   return (await probeArchiveImage(messageId, channelId, client)).url || null;
+}
+
+/**
+ * Copy one archived image into the database, keyed to its archive message.
+ * Used by the syncimages backfill for images archived before the database
+ * copy existed.
+ * @param {string} messageId - evidence-channel message
+ * @param {string} channelId - its channel
+ * @param {Client} client - the bot client
+ * @returns {Promise<{status: 'stored'|'gone'|'failed', error: string}>}
+ */
+export async function copyArchiveToDatabase(messageId, channelId, client) {
+  const archived = await probeArchiveImage(messageId, channelId, client);
+  if (!archived.url) {
+    return archived.gone
+      ? { status: 'gone', error: 'archive message is gone' }
+      : { status: 'failed', error: 'archive message could not be read' };
+  }
+
+  let response;
+  try {
+    response = await fetch(archived.url, { signal: AbortSignal.timeout(REHOST_DOWNLOAD_TIMEOUT_MS) });
+  } catch (err) {
+    return { status: 'failed', error: `download fetch threw: ${err.message}` };
+  }
+  if (!response.ok) return { status: 'failed', error: `download HTTP ${response.status}` };
+
+  let buffer;
+  try {
+    buffer = await readBodyWithin(response, EVIDENCE_COPY_MAX_BYTES);
+  } catch (err) {
+    return {
+      status: 'failed',
+      error: err.code === 'BODY_TOO_LARGE' ? 'image is over the database copy cap' : `download read body failed: ${err.message}`,
+    };
+  }
+
+  const sha256 = await storeEvidenceImage({
+    buffer,
+    contentType: response.headers.get('content-type') || '',
+    filename: imageFilenameFromUrl(archived.url, 'evidence.png'),
+    archive: { messageId, channelId },
+  });
+  return sha256 ? { status: 'stored', error: '' } : { status: 'failed', error: 'database copy failed' };
 }
 
 // Discord answers that the archive copy no longer exists or can no longer be

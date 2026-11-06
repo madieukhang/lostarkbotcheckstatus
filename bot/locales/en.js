@@ -452,6 +452,7 @@ const en = {
               '       External URL -> use as-is, no refresh needed',
               '**3.** Download file -> upload to evidence channel with audit metadata',
               '**4.** Compare-and-swap DB update: clear `imageUrl`, set `imageMessageId/imageChannelId`',
+              '**5.** Then every archived image without a database copy is downloaded and stored in MongoDB (12 minutes per run; run again to continue)',
             ],
           },
           {
@@ -470,6 +471,8 @@ const en = {
               '**Skipped (dead URLs)** - original file deleted, cannot recover',
               '**Skipped (raced)** - entry was edited/migrated by another source',
               '**Failed** - infra error (channel down, rate limit, etc.); retryable',
+              '**Copied to database** - the archived image now has a copy in MongoDB, used if its archive message is deleted',
+              '**Left for next run** - not reached within 12 minutes; run the command again',
             ],
           },
           {

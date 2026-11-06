@@ -310,6 +310,7 @@ const jp = {
               '       External URL -> そのまま使用、refresh 不要',
               '**3.** Download file -> evidence channel へ audit metadata 付きで upload',
               '**4.** Compare-and-swap DB update: clear `imageUrl`, set `imageMessageId/imageChannelId`',
+              '**5.** Then every archived image without a database copy is downloaded and stored in MongoDB (12 minutes per run; run again to continue)',
             ],
           },
           {
@@ -328,6 +329,8 @@ const jp = {
               '**Skipped (dead URLs)** - original file deleted, cannot recover',
               '**Skipped (raced)** - entry が別 source により edit/migrate 済み',
               '**Failed** - infra error (channel down, rate limit, etc.); retryable',
+              '**Copied to database** - the archived image now has a copy in MongoDB, used if its archive message is deleted',
+              '**Left for next run** - not reached within 12 minutes; run the command again',
             ],
           },
           {

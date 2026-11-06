@@ -10,8 +10,13 @@ import GuildConfig from '../../models/GuildConfig.js';
 import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
-import { refreshLegacyImageUrl, rehostImage } from '../../utils/imageRehost.js';
+import { copyArchiveToDatabase, refreshLegacyImageUrl, rehostImage } from '../../utils/imageRehost.js';
+import { listArchivedMessageIds } from '../../utils/evidenceStore.js';
 import { t } from '../../services/i18n/index.js';
+
+// A Discord interaction token lasts 15 minutes; the copy pass starts no new
+// image after 12, so the summary still reaches the user.
+export const SYNC_COPY_BUDGET_MS = 12 * 60 * 1000;
 
 async function resolveDownloadUrl(entry, interaction, stats) {
   const { url, error } = await refreshLegacyImageUrl(entry.imageUrl, interaction.client);
@@ -103,6 +108,8 @@ function buildSyncStatsFields(stats, lang) {
     { name: `⚠️ ${t('dialogue.syncImages.fields.dead', lang)}`, value: String(stats.skippedDead), inline: true },
     { name: `🔀 ${t('dialogue.syncImages.fields.raced', lang)}`, value: String(stats.skippedRaced), inline: true },
     { name: `❌ ${t('dialogue.syncImages.fields.failed', lang)}`, value: String(stats.failed), inline: true },
+    { name: `🗄️ ${t('dialogue.syncImages.fields.copied', lang)}`, value: String(stats.copied), inline: true },
+    { name: `⏭️ ${t('dialogue.syncImages.fields.copyLeft', lang)}`, value: String(stats.copyLeft), inline: true },
   ];
 }
 
@@ -127,7 +134,7 @@ function buildSummaryPayload(interaction, total, stats, lang) {
 
   const summaryEmbed = createArtistEmbed()
     .setTitle(`✅ ${t('dialogue.syncImages.completeTitle', lang)}`)
-    .setDescription(t('dialogue.syncImages.completeDescription', lang, { total }))
+    .setDescription(t('dialogue.syncImages.completeDescription', lang, { total, copies: stats.copyTotal }))
     .addFields(...buildSyncStatsFields(stats, lang))
     .setColor(summaryColor)
     .setFooter({ text: t('dialogue.syncImages.summaryFooter', lang, { user: interaction.user.tag }) })
@@ -153,7 +160,7 @@ function buildSummaryPayload(interaction, total, stats, lang) {
       `Date: ${new Date().toISOString()}`,
       `By: ${interaction.user.tag}`,
       `Total entries: ${total}`,
-      `Synced: ${stats.synced} | Dead: ${stats.skippedDead} | Raced: ${stats.skippedRaced} | Failed: ${stats.failed}`,
+      `Synced: ${stats.synced} | Dead: ${stats.skippedDead} | Raced: ${stats.skippedRaced} | Failed: ${stats.failed} | Copied: ${stats.copied} | Left: ${stats.copyLeft}`,
       `${'-'.repeat(60)}`,
       '',
     ].join('\n');
@@ -169,7 +176,94 @@ function buildSummaryPayload(interaction, total, stats, lang) {
   return replyPayload;
 }
 
-export async function handleSyncImagesAction(interaction, lang = 'en') {
+// Every archive message an entry points at that no stored image lists yet,
+// once per message.
+async function findArchiveCopyTargets() {
+  const onArchive = { imageMessageId: { $nin: ['', null] }, imageChannelId: { $nin: ['', null] } };
+  const [stored, ...lists] = await Promise.all([
+    listArchivedMessageIds(),
+    ...[Blacklist, Whitelist, Watchlist].map(model => model.find(onArchive).select('name imageMessageId imageChannelId').lean()),
+  ]);
+  const targets = new Map();
+  for (const entry of lists.flat()) {
+    if (!stored.has(entry.imageMessageId) && !targets.has(entry.imageMessageId)) {
+      targets.set(entry.imageMessageId, entry);
+    }
+  }
+  return [...targets.values()];
+}
+
+async function runLegacyPass(legacyEntries, interaction, stats, lang) {
+  for (let i = 0; i < legacyEntries.length; i++) {
+    const { entry, model, type } = legacyEntries[i];
+
+    try {
+      const downloadUrl = await resolveDownloadUrl(entry, interaction, stats);
+      if (!downloadUrl) continue;
+
+      const rehosted = await rehostWithRetry(downloadUrl, entry, type, interaction, stats);
+      if (!rehosted) continue;
+
+      await markEntryAsRehosted(model, entry, rehosted, stats);
+    } catch (err) {
+      stats.failed += 1;
+      stats.errors.push(`${entry.name}: ${err.message}`);
+      console.warn(`[syncimages] Entry ${entry.name} failed:`, err.message);
+    }
+
+    if (i < legacyEntries.length - 1) {
+      await sleep(500);
+    }
+
+    if ((i + 1) % 10 === 0 && i + 1 < legacyEntries.length) {
+      await sendProgress(interaction, i + 1, legacyEntries.length, stats, lang);
+    }
+  }
+}
+
+// Copies archived images into the database until the budget runs out; the
+// rest are counted as left for the next run, which selects them again.
+async function runCopyPass(targets, interaction, stats, lang, { startedAt, now, copyBudgetMs }) {
+  for (let i = 0; i < targets.length; i++) {
+    if (now() - startedAt >= copyBudgetMs) {
+      stats.copyLeft = targets.length - i;
+      return;
+    }
+    const { name, imageMessageId, imageChannelId } = targets[i];
+    const result = await copyArchiveToDatabase(imageMessageId, imageChannelId, interaction.client);
+    if (result.status === 'stored') {
+      stats.copied += 1;
+    } else if (result.status === 'gone') {
+      stats.skippedDead += 1;
+      stats.errors.push(`${name}: ${result.error}`);
+    } else {
+      stats.failed += 1;
+      stats.errors.push(`${name}: ${result.error}`);
+    }
+
+    if (i < targets.length - 1) await sleep(500);
+    if ((i + 1) % 10 === 0 && i + 1 < targets.length) {
+      await sendProgress(interaction, i + 1, targets.length, stats, lang);
+    }
+  }
+}
+
+/**
+ * /la-remote action:syncimages: rehost legacy direct links into the evidence
+ * archive, then copy archived images the database does not hold yet.
+ * @param {import('discord.js').Interaction} interaction - the deferred command
+ * @param {string} [lang='en'] - reply language
+ * @param {object} [options]
+ * @param {Function} [options.now=Date.now] - clock for the copy budget
+ * @param {number} [options.copyBudgetMs=SYNC_COPY_BUDGET_MS] - time after
+ *   which the copy pass starts no new image
+ * @returns {Promise<void>}
+ */
+export async function handleSyncImagesAction(interaction, lang = 'en', {
+  now = Date.now,
+  copyBudgetMs = SYNC_COPY_BUDGET_MS,
+} = {}) {
+  const startedAt = now();
   const ownerCfg = await GuildConfig.findOne({ guildId: config.ownerGuildId }).lean();
   if (!ownerCfg?.evidenceChannelId) {
     await editPayload(interaction, {
@@ -196,7 +290,8 @@ export async function handleSyncImagesAction(interaction, lang = 'en') {
     ...watchLegacy.map((e) => ({ entry: e, model: Watchlist, type: 'watch' })),
   ];
 
-  if (legacyEntries.length === 0) {
+  const copyTargets = await findArchiveCopyTargets();
+  if (legacyEntries.length === 0 && copyTargets.length === 0) {
     await editPayload(interaction, {
       embeds: [
         createArtistEmbed()
@@ -210,50 +305,36 @@ export async function handleSyncImagesAction(interaction, lang = 'en') {
     return;
   }
 
-  await editPayload(interaction, {
-    embeds: [
-      createArtistEmbed()
-        .setTitle(`🔄 ${t('dialogue.syncImages.startingTitle', lang)}`)
-        .setDescription(t('dialogue.syncImages.startingDescription', lang, { count: legacyEntries.length }))
-        .addFields(
-          { name: t('dialogue.syncImages.fields.blacklist', lang), value: String(blackLegacy.length), inline: true },
-          { name: t('dialogue.syncImages.fields.whitelist', lang), value: String(whiteLegacy.length), inline: true },
-          { name: t('dialogue.syncImages.fields.watchlist', lang), value: String(watchLegacy.length), inline: true },
-        )
-        .setColor(COLORS.warning)
-        .setFooter({ text: t('dialogue.syncImages.startingFooter', lang) })
-        .setTimestamp(),
-    ],
-  });
+  const stats = {
+    synced: 0, skippedDead: 0, skippedRaced: 0, failed: 0,
+    copied: 0, copyLeft: 0, copyTotal: copyTargets.length, errors: [],
+  };
 
-  const stats = { synced: 0, skippedDead: 0, skippedRaced: 0, failed: 0, errors: [] };
-
-  for (let i = 0; i < legacyEntries.length; i++) {
-    const { entry, model, type } = legacyEntries[i];
-
-    try {
-      const downloadUrl = await resolveDownloadUrl(entry, interaction, stats);
-      if (!downloadUrl) continue;
-
-      const rehosted = await rehostWithRetry(downloadUrl, entry, type, interaction, stats);
-      if (!rehosted) continue;
-
-      await markEntryAsRehosted(model, entry, rehosted, stats);
-    } catch (err) {
-      stats.failed += 1;
-      stats.errors.push(`${entry.name}: ${err.message}`);
-      console.warn(`[syncimages] Entry ${entry.name} failed:`, err.message);
-    }
-
-    if (i < legacyEntries.length - 1) {
-      await sleep(500);
-    }
-
-    if ((i + 1) % 10 === 0 && i + 1 < legacyEntries.length) {
-      await sendProgress(interaction, i + 1, legacyEntries.length, stats, lang);
-    }
+  if (legacyEntries.length > 0) {
+    await editPayload(interaction, {
+      embeds: [
+        createArtistEmbed()
+          .setTitle(`🔄 ${t('dialogue.syncImages.startingTitle', lang)}`)
+          .setDescription(t('dialogue.syncImages.startingDescription', lang, { count: legacyEntries.length }))
+          .addFields(
+            { name: t('dialogue.syncImages.fields.blacklist', lang), value: String(blackLegacy.length), inline: true },
+            { name: t('dialogue.syncImages.fields.whitelist', lang), value: String(whiteLegacy.length), inline: true },
+            { name: t('dialogue.syncImages.fields.watchlist', lang), value: String(watchLegacy.length), inline: true },
+          )
+          .setColor(COLORS.warning)
+          .setFooter({ text: t('dialogue.syncImages.startingFooter', lang) })
+          .setTimestamp(),
+      ],
+    });
+    await runLegacyPass(legacyEntries, interaction, stats, lang);
   }
 
-  await editPayload(interaction, buildSummaryPayload(interaction, legacyEntries.length, stats, lang));
-  console.log(`[syncimages] Done by ${interaction.user.tag}: ${stats.synced} synced, ${stats.skippedDead} dead, ${stats.skippedRaced} raced, ${stats.failed} failed`);
+  await runCopyPass(copyTargets, interaction, stats, lang, { startedAt, now, copyBudgetMs });
+
+  try {
+    await editPayload(interaction, buildSummaryPayload(interaction, legacyEntries.length, stats, lang));
+  } catch (err) {
+    console.warn('[syncimages] Summary edit failed:', err.message);
+  }
+  console.log(`[syncimages] Done by ${interaction.user.tag}: ${stats.synced} synced, ${stats.skippedDead} dead, ${stats.skippedRaced} raced, ${stats.failed} failed, ${stats.copied} copied, ${stats.copyLeft} left`);
 }
