@@ -36,8 +36,8 @@ test('broadcast evidence handler acknowledges before refreshing and returns the 
   let editedPayload;
   const handler = createBroadcastEvidenceButtonHandler({
     client: { id: 'client' },
-    refreshImageUrlFn: async (messageId, channelId) => {
-      calls.push(`refresh:${channelId}/${messageId}`);
+    resolveImageFn: async ({ imageMessageId, imageChannelId }) => {
+      calls.push(`refresh:${imageChannelId}/${imageMessageId}`);
       return 'https://cdn.example.test/fresh.png';
     },
   });
@@ -63,7 +63,7 @@ test('broadcast evidence handler explains when archived evidence is gone', async
   let editedPayload;
   const handler = createBroadcastEvidenceButtonHandler({
     client: {},
-    refreshImageUrlFn: async () => null,
+    resolveImageFn: async () => '',
   });
 
   await handler({
@@ -82,7 +82,7 @@ test('broadcast evidence button uses the clicker language, not the message autho
   let editedPayload;
   const handler = createBroadcastEvidenceButtonHandler({
     client: {},
-    refreshImageUrlFn: async () => null,
+    resolveImageFn: async () => '',
     getUserLanguageFn: async (userId) => {
       resolvedUserId = userId;
       return 'vi';

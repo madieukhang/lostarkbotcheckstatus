@@ -34,6 +34,7 @@ export function shapeRosterListHit(entry) {
     imageUrl: entry.imageUrl ?? '',
     imageMessageId: entry.imageMessageId ?? '',
     imageChannelId: entry.imageChannelId ?? '',
+    imageSha256: entry.imageSha256 ?? '',
     allCharacters: entry.allCharacters ?? [],
     addedAt: entry.addedAt ?? null,
     addedByDisplayName: entry.addedByDisplayName ?? '',

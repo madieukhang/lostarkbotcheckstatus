@@ -426,6 +426,13 @@ export function hasEvidence(entry) {
   return Boolean(entry?.imageMessageId || entry?.imageUrl || entry?.imageSha256);
 }
 
+// An entry stored straight in the database with no archive message or link.
+// An edit to a new image leaves an older imageSha256 in place, so the hash
+// counts only when nothing newer is set.
+function isDatabaseOnlyEvidence(entry) {
+  return !entry.imageMessageId && !entry.imageUrl && Boolean(entry.imageSha256);
+}
+
 /**
  * Resolve the best display URL for an entry's evidence image: its archive
  * message, then the database copy when that message is gone (or the entry
@@ -452,8 +459,9 @@ export async function resolveDisplayImageUrl(entry, client, { heal = true } = {}
   }
 
   // Path 2: the database copy, only when Discord said the archive copy is
-  // gone or there never was one; a failed fetch for now does not heal.
-  if (goneIds.length > 0 || (!entry.imageMessageId && entry.imageSha256)) {
+  // gone or the entry has nothing but the database copy; a failed fetch for
+  // now does not heal.
+  if (goneIds.length > 0 || isDatabaseOnlyEvidence(entry)) {
     const restored = await restoreFromDatabase(entry, goneIds, client, { heal });
     if (restored) return restored;
   }
@@ -485,9 +493,12 @@ async function repointBestEffort(target) {
 // with `heal`, a re-post of the stored bytes. Entries on a gone copy (or
 // with only the hash) are re-pointed to the copy served.
 async function restoreFromDatabase(entry, goneIds, client, { heal }) {
+  // A gone message names its own image; the hash is used only by an entry
+  // with no message, since an edit can leave an older hash behind.
+  const key = goneIds.length > 0 ? { messageId: goneIds[0] } : { sha256: entry.imageSha256 };
   let image;
   try {
-    image = await findEvidenceImage({ sha256: entry.imageSha256 || '', messageId: goneIds[0] || '' });
+    image = await findEvidenceImage(key);
   } catch (err) {
     console.warn('[imageRehost] Database copy lookup failed:', err.message);
     return '';

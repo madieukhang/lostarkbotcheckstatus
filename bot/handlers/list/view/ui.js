@@ -18,7 +18,7 @@ import {
   StringSelectMenuBuilder,
 } from 'discord.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
-import { isLegacyEvidence } from '../../../utils/imageRehost.js';
+import { hasEvidence, isLegacyEvidence } from '../../../utils/imageRehost.js';
 
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
@@ -282,7 +282,7 @@ export function buildListViewComponents({ allEntries, itemsPerPage, lang = 'en',
   const pageEntries = allEntries.slice(start, start + itemsPerPage);
   // Stable references preserve the selected report if a refresh reorders rows
   // before Discord delivers an already-issued evidence interaction.
-  const withImages = pageEntries.filter(entry => entry.imageUrl || entry.imageMessageId);
+  const withImages = pageEntries.filter(hasEvidence);
 
   if (withImages.length > 0) {
     rows.push(
@@ -396,7 +396,7 @@ function applyEvidenceMedia(embed, entry, displayUrl, { lang }) {
     return;
   }
 
-  const evidenceMessage = entry.imageMessageId || entry.imageUrl
+  const evidenceMessage = hasEvidence(entry)
     ? t(`listView.evidence.${isLegacyEvidence(entry) ? 'legacyGone' : 'unavailable'}`, lang)
     : t('listView.evidence.noImage', lang);
   embed.addFields({

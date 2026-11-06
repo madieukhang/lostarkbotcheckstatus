@@ -85,6 +85,16 @@ test('repointEntries leaves entries on other messages alone', async () => {
   assert.equal((await Blacklist.findById(elsewhere._id).lean()).imageMessageId, 'm5');
 });
 
+test('repointEntries leaves a hash entry that has a newer direct link alone', async () => {
+  const sha = sha256Hex(png);
+  const edited = await Blacklist.create({ name: 'Edited', imageSha256: sha, imageUrl: 'https://img.example/new.png' });
+
+  const moved = await repointEntries({ sha256: sha, messageId: 'm9', channelId: 'c9' });
+
+  assert.equal(moved, 0);
+  assert.equal((await Blacklist.findById(edited._id).lean()).imageMessageId, '');
+});
+
 test('a failing store returns an empty hash instead of throwing', async (t) => {
   t.mock.method(console, 'warn', () => {});
   t.mock.method(EvidenceImage, 'updateOne', async () => { throw new Error('down'); });

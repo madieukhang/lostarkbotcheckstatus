@@ -8,7 +8,7 @@
  */
 
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
-import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { hasEvidence, resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { editAlert, editAlertAfterSavedWrite, editEmbed } from '../../../utils/interactionReplies.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
@@ -152,7 +152,9 @@ async function sendEditSuccess({
 }) {
   const [freshDisplayUrl, previousDisplayUrl, statMap] = await Promise.all([
     resolveDisplayImageUrl(entry, client),
-    evidenceChanged ? resolveDisplayImageUrl(previousEntry, client) : '',
+    // The replaced image is shown once and kept by no entry, so it is never
+    // re-posted to the archive.
+    evidenceChanged ? resolveDisplayImageUrl(previousEntry, client, { heal: false }) : '',
     loadCheckDetailStatMap(entry),
   ]);
   await editEmbed(
@@ -163,7 +165,7 @@ async function sendEditSuccess({
       previousEntry,
       freshDisplayUrl,
       previousDisplayUrl,
-      hadPreviousEvidence: Boolean(previousEntry?.imageUrl || previousEntry?.imageMessageId),
+      hadPreviousEvidence: hasEvidence(previousEntry),
       evidenceChanged,
       addedAlts,
       statMap,

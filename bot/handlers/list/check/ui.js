@@ -7,7 +7,7 @@
 import { t } from '../../../services/i18n/index.js';
 import { parsePositiveNumber } from '../../../services/roster/parsers.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
-import { isLegacyEvidence } from '../../../utils/imageRehost.js';
+import { hasEvidence, isLegacyEvidence } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
@@ -104,7 +104,7 @@ function applyCheckEvidence(embed, entry, displayUrl, lang) {
     embed.setImage(displayUrl);
     return;
   }
-  if (!entry.imageMessageId && !entry.imageUrl) return;
+  if (!hasEvidence(entry)) return;
   embed.addFields({
     name: `${ICONS.warn} ${t('listView.evidence.evidence', lang)}`,
     value: t(`listView.evidence.${isLegacyEvidence(entry) ? 'legacyGone' : 'unavailable'}`, lang),

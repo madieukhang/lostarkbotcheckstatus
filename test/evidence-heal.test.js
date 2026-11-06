@@ -108,7 +108,7 @@ test('a hash-only entry is posted to the archive the first time it is shown', as
   assert.equal(await resolveDisplayImageUrl({ name: 'Juntakssss', imageSha256: 'sha' }, client), 'https://cdn.test/new1.png');
   assert.deepEqual(lookups[0].filter, { _id: 'sha' });
   assert.equal(sends.length, 1);
-  assert.deepEqual(repoints[0].filter.$or, [{ imageSha256: 'sha', imageMessageId: { $in: ['', null] } }]);
+  assert.deepEqual(repoints[0].filter.$or, [{ imageSha256: 'sha', imageMessageId: { $in: ['', null] }, imageUrl: { $in: ['', null] } }]);
 });
 
 test('a transient refresh failure does not heal', async t => {
@@ -136,6 +136,20 @@ test('concurrent opens of one lost image re-post it once', async t => {
   assert.equal(sends.length, 1);
   assert.equal(first, 'https://cdn.test/new1.png');
   assert.equal(second, first);
+});
+
+test('an entry edited to a direct link keeps that link over its older database copy', async t => {
+  const { client, lookups, sends } = setup(t, { image: lostImage });
+  const edited = { name: 'Edited', imageSha256: 'sha', imageMessageId: '', imageUrl: 'https://img.example/new.png' };
+  assert.equal(await resolveDisplayImageUrl(edited, client), 'https://img.example/new.png');
+  assert.equal(lookups.length, 0);
+  assert.equal(sends.length, 0);
+});
+
+test('a gone newer archive message is looked up by its id, not by an older hash', async t => {
+  const { client, lookups } = setup(t, { image: lostImage });
+  await resolveDisplayImageUrl({ ...onM1, imageSha256: 'older' }, client);
+  assert.deepEqual(lookups[0].filter, { archiveMessageIds: 'm1' });
 });
 
 test('a lost image with no database copy resolves as today', async t => {

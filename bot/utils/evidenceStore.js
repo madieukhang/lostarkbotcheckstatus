@@ -102,7 +102,9 @@ export async function recordArchiveCopy(sha256, { messageId, channelId }) {
 export async function repointEntries({ sha256 = '', goneMessageIds = [], messageId, channelId }) {
   const matches = [];
   if (goneMessageIds.length > 0) matches.push({ imageMessageId: { $in: goneMessageIds } });
-  if (sha256) matches.push({ imageSha256: sha256, imageMessageId: { $in: ['', null] } });
+  // An entry edited to a newer direct link keeps its old hash; the empty
+  // imageUrl keeps that entry out.
+  if (sha256) matches.push({ imageSha256: sha256, imageMessageId: { $in: ['', null] }, imageUrl: { $in: ['', null] } });
   if (matches.length === 0) return 0;
   const results = await Promise.all(LIST_MODELS.map(model => model.updateMany(
     { $or: matches },

@@ -9,7 +9,7 @@ import { NoticeKind } from '../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed, editPayload, replyAlert } from '../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../utils/scope.js';
 import { resetSelectMenu } from '../../utils/selectMenu.js';
-import { resolveDisplayImageUrl } from '../../utils/imageRehost.js';
+import { hasEvidence, resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { catchListenerErrors } from '../../utils/async.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
@@ -17,15 +17,10 @@ import { decorateListEntry, getListContext, isOfficerOrSenior } from '../list/he
 import { loadCheckDetailStatMap } from '../list/check/index.js';
 import { buildCheckEntryDetailsEmbed } from '../list/check/ui.js';
 
-/** Detect whether an entry has any image evidence (rehosted OR legacy). */
-function entryHasImage(entry) {
-  return Boolean(entry?.imageMessageId || entry?.imageUrl);
-}
-
 /** Show an attachment marker only for the report opened by the details menu. */
 export function pickEvidenceEntry(result) {
   const entry = pickSearchDetailEntry(result)?.entry;
-  return entryHasImage(entry) ? entry : null;
+  return hasEvidence(entry) ? entry : null;
 }
 
 /** Select the report shown by the result's severity icon, regardless of images. */
@@ -126,7 +121,7 @@ export function createSearchDetailSelectHandler({
       }
 
       const [displayUrl, statMap] = await Promise.all([
-        entryHasImage(entry) ? resolveImageUrl(entry, interaction.client) : '',
+        hasEvidence(entry) ? resolveImageUrl(entry, interaction.client) : '',
         loadStatMap(entry),
       ]);
       // Preserve the stored primary name: the selected result may be its alt.

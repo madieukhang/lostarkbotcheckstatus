@@ -11,6 +11,8 @@ import { createEntryEvidenceButtonHandler } from '../bot/handlers/list/evidence/
 import { buildCheckEntryDetailsEmbed } from '../bot/handlers/list/check/ui.js';
 import { decorateListEntry } from '../bot/handlers/list/helpers.js';
 import { buildBroadcastPayload } from '../bot/handlers/list/services/broadcasts.js';
+import { buildListViewComponents } from '../bot/handlers/list/view/ui.js';
+import { shapeRosterListHit } from '../bot/services/roster/listChecks.js';
 
 const DISCORD_LINK = 'https://cdn.discordapp.com/attachments/1/2/proof.png?ex=1&is=2&hm=3';
 const FRESH_LINK = 'https://cdn.discordapp.com/attachments/1/2/proof.png?ex=9';
@@ -65,6 +67,29 @@ test('an entry outside the archive gets a View evidence button that names the en
   assert.equal(button.custom_id, `${ENTRY_EVIDENCE_PREFIX}:black:${legacy._id}`);
   assert.equal(button.label, 'View evidence');
   assert.equal(button.url, undefined);
+});
+
+const hashOnly = { ...legacy, _id: 'f'.repeat(24), name: 'Hashonly', imageUrl: '', imageMessageId: '', imageSha256: 'sha' };
+
+test('a hash-only entry gets a View evidence button that names the entry', () => {
+  const button = buildBroadcastEvidenceButton(hashOnly, { type: 'black' }).toJSON();
+  assert.equal(button.custom_id, `${ENTRY_EVIDENCE_PREFIX}:black:${hashOnly._id}`);
+});
+
+test('the check details card says evidence is unavailable for a hash-only entry it cannot show', () => {
+  const embed = buildCheckEntryDetailsEmbed(decorateListEntry(hashOnly, 'black'), { displayUrl: '' }).toJSON();
+  assert.equal(embed.fields.at(-1).value, translate('listView.evidence.unavailable', 'en'));
+});
+
+test('the list view offers a hash-only entry in its evidence menu', () => {
+  const rows = buildListViewComponents({ allEntries: [hashOnly], itemsPerPage: 10, page: 0, totalPages: 1, lang: 'en' });
+  const menu = rows.map(row => row.toJSON()).flatMap(row => row.components).find(c => c.custom_id === 'listview_evidence');
+  assert.ok(menu, 'the evidence menu is offered');
+  assert.deepEqual(menu.options.map(option => option.label), ['Hashonly', translate('listView.navigation.selectNone', 'en')]);
+});
+
+test('a roster check hit keeps the database copy hash', () => {
+  assert.equal(shapeRosterListHit(hashOnly).imageSha256, 'sha');
 });
 
 test('a broadcast opens a stored link in Discord unless the entry was just removed', () => {

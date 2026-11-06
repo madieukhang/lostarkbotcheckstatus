@@ -10,7 +10,7 @@ import { connectDB } from '../../../db.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { catchListenerErrors, createLatestOnlyQueue } from '../../../utils/async.js';
-import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { hasEvidence, resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
@@ -334,7 +334,7 @@ export function createViewHandlers({
             // An entry without a screenshot still has a reason, a raid and
             // its tracked alts · the card renders those and says the
             // evidence is missing.
-            const displayUrl = entry?.imageMessageId || entry?.imageUrl
+            const displayUrl = hasEvidence(entry)
               ? await resolveImageUrl(entry, client)
               : '';
             await editEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, {

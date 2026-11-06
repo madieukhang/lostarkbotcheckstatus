@@ -232,7 +232,7 @@ export function buildBroadcastFields({
 }
 
 function evidenceRef(entry) {
-  return entry.imageMessageId || entry.imageUrl || '';
+  return entry.imageMessageId || entry.imageUrl || entry.imageSha256 || '';
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 
-import { refreshImageUrl } from '../../../utils/imageRehost.js';
+import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity, NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, editEmbed } from '../../../utils/interactionReplies.js';
 import { ICONS } from '../../../utils/ui.js';
@@ -34,8 +34,9 @@ const viewEvidenceButton = (customId, lang) => new ButtonBuilder()
  * image inside Discord: from the archive, or for a stored direct link by
  * looking the entry up again, since the link does not fit in a custom id.
  * Open evidence, a plain link, is left only for a link with no entry to
- * look up: a request, or an entry that was just removed.
- * @param {object} entry - carries imageMessageId/imageChannelId or imageUrl
+ * look up: a request, or an entry that was just removed. An entry with only a
+ * database copy is looked up again too.
+ * @param {object} entry - carries imageMessageId/imageChannelId, imageUrl or imageSha256
  * @param {object} [options]
  * @param {string} [options.type] - the entry's list; omit when the entry
  *   cannot be looked up again
@@ -50,8 +51,9 @@ export function buildBroadcastEvidenceButton(entry, { type, legacyUrl, lang = 'e
     return viewEvidenceButton(`${BROADCAST_EVIDENCE_PREFIX}:${channelId}:${messageId}`, lang);
   }
   const directUrl = String(legacyUrl || entry?.imageUrl || '').trim();
-  if (!directUrl) return null;
+  if (!directUrl && !entry?.imageSha256) return null;
   if (type && entry._id) return viewEvidenceButton(`${ENTRY_EVIDENCE_PREFIX}:${type}:${entry._id}`, lang);
+  if (!directUrl) return null;
   return new ButtonBuilder()
     .setLabel(t('common.actions.openEvidence', lang))
     .setEmoji('📎')
@@ -67,9 +69,20 @@ function parseEvidenceCustomId(customId) {
   return { channelId, messageId };
 }
 
+/**
+ * Build the handler for the archive-backed evidence button. The button's
+ * custom id names an archive message; when that message is gone, the
+ * resolver finds the image's database copy by that id and heals it.
+ * @param {object} deps
+ * @param {Client} deps.client - the bot client
+ * @param {Function} [deps.resolveImageFn] - evidence resolver
+ * @param {Function} [deps.getUserLanguageFn] - clicker language lookup
+ * @param {object} [deps.UserPreferenceModel] - language preference model
+ * @returns {Function} the interaction handler
+ */
 export function createBroadcastEvidenceButtonHandler({
   client,
-  refreshImageUrlFn = refreshImageUrl,
+  resolveImageFn = resolveDisplayImageUrl,
   getUserLanguageFn = getUserLanguage,
   UserPreferenceModel = UserPreference,
 }) {
@@ -79,8 +92,8 @@ export function createBroadcastEvidenceButtonHandler({
 
     const ids = parseEvidenceCustomId(interaction.customId);
     const displayUrl = ids
-      ? await refreshImageUrlFn(ids.messageId, ids.channelId, client)
-      : null;
+      ? await resolveImageFn({ imageMessageId: ids.messageId, imageChannelId: ids.channelId }, client)
+      : '';
 
     if (!displayUrl) {
       await editEmbed(interaction, buildAlertEmbed({
