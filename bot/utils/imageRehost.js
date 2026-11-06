@@ -27,6 +27,7 @@ import config from '../config.js';
 import { getGuildConfig } from './scope.js';
 import { AlertSeverity, buildAlertEmbed } from './alertEmbed.js';
 import { readBodyWithin } from './responseBody.js';
+import { storeEvidenceImage } from './evidenceStore.js';
 
 // Bot uploads are capped at 25 MB; the margin leaves room for the message.
 const REHOST_MAX_BYTES = 24 * 1024 * 1024;
@@ -227,32 +228,59 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     }
   } catch { /* leave default filename */ }
 
-  // Step 2: Upload to the evidence channel
+  // Steps 2 and 3: upload to the evidence channel, with audit metadata so a
+  // human looking at #evidence-archive can see what each image is for.
+  const auditLines = [];
+  if (meta.entryName) auditLines.push(`${EVIDENCE_LIST_ICON[meta.listType] || '📎'} ${meta.entryName}`);
+  if (meta.addedBy) auditLines.push(`Added by: ${meta.addedBy}`);
+  const [title, ...details] = auditLines;
+  let archived;
+  try {
+    archived = await postToEvidenceChannel(channelId, { buffer, filename, title, details }, client);
+  } catch (err) {
+    return fail(err.message);
+  }
+
+  // Step 4: the database copy. It is best effort, so the archive result
+  // stands even when the store fails.
+  await storeEvidenceImage({
+    buffer,
+    contentType: typedImage ? contentType : `image/${sniffedExt}`,
+    filename,
+    archive: { messageId: archived.messageId, channelId: archived.channelId },
+  });
+  return archived;
+}
+
+/**
+ * Upload one image to the evidence channel with its audit embed.
+ * @param {string} channelId - the evidence channel
+ * @param {object} post
+ * @param {Buffer} post.buffer - image bytes
+ * @param {string} post.filename - attachment name
+ * @param {string} [post.title] - first audit line
+ * @param {string[]} [post.details] - further audit lines
+ * @param {Client} client - the bot client
+ * @returns {Promise<{messageId: string, channelId: string, freshUrl: string}>}
+ * @throws {Error} when the channel cannot be fetched, is not a text channel,
+ *   or refuses the message
+ */
+async function postToEvidenceChannel(channelId, { buffer, filename, title, details = [] }, client) {
   let channel;
   try {
     channel = await client.channels.fetch(channelId);
   } catch (err) {
-    return fail(`cannot fetch evidence channel ${channelId}: ${err.message}`);
+    throw new Error(`cannot fetch evidence channel ${channelId}: ${err.message}`);
   }
-
   if (!channel || !channel.isTextBased?.()) {
-    return fail(`evidence channel ${channelId} is not a text channel`);
+    throw new Error(`evidence channel ${channelId} is not a text channel`);
   }
 
-  // Step 3: Send the file with metadata in an embed for the audit trail.
+  let sentMessage;
   try {
-    const attachment = new AttachmentBuilder(buffer, { name: filename });
-
-    // Audit metadata so a human looking at #evidence-archive can see what each
-    // image is for. Mentions remain disabled to avoid archive-channel pings.
-    // The first named line is the title; the upload time stays in the
-    // description because a title shows <t:...> as raw text.
-    const auditLines = [];
-    if (meta.entryName) auditLines.push(`${EVIDENCE_LIST_ICON[meta.listType] || '📎'} ${meta.entryName}`);
-    if (meta.addedBy) auditLines.push(`Added by: ${meta.addedBy}`);
-    const [title, ...details] = auditLines;
-
-    const sentMessage = await channel.send({
+    // Mentions stay disabled to avoid archive-channel pings. The upload time
+    // stays in the description because a title shows <t:...> as raw text.
+    sentMessage = await channel.send({
       embeds: [buildAlertEmbed({
         severity: AlertSeverity.INFO,
         titleIcon: '📎',
@@ -260,22 +288,18 @@ export async function rehostImage(originalUrl, client, meta = {}) {
         description: [...details, `<t:${Math.floor(Date.now() / 1000)}:f>`].join('\n'),
         timestamp: false,
       })],
-      files: [attachment],
-      allowedMentions: { parse: [] }, // suppress all pings
+      files: [new AttachmentBuilder(buffer, { name: filename })],
+      allowedMentions: { parse: [] },
     });
-
-    // Extract the fresh signed URL from the just-sent attachment
-    const sentAttachment = sentMessage.attachments?.first();
-    const freshUrl = sentAttachment?.url || '';
-
-    return {
-      messageId: sentMessage.id,
-      channelId: channel.id,
-      freshUrl,
-    };
   } catch (err) {
-    return fail(`channel.send failed: ${err.code ? `[${err.code}] ` : ''}${err.message}`);
+    throw new Error(`channel.send failed: ${err.code ? `[${err.code}] ` : ''}${err.message}`);
   }
+
+  return {
+    messageId: sentMessage.id,
+    channelId: channel.id,
+    freshUrl: sentMessage.attachments?.first()?.url || '',
+  };
 }
 
 /**
@@ -291,25 +315,42 @@ export async function rehostImage(originalUrl, client, meta = {}) {
  *   no longer exists (deleted, channel removed, etc.)
  */
 export async function refreshImageUrl(messageId, channelId, client) {
-  if (!messageId || !channelId) return null;
+  return (await probeArchiveImage(messageId, channelId, client)).url || null;
+}
+
+// Discord answers that the archive copy no longer exists or can no longer be
+// read by the bot: Unknown Channel, Unknown Message, Missing Access.
+const ARCHIVE_GONE_CODES = new Set([10003, 10008, 50001]);
+
+/**
+ * Fetch an archive message's freshly signed image link, and tell a copy that
+ * is gone from a fetch that failed for now. Only a gone copy may be replaced
+ * from the database; a timeout, 5xx or 429 is not gone.
+ * @param {string} messageId - evidence-channel message
+ * @param {string} channelId - its channel
+ * @param {Client} client - the bot client
+ * @returns {Promise<{url: string, gone: boolean}>} url is '' when no link was
+ *   read; gone is true only when Discord says the copy cannot be read again
+ */
+export async function probeArchiveImage(messageId, channelId, client) {
+  if (!messageId || !channelId) return { url: '', gone: false };
 
   try {
     const channel = await client.channels.fetch(channelId);
-    if (!channel || !channel.isTextBased?.()) return null;
+    if (!channel || !channel.isTextBased?.()) return { url: '', gone: true };
 
     // A cached message holds the URL signed when it was cached, which may
     // have expired; only a REST fetch returns a newly signed one. The result
     // stays out of the cache because the next refresh fetches again anyway.
     const message = await channel.messages.fetch({ message: messageId, force: true, cache: false });
-    const attachment = message.attachments?.first();
-    return attachment?.url || null;
+    const url = message.attachments?.first()?.url || '';
+    return { url, gone: !url };
   } catch (err) {
-    // Message deleted, channel removed, bot lost access · all acceptable
-    // failure modes. Caller falls back to legacy URL or shows nothing.
+    // A deleted message or channel is an expected outcome and is not logged.
     if (err.code !== 10008 /* Unknown Message */ && err.code !== 10003 /* Unknown Channel */) {
       console.warn(`[imageRehost] Refresh failed for ${channelId}/${messageId}:`, err.message);
     }
-    return null;
+    return { url: '', gone: ARCHIVE_GONE_CODES.has(err.code) };
   }
 }
 
@@ -368,6 +409,16 @@ export async function refreshLegacyImageUrl(url, client) {
  */
 export function isLegacyEvidence(entry) {
   return !entry.imageMessageId && Boolean(entry.imageUrl);
+}
+
+/**
+ * Whether an entry has any evidence image: an archive message, a stored
+ * direct link, or a database copy not archived yet.
+ * @param {object|null} entry - a list entry
+ * @returns {boolean}
+ */
+export function hasEvidence(entry) {
+  return Boolean(entry?.imageMessageId || entry?.imageUrl || entry?.imageSha256);
 }
 
 /**

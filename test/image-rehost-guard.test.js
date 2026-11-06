@@ -5,17 +5,25 @@ import config from '../bot/config.js';
 import GuildConfig from '../bot/models/GuildConfig.js';
 import { invalidateGuildConfig } from '../bot/utils/scope.js';
 import { rehostImage } from '../bot/utils/imageRehost.js';
+import EvidenceImage from '../bot/models/EvidenceImage.js';
+import { sha256Hex } from '../bot/utils/evidenceStore.js';
 
 // Multiadd rows carry member-typed image URLs, so the rehost download must
 // never reach the bot's own network and must upload only images.
 const PUBLIC_ADDRESS = [{ address: '93.184.215.14', family: 4 }];
 
-function setup(t, { lookup = PUBLIC_ADDRESS, responses = [] } = {}) {
+function setup(t, { lookup = PUBLIC_ADDRESS, responses = [], storeFails = false, sendFails = false } = {}) {
   const ownerGuildId = config.ownerGuildId;
   config.ownerGuildId = 'rehost-guard-owner';
   t.after(() => { config.ownerGuildId = ownerGuildId; invalidateGuildConfig('rehost-guard-owner'); });
   t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ evidenceChannelId: 'evidence' }) }));
   t.mock.method(console, 'warn', () => {});
+  const stores = [];
+  t.mock.method(EvidenceImage, 'updateOne', async (filter, update) => {
+    if (storeFails) throw new Error('database down');
+    stores.push({ filter, update });
+    return { acknowledged: true };
+  });
   t.mock.method(dns.promises, 'lookup', async () => lookup);
   const fetched = [];
   // Like Node's fetch, a 3xx is followed inside fetch unless the caller asks
@@ -35,11 +43,12 @@ function setup(t, { lookup = PUBLIC_ADDRESS, responses = [] } = {}) {
     id: 'evidence',
     isTextBased: () => true,
     send: async payload => {
+      if (sendFails) throw new Error('Missing Permissions');
       uploads.push(payload);
       return { id: 'archived', attachments: { first: () => ({ url: 'https://cdn.discordapp.com/archived.png' }) } };
     },
   }) } };
-  return { fetched, uploads, client };
+  return { fetched, uploads, stores, client };
 }
 
 const image = () => new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), { headers: { 'content-type': 'image/png' } });
@@ -125,6 +134,33 @@ test('a body that is not an image is not uploaded', async t => {
   });
   await assert.rejects(rehostImage('https://evidence.example/a.png', client, { throwOnError: true }), /not an image/);
   assert.equal(uploads.length, 0);
+});
+
+test('the archived image is also copied to the database with its archive id', async t => {
+  const { stores, client } = setup(t, { responses: [image()] });
+  const result = await rehostImage('https://cdn.example/proof.png', client);
+
+  assert.equal(result.messageId, 'archived');
+  assert.equal(stores.length, 1);
+  assert.equal(stores[0].filter._id, sha256Hex(Buffer.from([0x89, 0x50, 0x4e, 0x47])));
+  assert.equal(stores[0].update.$addToSet.archiveMessageIds, 'archived');
+  assert.deepEqual(stores[0].update.$set, { archiveMessageId: 'archived', archiveChannelId: 'evidence' });
+  assert.equal(stores[0].update.$setOnInsert.contentType, 'image/png');
+  assert.equal(stores[0].update.$setOnInsert.filename, 'proof.png');
+});
+
+test('a failed send stores nothing', async t => {
+  const { stores, client } = setup(t, { responses: [image()], sendFails: true });
+  assert.equal(await rehostImage('https://cdn.example/proof.png', client), null);
+  assert.equal(stores.length, 0);
+});
+
+test('a failed database copy keeps the rehost result', async t => {
+  const { client } = setup(t, { responses: [image()], storeFails: true });
+  const result = await rehostImage('https://cdn.example/proof.png', client);
+  assert.equal(result.messageId, 'archived');
+  assert.equal(result.channelId, 'evidence');
+  assert.equal(result.freshUrl, 'https://cdn.discordapp.com/archived.png');
 });
 
 test('a public image is still archived, through a redirect', async t => {

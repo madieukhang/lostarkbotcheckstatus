@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ChannelType, Client } from 'discord.js';
-import { refreshImageUrl, refreshLegacyImageUrl, resolveDisplayImageUrl } from '../bot/utils/imageRehost.js';
+import {
+  hasEvidence,
+  probeArchiveImage,
+  refreshImageUrl,
+  refreshLegacyImageUrl,
+  resolveDisplayImageUrl,
+} from '../bot/utils/imageRehost.js';
 
 const evidenceMessage = (url) => ({
   id: '200', channel_id: '100', type: 0, content: '', timestamp: new Date().toISOString(),
@@ -23,6 +29,52 @@ test('refreshImageUrl asks Discord for a newly signed URL even when the message 
   assert.equal(await refreshImageUrl('200', '100', client), 'https://cdn.test/fresh');
   assert.equal(restCalls, 1);
   assert.equal(channel.messages.cache.get('200').attachments.first().url, 'https://cdn.test/expired');
+});
+
+// A client whose evidence channel is cached and whose REST reads answer with
+// `answer` (a message object, or an error to throw).
+function archiveClient(t, answer, { cacheChannel = true } = {}) {
+  const client = new Client({ intents: [] });
+  t.after(() => client.destroy());
+  if (cacheChannel) client.channels._add({ id: '100', type: ChannelType.DM, recipients: [], last_message_id: null });
+  client.rest.get = async () => {
+    if (answer instanceof Error) throw answer;
+    return answer;
+  };
+  return client;
+}
+const discordError = fields => Object.assign(new Error('Discord refused'), fields);
+
+test('probeArchiveImage reports gone for unknown message, unknown channel and missing access', async t => {
+  for (const [code, cacheChannel] of [[10008, true], [10003, false], [50001, true]]) {
+    const client = archiveClient(t, discordError({ code }), { cacheChannel });
+    assert.deepEqual(await probeArchiveImage('200', '100', client), { url: '', gone: true }, `code ${code}`);
+  }
+});
+
+test('probeArchiveImage reports a server error as not gone', async t => {
+  t.mock.method(console, 'warn', () => {});
+  const client = archiveClient(t, discordError({ status: 500 }));
+  assert.deepEqual(await probeArchiveImage('200', '100', client), { url: '', gone: false });
+  assert.equal(await refreshImageUrl('200', '100', client), null);
+});
+
+test('a message without an attachment is gone', async t => {
+  const client = archiveClient(t, { ...evidenceMessage('https://cdn.test/x'), attachments: [] });
+  assert.deepEqual(await probeArchiveImage('200', '100', client), { url: '', gone: true });
+});
+
+test('probeArchiveImage returns the fresh link of a live archive message', async t => {
+  const client = archiveClient(t, evidenceMessage('https://cdn.test/fresh'));
+  assert.deepEqual(await probeArchiveImage('200', '100', client), { url: 'https://cdn.test/fresh', gone: false });
+});
+
+test('hasEvidence is true for each evidence field and false for none', () => {
+  assert.equal(hasEvidence({ imageMessageId: 'm' }), true);
+  assert.equal(hasEvidence({ imageUrl: 'https://x/y.png' }), true);
+  assert.equal(hasEvidence({ imageSha256: 'abc' }), true);
+  assert.equal(hasEvidence({ imageMessageId: '', imageUrl: '', imageSha256: '' }), false);
+  assert.equal(hasEvidence(null), false);
 });
 
 const DISCORD_LINK = 'https://cdn.discordapp.com/attachments/1/2/proof.png?ex=1&is=2&hm=3';
