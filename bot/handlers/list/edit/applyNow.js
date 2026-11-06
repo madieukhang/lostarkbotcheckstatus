@@ -41,6 +41,8 @@ export function resolveMoveImageFields(existing, newImageUrl, newImageRehost) {
       imageUrl: existing.imageUrl || '',
       imageMessageId: existing.imageMessageId || '',
       imageChannelId: existing.imageChannelId || '',
+      // A database-only image (not archived yet) has no other reference.
+      ...(existing.imageSha256 ? { imageSha256: existing.imageSha256 } : {}),
     };
   }
   if (newImageRehost) {

@@ -51,10 +51,15 @@ export function resolveApprovalMoveImageFields(payload, existingEntry) {
     return { imageUrl: payload.imageUrl, imageMessageId: '', imageChannelId: '' };
   }
   const imageMessageId = payload.imageMessageId || existingEntry.imageMessageId || '';
+  // The entry keeps its image when the request brings none; a database-only
+  // image (not archived yet) then has no other reference.
+  const keepsImage = !payload.imageUrl
+    && (!payload.imageMessageId || payload.imageMessageId === existingEntry.imageMessageId);
   return {
     imageUrl: imageMessageId ? '' : (payload.imageUrl || existingEntry.imageUrl || ''),
     imageMessageId,
     imageChannelId: payload.imageChannelId || existingEntry.imageChannelId || '',
+    ...(keepsImage && existingEntry.imageSha256 ? { imageSha256: existingEntry.imageSha256 } : {}),
   };
 }
 

@@ -51,6 +51,25 @@ function makeEntry(overrides = {}) {
   };
 }
 
+test('a list move keeps the database copy of an entry that has no other evidence', () => {
+  const hashOnly = makeEntry({ imageMessageId: '', imageChannelId: '', imageSha256: 'abc' });
+  assert.equal(resolveMoveImageFields(hashOnly, '', null).imageSha256, 'abc');
+  assert.equal(buildMovedEntryData({
+    existing: hashOnly, targetType: 'black', editGuildId: 'guild-1', editGuildDefaultScope: 'global',
+    newReason: '', newRaid: '', newImageUrl: '', newImageRehost: null, newScope: '', additionalNamesParsed: { added: [] },
+  }).imageSha256, 'abc');
+  const keepPayload = { type: 'black', scope: 'global', guildId: '', reason: 'r', raid: '', imageUrl: '', imageMessageId: '', imageChannelId: '' };
+  assert.equal(resolveApprovalMoveImageFields(keepPayload, hashOnly).imageSha256, 'abc');
+  assert.equal(buildApprovalMoveData(keepPayload, hashOnly).imageSha256, 'abc');
+});
+
+test('a list move with a new image does not carry the old database copy', () => {
+  const hashOnly = makeEntry({ imageMessageId: '', imageChannelId: '', imageSha256: 'abc' });
+  assert.equal(resolveMoveImageFields(hashOnly, 'https://cdn.example/new.png', { messageId: 'm', channelId: 'c' }).imageSha256, undefined);
+  const newPayload = { imageUrl: '', imageMessageId: 'new-message', imageChannelId: 'new-channel' };
+  assert.equal(resolveApprovalMoveImageFields(newPayload, hashOnly).imageSha256, undefined);
+});
+
 test('immediate list move keeps blacklist scope boundaries and permanent image references', () => {
   const existing = makeEntry({ logsUrl: 'https://lostark.bible/logs/old' });
   assert.deepEqual(buildMovePreflightQuery(existing, 'white', 'guild-1'), {

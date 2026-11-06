@@ -152,6 +152,13 @@ test('a gone newer archive message is looked up by its id, not by an older hash'
   assert.deepEqual(lookups[0].filter, { archiveMessageIds: 'm1' });
 });
 
+test('a re-post whose archive record fails is still shown', async t => {
+  const { client, sends } = setup(t, { image: lostImage });
+  EvidenceImage.updateOne.mock.mockImplementation(async () => { throw new Error('database down'); });
+  assert.equal(await resolveDisplayImageUrl(onM1, client), 'https://cdn.test/new1.png');
+  assert.equal(sends.length, 1);
+});
+
 test('a lost image with no database copy resolves as today', async t => {
   const { client, sends } = setup(t, { image: null });
   const entry = { ...onM1, imageUrl: 'https://img.example/proof.png' };

@@ -596,7 +596,12 @@ async function repostFromDatabase(sha256, goneIds, entry, client) {
       title: 'Restored from database',
       details: entry?.name ? [entry.name] : [],
     }, client);
-    await recordArchiveCopy(sha256, archived);
+    // The post already exists, so a failed record still shows it.
+    try {
+      await recordArchiveCopy(sha256, archived);
+    } catch (err) {
+      console.warn(`[imageRehost] Recording the restored copy of ${sha256} failed:`, err.message);
+    }
     await repointBestEffort({ sha256, goneMessageIds: goneIds, messageId: archived.messageId, channelId: archived.channelId });
     return archived.freshUrl;
   } catch (err) {
