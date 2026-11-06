@@ -52,6 +52,9 @@ function buildCommonFields() {
     imageUrl: { type: String, default: '', trim: true },
     imageMessageId: { type: String, default: '', trim: true },
     imageChannelId: { type: String, default: '', trim: true },
+    // Set only for an image stored straight in the database (EvidenceImage)
+    // with no archive message yet; the bot archives it when first shown.
+    imageSha256: { type: String, default: '', trim: true },
 
     addedByUserId: { type: String, default: '', trim: true },
     addedByTag: { type: String, default: '', trim: true },
