@@ -143,7 +143,7 @@ erDiagram
     }
 ```
 
-Blacklist / Whitelist / Watchlist share the same shape; only the collection name and the list-semantics icon differ. TrustedUser is a subset (no scope, no raid/logs; just name + reason). `allCharacters[]` on every list entry holds the known alt names from a Stronghold-based roster scan, indexed for fast `$in` cross-checks during `/la-check` and auto-check.
+Blacklist / Whitelist / Watchlist share the same shape; only the collection name and the list-semantics icon differ. TrustedUser is a subset (no scope, no raid/logs; just name + reason). `allCharacters[]` on every list entry holds the known alt names from a Stronghold-based roster scan, indexed for fast `$in` cross-checks during `/la-check` and auto-check. A check that matches a name only through one of those alts (a renamed character on the same roster) adds that name to the blacklist, whitelist or watchlist entry, so later checks hit it directly.
 
 Sample blacklist document:
 

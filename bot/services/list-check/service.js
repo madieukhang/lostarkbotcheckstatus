@@ -30,6 +30,7 @@ import {
 } from './matchResolution.js';
 import { applyMarkedSiblingLevelCorrections } from './partyCorrections.js';
 import { attachRelatedClassNames } from './relatedClasses.js';
+import { rememberRosterMatchedNames } from './rosterNameTracking.js';
 import { hasDatabaseListMatch } from './verification.js';
 
 export { formatCheckResults } from './format.js';
@@ -190,6 +191,7 @@ function logListCheckTiming(startedAt, names, timings) {
     `enrichment=${timings.enrichment}ms`,
     `refreshDb=${timings.refreshDb}ms`,
     `trustedDb=${timings.trustedDb}ms`,
+    `renameDb=${timings.renameDb}ms`,
     `relatedClass=${timings.relatedClass}ms`,
   ].join(' '));
 }
@@ -290,6 +292,14 @@ export async function checkNamesAgainstLists(names, options = {}) {
   // phase.
   const trustedDbMs = await resolveTrustedRosterMatches(results);
 
+  // A name caught only through a roster alt is usually a renamed character.
+  // Its snapshot is saved by now, so the next check skips the roster fetch;
+  // writing the name onto the entry keeps that check a direct hit. Runs after
+  // trusted resolution so a trusted character is never written onto an entry.
+  const renameStartedAt = Date.now();
+  await rememberRosterMatchedNames(results);
+  const renameDbMs = Date.now() - renameStartedAt;
+
   // Canonicalization can reveal a list hit that the original OCR spelling did
   // not query. Treat that real Mongo record as identity proof even when Bible
   // was unavailable, while leaving external-only unresolved names unverified.
@@ -315,6 +325,7 @@ export async function checkNamesAgainstLists(names, options = {}) {
     enrichment: enrichmentMs,
     refreshDb: refreshDbMs,
     trustedDb: trustedDbMs,
+    renameDb: renameDbMs,
     relatedClass: relatedClassMs,
   });
   return results;

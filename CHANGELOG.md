@@ -1,5 +1,7 @@
 # Changelog
 
+- A listed player who renames a character stays caught. When `/la-check` or an image check matches a name only through an alt on the same lostark.bible roster, the bot adds that name to the entry's tracked characters, so the next check of it is a direct hit. Before, the first check caught it through the alt, but later checks skipped the roster read (its snapshot was saved by then) and showed the renamed character as not listed. Trusted entries are not changed this way, and a trusted character's name is never added to a list entry.
+
 - Every evidence image the bot archives is also saved in the database. If its message in the evidence channel is deleted, opening the evidence shows the image anyway: the bot posts the saved copy to the evidence channel again and keeps using it.
 - An entry added straight to the database can carry its screenshot; the bot posts it to the evidence channel the first time someone opens it.
 - `/la-remote action:syncimages` now also copies images already in the evidence channel into the database, and shows two new counts: **Copied to database** and **Left for next run** (it stops starting new copies after 12 minutes; run it again to finish).

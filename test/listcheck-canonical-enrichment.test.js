@@ -1074,6 +1074,132 @@ test('worker-online discovered alts refresh list hits before Quick Add', async (
   }
 });
 
+// A renamed character (Tothe -> Tothe2) is first caught through an alt that
+// kept its name. That check saves Tothe2's roster snapshot, so later checks
+// skip the roster fetch and must find Tothe2 on the entry itself.
+const RENAMED_ROSTER_HTML = [
+  '<html><body>',
+  '<script>name:"Tothe2",class:"berserker"</script>',
+  '<script>name:"Theto",class:"bard"</script>',
+  '<a href="/character/NA/Tothe2/roster">',
+  '  <div class="text-lg font-semibold">Tothe2<span>1745.00</span><span>4100.00</span></div>',
+  '</a>',
+  '<a href="/character/NA/Theto/roster">',
+  '  <div class="text-lg font-semibold">Theto<span>1720.00</span><span>3900.00</span></div>',
+  '</a>',
+  '</body></html>',
+].join('\n');
+
+function installRenamedRosterStub() {
+  const originalFetch = globalThis.fetch;
+  const rosterFetches = [];
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.includes('/character/NA/')) {
+      rosterFetches.push(requestedUrl);
+      return new Response(RENAMED_ROSTER_HTML, { status: 200, headers: { 'content-type': 'text/html' } });
+    }
+    if (requestedUrl.includes('/_app/remote/ngsbie/search')) {
+      return Response.json({ type: 'result', result: JSON.stringify([[]]) });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+  return { rosterFetches, restore: () => { globalThis.fetch = originalFetch; } };
+}
+
+for (const [listType, getModel] of [
+  ['black', () => Blacklist],
+  ['white', () => Whitelist],
+  ['watch', () => Watchlist],
+]) {
+  test(`a renamed character caught through a roster alt stays caught on the ${listType} list`, async () => {
+    await markWorkerOnline();
+    await getModel().create({
+      name: 'Tothe',
+      reason: 'same roster evidence',
+      allCharacters: ['Tothe', 'Theto'],
+      addedByUserId: 'tester',
+      addedByTag: 'tester#0001',
+    });
+    const stub = installRenamedRosterStub();
+
+    try {
+      const [first] = await checkNamesAgainstLists(['Tothe2'], { guildId: 'guild-1' });
+      assert.equal(first[`${listType}Entry`]?.name, 'Tothe');
+      assert.deepEqual(first.matchDetails[listType], { kind: 'roster', matchedName: 'Theto' });
+
+      const stored = await getModel().findOne({ name: 'Tothe' }).lean();
+      assert.deepEqual(stored.allCharacters, ['Tothe', 'Theto', 'Tothe2']);
+
+      const [second] = await checkNamesAgainstLists(['Tothe2'], { guildId: 'guild-1' });
+      assert.equal(stub.rosterFetches.length, 1, 'the saved snapshot skips the second roster fetch');
+      assert.equal(second[`${listType}Entry`]?.name, 'Tothe');
+      assert.equal(second.matchDetails[listType]?.kind, 'tracked');
+    } finally {
+      stub.restore();
+    }
+  });
+}
+
+test('a trusted character caught through a roster alt is not written onto the list entry', async () => {
+  await markWorkerOnline();
+  await Promise.all([
+    Blacklist.create({
+      name: 'Tothe',
+      reason: 'same roster evidence',
+      allCharacters: ['Tothe', 'Theto'],
+      addedByUserId: 'tester',
+      addedByTag: 'tester#0001',
+    }),
+    TrustedUser.create({
+      name: 'Tothe2',
+      reason: 'guild officer',
+      addedByUserId: 'tester',
+      addedByTag: 'tester#0001',
+    }),
+  ]);
+  const stub = installRenamedRosterStub();
+
+  try {
+    const [result] = await checkNamesAgainstLists(['Tothe2'], { guildId: 'guild-1' });
+    assert.equal(result.trustedEntry?.name, 'Tothe2');
+    assert.equal(result.matchDetails.black?.kind, 'roster');
+
+    const stored = await Blacklist.findOne({ name: 'Tothe' }).lean();
+    assert.deepEqual(stored.allCharacters, ['Tothe', 'Theto']);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('a failed rename write does not fail the list check', async () => {
+  await markWorkerOnline();
+  await Blacklist.create({
+    name: 'Tothe',
+    reason: 'same roster evidence',
+    allCharacters: ['Tothe', 'Theto'],
+    addedByUserId: 'tester',
+    addedByTag: 'tester#0001',
+  });
+  const stub = installRenamedRosterStub();
+  const originalUpdateOne = Blacklist.updateOne;
+  let attempted = 0;
+  Blacklist.updateOne = async () => {
+    attempted += 1;
+    throw new Error('write refused');
+  };
+
+  try {
+    const [result] = await checkNamesAgainstLists(['Tothe2'], { guildId: 'guild-1' });
+    assert.equal(attempted, 1);
+    assert.equal(result.blackEntry?.name, 'Tothe');
+    assert.equal(result.matchDetails.black?.kind, 'roster');
+  } finally {
+    Blacklist.updateOne = originalUpdateOne;
+    stub.restore();
+  }
+});
+
 test('diaeresis-digraph recovery resolves OCR-collapsed iy names (Qïlyn -> Qiylyn)', async () => {
   await markWorkerOnline();
 
