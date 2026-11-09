@@ -1,5 +1,7 @@
 # Changelog
 
+- Security update: `undici` 6.29.1 (used by discord.js), `follow-redirects` 1.16.3 and `brace-expansion` 5.0.12 close the advisories `npm audit` reported.
+
 - A listed player who renames a character stays caught. When `/la-check` or an image check matches a name only through an alt on the same lostark.bible roster, the bot adds that name to the entry's tracked characters, so the next check of it is a direct hit. Before, the first check caught it through the alt, but later checks skipped the roster read (its snapshot was saved by then) and showed the renamed character as not listed. Trusted entries are not changed this way, and a trusted character's name is never added to a list entry.
 
 - Every evidence image the bot archives is also saved in the database. If its message in the evidence channel is deleted, opening the evidence shows the image anyway: the bot posts the saved copy to the evidence channel again and keeps using it.
