@@ -1,5 +1,7 @@
 # Changelog
 
+- Updated `mongoose` to 9.12.1 (patch release).
+
 - `/la-remote action:syncimages`: the summary counts only the archived images checked in that run (it also counted the ones left for the next run), and the command's choice label names both passes. The new label appears when the bot next starts, since it registers its commands at boot.
 
 - Updated `discord.js` to 14.28.1, `mongoose` to 9.12.0 and `mongodb-memory-server` to 11.3.0.
