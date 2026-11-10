@@ -110,6 +110,29 @@ test('syncimages stops starting copies after its time budget and says how many a
   const summary = interaction.replies.at(-1);
   assert.equal(fieldValue(summary, /Copied to database/), '1');
   assert.equal(fieldValue(summary, /Left for next run/), '1');
+  // The image left for the next run was not checked in this one.
+  assert.match(summary.embeds[0].toJSON().description, /\*\*1\*\* archived images/);
+});
+
+test('syncimages counts a gone archive message as dead and a failed download as failed', async t => {
+  setup(t, {
+    archived: [
+      { name: 'Gone', imageMessageId: 'm2', imageChannelId: 'evidence' },
+      { name: 'Broken', imageMessageId: 'm3', imageChannelId: 'evidence' },
+    ],
+  });
+  t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 500 }));
+  const interaction = interactionFor({ archive: { m3: 'https://cdn.discordapp.com/b.png' } });
+
+  await handleSyncImagesAction(interaction, 'en');
+
+  const summary = interaction.replies.at(-1);
+  assert.equal(fieldValue(summary, /Copied to database/), '0');
+  assert.equal(fieldValue(summary, /Dead URLs/), '1');
+  assert.equal(fieldValue(summary, /Failed/), '1');
+  const errors = fieldValue(summary, /Errors/);
+  assert.match(errors, /Gone: archive message is gone/);
+  assert.match(errors, /Broken: download HTTP 500/);
 });
 
 test('syncimages reports nothing to do only when both passes are empty', async t => {

@@ -16,7 +16,7 @@ import { t } from '../../services/i18n/index.js';
 
 // A Discord interaction token lasts 15 minutes; the copy pass starts no new
 // image after 12, so the summary still reaches the user.
-export const SYNC_COPY_BUDGET_MS = 12 * 60 * 1000;
+const SYNC_COPY_BUDGET_MS = 12 * 60 * 1000;
 
 async function resolveDownloadUrl(entry, interaction, stats) {
   const { url, error } = await refreshLegacyImageUrl(entry.imageUrl, interaction.client);
@@ -134,7 +134,8 @@ function buildSummaryPayload(interaction, total, stats, lang) {
 
   const summaryEmbed = createArtistEmbed()
     .setTitle(`✅ ${t('dialogue.syncImages.completeTitle', lang)}`)
-    .setDescription(t('dialogue.syncImages.completeDescription', lang, { total, copies: stats.copyTotal }))
+    // Images left for the next run were not checked in this one.
+    .setDescription(t('dialogue.syncImages.completeDescription', lang, { total, copies: stats.copyTotal - stats.copyLeft }))
     .addFields(...buildSyncStatsFields(stats, lang))
     .setColor(summaryColor)
     .setFooter({ text: t('dialogue.syncImages.summaryFooter', lang, { user: interaction.user.tag }) })
@@ -221,6 +222,9 @@ async function runLegacyPass(legacyEntries, interaction, stats, lang) {
   }
 }
 
+// The summary counter a copy result adds to; any other status is a failure.
+const COPY_RESULT_COUNTER = Object.freeze({ stored: 'copied', gone: 'skippedDead' });
+
 // Copies archived images into the database until the budget runs out; the
 // rest are counted as left for the next run, which selects them again.
 async function runCopyPass(targets, interaction, stats, lang, { startedAt, now, copyBudgetMs }) {
@@ -231,15 +235,8 @@ async function runCopyPass(targets, interaction, stats, lang, { startedAt, now, 
     }
     const { name, imageMessageId, imageChannelId } = targets[i];
     const result = await copyArchiveToDatabase(imageMessageId, imageChannelId, interaction.client);
-    if (result.status === 'stored') {
-      stats.copied += 1;
-    } else if (result.status === 'gone') {
-      stats.skippedDead += 1;
-      stats.errors.push(`${name}: ${result.error}`);
-    } else {
-      stats.failed += 1;
-      stats.errors.push(`${name}: ${result.error}`);
-    }
+    stats[COPY_RESULT_COUNTER[result.status] || 'failed'] += 1;
+    if (result.status !== 'stored') stats.errors.push(`${name}: ${result.error}`);
 
     if (i < targets.length - 1) await sleep(500);
     if ((i + 1) % 10 === 0 && i + 1 < targets.length) {
