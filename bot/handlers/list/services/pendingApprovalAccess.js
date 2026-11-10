@@ -7,7 +7,7 @@ export const PENDING_APPROVAL_ACCESS = Object.freeze({
   processing: 'processing',
 });
 
-export const APPROVAL_LEASE_MS = 5 * 60 * 1000;
+const APPROVAL_LEASE_MS = 5 * 60 * 1000;
 
 /**
  * Resolve an approver-scoped pending request without duplicating the

@@ -1,19 +1,21 @@
 /**
  * imageRehost.js
  *
- * Solves the Discord CDN expiry problem for evidence images.
+ * Keeps evidence images readable for the lifetime of a list entry.
  *
- * Background: Discord CDN attachment URLs include signed expiry
- * tokens (`?ex=...&hm=...`) that invalidate after ~24 hours. Storing the URL
- * directly can produce a 404 after a day or two, violating the evidence
- * retention requirement for the lifetime of the entry.
+ * Discord CDN attachment URLs include signed expiry tokens (`?ex=...&hm=...`)
+ * that invalidate after ~24 hours, so an entry does not store one. When a user
+ * attaches an image to /la-list add (or similar), the bot re-uploads it to a
+ * dedicated "evidence channel" in the owner guild and stores that message ID +
+ * channel ID; the same bytes also go to MongoDB (utils/evidenceStore.js, keyed
+ * by SHA-256). To display the image, the bot fetches the stored message via
+ * the Discord API, which re-signs the attachment URL on every fetch.
  *
- * Solution: when a user attaches an image to /la-list add (or similar), the bot
- * immediately re-uploads it to a dedicated "evidence channel" in the owner
- * guild. The bot then stores the rehosted message ID + channel ID instead of
- * the URL. When the image needs to be displayed later, the bot fetches the
- * stored message via the Discord API · Discord re-signs the attachment URL
- * with a fresh expiry on every fetch, so the link is always valid.
+ * Two layers: when Discord reports the archive message gone, the display path
+ * serves the database copy, re-posting it to the evidence channel and pointing
+ * the entries at the new message. An entry written straight to the database
+ * (only imageSha256 set) is archived the same way the first time it is shown.
+ * copyArchiveToDatabase backfills the database copy for older archive messages.
  *
  * The evidence channel is configured via /la-remote action:evidencechannel
  * (Senior-only) and stored on the owner guild's GuildConfig.evidenceChannelId.

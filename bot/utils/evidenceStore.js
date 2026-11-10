@@ -65,9 +65,8 @@ export async function storeEvidenceImage({ buffer, contentType = '', filename = 
  * @returns {Promise<object|null>} the lean document, or null
  */
 export async function findEvidenceImage({ sha256 = '', messageId = '' }, { withData = false } = {}) {
-  const filter = sha256 ? { _id: sha256 } : (messageId ? { archiveMessageIds: messageId } : null);
-  if (!filter) return null;
-  const query = EvidenceImage.findOne(filter);
+  if (!sha256 && !messageId) return null;
+  const query = EvidenceImage.findOne(sha256 ? { _id: sha256 } : { archiveMessageIds: messageId });
   if (!withData) query.select('-data');
   return query.lean();
 }
