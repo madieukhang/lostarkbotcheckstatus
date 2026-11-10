@@ -2,8 +2,9 @@
 # Dockerfile – Lost Ark Discord Bot
 # ─────────────────────────────────────────────
 
-# Use the official Node 20 slim image for a small footprint
-FROM node:20-slim
+# Official Node 24 LTS slim image; the Debian release is pinned so a base
+# change is a deliberate edit, not a side effect of a new default tag
+FROM node:24-bookworm-slim
 
 # Set working directory inside the container
 WORKDIR /app

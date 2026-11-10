@@ -1,5 +1,7 @@
 # Changelog
 
+- The Docker image runs Node 24 LTS (`node:24-bookworm-slim`) instead of Node 20, which reached end of life on 2026-04-30 and no longer gets security fixes.
+
 - Updated `mongoose` to 9.12.1 (patch release).
 
 - `/la-remote action:syncimages`: the summary counts only the archived images checked in that run (it also counted the ones left for the next run), and the command's choice label names both passes. The new label appears when the bot next starts, since it registers its commands at boot.

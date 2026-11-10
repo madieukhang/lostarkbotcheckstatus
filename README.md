@@ -350,7 +350,7 @@ docker run --env-file .env --name lostark-bot lostark-discord-bot
 1. Push code to the GitHub branch Railway tracks.
 2. Create the Railway service → link repo.
 3. In **Variables** tab, set every env var (minimum: `DISCORD_TOKEN`, `CHANNEL_ID`, `MONGODB_URI`).
-4. Railway builds from `Dockerfile` (node:20-slim, `npm ci --omit=dev`) and starts via `node bot.js`.
+4. Railway builds from `Dockerfile` (node:24-bookworm-slim, `npm ci --omit=dev`) and starts via `node bot.js`.
 5. Flip **Message Content Intent** on in Discord Developer Portal if using auto-check channels, otherwise auto-check won't fire.
 
 Slash commands register through Discord's global endpoint on boot (`ClientReady` handler), so a Railway redeploy is enough to push schema changes, with no separate CLI step.
