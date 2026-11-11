@@ -585,13 +585,21 @@ function storedBytes(data) {
   return typeof data?.value === 'function' ? Buffer.from(data.value()) : null;
 }
 
+// A skipped re-post leaves the evidence hidden, so the log names the cause.
+function skipRepost(sha256, reason) {
+  console.warn(`[imageRehost] Re-post of database copy ${sha256} skipped: ${reason}`);
+  return '';
+}
+
 async function repostFromDatabase(sha256, goneIds, entry, client) {
   try {
     const channelId = await getEvidenceChannelId();
-    if (!channelId) return '';
+    if (!channelId) {
+      return skipRepost(sha256, config.ownerGuildId ? 'the owner guild has no evidence channel' : 'OWNER_GUILD_ID is not set');
+    }
     const image = await findEvidenceImage({ sha256 }, { withData: true });
     const buffer = storedBytes(image?.data);
-    if (!buffer) return '';
+    if (!buffer) return skipRepost(sha256, 'no stored bytes');
     const archived = await postToEvidenceChannel(channelId, {
       buffer,
       filename: image.filename || 'evidence.png',

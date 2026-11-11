@@ -14,11 +14,12 @@ const gone = code => Object.assign(new Error('Discord refused'), { code });
 
 // archive: message id -> image URL, or an Error the fetch throws.
 // image: the EvidenceImage document a lookup finds, or null.
-function setup(t, { archive = {}, image = null } = {}) {
+// data: the stored bytes a lookup with data returns.
+function setup(t, { archive = {}, image = null, data = STORED, evidenceChannelId = 'evidence' } = {}) {
   const ownerGuildId = config.ownerGuildId;
   config.ownerGuildId = 'evidence-heal-owner';
   t.after(() => { config.ownerGuildId = ownerGuildId; invalidateGuildConfig('evidence-heal-owner'); });
-  t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ evidenceChannelId: 'evidence' }) }));
+  t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ evidenceChannelId }) }));
   t.mock.method(console, 'warn', () => {});
 
   const lookups = [];
@@ -29,7 +30,7 @@ function setup(t, { archive = {}, image = null } = {}) {
       async lean() {
         lookups.push({ filter, withData: query.withData });
         if (!image) return null;
-        return query.withData ? { ...image, data: STORED } : { ...image };
+        return query.withData ? { ...image, data } : { ...image };
       },
     };
     return query;
@@ -157,6 +158,30 @@ test('a re-post whose archive record fails is still shown', async t => {
   EvidenceImage.updateOne.mock.mockImplementation(async () => { throw new Error('database down'); });
   assert.equal(await resolveDisplayImageUrl(onM1, client), 'https://cdn.test/new1.png');
   assert.equal(sends.length, 1);
+});
+
+const warned = () => console.warn.mock.calls.map(call => call.arguments.join(' ')).join('\n');
+
+test('a re-post skipped for a missing evidence channel says so', async t => {
+  const { client, sends } = setup(t, { image: lostImage, evidenceChannelId: '' });
+  assert.equal(await resolveDisplayImageUrl(onM1, client), '');
+  assert.equal(sends.length, 0);
+  assert.match(warned(), /Re-post of database copy sha skipped: the owner guild has no evidence channel/);
+});
+
+test('a re-post skipped for a missing owner guild id says so', async t => {
+  const { client, sends } = setup(t, { image: lostImage });
+  config.ownerGuildId = '';
+  assert.equal(await resolveDisplayImageUrl(onM1, client), '');
+  assert.equal(sends.length, 0);
+  assert.match(warned(), /Re-post of database copy sha skipped: OWNER_GUILD_ID is not set/);
+});
+
+test('a re-post skipped for missing stored bytes says so', async t => {
+  const { client, sends } = setup(t, { image: lostImage, data: null });
+  assert.equal(await resolveDisplayImageUrl(onM1, client), '');
+  assert.equal(sends.length, 0);
+  assert.match(warned(), /Re-post of database copy sha skipped: no stored bytes/);
 });
 
 test('a lost image with no database copy resolves as today', async t => {

@@ -1,5 +1,7 @@
 # Changelog
 
+- When the bot cannot post a saved evidence image back to the evidence channel, the log now says why: `OWNER_GUILD_ID` is not set, the owner server has no evidence channel, or the saved copy has no image data. Before, the image just stayed hidden with nothing in the log.
+
 - List-check typo recovery tries its three strategies (visual substitution, prefix transposition, prefix indel) from one ordered list; the order and the results are unchanged, and a test now pins which one wins when two would match.
 
 - `/la-roster`: a character whose item level could not be read no longer shows a `(NaN)` or a large negative change beside its row; the change is left out.
