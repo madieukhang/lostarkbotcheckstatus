@@ -1,5 +1,7 @@
 # Changelog
 
+- `/la-roster`: a character whose item level could not be read no longer shows a `(NaN)` or a large negative change beside its row; the change is left out.
+
 - Updated `jsdom` to 31.0.0 (it needs Node 22.22.2+, 24.15.0+ or 26+, so `engines` says so). The roster parser's quiet handling of unparsable page stylesheets follows jsdom's new `css-parsing` error type, so lookups do not fill the log with parse warnings.
 
 - The Docker image runs Node 24 LTS (`node:24-bookworm-slim`) instead of Node 20, which reached end of life on 2026-04-30 and no longer gets security fixes.

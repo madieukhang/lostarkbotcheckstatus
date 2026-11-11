@@ -42,6 +42,13 @@ test('/la-roster item-level delta keeps signed two-decimal formatting', () => {
   assert.equal(formatItemLevelDelta('1700', 0), '');
 });
 
+test('/la-roster item-level delta is left out when the current item level cannot be read', () => {
+  assert.equal(formatItemLevelDelta('', 1700), '');
+  assert.equal(formatItemLevelDelta('?', 1700), '');
+  assert.equal(formatItemLevelDelta(undefined, 1700), '');
+  assert.equal(formatItemLevelDelta(null, 1700), '');
+});
+
 test('/la-roster visible rows reuse snapshot deltas without mutating input', () => {
   const characters = [{
     name: 'Aresvn',

@@ -69,7 +69,11 @@ export function formatItemLevelDelta(currentItemLevel, previousItemLevel) {
   const previous = Number(previousItemLevel) || 0;
   if (previous <= 0) return '';
 
-  const diff = parseItemLevel(currentItemLevel) - previous;
+  // A roster row whose item level did not parse has no delta to show.
+  const current = parseItemLevel(currentItemLevel);
+  if (!(current > 0)) return '';
+
+  const diff = current - previous;
   if (diff === 0) return '';
   return ` *(${diff > 0 ? '+' : ''}${diff.toFixed(2)})*`;
 }
