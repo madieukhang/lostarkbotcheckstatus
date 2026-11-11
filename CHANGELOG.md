@@ -1,5 +1,7 @@
 # Changelog
 
+- Messages with a file post again on Node 24. Since the `jsdom` 31 update, every upload (new evidence images, saved copies posted back) failed with `UND_ERR_INVALID_ARG`: jsdom's newer `undici` took over the HTTP dispatcher discord.js falls back to, and it rejects the form data discord.js builds. The Discord client now sends through an agent of discord.js's own `undici` (`bot/app/discord-rest-agent.js`).
+
 - When the bot cannot post a saved evidence image back to the evidence channel, the log now says why: `OWNER_GUILD_ID` is not set, the owner server has no evidence channel, or the saved copy has no image data. Before, the image just stayed hidden with nothing in the log.
 
 - List-check typo recovery tries its three strategies (visual substitution, prefix transposition, prefix indel) from one ordered list; the order and the results are unchanged, and a test now pins which one wins when two would match.

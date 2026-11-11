@@ -13,6 +13,7 @@ import {
   installDiscordGatewayDiagnostics,
   startDiscordLogin,
 } from './bot/app/discord-startup.js';
+import { createDiscordRestAgent } from './bot/app/discord-rest-agent.js';
 import { createReadyHandler } from './bot/app/lifecycle.js';
 import { createInteractionRouter } from './bot/app/interaction-router.js';
 import {
@@ -26,6 +27,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
+  rest: { agent: createDiscordRestAgent() },
 });
 
 const terminate = createProcessTerminator({ client });
