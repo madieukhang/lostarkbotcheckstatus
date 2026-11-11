@@ -38,6 +38,15 @@ function formatSuggestionMatchLog(reason, context) {
   return (SUGGESTION_MATCH_LOGGERS[reason] || SUGGESTION_MATCH_LOGGERS.default)(context);
 }
 
+// Typo recovery in the order it is tried. The first strategy that finds a
+// match decides, and the later ones never run, so they spend none of the
+// request budget the deep phase shares.
+const DEEP_RECOVERY_STRATEGIES = Object.freeze([
+  { label: 'Visual-substitution recovery', recover: recoverViaVisualSubstitution },
+  { label: 'Prefix-transposition recovery', recover: recoverViaPrefixTransposition },
+  { label: 'Prefix-indel recovery', recover: recoverViaPrefixIndel },
+]);
+
 export async function enrichListCheckResults(
   results,
   { suggestionCache, suggestionContext } = {},
@@ -184,34 +193,9 @@ export async function enrichListCheckResults(
     }
 
     const recoveryOptions = searchOptions({ recoveryCandidateLimit: deepLimit });
-    const substituted = await recoverViaVisualSubstitution(originalName, recoveryOptions);
-    if (substituted) {
-      return applyRecoveredSuggestion(
-        item,
-        originalName,
-        substituted,
-        'Visual-substitution recovery',
-      );
-    }
-
-    const transposed = await recoverViaPrefixTransposition(originalName, recoveryOptions);
-    if (transposed) {
-      return applyRecoveredSuggestion(
-        item,
-        originalName,
-        transposed,
-        'Prefix-transposition recovery',
-      );
-    }
-
-    const recovered = await recoverViaPrefixIndel(originalName, recoveryOptions);
-    if (recovered) {
-      return applyRecoveredSuggestion(
-        item,
-        originalName,
-        recovered,
-        'Prefix-indel recovery',
-      );
+    for (const { label, recover } of DEEP_RECOVERY_STRATEGIES) {
+      const recovered = await recover(originalName, recoveryOptions);
+      if (recovered) return applyRecoveredSuggestion(item, originalName, recovered, label);
     }
     return LOOKUP_UNRESOLVED;
   }

@@ -1,5 +1,7 @@
 # Changelog
 
+- List-check typo recovery tries its three strategies (visual substitution, prefix transposition, prefix indel) from one ordered list; the order and the results are unchanged, and a test now pins which one wins when two would match.
+
 - `/la-roster`: a character whose item level could not be read no longer shows a `(NaN)` or a large negative change beside its row; the change is left out.
 
 - Updated `jsdom` to 31.0.0 (it needs Node 22.22.2+, 24.15.0+ or 26+, so `engines` says so). The roster parser's quiet handling of unparsable page stylesheets follows jsdom's new `css-parsing` error type, so lookups do not fill the log with parse warnings.

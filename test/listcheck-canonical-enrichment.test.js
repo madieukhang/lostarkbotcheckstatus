@@ -943,6 +943,22 @@ test('visual-substitution recovery resolves y read as q (Qiqlyn -> Qiylyn)', asy
   }
 });
 
+test('deep recovery tries visual substitution before prefix transposition when both would match', async () => {
+  await markWorkerOnline();
+  const stub = installPrefixIndelStub({
+    qiylyn: [[1], [2, 3, 4], 'Qiylyn', 'weather_artist', 1753.3334],
+    qiql: [[1], [2, 3, 4], 'Qiqlny', 'yinyangshi', 1740],
+  });
+  try {
+    const results = await checkNamesAgainstLists(['Qiqlyn'], { guildId: 'guild-1', inputSource: 'ocr' });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Qiylyn');
+  } finally {
+    stub.restore();
+  }
+});
+
 test('prefix-indel recovery picks the unique distance-1 candidate (Lpiiv -> Lpiiiv, not Lpiiiiv)', async () => {
   await markWorkerOnline();
   // prefix "lpii" returns Lpiiiv (dist 1, recover) AND Lpiiiiv (dist 2,
