@@ -44,6 +44,9 @@ export function getListContext(type) {
   return LIST_CONTEXTS[type] || LIST_CONTEXTS.white;
 }
 
+// The list types, in the order lists are searched and shown.
+export const LIST_TYPES = Object.freeze(Object.keys(LIST_CONTEXTS));
+
 /**
  * Whether a value names one of the lists. getListContext reads any other
  * value as the whitelist, so a write checks this first.

@@ -9,7 +9,7 @@
  * shape stays consistent across the three evidence entry points
  * (list view dropdown, search dropdown, this command).
  *
- * Autocomplete unions Blacklist/Whitelist/Watchlist by name prefix,
+ * Autocomplete (services/entrySuggestions.js) unions Blacklist/Whitelist/Watchlist by name prefix,
  * scope-filtered for blacklist so a guild only sees its own server-scoped
  * entries + global entries (owner guild sees everything · same model as
  * /la-list view). Value encoding is `<type>:<_id>` (Mongo ObjectId,
@@ -23,7 +23,6 @@ import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferReply, editAlert, editEmbed } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
-import { truncateInlineText } from '../../../utils/discordText.js';
 import { buildNoteHistoryRows } from '../notes/entryNotes.js';
 import {
   buildNameRosterQuery,
@@ -35,15 +34,13 @@ import UserPreference from '../../../models/UserPreference.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import {
+  LIST_TYPES,
   decorateListEntry,
   getListContext,
   isOfficerOrSenior,
   parseListEntryRef,
 } from '../helpers.js';
-
-const KNOWN_TYPES = ['black', 'white', 'watch'];
-const AUTOCOMPLETE_MAX = 25;
-const PER_LIST_FETCH_CAP = 25;
+import { respondWithEntrySuggestions } from '../services/entrySuggestions.js';
 
 /**
  * Parse the `name` option value. Delegates to the shared
@@ -82,8 +79,8 @@ async function findEntryById({ entryId, type, guildId }) {
  */
 async function findEntryByName({ name, preferredType, guildId }) {
   const types = preferredType
-    ? [preferredType, ...KNOWN_TYPES.filter((t) => t !== preferredType)]
-    : KNOWN_TYPES;
+    ? [preferredType, ...LIST_TYPES.filter((t) => t !== preferredType)]
+    : LIST_TYPES;
 
   for (const type of types) {
     const { model } = getListContext(type);
@@ -100,88 +97,22 @@ async function findEntryByName({ name, preferredType, guildId }) {
   return { entry: null, type: null };
 }
 
-/**
- * Lookup matching entries for autocomplete. Prefix-matches against each
- * list's `name` field via case-insensitive collation, scope-filters the
- * blacklist results to the viewer's guild, dedupes by _id, caps at 25
- * total options (Discord limit).
- */
-async function lookupAutocompleteCandidates(query, guildId) {
-  await connectDB();
-  const trimmed = (query || '').trim();
-
-  const buildBaseQuery = () => {
-    if (!trimmed) return {};
-    // Escape regex metacharacters and anchor with `^` so MongoDB can hit
-    // the compound (name, scope, guildId) index for a prefix range scan.
-    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return { name: new RegExp(`^${escaped}`, 'i') };
-  };
-
-  const results = await Promise.all(KNOWN_TYPES.map(async (type) => {
-    const { model } = getListContext(type);
-    const baseQuery = buildBaseQuery();
-    const scoped = buildScopedListQuery(type, baseQuery, guildId);
-    const docs = await model
-      .find(scoped)
-      .collation(CASE_INSENSITIVE_COLLATION)
-      .sort({ addedAt: -1 })
-      .limit(PER_LIST_FETCH_CAP)
-      .lean();
-    return docs.map((doc) => ({ doc, type }));
-  }));
-  return results.flat();
-}
+// The value encodes the Mongo _id so the command fetches the entry
+// unambiguously even when the same name exists across lists or scopes.
+const entryRefValue = ({ type, doc }) => `${type}:${doc._id}`;
 
 /**
- * Build Discord autocomplete choices from raw lookup results. Dedupes by
- * `_id` so an entry appearing twice in the union (shouldn't, but defense
- * in depth) renders once. Value encodes the Mongo _id so the handler
- * can fetch unambiguously even when the same name exists across types
- * or scopes.
+ * /la-evidence autocomplete: the entries matching the typed name.
+ * @param {import('discord.js').AutocompleteInteraction} interaction
+ * @returns {Promise<void>}
  */
-function buildAutocompleteChoices(rawResults, lang = 'en') {
-  const seen = new Set();
-  const choices = [];
-
-  for (const { doc, type } of rawResults) {
-    const key = String(doc._id);
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    const { icon } = getListContext(type);
-    const reasonSnippet = doc.reason
-      ? truncateInlineText(doc.reason, 50)
-      : t('listView.navigation.noReason', lang);
-    // Local-scope tag helps an officer tell apart the same name appearing
-    // under global vs server scope (rare but possible for blacklist).
-    const scopeTag = type === 'black' && doc.scope === 'server' ? ' [S]' : '';
-    // Discord caps name (label) and value at 100 chars each.
-    const label = `${icon} ${doc.name}${scopeTag} - ${reasonSnippet}`.slice(0, 100);
-    const value = `${type}:${doc._id}`.slice(0, 100);
-
-    choices.push({ name: label, value });
-    if (choices.length >= AUTOCOMPLETE_MAX) break;
-  }
-
-  return choices;
-}
-
 export async function handleListEvidenceAutocomplete(interaction) {
-  try {
-    const focused = interaction.options.getFocused(true);
-    if (focused?.name !== 'name') {
-      await interaction.respond([]);
-      return;
-    }
-    const raw = await lookupAutocompleteCandidates(focused.value, interaction.guild?.id);
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-    const choices = buildAutocompleteChoices(raw, lang);
-    await interaction.respond(choices);
-  } catch (err) {
-    console.error('[evidence] Autocomplete error:', err.message);
-    await interaction.respond([]).catch(() => {});
+  const focused = interaction.options.getFocused(true);
+  if (focused?.name !== 'name') {
+    await interaction.respond([]);
+    return;
   }
+  await respondWithEntrySuggestions(interaction, focused.value, entryRefValue);
 }
 
 export function createEvidenceHandlers({ client }) {
