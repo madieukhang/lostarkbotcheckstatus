@@ -2,14 +2,14 @@
  * handlers/list/services/entrySuggestions.js
  * Name suggestions for list entries: a prefix search over the three lists,
  * the blacklist limited to what the viewer's server may see, turned into
- * Discord autocomplete choices that read "list icon, class, name". A choice
- * is one line of text, so the class comes from the roster snapshots and the
- * reason and raid stay out. /la-evidence values a choice by list and id;
+ * Discord autocomplete choices that read "list icon, class, name, CP". A
+ * choice is one line of text, so the class and CP come from the roster
+ * snapshots and the reason and raid stay out. /la-evidence values a choice by list and id;
  * /la-list edit, remove and edit-form value it by name.
  */
 
 import { connectDB } from '../../../db.js';
-import { getClassName } from '../../../models/Class.js';
+import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
@@ -21,20 +21,28 @@ const CHOICE_TEXT_MAX = 100;
 const PER_LIST_FETCH_CAP = 25;
 
 /**
- * Class names of the given characters, keyed by lowercased name. A failed
- * lookup leaves the classes out rather than the suggestions.
+ * Class and combat power of the given characters from their roster
+ * snapshots, keyed by lowercased name. A failed lookup leaves them out
+ * rather than the suggestions.
  * @param {string[]} names
- * @returns {Promise<Map<string, string>>}
+ * @returns {Promise<Map<string, {className: string, combatScore: string}>>}
  */
-async function findClassNames(names) {
+async function findRosterFacts(names) {
   if (names.length === 0) return new Map();
   try {
     const snapshots = await RosterSnapshot.find({ name: { $in: names } })
       .collation(CASE_INSENSITIVE_COLLATION)
       .lean();
-    return new Map(snapshots.map((snapshot) => [snapshot.name.toLowerCase(), getClassName(snapshot.classId)]));
+    return new Map(snapshots.map((snapshot) => {
+      const combatScore = String(snapshot.combatScore ?? '').trim();
+      return [snapshot.name.toLowerCase(), {
+        className: getClassName(snapshot.classId),
+        // A snapshot stores '?' when the score was not readable.
+        combatScore: combatScore === '?' ? '' : combatScore,
+      }];
+    }));
   } catch (err) {
-    console.warn('[list] Class lookup for entry suggestions failed:', err.message);
+    console.warn('[list] Roster lookup for entry suggestions failed:', err.message);
     return new Map();
   }
 }
@@ -71,8 +79,8 @@ async function findEntrySuggestions(query, guildId) {
     return docs.map((doc) => ({ doc, type }));
   }))).flat();
 
-  const classNames = await findClassNames([...new Set(results.map(({ doc }) => doc.name))]);
-  return results.map((result) => ({ ...result, className: classNames.get(result.doc.name.toLowerCase()) ?? '' }));
+  const facts = await findRosterFacts([...new Set(results.map(({ doc }) => doc.name))]);
+  return results.map((result) => ({ ...result, ...facts.get(result.doc.name.toLowerCase()) }));
 }
 
 /**
@@ -90,13 +98,17 @@ export function buildEntryChoices(results, toValue) {
     if (seen.has(value)) continue;
     seen.add(value);
 
-    const { doc, type, className } = result;
+    const { doc, type, className = '', combatScore = '' } = result;
     const { icon } = getListContext(type);
-    const classPrefix = className ? `${className} · ` : '';
+    // The class icon is an application emoji loaded at runtime; until it is,
+    // or for a class without one, the class name stands in.
+    const classEmoji = getClassEmoji(className);
+    const classPrefix = classEmoji ? `${classEmoji} ` : (className && `${className} · `);
     // Local-scope tag helps an officer tell apart the same name appearing
     // under global vs server scope (rare but possible for blacklist).
     const scopeTag = type === 'black' && doc.scope === 'server' ? ' [S]' : '';
-    const label = `${icon} ${classPrefix}${doc.name}${scopeTag}`.slice(0, CHOICE_TEXT_MAX);
+    const combatPower = combatScore && ` · CP ${combatScore}`;
+    const label = `${icon} ${classPrefix}${doc.name}${scopeTag}${combatPower}`.slice(0, CHOICE_TEXT_MAX);
 
     choices.push({ name: label, value });
     if (choices.length >= AUTOCOMPLETE_MAX) break;

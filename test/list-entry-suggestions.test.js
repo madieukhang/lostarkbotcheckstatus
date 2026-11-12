@@ -7,6 +7,7 @@ import Whitelist from '../bot/models/Whitelist.js';
 import Watchlist from '../bot/models/Watchlist.js';
 import UserPreference from '../bot/models/UserPreference.js';
 import RosterSnapshot from '../bot/models/RosterSnapshot.js';
+import { CLASS_EMOJI_MAP } from '../bot/models/Class.js';
 import { disconnectDB } from '../bot/db.js';
 import { clearUserLanguageCache } from '../bot/services/i18n/index.js';
 import { buildScopedListQuery } from '../bot/utils/scope.js';
@@ -51,14 +52,14 @@ test('suggestions show the list icon, the class before the name and a server tag
   const queries = stubLists(t, {
     black: [{ _id: 'b1', name: 'Mokoko', scope: 'server', raid: 'Serca Hard', reason: 'Left mid-raid' }],
     white: [{ _id: 'w1', name: 'Mokobear', reason: '' }],
-    // Snapshot names match case-insensitively; Mokobear has none, so no class.
-    snapshots: [{ name: 'mokoko', classId: 'bard' }],
+    // Snapshot names match case-insensitively; Mokobear has none, so no class or CP.
+    snapshots: [{ name: 'mokoko', classId: 'bard', combatScore: '2,345.6' }],
   });
 
   const choices = await suggest({ name: 'name', value: ' mok ' });
 
   assert.deepEqual(choices, [
-    { name: '⛔ Bard · Mokoko [S]', value: 'black:b1' },
+    { name: '⛔ Bard · Mokoko [S] · CP 2,345.6', value: 'black:b1' },
     { name: '✅ Mokobear', value: 'white:w1' },
   ]);
   const prefix = { name: /^mok/i };
@@ -66,6 +67,16 @@ test('suggestions show the list icon, the class before the name and a server tag
   assert.deepEqual(queries.white, prefix);
   assert.deepEqual(queries.watch, prefix);
   assert.deepEqual(queries.snapshots, { name: { $in: ['Mokoko', 'Mokobear'] } });
+});
+
+test('a class with an icon shows the icon in place of its name, and an unknown CP stays out', async (t) => {
+  // Class icons are application emoji loaded at runtime; seed one for Bard.
+  const previous = CLASS_EMOJI_MAP.Bard;
+  CLASS_EMOJI_MAP.Bard = '<:bard:1>';
+  t.after(() => { CLASS_EMOJI_MAP.Bard = previous; });
+  stubLists(t, { black: [{ _id: 'b1', name: 'Mokoko', reason: 'r' }], snapshots: [{ name: 'Mokoko', classId: 'bard', combatScore: '?' }] });
+
+  assert.deepEqual(await suggest({ name: 'name', value: 'mok' }), [{ name: '⛔ <:bard:1> Mokoko', value: 'black:b1' }]);
 });
 
 test('suggestions leave the class out when the class lookup fails', async (t) => {
