@@ -99,7 +99,7 @@ test('a failed success card after an auto-approved add is not reported as a fail
     guild: { id: 'guild' },
     channelId: 'channel',
     options: {
-      getString: (key) => ({ type: 'black', name: 'Mokoko', reason: 'Left mid-raid', scope: 'server' })[key] ?? null,
+      getString: (key) => ({ type: 'black', name: 'Mokoko', reason: 'Left mid-raid', raid: 'Serca Hard', scope: 'server' })[key] ?? null,
       getAttachment: () => null,
     },
     deferReply: async () => {},
@@ -126,7 +126,7 @@ test('a rejected saved notice after an auto-approved add is swallowed', async (t
     guild: { id: 'guild' },
     channelId: 'channel',
     options: {
-      getString: (key) => ({ type: 'black', name: 'Mokoko', reason: 'Left mid-raid', scope: 'server' })[key] ?? null,
+      getString: (key) => ({ type: 'black', name: 'Mokoko', reason: 'Left mid-raid', raid: 'Serca Hard', scope: 'server' })[key] ?? null,
       getAttachment: () => null,
     },
     deferReply: async () => {},
@@ -193,7 +193,7 @@ test('a failed queued card after the pending request is saved is not reported as
     guild: { id: 'guild', name: 'Guild' },
     channelId: 'channel',
     options: {
-      getString: (key) => ({ type: 'black', name: 'Mokoko', reason: 'Left mid-raid', scope: 'global' })[key] ?? null,
+      getString: (key) => ({ type: 'black', name: 'Mokoko', reason: 'Left mid-raid', raid: 'Serca Hard', scope: 'global' })[key] ?? null,
       getAttachment: () => null,
     },
     deferReply: async () => {},

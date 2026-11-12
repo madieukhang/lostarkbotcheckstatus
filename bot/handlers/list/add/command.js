@@ -106,6 +106,12 @@ export function createListAddCommandHandler({
         message: () => t('dialogue.listAdd.command.reasonRequired', lang),
       },
       {
+        // Every entry names the raid it came from.
+        invalid: () => !String(request.raidInput).trim(),
+        kind: NoticeKind.INPUT,
+        message: () => t('dialogue.listAdd.command.raidRequired', lang),
+      },
+      {
         invalid: () => request.raid === null,
         kind: NoticeKind.INPUT,
         message: () => t('dialogue.listAdd.command.invalidRaid', lang, {

@@ -93,7 +93,7 @@ function listCommand(name) {
           return opt
             .setName('raid')
             .setDescription(commandText('list.subcommands.add.options.raid'))
-            .setRequired(false)
+            .setRequired(true)
             .setMaxLength(100)
             .setAutocomplete(true);
         })

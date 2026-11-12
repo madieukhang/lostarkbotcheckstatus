@@ -82,7 +82,7 @@ test('/la-list add runs a request read elsewhere without touching slash options'
   });
 
   await handler(formSubmit(replies), buildListAddRequest({
-    type: 'black', name: 'Mokoko', reason: 'Report', raidInput: '', image: PDF, inputScope: '',
+    type: 'black', name: 'Mokoko', reason: 'Report', raidInput: 'Serca Hard', image: PDF, inputScope: '',
   }));
 
   assert.equal(replies.length, 1);
@@ -135,6 +135,28 @@ test('an add form with no known list gets a notice and files nothing', async (t)
   assert.deepEqual(reached, []);
 });
 
+test('an add form without a raid gets a notice and files nothing, whatever the list', async (t) => {
+  stubLookups(t);
+  const reached = [];
+  const { handleListAddFormSubmit } = createListFormHandlers({
+    handleListAddCommand: createListAddCommandHandler({
+      client: {},
+      sendListAddApprovalToApprovers: async () => { reached.push('approvers'); },
+      executeListAddToDatabase: async () => { reached.push('write'); },
+    }),
+    handleListEditCommand: () => assert.fail('not an add'),
+  });
+  const texts = { [ID.name]: 'Mokoko', [ID.reason]: 'Report' };
+  const raidRequiredTitle = translate('dialogue.listAdd.command.raidRequired', 'en').title;
+
+  for (const selects of [{ [ID.type]: ['black'] }, { [ID.type]: ['white'], [ID.raid]: [] }, { [ID.type]: ['watch'] }]) {
+    const replies = [];
+    await handleListAddFormSubmit({ ...formSubmit(replies), fields: modalSubmitFields({ texts, selects }) });
+    assert.ok(replies.at(-1).embeds[0].toJSON().title.includes(raidRequiredTitle), JSON.stringify(selects));
+  }
+  assert.deepEqual(reached, []);
+});
+
 test('an edit form moving an entry to an unknown list gets a notice and changes nothing', async (t) => {
   stubLookups(t, [ENTRY]);
   const reached = [];
@@ -173,7 +195,7 @@ test('an add form with a PDF gets the same notice as /la-list add', async (t) =>
     ...formSubmit(replies),
     fields: modalSubmitFields({
       texts: { [ID.name]: 'Mokoko', [ID.reason]: 'Report' },
-      selects: { [ID.type]: ['black'] },
+      selects: { [ID.type]: ['black'], [ID.raid]: ['Serca Hard'] },
       files: { [ID.image]: [PDF] },
     }),
   });
@@ -219,7 +241,10 @@ test('a quick add answers privately and leaves the request message unrecorded', 
     ...formSubmit(replies),
     deferReply: async (options) => { deferred.push(options); },
     fetchReply: async () => { recorded.push('fetchReply'); return { id: 'reply-1' }; },
-    fields: modalSubmitFields({ texts: { [ID.name]: 'Mokoko', [ID.reason]: 'Report' }, selects: { [ID.type]: ['black'] } }),
+    fields: modalSubmitFields({
+      texts: { [ID.name]: 'Mokoko', [ID.reason]: 'Report' },
+      selects: { [ID.type]: ['black'], [ID.raid]: ['Serca Hard'] },
+    }),
   });
 
   assert.deepEqual(deferred, [{ flags: MessageFlags.Ephemeral }]);

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { modalSubmitFields } from './helpers/modal-submit.js';
+import { buildCommands } from '../bot/commands/index.js';
 import { getSelectableRaidValues } from '../bot/models/Raid.js';
 import { buildListAddRequest } from '../bot/handlers/list/add/command.js';
 import { buildListEditInput } from '../bot/handlers/list/edit/command.js';
@@ -36,11 +37,19 @@ test('the add form asks for list, name, reason, raid and an optional screenshot'
     [SELECT, ID.type, true],
     [TEXT, ID.name, true],
     [TEXT, ID.reason, true],
-    [SELECT, ID.raid, false],
+    [SELECT, ID.raid, true],
     [FILE, ID.image, false],
   ]);
   assert.deepEqual(optionValues(modal, ID.type), TYPE_VALUES);
   assert.deepEqual(optionValues(modal, ID.raid), getSelectableRaidValues());
+  assert.equal(componentOf(modal, ID.raid).min_values, 1);
+});
+
+test('/la-list add asks for a raid; /la-list edit leaves it optional', () => {
+  const list = buildCommands().find((command) => command.name === 'la-list');
+  const raidOf = (sub) => list.options.find((option) => option.name === sub).options.find((option) => option.name === 'raid');
+  assert.equal(raidOf('add').required, true);
+  assert.ok(!raidOf('edit').required);
 });
 
 test('the edit form asks for the name and leaves every change optional', () => {

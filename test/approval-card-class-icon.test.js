@@ -272,7 +272,7 @@ test("a member's /la-list add shows the class on their sent-for-approval card", 
     guild: { id: 'guild', name: 'Guild' },
     channelId: 'channel',
     options: {
-      getString: (key) => ({ type: 'black', name: 'Mokoko', reason: 'Left mid-raid', scope: 'global' })[key] ?? null,
+      getString: (key) => ({ type: 'black', name: 'Mokoko', reason: 'Left mid-raid', raid: 'Serca Hard', scope: 'global' })[key] ?? null,
       getAttachment: () => null,
     },
     deferReply: async () => {},

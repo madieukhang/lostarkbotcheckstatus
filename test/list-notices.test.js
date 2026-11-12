@@ -113,7 +113,7 @@ test('/la-list edit: an entry that is not on any list is an empty notice', async
 
 test('/la-list add: a request no approver received is a failure notice with a tip', async (context) => {
   stubVietnameseDb(context);
-  const interaction = interactionWith({ type: 'watch', name: 'Mokoko', reason: 'Left mid-raid' });
+  const interaction = interactionWith({ type: 'watch', name: 'Mokoko', reason: 'Left mid-raid', raid: 'Serca Hard' });
   const handleListAddCommand = createListAddCommandHandler({
     client: {},
     sendListAddApprovalToApprovers: async () => ({ success: false, reason: 'No approver reachable' }),

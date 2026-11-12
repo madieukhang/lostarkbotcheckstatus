@@ -19,13 +19,13 @@ export function quickAddSubmit(services) {
 }
 
 /**
- * The fields of a submitted Quick-Add form, raid and screenshot left out.
- * @param {{type: string, name: string, reason: string}} values
+ * The fields of a submitted Quick-Add form, screenshot left out.
+ * @param {{type: string, name: string, reason: string, raid?: string}} values
  * @returns {import('discord.js').ModalSubmitFields}
  */
-export function quickAddFields({ type, name, reason }) {
+export function quickAddFields({ type, name, reason, raid = 'Serca Hard' }) {
   return modalSubmitFields({
     texts: { [LIST_FORM_IDS.name]: name, [LIST_FORM_IDS.reason]: reason },
-    selects: { [LIST_FORM_IDS.type]: [type] },
+    selects: { [LIST_FORM_IDS.type]: [type], [LIST_FORM_IDS.raid]: [raid] },
   });
 }

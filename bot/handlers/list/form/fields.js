@@ -69,9 +69,9 @@ function typeSelect(lang, { required, placeholderKey, blackHintKey, chosen = '' 
   });
 }
 
-function raidSelect(lang, placeholderKey, now) {
+function raidSelect(lang, { placeholderKey, required }, now) {
   return choiceSelect(LIST_FORM_IDS.raid, {
-    required: false,
+    required,
     placeholder: t(`listForm.${placeholderKey}`, lang),
     options: getSelectableRaidValues({ now })
       .slice(0, SELECT_OPTION_LIMIT)
@@ -126,7 +126,7 @@ export function buildListAddFormModal(lang, {
       label(lang, 'reasonLabel').setTextInputComponent(textInput(LIST_FORM_IDS.reason, {
         style: TextInputStyle.Paragraph, required: true, placeholder: t('listForm.reasonPlaceholder', lang),
       })),
-      label(lang, 'raidLabel').setStringSelectMenuComponent(raidSelect(lang, 'raidPlaceholder', now)),
+      label(lang, 'raidLabel').setStringSelectMenuComponent(raidSelect(lang, { placeholderKey: 'raidPlaceholder', required: true }, now)),
       label(lang, 'imageLabel').setFileUploadComponent(imageUpload()),
     );
 }
@@ -154,7 +154,7 @@ export function buildListEditFormModal(lang, { now = new Date(), name = '' } = {
       label(lang, 'newTypeLabel').setStringSelectMenuComponent(
         typeSelect(lang, { required: false, placeholderKey: 'newTypePlaceholder', blackHintKey: 'blackEditHint' }),
       ),
-      label(lang, 'newRaidLabel').setStringSelectMenuComponent(raidSelect(lang, 'newRaidPlaceholder', now)),
+      label(lang, 'newRaidLabel').setStringSelectMenuComponent(raidSelect(lang, { placeholderKey: 'newRaidPlaceholder', required: false }, now)),
       label(lang, 'newImageLabel').setFileUploadComponent(imageUpload()),
     );
 }
