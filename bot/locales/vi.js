@@ -442,13 +442,6 @@ const vi = {
   quickAdd: {
     selectPlaceholder: '⚡ Quick Add vào list · chọn tên',
     noListHit: 'Chưa có trong list nào',
-    modalTitle: 'Quick Add · {name}',
-    typeLabel: 'List (black / white / watch)',
-    typePlaceholder: 'black',
-    reasonLabel: 'Lý do',
-    reasonPlaceholder: 'Vì sao thêm player này?',
-    raidLabel: 'Raid (tuỳ chọn)',
-    raidPlaceholder: 'vd. Kazeros Hard',
   },
 
   remove: {

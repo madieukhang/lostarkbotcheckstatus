@@ -601,11 +601,6 @@ export default {
     publicRestricted: { title: 'Public evidence is restricted', description: 'Only officers and seniors can post evidence publicly, so I kept this view private.' },
     failed: { title: 'Evidence lookup failed', description: 'I could not load the evidence record.', tip: 'Try again in a few minutes' },
   },
-  quickAdd: {
-    deliveryFailed: { title: 'I could not pass that on', description: 'The approval request did not reach anyone.', tip: 'Try again in a moment' },
-    failed: { title: 'That quick add did not go through', description: 'Something went wrong while I was filing that one.', tip: 'Give it another try' },
-    invalidType: { title: 'That is not a list type', description: 'I read `{type}`. Quick add takes `black`, `white` or `watch`.' },
-  },
   remove: {
     notFound: { title: 'Nothing to remove', description: '**{name}** is not in any visible list.', tip: 'Browse existing entries with /la-list view' },
     titles: { blocked: 'Removal blocked · {name}', one: 'Removed from {list} · {name}', many: 'Removed from {count} lists · {name}', mixed: 'Mixed result · {name}' },

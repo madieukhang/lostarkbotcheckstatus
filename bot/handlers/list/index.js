@@ -3,6 +3,7 @@ import { createAddHandlers } from './add/index.js';
 import { createCheckHandlers } from './check/index.js';
 import { createEditHandlers } from './edit/index.js';
 import { createEnrichHandlers } from './enrich/index.js';
+import { createListFormHandlers } from './form/index.js';
 import {
   createEvidenceHandlers,
   handleListEvidenceAutocomplete,
@@ -26,18 +27,24 @@ export { handleListEvidenceAutocomplete };
  */
 export function createListHandlers({ client }) {
   const services = createSharedServices({ client });
+  const addHandlers = createAddHandlers({ client, services });
+  const editHandlers = createEditHandlers({ client, services });
 
   return {
-    ...createAddHandlers({ client, services }),
+    ...addHandlers,
     ...createCheckHandlers({ client }),
-    ...createEditHandlers({ client, services }),
+    ...editHandlers,
     ...createEnrichHandlers({ services }),
     ...createEvidenceHandlers({ client }),
+    ...createListFormHandlers({
+      handleListAddCommand: addHandlers.handleListAddCommand,
+      handleListEditCommand: editHandlers.handleListEditCommand,
+    }),
     handleBroadcastEvidenceButton: createBroadcastEvidenceButtonHandler({ client }),
     handleEntryEvidenceButton: createEntryEvidenceButtonHandler({ client }),
     ...createMultiaddHandlers({ client, services }),
     ...createNoteHandlers({ services }),
-    ...createQuickAddHandlers({ services }),
+    ...createQuickAddHandlers(),
     ...createRemoveHandlers({ services }),
     ...createTrustHandlers({ client }),
     ...createViewHandlers({ client }),

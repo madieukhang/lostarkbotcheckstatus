@@ -174,6 +174,16 @@ function listCommand(name) {
     )
     .addSubcommand((sub) =>
       sub
+        .setName('add-form')
+        .setDescription(commandText('list.subcommands.addForm.description'))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('edit-form')
+        .setDescription(commandText('list.subcommands.editForm.description'))
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName('remove')
         .setDescription(commandText('list.subcommands.remove.description'))
         .addStringOption((opt) =>

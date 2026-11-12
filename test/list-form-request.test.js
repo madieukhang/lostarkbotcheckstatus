@@ -1,17 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
+import { Collection, MessageFlags } from 'discord.js';
 import Blacklist from '../bot/models/Blacklist.js';
 import Whitelist from '../bot/models/Whitelist.js';
 import Watchlist from '../bot/models/Watchlist.js';
 import GuildConfig from '../bot/models/GuildConfig.js';
 import UserPreference from '../bot/models/UserPreference.js';
 import TrustedUser from '../bot/models/TrustedUser.js';
+import PendingApproval from '../bot/models/PendingApproval.js';
 import { disconnectDB } from '../bot/db.js';
-import { clearUserLanguageCache } from '../bot/services/i18n/index.js';
+import { clearUserLanguageCache, t as translate } from '../bot/services/i18n/index.js';
 import { invalidateGuildConfig } from '../bot/utils/scope.js';
 import { buildListAddRequest, createListAddCommandHandler } from '../bot/handlers/list/add/command.js';
 import { buildListEditInput, createListEditCommandHandler } from '../bot/handlers/list/edit/command.js';
+import { LIST_FORM_IDS } from '../bot/handlers/list/form/fields.js';
+import { createListFormHandlers } from '../bot/handlers/list/form/index.js';
 
 const PDF = { url: 'https://cdn.example.test/report.pdf', contentType: 'application/pdf' };
 
@@ -99,4 +103,84 @@ test('/la-list edit runs an input read elsewhere without touching slash options'
 
   assert.equal(replies.length, 1);
   assert.match(replies[0].embeds[0].toJSON().title, /not an image/);
+});
+
+// The submit of a form: the ids in `values` were filled in.
+function formFields(values) {
+  return {
+    fields: new Map(Object.keys(values).map((id) => [id, {}])),
+    getTextInputValue: (id) => values[id],
+    getStringSelectValues: (id) => values[id],
+    getUploadedFiles: (id) => values[id],
+  };
+}
+
+test('an add form with a PDF gets the same notice as /la-list add', async (t) => {
+  stubLookups(t);
+  const replies = [];
+  const { handleListAddFormSubmit } = createListFormHandlers({
+    handleListAddCommand: createListAddCommandHandler({
+      client: {},
+      sendListAddApprovalToApprovers: () => assert.fail('A refused add must not ask approvers'),
+      executeListAddToDatabase: () => assert.fail('A refused add must not write'),
+    }),
+    handleListEditCommand: () => assert.fail('not an edit'),
+  });
+
+  await handleListAddFormSubmit({
+    ...formSubmit(replies),
+    fields: formFields({
+      [LIST_FORM_IDS.type]: ['black'],
+      [LIST_FORM_IDS.name]: 'Mokoko',
+      [LIST_FORM_IDS.reason]: 'Report',
+      [LIST_FORM_IDS.image]: new Collection([['1', PDF]]),
+    }),
+  });
+
+  assert.match(replies[0].embeds[0].toJSON().title, /not an image/);
+});
+
+test('an edit form with only the name gets the no-changes notice', async (t) => {
+  stubLookups(t, [{
+    _id: 'a'.repeat(24), name: 'Mokoko', reason: 'Report', scope: 'global', addedByUserId: 'entry-owner', allCharacters: [],
+  }]);
+  const replies = [];
+  const { handleListEditFormSubmit } = createListFormHandlers({
+    handleListAddCommand: () => assert.fail('not an add'),
+    handleListEditCommand: createListEditCommandHandler({
+      client: {},
+      broadcastListChange: () => assert.fail('A refused edit must not broadcast'),
+      sendListAddApprovalToApprovers: () => assert.fail('A refused edit must not ask approvers'),
+    }),
+  });
+
+  await handleListEditFormSubmit({ ...formSubmit(replies), fields: formFields({ [LIST_FORM_IDS.name]: 'Mokoko' }) });
+
+  assert.ok(replies[0].embeds[0].toJSON().title.includes(translate('dialogue.listEdit.command.noChanges', 'en').title));
+});
+
+test('a quick add answers privately and leaves the request message unrecorded', async (t) => {
+  stubLookups(t);
+  t.mock.method(PendingApproval, 'create', async (doc) => doc);
+  t.mock.method(PendingApproval, 'updateOne', async () => assert.fail('a private reply cannot be fetched back later'));
+  const deferred = [];
+  const replies = [];
+  const { handleQuickAddFormSubmit } = createListFormHandlers({
+    handleListAddCommand: createListAddCommandHandler({
+      client: {},
+      sendListAddApprovalToApprovers: async () => ({ success: true, deliveredApproverIds: ['senior'], deliveredDmMessages: [] }),
+      executeListAddToDatabase: () => assert.fail('a member add waits for an approver'),
+    }),
+    handleListEditCommand: () => assert.fail('not an edit'),
+  });
+
+  await handleQuickAddFormSubmit({
+    ...formSubmit(replies),
+    deferReply: async (options) => { deferred.push(options); },
+    fetchReply: async () => assert.fail('a private reply is not fetched'),
+    fields: formFields({ [LIST_FORM_IDS.type]: ['black'], [LIST_FORM_IDS.name]: 'Mokoko', [LIST_FORM_IDS.reason]: 'Report' }),
+  });
+
+  assert.deepEqual(deferred, [{ flags: MessageFlags.Ephemeral }]);
+  assert.equal(replies.at(-1).embeds[0].toJSON().title, '📨 Blacklist · Sent for approval · Mokoko');
 });

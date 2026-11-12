@@ -78,6 +78,12 @@ const en = {
             additionalNames: 'Comma-separated alts to append (officer/owner only, manual filler)',
           },
         },
+        addForm: {
+          description: 'Open a form to add a character to a list, no options to type',
+        },
+        editForm: {
+          description: 'Open a form to edit an existing list entry, no options to type',
+        },
         remove: {
           description: 'Remove a character from blacklist/whitelist/watchlist',
           options: {
@@ -584,13 +590,6 @@ const en = {
   quickAdd: {
     selectPlaceholder: '⚡ Quick Add to List · select a name',
     noListHit: 'Not on any list',
-    modalTitle: 'Quick Add · {name}',
-    typeLabel: 'List (black / white / watch)',
-    typePlaceholder: 'black',
-    reasonLabel: 'Reason',
-    reasonPlaceholder: 'Why add this player?',
-    raidLabel: 'Raid (optional)',
-    raidPlaceholder: 'e.g. Kazeros Hard',
   },
 
   remove: {

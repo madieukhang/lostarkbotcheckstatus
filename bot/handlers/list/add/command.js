@@ -162,7 +162,7 @@ export function createListAddCommandHandler({
     }
   }
 
-  async function submitListAddRequest(interaction, payload, lang) {
+  async function submitListAddRequest(interaction, payload, lang, { ephemeral }) {
     const submission = await submitListMutation({
       interaction,
       payload,
@@ -179,7 +179,9 @@ export function createListAddCommandHandler({
         buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang, snapshot: delivery.snapshot })
       ),
     });
-    if (submission.status === 'queued') {
+    // The decision later edits the request message, fetched from its channel;
+    // a private reply cannot be fetched that way, so it is not recorded.
+    if (submission.status === 'queued' && !ephemeral) {
       await captureRequestReplyId(interaction, payload.requestId);
     }
   }
@@ -189,11 +191,12 @@ export function createListAddCommandHandler({
    *   or the add form's submit
    * @param {object} [formRequest] - from buildListAddRequest; read from the
    *   slash options when omitted
+   * @param {{ephemeral?: boolean}} [options] - answer privately (Quick-Add)
    * @returns {Promise<void>}
    */
-  async function handleListAddCommand(interaction, formRequest = null) {
+  async function handleListAddCommand(interaction, formRequest = null, { ephemeral = false } = {}) {
     const request = formRequest ?? readListAddRequest(interaction);
-    await deferReply(interaction);
+    await deferReply(interaction, { ephemeral });
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     const validation = validateListAddRequest(interaction, request, lang);
     if (validation) {
@@ -206,7 +209,7 @@ export function createListAddCommandHandler({
       const scope = await resolveListAddScope(request, interaction.guild.id);
       const rehostResult = await rehostListAddImage(request, interaction);
       const payload = createListAddPayload(interaction, request, scope, rehostResult, lang);
-      await submitListAddRequest(interaction, payload, lang);
+      await submitListAddRequest(interaction, payload, lang, { ephemeral });
     } catch (err) {
       console.error('[list] ❌ Proposal create/send failed:', err.message);
       await editAlert(interaction, {

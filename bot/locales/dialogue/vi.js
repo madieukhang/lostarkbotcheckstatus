@@ -489,9 +489,6 @@ export default {
     nameRequired: { title: 'Cần tên character', description: 'Nhập một tên hoặc dùng autocomplete để chọn entry đang có nhé.' }, notListed: { title: 'Không có entry nào cậu được xem', description: '**{name}** không nằm trong list nào hiển thị với server này.', tip: 'Thử /la-search để tìm gần đúng trong chỉ mục tên của Bible nhé' },
     publicRestricted: { title: 'Evidence public được giới hạn', description: 'Chỉ officer và senior mới đăng evidence công khai được, nên tớ giữ view này ở chế độ riêng.' }, failed: { title: 'Tra evidence thất bại', description: 'Tớ chưa tải được record evidence.', tip: 'Thử lại sau ít phút' },
   },
-  quickAdd: {
-    deliveryFailed: { title: 'Tớ chưa chuyển đi được', description: 'Yêu cầu duyệt chưa tới được tay ai cả.', tip: 'Lát nữa cậu thử lại nhé' }, failed: { title: 'Lượt quick add đó chưa trót lọt', description: 'Đang ghi lại giúp cậu thì có gì đó trục trặc.', tip: 'Thử lại lần nữa nhé' }, invalidType: { title: 'Đó không phải loại list', description: 'Tớ đọc được `{type}`. Quick add chỉ nhận `black`, `white` hoặc `watch` thôi.' },
-  },
   remove: {
     notFound: { title: 'Không có gì để xóa', description: '**{name}** không nằm trong list nào cậu nhìn thấy.', tip: 'Xem các entry hiện có bằng /la-list view nhé' }, titles: { blocked: 'Không thể xóa · {name}', one: 'Đã xóa khỏi {list} · {name}', many: 'Đã xóa khỏi {count} list · {name}', mixed: 'Kết quả hỗn hợp · {name}' },
     line: { variants: [

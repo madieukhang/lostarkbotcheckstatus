@@ -465,9 +465,6 @@ export default {
     nameRequired: { title: 'Character 名が必要ですの', description: '名前を入力するか autocomplete で既存 entry を選んでくださいませ。' }, notListed: { title: '表示可能な entry がありませんの', description: '**{name}** はこの server から見える list にいませんわ。', tip: 'Bible name index の fuzzy match は /la-search をお試しくださいませ' },
     publicRestricted: { title: 'Public evidence は制限されていますの', description: 'Evidence を public 投稿できるのは officer / senior だけなので、この view は private にしましたわ。' }, failed: { title: 'Evidence 検索に失敗しましたの', description: 'Evidence record を読み込めませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' },
   },
-  quickAdd: {
-    deliveryFailed: { title: 'そちらをお渡しできませんでしたの', description: '承認のお願いがどなたにも届きませんでしたわ。', tip: '少し経ってからもう一度お試しくださいませ' }, failed: { title: 'その quick add は通りませんでしたの', description: 'お預かりして書き留めている途中で、どこかに引っかかってしまいましたの。', tip: 'もう一度お試しくださいませ' }, invalidType: { title: 'それは list の種類ではありませんの', description: '`{type}` と読めましたわ。quick add は `black`、`white`、`watch` のどれかでお願いしますの。' },
-  },
   remove: {
     notFound: { title: '削除するものがありませんの', description: '**{name}** は表示可能な list にいませんわ。', tip: '/la-list view で既存 entry を確認できますの' }, titles: { blocked: '削除できません · {name}', one: '{list} から削除 · {name}', many: '{count} lists から削除 · {name}', mixed: 'Mixed result · {name}' },
     line: { variants: [

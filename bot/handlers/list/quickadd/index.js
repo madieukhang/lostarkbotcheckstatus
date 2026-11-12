@@ -1,171 +1,31 @@
 /**
  * handlers/list/quickadd/index.js
  * Quick-Add dropdown on the auto-check / /la-check result card · lets
- * an officer one-click an unflagged OCR'd name into a list. Opens a
- * modal for reason + raid + scope, then routes through the same
- * approval pipeline as /la-list add (auto-approve for officers,
- * approver DM fan-out for everyone else).
+ * an officer one-click an unflagged OCR'd name into a list. Opens the
+ * /la-list add form with that name and blacklist chosen; its submit runs
+ * /la-list add (handlers/list/form), answered privately.
  */
 
-import {
-  ActionRowBuilder,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-} from 'discord.js';
-
 import { connectDB } from '../../../db.js';
-import PendingApproval from '../../../models/PendingApproval.js';
-import { resolveListAddRaidLabel } from '../../../models/Raid.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { getGuildConfig } from '../../../utils/scope.js';
-import { NoticeKind } from '../../../utils/alertEmbed.js';
-import {
-  deferEphemeralReply,
-  editAlert,
-  editEmbed,
-} from '../../../utils/interactionReplies.js';
-import { buildListAddApprovalEmbed } from '../helpers.js';
-import { getInteractionDisplayName } from '../../../utils/names.js';
-import { getUserLanguage, t } from '../../../services/i18n/index.js';
-import {
-  buildDeliveryFailedAlert,
-  buildListMutationPayload,
-  submitListMutation,
-} from '../services/mutationFlow.js';
+import { getUserLanguage } from '../../../services/i18n/index.js';
+import { LIST_FORM_IDS, buildListAddFormModal } from '../form/fields.js';
 
 /**
  * Build the Quick-Add handler bag.
- * @param {object} deps
- * @param {object} deps.services - shared approval-flow services
- *   (sendListAddApprovalToApprovers, executeListAddToDatabase)
- * @returns {{
- *   handleQuickAddSelect: Function,
- *   handleQuickAddModal: Function,
- * }}
+ * @returns {{handleQuickAddSelect: Function}}
  */
-export function createQuickAddHandlers({ services }) {
-  const { sendListAddApprovalToApprovers, executeListAddToDatabase } = services;
-
+export function createQuickAddHandlers() {
   async function handleQuickAddSelect(interaction) {
     const name = interaction.values[0];
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-
-    const modal = new ModalBuilder()
-      .setCustomId(`quickadd_modal:${name}`)
-      .setTitle(t('quickAdd.modalTitle', lang, { name }).slice(0, 45))
-      .addComponents(
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId('quickadd_type')
-            .setLabel(t('quickAdd.typeLabel', lang))
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder(t('quickAdd.typePlaceholder', lang))
-            .setValue('black')
-            .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId('quickadd_reason')
-            .setLabel(t('quickAdd.reasonLabel', lang))
-            .setStyle(TextInputStyle.Paragraph)
-            .setPlaceholder(t('quickAdd.reasonPlaceholder', lang))
-            .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId('quickadd_raid')
-            .setLabel(t('quickAdd.raidLabel', lang))
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder(t('quickAdd.raidPlaceholder', lang))
-            .setRequired(false)
-        ),
-      );
-
-    await interaction.showModal(modal);
+    await interaction.showModal(buildListAddFormModal(lang, {
+      customId: LIST_FORM_IDS.quickAddModal,
+      name,
+      chosenType: 'black',
+    }));
   }
 
-  async function handleQuickAddModal(interaction) {
-    const name = interaction.customId.split(':')[1];
-    const type = interaction.fields.getTextInputValue('quickadd_type').trim().toLowerCase();
-    const reason = interaction.fields.getTextInputValue('quickadd_reason').trim();
-    const raidInput = interaction.fields.getTextInputValue('quickadd_raid')?.trim() || '';
-    const raid = resolveListAddRaidLabel(type, raidInput);
-
-    await deferEphemeralReply(interaction);
-    await connectDB();
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-
-    const rules = [
-      {
-        invalid: () => !['black', 'white', 'watch'].includes(type),
-        alert: () => t('dialogue.quickAdd.invalidType', lang, { type }),
-      },
-      {
-        invalid: () => !reason,
-        alert: () => t('dialogue.listAdd.command.reasonRequired', lang),
-      },
-      {
-        invalid: () => raid === null,
-        alert: () => t('dialogue.listAdd.command.invalidRaid', lang, {
-          raid: raidInput,
-          list: type === 'black' ? 'blacklist' : 'whitelist',
-        }),
-      },
-    ];
-    const violation = rules.find(({ invalid }) => invalid());
-    if (violation) {
-      await editAlert(interaction, { kind: NoticeKind.INPUT, ...violation.alert() });
-      return;
-    }
-
-    try {
-      // Resolve scope from guild default setting
-      let quickScope = 'global';
-      if (type === 'black' && interaction.guild?.id) {
-        const gc = await getGuildConfig(interaction.guild.id);
-        quickScope = gc?.defaultBlacklistScope || 'global';
-      }
-
-      const payload = buildListMutationPayload({
-        interaction,
-        requestedByDisplayName: getInteractionDisplayName(interaction),
-        lang,
-        type,
-        name,
-        reason,
-        raid,
-        logsUrl: '',
-        imageUrl: '',
-        scope: quickScope,
-      });
-
-      await submitListMutation({
-        interaction,
-        payload,
-        lang,
-        PendingApprovalModel: PendingApproval,
-        sendListAddApprovalToApprovers,
-        executeListAddToDatabase,
-        onDeliveryFailed: (delivery) => editAlert(
-          interaction,
-          buildDeliveryFailedAlert('dialogue.quickAdd.deliveryFailed', delivery, lang),
-        ),
-        onQueued: (delivery) => editEmbed(
-          interaction,
-          buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang, snapshot: delivery.snapshot }),
-        ),
-      });
-    } catch (err) {
-      console.error('[quickadd] Failed:', err.message);
-      await editAlert(interaction, {
-        kind: NoticeKind.FAILURE,
-        ...t('dialogue.quickAdd.failed', lang),
-        fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
-      });
-    }
-  }
-
-  return { handleQuickAddSelect, handleQuickAddModal };
+  return { handleQuickAddSelect };
 }

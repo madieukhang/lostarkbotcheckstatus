@@ -20,6 +20,8 @@ import { buildListEditInput } from '../edit/command.js';
 
 export const LIST_FORM_IDS = Object.freeze({
   addModal: 'listform_add',
+  // The add form opened from Quick-Add on a /la-check card; it answers privately.
+  quickAddModal: 'listform_quickadd',
   editModal: 'listform_edit',
   type: 'listform_type',
   name: 'listform_name',
@@ -54,7 +56,7 @@ function choiceSelect(id, { required, placeholder, options }) {
     .addOptions(options);
 }
 
-function typeSelect(lang, { required, placeholderKey, blackHintKey }) {
+function typeSelect(lang, { required, placeholderKey, blackHintKey, chosen = '' }) {
   return choiceSelect(LIST_FORM_IDS.type, {
     required,
     placeholder: t(`listForm.${placeholderKey}`, lang),
@@ -62,6 +64,7 @@ function typeSelect(lang, { required, placeholderKey, blackHintKey }) {
       label: t(`listForm.types.${key}`, lang),
       value,
       ...(value === 'black' ? { description: t(`listForm.types.${blackHintKey}`, lang) } : {}),
+      ...(value === chosen ? { default: true } : {}),
     })),
   });
 }
@@ -76,12 +79,13 @@ function raidSelect(lang, placeholderKey, now) {
   });
 }
 
-function textInput(id, { style, required, placeholder }) {
-  return new TextInputBuilder()
+function textInput(id, { style, required, placeholder, value = '' }) {
+  const input = new TextInputBuilder()
     .setCustomId(id)
     .setStyle(style)
     .setRequired(required)
     .setPlaceholder(placeholder);
+  return value ? input.setValue(value) : input;
 }
 
 const imageUpload = () => new FileUploadBuilder()
@@ -90,22 +94,32 @@ const imageUpload = () => new FileUploadBuilder()
   .setMaxValues(1);
 
 /**
- * The /la-list add-form modal: list (with blacklist scope), name, reason,
- * raid and an optional evidence screenshot.
+ * The add form: list (with blacklist scope), name, reason, raid and an
+ * optional evidence screenshot. /la-list add-form opens it empty; Quick-Add
+ * opens it with the picked name and blacklist chosen.
  * @param {string} lang - viewer language
- * @param {{now?: Date}} [options] - clock for the selectable raids
+ * @param {object} [options]
+ * @param {Date} [options.now] - clock for the selectable raids
+ * @param {string} [options.customId] - LIST_FORM_IDS.addModal or quickAddModal
+ * @param {string} [options.name] - name to fill in
+ * @param {string} [options.chosenType] - list dropdown value to preselect
  * @returns {ModalBuilder}
  */
-export function buildListAddFormModal(lang, { now = new Date() } = {}) {
+export function buildListAddFormModal(lang, {
+  now = new Date(),
+  customId = LIST_FORM_IDS.addModal,
+  name = '',
+  chosenType = '',
+} = {}) {
   return new ModalBuilder()
-    .setCustomId(LIST_FORM_IDS.addModal)
+    .setCustomId(customId)
     .setTitle(t('listForm.addTitle', lang))
     .addLabelComponents(
-      label(lang, 'typeLabel').setStringSelectMenuComponent(
-        typeSelect(lang, { required: true, placeholderKey: 'typePlaceholder', blackHintKey: 'blackAddHint' }),
-      ),
+      label(lang, 'typeLabel').setStringSelectMenuComponent(typeSelect(lang, {
+        required: true, placeholderKey: 'typePlaceholder', blackHintKey: 'blackAddHint', chosen: chosenType,
+      })),
       label(lang, 'nameLabel').setTextInputComponent(textInput(LIST_FORM_IDS.name, {
-        style: TextInputStyle.Short, required: true, placeholder: t('listForm.namePlaceholder', lang),
+        style: TextInputStyle.Short, required: true, placeholder: t('listForm.namePlaceholder', lang), value: name,
       })),
       label(lang, 'reasonLabel').setTextInputComponent(textInput(LIST_FORM_IDS.reason, {
         style: TextInputStyle.Paragraph, required: true, placeholder: t('listForm.reasonPlaceholder', lang),

@@ -442,13 +442,6 @@ const jp = {
   quickAdd: {
     selectPlaceholder: '⚡ Quick Add to List · 名前を選択',
     noListHit: 'どの list にもいません',
-    modalTitle: 'Quick Add · {name}',
-    typeLabel: 'List (black / white / watch)',
-    typePlaceholder: 'black',
-    reasonLabel: 'Reason',
-    reasonPlaceholder: 'この player を追加する理由',
-    raidLabel: 'Raid (任意)',
-    raidPlaceholder: '例: Kazeros Hard',
   },
 
   remove: {

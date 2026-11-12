@@ -27,6 +27,7 @@ import { handleSetupRemoteCommand } from '../handlers/setup/remote.js';
 import { handleStatsCommand } from '../handlers/meta/stats.js';
 import { handleHelpCommand, handleHelpSelect } from '../handlers/meta/help.js';
 import { createOcrModeCommandHandler } from '../handlers/list/check/mode.js';
+import { LIST_FORM_IDS } from '../handlers/list/form/fields.js';
 import {
   handleLanguageSwitchCommand,
   handleLanguageSwitchSelect,
@@ -281,12 +282,22 @@ export function createSelectRoutes(listHandlers) {
   ];
 }
 
-function createModalRoutes(listHandlers) {
+export function createModalRoutes(listHandlers) {
   return [
     {
-      prefixes: ['quickadd_modal:'],
+      exact: LIST_FORM_IDS.addModal,
+      label: '[list-form] Add form error:',
+      handle: (interaction) => listHandlers.handleListAddFormSubmit(interaction),
+    },
+    {
+      exact: LIST_FORM_IDS.editModal,
+      label: '[list-form] Edit form error:',
+      handle: (interaction) => listHandlers.handleListEditFormSubmit(interaction),
+    },
+    {
+      exact: LIST_FORM_IDS.quickAddModal,
       label: '[quickadd] Modal error:',
-      handle: (interaction) => listHandlers.handleQuickAddModal(interaction),
+      handle: (interaction) => listHandlers.handleQuickAddFormSubmit(interaction),
     },
   ];
 }
@@ -301,7 +312,9 @@ export function createCommandRoutes({ systemHandlers, listHandlers }) {
     'la-list': {
       subcommands: {
         add: listHandlers.handleListAddCommand,
+        'add-form': listHandlers.handleListAddFormCommand,
         edit: listHandlers.handleListEditCommand,
+        'edit-form': listHandlers.handleListEditFormCommand,
         remove: listHandlers.handleListRemoveCommand,
         view: listHandlers.handleListViewCommand,
         trust: listHandlers.handleListTrustCommand,
