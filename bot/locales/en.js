@@ -82,9 +82,9 @@ const en = {
           description: 'Open a form to add a character to a list, no options to type',
         },
         editForm: {
-          description: 'Open a form to edit an existing list entry; search the name first if you like',
+          description: 'Pick the entry by name, then edit it in a form',
           options: {
-            name: 'Search the entry to edit (optional); empty shows the 10 newest entries',
+            name: 'Entry to edit; empty shows the 10 newest entries',
           },
         },
         remove: {
@@ -308,7 +308,7 @@ const en = {
           lines: [
             '`/la-list add type name reason raid [image] [scope]` - Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only). If the character is already listed, **Add to history** saves your reason and raid as a new note on that entry; a note on an entry you did not add in this server goes to the approvers first.',
             '`/la-list edit name [reason] [type] [raid] [image] [scope] [additional_names]` - Edit an existing entry. `additional_names` appends alts manually for hidden-roster/no-guild edges.',
-            '`/la-list add-form` · `/la-list edit-form` - The same add and edit as a form, for anyone who would rather not type options: pick the list (blacklist scope included) and the raid from dropdowns and attach a screenshot. A custom watchlist raid and `additional_names` stay on the commands.',
+            '`/la-list add-form` · `/la-list edit-form name` -The same add and edit as a form, for anyone who would rather not type options: pick the list (blacklist scope included) and the raid from dropdowns and attach a screenshot. A custom watchlist raid and `additional_names` stay on the commands.',
             '`/la-list remove name` - Remove an entry from a list. In remove, edit and edit-form, typing `name` searches the lists',
             '`/la-list view type [scope]` - View entries (type: all/black/white/watch/trusted, scope: all/global/server)',
           ],

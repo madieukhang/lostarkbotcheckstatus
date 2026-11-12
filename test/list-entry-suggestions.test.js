@@ -146,10 +146,10 @@ test('/la-list name suggestions answer empty when the lookup fails, and raid sug
   assert.ok(raids.some((choice) => choice.value === 'Serca Hard'));
 });
 
-test('the name option searches in edit, remove and edit-form, where it is optional', () => {
+test('the name option searches in edit, remove and edit-form, where it is required too', () => {
   const list = buildCommands().find((command) => command.name === 'la-list');
   const nameOf = (sub) => list.options.find((option) => option.name === sub).options.find((option) => option.name === 'name');
   for (const sub of ['edit', 'remove', 'edit-form']) assert.equal(nameOf(sub).autocomplete, true, sub);
   assert.ok(!nameOf('add').autocomplete);
-  assert.ok(!nameOf('edit-form').required);
+  assert.equal(nameOf('edit-form').required, true);
 });

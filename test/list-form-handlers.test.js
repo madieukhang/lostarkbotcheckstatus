@@ -113,9 +113,10 @@ test('/la-list routes add-form and edit-form, and each form id reaches its submi
   assert.equal(routed('quickadd_modal:Mokoko'), undefined, 'the old Quick-Add modal is gone');
 });
 
-test('the form subcommands ask nothing but an optional name to search in edit-form', () => {
+test('the form subcommands ask nothing but the name to search in edit-form', () => {
   const list = buildCommands().find((command) => command.name === 'la-list');
-  const expected = { 'add-form': [], 'edit-form': [['name', false]] };
+  // A required option shows at once with its suggestions; an optional one hides until added.
+  const expected = { 'add-form': [], 'edit-form': [['name', true]] };
   for (const [name, options] of Object.entries(expected)) {
     const sub = list.options.find((option) => option.name === name);
     assert.ok(sub, name);

@@ -186,7 +186,7 @@ function listCommand(name) {
           opt
             .setName('name')
             .setDescription(commandText('list.subcommands.editForm.options.name'))
-            .setRequired(false)
+            .setRequired(true)
             .setAutocomplete(true)
         )
     )
