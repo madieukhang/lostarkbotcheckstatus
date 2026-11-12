@@ -2,16 +2,14 @@
  * handlers/list/services/entrySuggestions.js
  * Name suggestions for list entries: a prefix search over the three lists,
  * the blacklist limited to what the viewer's server may see, turned into
- * Discord autocomplete choices that read "list icon, class, name, CP". A
- * choice is one line of text, so the class and CP come from the roster
- * snapshots and the reason and raid stay out. /la-evidence values a choice by list and id;
+ * Discord autocomplete choices that read "list icon, name". A choice is one
+ * line of plain text, so an application emoji (a class icon) would show as
+ * its raw <:name:id> markup. /la-evidence values a choice by list and id;
  * /la-list edit, remove and edit-form value it by name.
  */
 
 import { connectDB } from '../../../db.js';
-import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
-import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { LIST_TYPES, getListContext } from '../helpers.js';
 
@@ -25,40 +23,13 @@ const RECENT_LIMIT = 10;
 const addedTime = ({ doc }) => new Date(doc.addedAt || 0).getTime();
 
 /**
- * Class and combat power of the given characters from their roster
- * snapshots, keyed by lowercased name. A failed lookup leaves them out
- * rather than the suggestions.
- * @param {string[]} names
- * @returns {Promise<Map<string, {className: string, combatScore: string}>>}
- */
-async function findRosterFacts(names) {
-  if (names.length === 0) return new Map();
-  try {
-    const snapshots = await RosterSnapshot.find({ name: { $in: names } })
-      .collation(CASE_INSENSITIVE_COLLATION)
-      .lean();
-    return new Map(snapshots.map((snapshot) => {
-      const combatScore = String(snapshot.combatScore ?? '').trim();
-      return [snapshot.name.toLowerCase(), {
-        className: getClassName(snapshot.classId),
-        // A snapshot stores '?' when the score was not readable.
-        combatScore: combatScore === '?' ? '' : combatScore,
-      }];
-    }));
-  } catch (err) {
-    console.warn('[list] Roster lookup for entry suggestions failed:', err.message);
-    return new Map();
-  }
-}
-
-/**
  * Entries whose name starts with the typed text, newest first per list; with
  * nothing typed, the 10 newest entries across the lists. The blacklist is
  * scope-filtered to the viewer's server, so a server only sees its own
  * server-scoped entries and the global ones.
  * @param {string} query - typed text
  * @param {string} guildId - viewer's server
- * @returns {Promise<Array<{doc: object, type: string, className?: string, combatScore?: string}>>}
+ * @returns {Promise<Array<{doc: object, type: string}>>}
  */
 async function findEntrySuggestions(query, guildId) {
   await connectDB();
@@ -84,15 +55,12 @@ async function findEntrySuggestions(query, guildId) {
       .lean();
     return docs.map((doc) => ({ doc, type }));
   }))).flat();
-  const results = trimmed ? found : found.sort((a, b) => addedTime(b) - addedTime(a)).slice(0, RECENT_LIMIT);
-
-  const facts = await findRosterFacts([...new Set(results.map(({ doc }) => doc.name))]);
-  return results.map((result) => ({ ...result, ...facts.get(result.doc.name.toLowerCase()) }));
+  return trimmed ? found : found.sort((a, b) => addedTime(b) - addedTime(a)).slice(0, RECENT_LIMIT);
 }
 
 /**
  * Autocomplete choices for found entries, one per value, 25 at most.
- * @param {Array<{doc: object, type: string, className?: string}>} results - from findEntrySuggestions
+ * @param {Array<{doc: object, type: string}>} results - from findEntrySuggestions
  * @param {Function} toValue - ({doc, type}) => the value the command receives
  * @returns {Array<{name: string, value: string}>}
  */
@@ -105,17 +73,12 @@ export function buildEntryChoices(results, toValue) {
     if (seen.has(value)) continue;
     seen.add(value);
 
-    const { doc, type, className = '', combatScore = '' } = result;
+    const { doc, type } = result;
     const { icon } = getListContext(type);
-    // The class icon is an application emoji loaded at runtime; until it is,
-    // or for a class without one, the class name stands in.
-    const classEmoji = getClassEmoji(className);
-    const classPrefix = classEmoji ? `${classEmoji} ` : (className && `${className} · `);
     // Local-scope tag helps an officer tell apart the same name appearing
     // under global vs server scope (rare but possible for blacklist).
     const scopeTag = type === 'black' && doc.scope === 'server' ? ' [S]' : '';
-    const combatPower = combatScore && ` · CP ${combatScore}`;
-    const label = `${icon} ${classPrefix}${doc.name}${scopeTag}${combatPower}`.slice(0, CHOICE_TEXT_MAX);
+    const label = `${icon} ${doc.name}${scopeTag}`.slice(0, CHOICE_TEXT_MAX);
 
     choices.push({ name: label, value });
     if (choices.length >= AUTOCOMPLETE_MAX) break;
