@@ -205,16 +205,17 @@ export function createViewHandlers({
       }
 
       if (allEntries.length === 0) {
-        const ctx = type === 'all' ? null : getListContext(type);
-        await editAlert(interaction, {
-          kind: NoticeKind.EMPTY,
-          title: type === 'all'
-            ? t('listView.empty.allTitle', lang)
-            : t('listView.empty.typedTitle', lang, { label: ctx.label }),
-          description: type === 'all'
-            ? t('listView.empty.allDescription', lang)
-            : t('listView.empty.typedDescription', lang, { label: ctx.label }),
-        });
+        const label = type === 'all' ? '' : getListContext(type).label;
+        const emptyCopy = label
+          ? {
+            title: t('listView.empty.typedTitle', lang, { label }),
+            description: t('listView.empty.typedDescription', lang, { label }),
+          }
+          : {
+            title: t('listView.empty.allTitle', lang),
+            description: t('listView.empty.allDescription', lang),
+          };
+        await editAlert(interaction, { kind: NoticeKind.EMPTY, ...emptyCopy });
         return;
       }
 
@@ -290,6 +291,67 @@ export function createViewHandlers({
         : await interaction.fetchReply();
       const collector = reply.createMessageComponentCollector({ time: 300000 });
 
+      // Acknowledges a page button, applies its change, then redraws. The
+      // label names the redraw in a failed-render log.
+      const redrawAfter = (label, change) => async (componentInteraction) => {
+        await componentInteraction.deferUpdate();
+        await change();
+        await renderQueue.request(label);
+      };
+
+      // Opens one entry's evidence card, read again under the viewer's scope.
+      async function showEvidenceCard(componentInteraction) {
+        if (componentInteraction.values?.[0] === 'none') {
+          await resetSelectMenu(componentInteraction, 'listview_evidence');
+          return;
+        }
+        await deferReply(componentInteraction, { ephemeral: true });
+        try {
+          const entry = await loadEvidenceEntry(componentInteraction.values?.[0], viewGuildId);
+          if (!entry) {
+            await editAlert(componentInteraction, {
+              kind: NoticeKind.EXPIRED,
+              ...t('dialogue.check.entryRemoved', lang),
+            });
+            return;
+          }
+          // An entry without a screenshot still has a reason, a raid and
+          // its tracked alts · the card renders those and says the
+          // evidence is missing.
+          const displayUrl = hasEvidence(entry)
+            ? await resolveImageUrl(entry, client)
+            : '';
+          await editEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, {
+            includeAddedBy: isOfficerOrSenior(componentInteraction.user.id),
+            // The typed list view already told the user which collection they
+            // opened, so the detail card should spend this slot on new data.
+            includeList: false,
+            lang,
+            statMap,
+          }), { components: buildNoteHistoryRows(entry._listType, entry, lang) });
+        } catch (err) {
+          console.warn('[list-view] Evidence lookup failed:', err.message);
+          await editAlert(componentInteraction, {
+            kind: NoticeKind.FAILURE,
+            ...t('dialogue.listView.failed', lang),
+            fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
+          });
+        }
+      }
+
+      const componentHandlers = {
+        listview_prev: redrawAfter('pagination', () => {
+          currentPage = Math.max(0, currentPage - 1);
+        }),
+        listview_next: redrawAfter('pagination', () => {
+          currentPage = Math.min(totalPages - 1, currentPage + 1);
+        }),
+        listview_refresh: redrawAfter('refresh', () => refreshEntries().catch((err) => {
+          console.warn('[list] Live view refresh failed:', err.message);
+        })),
+        listview_evidence: showEvidenceCard,
+      };
+
       collector.on('collect', catchListenerErrors('list-view', async (componentInteraction) => {
         if (componentInteraction.user.id !== interaction.user.id) {
           const clickerLang = await getLanguage(componentInteraction.user.id, { UserPreferenceModel: UserPreference });
@@ -300,60 +362,10 @@ export function createViewHandlers({
           return;
         }
 
-        const isPrevious = componentInteraction.customId === 'listview_prev';
-        const isNext = componentInteraction.customId === 'listview_next';
-        const isRefresh = componentInteraction.customId === 'listview_refresh';
-        if (isPrevious || isNext || isRefresh) {
-          await componentInteraction.deferUpdate();
-          if (isRefresh) {
-            await refreshEntries().catch((err) => {
-              console.warn('[list] Live view refresh failed:', err.message);
-            });
-          }
-          if (isPrevious) currentPage = Math.max(0, currentPage - 1);
-          if (isNext) currentPage = Math.min(totalPages - 1, currentPage + 1);
-          await renderQueue.request(isRefresh ? 'refresh' : 'pagination');
-          return;
-        }
-
-        if (componentInteraction.customId === 'listview_evidence') {
-          if (componentInteraction.values?.[0] === 'none') {
-            await resetSelectMenu(componentInteraction, 'listview_evidence');
-            return;
-          }
-          await deferReply(componentInteraction, { ephemeral: true });
-          try {
-            const entry = await loadEvidenceEntry(componentInteraction.values?.[0], viewGuildId);
-            if (!entry) {
-              await editAlert(componentInteraction, {
-                kind: NoticeKind.EXPIRED,
-                ...t('dialogue.check.entryRemoved', lang),
-              });
-              return;
-            }
-            // An entry without a screenshot still has a reason, a raid and
-            // its tracked alts · the card renders those and says the
-            // evidence is missing.
-            const displayUrl = hasEvidence(entry)
-              ? await resolveImageUrl(entry, client)
-              : '';
-            await editEmbed(componentInteraction, buildEvidenceEmbed(entry, displayUrl, {
-              includeAddedBy: isOfficerOrSenior(componentInteraction.user.id),
-              // The typed list view already told the user which collection they
-              // opened, so the detail card should spend this slot on new data.
-              includeList: false,
-              lang,
-              statMap,
-            }), { components: buildNoteHistoryRows(entry._listType, entry, lang) });
-          } catch (err) {
-            console.warn('[list-view] Evidence lookup failed:', err.message);
-            await editAlert(componentInteraction, {
-              kind: NoticeKind.FAILURE,
-              ...t('dialogue.listView.failed', lang),
-              fields: [{ name: t('dialogue.common.fields.details', lang), value: `\`${err.message}\``, inline: false }],
-            });
-          }
-        }
+        const handleComponent = Object.hasOwn(componentHandlers, componentInteraction.customId)
+          ? componentHandlers[componentInteraction.customId]
+          : null;
+        if (handleComponent) await handleComponent(componentInteraction);
       }));
 
       collector.on('end', async () => {

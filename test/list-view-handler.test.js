@@ -5,6 +5,8 @@ import Blacklist from '../bot/models/Blacklist.js';
 import TrustedUser from '../bot/models/TrustedUser.js';
 import { buildScopedListQuery } from '../bot/utils/scope.js';
 import { t as translate } from '../bot/services/i18n/index.js';
+import { COLORS } from '../bot/utils/ui.js';
+import { getListContext } from '../bot/handlers/list/helpers.js';
 
 import {
   buildBlacklistViewQuery,
@@ -448,3 +450,93 @@ test('/la-list view loads entries and stats concurrently, then renders the compl
   assert.match(messageEdits[0].embeds[0].toJSON().description, /Bard \*\*\[Fastfirst\]/u);
   assert.equal(typeof collectHandler, 'function');
 });
+
+// Opens a view over fixed rows and returns the collector's click handler and
+// the replies edited into the view message.
+async function openListView({ type = 'black', entries, ...deps }) {
+  let collect;
+  const replies = [];
+  await createViewHandlers({
+    client: {}, connectDatabase: async () => {}, getLanguage: async () => 'en',
+    loadStatMap: async () => new Map(), loadEntries: async () => entries,
+    ...deps,
+  }).handleListViewCommand({
+    user: { id: 'viewer' }, guild: { id: 'guild' },
+    options: { getString: key => (key === 'type' ? type : null) },
+    deferReply: async () => {},
+    editReply: async payload => {
+      replies.push(payload);
+      return { createMessageComponentCollector: () => ({ on: (event, callback) => { if (event === 'collect') collect = callback; } }) };
+    },
+  });
+  return { click: payload => collect({ user: { id: 'viewer' }, ...payload }), replies };
+}
+
+const blacklistRow = (name, extra = {}) => ({
+  _id: 'c'.repeat(24), name, reason: 'Report', _listType: 'black', _label: 'Blacklist', _icon: '⛔', _color: 0xed4245, ...extra,
+});
+
+// Opens the evidence card of one row and returns the card's embed.
+async function openEvidence(t, loadEvidenceEntry) {
+  t.mock.method(console, 'warn', () => {});
+  const { click } = await openListView({ entries: [blacklistRow('Shown')], loadEvidenceEntry, resolveImageUrl: async () => '' });
+  let detail;
+  await click({
+    customId: 'listview_evidence', values: [`black:${'c'.repeat(24)}`],
+    deferReply: async () => {}, editReply: async payload => { detail = payload; },
+  });
+  return detail.embeds[0].toJSON();
+}
+
+test('list-view page buttons stop at the first and last page and acknowledge each click', async () => {
+  const entries = Array.from({ length: 11 }, (_, index) => blacklistRow(`Row${index + 1}x`, { addedAt: new Date(2026, 0, 11 - index) }));
+  const { click, replies } = await openListView({ entries });
+  let acknowledged = 0;
+  const press = customId => click({ customId, deferUpdate: async () => { acknowledged += 1; } });
+  // A page past either end renders an empty description, which the embed
+  // builder rejects; the render queue only logs that, so count the renders.
+  const pageLabel = () => replies.at(-1).components[0].toJSON().components[1].label;
+
+  await press('listview_prev');
+  assert.equal(replies.length, 2);
+  assert.equal(pageLabel(), '1 / 2');
+  assert.match(replies.at(-1).embeds[0].toJSON().description, /Row1x/u);
+  await press('listview_next');
+  await press('listview_next');
+  assert.equal(replies.length, 4);
+  assert.equal(pageLabel(), '2 / 2');
+  assert.match(replies.at(-1).embeds[0].toJSON().description, /Row9x/u);
+  assert.equal(acknowledged, 3);
+});
+
+test('list-view evidence of an entry removed since the view opened gets the expired notice', async t => {
+  const card = await openEvidence(t, async () => null);
+  assert.ok(card.title.includes(translate('dialogue.check.entryRemoved', 'en').title));
+  assert.equal(card.color, COLORS.muted);
+});
+
+test('list-view evidence card leaves out the list line the view already shows', async t => {
+  const card = await openEvidence(t, async () => blacklistRow('Shown'));
+  assert.ok(card.title.includes('Shown'));
+  const listField = translate('listView.evidence.list', 'en');
+  assert.equal((card.fields || []).some(field => field.name === listField), false);
+});
+
+test('list-view evidence lookup failure answers with a failure notice', async t => {
+  const card = await openEvidence(t, async () => { throw new Error('db down'); });
+  assert.ok(card.title.includes(translate('dialogue.listView.failed', 'en').title));
+  assert.equal(card.color, COLORS.danger);
+});
+
+for (const type of ['all', 'black']) {
+  test(`an empty ${type} list view names the list it opened`, async () => {
+    const { replies } = await openListView({ type, entries: [] });
+    const notice = replies[0].embeds[0].toJSON();
+    const label = type === 'all' ? null : getListContext(type).label;
+    const copy = type === 'all'
+      ? { title: translate('listView.empty.allTitle', 'en'), description: translate('listView.empty.allDescription', 'en') }
+      : { title: translate('listView.empty.typedTitle', 'en', { label }), description: translate('listView.empty.typedDescription', 'en', { label }) };
+    assert.ok(notice.title.includes(copy.title), notice.title);
+    assert.equal(notice.description, copy.description);
+  });
+}
