@@ -26,7 +26,7 @@ const PER_LIST_FETCH_CAP = 25;
  * @param {string} guildId - viewer's server
  * @returns {Promise<Array<{doc: object, type: string}>>}
  */
-export async function findEntrySuggestions(query, guildId) {
+async function findEntrySuggestions(query, guildId) {
   await connectDB();
   const trimmed = (query || '').trim();
 
