@@ -88,9 +88,11 @@ function textInput(id, { style, required, placeholder, value = '' }) {
   return value ? input.setValue(value) : input;
 }
 
+// A file upload asks for one file unless min_values says otherwise.
 const imageUpload = () => new FileUploadBuilder()
   .setCustomId(LIST_FORM_IDS.image)
   .setRequired(false)
+  .setMinValues(0)
   .setMaxValues(1);
 
 /**

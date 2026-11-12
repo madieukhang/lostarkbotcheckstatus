@@ -1,10 +1,10 @@
 /**
  * handlers/list/services/approvals.js
- * Approval DM dispatch + sync helpers shared across /la-list add,
- * edit, multiadd, and quickadd. Fans out the approval request to
- * every assigned approver, tracks the message IDs so a decision in
- * one DM mirrors to the others (syncApproverDmMessages), and posts
- * the final decision in the requester's origin channel.
+ * Approval DM dispatch + sync helpers shared across /la-list add (its
+ * forms and Quick-Add included), edit and multiadd. Fans out the
+ * approval request to every assigned approver, tracks the message IDs
+ * so a decision in one DM mirrors to the others (syncApproverDmMessages),
+ * and posts the final decision in the requester's origin channel.
  */
 
 import {

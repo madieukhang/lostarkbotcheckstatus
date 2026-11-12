@@ -102,8 +102,8 @@ export async function renderListAddExecutionResult(
  * A server-scoped request that finds a duplicate the requester did not add in
  * this server also goes to approval, since its note controls would change
  * that entry.
- * Surface-specific copy remains in callbacks so slash-add and Quick Add can
- * keep their own UI without duplicating the approval contract.
+ * Surface-specific copy stays in the caller's callbacks, so the approval
+ * contract carries no UI of its own.
  * After the write succeeds, or the request is saved for approval, a failure
  * to show the confirmation card, or of `onQueued`, is logged and answered with
  * a plain notice that the write is saved, and does not throw. A failure to show

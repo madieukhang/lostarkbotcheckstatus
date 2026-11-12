@@ -584,7 +584,7 @@ const en = {
       white: 'Whitelist',
       watch: 'Watchlist',
       blackAddHint: "Uses this server's default scope",
-      blackEditHint: 'Keeps the current scope',
+      blackEditHint: 'A blacklist entry keeps its scope; others take the server default',
     },
   },
 

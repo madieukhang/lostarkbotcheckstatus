@@ -436,7 +436,7 @@ const jp = {
       white: 'Whitelist',
       watch: 'Watchlist',
       blackAddHint: 'サーバーの既定 scope を使用',
-      blackEditHint: '今の scope のまま',
+      blackEditHint: 'Blacklist の entry は scope のまま、他はサーバー既定',
     },
   },
 

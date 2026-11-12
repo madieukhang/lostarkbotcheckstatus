@@ -44,8 +44,18 @@ export function getListContext(type) {
   return LIST_CONTEXTS[type] || LIST_CONTEXTS.white;
 }
 
+/**
+ * Whether a value names one of the lists. getListContext reads any other
+ * value as the whitelist, so a write checks this first.
+ * @param {string} type
+ * @returns {boolean}
+ */
+export function isListType(type) {
+  return Object.hasOwn(LIST_CONTEXTS, type);
+}
+
 export function listTypeIcon(type) {
-  return (Object.hasOwn(LIST_CONTEXTS, type) ? LIST_CONTEXTS[type] : LIST_CONTEXTS.watch).icon;
+  return (isListType(type) ? LIST_CONTEXTS[type] : LIST_CONTEXTS.watch).icon;
 }
 
 /**

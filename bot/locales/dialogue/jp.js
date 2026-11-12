@@ -431,7 +431,7 @@ export default {
   },
   listAdd: {
     command: {
-      reasonRequired: { title: '理由がまだありませんの', description: 'List entry には理由が必要ですわ。', tip: 'Command を再実行して reason を入力してくださいませ' }, invalidRaid: { title: '自由な raid tag は watchlist 専用ですの', description: '`{raid}` は {list} の標準 raid ではありません。候補から選ぶか、自由入力には `type:watch` を使ってくださいませ。' }, invalidImage: { title: '添付 file は画像ではありませんの', description: '`image` option は画像 file のみです。Discord は `{type}` と判定しましたわ。' },
+      reasonRequired: { title: '理由がまだありませんの', description: 'List entry には理由が必要ですわ。', tip: 'Command を再実行して reason を入力してくださいませ' }, invalidType: { title: 'List がまだ選ばれていませんの', description: 'List の欄で Blacklist、Whitelist、Watchlist のどれかを選んでくださいませ。', tip: 'Form を開き直して list を選んでくださいませ' }, invalidRaid: { title: '自由な raid tag は watchlist 専用ですの', description: '`{raid}` は {list} の標準 raid ではありません。候補から選ぶか、自由入力には `type:watch` を使ってくださいませ。' }, invalidImage: { title: '添付 file は画像ではありませんの', description: '`image` option は画像 file のみです。Discord は `{type}` と判定しましたわ。' },
       deliveryFailed: { title: '承認してくださる方までお届けできませんでしたわ', description: '指定された approver のどなたにも連絡がつきませんでしたの。', tip: '何も保存されておりませんわ。もう一度お試しになるか、officer に直接ご連絡くださいませ' },
       proposalFailed: { title: '提案を作れませんでしたの', description: '承認 request の作成に失敗しましたので、entry は作成されていませんわ。', tip: '再実行し、続く場合は officer にご連絡くださいませ' },
     },

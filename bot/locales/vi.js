@@ -436,7 +436,7 @@ const vi = {
       white: 'Whitelist',
       watch: 'Watchlist',
       blackAddHint: 'Theo scope mặc định của server',
-      blackEditHint: 'Giữ scope hiện tại',
+      blackEditHint: 'Entry blacklist giữ scope; list khác theo mặc định của server',
     },
   },
 

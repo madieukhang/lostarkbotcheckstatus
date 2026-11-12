@@ -1,8 +1,9 @@
 /**
  * handlers/list/add/command.js
- * /la-list add: slash entry that opens the approval flow for adding
- * a character to the blacklist, whitelist or watchlist. Performs bible
- * roster scrape for `allCharacters` and resolves evidence image rehost.
+ * /la-list add, and the add form's submit (add-form and Quick-Add): opens the
+ * approval flow for adding a character to the blacklist, whitelist or
+ * watchlist. Performs bible roster scrape for `allCharacters` and resolves
+ * evidence image rehost.
  * Requests from any configured approver are written at once, and so are
  * server-scoped entries unless they find a duplicate the requester did not
  * add in this server; the rest go to the approvers via DM.
@@ -27,6 +28,7 @@ import {
 } from '../../../utils/interactionReplies.js';
 import {
   buildListAddApprovalEmbed,
+  isListType,
 } from '../helpers.js';
 import {
   buildDeliveryFailedAlert,
@@ -67,7 +69,7 @@ export function buildListAddRequest({ type, name, reason, raidInput = '', image 
  *   broadcaster (returns the message IDs for sync tracking)
  * @param {Function} deps.executeListAddToDatabase - the actual
  *   add-to-DB executor, also called from the approval-button handler
- * @returns {Function} handleListAddCommand(interaction)
+ * @returns {Function} handleListAddCommand(interaction, request?, options?)
  */
 export function createListAddCommandHandler({
   client,
@@ -91,6 +93,12 @@ export function createListAddCommandHandler({
         invalid: () => !interaction.guild,
         kind: NoticeKind.GUARD,
         message: () => t('dialogue.common.serverOnly', lang),
+      },
+      {
+        // The slash option offers only the lists; a form submit carries what its dropdown sent.
+        invalid: () => !isListType(request.type),
+        kind: NoticeKind.INPUT,
+        message: () => t('dialogue.listAdd.command.invalidType', lang),
       },
       {
         invalid: () => !request.reason,
@@ -179,8 +187,8 @@ export function createListAddCommandHandler({
         buildListAddApprovalEmbed(interaction.guild, payload, { forRequester: true, lang, snapshot: delivery.snapshot })
       ),
     });
-    // The decision later edits the request message, fetched from its channel;
-    // a private reply cannot be fetched that way, so it is not recorded.
+    // The decision later replies to the request message, fetched from its
+    // channel; a private reply cannot be fetched that way, so it is not recorded.
     if (submission.status === 'queued' && !ephemeral) {
       await captureRequestReplyId(interaction, payload.requestId);
     }

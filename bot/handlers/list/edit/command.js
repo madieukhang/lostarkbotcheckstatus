@@ -1,6 +1,6 @@
 /**
  * handlers/list/edit/command.js
- * /la-list edit: slash entry that edits an existing list entry's
+ * /la-list edit, and the edit form's submit: edits an existing list entry's
  * reason/raid/scope/image/allCharacters. Auto-approves for officers
  * (applyListEditNow), otherwise fans out an approval request via
  * sendListEditApprovalRequest.
@@ -35,6 +35,7 @@ import {
   buildTrustedBlockEmbed,
   isRequesterAutoApprover,
   isOfficerOrSenior,
+  isListType,
 } from '../helpers.js';
 import { applyListEditNow } from './applyNow.js';
 import { sendListEditApprovalRequest } from './approvalRequest.js';
@@ -134,6 +135,11 @@ async function rejectInvalidListEditInput({
   const mayAppendNames = existing.addedByUserId === interaction.user.id
     || isOfficerOrSenior(interaction.user.id);
   const rules = [
+    {
+      // The slash option offers only the lists; a form submit carries what its dropdown sent.
+      invalid: () => !isListType(plan.targetType),
+      alert: () => ({ kind: NoticeKind.INPUT, ...t('dialogue.listAdd.command.invalidType', lang) }),
+    },
     {
       invalid: () => plan.invalidRaid,
       alert: () => ({
@@ -323,7 +329,7 @@ async function dispatchListEdit({
  *   the same approval pipeline)
  * @param {Function} deps.broadcastListChange - guild broadcast
  * @param {Function} [deps.rehostImageFn] - evidence image rehost
- * @returns {Function} handleListEditCommand(interaction)
+ * @returns {Function} handleListEditCommand(interaction, input?)
  */
 export function createListEditCommandHandler({
   client,

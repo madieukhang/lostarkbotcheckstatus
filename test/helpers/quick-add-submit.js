@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createListAddCommandHandler } from '../../bot/handlers/list/add/command.js';
 import { LIST_FORM_IDS } from '../../bot/handlers/list/form/fields.js';
 import { createListFormHandlers } from '../../bot/handlers/list/form/index.js';
+import { modalSubmitFields } from './modal-submit.js';
 
 /**
  * Quick-Add's submit as the bot wires it: the add form, run by the
@@ -18,16 +19,13 @@ export function quickAddSubmit(services) {
 }
 
 /**
- * The fields of a submitted Quick-Add form.
+ * The fields of a submitted Quick-Add form, raid and screenshot left out.
  * @param {{type: string, name: string, reason: string}} values
- * @returns {object} stands in for ModalSubmitFields
+ * @returns {import('discord.js').ModalSubmitFields}
  */
 export function quickAddFields({ type, name, reason }) {
-  const values = { [LIST_FORM_IDS.type]: [type], [LIST_FORM_IDS.name]: name, [LIST_FORM_IDS.reason]: reason };
-  return {
-    fields: new Map(Object.keys(values).map((id) => [id, {}])),
-    getTextInputValue: (id) => values[id],
-    getStringSelectValues: (id) => values[id],
-    getUploadedFiles: () => null,
-  };
+  return modalSubmitFields({
+    texts: { [LIST_FORM_IDS.name]: name, [LIST_FORM_IDS.reason]: reason },
+    selects: { [LIST_FORM_IDS.type]: [type] },
+  });
 }

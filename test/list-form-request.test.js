@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import { Collection, MessageFlags } from 'discord.js';
+import { MessageFlags } from 'discord.js';
+import { modalSubmitFields } from './helpers/modal-submit.js';
+import { COLORS } from '../bot/utils/ui.js';
 import Blacklist from '../bot/models/Blacklist.js';
 import Whitelist from '../bot/models/Whitelist.js';
 import Watchlist from '../bot/models/Watchlist.js';
@@ -105,15 +107,55 @@ test('/la-list edit runs an input read elsewhere without touching slash options'
   assert.match(replies[0].embeds[0].toJSON().title, /not an image/);
 });
 
-// The submit of a form: the ids in `values` were filled in.
-function formFields(values) {
-  return {
-    fields: new Map(Object.keys(values).map((id) => [id, {}])),
-    getTextInputValue: (id) => values[id],
-    getStringSelectValues: (id) => values[id],
-    getUploadedFiles: (id) => values[id],
-  };
-}
+const ID = LIST_FORM_IDS;
+const ENTRY = {
+  _id: 'a'.repeat(24), name: 'Mokoko', reason: 'Report', scope: 'global', addedByUserId: 'entry-owner', allCharacters: [],
+};
+const invalidTypeTitle = translate('dialogue.listAdd.command.invalidType', 'en').title;
+
+test('an add form with no known list gets a notice and files nothing', async (t) => {
+  stubLookups(t);
+  // The add path catches its own errors, so record the calls instead of failing inside them.
+  const reached = [];
+  const { handleListAddFormSubmit } = createListFormHandlers({
+    handleListAddCommand: createListAddCommandHandler({
+      client: {},
+      sendListAddApprovalToApprovers: async () => { reached.push('approvers'); },
+      executeListAddToDatabase: async () => { reached.push('write'); },
+    }),
+    handleListEditCommand: () => assert.fail('not an add'),
+  });
+  const texts = { [ID.name]: 'Mokoko', [ID.reason]: 'Report' };
+
+  for (const selects of [{ [ID.type]: ['foo:server'] }, {}]) {
+    const replies = [];
+    await handleListAddFormSubmit({ ...formSubmit(replies), fields: modalSubmitFields({ texts, selects }) });
+    assert.ok(replies.at(-1).embeds[0].toJSON().title.includes(invalidTypeTitle), JSON.stringify(selects));
+  }
+  assert.deepEqual(reached, []);
+});
+
+test('an edit form moving an entry to an unknown list gets a notice and changes nothing', async (t) => {
+  stubLookups(t, [ENTRY]);
+  const reached = [];
+  const { handleListEditFormSubmit } = createListFormHandlers({
+    handleListAddCommand: () => assert.fail('not an add'),
+    handleListEditCommand: createListEditCommandHandler({
+      client: {},
+      broadcastListChange: async () => { reached.push('broadcast'); },
+      sendListAddApprovalToApprovers: async () => { reached.push('approvers'); },
+    }),
+  });
+  const replies = [];
+
+  await handleListEditFormSubmit({
+    ...formSubmit(replies),
+    fields: modalSubmitFields({ texts: { [ID.name]: 'Mokoko' }, selects: { [ID.type]: ['foo'] } }),
+  });
+
+  assert.ok(replies.at(-1).embeds[0].toJSON().title.includes(invalidTypeTitle));
+  assert.deepEqual(reached, []);
+});
 
 test('an add form with a PDF gets the same notice as /la-list add', async (t) => {
   stubLookups(t);
@@ -129,11 +171,10 @@ test('an add form with a PDF gets the same notice as /la-list add', async (t) =>
 
   await handleListAddFormSubmit({
     ...formSubmit(replies),
-    fields: formFields({
-      [LIST_FORM_IDS.type]: ['black'],
-      [LIST_FORM_IDS.name]: 'Mokoko',
-      [LIST_FORM_IDS.reason]: 'Report',
-      [LIST_FORM_IDS.image]: new Collection([['1', PDF]]),
+    fields: modalSubmitFields({
+      texts: { [ID.name]: 'Mokoko', [ID.reason]: 'Report' },
+      selects: { [ID.type]: ['black'] },
+      files: { [ID.image]: [PDF] },
     }),
   });
 
@@ -141,9 +182,7 @@ test('an add form with a PDF gets the same notice as /la-list add', async (t) =>
 });
 
 test('an edit form with only the name gets the no-changes notice', async (t) => {
-  stubLookups(t, [{
-    _id: 'a'.repeat(24), name: 'Mokoko', reason: 'Report', scope: 'global', addedByUserId: 'entry-owner', allCharacters: [],
-  }]);
+  stubLookups(t, [ENTRY]);
   const replies = [];
   const { handleListEditFormSubmit } = createListFormHandlers({
     handleListAddCommand: () => assert.fail('not an add'),
@@ -154,7 +193,7 @@ test('an edit form with only the name gets the no-changes notice', async (t) => 
     }),
   });
 
-  await handleListEditFormSubmit({ ...formSubmit(replies), fields: formFields({ [LIST_FORM_IDS.name]: 'Mokoko' }) });
+  await handleListEditFormSubmit({ ...formSubmit(replies), fields: modalSubmitFields({ texts: { [ID.name]: 'Mokoko' } }) });
 
   assert.ok(replies[0].embeds[0].toJSON().title.includes(translate('dialogue.listEdit.command.noChanges', 'en').title));
 });
@@ -180,10 +219,19 @@ test('a quick add answers privately and leaves the request message unrecorded', 
     ...formSubmit(replies),
     deferReply: async (options) => { deferred.push(options); },
     fetchReply: async () => { recorded.push('fetchReply'); return { id: 'reply-1' }; },
-    fields: formFields({ [LIST_FORM_IDS.type]: ['black'], [LIST_FORM_IDS.name]: 'Mokoko', [LIST_FORM_IDS.reason]: 'Report' }),
+    fields: modalSubmitFields({ texts: { [ID.name]: 'Mokoko', [ID.reason]: 'Report' }, selects: { [ID.type]: ['black'] } }),
   });
 
   assert.deepEqual(deferred, [{ flags: MessageFlags.Ephemeral }]);
   assert.deepEqual(recorded, [], 'a private reply cannot be fetched back from its channel later');
-  assert.equal(replies.at(-1).embeds[0].toJSON().title, '📨 Blacklist · Sent for approval · Mokoko');
+  // The private answer is the /la-list add requester card.
+  const embed = replies.at(-1).embeds[0].toJSON();
+  assert.equal(embed.title, '📨 Blacklist · Sent for approval · Mokoko');
+  // Blurple marks the waiting state; the blacklist red belongs to the decision.
+  assert.equal(embed.color, COLORS.info);
+  assert.match(embed.description, /^I sent \*\*\[Mokoko\]\(.+\)\*\* to the approvers for the \*\*Blacklist\*\* `\[Global\]`/);
+  const names = embed.fields.map((field) => field.name);
+  for (const expected of ['📒 List', '🗡️ Raid', '🌐 Scope', '📝 Reason']) assert.ok(names.includes(expected), `missing ${expected}`);
+  assert.ok(!names.some((name) => /Requested by/.test(name)));
+  assert.equal(embed.footer.text, '⏳ Waiting on an approver');
 });

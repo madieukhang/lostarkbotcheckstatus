@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Collection } from 'discord.js';
 
+import { modalSubmitFields } from './helpers/modal-submit.js';
 import { getSelectableRaidValues } from '../bot/models/Raid.js';
 import { buildListAddRequest } from '../bot/handlers/list/add/command.js';
 import { buildListEditInput } from '../bot/handlers/list/edit/command.js';
@@ -26,19 +26,8 @@ const rowsOf = (modal) => modal.toJSON().components.map((row) => {
   assert.equal(row.type, LABEL);
   return [row.component.type, row.component.custom_id, row.component.required];
 });
-const optionValues = (modal, id) => modal.toJSON().components
-  .find((row) => row.component.custom_id === id).component.options.map((option) => option.value);
-
-// Stands in for ModalSubmitFields: only the ids in `values` were submitted.
-function submitted(values) {
-  const present = new Map(Object.keys(values).map((id) => [id, {}]));
-  return {
-    fields: present,
-    getTextInputValue: (id) => values[id],
-    getStringSelectValues: (id) => values[id],
-    getUploadedFiles: (id) => values[id],
-  };
-}
+const componentOf = (modal, id) => modal.toJSON().components.find((row) => row.component.custom_id === id).component;
+const optionValues = (modal, id) => componentOf(modal, id).options.map((option) => option.value);
 
 test('the add form asks for list, name, reason, raid and an optional screenshot', () => {
   const modal = buildListAddFormModal('en');
@@ -65,6 +54,13 @@ test('the edit form asks for the name and leaves every change optional', () => {
     [FILE, ID.image, false],
   ]);
   assert.deepEqual(optionValues(modal, ID.type), TYPE_VALUES);
+});
+
+test('the screenshot can be left out of either form', () => {
+  // A file upload asks for one file unless min_values says otherwise.
+  for (const modal of [buildListAddFormModal('en'), buildListEditFormModal('en')]) {
+    assert.equal(componentOf(modal, ID.image).min_values, 0);
+  }
 });
 
 test('the plain blacklist choice says what happens to the scope in each form', () => {
@@ -98,27 +94,30 @@ test('the type choice carries the blacklist scope', () => {
 });
 
 test('an add form submit becomes the request the add command builds', () => {
-  const proof = { url: 'https://cdn.example.test/proof.png', contentType: 'image/png' };
-  const request = readListAddForm(submitted({
-    [ID.type]: ['black:server'],
-    [ID.name]: 'mokoko',
-    [ID.reason]: 'Left mid-raid',
-    [ID.raid]: ['Serca Hard'],
-    [ID.image]: new Collection([['1', proof]]),
+  const request = readListAddForm(modalSubmitFields({
+    texts: { [ID.name]: 'mokoko', [ID.reason]: 'Left mid-raid' },
+    selects: { [ID.type]: ['black:server'], [ID.raid]: ['Serca Hard'] },
+    files: { [ID.image]: [{ url: 'https://cdn.example.test/proof.png', contentType: 'image/png' }] },
   }));
 
-  assert.deepEqual(request, buildListAddRequest({
-    type: 'black', name: 'mokoko', reason: 'Left mid-raid', raidInput: 'Serca Hard', image: proof, inputScope: 'server',
+  assert.deepEqual({ ...request, image: null }, buildListAddRequest({
+    type: 'black', name: 'mokoko', reason: 'Left mid-raid', raidInput: 'Serca Hard', image: null, inputScope: 'server',
   }));
+  assert.equal(request.image.url, 'https://cdn.example.test/proof.png');
+  assert.equal(request.image.contentType, 'image/png');
 });
 
 test('an edit form with only a name reads every change as keep, even with fields left out', () => {
-  const input = readListEditForm(submitted({ [ID.name]: 'mokoko', [ID.type]: [], [ID.image]: null }));
+  // Discord leaves an untouched optional field out of the submit.
+  const input = readListEditForm(modalSubmitFields({ texts: { [ID.name]: 'mokoko' }, selects: { [ID.type]: [] } }));
   assert.deepEqual(input, buildListEditInput({ name: 'mokoko' }));
 });
 
 test('an edit form moving an entry to a server-only blacklist reads type and scope', () => {
-  const input = readListEditForm(submitted({ [ID.name]: 'mokoko', [ID.type]: ['black:server'], [ID.raid]: ['Serca NM'] }));
+  const input = readListEditForm(modalSubmitFields({
+    texts: { [ID.name]: 'mokoko' },
+    selects: { [ID.type]: ['black:server'], [ID.raid]: ['Serca NM'] },
+  }));
   assert.equal(input.newType, 'black');
   assert.equal(input.newScope, 'server');
   assert.equal(input.newRaidInput, 'Serca NM');
