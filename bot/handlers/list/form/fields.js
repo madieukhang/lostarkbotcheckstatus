@@ -1,0 +1,191 @@
+/**
+ * handlers/list/form/fields.js
+ * The /la-list add-form and edit-form modals, and the reading of their
+ * submits into the same requests /la-list add and edit build from options.
+ */
+
+import {
+  FileUploadBuilder,
+  LabelBuilder,
+  ModalBuilder,
+  StringSelectMenuBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} from 'discord.js';
+
+import { getSelectableRaidValues } from '../../../models/Raid.js';
+import { t } from '../../../services/i18n/index.js';
+import { buildListAddRequest } from '../add/command.js';
+import { buildListEditInput } from '../edit/command.js';
+
+export const LIST_FORM_IDS = Object.freeze({
+  addModal: 'listform_add',
+  editModal: 'listform_edit',
+  type: 'listform_type',
+  name: 'listform_name',
+  reason: 'listform_reason',
+  raid: 'listform_raid',
+  image: 'listform_image',
+});
+
+// The list dropdown: a value carries the blacklist scope after a colon, since
+// scope only applies to blacklist. Plain `black` leaves the scope to the
+// handler (the server default on add, the entry's own scope on edit).
+const TYPE_CHOICES = Object.freeze([
+  { value: 'black', key: 'black' },
+  { value: 'black:server', key: 'blackServer' },
+  { value: 'black:global', key: 'blackGlobal' },
+  { value: 'white', key: 'white' },
+  { value: 'watch', key: 'watch' },
+]);
+
+// Discord's limit on the options of one select.
+const SELECT_OPTION_LIMIT = 25;
+
+const label = (lang, key) => new LabelBuilder().setLabel(t(`listForm.${key}`, lang));
+
+function choiceSelect(id, { required, placeholder, options }) {
+  return new StringSelectMenuBuilder()
+    .setCustomId(id)
+    .setPlaceholder(placeholder)
+    .setRequired(required)
+    .setMinValues(required ? 1 : 0)
+    .setMaxValues(1)
+    .addOptions(options);
+}
+
+function typeSelect(lang, { required, placeholderKey, blackHintKey }) {
+  return choiceSelect(LIST_FORM_IDS.type, {
+    required,
+    placeholder: t(`listForm.${placeholderKey}`, lang),
+    options: TYPE_CHOICES.map(({ value, key }) => ({
+      label: t(`listForm.types.${key}`, lang),
+      value,
+      ...(value === 'black' ? { description: t(`listForm.types.${blackHintKey}`, lang) } : {}),
+    })),
+  });
+}
+
+function raidSelect(lang, placeholderKey, now) {
+  return choiceSelect(LIST_FORM_IDS.raid, {
+    required: false,
+    placeholder: t(`listForm.${placeholderKey}`, lang),
+    options: getSelectableRaidValues({ now })
+      .slice(0, SELECT_OPTION_LIMIT)
+      .map((raid) => ({ label: raid, value: raid })),
+  });
+}
+
+function textInput(id, { style, required, placeholder }) {
+  return new TextInputBuilder()
+    .setCustomId(id)
+    .setStyle(style)
+    .setRequired(required)
+    .setPlaceholder(placeholder);
+}
+
+const imageUpload = () => new FileUploadBuilder()
+  .setCustomId(LIST_FORM_IDS.image)
+  .setRequired(false)
+  .setMaxValues(1);
+
+/**
+ * The /la-list add-form modal: list (with blacklist scope), name, reason,
+ * raid and an optional evidence screenshot.
+ * @param {string} lang - viewer language
+ * @param {{now?: Date}} [options] - clock for the selectable raids
+ * @returns {ModalBuilder}
+ */
+export function buildListAddFormModal(lang, { now = new Date() } = {}) {
+  return new ModalBuilder()
+    .setCustomId(LIST_FORM_IDS.addModal)
+    .setTitle(t('listForm.addTitle', lang))
+    .addLabelComponents(
+      label(lang, 'typeLabel').setStringSelectMenuComponent(
+        typeSelect(lang, { required: true, placeholderKey: 'typePlaceholder', blackHintKey: 'blackAddHint' }),
+      ),
+      label(lang, 'nameLabel').setTextInputComponent(textInput(LIST_FORM_IDS.name, {
+        style: TextInputStyle.Short, required: true, placeholder: t('listForm.namePlaceholder', lang),
+      })),
+      label(lang, 'reasonLabel').setTextInputComponent(textInput(LIST_FORM_IDS.reason, {
+        style: TextInputStyle.Paragraph, required: true, placeholder: t('listForm.reasonPlaceholder', lang),
+      })),
+      label(lang, 'raidLabel').setStringSelectMenuComponent(raidSelect(lang, 'raidPlaceholder', now)),
+      label(lang, 'imageLabel').setFileUploadComponent(imageUpload()),
+    );
+}
+
+/**
+ * The /la-list edit-form modal: the name of the entry, then optional
+ * changes; a field left empty keeps the entry's value.
+ * @param {string} lang - viewer language
+ * @param {{now?: Date}} [options] - clock for the selectable raids
+ * @returns {ModalBuilder}
+ */
+export function buildListEditFormModal(lang, { now = new Date() } = {}) {
+  return new ModalBuilder()
+    .setCustomId(LIST_FORM_IDS.editModal)
+    .setTitle(t('listForm.editTitle', lang))
+    .addLabelComponents(
+      label(lang, 'nameLabel').setTextInputComponent(textInput(LIST_FORM_IDS.name, {
+        style: TextInputStyle.Short, required: true, placeholder: t('listForm.namePlaceholder', lang),
+      })),
+      label(lang, 'newReasonLabel').setTextInputComponent(textInput(LIST_FORM_IDS.reason, {
+        style: TextInputStyle.Paragraph, required: false, placeholder: t('listForm.newReasonPlaceholder', lang),
+      })),
+      label(lang, 'newTypeLabel').setStringSelectMenuComponent(
+        typeSelect(lang, { required: false, placeholderKey: 'newTypePlaceholder', blackHintKey: 'blackEditHint' }),
+      ),
+      label(lang, 'newRaidLabel').setStringSelectMenuComponent(raidSelect(lang, 'newRaidPlaceholder', now)),
+      label(lang, 'newImageLabel').setFileUploadComponent(imageUpload()),
+    );
+}
+
+/**
+ * Splits a list dropdown value into the list and the blacklist scope.
+ * @param {string} [value] - one of the dropdown values, or '' when unchosen
+ * @returns {{type: string, scope: string}} '' for a part not given
+ */
+export function parseListFormType(value = '') {
+  const [type = '', scope = ''] = String(value).split(':');
+  return { type, scope };
+}
+
+// A field the submit does not carry reads as empty.
+const submittedText = (fields, id) => (fields.fields.has(id) ? fields.getTextInputValue(id) ?? '' : '');
+const submittedChoice = (fields, id) => (fields.fields.has(id) ? fields.getStringSelectValues(id)?.[0] ?? '' : '');
+const submittedFile = (fields, id) => (fields.fields.has(id) ? fields.getUploadedFiles(id)?.first() ?? null : null);
+
+/**
+ * Reads an add-form submit into the request /la-list add builds.
+ * @param {import('discord.js').ModalSubmitFields} fields
+ * @returns {object} from buildListAddRequest
+ */
+export function readListAddForm(fields) {
+  const { type, scope } = parseListFormType(submittedChoice(fields, LIST_FORM_IDS.type));
+  return buildListAddRequest({
+    type,
+    name: submittedText(fields, LIST_FORM_IDS.name),
+    reason: submittedText(fields, LIST_FORM_IDS.reason),
+    raidInput: submittedChoice(fields, LIST_FORM_IDS.raid),
+    image: submittedFile(fields, LIST_FORM_IDS.image),
+    inputScope: scope,
+  });
+}
+
+/**
+ * Reads an edit-form submit into the input /la-list edit builds.
+ * @param {import('discord.js').ModalSubmitFields} fields
+ * @returns {object} from buildListEditInput
+ */
+export function readListEditForm(fields) {
+  const { type, scope } = parseListFormType(submittedChoice(fields, LIST_FORM_IDS.type));
+  return buildListEditInput({
+    name: submittedText(fields, LIST_FORM_IDS.name),
+    reason: submittedText(fields, LIST_FORM_IDS.reason),
+    type,
+    raidInput: submittedChoice(fields, LIST_FORM_IDS.raid),
+    image: submittedFile(fields, LIST_FORM_IDS.image),
+    scope,
+  });
+}
