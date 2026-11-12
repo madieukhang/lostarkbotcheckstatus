@@ -6,8 +6,9 @@ import Blacklist from '../bot/models/Blacklist.js';
 import Whitelist from '../bot/models/Whitelist.js';
 import Watchlist from '../bot/models/Watchlist.js';
 import UserPreference from '../bot/models/UserPreference.js';
+import RosterSnapshot from '../bot/models/RosterSnapshot.js';
 import { disconnectDB } from '../bot/db.js';
-import { clearUserLanguageCache, t as translate } from '../bot/services/i18n/index.js';
+import { clearUserLanguageCache } from '../bot/services/i18n/index.js';
 import { buildScopedListQuery } from '../bot/utils/scope.js';
 import { handleListEvidenceAutocomplete } from '../bot/handlers/list/evidence/command.js';
 import { buildEntryChoices } from '../bot/handlers/list/services/entrySuggestions.js';
@@ -16,14 +17,15 @@ import { buildCommands } from '../bot/commands/index.js';
 
 const GUILD = 'suggest-guild';
 
-// Each list answers `docs[type]`; `queries[type]` records what it was asked.
+// Each list answers `docs[type]`, the roster snapshots `docs.snapshots`;
+// `queries[type]` records what each was asked.
 function stubLists(t, docs) {
   clearUserLanguageCache();
   t.mock.method(mongoose, 'connect', async () => mongoose);
   t.after(async () => { clearUserLanguageCache(); await disconnectDB(); });
   t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
   const queries = {};
-  for (const [type, model] of [['black', Blacklist], ['white', Whitelist], ['watch', Watchlist]]) {
+  for (const [type, model] of [['black', Blacklist], ['white', Whitelist], ['watch', Watchlist], ['snapshots', RosterSnapshot]]) {
     t.mock.method(model, 'find', (query) => {
       queries[type] = query;
       const chain = { collation: () => chain, sort: () => chain, limit: () => chain, lean: async () => docs[type] ?? [] };
@@ -45,22 +47,30 @@ async function suggest(focused) {
   return answered;
 }
 
-test('evidence suggestions show the list icon, a server tag and the reason, valued by list and id', async (t) => {
+test('suggestions show the list icon, the class before the name and a server tag, valued by list and id', async (t) => {
   const queries = stubLists(t, {
-    black: [{ _id: 'b1', name: 'Mokoko', scope: 'server', reason: 'Left mid-raid' }],
+    black: [{ _id: 'b1', name: 'Mokoko', scope: 'server', raid: 'Serca Hard', reason: 'Left mid-raid' }],
     white: [{ _id: 'w1', name: 'Mokobear', reason: '' }],
+    // Snapshot names match case-insensitively; Mokobear has none, so no class.
+    snapshots: [{ name: 'mokoko', classId: 'bard' }],
   });
 
   const choices = await suggest({ name: 'name', value: ' mok ' });
 
   assert.deepEqual(choices, [
-    { name: '⛔ Mokoko [S] - Left mid-raid', value: 'black:b1' },
-    { name: `✅ Mokobear - ${translate('listView.navigation.noReason', 'en')}`, value: 'white:w1' },
+    { name: '⛔ Bard · Mokoko [S]', value: 'black:b1' },
+    { name: '✅ Mokobear', value: 'white:w1' },
   ]);
   const prefix = { name: /^mok/i };
   assert.deepEqual(queries.black, buildScopedListQuery('black', prefix, GUILD));
   assert.deepEqual(queries.white, prefix);
   assert.deepEqual(queries.watch, prefix);
+  assert.deepEqual(queries.snapshots, { name: { $in: ['Mokoko', 'Mokobear'] } });
+});
+
+test('suggestions leave the class out when the class lookup fails', async (t) => {
+  stubLists(t, { black: [{ _id: 'b1', name: 'Mokoko', reason: 'r' }], snapshots: new Error('db busy') });
+  assert.deepEqual(await suggest({ name: 'name', value: 'mok' }), [{ name: '⛔ Mokoko', value: 'black:b1' }]);
 });
 
 test('evidence suggestions match the typed text literally and list recent entries when nothing is typed', async (t) => {
@@ -86,8 +96,8 @@ test('name-valued choices show a name found in two lists once', () => {
     { type: 'black', doc: { _id: 'b1', name: 'Mokoko', reason: 'r' } },
     { type: 'white', doc: { _id: 'w1', name: 'Mokoko', reason: 'r' } },
   ];
-  assert.deepEqual(buildEntryChoices(results, 'en', ({ doc }) => doc.name), [{ name: '⛔ Mokoko - r', value: 'Mokoko' }]);
-  assert.equal(buildEntryChoices(results, 'en', ({ type, doc }) => `${type}:${doc._id}`).length, 2);
+  assert.deepEqual(buildEntryChoices(results, ({ doc }) => doc.name), [{ name: '⛔ Mokoko', value: 'Mokoko' }]);
+  assert.equal(buildEntryChoices(results, ({ type, doc }) => `${type}:${doc._id}`).length, 2);
 });
 
 test('evidence suggestions answer empty for another option', async (t) => {

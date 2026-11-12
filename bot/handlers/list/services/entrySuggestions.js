@@ -2,21 +2,42 @@
  * handlers/list/services/entrySuggestions.js
  * Name suggestions for list entries: a prefix search over the three lists,
  * the blacklist limited to what the viewer's server may see, turned into
- * Discord autocomplete choices. /la-evidence values a choice by list and id;
+ * Discord autocomplete choices that read "list icon, class, name". A choice
+ * is one line of text, so the class comes from the roster snapshots and the
+ * reason and raid stay out. /la-evidence values a choice by list and id;
  * /la-list edit, remove and edit-form value it by name.
  */
 
 import { connectDB } from '../../../db.js';
+import { getClassName } from '../../../models/Class.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
-import UserPreference from '../../../models/UserPreference.js';
-import { getUserLanguage, t } from '../../../services/i18n/index.js';
-import { truncateInlineText } from '../../../utils/discordText.js';
+import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { LIST_TYPES, getListContext } from '../helpers.js';
 
-// Discord shows at most 25 choices.
+// Discord shows at most 25 choices, each label and value at most 100 characters.
 const AUTOCOMPLETE_MAX = 25;
+const CHOICE_TEXT_MAX = 100;
 const PER_LIST_FETCH_CAP = 25;
+
+/**
+ * Class names of the given characters, keyed by lowercased name. A failed
+ * lookup leaves the classes out rather than the suggestions.
+ * @param {string[]} names
+ * @returns {Promise<Map<string, string>>}
+ */
+async function findClassNames(names) {
+  if (names.length === 0) return new Map();
+  try {
+    const snapshots = await RosterSnapshot.find({ name: { $in: names } })
+      .collation(CASE_INSENSITIVE_COLLATION)
+      .lean();
+    return new Map(snapshots.map((snapshot) => [snapshot.name.toLowerCase(), getClassName(snapshot.classId)]));
+  } catch (err) {
+    console.warn('[list] Class lookup for entry suggestions failed:', err.message);
+    return new Map();
+  }
+}
 
 /**
  * Entries whose name starts with the typed text, newest first per list.
@@ -24,7 +45,7 @@ const PER_LIST_FETCH_CAP = 25;
  * sees its own server-scoped entries and the global ones.
  * @param {string} query - typed text; empty lists the newest entries
  * @param {string} guildId - viewer's server
- * @returns {Promise<Array<{doc: object, type: string}>>}
+ * @returns {Promise<Array<{doc: object, type: string, className: string}>>}
  */
 async function findEntrySuggestions(query, guildId) {
   await connectDB();
@@ -38,7 +59,7 @@ async function findEntrySuggestions(query, guildId) {
     return { name: new RegExp(`^${escaped}`, 'i') };
   };
 
-  const results = await Promise.all(LIST_TYPES.map(async (type) => {
+  const results = (await Promise.all(LIST_TYPES.map(async (type) => {
     const { model } = getListContext(type);
     const scoped = buildScopedListQuery(type, buildBaseQuery(), guildId);
     const docs = await model
@@ -48,36 +69,34 @@ async function findEntrySuggestions(query, guildId) {
       .limit(PER_LIST_FETCH_CAP)
       .lean();
     return docs.map((doc) => ({ doc, type }));
-  }));
-  return results.flat();
+  }))).flat();
+
+  const classNames = await findClassNames([...new Set(results.map(({ doc }) => doc.name))]);
+  return results.map((result) => ({ ...result, className: classNames.get(result.doc.name.toLowerCase()) ?? '' }));
 }
 
 /**
  * Autocomplete choices for found entries, one per value, 25 at most.
- * @param {Array<{doc: object, type: string}>} results - from findEntrySuggestions
- * @param {string} lang - viewer language, for the missing-reason text
+ * @param {Array<{doc: object, type: string, className?: string}>} results - from findEntrySuggestions
  * @param {Function} toValue - ({doc, type}) => the value the command receives
  * @returns {Array<{name: string, value: string}>}
  */
-export function buildEntryChoices(results, lang, toValue) {
+export function buildEntryChoices(results, toValue) {
   const seen = new Set();
   const choices = [];
 
   for (const result of results) {
-    // Discord caps name (label) and value at 100 chars each.
-    const value = toValue(result).slice(0, 100);
+    const value = toValue(result).slice(0, CHOICE_TEXT_MAX);
     if (seen.has(value)) continue;
     seen.add(value);
 
-    const { doc, type } = result;
+    const { doc, type, className } = result;
     const { icon } = getListContext(type);
-    const reasonSnippet = doc.reason
-      ? truncateInlineText(doc.reason, 50)
-      : t('listView.navigation.noReason', lang);
+    const classPrefix = className ? `${className} · ` : '';
     // Local-scope tag helps an officer tell apart the same name appearing
     // under global vs server scope (rare but possible for blacklist).
     const scopeTag = type === 'black' && doc.scope === 'server' ? ' [S]' : '';
-    const label = `${icon} ${doc.name}${scopeTag} - ${reasonSnippet}`.slice(0, 100);
+    const label = `${icon} ${classPrefix}${doc.name}${scopeTag}`.slice(0, CHOICE_TEXT_MAX);
 
     choices.push({ name: label, value });
     if (choices.length >= AUTOCOMPLETE_MAX) break;
@@ -97,8 +116,7 @@ export function buildEntryChoices(results, lang, toValue) {
 export async function respondWithEntrySuggestions(interaction, query, toValue) {
   try {
     const results = await findEntrySuggestions(query, interaction.guild?.id);
-    const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
-    await interaction.respond(buildEntryChoices(results, lang, toValue));
+    await interaction.respond(buildEntryChoices(results, toValue));
   } catch (err) {
     console.error('[list] Entry suggestions failed:', err.message);
     await interaction.respond([]).catch(() => {});
