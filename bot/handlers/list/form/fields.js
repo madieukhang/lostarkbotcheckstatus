@@ -135,16 +135,18 @@ export function buildListAddFormModal(lang, {
  * The /la-list edit-form modal: the name of the entry, then optional
  * changes; a field left empty keeps the entry's value.
  * @param {string} lang - viewer language
- * @param {{now?: Date}} [options] - clock for the selectable raids
+ * @param {object} [options]
+ * @param {Date} [options.now] - clock for the selectable raids
+ * @param {string} [options.name] - name searched in the command, filled in
  * @returns {ModalBuilder}
  */
-export function buildListEditFormModal(lang, { now = new Date() } = {}) {
+export function buildListEditFormModal(lang, { now = new Date(), name = '' } = {}) {
   return new ModalBuilder()
     .setCustomId(LIST_FORM_IDS.editModal)
     .setTitle(t('listForm.editTitle', lang))
     .addLabelComponents(
       label(lang, 'nameLabel').setTextInputComponent(textInput(LIST_FORM_IDS.name, {
-        style: TextInputStyle.Short, required: true, placeholder: t('listForm.namePlaceholder', lang),
+        style: TextInputStyle.Short, required: true, placeholder: t('listForm.namePlaceholder', lang), value: name,
       })),
       label(lang, 'newReasonLabel').setTextInputComponent(textInput(LIST_FORM_IDS.reason, {
         style: TextInputStyle.Paragraph, required: false, placeholder: t('listForm.newReasonPlaceholder', lang),

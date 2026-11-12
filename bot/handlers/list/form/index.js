@@ -39,12 +39,15 @@ export function createListFormHandlers({ handleListAddCommand, handleListEditCom
       await replyAlert(interaction, { kind: NoticeKind.GUARD, ...t('dialogue.common.serverOnly', lang) });
       return;
     }
-    await interaction.showModal(buildModal(lang));
+    await interaction.showModal(buildModal(lang, interaction));
   };
 
   return {
-    handleListAddFormCommand: openForm(buildListAddFormModal),
-    handleListEditFormCommand: openForm(buildListEditFormModal),
+    handleListAddFormCommand: openForm((lang) => buildListAddFormModal(lang)),
+    // edit-form's optional `name` comes from the entry search.
+    handleListEditFormCommand: openForm((lang, interaction) => buildListEditFormModal(lang, {
+      name: interaction.options.getString('name') ?? '',
+    })),
     handleListAddFormSubmit: (interaction) => handleListAddCommand(interaction, readListAddForm(interaction.fields)),
     handleListEditFormSubmit: (interaction) => handleListEditCommand(interaction, readListEditForm(interaction.fields)),
     // Quick-Add opens from a public /la-check card, so its answer stays private.

@@ -9,6 +9,7 @@ import { buildCommands } from '../bot/commands/index.js';
 import { createCommandRoutes, createModalRoutes, findCustomIdRoute } from '../bot/app/interaction-router.js';
 import { LIST_FORM_IDS } from '../bot/handlers/list/form/fields.js';
 import { createListFormHandlers } from '../bot/handlers/list/form/index.js';
+import { modalSubmitFields } from './helpers/modal-submit.js';
 
 function stubEnglishViewer(t) {
   clearUserLanguageCache();
@@ -17,12 +18,14 @@ function stubEnglishViewer(t) {
   t.after(async () => { clearUserLanguageCache(); await disconnectDB(); });
 }
 
-function commandInteraction({ guild = { id: 'form-guild' } } = {}) {
+// A form command; `name` is the value of edit-form's optional name option.
+function commandInteraction({ guild = { id: 'form-guild' }, name = null } = {}) {
   const seen = { modals: [], replies: [] };
   return {
     seen,
     user: { id: 'viewer' },
     guild,
+    options: { getString: (option) => (option === 'name' ? name : null) },
     showModal: async (modal) => { seen.modals.push(modal.toJSON()); },
     reply: async (payload) => { seen.replies.push(payload); },
   };
@@ -39,16 +42,10 @@ function recordingForms() {
 }
 
 // A submit carrying only a name and a reason.
-const nameOnlySubmit = (customId) => {
-  const values = { [LIST_FORM_IDS.name]: 'mokoko', [LIST_FORM_IDS.reason]: 'Report' };
-  return {
-    customId,
-    fields: {
-      fields: new Map(Object.keys(values).map((id) => [id, {}])),
-      getTextInputValue: (id) => values[id],
-    },
-  };
-};
+const nameOnlySubmit = (customId) => ({
+  customId,
+  fields: modalSubmitFields({ texts: { [LIST_FORM_IDS.name]: 'mokoko', [LIST_FORM_IDS.reason]: 'Report' } }),
+});
 
 for (const [command, modalId] of [['handleListAddFormCommand', LIST_FORM_IDS.addModal], ['handleListEditFormCommand', LIST_FORM_IDS.editModal]]) {
   test(`${command} opens its form in a server`, async (t) => {
@@ -67,6 +64,20 @@ for (const [command, modalId] of [['handleListAddFormCommand', LIST_FORM_IDS.add
     assert.ok(interaction.seen.replies[0].embeds[0].toJSON().title.includes(translate('dialogue.common.serverOnly', 'en').title));
   });
 }
+
+test('edit-form opens with the searched name filled in, and empty without one', async (t) => {
+  stubEnglishViewer(t);
+  const nameValue = (interaction) => interaction.seen.modals[0].components
+    .find((row) => row.component.custom_id === LIST_FORM_IDS.name).component.value;
+  const picked = commandInteraction({ name: 'Mokoko' });
+  const plain = commandInteraction();
+
+  await recordingForms().handlers.handleListEditFormCommand(picked);
+  await recordingForms().handlers.handleListEditFormCommand(plain);
+
+  assert.equal(nameValue(picked), 'Mokoko');
+  assert.equal(nameValue(plain), undefined);
+});
 
 test('each form submit hands the request it read to the add or edit handler', async () => {
   const { calls, handlers } = recordingForms();
