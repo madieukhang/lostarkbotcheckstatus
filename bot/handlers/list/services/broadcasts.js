@@ -431,15 +431,14 @@ export function createBroadcastServices({ client }) {
     return channelIds;
   }
 
-  function indexConfiguredBroadcastChannels(guildConfigs, originGuildId, isOwnerOrigin) {
+  function indexConfiguredBroadcastChannels(guildConfigs, skipsGuild) {
     const channelIds = new Set();
     const disabledGuildIds = new Set();
     const dbNotifyGuildIds = new Set();
     for (const guildConfig of guildConfigs) {
       if (guildConfig.globalNotifyEnabled === false) disabledGuildIds.add(guildConfig.guildId);
       if (guildConfig.listNotifyChannelId) dbNotifyGuildIds.add(guildConfig.guildId);
-      const excludedOrigin = guildConfig.guildId === originGuildId && !isOwnerOrigin;
-      if (excludedOrigin || guildConfig.globalNotifyEnabled === false || !guildConfig.listNotifyChannelId) {
+      if (skipsGuild(guildConfig.guildId) || guildConfig.globalNotifyEnabled === false || !guildConfig.listNotifyChannelId) {
         continue;
       }
       channelIds.add(guildConfig.listNotifyChannelId);
@@ -447,7 +446,7 @@ export function createBroadcastServices({ client }) {
     return { channelIds, disabledGuildIds, dbNotifyGuildIds };
   }
 
-  async function loadConfiguredBroadcastChannels(originGuildId, isOwnerOrigin) {
+  async function loadConfiguredBroadcastChannels(skipsGuild) {
     try {
       const guildConfigs = await GuildConfig.find({}, {
         _id: 0,
@@ -455,21 +454,21 @@ export function createBroadcastServices({ client }) {
         globalNotifyEnabled: 1,
         listNotifyChannelId: 1,
       }).lean();
-      return indexConfiguredBroadcastChannels(guildConfigs, originGuildId, isOwnerOrigin);
+      return indexConfiguredBroadcastChannels(guildConfigs, skipsGuild);
     } catch (err) {
       console.warn('[list] Failed to query GuildConfig for broadcast:', err.message);
       return { channelIds: new Set(), disabledGuildIds: new Set(), dbNotifyGuildIds: new Set() };
     }
   }
 
-  async function appendEnvBroadcastChannels(state, originGuildId, isOwnerOrigin) {
+  async function appendEnvBroadcastChannels(state, skipsGuild) {
     for (const envId of config.listNotifyChannelIds) {
       if (state.channelIds.has(envId)) continue;
       try {
         const channel = await client.channels.fetch(envId);
         if (!channel?.isTextBased()) continue;
         const guildId = channel.guild?.id || '';
-        if (guildId === originGuildId && !isOwnerOrigin) continue;
+        if (skipsGuild(guildId)) continue;
         if (state.disabledGuildIds.has(guildId) || state.dbNotifyGuildIds.has(guildId)) continue;
         state.channelIds.add(envId);
       } catch { /* skip */ }
@@ -548,9 +547,12 @@ export function createBroadcastServices({ client }) {
 
   async function resolveBroadcastChannels(originGuildId, { onlyOwner = false } = {}) {
     if (onlyOwner) return resolveOwnerBroadcastChannels();
+    // A change is not posted back to the server it came from, except the
+    // owner server, which receives every change.
     const isOwnerOrigin = originGuildId === config.ownerGuildId;
-    const state = await loadConfiguredBroadcastChannels(originGuildId, isOwnerOrigin);
-    await appendEnvBroadcastChannels(state, originGuildId, isOwnerOrigin);
+    const skipsGuild = (guildId) => guildId === originGuildId && !isOwnerOrigin;
+    const state = await loadConfiguredBroadcastChannels(skipsGuild);
+    await appendEnvBroadcastChannels(state, skipsGuild);
     return state.channelIds;
   }
 
