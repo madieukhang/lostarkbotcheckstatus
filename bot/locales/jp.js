@@ -157,6 +157,7 @@ const jp = {
           lines: [
             '`/la-list add type name reason [raid] [image] [scope]` - blacklist/whitelist/watchlist に追加。scope global/server は blacklist のみ。すでに登録済みの場合は、**履歴に追加** で reason と raid をその entry の新しいメモとして保存できますわ。このサーバーで自分が追加した entry 以外へのメモは、先に approver の承認が必要ですわ。',
             '`/la-list edit name [reason] [type] [raid] [image] [scope] [additional_names]` - 既存 entry を編集。`additional_names` は hidden roster/no-guild 用の手動 alt 追加。',
+            '`/la-list add-form` · `/la-list edit-form` - add と edit を form で行えますわ。オプション入力に慣れていない方向けで、list (blacklist の scope 込み) と raid を dropdown から選び、スクリーンショットも添付できます。watchlist の自由な raid 名と `additional_names` はコマンドのみですわ。',
             '`/la-list remove name` - list から entry を削除',
             '`/la-list view type [scope]` - list 表示 (type: all/black/white/watch/trusted, scope: all/global/server)',
           ],

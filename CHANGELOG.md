@@ -1,5 +1,7 @@
 # Changelog
 
+- New `/la-list add-form` and `/la-list edit-form`: the same add and edit as a form, for members who do not know how to fill command options. The list comes from a dropdown that also carries the blacklist scope (server default, this server only, all servers), the raid from a dropdown of the selectable raids, and a screenshot can be attached; the submit runs the same checks and approval flow as the commands. In edit-form an empty field keeps the entry's value. Quick Add now opens this add form with the name filled and blacklist chosen (it gains the screenshot field and keeps its private answer). A custom watchlist raid and `additional_names` stay on the commands.
+
 - Serca raids are spelled right: the raid list said `Secra`, so `/la-list add` and `/la-list edit` refused a typed `Serca Hard` as an unknown raid, and new entries were saved as `Secra`. Suggestions and the multiadd template now offer `Serca Nor/Hard/NM`; the old spelling is still accepted (typed, or in an older multiadd file) and is saved as `Serca`.
 
 - Messages with a file post again on Node 24. Since the `jsdom` 31 update, every upload (new evidence images, saved copies posted back) failed with `UND_ERR_INVALID_ARG`: jsdom's newer `undici` took over the HTTP dispatcher discord.js falls back to, and it rejects the form data discord.js builds. The Discord client now sends through an agent of discord.js's own `undici` (`bot/app/discord-rest-agent.js`).

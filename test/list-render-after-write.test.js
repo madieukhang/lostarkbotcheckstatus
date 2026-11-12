@@ -15,7 +15,7 @@ const { disconnectDB } = await import('../bot/db.js');
 const { clearUserLanguageCache, t: translate } = await import('../bot/services/i18n/index.js');
 const { applyListEditNow } = await import('../bot/handlers/list/edit/applyNow.js');
 const { createListAddCommandHandler } = await import('../bot/handlers/list/add/command.js');
-const { createQuickAddHandlers } = await import('../bot/handlers/list/quickadd/index.js');
+const { quickAddFields, quickAddSubmit } = await import('./helpers/quick-add-submit.js');
 const { submitListMutation } = await import('../bot/handlers/list/services/mutationFlow.js');
 
 // The first reply, the success card, is rejected. The only later reply this
@@ -141,16 +141,15 @@ test('a failed success card after an auto-approved quick add is not reported as 
   stubEnglishViewer(t);
   const { attempts, editReply } = replyRecorder();
   const writes = [];
-  const { handleQuickAddModal } = createQuickAddHandlers({ services: {
+  const handleQuickAddFormSubmit = quickAddSubmit({
     sendListAddApprovalToApprovers: async () => assert.fail('an officer add is written at once'),
     executeListAddToDatabase: async (payload) => { writes.push(payload.name); return { ok: true, content: 'Added' }; },
-  } });
-  const values = { quickadd_type: 'white', quickadd_reason: 'Reliable', quickadd_raid: '' };
+  });
 
-  await handleQuickAddModal({
-    customId: 'quickadd_modal:Mokoko',
-    fields: { getTextInputValue: (id) => values[id] },
+  await handleQuickAddFormSubmit({
+    fields: quickAddFields({ type: 'white', name: 'Mokoko', reason: 'Reliable' }),
     user: { id: 'officer-1', tag: 'Officer#0001', username: 'Officer' },
+    guild: { id: 'guild', name: 'Guild' },
     deferReply: async () => {},
     editReply,
   });
@@ -213,15 +212,13 @@ test('a failed queued card after the pending request is saved is not reported as
   const saved = [];
   t.mock.method(PendingApproval, 'create', async (doc) => { saved.push(doc); return doc; });
   const { attempts, editReply } = replyRecorder();
-  const { handleQuickAddModal } = createQuickAddHandlers({ services: {
+  const handleQuickAddFormSubmit = quickAddSubmit({
     sendListAddApprovalToApprovers: async () => ({ success: true, deliveredApproverIds: ['senior'], deliveredDmMessages: [] }),
     executeListAddToDatabase: async () => assert.fail('a member add waits for an approver'),
-  } });
-  const values = { quickadd_type: 'white', quickadd_reason: 'Reliable', quickadd_raid: '' };
+  });
 
-  await handleQuickAddModal({
-    customId: 'quickadd_modal:Mokoko',
-    fields: { getTextInputValue: (id) => values[id] },
+  await handleQuickAddFormSubmit({
+    fields: quickAddFields({ type: 'white', name: 'Mokoko', reason: 'Reliable' }),
     user: { id: 'member-1', tag: 'Member#0001', username: 'Member' },
     guild: { id: 'guild', name: 'Guild' },
     deferReply: async () => {},

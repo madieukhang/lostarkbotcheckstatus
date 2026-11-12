@@ -9,7 +9,8 @@ import { createAddHandlers } from '../bot/handlers/list/add/index.js';
 import { createListAddCommandHandler } from '../bot/handlers/list/add/command.js';
 import { handleApprovedEditRequest } from '../bot/handlers/list/add/editApproval.js';
 import { createListAddOverwriteButtonHandler } from '../bot/handlers/list/add/overwriteButton.js';
-import { createQuickAddHandlers } from '../bot/handlers/list/quickadd/index.js';
+import GuildConfig from '../bot/models/GuildConfig.js';
+import { quickAddFields, quickAddSubmit } from './helpers/quick-add-submit.js';
 import { createApprovalServices } from '../bot/handlers/list/services/approvals.js';
 import { clearUserLanguageCache } from '../bot/services/i18n/index.js';
 import { disconnectDB } from '../bot/db.js';
@@ -287,16 +288,16 @@ test("a member's quick add shows the class on their sent-for-approval card", asy
   stubEnglishViewer(t);
   t.mock.method(PendingApproval, 'create', async (doc) => doc);
   const replies = [];
-  const { handleQuickAddModal } = createQuickAddHandlers({ services: {
+  t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ defaultBlacklistScope: 'global' }) }));
+  const handleQuickAddFormSubmit = quickAddSubmit({
     sendListAddApprovalToApprovers: deliveredWithSnapshot(),
     executeListAddToDatabase: async () => assert.fail('a member add waits for an approver'),
-  } });
-  const values = { quickadd_type: 'black', quickadd_reason: 'Left mid-raid', quickadd_raid: '' };
+  });
 
-  await handleQuickAddModal({
-    customId: 'quickadd_modal:Mokoko',
-    fields: { getTextInputValue: (id) => values[id] },
+  await handleQuickAddFormSubmit({
+    fields: quickAddFields({ type: 'black', name: 'Mokoko', reason: 'Left mid-raid' }),
     user: { id: 'requester-1', tag: 'requester#0001', username: 'requester' },
+    guild: { id: 'quick-guild', name: 'Guild' },
     deferReply: async () => {},
     editReply: async (payload) => { replies.push(payload); },
   });

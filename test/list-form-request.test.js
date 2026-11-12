@@ -162,7 +162,9 @@ test('an edit form with only the name gets the no-changes notice', async (t) => 
 test('a quick add answers privately and leaves the request message unrecorded', async (t) => {
   stubLookups(t);
   t.mock.method(PendingApproval, 'create', async (doc) => doc);
-  t.mock.method(PendingApproval, 'updateOne', async () => assert.fail('a private reply cannot be fetched back later'));
+  // captureRequestReplyId catches its own errors, so record the calls instead of failing inside them.
+  const recorded = [];
+  t.mock.method(PendingApproval, 'updateOne', async () => { recorded.push('updateOne'); });
   const deferred = [];
   const replies = [];
   const { handleQuickAddFormSubmit } = createListFormHandlers({
@@ -177,10 +179,11 @@ test('a quick add answers privately and leaves the request message unrecorded', 
   await handleQuickAddFormSubmit({
     ...formSubmit(replies),
     deferReply: async (options) => { deferred.push(options); },
-    fetchReply: async () => assert.fail('a private reply is not fetched'),
+    fetchReply: async () => { recorded.push('fetchReply'); return { id: 'reply-1' }; },
     fields: formFields({ [LIST_FORM_IDS.type]: ['black'], [LIST_FORM_IDS.name]: 'Mokoko', [LIST_FORM_IDS.reason]: 'Report' }),
   });
 
   assert.deepEqual(deferred, [{ flags: MessageFlags.Ephemeral }]);
+  assert.deepEqual(recorded, [], 'a private reply cannot be fetched back from its channel later');
   assert.equal(replies.at(-1).embeds[0].toJSON().title, '📨 Blacklist · Sent for approval · Mokoko');
 });
