@@ -1,5 +1,7 @@
 # Changelog
 
+- Every new list entry names its raid: `raid` is required in `/la-list add`, the add form, Quick-Add and multiadd (a row without one is refused), for blacklist, whitelist and watchlist alike, so each entry says which raid it came from. Editing is unchanged, and entries saved without a raid stay as they are.
+
 - Name search in `/la-list edit`, `/la-list remove` and `/la-list edit-form`: typing `name` suggests the entries this server may see (the same search `/la-evidence` uses), and edit-form takes an optional `name` that opens the form with it filled in. Removing stays a command, since a form has no search.
 
 - New `/la-list add-form` and `/la-list edit-form`: the same add and edit as a form, for members who do not know how to fill command options. The list comes from a dropdown that also carries the blacklist scope (server default, this server only, all servers), the raid from a dropdown of the selectable raids, and a screenshot can be attached; the submit runs the same checks and approval flow as the commands. In edit-form an empty field keeps the entry's value. Quick Add now opens this add form with the name filled and blacklist chosen: its typed list and raid become the same dropdowns, it gains the scope choice and the screenshot field, and it keeps its private answer. A custom watchlist raid and `additional_names` stay on the commands.

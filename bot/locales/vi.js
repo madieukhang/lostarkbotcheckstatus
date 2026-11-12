@@ -155,7 +155,7 @@ const vi = {
         {
           name: '📒 Lists',
           lines: [
-            '`/la-list add type name reason [raid] [image] [scope]` - Thêm vào blacklist/whitelist/watchlist. Scope global/server chỉ áp dụng blacklist. Nếu nhân vật đã có trong list, **Ghi vào lịch sử** lưu lý do và raid của cậu thành ghi chú mới của entry đó; ghi chú vào entry không phải do cậu thêm trong server này sẽ chờ approver duyệt trước.',
+            '`/la-list add type name reason raid [image] [scope]` - Thêm vào blacklist/whitelist/watchlist. Scope global/server chỉ áp dụng blacklist. Nếu nhân vật đã có trong list, **Ghi vào lịch sử** lưu lý do và raid của cậu thành ghi chú mới của entry đó; ghi chú vào entry không phải do cậu thêm trong server này sẽ chờ approver duyệt trước.',
             '`/la-list edit name [reason] [type] [raid] [image] [scope] [additional_names]` - Sửa entry đã có. `additional_names` dùng để append alt thủ công cho case hidden roster/no-guild.',
             '`/la-list add-form` · `/la-list edit-form` - Thêm và sửa y như lệnh nhưng bằng form, cho ai không quen gõ ô lệnh: chọn list (kèm scope của blacklist) và raid trong dropdown, đính kèm ảnh. Raid tự đặt của watchlist và `additional_names` vẫn chỉ có ở lệnh.',
             '`/la-list remove name` - Xoá entry khỏi list. Ở remove, edit và edit-form, gõ `name` là tìm trong các list',
@@ -244,8 +244,8 @@ const vi = {
           {
             name: '🗂️ Các cột trong template',
             value: [
-              '**Bắt buộc:** `name`, `type`, `reason`',
-              '**Tuỳ chọn:** `raid`, `logs`, `image`, `scope`',
+              '**Bắt buộc:** `name`, `type`, `reason`, `raid`',
+              '**Tuỳ chọn:** `logs`, `image`, `scope`',
               '- `type` (dropdown): `black` / `white` / `watch`',
               '- `scope` (dropdown): `global` / `server` - chỉ blacklist',
               '- `logs` và `image` phải là URL (`https://...`)',

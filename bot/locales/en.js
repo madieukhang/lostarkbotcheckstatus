@@ -306,7 +306,7 @@ const en = {
         {
           name: '📒 Lists',
           lines: [
-            '`/la-list add type name reason [raid] [image] [scope]` - Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only). If the character is already listed, **Add to history** saves your reason and raid as a new note on that entry; a note on an entry you did not add in this server goes to the approvers first.',
+            '`/la-list add type name reason raid [image] [scope]` - Add to blacklist/whitelist/watchlist. Scope: global/server (blacklist only). If the character is already listed, **Add to history** saves your reason and raid as a new note on that entry; a note on an entry you did not add in this server goes to the approvers first.',
             '`/la-list edit name [reason] [type] [raid] [image] [scope] [additional_names]` - Edit an existing entry. `additional_names` appends alts manually for hidden-roster/no-guild edges.',
             '`/la-list add-form` · `/la-list edit-form` - The same add and edit as a form, for anyone who would rather not type options: pick the list (blacklist scope included) and the raid from dropdowns and attach a screenshot. A custom watchlist raid and `additional_names` stay on the commands.',
             '`/la-list remove name` - Remove an entry from a list. In remove, edit and edit-form, typing `name` searches the lists',
@@ -395,8 +395,8 @@ const en = {
           {
             name: '🗂️ Template columns',
             value: [
-              '**Required:** `name`, `type`, `reason`',
-              '**Optional:** `raid`, `logs`, `image`, `scope`',
+              '**Required:** `name`, `type`, `reason`, `raid`',
+              '**Optional:** `logs`, `image`, `scope`',
               '- `type` (dropdown): `black` / `white` / `watch`',
               '- `scope` (dropdown): `global` / `server` - blacklist only',
               '- `logs` and `image` must be URLs (`https://...`)',
