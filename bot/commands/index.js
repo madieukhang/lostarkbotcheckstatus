@@ -123,6 +123,7 @@ function listCommand(name) {
             .setName('name')
             .setDescription(commandText('list.subcommands.edit.options.name'))
             .setRequired(true)
+            .setAutocomplete(true)
         )
         .addStringOption((opt) =>
           opt
@@ -181,6 +182,13 @@ function listCommand(name) {
       sub
         .setName('edit-form')
         .setDescription(commandText('list.subcommands.editForm.description'))
+        .addStringOption((opt) =>
+          opt
+            .setName('name')
+            .setDescription(commandText('list.subcommands.editForm.options.name'))
+            .setRequired(false)
+            .setAutocomplete(true)
+        )
     )
     .addSubcommand((sub) =>
       sub
@@ -191,6 +199,7 @@ function listCommand(name) {
             .setName('name')
             .setDescription(commandText('list.subcommands.remove.options.name'))
             .setRequired(true)
+            .setAutocomplete(true)
         )
     )
     .addSubcommand((sub) =>

@@ -82,7 +82,10 @@ const en = {
           description: 'Open a form to add a character to a list, no options to type',
         },
         editForm: {
-          description: 'Open a form to edit an existing list entry, no options to type',
+          description: 'Open a form to edit an existing list entry; search the name first if you like',
+          options: {
+            name: 'Search the entry to edit (optional)',
+          },
         },
         remove: {
           description: 'Remove a character from blacklist/whitelist/watchlist',

@@ -104,3 +104,14 @@ export async function respondWithEntrySuggestions(interaction, query, toValue) {
     await interaction.respond([]).catch(() => {});
   }
 }
+
+/**
+ * Answer an autocomplete with matching entry names, for the commands that
+ * take a name and resolve it across the lists themselves (edit, remove).
+ * @param {import('discord.js').AutocompleteInteraction} interaction
+ * @param {string} query - typed text
+ * @returns {Promise<void>}
+ */
+export function respondWithEntryNames(interaction, query) {
+  return respondWithEntrySuggestions(interaction, query, ({ doc }) => doc.name);
+}

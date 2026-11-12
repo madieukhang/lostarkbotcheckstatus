@@ -28,6 +28,10 @@ import { handleStatsCommand } from '../handlers/meta/stats.js';
 import { handleHelpCommand, handleHelpSelect } from '../handlers/meta/help.js';
 import { createOcrModeCommandHandler } from '../handlers/list/check/mode.js';
 import { LIST_FORM_IDS } from '../handlers/list/form/fields.js';
+import { respondWithEntryNames } from '../handlers/list/services/entrySuggestions.js';
+
+// The /la-list subcommands whose `name` searches the entries this server may see.
+const NAME_SEARCH_SUBCOMMANDS = new Set(['edit', 'remove', 'edit-form']);
 import {
   handleLanguageSwitchCommand,
   handleLanguageSwitchSelect,
@@ -88,6 +92,10 @@ export function createAutocompleteRoutes() {
     'la-list': async (interaction) => {
       const focused = interaction.options.getFocused(true);
       const subcommand = interaction.options.getSubcommand(false);
+      if (focused?.name === 'name' && NAME_SEARCH_SUBCOMMANDS.has(subcommand)) {
+        await respondWithEntryNames(interaction, focused.value);
+        return;
+      }
       const type = interaction.options.getString('type');
       const supportsRaidAutocomplete = subcommand === 'add' || subcommand === 'edit';
       const choices = focused?.name === 'raid' && supportsRaidAutocomplete

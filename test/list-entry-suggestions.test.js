@@ -11,6 +11,8 @@ import { clearUserLanguageCache, t as translate } from '../bot/services/i18n/ind
 import { buildScopedListQuery } from '../bot/utils/scope.js';
 import { handleListEvidenceAutocomplete } from '../bot/handlers/list/evidence/command.js';
 import { buildEntryChoices } from '../bot/handlers/list/services/entrySuggestions.js';
+import { createAutocompleteRoutes } from '../bot/app/interaction-router.js';
+import { buildCommands } from '../bot/commands/index.js';
 
 const GUILD = 'suggest-guild';
 
@@ -96,4 +98,43 @@ test('evidence suggestions answer empty for another option', async (t) => {
 test('evidence suggestions answer empty when the lookup fails', async (t) => {
   stubLists(t, { white: new Error('db down') });
   assert.deepEqual(await suggest({ name: 'name', value: 'x' }), []);
+});
+
+// The /la-list autocomplete answer for a focused option under a subcommand.
+async function listSuggest(subcommand, focused) {
+  let answered = null;
+  await createAutocompleteRoutes()['la-list']({
+    user: { id: 'viewer' },
+    guild: { id: GUILD },
+    options: { getFocused: () => focused, getSubcommand: () => subcommand, getString: () => null },
+    respond: async (choices) => { answered = choices; },
+  });
+  return answered;
+}
+
+test('/la-list edit, remove and edit-form suggest entry names; add does not', async (t) => {
+  stubLists(t, {
+    black: [{ _id: 'b1', name: 'Mokoko', scope: 'global', reason: 'Left mid-raid' }],
+    white: [{ _id: 'w1', name: 'Mokoko', reason: 'Carried' }, { _id: 'w2', name: 'Mokobear', reason: 'r' }],
+  });
+  for (const subcommand of ['edit', 'remove', 'edit-form']) {
+    const choices = await listSuggest(subcommand, { name: 'name', value: 'mok' });
+    assert.deepEqual(choices.map((choice) => choice.value), ['Mokoko', 'Mokobear'], subcommand);
+  }
+  assert.deepEqual(await listSuggest('add', { name: 'name', value: 'mok' }), []);
+});
+
+test('/la-list name suggestions answer empty when the lookup fails, and raid suggestions stay', async (t) => {
+  stubLists(t, { black: new Error('db down') });
+  assert.deepEqual(await listSuggest('edit', { name: 'name', value: 'mok' }), []);
+  const raids = await listSuggest('add', { name: 'raid', value: 'serca' });
+  assert.ok(raids.some((choice) => choice.value === 'Serca Hard'));
+});
+
+test('the name option searches in edit, remove and edit-form, where it is optional', () => {
+  const list = buildCommands().find((command) => command.name === 'la-list');
+  const nameOf = (sub) => list.options.find((option) => option.name === sub).options.find((option) => option.name === 'name');
+  for (const sub of ['edit', 'remove', 'edit-form']) assert.equal(nameOf(sub).autocomplete, true, sub);
+  assert.ok(!nameOf('add').autocomplete);
+  assert.ok(!nameOf('edit-form').required);
 });

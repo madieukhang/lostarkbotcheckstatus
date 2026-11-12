@@ -102,12 +102,13 @@ test('/la-list routes add-form and edit-form, and each form id reaches its submi
   assert.equal(routed('quickadd_modal:Mokoko'), undefined, 'the old Quick-Add modal is gone');
 });
 
-test('the form subcommands are registered with no options', () => {
+test('the form subcommands ask nothing but an optional name to search in edit-form', () => {
   const list = buildCommands().find((command) => command.name === 'la-list');
-  for (const name of ['add-form', 'edit-form']) {
+  const expected = { 'add-form': [], 'edit-form': [['name', false]] };
+  for (const [name, options] of Object.entries(expected)) {
     const sub = list.options.find((option) => option.name === name);
     assert.ok(sub, name);
     assert.ok(sub.description.length > 0 && sub.description.length <= 100);
-    assert.deepEqual(sub.options ?? [], []);
+    assert.deepEqual((sub.options ?? []).map((option) => [option.name, Boolean(option.required)]), options, name);
   }
 });
