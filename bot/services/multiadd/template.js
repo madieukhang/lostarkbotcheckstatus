@@ -288,10 +288,10 @@ export async function buildMultiaddTemplate({ now = new Date() } = {}) {
       errorTitle: 'Invalid type',
       error: 'type must be one of: black, white, watch',
     };
-    // raid column (D) · enum from models/Raid.js, optional
+    // raid column (D) · enum from models/Raid.js, required
     sheet.getCell(`D${r}`).dataValidation = {
       type: 'list',
-      allowBlank: true,
+      allowBlank: false,
       formulae: [raidDropdownFormula],
       showErrorMessage: true,
       errorStyle: 'error',

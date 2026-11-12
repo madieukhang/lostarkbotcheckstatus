@@ -35,7 +35,7 @@ test('multiadd validation preserves warning-before-duplicate ordering', () => {
     name: 'Alpha',
     type: 'white',
     reason: 'reason',
-    raid: '',
+    raid: 'Serca Hard',
     logs: '',
     image: '',
     scope: 'server',
@@ -56,9 +56,9 @@ test('parseMultiaddFile applies ordered rules and only accepts valid unique rows
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Entries');
   sheet.addRow(['Name', 'Type', 'Reason', 'Raid', 'Logs', 'Image', 'Scope']);
-  sheet.addRow(['Alpha', 'black', 'reason', '', 'https://logs.example', '', 'global']);
-  sheet.addRow(['Beta', 'white', 'reason', '', '', '', 'server']);
-  sheet.addRow(['alpha', 'watch', 'duplicate', '', '', '', '']);
+  sheet.addRow(['Alpha', 'black', 'reason', 'Serca Hard', 'https://logs.example', '', 'global']);
+  sheet.addRow(['Beta', 'white', 'reason', 'Serca Hard', '', '', 'server']);
+  sheet.addRow(['alpha', 'watch', 'duplicate', 'Serca Hard', '', '', '']);
 
   const result = await parseMultiaddFile(await workbook.xlsx.writeBuffer());
 
@@ -97,8 +97,8 @@ test('parseMultiaddFile measures a workbook with bytes prepended where JSZip rea
 
 test('parseMultiaddFile rejects a row whose field is longer than /la-list add accepts', async () => {
   const result = await parseMultiaddFile(await entriesWorkbook(
-    ['Alpha', 'black', 'r'.repeat(MULTIADD_MAX_FIELD_LENGTH + 1), '', '', '', ''],
-    ['Beta', 'black', 'r'.repeat(MULTIADD_MAX_FIELD_LENGTH), '', '', '', ''],
+    ['Alpha', 'black', 'r'.repeat(MULTIADD_MAX_FIELD_LENGTH + 1), 'Serca Hard', '', '', ''],
+    ['Beta', 'black', 'r'.repeat(MULTIADD_MAX_FIELD_LENGTH), 'Serca Hard', '', '', ''],
   ));
 
   assert.equal(result.ok, true);
@@ -108,14 +108,26 @@ test('parseMultiaddFile rejects a row whose field is longer than /la-list add ac
 
 test('parseMultiaddFile rejects a name that is not a character name without echoing it', async () => {
   const result = await parseMultiaddFile(await entriesWorkbook(
-    ['[Free Gold](https://evil.example)', 'black', 'reason', '', '', '', ''],
-    ['Free Gold', 'black', 'spaces collapse like /la-list add', '', '', '', ''],
-    ['Alpha', 'black', 'reason', '', '', '', ''],
+    ['[Free Gold](https://evil.example)', 'black', 'reason', 'Serca Hard', '', '', ''],
+    ['Free Gold', 'black', 'spaces collapse like /la-list add', 'Serca Hard', '', '', ''],
+    ['Alpha', 'black', 'reason', 'Serca Hard', '', '', ''],
   ));
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.rows.map(({ name }) => name), ['Free Gold', 'Alpha']);
   assert.deepEqual(result.errors, ['Row 2: "name" is not a valid character name.']);
+});
+
+test('parseMultiaddFile rejects a row without a raid, whatever the list', async () => {
+  const result = await parseMultiaddFile(await entriesWorkbook(
+    ['Alpha', 'black', 'reason', '', '', '', ''],
+    ['Beta', 'watch', 'reason', '', '', '', ''],
+    ['Gamma', 'white', 'reason', 'Serca Hard', '', '', ''],
+  ));
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.rows.map(({ name }) => name), ['Gamma']);
+  assert.deepEqual(result.errors, ['Row 2: missing required field "raid".', 'Row 3: missing required field "raid".']);
 });
 
 test('parseMultiaddFile reads a former raid spelling as its current one', async () => {

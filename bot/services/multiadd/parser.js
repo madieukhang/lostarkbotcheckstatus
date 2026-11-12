@@ -166,6 +166,10 @@ const ROW_VALIDATION_RULES = [
     message: (row) => `Row ${row.rowNum}: missing required field "reason".`,
   },
   {
+    invalid: (row) => !row.raid,
+    message: (row) => `Row ${row.rowNum}: missing required field "raid".`,
+  },
+  {
     invalid: (row) => row.raid && !VALID_RAIDS.has(row.raid),
     message: (row) => `Row ${row.rowNum}: raid must be one of [${RAIDS.join(', ')}] (got "${row.raid}").`,
   },

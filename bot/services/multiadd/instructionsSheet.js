@@ -167,6 +167,7 @@ export function buildInstructionsSheet(wb, options) {
       ['name', 'Character name · roster must exist on lostark.bible'],
       ['type', 'Dropdown: black / white / watch'],
       ['reason', 'Why this entry is added (free text)'],
+      ['raid', `Dropdown · one of: ${raids.join(', ')}`],
     ]
   );
 
@@ -176,7 +177,6 @@ export function buildInstructionsSheet(wb, options) {
     COLOR_SEC_GREEN_TEXT,
     COLOR_GRAY_50,
     [
-      ['raid', `Dropdown · one of: ${raids.join(', ')}`],
       ['logs', 'URL to lostark.bible logs page · must start with https://'],
       ['image', 'URL to evidence screenshot · upload to Discord first'],
       ['scope', 'Blacklist only: global (shared) or server (this guild)'],
