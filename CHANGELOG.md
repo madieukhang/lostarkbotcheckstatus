@@ -1,5 +1,7 @@
 # Changelog
 
+- Serca raids are spelled right: the raid list said `Secra`, so `/la-list add` and `/la-list edit` refused a typed `Serca Hard` as an unknown raid, and new entries were saved as `Secra`. Suggestions and the multiadd template now offer `Serca Nor/Hard/NM`; the old spelling is still accepted (typed, or in an older multiadd file) and is saved as `Serca`.
+
 - Messages with a file post again on Node 24. Since the `jsdom` 31 update, every upload (new evidence images, saved copies posted back) failed with `UND_ERR_INVALID_ARG`: jsdom's newer `undici` took over the HTTP dispatcher discord.js falls back to, and it rejects the form data discord.js builds. The Discord client now sends through an agent of discord.js's own `undici` (`bot/app/discord-rest-agent.js`).
 
 - When the bot cannot post a saved evidence image back to the evidence channel, the log now says why: `OWNER_GUILD_ID` is not set, the owner server has no evidence channel, or the saved copy has no image data. Before, the image just stayed hidden with nothing in the log.

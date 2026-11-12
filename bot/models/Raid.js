@@ -14,9 +14,11 @@ const RAID_CATALOG = [
   // Mordum is retired from new selections but remains a recognized stored
   // value for existing entries and older multiadd workbooks.
   { value: 'Mordum Hard', selectable: false },
-  { value: 'Secra Nor', selectable: false },
-  { value: 'Secra Hard' },
-  { value: 'Secra NM' },
+  // `aliases` are former spellings ("Secra") that older multiadd workbooks and
+  // typed names may still carry; they resolve to the current value.
+  { value: 'Serca Nor', selectable: false, aliases: ['Secra Nor'] },
+  { value: 'Serca Hard', aliases: ['Secra Hard'] },
+  { value: 'Serca NM', aliases: ['Secra NM'] },
   // Horizon ships with three level tiers (Lv1/Lv2/Lv3) instead of
   // Nor/Hard/NM difficulties · mirrors the RaidManage catalog's
   // Horizon Level 1/2/3. Newest permanent content sorts last like in-game.
@@ -39,11 +41,25 @@ const RAID_CATALOG = [
 
 const RAID_VALUE_BY_LABEL = new Map();
 for (const raid of RAID_CATALOG) {
-  for (const label of [raid.value, raid.choiceName]) {
+  for (const label of [raid.value, raid.choiceName, ...(raid.aliases || [])]) {
     if (!label) continue;
     const key = label.toLocaleLowerCase();
     if (!RAID_VALUE_BY_LABEL.has(key)) RAID_VALUE_BY_LABEL.set(key, raid.value);
   }
+}
+
+const RAID_VALUE_BY_ALIAS = new Map(
+  RAID_CATALOG.flatMap((raid) => (raid.aliases || []).map((alias) => [alias, raid.value])),
+);
+
+/**
+ * The value to store for an exact raid value: a former spelling becomes its
+ * current value, anything else is returned unchanged.
+ * @param {string} value
+ * @returns {string}
+ */
+export function currentRaidValue(value) {
+  return RAID_VALUE_BY_ALIAS.get(value) ?? value;
 }
 
 /**

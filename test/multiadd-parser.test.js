@@ -117,3 +117,14 @@ test('parseMultiaddFile rejects a name that is not a character name without echo
   assert.deepEqual(result.rows.map(({ name }) => name), ['Free Gold', 'Alpha']);
   assert.deepEqual(result.errors, ['Row 2: "name" is not a valid character name.']);
 });
+
+test('parseMultiaddFile reads a former raid spelling as its current one', async () => {
+  const result = await parseMultiaddFile(await entriesWorkbook(
+    ['Alpha', 'black', 'reason', 'Secra Hard', '', '', ''],
+    ['Beta', 'black', 'reason', 'Serca NM', '', '', ''],
+  ));
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.rows.map(({ raid }) => raid), ['Serca Hard', 'Serca NM']);
+});

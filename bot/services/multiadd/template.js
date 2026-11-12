@@ -214,7 +214,7 @@ export async function buildMultiaddTemplate({ now = new Date() } = {}) {
       name: 'ExamplePlayer3',
       type: 'watch',
       reason: `${EXAMPLE_REASON_PREFIX} Inconsistent dps, investigating (delete this row)`,
-      raid: 'Secra Hard',
+      raid: 'Serca Hard',
       logs: '',
       image: '',
       scope: '',

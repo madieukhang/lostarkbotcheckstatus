@@ -10,7 +10,7 @@
 
 import { inflateRawSync } from 'node:zlib';
 
-import { RAIDS } from '../../models/Raid.js';
+import { RAIDS, currentRaidValue } from '../../models/Raid.js';
 import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
 import {
   EXAMPLE_REASON_PREFIX,
@@ -228,7 +228,7 @@ function readMultiaddRow(row, rowNum) {
     name: cellToString(row.getCell(1).value),
     type: cellToString(row.getCell(2).value).toLowerCase(),
     reason: cellToString(row.getCell(3).value),
-    raid: cellToString(row.getCell(4).value),
+    raid: currentRaidValue(cellToString(row.getCell(4).value)),
     logs: cellToString(row.getCell(5).value),
     image: cellToString(row.getCell(6).value),
     scope: cellToString(row.getCell(7).value).toLowerCase(),

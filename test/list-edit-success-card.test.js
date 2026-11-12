@@ -21,7 +21,7 @@ const BEFORE = {
 const AFTER = {
   ...BEFORE,
   reason: 'Left at G2, then flamed the party',
-  raid: 'Secra NM',
+  raid: 'Serca NM',
   allCharacters: ['Tenshi', 'Altone', 'Newalt'],
 };
 const STATS = statMapFromRosterCharacters([
@@ -68,8 +68,8 @@ test('a changed raid is marked in place and shown once', () => {
   const card = edit();
 
   assert.equal(byPrefix(card, '🗡️').name, '🗡️ Raid ✏️');
-  assert.equal(byPrefix(card, '🗡️').value, '~~Kazeros Hard~~\n`Secra NM`');
-  assert.equal(JSON.stringify(card).split('Secra NM').length - 1, 1);
+  assert.equal(byPrefix(card, '🗡️').value, '~~Kazeros Hard~~\n`Serca NM`');
+  assert.equal(JSON.stringify(card).split('Serca NM').length - 1, 1);
   assert.equal(byPrefix(card, '📒').name, '📒 List');
 });
 

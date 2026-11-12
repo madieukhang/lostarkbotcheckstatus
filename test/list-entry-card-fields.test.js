@@ -18,7 +18,7 @@ const STATS = statMapFromRosterCharacters([
 ]);
 const BASE = {
   type: 'black',
-  raid: 'Secra NM',
+  raid: 'Serca NM',
   scope: 'server',
   entry: ENTRY,
   statMap: STATS,
@@ -43,14 +43,14 @@ test('changed list, raid and scope carry the mark and the struck old value', () 
 
   assert.equal(byPrefix('📒').name, '📒 List ✏️');
   assert.equal(byPrefix('📒').value, '~~⚠️ Watchlist~~\n⛔ Blacklist');
-  assert.equal(byPrefix('🗡️').value, '~~Kazeros Hard~~\n`Secra NM`');
+  assert.equal(byPrefix('🗡️').value, '~~Kazeros Hard~~\n`Serca NM`');
   assert.equal(byPrefix('🌐').value, '~~Toàn cục~~\nNội bộ server');
   assert.equal(byPrefix('🌍').name, '🌍 Server');
 });
 
 test('a raid added to an entry without one strikes the empty placeholder', () => {
   const fields = buildListEntryInlineFields({ ...BASE, previous: { raid: '' } });
-  assert.equal(fields[1].value, '~~Chưa có~~\n`Secra NM`');
+  assert.equal(fields[1].value, '~~Chưa có~~\n`Serca NM`');
 });
 
 test('the struck value is one line with tildes and backslashes escaped', () => {

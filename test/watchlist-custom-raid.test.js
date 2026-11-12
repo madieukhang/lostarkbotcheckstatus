@@ -80,7 +80,7 @@ test('Mordum is hidden from new choices while historical raid values still norma
 });
 
 test('normal raids are hidden from selectors but remain valid historical values', () => {
-  const normalRaids = ['Act4 Nor', 'Kazeros Nor', 'Secra Nor'];
+  const normalRaids = ['Act4 Nor', 'Kazeros Nor', 'Serca Nor'];
   const selectableValues = getSelectableRaidValues();
 
   for (const raid of normalRaids) {
@@ -90,8 +90,9 @@ test('normal raids are hidden from selectors but remain valid historical values'
   assert.deepEqual(getRaidAutocompleteChoices('Nor'), [
     { name: 'Belgardin Nor', value: 'Belgardin Nor' },
   ]);
-  assert.equal(selectableValues.includes('Secra Hard'), true);
-  assert.equal(selectableValues.includes('Secra NM'), true);
+  assert.equal(selectableValues.includes('Serca Hard'), true);
+  assert.equal(selectableValues.includes('Serca NM'), true);
+  assert.equal(selectableValues.some((raid) => raid.startsWith('Secra')), false);
   assert.deepEqual(
     selectableValues.filter((raid) => raid.startsWith('Horizon ')),
     ['Horizon Lv3'],
@@ -160,16 +161,20 @@ test('multiadd raid dropdown follows the same retired and limited choice policy'
 });
 
 test('watchlist raid autocomplete offers the typed custom label plus canonical matches', () => {
-  assert.deepEqual(getRaidAutocompleteChoices('Secra', { allowCustom: true }), [
-    { name: 'Custom · Secra', value: 'Secra' },
-    { name: 'Secra Hard', value: 'Secra Hard' },
-    { name: 'Secra NM', value: 'Secra NM' },
+  assert.deepEqual(getRaidAutocompleteChoices('Serca', { allowCustom: true }), [
+    { name: 'Custom · Serca', value: 'Serca' },
+    { name: 'Serca Hard', value: 'Serca Hard' },
+    { name: 'Serca NM', value: 'Serca NM' },
   ]);
   assert.deepEqual(getRaidAutocompleteChoices('Custom Gate', { allowCustom: false }), []);
 });
 
 test('raid normalization accepts custom labels only when watchlist opts in', () => {
-  assert.equal(resolveRaidLabel('  secra hard  '), 'Secra Hard');
+  assert.equal(resolveRaidLabel('  serca hard  '), 'Serca Hard');
+  // The former spelling still resolves, and is stored with the right one.
+  assert.equal(resolveRaidLabel('Secra Hard'), 'Serca Hard');
+  assert.equal(resolveRaidLabel('secra nm'), 'Serca NM');
+  assert.equal(resolveRaidLabel('Secra Nor'), 'Serca Nor');
   assert.equal(resolveRaidLabel('  Event Gate  ', { allowCustom: true }), 'Event Gate');
   assert.equal(resolveRaidLabel('Event Gate'), null);
   assert.equal(resolveRaidLabel('   ', { allowCustom: true }), '');
@@ -199,7 +204,7 @@ test('la-list autocomplete route supports edit and custom add for type:watch', a
   assert.deepEqual(responses[1], []);
 
   subcommand = 'edit';
-  interaction.options.getFocused = () => ({ name: 'raid', value: 'Secra Hard' });
+  interaction.options.getFocused = () => ({ name: 'raid', value: 'Serca Hard' });
   await route(interaction);
-  assert.deepEqual(responses[2], [{ name: 'Secra Hard', value: 'Secra Hard' }]);
+  assert.deepEqual(responses[2], [{ name: 'Serca Hard', value: 'Serca Hard' }]);
 });
