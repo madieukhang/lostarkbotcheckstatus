@@ -69,7 +69,7 @@ const en = {
         edit: {
           description: 'Edit an existing list entry (reason, raid, type, scope)',
           options: {
-            name: 'Character name to edit',
+            name: 'Character name to edit; empty shows the 10 newest entries',
             reason: 'New reason (leave empty to keep current)',
             type: 'Move to a different list',
             raid: 'New raid tag',
@@ -84,13 +84,13 @@ const en = {
         editForm: {
           description: 'Open a form to edit an existing list entry; search the name first if you like',
           options: {
-            name: 'Search the entry to edit (optional)',
+            name: 'Search the entry to edit (optional); empty shows the 10 newest entries',
           },
         },
         remove: {
           description: 'Remove a character from blacklist/whitelist/watchlist',
           options: {
-            name: 'Character name to remove',
+            name: 'Character name to remove; empty shows the 10 newest entries',
           },
         },
         view: {
@@ -136,7 +136,7 @@ const en = {
     evidence: {
       description: 'Direct lookup: show evidence for a listed character (autocomplete-driven)',
       options: {
-        name: 'Character name (autocomplete shows entries across all lists)',
+        name: 'Character name to search across all lists; empty shows the 10 newest entries',
         public: 'Broadcast publicly in this channel (officer/senior only; defaults private)',
       },
     },

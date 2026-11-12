@@ -92,6 +92,16 @@ test('evidence suggestions match the typed text literally and list recent entrie
   assert.deepEqual(queries.white, {});
 });
 
+test('with nothing typed, suggestions are the 10 newest entries across the lists', async (t) => {
+  const at = (day) => new Date(Date.UTC(2026, 10, day));
+  const entries = (prefix, days) => days.map((day) => ({ _id: `${prefix}${day}`, name: `N${prefix}${day}`, reason: 'r', addedAt: at(day) }));
+  stubLists(t, { black: entries('b', [20, 14, 9, 3]), white: entries('w', [19, 12, 8, 2]), watch: entries('t', [18, 11, 7, 1]) });
+
+  const choices = await listSuggest('remove', { name: 'name', value: '' });
+
+  assert.deepEqual(choices.map((choice) => choice.value), ['Nb20', 'Nw19', 'Nt18', 'Nb14', 'Nw12', 'Nt11', 'Nb9', 'Nw8', 'Nt7', 'Nb3']);
+});
+
 test('evidence suggestions stop at 25 and show an entry once', async (t) => {
   const many = (prefix, count) => Array.from({ length: count }, (_, i) => ({ _id: `${prefix}${i}`, name: `N${prefix}${i}`, reason: 'r' }));
   stubLists(t, { black: [...many('b', 20), { _id: 'b0', name: 'Nb0', reason: 'r' }], white: many('w', 10) });

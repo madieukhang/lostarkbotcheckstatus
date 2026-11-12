@@ -19,6 +19,10 @@ import { LIST_TYPES, getListContext } from '../helpers.js';
 const AUTOCOMPLETE_MAX = 25;
 const CHOICE_TEXT_MAX = 100;
 const PER_LIST_FETCH_CAP = 25;
+// With nothing typed, the suggestions are the newest entries across the lists.
+const RECENT_LIMIT = 10;
+
+const addedTime = ({ doc }) => new Date(doc.addedAt || 0).getTime();
 
 /**
  * Class and combat power of the given characters from their roster
@@ -48,12 +52,13 @@ async function findRosterFacts(names) {
 }
 
 /**
- * Entries whose name starts with the typed text, newest first per list.
- * The blacklist is scope-filtered to the viewer's server, so a server only
- * sees its own server-scoped entries and the global ones.
- * @param {string} query - typed text; empty lists the newest entries
+ * Entries whose name starts with the typed text, newest first per list; with
+ * nothing typed, the 10 newest entries across the lists. The blacklist is
+ * scope-filtered to the viewer's server, so a server only sees its own
+ * server-scoped entries and the global ones.
+ * @param {string} query - typed text
  * @param {string} guildId - viewer's server
- * @returns {Promise<Array<{doc: object, type: string, className: string}>>}
+ * @returns {Promise<Array<{doc: object, type: string, className?: string, combatScore?: string}>>}
  */
 async function findEntrySuggestions(query, guildId) {
   await connectDB();
@@ -67,17 +72,19 @@ async function findEntrySuggestions(query, guildId) {
     return { name: new RegExp(`^${escaped}`, 'i') };
   };
 
-  const results = (await Promise.all(LIST_TYPES.map(async (type) => {
+  const perListCap = trimmed ? PER_LIST_FETCH_CAP : RECENT_LIMIT;
+  const found = (await Promise.all(LIST_TYPES.map(async (type) => {
     const { model } = getListContext(type);
     const scoped = buildScopedListQuery(type, buildBaseQuery(), guildId);
     const docs = await model
       .find(scoped)
       .collation(CASE_INSENSITIVE_COLLATION)
       .sort({ addedAt: -1 })
-      .limit(PER_LIST_FETCH_CAP)
+      .limit(perListCap)
       .lean();
     return docs.map((doc) => ({ doc, type }));
   }))).flat();
+  const results = trimmed ? found : found.sort((a, b) => addedTime(b) - addedTime(a)).slice(0, RECENT_LIMIT);
 
   const facts = await findRosterFacts([...new Set(results.map(({ doc }) => doc.name))]);
   return results.map((result) => ({ ...result, ...facts.get(result.doc.name.toLowerCase()) }));
