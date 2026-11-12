@@ -35,6 +35,30 @@ import {
 } from '../services/mutationFlow.js';
 
 /**
+ * The add request both the slash command and the add form hand to the add
+ * handler: trimmed text, the normalized name and the resolved raid.
+ * @param {object} fields
+ * @param {string} fields.type - black, white or watch
+ * @param {string} fields.name
+ * @param {string} fields.reason
+ * @param {string} [fields.raidInput] - raid as given; '' for none
+ * @param {?object} [fields.image] - Discord attachment
+ * @param {string} [fields.inputScope] - global, server or '' for the default
+ * @returns {object} request; `raid` is null when the raid is not allowed for the list
+ */
+export function buildListAddRequest({ type, name, reason, raidInput = '', image = null, inputScope = '' }) {
+  return {
+    type,
+    name: normalizeCharacterName(String(name ?? '').trim()),
+    reason: String(reason ?? '').trim(),
+    raidInput,
+    raid: resolveListAddRaidLabel(type, raidInput),
+    image,
+    inputScope,
+  };
+}
+
+/**
  * Build the /la-list add slash-command handler.
  * @param {object} deps
  * @param {import('discord.js').Client} deps.client - Discord client for
@@ -51,17 +75,14 @@ export function createListAddCommandHandler({
   executeListAddToDatabase,
 }) {
   function readListAddRequest(interaction) {
-    const type = interaction.options.getString('type', true);
-    const raidInput = interaction.options.getString('raid') ?? '';
-    return {
-      type,
-      name: normalizeCharacterName(interaction.options.getString('name', true).trim()),
-      reason: interaction.options.getString('reason', true).trim(),
-      raidInput,
-      raid: resolveListAddRaidLabel(type, raidInput),
+    return buildListAddRequest({
+      type: interaction.options.getString('type', true),
+      name: interaction.options.getString('name', true),
+      reason: interaction.options.getString('reason', true),
+      raidInput: interaction.options.getString('raid') ?? '',
       image: interaction.options.getAttachment('image'),
       inputScope: interaction.options.getString('scope') || '',
-    };
+    });
   }
 
   function validateListAddRequest(interaction, request, lang) {
@@ -163,8 +184,15 @@ export function createListAddCommandHandler({
     }
   }
 
-  async function handleListAddCommand(interaction) {
-    const request = readListAddRequest(interaction);
+  /**
+   * @param {import('discord.js').Interaction} interaction - the slash command,
+   *   or the add form's submit
+   * @param {object} [formRequest] - from buildListAddRequest; read from the
+   *   slash options when omitted
+   * @returns {Promise<void>}
+   */
+  async function handleListAddCommand(interaction, formRequest = null) {
+    const request = formRequest ?? readListAddRequest(interaction);
     await deferReply(interaction);
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     const validation = validateListAddRequest(interaction, request, lang);

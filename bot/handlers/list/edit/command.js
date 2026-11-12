@@ -51,17 +51,41 @@ import { getUserLanguage, t } from '../../../services/i18n/index.js';
 // echoed part, and the alert description must stay under 4096.
 const REFUSED_NAMES_ECHO_LIMIT = 1000;
 
-function readListEditInput(interaction) {
-  const newScopeRaw = interaction.options.getString('scope') || '';
+/**
+ * The edit input both the slash command and the edit form hand to the edit
+ * handler. An empty field keeps the entry's current value.
+ * @param {object} fields
+ * @param {string} fields.name - entry to edit
+ * @param {?string} [fields.reason]
+ * @param {?string} [fields.type] - black, white or watch
+ * @param {?string} [fields.raidInput]
+ * @param {?object} [fields.image] - Discord attachment
+ * @param {?string} [fields.scope] - global or server; anything else keeps it
+ * @param {?string} [fields.additionalNames] - comma-separated alts
+ * @returns {object} input for the edit plan
+ */
+export function buildListEditInput({ name, reason, type, raidInput, image = null, scope, additionalNames }) {
   return {
-    name: normalizeCharacterName(interaction.options.getString('name')),
-    newReason: interaction.options.getString('reason')?.trim() || '',
-    newType: interaction.options.getString('type') || '',
-    newRaidInput: interaction.options.getString('raid')?.trim() || '',
-    imageAttachment: interaction.options.getAttachment('image'),
-    newScope: newScopeRaw === 'global' || newScopeRaw === 'server' ? newScopeRaw : '',
-    additionalNamesRaw: interaction.options.getString('additional_names') || '',
+    name: normalizeCharacterName(name),
+    newReason: reason?.trim() || '',
+    newType: type || '',
+    newRaidInput: raidInput?.trim() || '',
+    imageAttachment: image,
+    newScope: scope === 'global' || scope === 'server' ? scope : '',
+    additionalNamesRaw: additionalNames || '',
   };
+}
+
+function readListEditInput(interaction) {
+  return buildListEditInput({
+    name: interaction.options.getString('name'),
+    reason: interaction.options.getString('reason'),
+    type: interaction.options.getString('type'),
+    raidInput: interaction.options.getString('raid'),
+    image: interaction.options.getAttachment('image'),
+    scope: interaction.options.getString('scope'),
+    additionalNames: interaction.options.getString('additional_names'),
+  });
 }
 
 async function findListEditTarget({ name, guildId }) {
@@ -307,7 +331,14 @@ export function createListEditCommandHandler({
   broadcastListChange,
   rehostImageFn = rehostImage,
 }) {
-  async function handleListEditCommand(interaction) {
+  /**
+   * @param {import('discord.js').Interaction} interaction - the slash command,
+   *   or the edit form's submit
+   * @param {object} [formInput] - from buildListEditInput; read from the
+   *   slash options when omitted
+   * @returns {Promise<void>}
+   */
+  async function handleListEditCommand(interaction, formInput = null) {
     if (!interaction.guild) {
       const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       await replyAlert(interaction, {
@@ -317,7 +348,7 @@ export function createListEditCommandHandler({
       return;
     }
 
-    const input = readListEditInput(interaction);
+    const input = formInput ?? readListEditInput(interaction);
     const newImageUrl = input.imageAttachment?.url || '';
 
     // Defer FIRST so the lookups and the rehost (download + upload, can take
