@@ -41,6 +41,16 @@ export function getProtectedGuildIds(client) {
   return new Set([config.ownerGuildId, ...channelGuildIds].filter(Boolean));
 }
 
+// An unavailable guild (a Discord outage at ready) carries only its id, with
+// no name and no join date, so every label falls back to the id.
+function guildName(guild) {
+  return guild.name ?? guild.id;
+}
+
+function joinedLabel(guild) {
+  return Number.isFinite(guild.joinedTimestamp) ? `<t:${Math.floor(guild.joinedTimestamp / 1000)}:D>` : '?';
+}
+
 /**
  * Suggest the servers the bot is in for the `guild` option. Only Seniors get
  * suggestions; the leave action hides the protected guilds.
@@ -60,10 +70,13 @@ export async function handleRemoteGuildAutocomplete(interaction) {
     const query = String(focused.value || '').trim().toLowerCase();
     const choices = [...interaction.client.guilds.cache.values()]
       .filter((guild) => !hidden.has(guild.id))
-      .filter((guild) => guild.name.toLowerCase().includes(query) || guild.id.includes(query))
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .filter((guild) => guildName(guild).toLowerCase().includes(query) || guild.id.includes(query))
+      .sort((a, b) => guildName(a).localeCompare(guildName(b)))
       .slice(0, SUGGESTION_LIMIT)
-      .map((guild) => ({ name: `${guild.name} · ${guild.id}`.slice(0, CHOICE_TEXT_MAX), value: guild.id }));
+      .map((guild) => ({
+        name: (guild.name ? `${guild.name} · ${guild.id}` : guild.id).slice(0, CHOICE_TEXT_MAX),
+        value: guild.id,
+      }));
     await interaction.respond(choices);
   } catch (err) {
     console.warn('[la-remote] Server suggestions failed:', err?.message || err);
@@ -71,8 +84,9 @@ export async function handleRemoteGuildAutocomplete(interaction) {
   }
 }
 
-// Checked before the card and again on the click, since the owner, the
-// guild list and the protected set can change while the card waits.
+// Checked before the card and again on the click, since the guild list and
+// the protected set can change while the card waits. The owner is read from
+// the cached application, so an ownership transfer shows after a restart.
 async function findLeaveRefusal(interaction, guildId, isOwner) {
   const { client } = interaction;
   if (!(await isOwner(client, interaction.user.id))) return 'ownerOnly';
@@ -86,14 +100,15 @@ function leaveRefusalAlert(refusal, guildId, lang) {
   return { kind, ...t(key, lang, { guild: guildId }) };
 }
 
+// The private card asking the owner to confirm, with Leave and Cancel.
 function buildLeaveConfirmCard(guild, lang) {
   const embed = createArtistEmbed()
     .setTitle(`⚠️ ${t('dialogue.remote.leave.confirm.title', lang)}`)
-    .setDescription(t('dialogue.remote.leave.confirm.description', lang, { guild: guild.name }))
+    .setDescription(t('dialogue.remote.leave.confirm.description', lang, { guild: guildName(guild) }))
     .addFields(
-      { name: t('dialogue.remote.fields.server', lang), value: `**${guild.name}**\n\`${guild.id}\``, inline: true },
+      { name: t('dialogue.remote.fields.server', lang), value: `**${guildName(guild)}**\n\`${guild.id}\``, inline: true },
       { name: t('dialogue.remote.leave.fields.members', lang), value: String(guild.memberCount ?? '?'), inline: true },
-      { name: t('dialogue.remote.leave.fields.joined', lang), value: `<t:${Math.floor(guild.joinedTimestamp / 1000)}:D>`, inline: true },
+      { name: t('dialogue.remote.leave.fields.joined', lang), value: joinedLabel(guild), inline: true },
     )
     .setColor(COLORS.warning);
   const buttons = new ActionRowBuilder().addComponents(
@@ -103,6 +118,8 @@ function buildLeaveConfirmCard(guild, lang) {
   return { embeds: [embed], components: [buttons] };
 }
 
+// The confirmed click: re-check, then the one guild.leave() call, logged.
+// The original reply carries the outcome, since the button was deferred.
 async function leaveGuild(interaction, guildId, lang, isOwner) {
   const refusal = await findLeaveRefusal(interaction, guildId, isOwner);
   if (refusal) {
@@ -110,7 +127,7 @@ async function leaveGuild(interaction, guildId, lang, isOwner) {
     return;
   }
   const guild = interaction.client.guilds.cache.get(guildId);
-  const label = `${guild.name} (${guild.id})`;
+  const label = `${guildName(guild)} (${guild.id})`;
   try {
     await guild.leave();
   } catch (err) {

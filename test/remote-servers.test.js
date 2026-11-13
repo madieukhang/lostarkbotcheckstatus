@@ -268,3 +268,29 @@ test('a throwing leave shows the failed card', async (testContext) => {
   await handleLeaveAction(interaction, 'g-a', 'en', { isOwner: ownerYes });
   assert.ok(embedOf(lastEdit(interaction)).title.includes(titleKey('dialogue.remote.leave.failed')));
 });
+
+// An unavailable guild (a Discord outage at ready) carries only its id.
+function makeUnavailableGuild(id) {
+  const guild = { id, available: false, leaveCalls: 0, async leave() { guild.leaveCalls += 1; } };
+  return guild;
+}
+
+test('suggestions keep working when a guild is unavailable', async (testContext) => {
+  useConfig(testContext);
+  const interaction = makeAutocomplete(makeClient([makeGuild('g-a', 'Alpha'), makeUnavailableGuild('g-x')]));
+  await handleRemoteGuildAutocomplete(interaction);
+  assert.deepEqual(interaction.responded, [
+    { name: 'Alpha · g-a', value: 'g-a' },
+    { name: 'g-x', value: 'g-x' },
+  ]);
+});
+
+test('the confirmation card of an unavailable guild shows its id and no NaN date', async (testContext) => {
+  useConfig(testContext);
+  const { interaction } = makeLeaveInteraction(makeClient([makeUnavailableGuild('g-x')]));
+  await handleLeaveAction(interaction, 'g-x', 'en', { isOwner: ownerYes });
+  const values = embedOf(interaction.edits[0]).fields.map(({ value }) => value).join('\n');
+  assert.ok(values.includes('g-x'));
+  assert.ok(!values.includes('NaN'));
+  assert.ok(!values.includes('undefined'));
+});
