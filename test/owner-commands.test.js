@@ -29,3 +29,13 @@ test('/la-remote offers leave with server suggestions', () => {
     assert.equal(ownerLines.some((line) => line.includes('action:leave')), true, `${code} owner help`);
   }
 });
+
+test('the /la-remote help summary names every action choice', () => {
+  const remote = buildOwnerCommands().find(({ name }) => name === 'la-remote');
+  const actions = remote.options.find(({ name }) => name === 'action').choices.map(({ value }) => value);
+  for (const { code } of SUPPORTED_LANGUAGES) {
+    const summary = t('help.overview.ownerGroup', code).lines.find((line) => line.startsWith('`/la-remote action ['));
+    const listed = summary.match(/\(([^)]*)\)\s*$/)[1].split('/').map((part) => part.trim());
+    assert.deepEqual(listed, actions, `${code} owner help summary`);
+  }
+});

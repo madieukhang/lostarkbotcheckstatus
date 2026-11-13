@@ -202,7 +202,7 @@ const jp = {
         lines: [
           '`/la-stats` - bot 統計を見る',
           '`/la-reset` - 保存済みのサーバー状態を消去 (次回のチェックは最初からやり直し、オンライン通知は出しません)',
-          '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
+          '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages / leave)',
           '`/la-remote action:evidencechannel channel:#...` - evidence 保存 channel を設定 (Discord CDN expiry 回避のため bot が rehost)',
           '`/la-remote action:syncimages` - legacy image を rehost storage へ migrate。詳細は dropdown へ。',
           '`/la-remote action:leave guild:<server>` - Bot owner: 確認のあとサーバーから bot を退出。保存データは残り、owner サーバーは保護',

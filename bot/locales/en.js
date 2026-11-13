@@ -353,7 +353,7 @@ const en = {
         lines: [
           '`/la-stats` - Show bot usage statistics',
           '`/la-reset` - Clear the stored server status; the next check starts over without an online alert',
-          '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
+          '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages / leave)',
           '`/la-remote action:evidencechannel channel:#...` - Set evidence storage channel (bot rehosts here to avoid Discord CDN expiry)',
           '`/la-remote action:syncimages` - Migrate legacy images to rehost storage. See dropdown for the detailed flow.',
           '`/la-remote action:leave guild:<server>` - Bot owner: remove the bot from a server after a confirmation; saved data stays, the owner server is protected',
