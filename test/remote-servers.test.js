@@ -47,8 +47,10 @@ function makeGuild(id, name, { leave } = {}) {
   return guild;
 }
 
-function makeClient(guilds = [], channels = []) {
+// The application owner is the leave interactions' user unless a test says otherwise.
+function makeClient(guilds = [], channels = [], { ownerId = 'owner-1' } = {}) {
   return {
+    application: { owner: { id: ownerId } },
     guilds: { cache: new Map(guilds.map((guild) => [guild.id, guild])) },
     channels: { cache: new Map(channels.map((channel) => [channel.id, channel])) },
   };
@@ -100,8 +102,6 @@ function makeLeaveInteraction(client, click = async () => makeButton('remote_lea
   return { interaction, message };
 }
 
-const ownerYes = async () => true;
-const ownerNo = async () => false;
 const embedOf = (payload) => {
   const embed = payload.embeds[0];
   return embed.toJSON ? embed.toJSON() : embed;
@@ -169,8 +169,8 @@ test('suggestions cap at 25 and cut labels', async (testContext) => {
 test('leave refuses a non-owner', async (testContext) => {
   useConfig(testContext);
   const guild = makeGuild('g-a', 'Alpha');
-  const { interaction, message } = makeLeaveInteraction(makeClient([guild]));
-  await handleLeaveAction(interaction, 'g-a', 'en', { isOwner: ownerNo });
+  const { interaction, message } = makeLeaveInteraction(makeClient([guild], [], { ownerId: 'someone-else' }));
+  await handleLeaveAction(interaction, 'g-a', 'en');
   assert.ok(embedOf(lastEdit(interaction)).title.includes(titleKey('dialogue.remote.leave.ownerOnly')));
   assert.equal(message.awaitOptions, null);
   assert.equal(guild.leaveCalls, 0);
@@ -180,7 +180,7 @@ test('leave refuses a protected guild typed by id', async (testContext) => {
   useConfig(testContext);
   const guild = makeGuild(OWNER_GUILD, 'Home');
   const { interaction } = makeLeaveInteraction(makeClient([guild]));
-  await handleLeaveAction(interaction, OWNER_GUILD, 'en', { isOwner: ownerYes });
+  await handleLeaveAction(interaction, OWNER_GUILD, 'en');
   assert.ok(embedOf(lastEdit(interaction)).title.includes(titleKey('dialogue.remote.leave.protected')));
   assert.equal(guild.leaveCalls, 0);
 });
@@ -188,14 +188,14 @@ test('leave refuses a protected guild typed by id', async (testContext) => {
 test('leave refuses an id the bot is not in', async (testContext) => {
   useConfig(testContext);
   const { interaction } = makeLeaveInteraction(makeClient([]));
-  await handleLeaveAction(interaction, 'g-missing', 'en', { isOwner: ownerYes });
+  await handleLeaveAction(interaction, 'g-missing', 'en');
   assert.ok(embedOf(lastEdit(interaction)).title.includes(titleKey('dialogue.remote.guildNotFound')));
 });
 
 test('leave shows the confirmation card', async (testContext) => {
   useConfig(testContext);
   const { interaction } = makeLeaveInteraction(makeClient([makeGuild('g-a', 'Alpha')]));
-  await handleLeaveAction(interaction, 'g-a', 'en', { isOwner: ownerYes });
+  await handleLeaveAction(interaction, 'g-a', 'en');
   const card = interaction.edits[0];
   const values = embedOf(card).fields.map(({ value }) => value).join('\n');
   assert.ok(values.includes('Alpha'));
@@ -209,7 +209,7 @@ test('leave shows the confirmation card', async (testContext) => {
 test('confirmation filter accepts only the invoker', async (testContext) => {
   useConfig(testContext);
   const { interaction, message } = makeLeaveInteraction(makeClient([makeGuild('g-a', 'Alpha')]));
-  await handleLeaveAction(interaction, 'g-a', 'en', { isOwner: ownerYes });
+  await handleLeaveAction(interaction, 'g-a', 'en');
   assert.equal(message.awaitOptions.filter({ user: { id: 'owner-1' } }), true);
   assert.equal(message.awaitOptions.filter({ user: { id: 'someone-else' } }), false);
   assert.equal(message.awaitOptions.time, 60_000);
@@ -221,7 +221,7 @@ test('confirm leaves once and logs', async (testContext) => {
   const guild = makeGuild('g-a', 'Alpha');
   const button = makeButton('remote_leave_confirm');
   const { interaction } = makeLeaveInteraction(makeClient([guild]), async () => button);
-  await handleLeaveAction(interaction, 'g-a', 'en', { isOwner: ownerYes });
+  await handleLeaveAction(interaction, 'g-a', 'en');
   assert.equal(guild.leaveCalls, 1);
   assert.equal(button.deferred, 1);
   assert.ok(embedOf(lastEdit(interaction)).title.includes(titleKey('dialogue.remote.leave.done')));
@@ -234,14 +234,14 @@ test('cancel and timeout never leave', async (testContext) => {
   const guild = makeGuild('g-a', 'Alpha');
   const cancel = makeButton('remote_leave_cancel');
   const cancelled = makeLeaveInteraction(makeClient([guild]), async () => cancel);
-  await handleLeaveAction(cancelled.interaction, 'g-a', 'en', { isOwner: ownerYes });
+  await handleLeaveAction(cancelled.interaction, 'g-a', 'en');
   assert.ok(embedOf(cancel.updates[0]).title.includes(titleKey('dialogue.remote.leave.cancelled')));
   assert.deepEqual(cancel.updates[0].components, []);
 
   const timedOut = makeLeaveInteraction(makeClient([guild]), async () => {
     throw Object.assign(new Error('time'), { code: DiscordjsErrorCodes.InteractionCollectorError });
   });
-  await handleLeaveAction(timedOut.interaction, 'g-a', 'en', { isOwner: ownerYes });
+  await handleLeaveAction(timedOut.interaction, 'g-a', 'en');
   assert.ok(embedOf(lastEdit(timedOut.interaction)).title.includes(titleKey('dialogue.remote.leave.expired')));
   assert.deepEqual(lastEdit(timedOut.interaction).components, []);
   assert.equal(guild.leaveCalls, 0);
@@ -255,7 +255,7 @@ test('confirm after the guild vanished does not leave', async (testContext) => {
     client.guilds.cache.delete('g-a');
     return makeButton('remote_leave_confirm');
   });
-  await handleLeaveAction(interaction, 'g-a', 'en', { isOwner: ownerYes });
+  await handleLeaveAction(interaction, 'g-a', 'en');
   assert.ok(embedOf(lastEdit(interaction)).title.includes(titleKey('dialogue.remote.guildNotFound')));
   assert.equal(guild.leaveCalls, 0);
 });
@@ -265,7 +265,7 @@ test('a throwing leave shows the failed card', async (testContext) => {
   testContext.mock.method(console, 'error', () => {});
   const guild = makeGuild('g-a', 'Alpha', { leave: async () => { throw new Error('Missing Access'); } });
   const { interaction } = makeLeaveInteraction(makeClient([guild]), async () => makeButton('remote_leave_confirm'));
-  await handleLeaveAction(interaction, 'g-a', 'en', { isOwner: ownerYes });
+  await handleLeaveAction(interaction, 'g-a', 'en');
   assert.ok(embedOf(lastEdit(interaction)).title.includes(titleKey('dialogue.remote.leave.failed')));
 });
 
@@ -288,9 +288,70 @@ test('suggestions keep working when a guild is unavailable', async (testContext)
 test('the confirmation card of an unavailable guild shows its id and no NaN date', async (testContext) => {
   useConfig(testContext);
   const { interaction } = makeLeaveInteraction(makeClient([makeUnavailableGuild('g-x')]));
-  await handleLeaveAction(interaction, 'g-x', 'en', { isOwner: ownerYes });
+  await handleLeaveAction(interaction, 'g-x', 'en');
   const values = embedOf(interaction.edits[0]).fields.map(({ value }) => value).join('\n');
   assert.ok(values.includes('g-x'));
   assert.ok(!values.includes('NaN'));
   assert.ok(!values.includes('undefined'));
+});
+
+test('suggestion labels never end in half an emoji', async (testContext) => {
+  useConfig(testContext);
+  const interaction = makeAutocomplete(makeClient([makeGuild('g-1', `${'x'.repeat(99)}😀`)]));
+  await handleRemoteGuildAutocomplete(interaction);
+  assert.equal(interaction.responded[0].name, 'x'.repeat(99));
+});
+
+test('a stranger-set server name is escaped on the cards', async (testContext) => {
+  useConfig(testContext);
+  testContext.mock.method(console, 'log', () => {});
+  const name = '[x](https://evil.test) **b**';
+  const { interaction } = makeLeaveInteraction(
+    makeClient([makeGuild('g-a', name)]),
+    async () => makeButton('remote_leave_confirm'),
+  );
+  await handleLeaveAction(interaction, 'g-a', 'en');
+  for (const payload of [interaction.edits[0], lastEdit(interaction)]) {
+    const card = embedOf(payload);
+    const shown = [card.description, ...(card.fields || []).map(({ value }) => value)].join('\n');
+    assert.ok(!shown.includes('[x](https://evil.test)'), shown);
+    assert.ok(shown.includes(String.raw`\[x\](https://evil.test) \*\*b\*\*`), shown);
+  }
+});
+
+test('the la-remote autocomplete route serves the server suggestions', async (testContext) => {
+  useConfig(testContext);
+  const { createAutocompleteRoutes } = await import('../bot/app/interaction-router.js');
+  const interaction = makeAutocomplete(makeClient([makeGuild('g-a', 'Alpha')]));
+  await createAutocompleteRoutes()['la-remote'](interaction);
+  assert.deepEqual(interaction.responded, [{ name: 'Alpha · g-a', value: 'g-a' }]);
+});
+
+test('/la-remote action:leave reaches the confirmation card', async (testContext) => {
+  useConfig(testContext, { seniorApproverIds: ['owner-1'] });
+  const { default: mongoose } = await import('mongoose');
+  const { default: UserPreference } = await import('../bot/models/UserPreference.js');
+  const { disconnectDB } = await import('../bot/db.js');
+  const { clearUserLanguageCache } = await import('../bot/services/i18n/index.js');
+  const { handleSetupRemoteCommand } = await import('../bot/handlers/setup/remote.js');
+  testContext.mock.method(mongoose, 'connect', async () => mongoose);
+  testContext.after(disconnectDB);
+  clearUserLanguageCache();
+  testContext.after(() => clearUserLanguageCache());
+  testContext.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+
+  const client = makeClient([makeGuild('g-a', 'Alpha')]);
+  client.guilds.fetch = async (id) => {
+    if (!client.guilds.cache.has(id)) throw new Error('Unknown Guild');
+    return client.guilds.cache.get(id);
+  };
+  const { interaction } = makeLeaveInteraction(client);
+  const options = { action: 'leave', guild: 'g-a' };
+  Object.assign(interaction, {
+    options: { getString: (name) => options[name] ?? null, getChannel: () => null },
+    deferReply: async () => {},
+  });
+  await handleSetupRemoteCommand(interaction);
+  const ids = interaction.edits[0].components[0].toJSON().components.map(({ custom_id: id }) => id);
+  assert.deepEqual(ids, ['remote_leave_confirm', 'remote_leave_cancel']);
 });

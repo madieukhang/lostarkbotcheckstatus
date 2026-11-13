@@ -105,6 +105,13 @@ test('name-valued choices show a name found in two lists once', () => {
   assert.equal(buildEntryChoices(results, ({ type, doc }) => `${type}:${doc._id}`).length, 2);
 });
 
+test('choice labels cut at 100 without splitting an emoji', () => {
+  const name = `${'x'.repeat(97)}😀`;
+  const [choice] = buildEntryChoices([{ type: 'black', doc: { _id: 'b1', name, reason: 'r' } }], ({ doc }) => doc.name);
+  assert.equal(choice.name, `⛔ ${'x'.repeat(97)}`);
+  assert.equal(choice.value, name);
+});
+
 test('evidence suggestions answer empty for another option', async (t) => {
   stubLists(t, { white: [{ _id: 'w1', name: 'Xavier', reason: 'r' }] });
   assert.deepEqual(await suggest({ name: 'public', value: 'x' }), []);

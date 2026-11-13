@@ -10,12 +10,12 @@
 
 import { connectDB } from '../../../db.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
+import { cutChoiceText } from '../../../utils/discordText.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { LIST_TYPES, getListContext } from '../helpers.js';
 
 // Discord shows at most 25 choices, each label and value at most 100 characters.
 const AUTOCOMPLETE_MAX = 25;
-const CHOICE_TEXT_MAX = 100;
 const PER_LIST_FETCH_CAP = 25;
 // With nothing typed, the suggestions are the newest entries across the lists.
 const RECENT_LIMIT = 10;
@@ -69,7 +69,7 @@ export function buildEntryChoices(results, toValue) {
   const choices = [];
 
   for (const result of results) {
-    const value = toValue(result).slice(0, CHOICE_TEXT_MAX);
+    const value = cutChoiceText(toValue(result));
     if (seen.has(value)) continue;
     seen.add(value);
 
@@ -78,7 +78,7 @@ export function buildEntryChoices(results, toValue) {
     // Local-scope tag helps an officer tell apart the same name appearing
     // under global vs server scope (rare but possible for blacklist).
     const scopeTag = type === 'black' && doc.scope === 'server' ? ' [S]' : '';
-    const label = `${icon} ${doc.name}${scopeTag}`.slice(0, CHOICE_TEXT_MAX);
+    const label = cutChoiceText(`${icon} ${doc.name}${scopeTag}`);
 
     choices.push({ name: label, value });
     if (choices.length >= AUTOCOMPLETE_MAX) break;

@@ -1,7 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { truncateInlineText } from '../bot/utils/discordText.js';
+import { cutChoiceText, escapeEmbedText, truncateInlineText } from '../bot/utils/discordText.js';
+
+test('cutChoiceText keeps a choice within 100 units without splitting an emoji', () => {
+  assert.equal(cutChoiceText('short'), 'short');
+  assert.equal(cutChoiceText(`${'x'.repeat(98)}😀z`), `${'x'.repeat(98)}😀`);
+  assert.equal(cutChoiceText(`${'x'.repeat(99)}😀`), 'x'.repeat(99));
+});
+
+test('escapeEmbedText escapes markdown and masked-link brackets once', () => {
+  assert.equal(escapeEmbedText('[x](https://a.b) **b**'), '\\[x\\](https://a.b) \\*\\*b\\*\\*');
+  assert.equal(escapeEmbedText('Plain Guild'), 'Plain Guild');
+});
 
 test('truncateInlineText trims labels and preserves short values', () => {
   assert.equal(truncateInlineText('  short  ', 20), 'short');

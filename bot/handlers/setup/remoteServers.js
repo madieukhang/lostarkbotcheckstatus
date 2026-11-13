@@ -12,21 +12,34 @@ import { createArtistEmbed } from '../../utils/artistVoice.js';
 import { NoticeKind } from '../../utils/alertEmbed.js';
 import { isApplicationOwner } from '../../utils/applicationOwner.js';
 import { isSeniorApprover } from '../../utils/approverRoles.js';
+import { cutChoiceText, escapeEmbedText } from '../../utils/discordText.js';
 import { editAlert, editPayload, updateAlert } from '../../utils/interactionReplies.js';
 import { COLORS } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
 
 const SUGGESTION_LIMIT = 25;
-const CHOICE_TEXT_MAX = 100;
 const CONFIRM_TIMEOUT_MS = 60_000;
 const LEAVE_CONFIRM_ID = 'remote_leave_confirm';
 const LEAVE_CANCEL_ID = 'remote_leave_cancel';
 
-const LEAVE_REFUSALS = Object.freeze({
-  ownerOnly: { kind: NoticeKind.GUARD, key: 'dialogue.remote.leave.ownerOnly' },
-  notFound: { kind: NoticeKind.EXPIRED, key: 'dialogue.remote.guildNotFound' },
-  protected: { kind: NoticeKind.GUARD, key: 'dialogue.remote.leave.protected' },
-});
+// Checked in order before the card and again on the click, since the guild
+// list and the protected set can change while the card waits. The owner is
+// read from the cached application, so an ownership transfer shows after a
+// restart.
+const LEAVE_RULES = Object.freeze([
+  {
+    refusal: { kind: NoticeKind.GUARD, key: 'dialogue.remote.leave.ownerOnly' },
+    refuses: async ({ client, userId }) => !(await isApplicationOwner(client, userId)),
+  },
+  {
+    refusal: { kind: NoticeKind.EXPIRED, key: 'dialogue.remote.guildNotFound' },
+    refuses: ({ client, guildId }) => !client.guilds.cache.has(guildId),
+  },
+  {
+    refusal: { kind: NoticeKind.GUARD, key: 'dialogue.remote.leave.protected' },
+    refuses: ({ client, guildId }) => getProtectedGuildIds(client).has(guildId),
+  },
+]);
 
 /**
  * Guilds the bot must stay in: the owner guild, which holds the owner
@@ -74,7 +87,7 @@ export async function handleRemoteGuildAutocomplete(interaction) {
       .sort((a, b) => guildName(a).localeCompare(guildName(b)))
       .slice(0, SUGGESTION_LIMIT)
       .map((guild) => ({
-        name: (guild.name ? `${guild.name} · ${guild.id}` : guild.id).slice(0, CHOICE_TEXT_MAX),
+        name: cutChoiceText(guild.name ? `${guild.name} · ${guild.id}` : guild.id),
         value: guild.id,
       }));
     await interaction.respond(choices);
@@ -84,29 +97,28 @@ export async function handleRemoteGuildAutocomplete(interaction) {
   }
 }
 
-// Checked before the card and again on the click, since the guild list and
-// the protected set can change while the card waits. The owner is read from
-// the cached application, so an ownership transfer shows after a restart.
-async function findLeaveRefusal(interaction, guildId, isOwner) {
-  const { client } = interaction;
-  if (!(await isOwner(client, interaction.user.id))) return 'ownerOnly';
-  if (!client.guilds.cache.has(guildId)) return 'notFound';
-  if (getProtectedGuildIds(client).has(guildId)) return 'protected';
+// The first LEAVE_RULES refusal for this caller and guild, or null.
+async function findLeaveRefusal(interaction, guildId) {
+  const context = { client: interaction.client, userId: interaction.user.id, guildId };
+  for (const rule of LEAVE_RULES) {
+    if (await rule.refuses(context)) return rule.refusal;
+  }
   return null;
 }
 
-function leaveRefusalAlert(refusal, guildId, lang) {
-  const { kind, key } = LEAVE_REFUSALS[refusal];
+function leaveRefusalAlert({ kind, key }, guildId, lang) {
   return { kind, ...t(key, lang, { guild: guildId }) };
 }
 
-// The private card asking the owner to confirm, with Leave and Cancel.
+// The private card asking the owner to confirm, with Leave and Cancel. The
+// server name is chosen by strangers, so it is escaped before it is shown.
 function buildLeaveConfirmCard(guild, lang) {
+  const shownName = escapeEmbedText(guildName(guild));
   const embed = createArtistEmbed()
     .setTitle(`⚠️ ${t('dialogue.remote.leave.confirm.title', lang)}`)
-    .setDescription(t('dialogue.remote.leave.confirm.description', lang, { guild: guildName(guild) }))
+    .setDescription(t('dialogue.remote.leave.confirm.description', lang, { guild: shownName }))
     .addFields(
-      { name: t('dialogue.remote.fields.server', lang), value: `**${guildName(guild)}**\n\`${guild.id}\``, inline: true },
+      { name: t('dialogue.remote.fields.server', lang), value: `**${shownName}**\n\`${guild.id}\``, inline: true },
       { name: t('dialogue.remote.leave.fields.members', lang), value: String(guild.memberCount ?? '?'), inline: true },
       { name: t('dialogue.remote.leave.fields.joined', lang), value: joinedLabel(guild), inline: true },
     )
@@ -120,28 +132,29 @@ function buildLeaveConfirmCard(guild, lang) {
 
 // The confirmed click: re-check, then the one guild.leave() call, logged.
 // The original reply carries the outcome, since the button was deferred.
-async function leaveGuild(interaction, guildId, lang, isOwner) {
-  const refusal = await findLeaveRefusal(interaction, guildId, isOwner);
+async function leaveGuild(interaction, guildId, lang) {
+  const refusal = await findLeaveRefusal(interaction, guildId);
   if (refusal) {
     await editAlert(interaction, leaveRefusalAlert(refusal, guildId, lang), { components: [] });
     return;
   }
   const guild = interaction.client.guilds.cache.get(guildId);
-  const label = `${guildName(guild)} (${guild.id})`;
+  const logLabel = `${guildName(guild)} (${guild.id})`;
+  const shownLabel = `${escapeEmbedText(guildName(guild))} (${guild.id})`;
   try {
     await guild.leave();
   } catch (err) {
-    console.error(`[la-remote] leave ${label} failed:`, err?.message || err);
+    console.error(`[la-remote] leave ${logLabel} failed:`, err?.message || err);
     await editAlert(interaction, {
       kind: NoticeKind.FAILURE,
-      ...t('dialogue.remote.leave.failed', lang, { guild: label }),
+      ...t('dialogue.remote.leave.failed', lang, { guild: shownLabel }),
     }, { components: [] });
     return;
   }
-  console.log(`[la-remote] left ${label} by ${interaction.user.tag}`);
+  console.log(`[la-remote] left ${logLabel} by ${interaction.user.tag}`);
   await editAlert(interaction, {
     kind: NoticeKind.DONE,
-    ...t('dialogue.remote.leave.done', lang, { guild: label }),
+    ...t('dialogue.remote.leave.done', lang, { guild: shownLabel }),
   }, { components: [] });
 }
 
@@ -152,11 +165,10 @@ async function leaveGuild(interaction, guildId, lang, isOwner) {
  * @param {import('discord.js').ChatInputCommandInteraction} interaction - deferred /la-remote interaction
  * @param {string} guildId - server to leave
  * @param {string} lang - caller's language
- * @param {{ isOwner?: (client: object, userId: string) => Promise<boolean> }} [deps] - owner check override for tests
  * @returns {Promise<void>}
  */
-export async function handleLeaveAction(interaction, guildId, lang, { isOwner = isApplicationOwner } = {}) {
-  const refusal = await findLeaveRefusal(interaction, guildId, isOwner);
+export async function handleLeaveAction(interaction, guildId, lang) {
+  const refusal = await findLeaveRefusal(interaction, guildId);
   if (refusal) {
     await editAlert(interaction, leaveRefusalAlert(refusal, guildId, lang));
     return;
@@ -180,5 +192,5 @@ export async function handleLeaveAction(interaction, guildId, lang, { isOwner = 
     return;
   }
   await button.deferUpdate();
-  await leaveGuild(interaction, guildId, lang, isOwner);
+  await leaveGuild(interaction, guildId, lang);
 }
