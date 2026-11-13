@@ -140,7 +140,10 @@ test('suggestions hide protected guilds only for leave', async (testContext) => 
   assert.deepEqual(leave.responded.map(({ value }) => value), ['g-a']);
   const off = makeAutocomplete(client, { action: 'off' });
   await handleRemoteGuildAutocomplete(off);
-  assert.deepEqual(off.responded.map(({ value }) => value), ['g-a', OWNER_GUILD]);
+  assert.deepEqual(off.responded, [
+    { name: '🏠 Alpha', value: 'g-a' },
+    { name: '👑 Home', value: OWNER_GUILD },
+  ]);
 });
 
 test('suggestions match name or id without case', async (testContext) => {
@@ -149,7 +152,7 @@ test('suggestions match name or id without case', async (testContext) => {
   const interaction = makeAutocomplete(client, { focused: { name: 'guild', value: 'ABC' } });
   await handleRemoteGuildAutocomplete(interaction);
   assert.deepEqual(interaction.responded.map(({ value }) => value).sort(), ['111abc222', 'g-2']);
-  assert.equal(interaction.responded.find(({ value }) => value === 'g-2').name, 'Guild ABC · g-2');
+  assert.equal(interaction.responded.find(({ value }) => value === 'g-2').name, '🏠 Guild ABC');
 });
 
 test('suggestions cap at 25 and cut labels', async (testContext) => {
@@ -158,7 +161,7 @@ test('suggestions cap at 25 and cut labels', async (testContext) => {
   const capped = makeAutocomplete(makeClient(many));
   await handleRemoteGuildAutocomplete(capped);
   assert.equal(capped.responded.length, 25);
-  assert.equal(capped.responded[0].name, 'Server 00 · g-29');
+  assert.equal(capped.responded[0].name, '🏠 Server 00');
 
   const long = makeAutocomplete(makeClient([makeGuild('g-long', 'x'.repeat(120))]));
   await handleRemoteGuildAutocomplete(long);
@@ -280,8 +283,8 @@ test('suggestions keep working when a guild is unavailable', async (testContext)
   const interaction = makeAutocomplete(makeClient([makeGuild('g-a', 'Alpha'), makeUnavailableGuild('g-x')]));
   await handleRemoteGuildAutocomplete(interaction);
   assert.deepEqual(interaction.responded, [
-    { name: 'Alpha · g-a', value: 'g-a' },
-    { name: 'g-x', value: 'g-x' },
+    { name: '🏠 Alpha', value: 'g-a' },
+    { name: '🏠 g-x', value: 'g-x' },
   ]);
 });
 
@@ -297,9 +300,10 @@ test('the confirmation card of an unavailable guild shows its id and no NaN date
 
 test('suggestion labels never end in half an emoji', async (testContext) => {
   useConfig(testContext);
-  const interaction = makeAutocomplete(makeClient([makeGuild('g-1', `${'x'.repeat(99)}😀`)]));
+  // '🏠 ' takes 3 UTF-16 units, so the emoji straddles the 100-unit cut.
+  const interaction = makeAutocomplete(makeClient([makeGuild('g-1', `${'x'.repeat(96)}😀`)]));
   await handleRemoteGuildAutocomplete(interaction);
-  assert.equal(interaction.responded[0].name, 'x'.repeat(99));
+  assert.equal(interaction.responded[0].name, `🏠 ${'x'.repeat(96)}`);
 });
 
 test('a stranger-set server name is escaped on the cards', async (testContext) => {
@@ -324,7 +328,7 @@ test('the la-remote autocomplete route serves the server suggestions', async (te
   const { createAutocompleteRoutes } = await import('../bot/app/interaction-router.js');
   const interaction = makeAutocomplete(makeClient([makeGuild('g-a', 'Alpha')]));
   await createAutocompleteRoutes()['la-remote'](interaction);
-  assert.deepEqual(interaction.responded, [{ name: 'Alpha · g-a', value: 'g-a' }]);
+  assert.deepEqual(interaction.responded, [{ name: '🏠 Alpha', value: 'g-a' }]);
 });
 
 test('/la-remote action:leave reaches the confirmation card', async (testContext) => {

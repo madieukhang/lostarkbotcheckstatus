@@ -60,6 +60,13 @@ function guildName(guild) {
   return guild.name ?? guild.id;
 }
 
+// A suggestion shows an icon and the name; the id stays the value, and the
+// confirmation card shows it. The owner server keeps the 👑 of the view card.
+function guildChoiceName(guild) {
+  const icon = guild.id === config.ownerGuildId ? '👑' : '🏠';
+  return cutChoiceText(`${icon} ${guildName(guild)}`);
+}
+
 function joinedLabel(guild) {
   return Number.isFinite(guild.joinedTimestamp) ? `<t:${Math.floor(guild.joinedTimestamp / 1000)}:D>` : '?';
 }
@@ -86,10 +93,7 @@ export async function handleRemoteGuildAutocomplete(interaction) {
       .filter((guild) => guildName(guild).toLowerCase().includes(query) || guild.id.includes(query))
       .sort((a, b) => guildName(a).localeCompare(guildName(b)))
       .slice(0, SUGGESTION_LIMIT)
-      .map((guild) => ({
-        name: cutChoiceText(guild.name ? `${guild.name} · ${guild.id}` : guild.id),
-        value: guild.id,
-      }));
+      .map((guild) => ({ name: guildChoiceName(guild), value: guild.id }));
     await interaction.respond(choices);
   } catch (err) {
     console.warn('[la-remote] Server suggestions failed:', err?.message || err);
