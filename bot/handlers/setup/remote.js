@@ -21,6 +21,7 @@ import { rejectNonSenior } from '../../utils/seniorGate.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { resolveAutoCheckCleanupEnabled } from '../../services/setup/autoCheckCleanupPolicy.js';
 import { handleSyncImagesAction } from './syncImages.js';
+import { handleLeaveAction } from './remoteServers.js';
 
 const EVIDENCE_CHANNEL_RULES = Object.freeze([
   {
@@ -232,6 +233,7 @@ function buildMissingGuildEmbed(lang) {
       { name: t('dialogue.remote.missingGuild.setScope', lang), value: '`/la-remote action:defaultscope guild:<ID> scope:server`', inline: false },
       { name: t('dialogue.remote.missingGuild.setEvidence', lang), value: '`/la-remote action:evidencechannel channel:#...`', inline: false },
       { name: t('dialogue.remote.missingGuild.syncImages', lang), value: `\`/la-remote action:syncimages\` (${t('dialogue.remote.missingGuild.noGuildNeeded', lang)})`, inline: false },
+      { name: t('dialogue.remote.missingGuild.leave', lang), value: '`/la-remote action:leave guild:<ID>`', inline: false },
     )
     .setColor(COLORS.danger);
 }
@@ -341,6 +343,7 @@ export async function handleSetupRemoteCommand(interaction) {
       auditFields,
       lang
     ),
+    leave: () => handleLeaveAction(interaction, targetGuildId, lang),
   };
   await guildActions[action]?.();
 }

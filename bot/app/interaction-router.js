@@ -24,6 +24,7 @@ import {
 import { handleSearchCommand } from '../handlers/search/index.js';
 import { handleSetupCommand } from '../handlers/setup/guildSetup.js';
 import { handleSetupRemoteCommand } from '../handlers/setup/remote.js';
+import { handleRemoteGuildAutocomplete } from '../handlers/setup/remoteServers.js';
 import { handleStatsCommand } from '../handlers/meta/stats.js';
 import { handleHelpCommand, handleHelpSelect } from '../handlers/meta/help.js';
 import { createOcrModeCommandHandler } from '../handlers/list/check/mode.js';
@@ -106,6 +107,7 @@ export function createAutocompleteRoutes() {
       await interaction.respond(choices);
     },
     'la-evidence': handleListEvidenceAutocomplete,
+    'la-remote': handleRemoteGuildAutocomplete,
     'la-setup': async (interaction) => {
       const focused = interaction.options.getFocused(true);
       if (focused.name === 'language') {

@@ -1,5 +1,7 @@
 # Changelog
 
+- New `/la-remote action:leave`: the bot owner can take LoaLogs out of a server that no longer uses it. The `guild` option now suggests server names for every action (a typed ID still works); after picking one, a private card shows the server, its member count and when the bot joined, with Leave and Cancel buttons that last 60 seconds. Only the owner of the Discord application may leave, the owner server and servers holding a channel set in the environment are refused, and nothing saved about the server is deleted, so inviting the bot back restores its settings.
+
 - Every new list entry names its raid: `raid` is required in `/la-list add`, the add form, Quick-Add and multiadd (a row without one is refused), for blacklist, whitelist and watchlist alike, so each entry says which raid it came from. Editing is unchanged, and entries saved without a raid stay as they are.
 
 - Name search in `/la-list edit`, `/la-list remove` and `/la-list edit-form`: typing `name` suggests the entries this server may see (the same search `/la-evidence` uses), each shown as list icon and name; with nothing typed they are the 10 newest entries, which the option's description says, and edit-form first asks for the `name` with the same suggestions, then opens the form with it filled in (a form's own text box cannot suggest). `/la-evidence` suggestions read the same way; the reason no longer shows there. Removing stays a command, since a form has no search.

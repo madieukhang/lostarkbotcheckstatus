@@ -477,7 +477,8 @@ function remoteCommand(name) {
           { name: 'off - toggle notify for a server', value: 'off' },
           { name: 'defaultscope - set scope for a server', value: 'defaultscope' },
           { name: 'evidencechannel - set image rehost channel (bot-wide)', value: 'evidencechannel' },
-          { name: 'syncimages - archive legacy links, copy evidence to the database', value: 'syncimages' }
+          { name: 'syncimages - archive legacy links, copy evidence to the database', value: 'syncimages' },
+          { name: 'leave - remove the bot from a server (bot owner)', value: 'leave' }
         )
     )
     .addStringOption((opt) =>
@@ -485,6 +486,7 @@ function remoteCommand(name) {
         .setName('guild')
         .setDescription(commandText('remote.options.guild'))
         .setRequired(false)
+        .setAutocomplete(true)
     )
     .addStringOption((opt) =>
       opt

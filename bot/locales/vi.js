@@ -205,6 +205,7 @@ const vi = {
           '`/la-remote action [guild] [scope] [channel]` - Senior: remote config dashboard (view / off / defaultscope / evidencechannel / syncimages)',
           '`/la-remote action:evidencechannel channel:#...` - Set channel lưu evidence (bot rehost ảnh ở đây để tránh Discord CDN expire)',
           '`/la-remote action:syncimages` - Migrate ảnh legacy sang rehost storage. Xem chi tiết trong dropdown.',
+          '`/la-remote action:leave guild:<server>` - Chủ bot: rút bot khỏi một server sau khi xác nhận; dữ liệu đã lưu vẫn giữ, server chủ được bảo vệ',
         ],
       },
     },

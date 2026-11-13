@@ -75,7 +75,7 @@ image may need fallback or a correction pass. Settings do not create new quota.
 | `action:set-language` / `action:repin` / `action:notify-repin` | Set public language / clean non-pinned auto-check messages and refresh its guide / refresh the notification guide |
 | `action:notify-cleanup` | Run one notification-channel cleanup immediately |
 
-Owner-server commands (`/la-stats`, `/la-remote`, `/la-reset`) are registered only in `OWNER_GUILD_ID` and listed in `/la-help` there. All three also check `SENIOR_APPROVER_IDS` in the handler · owner-guild registration alone is not a permission. `/la-reset` clears the stored server status; the next check starts over without an online alert.
+Owner-server commands (`/la-stats`, `/la-remote`, `/la-reset`) are registered only in `OWNER_GUILD_ID` and listed in `/la-help` there. All three also check `SENIOR_APPROVER_IDS` in the handler · owner-guild registration alone is not a permission. `/la-reset` clears the stored server status; the next check starts over without an online alert. `/la-remote action:leave guild:<server>` removes the bot from a server after a confirmation card, for the application owner only (the Developer Portal owner, not the Senior list); the `guild` option suggests server names, the owner server and any server holding a channel named in `CHANNEL_ID`, `LIST_NOTIFY_CHANNEL_IDS` or `AUTO_CHECK_CHANNEL_IDS` are refused, and the server's saved settings and entries stay.
 
 ### Status Icons
 

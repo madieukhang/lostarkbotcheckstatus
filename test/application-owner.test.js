@@ -44,7 +44,9 @@ test('false when the fetch fails', async (t) => {
   assert.equal(await isApplicationOwner(client, 'u1'), false);
 });
 
-test('false without a user id or an application', async () => {
+test('false without a user id or an application', async (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
   assert.equal(await isApplicationOwner({ application: null }, 'u1'), false);
+  assert.equal(warn.mock.callCount(), 0, 'a client that is not ready is not a failed fetch');
   assert.equal(await isApplicationOwner(makeClient({ owner: { id: 'u1' } }), ''), false);
 });

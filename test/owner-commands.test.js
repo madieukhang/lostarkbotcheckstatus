@@ -16,3 +16,16 @@ test('/la-reset is registered and listed in help only for the owner server', () 
     assert.equal(ownerLines.some((line) => line.includes('/la-reset')), true, `${code} owner help`);
   }
 });
+
+test('/la-remote offers leave with server suggestions', () => {
+  const remote = buildOwnerCommands().find(({ name }) => name === 'la-remote');
+  const action = remote.options.find(({ name }) => name === 'action');
+  const guild = remote.options.find(({ name }) => name === 'guild');
+  assert.equal(action.choices.some(({ value }) => value === 'leave'), true);
+  assert.equal(guild.autocomplete, true);
+
+  for (const { code } of SUPPORTED_LANGUAGES) {
+    const ownerLines = t('help.overview.ownerGroup', code).lines;
+    assert.equal(ownerLines.some((line) => line.includes('action:leave')), true, `${code} owner help`);
+  }
+});
