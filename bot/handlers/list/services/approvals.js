@@ -34,7 +34,7 @@ import {
 import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
-import { escapeEmbedText, escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
+import { codeSpanText, escapeEmbedText, escapeLinkBrackets, storedText } from '../../../utils/discordText.js';
 import { normalizeNameKey } from '../../../utils/names.js';
 
 /**
@@ -272,9 +272,9 @@ export function createApprovalServices({
       ].filter(Boolean);
 
       const previewLines = pending.rows.slice(0, 20).map((row, index) => {
-        const reasonShort = truncateInlineText(row.reason, 40);
+        const reasonShort = storedText(row.reason, 40);
         const scopeTag = row.scope === 'server' ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}]\`` : '';
-        const raidTag = row.raid ? ` \`${row.raid}\`` : '';
+        const raidTag = row.raid ? ` \`${codeSpanText(row.raid)}\`` : '';
         return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${escapeLinkBrackets(row.name)}**${scopeTag}${raidTag} · ${reasonShort}`;
       });
       if (pending.rows.length > 20) {

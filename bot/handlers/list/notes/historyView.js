@@ -8,7 +8,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { t } from '../../../services/i18n/index.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
-import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
+import { storedText } from '../../../utils/discordText.js';
 import { formatListScopeTag } from '../entryCardFields.js';
 import { getListContext } from '../helpers.js';
 import { NOTE_PAGE_PREFIX, formatNoteDate, readEntryNotes } from './entryNotes.js';
@@ -26,7 +26,7 @@ function noteField(note, index, total, lang, showAuthors) {
     index === total - 1 && total > 1 ? t('dialogue.notes.history.latest', lang) : '',
     showAuthors && note.byName ? t('dialogue.notes.history.by', lang, { name: note.byName }) : '',
   ].filter(Boolean).join(' · ');
-  const reason = escapeLinkBrackets(truncateInlineText(note.reason, NOTE_REASON_LIMIT) || t('dialogue.broadcast.notAvailable', lang));
+  const reason = storedText(note.reason, NOTE_REASON_LIMIT) || t('dialogue.broadcast.notAvailable', lang);
   return {
     name: [`${index === 0 ? '🌱' : '📝'} ${formatNoteDate(note.at, lang)}`, note.raid].filter(Boolean).join(' · '),
     value: tail ? `${reason}\n-# ${tail}` : reason,

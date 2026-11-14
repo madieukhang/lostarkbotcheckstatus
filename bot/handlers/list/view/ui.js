@@ -23,7 +23,7 @@ import { hasEvidence, isLegacyEvidence } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
-import { codeSpanText, isSafeLogsUrl, truncateInlineText } from '../../../utils/discordText.js';
+import { codeSpanText, isSafeLogsUrl, storedText } from '../../../utils/discordText.js';
 import { t } from '../../../services/i18n/index.js';
 import {
   formatLinkedCharacter,
@@ -58,8 +58,8 @@ function getListTypeLabel(type, fallback, lang) {
  */
 function buildEntryMetaLine({ entry, lang = 'en' }) {
   const parts = [
-    truncateInlineText(entry.reason, 80),
-    entry.raid ? `\`${entry.raid}\`` : '',
+    storedText(entry.reason, 80),
+    entry.raid ? `\`${codeSpanText(entry.raid)}\`` : '',
     entry.addedAt ? relativeTime(entry.addedAt) : '',
   ].filter(Boolean);
   return parts.length > 0 ? `└ ${parts.join(' · ')}` : '';
@@ -321,7 +321,7 @@ function buildEvidenceInlineMeta(entry, snapshot, {
   const world = resolveRosterWorld(entry, statMap);
   const inlineMeta = [
     entry.raid
-      ? { name: t('listView.evidence.raid', lang), value: `\`${entry.raid}\``, inline: true }
+      ? { name: t('listView.evidence.raid', lang), value: `\`${codeSpanText(entry.raid)}\``, inline: true }
       : null,
     // When /la-list view already establishes the selected list before this
     // detail opens, repeating the list adds no information.
@@ -359,7 +359,7 @@ function buildEvidenceFields(entry, snapshot, {
   statMap,
 }) {
   const fields = [
-    { name: t('listView.evidence.reason', lang), value: appendFieldLine((entry.reason || 'N/A').slice(0, 1024), buildNoteCountLine(entry, lang)), inline: false },
+    { name: t('listView.evidence.reason', lang), value: appendFieldLine(storedText(entry.reason || 'N/A', 1024), buildNoteCountLine(entry, lang)), inline: false },
     ...buildEvidenceInlineMeta(entry, snapshot, {
       includeAddedBy,
       includeList,

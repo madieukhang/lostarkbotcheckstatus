@@ -1,6 +1,7 @@
 import { resolveRaidLabel } from '../../../models/Raid.js';
 import { parseAdditionalNames } from '../../../utils/names.js';
 import { t } from '../../../services/i18n/index.js';
+import { codeSpanText } from '../../../utils/discordText.js';
 
 function buildAdditionalNamesChange(additionalNamesParsed, lang) {
   if (additionalNamesParsed.added.length === 0) return '';
@@ -40,17 +41,18 @@ function buildListEditChanges({
   lang,
 }) {
   return [
+    // The locale puts old and new values in code spans.
     newReason ? t('dialogue.listEdit.change.reason', lang, {
-      old: existing.reason,
-      next: newReason,
+      old: codeSpanText(existing.reason),
+      next: codeSpanText(newReason),
     }) : '',
     isTypeChange ? t('dialogue.listEdit.change.list', lang, {
       old: t(`dialogue.broadcast.list.${currentType}`, lang),
       next: t(`dialogue.broadcast.list.${targetType}`, lang),
     }) : '',
     newRaid ? t('dialogue.listEdit.change.raid', lang, {
-      old: existing.raid || t('dialogue.broadcast.notAvailable', lang),
-      next: newRaid,
+      old: codeSpanText(existing.raid || t('dialogue.broadcast.notAvailable', lang)),
+      next: codeSpanText(newRaid),
     }) : '',
     newImageUrl ? t('dialogue.listEdit.change.evidence', lang) : '',
     isScopeChange ? t('dialogue.listEdit.change.scope', lang, {

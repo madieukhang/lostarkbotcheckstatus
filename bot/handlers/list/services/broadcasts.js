@@ -20,7 +20,7 @@ import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { mapWithConcurrency } from '../../../utils/async.js';
 import { normalizeNameKey } from '../../../utils/names.js';
-import { codeSpanText, escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
+import { codeSpanText, escapeLinkBrackets, storedText } from '../../../utils/discordText.js';
 import {
   describeListEntryEdit,
   formatListEditSummary,
@@ -584,7 +584,7 @@ export function createBroadcastServices({ client }) {
       const snap = snapshotMap.get(normalizeNameKey(name));
       const cls = snap?.classId ? getClassName(snap.classId) : '';
       const classPrefix = cls ? `${getClassEmoji(cls) || cls} ` : '';
-      const reasonShort = truncateInlineText(r.entry?.reason, 60);
+      const reasonShort = storedText(r.entry?.reason, 60);
       return `${i + 1}. ${listTypeIcon(type)} ${classPrefix}**${escapeLinkBrackets(name)}** · ${reasonShort}`;
     };
 

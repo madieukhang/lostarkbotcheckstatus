@@ -19,20 +19,27 @@ const BUCKET_MS = Object.freeze({
   roster: 5_000,
   search: 5_000,
   listWrite: 10_000,
+  multiaddFile: 30_000,
 });
 
 // Route key (command, "command subcommand", or modal id) to its bucket. A
 // list add or edit shares one bucket whether it came from options or a form.
+// A member's multiadd file sends every senior a bulk approval DM, so the
+// upload is limited; the template download before it is not.
 const ROUTE_BUCKETS = Object.freeze({
   'la-check': 'check',
   'la-roster': 'roster',
   'la-search': 'search',
   'la-list add': 'listWrite',
   'la-list edit': 'listWrite',
+  'la-list multiadd file': 'multiaddFile',
   [LIST_FORM_IDS.addModal]: 'listWrite',
   [LIST_FORM_IDS.quickAddModal]: 'listWrite',
   [LIST_FORM_IDS.editModal]: 'listWrite',
 });
+
+// Routes whose key also carries one option's value.
+const OPTION_KEYED_ROUTES = Object.freeze({ 'la-list multiadd': 'action' });
 
 let stores = createStores();
 
@@ -43,7 +50,9 @@ function createStores(options) {
 function routeKey(interaction) {
   if (interaction.isChatInputCommand?.()) {
     const subcommand = interaction.options.getSubcommand(false);
-    return subcommand ? `${interaction.commandName} ${subcommand}` : interaction.commandName;
+    const route = subcommand ? `${interaction.commandName} ${subcommand}` : interaction.commandName;
+    if (!Object.hasOwn(OPTION_KEYED_ROUTES, route)) return route;
+    return `${route} ${interaction.options.getString(OPTION_KEYED_ROUTES[route], false) || ''}`;
   }
   if (interaction.isModalSubmit?.()) return String(interaction.customId || '').split(':')[0];
   return '';
@@ -59,7 +68,9 @@ function routeKey(interaction) {
 export async function refuseCoolingDown(interaction, {
   getLang = (userId) => getUserLanguage(userId, { UserPreferenceModel: UserPreference }),
 } = {}) {
-  const bucket = ROUTE_BUCKETS[routeKey(interaction)];
+  // A modal id comes from the client, so only the table's own keys count.
+  const key = routeKey(interaction);
+  const bucket = Object.hasOwn(ROUTE_BUCKETS, key) ? ROUTE_BUCKETS[key] : null;
   const userId = interaction.user?.id;
   if (!bucket || !userId || isOfficerOrSenior(userId)) return false;
   const store = stores[bucket];

@@ -71,3 +71,27 @@ test('officers and seniors, and commands without a cost, are never refused', asy
     assert.equal(await refuseCoolingDown(command('la-help'), { getLang }), false);
   }
 });
+
+function multiadd(action, userId = 'member-1') {
+  const interaction = command('la-list', { subcommand: 'multiadd', userId });
+  interaction.options.getString = (name) => (name === 'action' ? action : null);
+  return interaction;
+}
+
+test('a multiadd file upload waits out its cooldown; the template download never does', async (t2) => {
+  resetCommandCooldowns();
+  t2.after(() => resetCommandCooldowns());
+  assert.equal(await refuseCoolingDown(multiadd('template'), { getLang }), false);
+  assert.equal(await refuseCoolingDown(multiadd('file'), { getLang }), false);
+  assert.equal(await refuseCoolingDown(multiadd('template'), { getLang }), false);
+  assert.equal(await refuseCoolingDown(multiadd('file'), { getLang }), true);
+  assert.equal(await refuseCoolingDown(multiadd('file', 'member-2'), { getLang }), false);
+});
+
+test('a modal id that names an object property is not limited and does not throw', async (t2) => {
+  resetCommandCooldowns();
+  t2.after(() => resetCommandCooldowns());
+  for (const customId of ['constructor:1', '__proto__:x', 'toString', 'hasOwnProperty']) {
+    assert.equal(await refuseCoolingDown(modal(customId), { getLang }), false, customId);
+  }
+});

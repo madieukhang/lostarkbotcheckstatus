@@ -60,6 +60,7 @@ test('duplicate roster result opens with the reason pair, each with its raid, an
         ['lungzhu', { name: 'Lungzhu', className: 'Bard', world: 'Vairgrys' }],
       ]),
       typedReason: 'ninja loot g2',
+      showAddedBy: true,
     });
     const embed = result.embeds[0].toJSON();
     const fields = embed.fields;
@@ -120,6 +121,7 @@ test('duplicate card drops the typed-reason block when the add carried none', ()
     labelCap: 'Blacklist',
     type: 'black',
     lang: 'en',
+    showAddedBy: true,
   });
   const fields = result.embeds[0].toJSON().fields;
 
@@ -140,6 +142,7 @@ test('duplicate card tolerates an entry with no stored metadata at all', () => {
     labelCap: 'Blacklist',
     type: 'black',
     lang: 'vi',
+    showAddedBy: true,
   });
   const fields = result.embeds[0].toJSON().fields;
 
@@ -186,4 +189,13 @@ test('list-add success labels and counts the primary character plus its tracked 
   assert.equal(field.name, '🧬 Tracked rosters (2)');
   assert.match(field.value, /^\*\*1\.\*\* \[Tenshi\]/);
   assert.match(field.value, /\n\*\*2\.\*\* \[Hanako\]/);
+});
+
+test('a member adding a listed name is not told who reported it; an officer is', () => {
+  const card = (showAddedBy) => JSON.stringify(buildDuplicateListAddResult({
+    existed: { name: 'Lungzhu', reason: 'zdps', addedByDisplayName: 'Bao', addedByTag: 'bao#0001' },
+    name: 'Lungzhu', labelCap: 'Blacklist', type: 'black', lang: 'en', showAddedBy,
+  }).embeds[0].toJSON());
+  assert.equal(/Bao|bao#0001|Added by/.test(card(undefined)), false);
+  assert.match(card(true), /Added by[^}]*Bao/);
 });

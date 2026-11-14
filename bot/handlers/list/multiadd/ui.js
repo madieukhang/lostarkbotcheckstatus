@@ -12,7 +12,7 @@ import {
 } from '../../../services/multiadd/index.js';
 import { COLORS } from '../../../utils/ui.js';
 import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
-import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
+import { escapeLinkBrackets, storedText } from '../../../utils/discordText.js';
 import { t } from '../../../services/i18n/index.js';
 import { listTypeIcon } from '../helpers.js';
 
@@ -78,7 +78,7 @@ export function buildNoValidRowsEmbed(errors, lang = 'en') {
  */
 export function buildPreviewReply(parsed, requestId, lang = 'en') {
   const previewLines = parsed.rows.slice(0, 20).map((row, index) => {
-    const reasonShort = truncateInlineText(row.reason, 50);
+    const reasonShort = storedText(row.reason, 50);
     const scopeTag = row.scope === 'server' ? ' `[S]`' : '';
     return `\`${String(index + 1).padStart(2, ' ')}.\` ${listTypeIcon(row.type)} **${escapeLinkBrackets(row.name)}**${scopeTag} · ${reasonShort}`;
   });

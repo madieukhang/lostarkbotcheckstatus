@@ -1,5 +1,5 @@
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
-import { escapeLinkBrackets, truncateInlineText } from '../../utils/discordText.js';
+import { codeSpanText, escapeLinkBrackets, truncateInlineText } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { relativeTime } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
@@ -47,7 +47,7 @@ function buildComparisonMetadata(entry, lang, isRequest = false, statMap = new M
     ? entry.requestedByDisplayName || entry.requestedByTag || entry.requestedByName
     : entry.addedByDisplayName || entry.addedByTag || entry.addedByName;
   const raid = entry.raid
-    ? `\`${truncateInlineText(entry.raid, 180)}\``
+    ? `\`${codeSpanText(truncateInlineText(entry.raid, 180))}\``
     : isRequest ? t('dialogue.approval.flow.unchangedValue', lang) : fallback;
   return {
     name: `${isRequest ? '🆕' : '📌'} ${t(`dialogue.approval.flow.${isRequest ? 'newRequest' : 'existingEntry'}`, lang)}`,

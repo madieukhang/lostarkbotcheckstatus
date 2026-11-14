@@ -150,3 +150,51 @@ test('decided approval card escapes a bracketed name in its title', () => {
   });
   assertNoLiveLink(embeds[0].toJSON().title);
 });
+
+// Stored reasons and raids ride the same bulk paths as names.
+const RAID_BREAK = 'Act 4 ` **Claim now** `';
+const assertRaidInSpan = (text) => assert.equal(text.includes('Act 4 `'), false, `raid closed its code span in: ${text}`);
+
+test('multiadd preview shows a stored reason and raid as text', () => {
+  const reply = buildPreviewReply({
+    rows: [{ name: 'Main', type: 'watch', reason: LINK_NAME, raid: RAID_BREAK, scope: '' }],
+    errors: [],
+  }, 'request-2', 'en');
+  assertNoLiveLink(textOf(reply.embeds[0]));
+});
+
+test('senior bulk approval DM shows a stored reason and raid as text', async () => {
+  const sent = [];
+  const services = createApprovalServices({
+    client: {
+      users: {
+        fetch: async (id) => ({ id, bot: false, send: async (message) => { sent.push(message); return { id: 'message', channelId: 'dm' }; } }),
+      },
+    },
+    getUserLanguageFn: async () => 'en',
+    getSeniorApproverIdsFn: () => ['senior'],
+  });
+  await services.sendBulkApprovalToApprovers({ id: 'guild-1', name: 'Guild' }, {
+    requestId: 'bulk-2', requesterId: 'requester-1', requesterDisplayName: 'Requester', guildId: 'guild-1',
+    rows: [{ type: 'watch', name: 'Main', reason: LINK_NAME, scope: 'global', raid: RAID_BREAK }],
+  });
+  const text = textOf(sent[0].embeds[0]);
+  assertNoLiveLink(text);
+  assertRaidInSpan(text);
+});
+
+test('bulk broadcast line shows a stored reason as text', async (t) => {
+  t.mock.method(RosterSnapshot, 'find', () => ({ collation() { return this; }, lean: async () => [] }));
+  t.mock.method(GuildConfig, 'find', () => ({
+    lean: async () => [{ guildId: 'other-guild', listNotifyChannelId: 'channel-1' }],
+  }));
+  t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  const sent = [];
+  const channel = { isTextBased: () => true, guild: { id: 'other-guild' }, send: async (message) => sent.push(message) };
+  const { broadcastBulkAdd } = createBroadcastServices({ client: { channels: { fetch: async () => channel } } });
+  await broadcastBulkAdd(
+    [{ type: 'black', entry: { name: 'Main', type: 'black', reason: LINK_NAME, scope: 'global' } }],
+    { guildId: 'origin-guild' },
+  );
+  assertNoLiveLink(sent[0].embeds[0].toJSON().fields[0].value);
+});

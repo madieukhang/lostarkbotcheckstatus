@@ -11,7 +11,7 @@
 
 import { t } from '../../services/i18n/index.js';
 import { normalizeNameKey } from '../../utils/names.js';
-import { escapeLinkBrackets } from '../../utils/discordText.js';
+import { codeSpanText, escapeLinkBrackets } from '../../utils/discordText.js';
 import { padInlineRow } from '../../utils/ui.js';
 import {
   formatRosterStatBadges,
@@ -118,9 +118,9 @@ export function buildListEntryInlineFields({
     ),
     buildMarkedInlineField(
       `🗡️ ${t('dialogue.listAdd.success.fields.raid', lang)}`,
-      raid ? `\`${raid}\`` : notAvailable,
+      raid ? `\`${codeSpanText(raid)}\`` : notAvailable,
       'raid' in previous,
-      previous.raid || notAvailable,
+      previous.raid ? escapeLinkBrackets(previous.raid) : notAvailable,
     ),
   ];
   if (type === 'black') {

@@ -16,6 +16,7 @@ import { MIN_TRACKED_ITEM_LEVEL } from '../../config/itemLevelThreshold.js';
 import { buildBlacklistQuery } from '../../utils/scope.js';
 import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import { COLORS, ICONS, padInlineRow } from '../../utils/ui.js';
+import { codeSpanText, storedText } from '../../utils/discordText.js';
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
 import {
@@ -121,9 +122,9 @@ function buildHitField(entries, icon, noReason, lang, statMap) {
     const record = statMap.get(String(entry.name || '').toLowerCase());
     const level = Number(String(record?.itemLevel ?? '').replace(/,/g, ''));
     const ilvl = Number.isFinite(level) && level > 0 ? ` · \`${level.toFixed(2)}\`` : '';
-    const raid = entry.raid ? ` · \`${entry.raid}\`` : '';
+    const raid = entry.raid ? ` · \`${codeSpanText(entry.raid)}\`` : '';
     return `**${index + 1}.** ${formatLinkedCharacter(entry.name, record)}${ilvl}${raid}`
-      + `\n${entry.reason || noReason}`;
+      + `\n${storedText(entry.reason) || noReason}`;
   });
   return {
     name: `${icon} ${t(`dialogue.roster.${headingKey}`, lang, { count: entries.length })}`,

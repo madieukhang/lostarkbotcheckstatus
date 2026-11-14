@@ -28,6 +28,7 @@ import {
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
+import { isOfficerOrSenior } from '../../../utils/approverRoles.js';
 import { buildAlertEmbed, AlertSeverity, NoticeKind } from '../../../utils/alertEmbed.js';
 import { ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { t } from '../../../services/i18n/index.js';
@@ -248,9 +249,11 @@ export function buildItemLevelRejection({ name, targetItemLevel, labelCap, lang,
  * @param {string} lang - locale for every label
  * @param {Map<string, object>} statMap - roster snapshots, for the class
  *   icon on the matched name and for the server
+ * @param {boolean} showAddedBy - name who added the entry; only officers
+ *   and seniors see the reporter, as on every other card
  * @returns {Array<object>} inline fields, padded to whole rows
  */
-function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap) {
+function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap, showAddedBy) {
   const fallback = t('dialogue.broadcast.notAvailable', lang);
   const world = resolveRosterWorld(existed, statMap);
   const inlineFields = [
@@ -267,11 +270,11 @@ function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap) {
       value: `\`${world}\``,
       inline: true,
     } : null,
-    {
+    showAddedBy ? {
       name: `👤 ${t('dialogue.listAdd.duplicate.addedBy', lang)}`,
       value: existed.addedByDisplayName || existed.addedByTag || fallback,
       inline: true,
-    },
+    } : null,
     {
       name: `🕐 ${t('dialogue.listAdd.duplicate.timeAdded', lang)}`,
       value: relativeTime(existed.addedAt) || fallback,
@@ -281,6 +284,23 @@ function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap) {
   return padInlineRow(inlineFields);
 }
 
+/**
+ * The card for an add whose name, or an alt in its roster, is already listed.
+ * @param {object} options
+ * @param {object} options.existed - the entry already in the list
+ * @param {string} options.name - the name the member typed
+ * @param {string} options.labelCap - target list label
+ * @param {string} options.type - black | white | watch
+ * @param {string} options.lang - viewer language
+ * @param {Map<string, object>} [options.statMap] - roster snapshots
+ * @param {string} [options.typedReason] - the reason the member typed
+ * @param {string} [options.typedRaid] - the raid the member typed
+ * @param {string[]} [options.rosterNames] - the fetched roster's names
+ * @param {object[]} [options.rosterCharacters] - the fetched roster
+ * @param {boolean} [options.showAddedBy=false] - name who added the entry,
+ *   for an officer or senior viewer only
+ * @returns {object} the duplicate add result with its card
+ */
 export function buildDuplicateListAddResult({
   existed,
   name,
@@ -292,6 +312,7 @@ export function buildDuplicateListAddResult({
   typedRaid = '',
   rosterNames = [],
   rosterCharacters = [],
+  showAddedBy = false,
 }) {
   const isRosterMatch = normalizeNameKey(existed.name) !== normalizeNameKey(name);
   const variant = isRosterMatch ? 'roster' : 'direct';
@@ -315,7 +336,7 @@ export function buildDuplicateListAddResult({
   // bot uses, and it puts the decision the officer has to make at the top.
   const fields = [
     ...buildDuplicateReasonFields(existed, typedReason, lang, { typedRaid }),
-    ...buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap),
+    ...buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap, showAddedBy),
   ];
   return {
     ok: false,
@@ -623,6 +644,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
         typedRaid: payload.raid,
         rosterNames: roster.allCharacters,
         rosterCharacters: roster.rosterCharacters,
+        showAddedBy: isOfficerOrSenior(payload.requestedByUserId),
       });
     }
 

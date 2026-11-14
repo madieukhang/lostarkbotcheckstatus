@@ -12,7 +12,7 @@ import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
 import { appendFieldLine, buildNoteCountLine } from '../notes/entryNotes.js';
-import { escapeLinkBrackets } from '../../../utils/discordText.js';
+import { codeSpanText, escapeLinkBrackets } from '../../../utils/discordText.js';
 import {
   formatLinkedCharacter,
   formatRosterStatBadges,
@@ -32,7 +32,7 @@ function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang, statM
   const inlineFields = [
     {
       name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`,
-      value: entry.raid ? `\`${entry.raid}\`` : notAvailable,
+      value: entry.raid ? `\`${codeSpanText(entry.raid)}\`` : notAvailable,
       inline: true,
     },
     {

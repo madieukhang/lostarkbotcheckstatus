@@ -72,3 +72,15 @@ export function truncateInlineText(value, limit, suffix = '...') {
   if (limit <= suffix.length) return text.slice(0, limit);
   return `${text.slice(0, limit - suffix.length)}${suffix}`;
 }
+
+/**
+ * Text a member stored (a reason, a note), ready for any markdown spot: link
+ * brackets are escaped first and the result is then cut, so the escapes count
+ * toward the limit and a cut can never leave a bracket unescaped.
+ * @param {string} value - the stored text
+ * @param {number} [limit=Infinity] - longest result, suffix included
+ * @returns {string} the escaped, trimmed text; '' for none
+ */
+export function storedText(value, limit = Infinity) {
+  return truncateInlineText(escapeLinkBrackets(String(value ?? '').trim()), limit);
+}

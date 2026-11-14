@@ -6,7 +6,16 @@ import { buildEvidenceEmbed } from '../bot/handlers/list/view/ui.js';
 import { buildCheckEntryDetailsEmbed } from '../bot/handlers/list/check/ui.js';
 import { buildVisibleRosterPresentation } from '../bot/handlers/roster/command.js';
 import { validateMultiaddRow } from '../bot/services/multiadd/parser.js';
-import { codeSpanText, isSafeLogsUrl } from '../bot/utils/discordText.js';
+import { codeSpanText, isSafeLogsUrl, storedText } from '../bot/utils/discordText.js';
+import { formatCheckResults } from '../bot/services/list-check/format.js';
+import { buildHiddenFields } from '../bot/handlers/roster/hiddenRoster.js';
+import { buildListPageEmbed } from '../bot/handlers/list/view/ui.js';
+import { buildNoteAddedPayload } from '../bot/handlers/list/notes/addedCard.js';
+import { buildNoteHistoryPayload } from '../bot/handlers/list/notes/historyView.js';
+import { buildDuplicateApprovalEmbed } from '../bot/handlers/list/duplicate-ui.js';
+import { buildListEditPlan } from '../bot/handlers/list/edit/plan.js';
+import { buildListEntryInlineFields } from '../bot/handlers/list/entryCardFields.js';
+import { getListContext } from '../bot/handlers/list/helpers.js';
 
 // Text one member stores is shown to every guild, so a masked link in it
 // must show as typed and never as a link.
@@ -89,4 +98,96 @@ test('a stored reason of any length leaves the roster card buildable and short',
   });
   const description = embed.toJSON().description;
   assert.ok(description.length < 1500, `description is ${description.length} characters`);
+});
+
+// A reason is checked for a live link to its own target only, since cards
+// also carry the bot's own character links; a raid must stay inside its
+// code span, where a link renders as text.
+const LIVE_PHISH = /(?<!\\)\]\(https:\/\/evil\.example\/login/;
+const RAID_BREAK = 'Act 4 ` [Claim](https://evil.example/raid) `';
+
+function shownText(embed) {
+  const data = embed?.toJSON ? embed.toJSON() : embed;
+  return [data.title, data.description, data.footer?.text, ...(data.fields || []).flatMap((f) => [f.name, f.value])]
+    .filter(Boolean).join('\n');
+}
+
+function assertStoredTextSafe(text, label) {
+  assert.equal(LIVE_PHISH.test(text), false, `${label}: live masked link in ${text}`);
+  assert.equal(text.includes('Act 4 `'), false, `${label}: the raid closed its code span in ${text}`);
+}
+
+const STORED = {
+  _id: 'e'.repeat(24), name: 'Main', reason: PHISH, raid: RAID_BREAK, scope: 'global',
+  allCharacters: ['Main'], _listType: 'black', _icon: '⛔', _color: 0, addedAt: new Date('2026-11-01T00:00:00Z'),
+};
+
+test('storedText escapes before it cuts, so a cut never leaves a bracket live', () => {
+  assert.equal(storedText(PHISH), SHOWN);
+  const cut = storedText('['.repeat(1000), 950);
+  assert.ok(cut.length <= 950, String(cut.length));
+  assert.equal(/(?<!\\)\[/.test(cut), false);
+  assert.equal(storedText(''), '');
+});
+
+test('the /la-check report lines show a stored reason and raid as text', () => {
+  const lines = formatCheckResults([{
+    inputName: 'Main', inputSource: 'ocr', name: 'Main', blackEntry: STORED, snapClassName: '', snapItemLevel: 1720,
+  }], 'en');
+  assertStoredTextSafe(lines.join('\n'), 'list-check');
+});
+
+test('the hidden roster hit rows show a stored reason and raid as text', () => {
+  const fields = buildHiddenFields({
+    meta: { guildName: 'Guild', world: 'Thaemine', strongholdName: 'Home', strongholdLevel: 70 },
+    guildMembers: [], hits: { black: [STORED], white: [] }, deep: false, lang: 'en',
+  });
+  assertStoredTextSafe(shownText({ fields }), 'hidden roster');
+});
+
+test('/la-list view pages and the evidence detail show a stored reason and raid as text', () => {
+  const page = buildListPageEmbed({
+    allEntries: [STORED], currentType: 'black', getListContext, guildNameCache: new Map(),
+    isOwnerGuild: false, itemsPerPage: 8, page: 0, statMap: new Map(),
+  });
+  assertStoredTextSafe(shownText(page), 'list page');
+  assertStoredTextSafe(shownText(buildEvidenceEmbed(STORED, null, { lang: 'en' })), 'evidence detail');
+});
+
+test('entry cards, note cards and the duplicate comparison keep a stored raid in its code span', () => {
+  const inline = buildListEntryInlineFields({
+    type: 'black', raid: RAID_BREAK, scope: 'global', entry: STORED, icon: '⛔', labelCap: 'Blacklist', lang: 'en',
+    previous: { raid: PHISH },
+  });
+  assertStoredTextSafe(shownText({ fields: inline }), 'entry card');
+  assertStoredTextSafe(shownText(buildCheckEntryDetailsEmbed(STORED, { lang: 'en' })), 'check details');
+  const added = buildNoteAddedPayload({
+    entry: { ...STORED, notes: [{ at: new Date(), reason: PHISH, raid: RAID_BREAK }] },
+    type: 'black', addedAlts: [], statMap: new Map(), lang: 'en',
+  });
+  assertStoredTextSafe(shownText(added.embeds[0]), 'note added');
+  const duplicate = buildDuplicateApprovalEmbed(
+    { ...STORED, addedByDisplayName: 'Reporter' },
+    { name: 'Main', type: 'black', reason: PHISH, raid: RAID_BREAK, scope: 'global', requestedByDisplayName: 'Asker' },
+    'en',
+  );
+  assertStoredTextSafe(shownText(duplicate), 'duplicate comparison');
+});
+
+test('the edit change summary keeps the old and new reason and raid inside their code spans', () => {
+  const plan = buildListEditPlan({
+    existing: { name: 'Main', reason: 'old ` [x](https://evil.example/login) `', raid: RAID_BREAK, allCharacters: [] },
+    currentType: 'watch', newReason: 'new ` reason', newRaidInput: 'Act 4 ` custom', lang: 'en',
+  });
+  const text = plan.changes.join('\n');
+  assert.equal(/old `|new `|Act 4 `/.test(text), false, text);
+});
+
+test('the note History card fits a 1000-character reason of brackets', () => {
+  const payload = buildNoteHistoryPayload({
+    entry: { _id: 'b'.repeat(24), name: 'Main', scope: 'global', notes: [{ at: new Date(), reason: '['.repeat(1000), raid: '' }] },
+    type: 'black', page: 1, lang: 'en',
+  });
+  const value = payload.embeds[0].toJSON().fields[0].value;
+  assert.ok(value.length <= 1024, String(value.length));
 });

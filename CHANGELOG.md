@@ -1,5 +1,9 @@
 # Changelog
 
+- Stored text shows as typed everywhere it appears, not only on the cards fixed before: `/la-check` report lines, the `/la-roster` hidden-roster rows, `/la-list view` pages and its evidence detail, note cards, duplicate comparisons, the edit change summary, the senior bulk-approval DM, the bulk broadcast and the multiadd preview. A reason written as `[Verify your account](https://...)` no longer shows as a link there, and a custom watchlist raid can no longer close its code span. The note **History** no longer fails on a reason full of brackets.
+- The duplicate card of `/la-list add` names who added the entry only for officers and seniors, as `/la-check`, `/la-list view` and `/la-search` already did; a reported member could learn the reporter by trying to add their own name.
+- A member's `/la-list multiadd action:file` upload waits 30 seconds after the last one, since each confirmed file sends every senior a bulk approval DM; `action:template` is not limited. A form id that names a JavaScript object property no longer makes the cooldown check throw.
+
 - Small safety fixes. `/la-list view type:all scope:all` shows the whitelist and watchlist too (it showed only the blacklist). Two quick clicks on an enrich **Confirm** now save and announce the new alts once. A broadcast's **View evidence** button opens only messages of the evidence archive, so a forged button cannot show an attachment from another channel the bot can read. Only Discord's own hosts and their subdomains are sent to Discord to re-sign an old image link (`notdiscordapp.com` was accepted). The Bible worker fetches only `https://lostark.bible` and fails any other job.
 
 - The reporter stays private. When `/la-list remove` refuses because someone else added the entry, the card no longer names them, and the note **History** names each note's writer only for officers and seniors; a member who was reported can no longer learn who reported them from either.

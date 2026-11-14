@@ -1,5 +1,5 @@
 import { getClassEmoji, isSupportClass } from '../../models/Class.js';
-import { escapeLinkBrackets } from '../../utils/discordText.js';
+import { codeSpanText, escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { t } from '../i18n/index.js';
@@ -135,8 +135,8 @@ function formatListEntryBranches(item, entry, listType, lang) {
     // Keep the report itself compact: reason and raid describe the same entry.
     // An indirect match is navigation context, so it gets a separate line.
     formatBranch([
-      wrapTrimmed(entry.reason, (reason) => `*${reason}*`),
-      wrapTrimmed(entry.raid, (raid) => `\`${raid}\``),
+      wrapTrimmed(entry.reason, (reason) => `*${escapeLinkBrackets(reason)}*`),
+      wrapTrimmed(entry.raid, (raid) => `\`${codeSpanText(raid)}\``),
     ]),
     formatBranch([formatMatchContext(item, entry, listType, lang)]),
   ].filter(Boolean);
