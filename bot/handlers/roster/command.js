@@ -28,7 +28,7 @@ import {
   upsertRosterSnapshots,
 } from '../../services/roster/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
-import { escapeLinkBrackets } from '../../utils/discordText.js';
+import { escapeLinkBrackets, truncateInlineText } from '../../utils/discordText.js';
 import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import {
@@ -187,8 +187,12 @@ function collectListHits(matches) {
   ].filter(([, entry]) => entry).map(([listType, entry]) => ({ listType, entry }));
 }
 
+// The full reason is one button away, and an entry stored before the reason
+// cap could otherwise overflow the card description.
+const STATUS_REASON_LIMIT = 200;
+
 function formatStatusLine(icon, text, reason) {
-  return `${icon} ${text}${reason ? ` · *${escapeLinkBrackets(reason)}*` : ''}`;
+  return `${icon} ${text}${reason ? ` · *${escapeLinkBrackets(truncateInlineText(reason, STATUS_REASON_LIMIT))}*` : ''}`;
 }
 
 /**

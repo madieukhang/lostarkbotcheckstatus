@@ -131,3 +131,12 @@ test('an edit form moving an entry to a server-only blacklist reads type and sco
   assert.equal(input.newScope, 'server');
   assert.equal(input.newRaidInput, 'Serca NM');
 });
+
+test('a reason is at most 1000 characters in the commands and both forms', () => {
+  const list = buildCommands().find((command) => command.name === 'la-list');
+  const reasonOf = (sub) => list.options.find((option) => option.name === sub).options.find((option) => option.name === 'reason');
+  assert.equal(reasonOf('add').max_length, 1000);
+  assert.equal(reasonOf('edit').max_length, 1000);
+  assert.equal(componentOf(buildListAddFormModal('en'), ID.reason).max_length, 1000);
+  assert.equal(componentOf(buildListEditFormModal('en'), ID.reason).max_length, 1000);
+});

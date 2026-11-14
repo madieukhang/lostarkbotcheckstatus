@@ -4,6 +4,7 @@ import {
 } from 'discord.js';
 
 import { getSupportedLanguages, t } from '../services/i18n/index.js';
+import { LIST_REASON_MAX_LENGTH } from '../models/listEntrySchema.js';
 
 /**
  * Public commands use the stable `la-` prefix so Discord autocomplete
@@ -88,6 +89,7 @@ function listCommand(name) {
             .setName('reason')
             .setDescription(commandText('list.subcommands.add.options.reason'))
             .setRequired(true)
+            .setMaxLength(LIST_REASON_MAX_LENGTH)
         )
         .addStringOption((opt) => {
           return opt
@@ -130,6 +132,7 @@ function listCommand(name) {
             .setName('reason')
             .setDescription(commandText('list.subcommands.edit.options.reason'))
             .setRequired(false)
+            .setMaxLength(LIST_REASON_MAX_LENGTH)
         )
         .addStringOption((opt) =>
           opt

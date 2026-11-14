@@ -7,6 +7,10 @@
 import mongoose from 'mongoose';
 import { CASE_INSENSITIVE_COLLATION } from './collation.js';
 
+// Longest reason a new add, edit or multiadd row may carry. Every card that
+// shows a reason is shared across servers, and a longer one overflowed them.
+export const LIST_REASON_MAX_LENGTH = 1000;
+
 export function buildRosterIdentityFields() {
   return {
     name: { type: String, required: true, trim: true },

@@ -24,6 +24,7 @@ import {
 } from '../../../utils/listEntryMap.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { buildImageQuotaAlert, takeEvidenceUploads } from '../../../utils/evidenceQuota.js';
+import { LIST_REASON_MAX_LENGTH } from '../../../models/listEntrySchema.js';
 import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import {
@@ -126,6 +127,7 @@ async function rejectInvalidListEditInput({
   existing,
   plan,
   newRaidInput,
+  newReason = '',
   additionalNamesRaw,
   imageContentType,
   lang,
@@ -156,6 +158,13 @@ async function rejectInvalidListEditInput({
       alert: () => ({
         kind: NoticeKind.INPUT,
         ...t('dialogue.listAdd.command.invalidImage', lang, { type: imageContentType }),
+      }),
+    },
+    {
+      invalid: () => newReason.length > LIST_REASON_MAX_LENGTH,
+      alert: () => ({
+        kind: NoticeKind.INPUT,
+        ...t('dialogue.listAdd.command.reasonTooLong', lang, { max: LIST_REASON_MAX_LENGTH }),
       }),
     },
     {
@@ -395,6 +404,7 @@ export function createListEditCommandHandler({
       existing,
       plan,
       newRaidInput: input.newRaidInput,
+      newReason: input.newReason,
       additionalNamesRaw: input.additionalNamesRaw,
       imageContentType: input.imageAttachment?.contentType || '',
       lang,

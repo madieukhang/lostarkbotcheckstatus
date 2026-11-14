@@ -565,6 +565,7 @@ export default {
   listAdd: {
     command: {
       reasonRequired: { title: 'A reason is still missing', description: 'Every list entry needs a reason.', tip: 'Run the command again and fill in reason' },
+      reasonTooLong: { title: 'That reason is too long', description: 'A reason can be at most {max} characters.', tip: 'Shorten it and send it again' },
       invalidType: { title: 'Pick a list first', description: 'Choose Blacklist, Whitelist or Watchlist in the list field.', tip: 'Open the form again and pick a list' },
       raidRequired: { title: 'Which raid was it?', description: 'Every list entry names the raid it came from.', tip: 'Add the raid and send it again' },
       invalidRaid: { title: 'That raid label is only available for watchlist', description: '`{raid}` is not a standard raid for {list}. Choose one of the raid suggestions, or use `type:watch` for a custom label.' },

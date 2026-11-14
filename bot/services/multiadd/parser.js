@@ -13,6 +13,7 @@ import { inflateRawSync } from 'node:zlib';
 import { RAIDS, currentRaidValue } from '../../models/Raid.js';
 import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
 import { isSafeLogsUrl } from '../../utils/discordText.js';
+import { LIST_REASON_MAX_LENGTH } from '../../models/listEntrySchema.js';
 import {
   EXAMPLE_REASON_PREFIX,
   MULTIADD_MAX_ROWS,
@@ -165,6 +166,10 @@ const ROW_VALIDATION_RULES = [
   {
     invalid: (row) => !row.reason,
     message: (row) => `Row ${row.rowNum}: missing required field "reason".`,
+  },
+  {
+    invalid: (row) => row.reason.length > LIST_REASON_MAX_LENGTH,
+    message: (row) => `Row ${row.rowNum}: "reason" is longer than ${LIST_REASON_MAX_LENGTH} characters.`,
   },
   {
     invalid: (row) => !row.raid,

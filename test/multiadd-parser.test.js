@@ -10,6 +10,7 @@ import {
   parseMultiaddFile,
   validateMultiaddRow,
 } from '../bot/services/multiadd/parser.js';
+import { LIST_REASON_MAX_LENGTH } from '../bot/models/listEntrySchema.js';
 
 async function entriesWorkbook(...rows) {
   const workbook = new ExcelJS.Workbook();
@@ -98,12 +99,16 @@ test('parseMultiaddFile measures a workbook with bytes prepended where JSZip rea
 test('parseMultiaddFile rejects a row whose field is longer than /la-list add accepts', async () => {
   const result = await parseMultiaddFile(await entriesWorkbook(
     ['Alpha', 'black', 'r'.repeat(MULTIADD_MAX_FIELD_LENGTH + 1), 'Serca Hard', '', '', ''],
-    ['Beta', 'black', 'r'.repeat(MULTIADD_MAX_FIELD_LENGTH), 'Serca Hard', '', '', ''],
+    ['Beta', 'black', 'r'.repeat(LIST_REASON_MAX_LENGTH), 'Serca Hard', '', '', ''],
+    ['Gamma', 'black', 'r'.repeat(LIST_REASON_MAX_LENGTH + 1), 'Serca Hard', '', '', ''],
   ));
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.rows.map(({ name }) => name), ['Beta']);
-  assert.deepEqual(result.errors, [`Row 2: "reason" is longer than ${MULTIADD_MAX_FIELD_LENGTH} characters.`]);
+  assert.deepEqual(result.errors, [
+    `Row 2: "reason" is longer than ${MULTIADD_MAX_FIELD_LENGTH} characters.`,
+    `Row 4: "reason" is longer than ${LIST_REASON_MAX_LENGTH} characters.`,
+  ]);
 });
 
 test('parseMultiaddFile rejects a name that is not a character name without echoing it', async () => {

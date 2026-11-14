@@ -21,6 +21,7 @@ import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
 import { buildImageQuotaAlert, takeEvidenceUploads } from '../../../utils/evidenceQuota.js';
+import { LIST_REASON_MAX_LENGTH } from '../../../models/listEntrySchema.js';
 import { NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
@@ -105,6 +106,11 @@ export function createListAddCommandHandler({
         invalid: () => !request.reason,
         kind: NoticeKind.INPUT,
         message: () => t('dialogue.listAdd.command.reasonRequired', lang),
+      },
+      {
+        invalid: () => request.reason.length > LIST_REASON_MAX_LENGTH,
+        kind: NoticeKind.INPUT,
+        message: () => t('dialogue.listAdd.command.reasonTooLong', lang, { max: LIST_REASON_MAX_LENGTH }),
       },
       {
         // Every entry names the raid it came from.

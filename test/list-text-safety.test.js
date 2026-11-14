@@ -73,3 +73,20 @@ test('multiadd refuses a logs cell that is not a plain https URL', () => {
   const result = validateMultiaddRow(row, { acceptedCount: 0, seenNames: new Set() });
   assert.match(result.error, /logs/);
 });
+
+test('multiadd refuses a reason over 1000 characters', () => {
+  const row = { rowNum: 3, name: 'Alpha', type: 'black', reason: 'r'.repeat(1001), raid: 'Serca Hard', logs: '', image: '', scope: '' };
+  const result = validateMultiaddRow(row, { acceptedCount: 0, seenNames: new Set() });
+  assert.match(result.error, /reason/);
+});
+
+test('a stored reason of any length leaves the roster card buildable and short', () => {
+  const entry = { _id: 'a'.repeat(24), name: 'Main', reason: 'x'.repeat(6000), allCharacters: ['Main'] };
+  const { embed } = buildVisibleRosterPresentation({
+    name: 'Main', lang: 'en', previousSnapshots: new Map(),
+    characters: [{ name: 'Main', className: 'Bard', itemLevel: '1730', combatScore: '3000' }],
+    matches: { blacklist: entry },
+  });
+  const description = embed.toJSON().description;
+  assert.ok(description.length < 1500, `description is ${description.length} characters`);
+});

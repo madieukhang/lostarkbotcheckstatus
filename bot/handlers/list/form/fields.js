@@ -14,6 +14,7 @@ import {
 } from 'discord.js';
 
 import { getSelectableRaidValues } from '../../../models/Raid.js';
+import { LIST_REASON_MAX_LENGTH } from '../../../models/listEntrySchema.js';
 import { t } from '../../../services/i18n/index.js';
 import { buildListAddRequest } from '../add/command.js';
 import { buildListEditInput } from '../edit/command.js';
@@ -79,12 +80,13 @@ function raidSelect(lang, { placeholderKey, required }, now) {
   });
 }
 
-function textInput(id, { style, required, placeholder, value = '' }) {
+function textInput(id, { style, required, placeholder, value = '', maxLength = 0 }) {
   const input = new TextInputBuilder()
     .setCustomId(id)
     .setStyle(style)
     .setRequired(required)
     .setPlaceholder(placeholder);
+  if (maxLength) input.setMaxLength(maxLength);
   return value ? input.setValue(value) : input;
 }
 
@@ -124,7 +126,7 @@ export function buildListAddFormModal(lang, {
         style: TextInputStyle.Short, required: true, placeholder: t('listForm.namePlaceholder', lang), value: name,
       })),
       label(lang, 'reasonLabel').setTextInputComponent(textInput(LIST_FORM_IDS.reason, {
-        style: TextInputStyle.Paragraph, required: true, placeholder: t('listForm.reasonPlaceholder', lang),
+        style: TextInputStyle.Paragraph, required: true, placeholder: t('listForm.reasonPlaceholder', lang), maxLength: LIST_REASON_MAX_LENGTH,
       })),
       label(lang, 'raidLabel').setStringSelectMenuComponent(raidSelect(lang, { placeholderKey: 'raidPlaceholder', required: true }, now)),
       label(lang, 'imageLabel').setFileUploadComponent(imageUpload()),
@@ -149,7 +151,7 @@ export function buildListEditFormModal(lang, { now = new Date(), name = '' } = {
         style: TextInputStyle.Short, required: true, placeholder: t('listForm.namePlaceholder', lang), value: name,
       })),
       label(lang, 'newReasonLabel').setTextInputComponent(textInput(LIST_FORM_IDS.reason, {
-        style: TextInputStyle.Paragraph, required: false, placeholder: t('listForm.newReasonPlaceholder', lang),
+        style: TextInputStyle.Paragraph, required: false, placeholder: t('listForm.newReasonPlaceholder', lang), maxLength: LIST_REASON_MAX_LENGTH,
       })),
       label(lang, 'newTypeLabel').setStringSelectMenuComponent(
         typeSelect(lang, { required: false, placeholderKey: 'newTypePlaceholder', blackHintKey: 'blackEditHint' }),

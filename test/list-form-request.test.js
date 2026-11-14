@@ -304,3 +304,28 @@ test('/la-list edit past the daily evidence image allowance archives nothing', a
   assert.equal(replies.length, 1);
   assert.equal(replies[0].embeds[0].toJSON().title.endsWith(translate('dialogue.common.imageQuota', 'en').title), true);
 });
+
+test('/la-list add and edit refuse a reason over 1000 characters before any write', async (t) => {
+  stubLookups(t, [{
+    _id: 'a'.repeat(24), name: 'Mokoko', reason: 'Report', scope: 'global', addedByUserId: 'entry-owner', allCharacters: [],
+  }]);
+  const tooLong = translate('dialogue.listAdd.command.reasonTooLong', 'en', { max: 1000 }).title;
+  const addReplies = [];
+  await createListAddCommandHandler({
+    client: {},
+    sendListAddApprovalToApprovers: () => assert.fail('A refused add must not ask approvers'),
+    executeListAddToDatabase: () => assert.fail('A refused add must not write'),
+  })(formSubmit(addReplies), buildListAddRequest({
+    type: 'black', name: 'Mokoko', reason: 'r'.repeat(1001), raidInput: 'Serca Hard', image: null, inputScope: '',
+  }));
+  assert.ok(addReplies[0].embeds[0].toJSON().title.endsWith(tooLong));
+
+  const editReplies = [];
+  await createListEditCommandHandler({
+    client: {},
+    broadcastListChange: () => assert.fail('A refused edit must not broadcast'),
+    sendListAddApprovalToApprovers: () => assert.fail('A refused edit must not ask approvers'),
+    rehostImageFn: () => assert.fail('A refused edit must not rehost'),
+  })(formSubmit(editReplies), buildListEditInput({ name: 'Mokoko', reason: 'r'.repeat(1001) }));
+  assert.ok(editReplies[0].embeds[0].toJSON().title.endsWith(tooLong));
+});
