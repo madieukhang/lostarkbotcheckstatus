@@ -155,9 +155,21 @@ test('the archived image is also copied to the database with its archive id', as
   assert.equal(stores.length, 1);
   assert.equal(stores[0].filter._id, sha256Hex(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])));
   assert.equal(stores[0].update.$addToSet.archiveMessageIds, 'archived');
-  assert.deepEqual(stores[0].update.$set, { archiveMessageId: 'archived', archiveChannelId: 'evidence' });
+  assert.equal(stores[0].update.$set.archiveMessageId, 'archived');
+  assert.equal(stores[0].update.$set.archiveChannelId, 'evidence');
+  assert.ok(stores[0].update.$set.lastStoredAt instanceof Date);
   assert.equal(stores[0].update.$setOnInsert.contentType, 'image/png');
   assert.equal(stores[0].update.$setOnInsert.filename, 'proof.png');
+});
+
+test('a member request marks its new database copy pending; other rehosts do not', async t => {
+  const member = setup(t, { responses: [image()] });
+  await rehostImage('https://cdn.example/proof.png', member.client, { pending: true });
+  assert.equal(member.stores[0].update.$setOnInsert.pending, true);
+
+  const senior = setup(t, { responses: [image()] });
+  await rehostImage('https://cdn.example/proof.png', senior.client);
+  assert.equal(senior.stores[0].update.$setOnInsert.pending, false);
 });
 
 test('a failed send stores nothing', async t => {

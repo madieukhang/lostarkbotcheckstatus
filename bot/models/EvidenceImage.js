@@ -19,6 +19,12 @@ const evidenceImageSchema = new mongoose.Schema({
   archiveChannelId: { type: String, default: '' },
   archiveMessageId: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },
+  // Set when a member's request stored the image before any approval; the
+  // evidence sweep clears it once an entry or request points at the image,
+  // and removes the image when nothing has after a while.
+  pending: { type: Boolean, default: false, index: true },
+  // Bumped on every store, so a fresh upload of the same bytes restarts the age.
+  lastStoredAt: { type: Date, default: Date.now },
 });
 
 export default mongoose.model('evidence_image', evidenceImageSchema, 'evidence_images');

@@ -10,9 +10,13 @@ import EvidenceImage from '../models/EvidenceImage.js';
 import Blacklist from '../models/Blacklist.js';
 import Whitelist from '../models/Whitelist.js';
 import Watchlist from '../models/Watchlist.js';
+import PendingApproval from '../models/PendingApproval.js';
 
 // A MongoDB document holds at most 16 MB; the margin covers the other fields.
 export const EVIDENCE_COPY_MAX_BYTES = 15 * 1024 * 1024;
+// Twice the 24-hour life of a pending approval, so a request still waiting
+// keeps its image.
+export const PENDING_EVIDENCE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
 
 const LIST_MODELS = [Blacklist, Whitelist, Watchlist];
 
@@ -32,10 +36,12 @@ export function sha256Hex(buffer) {
  * @param {string} [options.filename] - file name as archived
  * @param {{messageId: string, channelId: string}|null} [options.archive] - the
  *   evidence-channel message holding this image
+ * @param {boolean} [options.pending] - a member's request stored it before any
+ *   approval; applies only when the image is new
  * @returns {Promise<string>} the hash, or '' when the image is over the cap or
  *   the write failed
  */
-export async function storeEvidenceImage({ buffer, contentType = '', filename = '', archive = null }) {
+export async function storeEvidenceImage({ buffer, contentType = '', filename = '', archive = null, pending = false }) {
   if (!buffer?.length) return '';
   if (buffer.length > EVIDENCE_COPY_MAX_BYTES) {
     console.warn(`[evidenceStore] ${buffer.length} bytes is over the database copy cap; the archive keeps the only copy`);
@@ -43,10 +49,11 @@ export async function storeEvidenceImage({ buffer, contentType = '', filename = 
   }
   const sha256 = sha256Hex(buffer);
   const update = {
-    $setOnInsert: { data: buffer, contentType, size: buffer.length, filename, createdAt: new Date() },
+    $setOnInsert: { data: buffer, contentType, size: buffer.length, filename, createdAt: new Date(), pending },
+    $set: { lastStoredAt: new Date() },
   };
   if (archive?.messageId) {
-    update.$set = { archiveMessageId: archive.messageId, archiveChannelId: archive.channelId || '' };
+    Object.assign(update.$set, { archiveMessageId: archive.messageId, archiveChannelId: archive.channelId || '' });
     update.$addToSet = { archiveMessageIds: archive.messageId };
   }
   try {
@@ -117,4 +124,54 @@ export async function repointEntries({ sha256 = '', goneMessageIds = [], message
  */
 export async function listArchivedMessageIds() {
   return new Set(await EvidenceImage.distinct('archiveMessageIds'));
+}
+
+// Whether a list entry or a pending approval points at the image, by any
+// archive message it has had or, for an entry, by its hash.
+async function isEvidenceReferenced(image) {
+  const messageIds = { $in: image.archiveMessageIds || [] };
+  const checks = [
+    ...LIST_MODELS.map((model) => model.exists({ $or: [{ imageMessageId: messageIds }, { imageSha256: image._id }] })),
+    PendingApproval.exists({ $or: [{ imageMessageId: messageIds }, { 'bulkRows.imageMessageId': messageIds }] }),
+  ];
+  return (await Promise.all(checks)).some(Boolean);
+}
+
+async function deleteArchiveMessages(image, client) {
+  try {
+    const channel = await client.channels.fetch(image.archiveChannelId);
+    await Promise.allSettled((image.archiveMessageIds || []).map((id) => channel.messages.delete(id)));
+  } catch (err) {
+    console.warn(`[evidenceStore] Archive cleanup for ${image._id} failed:`, err.message);
+  }
+}
+
+/**
+ * Settle the images members' requests stored before any approval: one an
+ * entry or request now points at is kept and loses its pending flag; one
+ * nothing points at after PENDING_EVIDENCE_MAX_AGE_MS is deleted with its
+ * archive messages. The delete matches the age it was judged by, so a store
+ * of the same bytes in between keeps the image.
+ * @param {object} options
+ * @param {import('discord.js').Client} options.client - the bot client
+ * @param {number} [options.now] - clock in milliseconds
+ * @returns {Promise<{confirmed: number, removed: number}>} images settled
+ */
+export async function sweepPendingEvidenceImages({ client, now = Date.now() }) {
+  const cutoff = new Date(now - PENDING_EVIDENCE_MAX_AGE_MS);
+  const images = await EvidenceImage.find({ pending: true }).select('-data').lean();
+  const result = { confirmed: 0, removed: 0 };
+  for (const image of images) {
+    if (await isEvidenceReferenced(image)) {
+      await EvidenceImage.updateOne({ _id: image._id }, { $set: { pending: false } });
+      result.confirmed += 1;
+      continue;
+    }
+    if (!(image.lastStoredAt <= cutoff)) continue;
+    const { deletedCount } = await EvidenceImage.deleteOne({ _id: image._id, pending: true, lastStoredAt: { $lte: cutoff } });
+    if (deletedCount !== 1) continue;
+    await deleteArchiveMessages(image, client);
+    result.removed += 1;
+  }
+  return result;
 }

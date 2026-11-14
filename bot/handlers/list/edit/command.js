@@ -421,6 +421,7 @@ export function createListEditCommandHandler({
         entryName: input.name,
         addedBy: getInteractionDisplayName(interaction),
         listType: '', // type may change in this edit; leave blank
+        pending: true,
       });
     }
 

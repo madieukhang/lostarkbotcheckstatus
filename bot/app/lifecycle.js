@@ -12,6 +12,7 @@ import { setupAutoCheck } from '../handlers/list/auto-check.js';
 import { bootstrapClassEmoji } from '../services/discord/emoji-bootstrap.js';
 import { startAutoCheckCleanup } from '../services/setup/autoCheckCleanup.js';
 import { startListNotifyCleanup } from '../services/setup/listNotifyCleanup.js';
+import { startEvidenceSweep } from '../services/setup/evidenceSweep.js';
 import { connectDB } from '../db.js';
 import Blacklist from '../models/Blacklist.js';
 import TrustedUser from '../models/TrustedUser.js';
@@ -24,11 +25,13 @@ export function startReadyBackgroundServices(client, {
   setupAutoCheckFn = setupAutoCheck,
   startAutoCheckCleanupFn = startAutoCheckCleanup,
   startListNotifyCleanupFn = startListNotifyCleanup,
+  startEvidenceSweepFn = startEvidenceSweep,
 } = {}) {
   startMonitorFn(client);
   setupAutoCheckFn(client);
   startAutoCheckCleanupFn(client);
   startListNotifyCleanupFn(client);
+  startEvidenceSweepFn(client);
 }
 
 /**

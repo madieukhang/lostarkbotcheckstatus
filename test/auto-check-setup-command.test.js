@@ -56,6 +56,7 @@ test('ready background services include both channel cleanup schedulers', () => 
     setupAutoCheckFn: (value) => calls.push(['auto-check', value]),
     startAutoCheckCleanupFn: (value) => calls.push(['cleanup', value]),
     startListNotifyCleanupFn: (value) => calls.push(['notify-cleanup', value]),
+    startEvidenceSweepFn: (value) => calls.push(['evidence-sweep', value]),
   });
 
   assert.deepEqual(calls, [
@@ -63,6 +64,7 @@ test('ready background services include both channel cleanup schedulers', () => 
     ['auto-check', client],
     ['cleanup', client],
     ['notify-cleanup', client],
+    ['evidence-sweep', client],
   ]);
 });
 

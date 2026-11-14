@@ -173,6 +173,8 @@ async function getEvidenceChannelId() {
  * @param {string} [meta.entryName] - Character name (for evidence message text)
  * @param {string} [meta.addedBy] - Display name of the requester
  * @param {string} [meta.listType] - 'black' / 'white' / 'watch'
+ * @param {boolean} [meta.pending] - a member's request archives it before any
+ *   approval, so the evidence sweep may remove it if nothing keeps it
  * @param {boolean} [meta.throwOnError] - When true, throws an Error with a
  *   specific message instead of returning null on any failure path. Used by
  *   callers (like /la-remote action:syncimages) that need the actual error
@@ -263,6 +265,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     contentType: typedImage ? contentType : `image/${sniffedExt}`,
     filename,
     archive: { messageId: archived.messageId, channelId: archived.channelId },
+    pending: meta.pending === true,
   });
   return archived;
 }

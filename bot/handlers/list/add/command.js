@@ -146,6 +146,7 @@ export function createListAddCommandHandler({
       entryName: request.name,
       addedBy: getInteractionDisplayName(interaction),
       listType: request.type,
+      pending: true,
     });
   }
 

@@ -193,6 +193,7 @@ export function createMultiaddConfirmButtonHandler(deps) {
             entryName: row.name,
             addedBy: pending.requesterDisplayName || pending.requesterTag,
             listType: row.type,
+            pending: true,
           });
         }
         rehostedRows.push({
