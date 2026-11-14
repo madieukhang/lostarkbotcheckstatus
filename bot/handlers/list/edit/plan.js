@@ -154,9 +154,21 @@ export function buildScopeConflictQuery({ existing, targetScope, guildId }) {
 
 /**
  * Route scope expansion and new global blacklist entries through approval, even for owners.
+ * A global entry is checked in every server, so its owner also needs an
+ * approver to add names to it, move it to another list or change its scope;
+ * a reason, raid or image change on an own entry still applies directly.
  * Server-scoped entries stay editable without approval only for the entry owner
  * or approvers · a stranger editing someone else's server entry goes through
  * the approval flow like every other non-owner edit.
+ * @param {object} edit
+ * @param {boolean} edit.isOwner - the editor added the entry
+ * @param {boolean} edit.isApprover - the editor is an officer or senior
+ * @param {string} edit.currentType - list the entry is on
+ * @param {string} edit.currentScope - its scope now
+ * @param {string} edit.targetType - list after the edit
+ * @param {string} edit.targetScope - scope after the edit
+ * @param {boolean} [edit.appendsNames] - the edit adds additional_names
+ * @returns {boolean} true when the edit applies without approval
  */
 export function shouldApplyListEditImmediately({
   isOwner,
@@ -165,11 +177,14 @@ export function shouldApplyListEditImmediately({
   currentScope,
   targetType,
   targetScope,
+  appendsNames = false,
 }) {
+  if (isApprover) return true;
   const needsGlobalApproval = targetScope === 'global' && (
     (currentType === 'black' && currentScope === 'server')
     || (targetType === 'black' && currentType !== 'black')
   );
-  if (needsGlobalApproval) return Boolean(isApprover);
-  return Boolean(isOwner || isApprover);
+  const reshapesGlobalEntry = currentScope === 'global'
+    && (appendsNames || targetType !== currentType || targetScope !== currentScope);
+  return Boolean(isOwner) && !needsGlobalApproval && !reshapesGlobalEntry;
 }

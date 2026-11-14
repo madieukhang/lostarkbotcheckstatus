@@ -1,5 +1,7 @@
 # Changelog
 
+- `/la-list edit` follows the approver roles. A global entry is checked in every server, so its owner now needs an approver to add `additional_names` to it, move it to another list or change its scope; a reason, raid or image change on an own entry still applies at once, and an owner's server entry is unchanged. A member approver's auto-approval covers only their own adds, so editing someone else's entry now goes to the officers and seniors like any other member's edit.
+
 - Evidence images have a daily allowance: a member who is not an officer or senior can attach up to 10 images in 24 hours across `/la-list add`, `/la-list edit`, the forms and multiadd, and a request that would go over it is refused before anything is archived. Each image is posted to the evidence channel and copied to the database before any approval, so one member could fill both without limit. A download that claims to be an image is now archived only when its bytes really are one.
 
 - Evidence images a member attached to a request that was never approved no longer stay forever. An image a member's add, edit or multiadd archived is kept as soon as an entry or a waiting approval points at it; one that nothing points at two days later is removed from the database and the evidence channel. A sweep checks every six hours. Images stored before this change are never touched.

@@ -151,3 +151,84 @@ for (const matchedCount of [0, 1]) {
     if (!matchedCount) assert.match(JSON.stringify(replies[0].components), /Failed/);
   });
 }
+
+test('a member approver editing someone else\'s global entry waits for approval', async t => {
+  clearUserLanguageCache();
+  invalidateGuildConfig('scope-guild');
+  t.mock.method(mongoose, 'connect', async () => mongoose);
+  t.after(async () => {
+    clearUserLanguageCache();
+    invalidateGuildConfig('scope-guild');
+    await disconnectDB();
+  });
+  const { default: config } = await import('../bot/config.js');
+  config.memberApproverIds.push('member-approver');
+  t.after(() => { config.memberApproverIds.splice(config.memberApproverIds.indexOf('member-approver'), 1); });
+  const entry = {
+    _id: 'b'.repeat(24), name: 'Mainchar', reason: 'Senior report',
+    scope: 'global', addedByUserId: 'senior-1', allCharacters: [],
+  };
+  const nullQuery = () => ({ collation() { return this; }, lean: async () => null, then: resolve => resolve(null) });
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ defaultBlacklistScope: 'global' }) }));
+  t.mock.method(Blacklist, 'find', () => ({ collation: async () => [entry] }));
+  for (const Model of [Blacklist, Whitelist, Watchlist, TrustedUser]) t.mock.method(Model, 'findOne', nullQuery);
+  t.mock.method(Blacklist, 'updateOne', () => assert.fail('A member approver must not edit another reporter\'s entry directly'));
+  t.mock.method(PendingApproval, 'create', async () => {});
+  let requested = null;
+  const handler = createListEditCommandHandler({
+    client: {},
+    broadcastListChange: () => assert.fail('A pending edit must not broadcast'),
+    sendListAddApprovalToApprovers: async (_guild, payload) => {
+      requested = payload;
+      return { success: true, deliveredApproverIds: ['officer'], deliveredDmMessages: [] };
+    },
+  });
+  await handler({
+    user: { id: 'member-approver', username: 'M', tag: 'M' },
+    guild: { id: 'scope-guild' }, channelId: 'channel',
+    options: { getString: key => ({ name: 'Mainchar', reason: 'replaced' })[key] || null, getAttachment: () => null },
+    deferReply: async () => {},
+    editReply: async () => {},
+  });
+  assert.equal(requested?.action, 'edit');
+});
+
+test('a non-approver owner adding names to a global entry waits for approval', async t => {
+  clearUserLanguageCache();
+  invalidateGuildConfig('scope-guild');
+  t.mock.method(mongoose, 'connect', async () => mongoose);
+  t.after(async () => {
+    clearUserLanguageCache();
+    invalidateGuildConfig('scope-guild');
+    await disconnectDB();
+  });
+  const entry = {
+    _id: 'c'.repeat(24), name: 'Mainchar', reason: 'Owner report',
+    scope: 'global', addedByUserId: 'entry-owner', allCharacters: [],
+  };
+  const nullQuery = () => ({ collation() { return this; }, lean: async () => null, then: resolve => resolve(null) });
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  t.mock.method(GuildConfig, 'findOne', () => ({ lean: async () => ({ defaultBlacklistScope: 'global' }) }));
+  t.mock.method(Blacklist, 'find', () => ({ collation: async () => [entry] }));
+  for (const Model of [Blacklist, Whitelist, Watchlist, TrustedUser]) t.mock.method(Model, 'findOne', nullQuery);
+  t.mock.method(Blacklist, 'updateOne', () => assert.fail('Names on a global entry need an approver'));
+  t.mock.method(PendingApproval, 'create', async () => {});
+  let requested = null;
+  const handler = createListEditCommandHandler({
+    client: {},
+    broadcastListChange: () => assert.fail('A pending edit must not broadcast'),
+    sendListAddApprovalToApprovers: async (_guild, payload) => {
+      requested = payload;
+      return { success: true, deliveredApproverIds: ['officer'], deliveredDmMessages: [] };
+    },
+  });
+  await handler({
+    user: { id: 'entry-owner', username: 'O', tag: 'O' },
+    guild: { id: 'scope-guild' }, channelId: 'channel',
+    options: { getString: key => ({ name: 'Mainchar', additional_names: 'Newalt' })[key] || null, getAttachment: () => null },
+    deferReply: async () => {},
+    editReply: async () => {},
+  });
+  assert.equal(requested?.action, 'edit');
+});

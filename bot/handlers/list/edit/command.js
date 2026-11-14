@@ -35,7 +35,6 @@ import {
 } from '../../../utils/interactionReplies.js';
 import {
   buildTrustedBlockEmbed,
-  isRequesterAutoApprover,
   isOfficerOrSenior,
   isListType,
 } from '../helpers.js';
@@ -279,13 +278,16 @@ async function dispatchListEdit({
   lang,
 }) {
   const isOwner = existing.addedByUserId === interaction.user.id;
+  // Member approvers bypass approval only on their own single add; editing
+  // an entry directly takes an officer or senior.
   const applyImmediately = shouldApplyListEditImmediately({
     isOwner,
-    isApprover: isRequesterAutoApprover(interaction.user.id),
+    isApprover: isOfficerOrSenior(interaction.user.id),
     currentType,
     currentScope: plan.existingObject.scope || 'global',
     targetType: plan.targetType,
     targetScope: plan.targetScope,
+    appendsNames: plan.additionalNamesParsed.added.length > 0,
   });
 
   if (applyImmediately) {

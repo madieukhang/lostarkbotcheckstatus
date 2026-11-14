@@ -135,3 +135,20 @@ test('owner edits retain direct access without allowing global blacklist through
     }), true);
   }
 });
+
+test('a non-approver owner needs approval to add names to, move or rescope a global entry', () => {
+  const owner = { isOwner: true, isApprover: false, currentType: 'black', currentScope: 'global' };
+  assert.equal(shouldApplyListEditImmediately({ ...owner, targetType: 'black', targetScope: 'global', appendsNames: true }), false);
+  assert.equal(shouldApplyListEditImmediately({ ...owner, targetType: 'watch', targetScope: 'global' }), false);
+  assert.equal(shouldApplyListEditImmediately({ ...owner, targetType: 'black', targetScope: 'server' }), false);
+  assert.equal(shouldApplyListEditImmediately({ ...owner, targetType: 'black', targetScope: 'global' }), true,
+    'a reason, raid or image change on an own entry still applies directly');
+  assert.equal(shouldApplyListEditImmediately({ ...owner, isApprover: true, targetType: 'watch', targetScope: 'global', appendsNames: true }), true);
+});
+
+test('an owner of a server entry still edits it directly, names included', () => {
+  assert.equal(shouldApplyListEditImmediately({
+    isOwner: true, isApprover: false, currentType: 'black', currentScope: 'server',
+    targetType: 'black', targetScope: 'server', appendsNames: true,
+  }), true);
+});
