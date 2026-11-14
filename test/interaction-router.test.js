@@ -164,3 +164,45 @@ test('/la-setup autocomplete reuses guild config until setup invalidates it', as
   assert.ok(choices.includes('cleanup-off'));
   assert.ok(!choices.includes('cleanup-on'));
 });
+
+test('interaction router refuses a repeated costly command and form submit before their handlers run', async (t) => {
+  const { resetCommandCooldowns } = await import('../bot/app/commandCooldowns.js');
+  const { LIST_FORM_IDS } = await import('../bot/handlers/list/form/fields.js');
+  const { default: UserPreference } = await import('../bot/models/UserPreference.js');
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  resetCommandCooldowns();
+  t.after(() => resetCommandCooldowns());
+  const calls = [];
+  const replies = [];
+  const chatInput = () => ({
+    commandName: 'la-check',
+    user: { id: 'router-member' },
+    isChatInputCommand: () => true,
+    isModalSubmit: () => false,
+    options: { getSubcommand: () => null },
+    reply: async (payload) => { replies.push(payload); },
+  });
+  const commandRoutes = { 'la-check': async () => calls.push('check') };
+  await dispatchCommandRoute(chatInput(), commandRoutes);
+  await dispatchCommandRoute(chatInput(), commandRoutes);
+
+  const formSubmit = () => ({
+    customId: LIST_FORM_IDS.addModal,
+    user: { id: 'router-member' },
+    isButton: () => false,
+    isStringSelectMenu: () => false,
+    isModalSubmit: () => true,
+    isAutocomplete: () => false,
+    isChatInputCommand: () => false,
+    reply: async (payload) => { replies.push(payload); },
+  });
+  const routes = {
+    buttonRoutes: [], selectRoutes: [], autocompleteRoutes: {},
+    modalRoutes: [{ exact: LIST_FORM_IDS.addModal, handle: async () => calls.push('form') }],
+  };
+  await dispatchComponentInteraction(formSubmit(), routes);
+  await dispatchComponentInteraction(formSubmit(), routes);
+
+  assert.deepEqual(calls, ['check', 'form']);
+  assert.equal(replies.length, 2);
+});

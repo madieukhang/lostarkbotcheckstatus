@@ -3,6 +3,10 @@ export default {
     fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細', queue: '🚦 順番待ち', unreadable: '✏️ 名前ではない語', unreadImages: '🖼️ 読めなかった画像', whoCanUse: '👥 使える方' },
     selectionLost: { title: 'その選択はもう一致しませんの', description: '選ばれた項目が見つかりませんでしたわ。', tip: 'Command をもう一度実行して、新しい選択肢を開いてくださいませ' },
     missingField: '🔑 不足', unknown: '不明',
+    cooldown: {
+      title: '少々お待ちくださいませ',
+      description: 'たった今実行したばかりですの。**{seconds}** 秒後にもう一度実行できますわ。',
+    },
     imageQuota: {
       title: '証拠画像の上限に達しました',
       description: '証拠画像は24時間で{limit}枚まで添付できます。このリクエストは上限を超えてしまいますわ。',
@@ -523,7 +527,7 @@ export default {
           '**{count}** {word}を読みましたわ · 今から list を確認いたしますの…',
           'screenshot から **{count}** {word} · 確認しておりますわ…',
         ],
-    }, imageQueueFull: { title: '画像 check の queue がいっぱいですの', description: '画像 check の queue がいっぱいで、まだお預かりできませんの。', tip: 'この request は保持しておりませんの。queue が進んでから画像をもう一度お送りくださいませ' }, imageQueued: '画像 check を順番待ちに入れましたわ · 前に **{count}** 件ございますの…', imageProgress: '画像を受け取りましたわ · **{current}/{count}** 枚目を読み取り中ですの…', imageCooldownWait: 'API error のため Gemini が cooldown 中ですの · **{seconds}秒** 後に画像 **{current}/{count}** を再試行いたしますわ…', imageIgnored: '一度に処理できるのは {limit} 枚までですので、あふれた **{count}** 枚は見送りましたわ。', partialImages: { title: '一部の画像を読み取れませんでしたの', description: 'OCR error のため **{failed}/{count}** 枚を見送りましたわ。上の結果は、読み取りに成功した画像だけを使っておりますの。', tip: '失敗した画像だけをもう一度お送りくだされば、続きを check いたしますわ' }, ignored: '一度にお預かりできるのは {limit} 名までですので、あふれた **{count}** 名は見送りましたわ。', nameOne: 'name', nameMany: 'names', failed: { title: '確認が最後まで終わりませんでしたの', description: '画像から名前は読み取れましたけれど、list との照合を最後まで終えられませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' }, autoFailed: { title: 'その確認を終えられませんでしたの', description: '途中でつまずいてしまいましたの。', tip: 'もう一度貼っていただければ、また見てみますわ' },
+    }, imageQueueFull: { title: '画像 check の queue がいっぱいですの', description: '画像 check の queue がいっぱいで、まだお預かりできませんの。', tip: 'この request は保持しておりませんの。queue が進んでから画像をもう一度お送りくださいませ' }, imageUserQueueFull: { title: 'すでに待機中の画像 check がありますの', description: 'お一人が待てる画像 check の数に達していますので、まだお預かりできませんの。', tip: 'この request は保持しておりませんの。どれか一つが終わってから画像をもう一度お送りくださいませ' }, imageQueued: '画像 check を順番待ちに入れましたわ · 前に **{count}** 件ございますの…', imageProgress: '画像を受け取りましたわ · **{current}/{count}** 枚目を読み取り中ですの…', imageCooldownWait: 'API error のため Gemini が cooldown 中ですの · **{seconds}秒** 後に画像 **{current}/{count}** を再試行いたしますわ…', imageIgnored: '一度に処理できるのは {limit} 枚までですので、あふれた **{count}** 枚は見送りましたわ。', partialImages: { title: '一部の画像を読み取れませんでしたの', description: 'OCR error のため **{failed}/{count}** 枚を見送りましたわ。上の結果は、読み取りに成功した画像だけを使っておりますの。', tip: '失敗した画像だけをもう一度お送りくだされば、続きを check いたしますわ' }, ignored: '一度にお預かりできるのは {limit} 名までですので、あふれた **{count}** 名は見送りましたわ。', nameOne: 'name', nameMany: 'names', failed: { title: '確認が最後まで終わりませんでしたの', description: '画像から名前は読み取れましたけれど、list との照合を最後まで終えられませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' }, autoFailed: { title: 'その確認を終えられませんでしたの', description: '途中でつまずいてしまいましたの。', tip: 'もう一度貼っていただければ、また見てみますわ' },
     embed: { imageAuthor: '送ってくれた screenshot の check 結果ですわ。', textAuthor: '送ってくれた名前の check 結果ですわ。', autoKicker: 'AUTO-CHECK', slashKicker: 'LIST CHECK', names: 'NAMES', notListed: '未登録', configured: 'configured', ignored: '上限 {limit} のため {count} {word}を除外しましたの。', unverified: '未確認 candidate {count} 件を除外し、Quick Add を無効にしましたの。', flagged: 'FLAGGED {count}', clear: 'CLEAR', elapsed: '⏱️ 解析 {seconds}s', elapsedQuick: { variants: [
         '⏱️ {seconds}s で終わりましたわ。',
         '⏱️ たった {seconds}s ですの。',

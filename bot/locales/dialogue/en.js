@@ -3,6 +3,10 @@ export default {
     fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details', queue: '🚦 Queue', unreadable: '✏️ Not names', unreadImages: '🖼️ Unread images', whoCanUse: '👥 Who can use it' },
     selectionLost: { title: 'That choice no longer matches', description: 'I could not find the item you picked.', tip: 'Run the command again for fresh choices' },
     missingField: '🔑 Missing',
+    cooldown: {
+      title: 'One moment',
+      description: 'You just ran this. You can run it again in **{seconds}** s.',
+    },
     imageQuota: {
       title: 'Evidence image limit reached',
       description: 'You can attach up to {limit} evidence images in 24 hours, and this request would go over it.',
@@ -675,7 +679,7 @@ export default {
           'Read **{count}** {word} · cross-checking the lists now…',
           '**{count}** {word} out of the screenshot · checking…',
         ],
-    }, imageQueueFull: { title: 'The screenshot queue is full', description: 'My screenshot check queue is full, so I cannot take another one yet.', tip: 'This request was not kept; post the image again once the queue moves' }, imageQueued: 'Screenshot check queued · **{count}** image request(s) ahead…', imageProgress: 'Images received · reading **{current}/{count}**…', imageCooldownWait: 'Gemini is cooling down after an API error · retrying image **{current}/{count}** in **{seconds}s**…', imageIgnored: 'Each check handles up to {limit} images, so I skipped **{count}** extra.', partialImages: { title: 'Some images could not be read', description: 'I skipped **{failed}/{count}** image(s) after OCR errors. The result above uses only the images that succeeded.', tip: 'Post the failed image again on its own to finish the check' }, ignored: 'I skipped **{count}** extra {word} - I can only take {limit} at a time.', nameOne: 'name', nameMany: 'names',
+    }, imageQueueFull: { title: 'The screenshot queue is full', description: 'My screenshot check queue is full, so I cannot take another one yet.', tip: 'This request was not kept; post the image again once the queue moves' }, imageUserQueueFull: { title: 'You already have screenshots waiting', description: 'You have as many screenshot checks waiting as one member can, so I cannot take another one yet.', tip: 'This request was not kept; post the image again once one of yours finishes' }, imageQueued: 'Screenshot check queued · **{count}** image request(s) ahead…', imageProgress: 'Images received · reading **{current}/{count}**…', imageCooldownWait: 'Gemini is cooling down after an API error · retrying image **{current}/{count}** in **{seconds}s**…', imageIgnored: 'Each check handles up to {limit} images, so I skipped **{count}** extra.', partialImages: { title: 'Some images could not be read', description: 'I skipped **{failed}/{count}** image(s) after OCR errors. The result above uses only the images that succeeded.', tip: 'Post the failed image again on its own to finish the check' }, ignored: 'I skipped **{count}** extra {word} - I can only take {limit} at a time.', nameOne: 'name', nameMany: 'names',
     failed: { title: 'The check did not finish', description: 'I got the names off the image, but I could not finish checking them against the lists.', tip: 'Try again in a few minutes' },
     autoFailed: { title: 'I could not finish that check', description: 'Something went wrong partway through this one.', tip: 'Post it again and I will have another go' },
     embed: {

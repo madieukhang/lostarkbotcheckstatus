@@ -40,6 +40,7 @@ import {
 } from '../handlers/meta/languageSwitch.js';
 import { getClassAutocompleteChoices } from '../models/Class.js';
 import { getRaidAutocompleteChoices } from '../models/Raid.js';
+import { refuseCoolingDown } from './commandCooldowns.js';
 
 function hasPrefix(value, prefixes) {
   return prefixes.some((prefix) => value.startsWith(prefix));
@@ -345,6 +346,7 @@ export function createCommandRoutes({ systemHandlers, listHandlers }) {
 export async function dispatchCommandRoute(interaction, commandRoutes) {
   const route = commandRoutes[interaction.commandName];
   if (!route) return false;
+  if (await refuseCoolingDown(interaction)) return true;
 
   if (route.subcommands) {
     const subcommand = interaction.options.getSubcommand();
@@ -379,7 +381,10 @@ export async function dispatchComponentInteraction(interaction, {
     },
     {
       matches: () => interaction.isModalSubmit(),
-      handle: () => dispatchCustomIdRoute(interaction, modalRoutes),
+      handle: async () => {
+        if (await refuseCoolingDown(interaction)) return;
+        await dispatchCustomIdRoute(interaction, modalRoutes);
+      },
     },
     {
       matches: () => interaction.isAutocomplete(),

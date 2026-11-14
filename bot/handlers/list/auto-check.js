@@ -33,6 +33,7 @@ import {
 import { getGuildLanguage, t, tPick } from '../../services/i18n/index.js';
 import { buildAutoCheckEvidenceRow, buildQueueFullAlert } from './check/index.js';
 import { runRosterLookup } from '../roster/command.js';
+import { isOfficerOrSenior } from '../../utils/approverRoles.js';
 
 /** Env-based channel set (global fallback) */
 const envChannelSet = new Set(config.autoCheckChannelIds);
@@ -45,13 +46,19 @@ const MESSAGE_DEDUPE_TTL_MS = 10 * 60 * 1000;
 const AUTO_CHECK_MAX_BATCH_NAMES = 24;
 const AUTO_CHECK_MAX_IMAGES = 3;
 const AUTO_CHECK_MAX_IMAGE_REQUESTS = 8;
+// One member's screenshots, running or waiting, so a single poster cannot
+// fill the shared queue for every other server. Officers and seniors are
+// not limited.
+const AUTO_CHECK_MAX_IMAGE_REQUESTS_PER_USER = 3;
 const AUTO_CHECK_MAX_COOLDOWN_RETRY_AFTER_MS = 60_000;
 const AUTO_CHECK_COOLDOWN_WAIT_BUFFER_MS = 250;
 const AUTO_CHECK_QUEUE_FULL_CODE = 'AUTO_CHECK_IMAGE_QUEUE_FULL';
+const AUTO_CHECK_USER_QUEUE_FULL_CODE = 'AUTO_CHECK_USER_IMAGE_QUEUE_FULL';
 // Full queues are busy signals, not failures: the message is not remembered,
 // so the same screenshot can be sent again once the line moves.
 const BUSY_REJECTION_NOTICE_KEYS = Object.freeze({
   [AUTO_CHECK_QUEUE_FULL_CODE]: 'dialogue.check.imageQueueFull',
+  [AUTO_CHECK_USER_QUEUE_FULL_CODE]: 'dialogue.check.imageUserQueueFull',
   [OCR_QUEUE_FULL_CODE]: 'dialogue.check.ocrQueueFull',
 });
 
@@ -60,6 +67,7 @@ const BUSY_REJECTION_NOTICE_KEYS = Object.freeze({
 // for the same API quota and are more likely to fail with 429/503 responses.
 let imageRequestQueueTail = Promise.resolve();
 let queuedImageRequestCount = 0;
+const queuedImageRequestsByUser = new Map();
 
 /**
  * Parse an explicit auto-check text request. Bare names and words such as
@@ -172,6 +180,7 @@ export function resetAutoCheckDedupeForTest() {
   userCooldowns.clear();
   imageRequestQueueTail = Promise.resolve();
   queuedImageRequestCount = 0;
+  queuedImageRequestsByUser.clear();
 }
 
 /**
@@ -181,17 +190,25 @@ export function resetAutoCheckDedupeForTest() {
  * @template T
  * @param {() => Promise<T>} task
  * @param {(waitingAhead: number) => Promise<void>} [onQueued]
+ * @param {string} [userId] - the poster, counted against their own allowance
  * @returns {Promise<T>}
  */
-async function runQueuedImageRequest(task, onQueued) {
+async function runQueuedImageRequest(task, onQueued, userId = '') {
   const waitingAhead = queuedImageRequestCount;
-  if (waitingAhead >= AUTO_CHECK_MAX_IMAGE_REQUESTS) {
-    const error = new Error(`Screenshot queue is full (${AUTO_CHECK_MAX_IMAGE_REQUESTS} requests).`);
-    error.code = AUTO_CHECK_QUEUE_FULL_CODE;
-    error.limit = AUTO_CHECK_MAX_IMAGE_REQUESTS;
+  const userLimited = Boolean(userId) && !isOfficerOrSenior(userId);
+  const userCount = queuedImageRequestsByUser.get(userId) || 0;
+  const refusal = [
+    { full: waitingAhead >= AUTO_CHECK_MAX_IMAGE_REQUESTS, code: AUTO_CHECK_QUEUE_FULL_CODE, limit: AUTO_CHECK_MAX_IMAGE_REQUESTS },
+    { full: userLimited && userCount >= AUTO_CHECK_MAX_IMAGE_REQUESTS_PER_USER, code: AUTO_CHECK_USER_QUEUE_FULL_CODE, limit: AUTO_CHECK_MAX_IMAGE_REQUESTS_PER_USER },
+  ].find(({ full }) => full);
+  if (refusal) {
+    const error = new Error(`Screenshot queue is full (${refusal.limit} requests).`);
+    error.code = refusal.code;
+    error.limit = refusal.limit;
     throw error;
   }
   queuedImageRequestCount += 1;
+  if (userLimited) queuedImageRequestsByUser.set(userId, userCount + 1);
 
   const previous = imageRequestQueueTail.catch(() => {});
   let releaseSlot;
@@ -206,6 +223,11 @@ async function runQueuedImageRequest(task, onQueued) {
     return await task();
   } finally {
     queuedImageRequestCount -= 1;
+    if (userLimited) {
+      const left = (queuedImageRequestsByUser.get(userId) || 1) - 1;
+      if (left > 0) queuedImageRequestsByUser.set(userId, left);
+      else queuedImageRequestsByUser.delete(userId);
+    }
     releaseSlot();
     if (queuedImageRequestCount === 0) imageRequestQueueTail = Promise.resolve();
   }
@@ -562,7 +584,7 @@ export function createAutoCheckMessageHandler({
           t('dialogue.check.imageQueued', lang, { count: waitingAhead }),
           imageLimitLine(request, lang),
         ]);
-      });
+      }, message.author.id);
     } else {
       mergeUniqueNames(names, request.textRequest.names, new Set());
     }

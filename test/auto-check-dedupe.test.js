@@ -518,6 +518,8 @@ test('auto-check queues rapid image messages instead of dropping them to cooldow
     buildAutoCheckEvidenceRowFn: () => null,
   });
 
+  // Three members post in turn, so the shared eight-request cap is reached
+  // before any one member's own allowance.
   function createQueuedMessage(number) {
     const replies = [];
     const edits = [];
@@ -529,7 +531,7 @@ test('auto-check queues rapid image messages instead of dropping them to cooldow
         content: '',
         channelId: 'channel-1',
         guild: { id: 'guild-1' },
-        author: { id: 'same-user', bot: false, tag: 'QueueUser#0001' },
+        author: { id: `queue-user-${Math.ceil(number / 3)}`, bot: false, tag: 'QueueUser#0001' },
         attachments: attachmentsOf({
           id: `queued-image-${number}`,
           contentType: 'image/png',
@@ -676,4 +678,64 @@ test('auto-check replaces the live status card when image processing fails', asy
   assert.equal(edits.length, 1);
   assert.match(edits[0].embeds[0].toJSON().title, /could not finish/i);
   assert.deepEqual(reactions, ['🔍', '❌']);
+});
+
+test('one member can keep at most three screenshot checks waiting', async () => {
+  resetAutoCheckDedupeForTest();
+  let releaseFirst;
+  let markFirstStarted;
+  const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+  const firstStarted = new Promise((resolve) => { markFirstStarted = resolve; });
+  const handler = createAutoCheckMessageHandler({
+    client: { user: { id: 'bot-user' } },
+    imageChecksEnabled: true,
+    isAutoCheckChannelFn: async () => true,
+    getGuildLanguageFn: async () => 'en',
+    extractNamesFromImageFn: async (image) => {
+      if (image.id === 'own-image-1') {
+        markFirstStarted();
+        await firstGate;
+      }
+      return ['Name'];
+    },
+    checkNamesAgainstListsFn: async (names) => names.map((name) => ({ name, blackEntry: { name } })),
+    formatCheckResultsFn: () => ['formatted'],
+    buildListCheckEmbedFn: ({ results }) => ({ embed: { title: results[0].name } }),
+    buildAutoCheckEvidenceRowFn: () => null,
+  });
+  const messages = Array.from({ length: 4 }, (_, index) => {
+    const replies = [];
+    return {
+      replies,
+      message: {
+        id: `own-message-${index + 1}`,
+        content: '',
+        channelId: 'channel-1',
+        guild: { id: 'guild-1' },
+        author: { id: 'busy-user', bot: false, tag: 'Busy#0001' },
+        attachments: attachmentsOf({ id: `own-image-${index + 1}`, contentType: 'image/png' }),
+        channel: { name: 'loa-check' },
+        reactions: { cache: { get: () => null } },
+        react: async () => {},
+        reply: async (payload) => {
+          replies.push(payload);
+          return { edit: async () => {} };
+        },
+      },
+    };
+  });
+
+  const firstRun = handler(messages[0].message);
+  await firstStarted;
+  const runs = messages.slice(1).map(({ message }) => handler(message));
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  // Read the fourth reply before the first check is released, so a fourth
+  // request that queued instead of being refused shows up as a failure.
+  const fourthTitle = messages[3].replies[0]?.embeds[0].toJSON().title || '';
+  releaseFirst();
+  await Promise.all([firstRun, ...runs]);
+
+  assert.match(fourthTitle, /screenshots waiting/i);
+  assert.equal(messages[1].replies.length > 0, true, 'the second request queued');
 });
