@@ -23,7 +23,7 @@ import { hasEvidence, isLegacyEvidence } from '../../../utils/imageRehost.js';
 import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { rosterUrl } from '../../../utils/rosterLink.js';
 import { COLORS, ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
-import { truncateInlineText } from '../../../utils/discordText.js';
+import { codeSpanText, isSafeLogsUrl, truncateInlineText } from '../../../utils/discordText.js';
 import { t } from '../../../services/i18n/index.js';
 import {
   formatLinkedCharacter,
@@ -194,7 +194,7 @@ export function buildListPageEmbed(options) {
       let scopeTag = '';
       if (entry.scope === 'server') {
         if (isOwnerGuild && entry.guildId) {
-          const guildName = guildNameCache.get(entry.guildId) || entry.guildId;
+          const guildName = codeSpanText(guildNameCache.get(entry.guildId) || entry.guildId);
           scopeTag = ` \`[${t('listView.scope.localWithGuild', lang, { guildName })}]\``;
         } else {
           scopeTag = ` \`[${t('listView.scope.local', lang)}]\``;
@@ -456,7 +456,8 @@ export function buildEvidenceEmbed(entry, displayUrl, {
     .setTimestamp(entry.addedAt ? new Date(entry.addedAt) : undefined);
   applyEvidenceMedia(embed, entry, displayUrl, { lang });
 
-  if (entry.logsUrl) {
+  // A link that could end the masked link early is not shown at all.
+  if (isSafeLogsUrl(entry.logsUrl)) {
     embed.addFields({
       name: t('listView.evidence.logs', lang),
       value: `[${t('listView.evidence.viewLogs', lang)}](${entry.logsUrl})`,

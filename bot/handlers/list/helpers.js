@@ -17,7 +17,7 @@ import Whitelist from '../../models/Whitelist.js';
 import Watchlist from '../../models/Watchlist.js';
 import { buildAlertEmbed, AlertSeverity, NoticeKind } from '../../utils/alertEmbed.js';
 import { COLORS, ICONS } from '../../utils/ui.js';
-import { escapeLinkBrackets } from '../../utils/discordText.js';
+import { codeSpanText, escapeEmbedText, escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { t } from '../../services/i18n/index.js';
 import { formatLinkedCharacter, renderTrackedAltsField } from './trackedAltsRender.js';
@@ -363,7 +363,7 @@ const APPROVAL_CARD_VIEWS = Object.freeze({
       name: escapeLinkBrackets(payload.name),
     }),
     hero: ({ isEdit, guild, payload, snapshot, listLabel, scopeTag, lang }) => t(`dialogue.approval.${isEdit ? 'heroEdit' : 'heroAdd'}`, lang, {
-      guild: guild.name,
+      guild: escapeEmbedText(guild.name),
       name: formatLinkedCharacter(payload.name, snapshot),
       list: listLabel,
       scope: scopeTag,
@@ -445,9 +445,9 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
 
   const fields = [
     { name: `📒 ${t('dialogue.approval.fields.list', lang)}`, value: `${listIcon} ${listLabel}`, inline: true },
-    { name: `🗡️ ${t('dialogue.approval.fields.raid', lang)}`, value: payload.raid ? `\`${payload.raid}\`` : t('dialogue.broadcast.notAvailable', lang), inline: true },
+    { name: `🗡️ ${t('dialogue.approval.fields.raid', lang)}`, value: payload.raid ? `\`${codeSpanText(payload.raid)}\`` : t('dialogue.broadcast.notAvailable', lang), inline: true },
     { name: `🌐 ${t('dialogue.approval.fields.scope', lang)}`, value: t(`dialogue.approval.scopeTag.${payload.scope === 'server' ? 'local' : 'global'}`, lang), inline: true },
-    { name: `📝 ${t('dialogue.approval.fields.reason', lang)}`, value: (payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false },
+    { name: `📝 ${t('dialogue.approval.fields.reason', lang)}`, value: escapeLinkBrackets(payload.reason || t('dialogue.broadcast.notAvailable', lang)).slice(0, 1024), inline: false },
   ];
 
   // Tracked alts give the approver "is this the right person?" context

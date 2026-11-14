@@ -28,6 +28,7 @@ import {
   upsertRosterSnapshots,
 } from '../../services/roster/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
+import { escapeLinkBrackets } from '../../utils/discordText.js';
 import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import {
@@ -187,7 +188,7 @@ function collectListHits(matches) {
 }
 
 function formatStatusLine(icon, text, reason) {
-  return `${icon} ${text}${reason ? ` · *${reason}*` : ''}`;
+  return `${icon} ${text}${reason ? ` · *${escapeLinkBrackets(reason)}*` : ''}`;
 }
 
 /**

@@ -12,6 +12,7 @@ import { getAddedByDisplay, normalizeNameKey } from '../../../utils/names.js';
 import { ICONS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { getListContext } from '../helpers.js';
 import { appendFieldLine, buildNoteCountLine } from '../notes/entryNotes.js';
+import { escapeLinkBrackets } from '../../../utils/discordText.js';
 import {
   formatLinkedCharacter,
   formatRosterStatBadges,
@@ -67,7 +68,7 @@ function buildCheckMetadataFields(entry, snapshot, { includeAddedBy, lang, statM
   return [
     {
       name: `📝 ${t('dialogue.broadcast.fields.reason', lang)}`,
-      value: appendFieldLine((entry.reason || notAvailable).slice(0, 1024), buildNoteCountLine(entry, lang)),
+      value: appendFieldLine(escapeLinkBrackets(entry.reason || notAvailable).slice(0, 1024), buildNoteCountLine(entry, lang)),
       inline: false,
     },
     // Added by is optional, so the inline count is 5 or 6 depending on

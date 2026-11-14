@@ -12,6 +12,7 @@ import { inflateRawSync } from 'node:zlib';
 
 import { RAIDS, currentRaidValue } from '../../models/Raid.js';
 import { isValidCharacterName, normalizeCharacterName } from '../../utils/names.js';
+import { isSafeLogsUrl } from '../../utils/discordText.js';
 import {
   EXAMPLE_REASON_PREFIX,
   MULTIADD_MAX_ROWS,
@@ -174,8 +175,8 @@ const ROW_VALIDATION_RULES = [
     message: (row) => `Row ${row.rowNum}: raid must be one of [${RAIDS.join(', ')}] (got "${row.raid}").`,
   },
   {
-    invalid: (row) => row.logs && !/^https?:\/\//i.test(row.logs),
-    message: (row) => `Row ${row.rowNum}: "logs" must start with http:// or https://.`,
+    invalid: (row) => row.logs && !isSafeLogsUrl(row.logs),
+    message: (row) => `Row ${row.rowNum}: "logs" must be one https:// link with no spaces or brackets, at most 512 characters.`,
   },
   {
     invalid: (row) => row.image && !/^https?:\/\//i.test(row.image),

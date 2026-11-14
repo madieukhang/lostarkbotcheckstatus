@@ -20,7 +20,7 @@ import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
 import { mapWithConcurrency } from '../../../utils/async.js';
 import { normalizeNameKey } from '../../../utils/names.js';
-import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
+import { codeSpanText, escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import {
   describeListEntryEdit,
   formatListEditSummary,
@@ -195,9 +195,9 @@ export function buildBroadcastFields({
     entry.raid || raidChanged
       ? buildMarkedInlineField(
           `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`,
-          entry.raid ? `\`${entry.raid}\`` : notAvailable,
+          entry.raid ? `\`${codeSpanText(entry.raid)}\`` : notAvailable,
           raidChanged,
-          previous.raid || notAvailable,
+          escapeLinkBrackets(previous.raid || notAvailable),
         )
       : null,
     stampedAt

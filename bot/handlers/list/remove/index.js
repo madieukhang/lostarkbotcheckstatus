@@ -37,7 +37,7 @@ import {
   pickPreferredListEntry,
 } from '../../../utils/listEntryMap.js';
 import { NoticeKind } from '../../../utils/alertEmbed.js';
-import { truncateInlineText } from '../../../utils/discordText.js';
+import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import {
   deferReply,
   editAlert,
@@ -123,10 +123,10 @@ export function buildRemoveResultCard(outcomes, {
   // After this card the reason is gone from the database, so it is kept
   // whole. Removing from several lists keeps each one, named by its list.
   const reasonValue = oks.length === 1
-    ? String(oks[0].entry.reason || '').trim()
+    ? escapeLinkBrackets(String(oks[0].entry.reason || '').trim())
     : oks
       .filter((o) => String(o.entry.reason || '').trim())
-      .map((o) => `${o.icon} **${o.label}**: ${o.entry.reason.trim()}`)
+      .map((o) => `${o.icon} **${o.label}**: ${escapeLinkBrackets(o.entry.reason.trim())}`)
       .join('\n');
 
   const failedField = fails.length > 0 ? {
@@ -405,7 +405,7 @@ export function createRemoveHandlers({ services }) {
         const scopeTag = f.entry.scope === 'server'
           ? ` \`[${t('dialogue.approval.scopeTag.local', lang)}${foreignGuildId}]\``
           : '';
-        const reason = f.entry.reason ? ` *${truncateInlineText(f.entry.reason, 80)}*` : '';
+        const reason = f.entry.reason ? ` *${escapeLinkBrackets(truncateInlineText(f.entry.reason, 80))}*` : '';
         return `${i + 1}. ${ctx.icon} **${t(`dialogue.broadcast.list.${f.type}`, lang)}**${scopeTag}${reason}`;
       });
       const pickerEmbed = createArtistEmbed()

@@ -36,6 +36,35 @@ export function escapeLinkBrackets(value) {
   return String(value).replace(/[\\[\]]/g, '\\$&');
 }
 
+/**
+ * Text for a Discord code span: a backtick would end the span early and let
+ * the rest render as markdown, so it becomes an apostrophe.
+ * @param {string} value
+ * @returns {string}
+ */
+export function codeSpanText(value) {
+  return String(value ?? '').replace(/`/g, "'");
+}
+
+const LOGS_URL_MAX_LENGTH = 512;
+
+/**
+ * Whether a stored logs link can sit in `[label](url)` as typed: an https URL
+ * with no whitespace, parenthesis or angle bracket that would end the link
+ * early, and at most 512 characters.
+ * @param {string} value
+ * @returns {boolean}
+ */
+export function isSafeLogsUrl(value) {
+  const text = String(value ?? '');
+  if (text.length > LOGS_URL_MAX_LENGTH || /[\s()<>]/.test(text)) return false;
+  try {
+    return new URL(text).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 /** Trim an inline Discord label and reserve space for its truncation suffix. */
 export function truncateInlineText(value, limit, suffix = '...') {
   const text = String(value || '').trim();

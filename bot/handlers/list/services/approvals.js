@@ -34,7 +34,7 @@ import {
 import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
 import { getGuildLanguage, getUserLanguage, t } from '../../../services/i18n/index.js';
 import { editPayload } from '../../../utils/interactionReplies.js';
-import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
+import { escapeEmbedText, escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import { normalizeNameKey } from '../../../utils/names.js';
 
 /**
@@ -290,7 +290,7 @@ export function createApprovalServices({
         .setColor(color)
         .addFields(
           { name: `👤 ${t('dialogue.approval.fields.requestedBy', lang)}`, value: `${pending.requesterDisplayName || pending.requesterTag || t('dialogue.common.unknown', lang)} (<@${pending.requesterId}>)`, inline: false },
-          { name: `🏠 ${t('dialogue.approval.fields.server', lang)}`, value: guild?.name || pending.guildId || t('dialogue.common.unknown', lang), inline: true },
+          { name: `🏠 ${t('dialogue.approval.fields.server', lang)}`, value: escapeEmbedText(guild?.name || pending.guildId || t('dialogue.common.unknown', lang)), inline: true },
           { name: `📊 ${t('dialogue.approval.fields.total', lang)}`, value: String(pending.rows.length), inline: true },
           { name: `🆔 ${t('dialogue.approval.fields.requestId', lang)}`, value: `\`${pending.requestId.slice(0, 8)}\``, inline: true },
         )

@@ -1,5 +1,5 @@
 import { buildAlertEmbed, AlertSeverity } from '../../utils/alertEmbed.js';
-import { truncateInlineText } from '../../utils/discordText.js';
+import { escapeLinkBrackets, truncateInlineText } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { relativeTime } from '../../utils/ui.js';
 import { t } from '../../services/i18n/index.js';
@@ -28,13 +28,13 @@ export function buildDuplicateReasonFields(existed, typedReason, lang, { forAppr
   return [
     {
       name: `📝 ${t('dialogue.listAdd.duplicate.storedReason', lang)}`,
-      value: appendFieldLine((existed.reason || fallback).slice(0, 1024), storedLines),
+      value: appendFieldLine(escapeLinkBrackets(existed.reason || fallback).slice(0, 1024), storedLines),
       inline: false,
     },
     // Keep identical reasons visible: the reviewer still needs both sides.
     typed || forApproval ? {
       name: `✏️ ${t(forApproval ? 'dialogue.approval.flow.requestReason' : 'dialogue.listAdd.duplicate.typedReason', lang)}`,
-      value: appendFieldLine((typed || t('dialogue.approval.flow.unchangedValue', lang)).slice(0, 1024), raidLine(typedRaid)),
+      value: appendFieldLine(escapeLinkBrackets(typed || t('dialogue.approval.flow.unchangedValue', lang)).slice(0, 1024), raidLine(typedRaid)),
       inline: false,
     } : null,
   ].filter(Boolean);

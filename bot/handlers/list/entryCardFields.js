@@ -11,6 +11,7 @@
 
 import { t } from '../../services/i18n/index.js';
 import { normalizeNameKey } from '../../utils/names.js';
+import { escapeLinkBrackets } from '../../utils/discordText.js';
 import { padInlineRow } from '../../utils/ui.js';
 import {
   formatRosterStatBadges,
@@ -165,13 +166,14 @@ export function buildListEntryReasonField({ reason, previousReason, noteLine = n
   const notAvailable = t('dialogue.broadcast.notAvailable', lang);
   const limit = FIELD_VALUE_LIMIT - (noteLine ? noteLine.length + 1 : 0);
   const withLine = value => (noteLine ? `${value}\n${noteLine}` : value);
-  const current = (reason || notAvailable).slice(0, limit);
+  // A reason is shown to every guild, so its masked links show as typed.
+  const current = escapeLinkBrackets(reason || notAvailable).slice(0, limit);
   if (previousReason === undefined) return { name: label, value: withLine(current), inline: false };
 
   const room = limit - current.length - 1;
   const value = room < MIN_STRUCK_REASON_LENGTH
     ? current
-    : `${formatStruckValue(previousReason || notAvailable, room)}\n${current}`;
+    : `${formatStruckValue(escapeLinkBrackets(previousReason || notAvailable), room)}\n${current}`;
   return { name: `${label}${CHANGED_MARK}`, value: withLine(value), inline: false };
 }
 
