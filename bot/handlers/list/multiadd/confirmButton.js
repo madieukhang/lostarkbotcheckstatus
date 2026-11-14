@@ -20,6 +20,7 @@ import {
   isOfficerOrSenior,
 } from '../helpers.js';
 import { buildDeliveryFailedAlert } from '../services/mutationFlow.js';
+import { buildImageQuotaAlert, takeEvidenceUploads } from '../../../utils/evidenceQuota.js';
 
 const MULTIADD_CONFIRM_STATE_RULES = Object.freeze([
   { state: 'expired', matches: ({ pending }) => !pending },
@@ -106,6 +107,12 @@ export function createMultiaddConfirmButtonHandler(deps) {
     if (!shouldConfirm) return;
 
     clearMultiaddPending(requestId);
+
+    const imageCount = pending.rows.filter((row) => row.image).length;
+    if (!takeEvidenceUploads(pending.requesterId, imageCount)) {
+      await updateAlert(interaction, buildImageQuotaAlert(lang), { content: null, components: [] });
+      return;
+    }
 
     // Both paths rehost images, write to Mongo and message people before they
     // finish, which outlasts Discord's 3-second window, so the card is

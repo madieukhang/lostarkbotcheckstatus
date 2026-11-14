@@ -3,6 +3,11 @@ export default {
     fields: { filter: '🎚️ Filters', beforeFilter: '📋 Before filtering', details: '🧾 Details', queue: '🚦 Queue', unreadable: '✏️ Not names', unreadImages: '🖼️ Unread images', whoCanUse: '👥 Who can use it' },
     selectionLost: { title: 'That choice no longer matches', description: 'I could not find the item you picked.', tip: 'Run the command again for fresh choices' },
     missingField: '🔑 Missing',
+    imageQuota: {
+      title: 'Evidence image limit reached',
+      description: 'You can attach up to {limit} evidence images in 24 hours, and this request would go over it.',
+      tip: 'Try again later, or send it without an image',
+    },
     unknown: 'Unknown',
     savedCardFailed: { title: 'Saved', description: 'The change is saved; I just could not show the confirmation card.' },
     queuedCardFailed: { title: 'Sent for approval', description: 'Your request is saved and waiting for approval; I just could not show the confirmation card.' },

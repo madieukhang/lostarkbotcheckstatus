@@ -13,6 +13,8 @@ const { default: UserPreference } = await import('../bot/models/UserPreference.j
 const { disconnectDB } = await import('../bot/db.js');
 const { clearUserLanguageCache } = await import('../bot/services/i18n/index.js');
 const { createMultiaddConfirmButtonHandler } = await import('../bot/handlers/list/multiadd/confirmButton.js');
+const { resetEvidenceQuota } = await import('../bot/utils/evidenceQuota.js');
+const { t: translate } = await import('../bot/services/i18n/index.js');
 
 // The first acknowledgement fails once the slow work has started, the way
 // Discord's 3-second window does for a click answered too late.
@@ -36,7 +38,7 @@ function makeConfirmInteraction(events, { failFinalEdit = false } = {}) {
   };
 }
 
-function createHandler(t, events) {
+function createHandler(t, events, rows = [{ name: 'Alpha', type: 'black', reason: 'Report' }]) {
   clearUserLanguageCache();
   t.mock.method(mongoose, 'connect', async () => mongoose);
   t.after(async () => {
@@ -54,7 +56,7 @@ function createHandler(t, events) {
     requesterDisplayName: 'Member',
     guildId: 'guild-1',
     channelId: 'channel-1',
-    rows: [{ name: 'Alpha', type: 'black', reason: 'Report' }],
+    rows,
   }]]);
   return createMultiaddConfirmButtonHandler({
     client: {},
@@ -88,4 +90,21 @@ test('member multiadd confirm keeps the sent approval when only the last edit fa
 
   assert.ok(events.includes('dm'));
   assert.ok(!events.includes('delete'), `events: ${JSON.stringify(events)}`);
+});
+
+test("a member batch with more images than the daily allowance is refused before anything is archived", async (t) => {
+  resetEvidenceQuota();
+  t.after(resetEvidenceQuota);
+  const events = [];
+  const rows = Array.from({ length: 11 }, (_, i) => ({ name: `Alpha${i}`, type: "black", reason: "Report", image: `https://img.example/${i}.png` }));
+  const handler = createHandler(t, events, rows);
+  const interaction = makeConfirmInteraction(events);
+  const acknowledge = interaction.update;
+  interaction.update = async (payload) => { events.push({ update: payload }); return acknowledge(payload); };
+  await handler(interaction);
+
+  assert.ok(!events.includes("create"), `events: ${JSON.stringify(events)}`);
+  assert.ok(!events.includes("dm"));
+  const shown = JSON.stringify(events);
+  assert.ok(shown.includes(translate("dialogue.common.imageQuota", "en").title), shown);
 });

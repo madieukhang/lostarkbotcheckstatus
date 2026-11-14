@@ -20,6 +20,7 @@ import {
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { getGuildConfig } from '../../../utils/scope.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
+import { buildImageQuotaAlert, takeEvidenceUploads } from '../../../utils/evidenceQuota.js';
 import { NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
@@ -215,6 +216,10 @@ export function createListAddCommandHandler({
     const validation = validateListAddRequest(interaction, request, lang);
     if (validation) {
       await editAlert(interaction, validation);
+      return;
+    }
+    if (request.image?.url && !takeEvidenceUploads(interaction.user.id, 1)) {
+      await editAlert(interaction, buildImageQuotaAlert(lang));
       return;
     }
 

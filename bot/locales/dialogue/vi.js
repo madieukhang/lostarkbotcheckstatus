@@ -3,6 +3,11 @@ export default {
     fields: { filter: '🎚️ Bộ lọc', beforeFilter: '📋 Trước khi lọc', details: '🧾 Chi tiết', queue: '🚦 Hàng chờ', unreadable: '✏️ Không đọc được', unreadImages: '🖼️ Ảnh chưa đọc được', whoCanUse: '👥 Ai dùng được' },
     selectionLost: { title: 'Lựa chọn này không còn khớp', description: 'Tớ không tìm ra mục cậu vừa chọn nữa.', tip: 'Chạy lại lệnh để lấy lựa chọn mới nhé' },
     missingField: '🔑 Còn thiếu',
+    imageQuota: {
+      title: 'Đã chạm giới hạn ảnh bằng chứng',
+      description: 'Mỗi người gửi được tối đa {limit} ảnh bằng chứng trong 24 giờ, và yêu cầu này sẽ vượt quá giới hạn đó.',
+      tip: 'Thử lại sau, hoặc gửi mà không kèm ảnh',
+    },
     unknown: 'Không rõ',
     savedCardFailed: { title: 'Đã lưu', description: 'Thay đổi đã được lưu, chỉ là tớ chưa hiển thị được card xác nhận.' },
     queuedCardFailed: { title: 'Đã gửi đi duyệt', description: 'Yêu cầu của cậu đã được lưu và đang chờ duyệt, chỉ là tớ chưa hiển thị được card xác nhận.' },

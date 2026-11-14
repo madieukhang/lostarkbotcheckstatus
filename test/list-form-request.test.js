@@ -18,6 +18,7 @@ import { buildListAddRequest, createListAddCommandHandler } from '../bot/handler
 import { buildListEditInput, createListEditCommandHandler } from '../bot/handlers/list/edit/command.js';
 import { LIST_FORM_IDS } from '../bot/handlers/list/form/fields.js';
 import { createListFormHandlers } from '../bot/handlers/list/form/index.js';
+import { EVIDENCE_UPLOAD_LIMIT, resetEvidenceQuota, takeEvidenceUploads } from '../bot/utils/evidenceQuota.js';
 
 const PDF = { url: 'https://cdn.example.test/report.pdf', contentType: 'application/pdf' };
 
@@ -259,4 +260,47 @@ test('a quick add answers privately and leaves the request message unrecorded', 
   for (const expected of ['📒 List', '🗡️ Raid', '🌐 Scope', '📝 Reason']) assert.ok(names.includes(expected), `missing ${expected}`);
   assert.ok(!names.some((name) => /Requested by/.test(name)));
   assert.equal(embed.footer.text, '⏳ Waiting on an approver');
+});
+
+const PNG = { url: 'https://cdn.example.test/proof.png', contentType: 'image/png' };
+
+test('/la-list add past the daily evidence image allowance archives nothing', async (t) => {
+  stubLookups(t);
+  resetEvidenceQuota();
+  t.after(resetEvidenceQuota);
+  assert.equal(takeEvidenceUploads('entry-owner', EVIDENCE_UPLOAD_LIMIT), true);
+  const replies = [];
+  const handler = createListAddCommandHandler({
+    client: { channels: { fetch: () => assert.fail('An add over the allowance must not reach the evidence channel') } },
+    sendListAddApprovalToApprovers: () => assert.fail('An add over the allowance must not ask approvers'),
+    executeListAddToDatabase: () => assert.fail('An add over the allowance must not write'),
+  });
+
+  await handler(formSubmit(replies), buildListAddRequest({
+    type: 'black', name: 'Mokoko', reason: 'Report', raidInput: 'Serca Hard', image: PNG, inputScope: '',
+  }));
+
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].embeds[0].toJSON().title.endsWith(translate('dialogue.common.imageQuota', 'en').title), true);
+});
+
+test('/la-list edit past the daily evidence image allowance archives nothing', async (t) => {
+  stubLookups(t, [{
+    _id: 'a'.repeat(24), name: 'Mokoko', reason: 'Report', scope: 'global', addedByUserId: 'entry-owner', allCharacters: [],
+  }]);
+  resetEvidenceQuota();
+  t.after(resetEvidenceQuota);
+  assert.equal(takeEvidenceUploads('entry-owner', EVIDENCE_UPLOAD_LIMIT), true);
+  const replies = [];
+  const handler = createListEditCommandHandler({
+    client: {},
+    broadcastListChange: () => assert.fail('An edit over the allowance must not broadcast'),
+    sendListAddApprovalToApprovers: () => assert.fail('An edit over the allowance must not ask approvers'),
+    rehostImageFn: () => assert.fail('An edit over the allowance must not rehost its image'),
+  });
+
+  await handler(formSubmit(replies), buildListEditInput({ name: 'Mokoko', image: PNG }));
+
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].embeds[0].toJSON().title.endsWith(translate('dialogue.common.imageQuota', 'en').title), true);
 });

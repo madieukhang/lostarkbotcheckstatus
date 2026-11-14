@@ -23,6 +23,7 @@ import {
   pickPreferredListEntry,
 } from '../../../utils/listEntryMap.js';
 import { rehostImage } from '../../../utils/imageRehost.js';
+import { buildImageQuotaAlert, takeEvidenceUploads } from '../../../utils/evidenceQuota.js';
 import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { escapeLinkBrackets, truncateInlineText } from '../../../utils/discordText.js';
 import {
@@ -410,6 +411,10 @@ export function createListEditCommandHandler({
     // Rehost only an edit that passed every check, so a refused edit leaves
     // no copy in the evidence channel. Rehost failure or a missing evidence
     // channel falls back to the Discord URL, which eventually expires.
+    if (newImageUrl && !takeEvidenceUploads(interaction.user.id, 1)) {
+      await editAlert(interaction, buildImageQuotaAlert(lang));
+      return;
+    }
     let newImageRehost = null;
     if (newImageUrl) {
       newImageRehost = await rehostImageFn(newImageUrl, client, {

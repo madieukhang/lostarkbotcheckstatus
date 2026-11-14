@@ -104,6 +104,12 @@ const IMAGE_SIGNATURES = Object.freeze([
   { ext: 'jpg', parts: [[0, 'ffd8ff']] },
   { ext: 'gif', parts: [[0, '47494638']] },
   { ext: 'webp', parts: [[0, '52494646'], [8, '57454250']] },
+  { ext: 'bmp', parts: [[0, '424d']] },
+  // ISO base media files carry their brand after `ftyp`; only image brands count.
+  ...['avif', 'avis', 'heic', 'heix', 'mif1'].map((brand) => ({
+    ext: brand.startsWith('avi') ? 'avif' : 'heic',
+    parts: [[4, Buffer.from(`ftyp${brand}`).toString('hex')]],
+  })),
 ]);
 
 function imageSignatureExtension(buffer) {
@@ -213,9 +219,9 @@ export async function rehostImage(originalUrl, client, meta = {}) {
     return fail(`download HTTP ${response.status}${response.statusText ? ` (${response.statusText})` : ''}`);
   }
 
-  // Only an image goes into the archive. A body without a specific type is
-  // read and kept only when it starts with an image signature; any other
-  // type is not read.
+  // Only an image goes into the archive. A body typed as an image or without
+  // a specific type is read and kept only when it starts with an image
+  // signature; any other type is not read.
   const contentType = response.headers.get('content-type') || '';
   const typedImage = /^image\//i.test(contentType);
   const notAnImage = `download is not an image (${contentType || 'no content type'})`;
@@ -232,10 +238,10 @@ export async function rehostImage(originalUrl, client, meta = {}) {
       ? 'file too large to rehost (> 24 MB limit)'
       : `download read body failed: ${err.message}`);
   }
-  const sniffedExt = typedImage ? '' : imageSignatureExtension(buffer);
-  if (!typedImage && !sniffedExt) return fail(notAnImage);
+  const sniffedExt = imageSignatureExtension(buffer);
+  if (!sniffedExt) return fail(notAnImage);
 
-  const filename = imageFilenameFromUrl(originalUrl, `evidence.${sniffedExt || 'png'}`);
+  const filename = imageFilenameFromUrl(originalUrl, `evidence.${sniffedExt}`);
 
   // Steps 2 and 3: upload to the evidence channel, with audit metadata so a
   // human looking at #evidence-archive can see what each image is for.

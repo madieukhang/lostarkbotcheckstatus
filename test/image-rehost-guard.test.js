@@ -51,7 +51,7 @@ function setup(t, { lookup = PUBLIC_ADDRESS, responses = [], storeFails = false,
   return { fetched, uploads, stores, client };
 }
 
-const image = () => new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), { headers: { 'content-type': 'image/png' } });
+const image = () => new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), { headers: { 'content-type': 'image/png' } });
 const redirectTo = location => new Response(null, { status: 302, headers: { location } });
 
 test('a loopback, private or link-local address is refused before any request', async t => {
@@ -128,6 +128,17 @@ test('a redirect to a private address is not followed', async t => {
   assert.equal(uploads.length, 0);
 });
 
+test('a body typed as an image is archived only when its bytes are an image', async t => {
+  const typed = bytes => new Response(new Uint8Array(bytes), { headers: { 'content-type': 'image/png' } });
+  const junk = setup(t, { responses: [typed([...Buffer.from('random bytes, not a picture')])] });
+  await assert.rejects(rehostImage('https://cdn.example/a.png', junk.client, { throwOnError: true }), /not an image/);
+  assert.equal(junk.uploads.length, 0);
+  assert.equal(junk.stores.length, 0);
+
+  const avif = setup(t, { responses: [typed([0, 0, 0, 0x1c, ...Buffer.from('ftypavif')])] });
+  assert.equal((await rehostImage('https://cdn.example/a.avif', avif.client)).messageId, 'archived');
+});
+
 test('a body that is not an image is not uploaded', async t => {
   const { uploads, client } = setup(t, {
     responses: [new Response('internal status page', { headers: { 'content-type': 'text/plain' } })],
@@ -142,7 +153,7 @@ test('the archived image is also copied to the database with its archive id', as
 
   assert.equal(result.messageId, 'archived');
   assert.equal(stores.length, 1);
-  assert.equal(stores[0].filter._id, sha256Hex(Buffer.from([0x89, 0x50, 0x4e, 0x47])));
+  assert.equal(stores[0].filter._id, sha256Hex(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])));
   assert.equal(stores[0].update.$addToSet.archiveMessageIds, 'archived');
   assert.deepEqual(stores[0].update.$set, { archiveMessageId: 'archived', archiveChannelId: 'evidence' });
   assert.equal(stores[0].update.$setOnInsert.contentType, 'image/png');

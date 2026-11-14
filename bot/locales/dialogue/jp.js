@@ -3,6 +3,11 @@ export default {
     fields: { filter: '🎚️ Filter', beforeFilter: '📋 Filter 前', details: '🧾 詳細', queue: '🚦 順番待ち', unreadable: '✏️ 名前ではない語', unreadImages: '🖼️ 読めなかった画像', whoCanUse: '👥 使える方' },
     selectionLost: { title: 'その選択はもう一致しませんの', description: '選ばれた項目が見つかりませんでしたわ。', tip: 'Command をもう一度実行して、新しい選択肢を開いてくださいませ' },
     missingField: '🔑 不足', unknown: '不明',
+    imageQuota: {
+      title: '証拠画像の上限に達しました',
+      description: '証拠画像は24時間で{limit}枚まで添付できます。このリクエストは上限を超えてしまいますわ。',
+      tip: 'しばらくしてからもう一度、または画像なしで送ってくださいませ',
+    },
     savedCardFailed: { title: '保存しましたわ', description: '変更は保存しましたが、確認 card を表示できませんでしたの。' },
     queuedCardFailed: { title: '承認に回しましたわ', description: 'ご依頼は保存され承認待ちですが、確認 card を表示できませんでしたの。' },
     officerRoles: 'Officer · Senior',
