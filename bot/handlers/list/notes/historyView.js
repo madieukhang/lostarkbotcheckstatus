@@ -1,8 +1,8 @@
 /**
  * handlers/list/notes/historyView.js
  * The note history card: one field per note, oldest first, the original
- * marked 🌱, each with its writer. Long histories page by note count and by
- * the embed's text budget.
+ * marked 🌱, with its writer shown only to officers and seniors. Long
+ * histories page by note count and by the embed's text budget.
  */
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
@@ -20,11 +20,11 @@ const PAGE_TEXT_BUDGET = 5500;
 // Leaves room for the writer line under the reason in a 1024-character field.
 const NOTE_REASON_LIMIT = 950;
 
-function noteField(note, index, total, lang) {
+function noteField(note, index, total, lang, showAuthors) {
   const tail = [
     index === 0 ? t('dialogue.notes.history.original', lang) : '',
     index === total - 1 && total > 1 ? t('dialogue.notes.history.latest', lang) : '',
-    note.byName ? t('dialogue.notes.history.by', lang, { name: note.byName }) : '',
+    showAuthors && note.byName ? t('dialogue.notes.history.by', lang, { name: note.byName }) : '',
   ].filter(Boolean).join(' · ');
   const reason = escapeLinkBrackets(truncateInlineText(note.reason, NOTE_REASON_LIMIT) || t('dialogue.broadcast.notAvailable', lang));
   return {
@@ -67,11 +67,12 @@ function pageButton(type, entry, target, emoji, labelKey, disabled, lang) {
  * @param {string} options.type - black | white | watch
  * @param {number} options.page - 1-based; clamped to the pages that exist
  * @param {string} options.lang - reader language
+ * @param {boolean} [options.showAuthors] - name each note's writer; off unless the reader is an officer or senior
  * @returns {{embeds: object[], components: object[]}} the history card
  */
-export function buildNoteHistoryPayload({ entry, type, page, lang }) {
+export function buildNoteHistoryPayload({ entry, type, page, lang, showAuthors = false }) {
   const notes = readEntryNotes(entry);
-  const pages = packPages(notes.map((note, index) => noteField(note, index, notes.length, lang)));
+  const pages = packPages(notes.map((note, index) => noteField(note, index, notes.length, lang, showAuthors)));
   const current = Math.min(Math.max(page, 1), pages.length);
   const { color, icon } = getListContext(type);
   const embed = createArtistEmbed()

@@ -114,3 +114,16 @@ test('an entry with no reason gets a line that does not promise a copy', () => {
   assert.equal(embed.fields.some((f) => f.name.includes('Lý do')), false);
   assert.doesNotMatch(embed.description, /chép lại lý do/u);
 });
+
+test('a removal blocked by ownership names no reporter, in every language', () => {
+  const blocked = {
+    ok: false, reason: 'owner',
+    entry: { name: 'Zhaohang', addedByTag: 'Reporter#0001', addedByUserId: '123456789012345678' },
+    type: 'black', label: 'Blacklist', icon: '⛔',
+  };
+  for (const lang of ['en', 'vi', 'jp']) {
+    const text = JSON.stringify(buildRemoveResultCard([blocked], { name: 'Zhaohang', lang }).toJSON());
+    assert.doesNotMatch(text, /Reporter|123456789012345678|\{owner\}/u, lang);
+    assert.match(text, /Blacklist/u, lang);
+  }
+});

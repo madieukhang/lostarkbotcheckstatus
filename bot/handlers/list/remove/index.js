@@ -135,8 +135,9 @@ export function buildRemoveResultCard(outcomes, {
       if (o.reason === 'legacy') {
         return `⚠️ ${t('dialogue.remove.legacy', lang, { list: o.label })}`;
       }
-      const owner = o.entry.addedByTag || o.entry.addedByUserId;
-      return `⛔ ${t('dialogue.remove.ownerOnly', lang, { list: o.label, owner })}`;
+      // The reporter stays private: the card names no one, so a member
+      // cannot learn who reported them by trying to remove the entry.
+      return `⛔ ${t('dialogue.remove.ownerOnly', lang, { list: o.label })}`;
     }).join('\n').slice(0, 1024),
     inline: false,
   } : null;

@@ -10,7 +10,7 @@ import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, deferUpdate, editAlert, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
-import { canChangeEntryWithoutApproval, getListContext, isRequesterAutoApprover } from '../helpers.js';
+import { canChangeEntryWithoutApproval, getListContext, isOfficerOrSenior, isRequesterAutoApprover } from '../helpers.js';
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 import { buildNoteAddedPayload } from './addedCard.js';
 import { appendEntryNote, listAddedAlts } from './appendNote.js';
@@ -34,36 +34,44 @@ async function loadHistoryEntry(interaction) {
   return { type, entry, page: Number(page) };
 }
 
-async function renderHistory(interaction, lang) {
+// Writers are shown only to officers and seniors, so a member cannot read
+// who reported them from the history.
+async function renderHistory(interaction, lang, showAuthors) {
   const { type, entry, page } = await loadHistoryEntry(interaction);
   if (!entry) {
     await editAlert(interaction, { kind: NoticeKind.EXPIRED, ...t('dialogue.check.entryRemoved', lang) });
     return;
   }
-  await editPayload(interaction, buildNoteHistoryPayload({ entry, type, page, lang }));
+  await editPayload(interaction, buildNoteHistoryPayload({ entry, type, page, lang, showAuthors }));
 }
 
 /**
  * @param {object} deps
  * @param {object} deps.services - shared list services (broadcastListChange)
  * @param {Function} [deps.isRequesterAutoApproverFn]
+ * @param {Function} [deps.isOfficerOrSeniorFn] - decides who sees note writers
  * @returns {{
  *   handleListNoteHistoryButton: Function,
  *   handleListNotePageButton: Function,
  *   handleListNoteAddButton: Function,
  * }}
  */
-export function createNoteHandlers({ services, isRequesterAutoApproverFn = isRequesterAutoApprover }) {
+export function createNoteHandlers({
+  services,
+  isRequesterAutoApproverFn = isRequesterAutoApprover,
+  isOfficerOrSeniorFn = isOfficerOrSenior,
+}) {
   const languageOf = interaction => getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
+  const showsAuthors = interaction => Boolean(isOfficerOrSeniorFn(interaction.user.id));
 
   async function handleListNoteHistoryButton(interaction) {
     await deferEphemeralReply(interaction);
-    await renderHistory(interaction, await languageOf(interaction));
+    await renderHistory(interaction, await languageOf(interaction), showsAuthors(interaction));
   }
 
   async function handleListNotePageButton(interaction) {
     await deferUpdate(interaction);
-    await renderHistory(interaction, await languageOf(interaction));
+    await renderHistory(interaction, await languageOf(interaction), showsAuthors(interaction));
   }
 
   async function handleListNoteAddButton(interaction) {

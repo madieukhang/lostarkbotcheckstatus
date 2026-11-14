@@ -522,7 +522,7 @@ export default {
       'Xong, {name} biến khỏi list rồi.',
     ] },
     removedBy: 'Người gỡ', removedAt: 'Gỡ lúc',
-    failedSection: 'Không thể xóa', legacy: '**{list}**: entry legacy này không có metadata chủ sở hữu. Dùng `/la-list edit` để chỉnh.', ownerOnly: '**{list}**: chỉ **{owner}**, người đã thêm entry, mới xóa được.', more: '+{count} tên khác',
+    failedSection: 'Không thể xóa', legacy: '**{list}**: entry legacy này không có metadata chủ sở hữu. Dùng `/la-list edit` để chỉnh.', ownerOnly: '**{list}**: chỉ người đã thêm entry mới xóa được.', more: '+{count} tên khác',
     footerBlocked: 'Kiểm tra bằng `/la-list view`; dùng `/la-list edit` cho entry legacy.', pickerTitle: 'Đã tìm thấy · {name}', pickerDescription: '**{name}** nằm trong {count} list. Chọn mục cần xóa:', pickerFooter: 'Hết hạn sau 30 giây · chỉ cậu dùng được picker này.', pickerExpired: { title: 'Picker đã hết hạn', description: 'Tớ chưa xóa gì cả.', tip: 'Chạy lại /la-list remove để chọn nhé' }, failed: { title: 'Xóa thất bại', description: 'Tớ chưa xóa được entry.', tip: 'Thử lại sau ít phút' }, unknown: 'không xác định',
   },
   check: {

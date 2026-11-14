@@ -1,5 +1,7 @@
 # Changelog
 
+- The reporter stays private. When `/la-list remove` refuses because someone else added the entry, the card no longer names them, and the note **History** names each note's writer only for officers and seniors; a member who was reported can no longer learn who reported them from either.
+
 - `/la-list edit` follows the approver roles. A global entry is checked in every server, so its owner now needs an approver to add `additional_names` to it, move it to another list or change its scope; a reason, raid or image change on an own entry still applies at once, and an owner's server entry is unchanged. A member approver's auto-approval covers only their own adds, so editing someone else's entry now goes to the officers and seniors like any other member's edit.
 
 - Evidence images have a daily allowance: a member who is not an officer or senior can attach up to 10 images in 24 hours across `/la-list add`, `/la-list edit`, the forms and multiadd, and a request that would go over it is refused before anything is archived. Each image is posted to the evidence channel and copied to the database before any approval, so one member could fill both without limit. A download that claims to be an image is now archived only when its bytes really are one.

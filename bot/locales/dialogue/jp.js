@@ -498,7 +498,7 @@ export default {
       '完了ですわ。{name} は list から消えました。',
     ] },
     removedBy: '削除者', removedAt: '削除日時',
-    failedSection: '削除できません', legacy: '**{list}**: この legacy entry には owner metadata がありません。`/la-list edit` で変更してくださいませ。', ownerOnly: '**{list}**: 追加した **{owner}** だけが削除できますの。', more: '+{count} 名',
+    failedSection: '削除できません', legacy: '**{list}**: この legacy entry には owner metadata がありません。`/la-list edit` で変更してくださいませ。', ownerOnly: '**{list}**: 追加した方だけが削除できますの。', more: '+{count} 名',
     footerBlocked: '`/la-list view` で確認し、legacy entry は `/la-list edit` で変更してくださいませ。', pickerTitle: '発見 · {name}', pickerDescription: '**{name}** は {count} lists にいます。削除対象を選んでくださいませ:', pickerFooter: '30秒で期限切れ · この picker はあなた専用ですの。', pickerExpired: { title: 'Picker の期限が切れましたわ', description: '何も削除していませんの。', tip: 'もう一度 /la-list remove を実行してくださいませ' }, failed: { title: '削除に失敗しましたの', description: 'Entry を削除できませんでしたわ。', tip: '数分後にもう一度お試しくださいませ' }, unknown: '不明',
   },
   check: {

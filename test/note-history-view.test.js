@@ -12,10 +12,10 @@ const day = n => new Date(Date.UTC(2026, 6, n));
 const note = (n, reason, extra = {}) => ({ at: day(n), reason, raid: 'Kazeros Hard', byUserId: `u${n}`, byName: `Reporter${n}`, ...extra });
 const entryWith = (notes, extra = {}) => ({ _id: 'b'.repeat(24), name: 'Lovesiiii', scope: 'global', notes, ...extra });
 
-test('three notes read oldest first, the original marked 🌱 and the last as latest, each with its writer', () => {
+test('three notes read oldest first, the original marked 🌱 and the last as latest, each with its writer for an officer', () => {
   const { embeds, components } = buildNoteHistoryPayload({
     entry: entryWith([note(2, 'Đánh quá yếu', { raid: 'Act4 Nor' }), note(14, 'afk G1'), note(30, 'vẫn thế', { raid: '' })]),
-    type: 'black', page: 1, lang: 'en',
+    type: 'black', page: 1, lang: 'en', showAuthors: true,
   });
   const embed = embeds[0].toJSON();
   assert.equal(embed.title, '📜 Note history · Lovesiiii');
@@ -31,7 +31,7 @@ test('three notes read oldest first, the original marked 🌱 and the last as la
 
 test('an entry saved before notes shows its add as the only note, and a missing date reads N/A', () => {
   const entry = { _id: 'c'.repeat(24), name: 'Old', reason: 'Legacy', raid: '', addedByDisplayName: 'KilZ' };
-  const embed = buildNoteHistoryPayload({ entry, type: 'white', page: 1, lang: 'en' }).embeds[0].toJSON();
+  const embed = buildNoteHistoryPayload({ entry, type: 'white', page: 1, lang: 'en', showAuthors: true }).embeds[0].toJSON();
   assert.deepEqual(embed.fields.map(field => [field.name, field.value]), [['🌱 N/A', 'Legacy\n-# Original note · by KilZ']]);
 });
 
@@ -116,4 +116,25 @@ test('the page buttons edit the history card in place', async t => {
   assert.equal(calls.updated, 1);
   assert.equal(calls.deferred, 0);
   assert.equal(calls.edits[0].embeds[0].toJSON().footer.text, 'Page 2/2 · only you can see this');
+});
+
+test('a member reads the history without its writers', () => {
+  const embed = buildNoteHistoryPayload({
+    entry: entryWith([note(2, 'one'), note(3, 'two')]), type: 'black', page: 1, lang: 'en',
+  }).embeds[0].toJSON();
+  assert.deepEqual(embed.fields.map(field => field.value), ['one\n-# Original note', 'two\n-# Latest']);
+});
+
+test('the History and page buttons show writers only to officers and seniors', async t => {
+  mockLanguage(t);
+  const entry = entryWith([note(2, 'one'), note(3, 'two')]);
+  t.mock.method(Blacklist, 'findOne', () => ({ lean: async () => entry }));
+  for (const [handlerName, prefix] of [['handleListNoteHistoryButton', 'listnote_history'], ['handleListNotePageButton', 'listnote_page']]) {
+    for (const officer of [true, false]) {
+      const handlers = createNoteHandlers({ services: {}, isOfficerOrSeniorFn: () => officer });
+      const { calls, interaction } = buttonInteraction(`${prefix}:black:${entry._id}:1`);
+      await handlers[handlerName](interaction);
+      assert.equal(/by Reporter2/.test(JSON.stringify(calls.edits[0].embeds[0].toJSON())), officer, `${handlerName} officer=${officer}`);
+    }
+  }
 });

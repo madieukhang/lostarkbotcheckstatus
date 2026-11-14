@@ -639,7 +639,7 @@ export default {
     ] },
     removedBy: 'Removed by', removedAt: 'Removed',
     failedSection: 'Could not remove',
-    legacy: '**{list}**: this legacy entry has no owner metadata. Use `/la-list edit` to change it.', ownerOnly: '**{list}**: only **{owner}**, who added it, can remove this entry.',
+    legacy: '**{list}**: this legacy entry has no owner metadata. Use `/la-list edit` to change it.', ownerOnly: '**{list}**: only the member who added it can remove this entry.',
     more: '+{count} more',
     footerBlocked: 'Inspect it with `/la-list view`; use `/la-list edit` for legacy entries.',
     pickerTitle: 'Found · {name}', pickerDescription: '**{name}** is in {count} lists. Choose what to remove:', pickerFooter: 'Expires in 30 seconds · only you can use this picker.',
