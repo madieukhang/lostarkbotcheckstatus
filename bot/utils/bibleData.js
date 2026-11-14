@@ -32,35 +32,52 @@
  *     introduce them and crash a worker without this guard.
  */
 
+import { readBodyWithin } from './responseBody.js';
+
+// Bodies from lostark.bible, ScraperAPI or the worker are read up to this
+// size; a real roster or character page is well under it.
+export const BIBLE_BODY_MAX_BYTES = 8 * 1024 * 1024;
+
 /**
- * Decode a value at index `idx` from a SvelteKit deduped data array.
+ * Read a Bible response body as text, refusing one over BIBLE_BODY_MAX_BYTES.
+ * @param {Response} response - fetch response with an unread body
+ * @returns {Promise<string>} the body
+ * @throws {RangeError} with code BODY_TOO_LARGE when the body is over the cap
+ */
+export async function readBibleText(response) {
+  return new TextDecoder().decode(await readBodyWithin(response, BIBLE_BODY_MAX_BYTES));
+}
+
+/**
+ * Decode a value at index `idx` from a SvelteKit deduped data array. Each
+ * object or array node is decoded once and shared by every reference to it,
+ * so a payload whose nodes point at the same children costs linear time; a
+ * node reached again while it is still being decoded is a cycle and reads
+ * as null.
  *
  * @param {Array} data - The flat `nodes[i].data` array.
  * @param {number|null|undefined} idx - Index into `data`, or sentinel.
- * @param {Set<number>} [seen] - In-progress indexes for cycle guard.
+ * @param {Map<number, any>} [decoded] - Nodes already decoded in this walk.
+ * @param {Set<number>} [inProgress] - Nodes on the current path.
  * @returns {any} Reconstructed value (primitives, plain objects, arrays).
  */
-function decodeBibleData(data, idx, seen = new Set()) {
+function decodeBibleData(data, idx, decoded = new Map(), inProgress = new Set()) {
   const invalidReference = idx === undefined
     || idx === null
     || idx === -1
     || !Array.isArray(data)
-    || seen.has(idx);
+    || inProgress.has(idx);
   if (invalidReference) return null;
   const value = data[idx];
   if (value === null || typeof value !== 'object') return value;
-  // Track only object/array nodes; primitives can repeat freely without
-  // forming a cycle. Use a fresh `seen` per branch so siblings do not
-  // shadow each other (they share parent-chain ancestors only).
-  const branchSeen = new Set(seen);
-  branchSeen.add(idx);
-  if (Array.isArray(value)) {
-    return value.map((sub) => decodeBibleData(data, sub, branchSeen));
-  }
-  const out = {};
-  for (const [key, subIdx] of Object.entries(value)) {
-    out[key] = decodeBibleData(data, subIdx, branchSeen);
-  }
+  if (decoded.has(idx)) return decoded.get(idx);
+  inProgress.add(idx);
+  const decodeChild = (subIdx) => decodeBibleData(data, subIdx, decoded, inProgress);
+  const out = Array.isArray(value)
+    ? value.map(decodeChild)
+    : Object.fromEntries(Object.entries(value).map(([key, subIdx]) => [key, decodeChild(subIdx)]));
+  inProgress.delete(idx);
+  decoded.set(idx, out);
   return out;
 }
 

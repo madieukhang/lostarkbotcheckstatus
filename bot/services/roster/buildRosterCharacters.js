@@ -9,6 +9,7 @@
 
 import { JSDOM } from 'jsdom';
 import { normalizeNameKey } from '../../utils/names.js';
+import { readBibleText } from '../../utils/bibleData.js';
 
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
@@ -124,7 +125,7 @@ async function buildRosterCharactersOnce(name, options) {
     if (!response.ok) {
       failReason = describeFailedBibleStatus(response.status);
     } else {
-      const html = await response.text();
+      const html = await readBibleText(response);
       const { document } = new JSDOM(html, { virtualConsole }).window;
 
       // Use the canonical parser that /la-roster also uses. It returns

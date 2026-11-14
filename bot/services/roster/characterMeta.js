@@ -1,5 +1,5 @@
 import config from '../../config.js';
-import { findBibleNode } from '../../utils/bibleData.js';
+import { findBibleNode, readBibleText } from '../../utils/bibleData.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import {
   configureMetaCache,
@@ -127,7 +127,7 @@ async function fetchCharacterMetaUncached(name, options = {}) {
 
     if (res.ok) {
       try {
-        const parsed = await res.json();
+        const parsed = JSON.parse(await readBibleText(res));
         const payload = findBibleNode(parsed, 'header');
         const shaped = shapeCharacterMetaFromHeader(payload?.header);
         if (shaped) return shaped;
@@ -143,7 +143,7 @@ async function fetchCharacterMetaUncached(name, options = {}) {
 
     const htmlRes = await fetchMetaResponse(htmlUrl, name, 'HTML', options);
     if (!htmlRes.ok) return null;
-    const html = await htmlRes.text();
+    const html = await readBibleText(htmlRes);
     return parseCharacterMetaFromHtml(html);
   } catch (err) {
     console.warn(`[alt-detect] Failed to fetch meta for ${name}:`, err.message);

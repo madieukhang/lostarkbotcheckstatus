@@ -1,5 +1,5 @@
 import config from '../../config.js';
-import { findBibleNode } from '../../utils/bibleData.js';
+import { findBibleNode, readBibleText } from '../../utils/bibleData.js';
 import { createLruTtlCache } from '../../utils/cache/lruTtlCache.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
@@ -47,7 +47,7 @@ async function fetchGuildMembersUncached(name, options = {}) {
     const res = await bibleClient.fetch(jsonUrl, buildBibleFetchOptions(options));
     if (res.ok) {
       try {
-        const parsed = await res.json();
+        const parsed = JSON.parse(await readBibleText(res));
         const payload = findBibleNode(parsed, 'guild');
         const members = payload?.guild?.members;
         if (Array.isArray(members)) {
@@ -78,7 +78,7 @@ async function fetchGuildMembersUncached(name, options = {}) {
 
     const htmlRes = await bibleClient.fetch(htmlUrl, buildBibleFetchOptions(options));
     if (!htmlRes.ok) return null;
-    const html = await htmlRes.text();
+    const html = await readBibleText(htmlRes);
     return parseGuildMembersFromHtml(html);
   } catch (err) {
     console.warn('[alt-detect] Failed to fetch guild members:', err.message);

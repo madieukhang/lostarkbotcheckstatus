@@ -182,7 +182,7 @@ test('a name Bible has no profile for is labelled a warning, not a success', asy
 test('hidden roster flow returns false when Bible has no profile for the name', async context => {
   context.mock.method(mongoose, 'connect', async () => mongoose);
   context.mock.method(bibleClient, 'fetch', async url => String(url).includes('/_app/remote/ngsbie/search')
-    ? { ok: true, status: 200, json: async () => ({ type: 'result', data: [[]] }) }
+    ? Response.json({ type: 'result', data: [[]] })
     : { ok: false, status: 404 });
   clearNameSuggestionCache();
   context.after(async () => { clearNameSuggestionCache(); await disconnectDB(); });
@@ -215,7 +215,7 @@ function mockBibleProfile(context, { meta, guild = () => ({ ok: false, status: 5
   context.mock.method(bibleClient, 'fetch', async url => {
     const target = String(url);
     if (target.includes('/_app/remote/ngsbie/search')) {
-      return { ok: true, status: 200, json: async () => ({ type: 'result', data: [[]] }) };
+      return Response.json({ type: 'result', data: [[]] });
     }
     return target.endsWith('/guild/__data.json') || target.endsWith('/guild') ? guild() : meta();
   });

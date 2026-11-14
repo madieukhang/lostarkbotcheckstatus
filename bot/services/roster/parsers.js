@@ -1,5 +1,5 @@
 import { getClassName } from '../../models/Class.js';
-import { normalizeNameKey } from '../../utils/names.js';
+import { isValidCharacterName, normalizeNameKey } from '../../utils/names.js';
 
 export function parseItemLevelValue(value) {
   const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
@@ -121,14 +121,16 @@ export async function parseRosterCharactersFromHtml(html, document) {
     const classId = charName ? rosterClassMap.get(charName) ?? '' : '';
     const className = getClassName(classId);
 
-    if (charName) characters.push({ name: charName, itemLevel, combatScore, classId, className });
+    // Names are stored on list entries and shown in every server, so a card
+    // whose text is not a character name is not one.
+    if (isValidCharacterName(charName)) characters.push({ name: charName, itemLevel, combatScore, classId, className });
   }
   if (characters.length === 0) return characters;
 
   const listed = new Set(characters.map((character) => normalizeNameKey(character.name)));
   for (const record of extractRosterPayloadFromHtml(html)) {
     const key = normalizeNameKey(record.name);
-    if (listed.has(key)) continue;
+    if (listed.has(key) || !isValidCharacterName(record.name)) continue;
     listed.add(key);
     const itemLevel = parseItemLevelValue(record.itemLevel);
     // A card without an item level keeps its place instead of reading as 0.
@@ -144,7 +146,8 @@ export async function parseRosterCharactersFromHtml(html, document) {
 
 export function parseCharacterMetaFromHtml(html) {
   const rlMatch = html.match(/rosterLevel:(\d+)/);
-  const shMatch = html.match(/stronghold:\{[^}]*level:(\d+),name:"([^"]+)"\}/);
+  // Bounded runs keep this linear on a page of unclosed `stronghold:{`.
+  const shMatch = html.match(/stronghold:\{[^}]{0,200}level:(\d+),name:"([^"]{1,100})"\}/);
   const guildMatch = html.match(/guild:\{name:"([^"]+)",grade:"([^"]+)"\}/);
   // The in-game server. bible calls it `world` and puts it in the same
   // SSR payload as stronghold and guild, right before `class:` · the URL

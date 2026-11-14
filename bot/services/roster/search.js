@@ -12,6 +12,7 @@ import config from '../../config.js';
 import { getClassEmoji, getClassName } from '../../models/Class.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
 import { normalizeNameKey } from '../../utils/names.js';
+import { readBibleText } from '../../utils/bibleData.js';
 import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
 import { parseItemLevelValue } from './parsers.js';
@@ -245,7 +246,7 @@ export async function fetchNameSuggestions(name, options = {}) {
         return null;
       }
 
-      const json = await res.json();
+      const json = JSON.parse(await readBibleText(res));
       return decodeSearchResponse(json);
     } catch (err) {
       console.warn(`[search] fetchNameSuggestions error for "${queryName}":`, err.message);

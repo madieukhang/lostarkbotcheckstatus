@@ -29,7 +29,7 @@ function bibleRows(rows) {
     table[0].push(row);
     table.push([row + 1, row + 2, row + 3], name, cls, itemLevel);
   }
-  return { ok: true, status: 200, json: async () => ({ type: 'result', data: table }) };
+  return Response.json({ type: 'result', data: table });
 }
 
 function searchInteraction(name) {

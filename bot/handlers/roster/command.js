@@ -29,6 +29,7 @@ import {
 } from '../../services/roster/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 import { escapeLinkBrackets, truncateInlineText } from '../../utils/discordText.js';
+import { readBibleText } from '../../utils/bibleData.js';
 import { buildNameRosterQuery } from '../../utils/listEntryMap.js';
 import { isPrivilegedStrongholdScanUser } from '../../utils/scanPermissions.js';
 import {
@@ -95,7 +96,7 @@ async function fetchRosterCharacters(name, deep) {
   const response = await bibleClient.fetch(targetUrl, deep ? { viaWorker: true } : {});
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-  const html = await response.text();
+  const html = await readBibleText(response);
   const { document } = new JSDOM(html, { virtualConsole }).window;
   // The in-game server rides in the same SSR payload this page already
   // carries, so reading it here costs nothing extra.

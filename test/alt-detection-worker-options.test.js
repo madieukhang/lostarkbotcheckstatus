@@ -12,7 +12,7 @@ test('a worker-routed scan also routes the hidden-roster item level lookup', asy
   const calls = [];
   t.mock.method(bibleClient, 'fetch', async (url, options) => {
     calls.push({ url, options });
-    return { ok: true, status: 200, json: async () => ({}) };
+    return Response.json({});
   });
   t.mock.method(console, 'log', () => {});
   t.mock.method(console, 'warn', () => {});

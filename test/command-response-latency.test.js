@@ -61,7 +61,7 @@ function mockRoster(context, events, { language, snapshots = async () => [], fai
   context.mock.method(bibleClient, 'fetch', async () => {
     events.push('bible');
     if (failFetch) throw new Error('Bible unavailable');
-    return { ok: true, text: async () => '<a href="/character/NA/Alice"><div class="text-lg font-semibold">Alice<span>1,790</span><span>6000</span></div></a>' };
+    return new Response('<a href="/character/NA/Alice"><div class="text-lg font-semibold">Alice<span>1,790</span><span>6000</span></div></a>');
   });
 }
 
@@ -151,7 +151,7 @@ test('/la-search overlaps Bible with language lookup and keeps empty-result loca
   context.mock.method(UserPreference, 'findOne', () => query(() => language.promise));
   context.mock.method(bibleClient, 'fetch', async () => {
     events.push('bible');
-    return { ok: true, status: 200, json: async () => ({ type: 'result', data: [[]] }) };
+    return Response.json({ type: 'result', data: [[]] });
   });
   const interaction = interactionFor(events);
   const running = handleSearchCommand(interaction);
