@@ -325,3 +325,23 @@ test('executeJob refuses a URL that is not https://lostark.bible without fetchin
   }
   assert.equal(fetchMock.mock.callCount(), 0);
 });
+
+test('executeJob follows a redirect inside lostark.bible and refuses one that leaves it', async t => {
+  const asked = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    asked.push(String(url));
+    const hops = {
+      'https://lostark.bible/a': new Response(null, { status: 301, headers: { location: '/b' } }),
+      'https://lostark.bible/b': new Response('{"ok":true}', { status: 200 }),
+      'https://lostark.bible/out': new Response(null, { status: 302, headers: { location: 'https://evil.example/x' } }),
+    };
+    return hops[String(url)] || new Response('unexpected', { status: 500 });
+  });
+  const inside = await ScrapeJob.create({ url: 'https://lostark.bible/a', status: 'in_progress', claimId: 'redirect-in' });
+  assert.equal((await executeJob(inside, { logger: silentLogger })).state, 'done');
+  assert.equal((await ScrapeJob.findById(inside._id).lean()).result.body, '{"ok":true}');
+
+  const outside = await ScrapeJob.create({ url: 'https://lostark.bible/out', status: 'in_progress', claimId: 'redirect-out' });
+  assert.equal((await executeJob(outside, { logger: silentLogger })).state, 'failed');
+  assert.deepEqual(asked, ['https://lostark.bible/a', 'https://lostark.bible/b', 'https://lostark.bible/out']);
+});

@@ -38,6 +38,23 @@ function assertBibleUrl(url) {
   if (origin !== BIBLE_ORIGIN) throw new Error(`refused: the job URL is not on ${BIBLE_ORIGIN}`);
 }
 
+const BIBLE_MAX_REDIRECTS = 3;
+
+// Redirects are followed by hand, so every hop is checked before it is
+// requested and a redirect cannot lead the worker off lostark.bible.
+async function fetchBible(url, init) {
+  let target = url;
+  for (let hop = 0; hop <= BIBLE_MAX_REDIRECTS; hop++) {
+    assertBibleUrl(target);
+    const res = await fetch(target, { ...init, redirect: 'manual' });
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!location) return res;
+    await res.body?.cancel().catch(() => {});
+    target = new URL(location, target).href;
+  }
+  throw new Error(`refused: more than ${BIBLE_MAX_REDIRECTS} redirects`);
+}
+
 function abbreviateUrl(url) {
   if (typeof url !== 'string') return '';
   if (url.length <= 100) return url;
@@ -96,8 +113,7 @@ export async function executeJob(job, { logger = console } = {}) {
     : FETCH_DEFAULT_TIMEOUT_MS;
 
   try {
-    assertBibleUrl(job.url);
-    const res = await fetch(job.url, {
+    const res = await fetchBible(job.url, {
       headers: FETCH_HEADERS,
       signal: AbortSignal.timeout(timeoutMs),
     });

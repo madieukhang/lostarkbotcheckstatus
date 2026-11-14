@@ -139,6 +139,23 @@ test('a body typed as an image is archived only when its bytes are an image', as
   assert.equal((await rehostImage('https://cdn.example/a.avif', avif.client)).messageId, 'archived');
 });
 
+test('a body that only starts with BM is not taken for a bitmap', async t => {
+  const typed = bytes => new Response(new Uint8Array(bytes), { headers: { 'content-type': 'image/png' } });
+  const text = setup(t, { responses: [typed([...Buffer.from('BM this is not a bitmap, it is plain text')])] });
+  await assert.rejects(rehostImage('https://cdn.example/a.png', text.client, { throwOnError: true }), /not an image/);
+  assert.equal(text.uploads.length, 0);
+
+  // A real BMP: "BM", file size, two reserved words, pixel offset, then a
+  // 40-byte BITMAPINFOHEADER whose size is the uint32 at offset 14.
+  const header = Buffer.alloc(54);
+  header.write('BM', 0, 'latin1');
+  header.writeUInt32LE(54, 2);
+  header.writeUInt32LE(54, 10);
+  header.writeUInt32LE(40, 14);
+  const bmp = setup(t, { responses: [typed([...header])] });
+  assert.equal((await rehostImage('https://cdn.example/a.bmp', bmp.client)).messageId, 'archived');
+});
+
 test('a body that is not an image is not uploaded', async t => {
   const { uploads, client } = setup(t, {
     responses: [new Response('internal status page', { headers: { 'content-type': 'text/plain' } })],

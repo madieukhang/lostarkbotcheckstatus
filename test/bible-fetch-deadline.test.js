@@ -48,3 +48,24 @@ test('caller deadline covers direct and ScraperAPI attempts and stops key rotati
     globalThis.fetch = originalFetch;
   }
 });
+
+test('a refused ScraperAPI key logs the start of its error body without reading all of it', async (t) => {
+  const originalKeys = [...config.scraperApiKeys];
+  config.scraperApiKeys.splice(0, config.scraperApiKeys.length, 'fake-scraper-key-error-body');
+  t.after(() => config.scraperApiKeys.splice(0, config.scraperApiKeys.length, ...originalKeys));
+  t.mock.method(console, 'warn', () => {});
+  let pulls = 0;
+  const chunk = new Uint8Array(1024 * 1024).fill(0x61);
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (!String(url).startsWith('https://api.scraperapi.com/')) return new Response('blocked', { status: 503 });
+    return new Response(new ReadableStream({
+      pull(controller) {
+        pulls += 1;
+        if (pulls > 64) controller.close();
+        else controller.enqueue(chunk);
+      },
+    }), { status: 429 });
+  });
+  await fetchWithFallback('https://lostark.bible/error-body').catch(() => {});
+  assert.ok(pulls <= 2, `read ${pulls} MiB of an error body`);
+});

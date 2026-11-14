@@ -105,7 +105,12 @@ const IMAGE_SIGNATURES = Object.freeze([
   { ext: 'jpg', parts: [[0, 'ffd8ff']] },
   { ext: 'gif', parts: [[0, '47494638']] },
   { ext: 'webp', parts: [[0, '52494646'], [8, '57454250']] },
-  { ext: 'bmp', parts: [[0, '424d']] },
+  // "BM" alone is common in text, so a bitmap also needs a known DIB header
+  // size: the little-endian uint32 at offset 14.
+  ...[12, 40, 52, 56, 64, 108, 124].map((size) => ({
+    ext: 'bmp',
+    parts: [[0, '424d'], [14, `${size.toString(16).padStart(2, '0')}000000`]],
+  })),
   // ISO base media files carry their brand after `ftyp`; only image brands count.
   ...['avif', 'avis', 'heic', 'heix', 'mif1'].map((brand) => ({
     ext: brand.startsWith('avi') ? 'avif' : 'heic',

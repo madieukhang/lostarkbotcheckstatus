@@ -10,6 +10,9 @@
 import config from '../../config.js';
 import { recordScraperApiRequest } from '../../utils/scraperApiUsage.js';
 import { FETCH_HEADERS } from './bibleHeaders.js';
+import { readBodyWithin } from '../../utils/responseBody.js';
+
+const SCRAPER_ERROR_BODY_MAX_BYTES = 64 * 1024;
 
 const SCRAPER_ATTEMPT_STATE_RULES = Object.freeze([
   { state: 'network-error', matches: ({ error }) => Boolean(error) },
@@ -63,7 +66,10 @@ async function tryScraperApi(url, key, keyIndex, signal) {
     });
     recordScraperApiRequest({ keyIndex, status: res.status, ok: res.ok });
     if (res.status === 401 || res.status === 403 || res.status === 429) {
-      const body = await res.text().catch(() => '');
+      // Only the start is logged, so a larger error body is not read at all.
+      const body = await readBodyWithin(res, SCRAPER_ERROR_BODY_MAX_BYTES)
+        .then((bytes) => bytes.toString('utf8'))
+        .catch(() => '');
       console.warn(`[scraperapi] Key #${keyIndex + 1} failed (HTTP ${res.status}): ${body.slice(0, 200)}`);
       deadKeysUntil.set(key, Date.now() + KEY_COOLDOWN_MS);
       return { res, keyDead: true };
