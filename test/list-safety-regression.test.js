@@ -198,3 +198,30 @@ for (const currentType of ['black', 'white']) {
     assert.equal(closed, true);
   });
 }
+
+test('two Confirm clicks on one enrich session write and broadcast once', async t => {
+  clearUserLanguageCache();
+  t.mock.method(mongoose, 'connect', async () => mongoose);
+  const session = createEnrichSession({
+    callerId: 'officer', type: 'black', entryId: 'e'.repeat(24), entryName: 'Original',
+    newAlts: [{ name: 'Newalt' }], scanStats: {},
+  });
+  t.after(async () => { clearEnrichSession(session.sessionId); clearUserLanguageCache(); await disconnectDB(); });
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  t.mock.method(RosterSnapshot, 'findOne', () => ({ collation() { return this; }, lean: async () => null }));
+  t.mock.method(Blacklist, 'findById', () => ({ lean: async () => ({ name: 'Original', allCharacters: ['Original'] }) }));
+  t.mock.method(TrustedUser, 'findOne', () => ({ collation() { return this; }, lean: async () => null }));
+  let writes = 0;
+  let broadcasts = 0;
+  t.mock.method(Blacklist, 'updateOne', async () => { writes += 1; return { modifiedCount: 1 }; });
+  const { handleListEnrichConfirmButton } = createEnrichHandlers({
+    services: { broadcastListChange: async () => { broadcasts += 1; } },
+  });
+  const click = () => handleListEnrichConfirmButton({
+    customId: `list:confirm:${session.sessionId}`, user: { id: 'officer' },
+    deferUpdate: async () => {}, editReply: async () => {},
+  });
+  await Promise.all([click(), click()]);
+  assert.equal(writes, 1);
+  assert.equal(broadcasts, 1);
+});

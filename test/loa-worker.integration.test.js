@@ -90,7 +90,7 @@ test('claimAndProcessOne processes a pending job and writes back done state', as
 
   try {
     const job = await ScrapeJob.create({
-      url: 'https://example.com/data.json',
+      url: 'https://lostark.bible/data.json',
       options: { timeoutMs: 5000 },
       status: 'pending',
     });
@@ -119,7 +119,7 @@ test('claimAndProcessOne processes a pending job and writes back done state', as
 test('executeJob preserves a successful response with no body', async t => {
   t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 204 }));
   const job = await ScrapeJob.create({
-    url: 'https://example.com/no-content',
+    url: 'https://lostark.bible/no-content',
     status: 'in_progress',
     claimId: 'no-content-claim',
   });
@@ -142,7 +142,7 @@ test('claimAndProcessOne marks job failed when fetch throws', async () => {
 
   try {
     const job = await ScrapeJob.create({
-      url: 'https://unreachable.example.com/',
+      url: 'https://lostark.bible/unreachable',
       status: 'pending',
     });
 
@@ -165,7 +165,7 @@ test('executeJob rejects a declared response body that is too large to persist',
     headers: { 'content-length': String(24 * MIB) },
   }));
   const job = await ScrapeJob.create({
-    url: 'https://example.com/oversized-declared',
+    url: 'https://lostark.bible/oversized-declared',
     status: 'in_progress',
     claimId: 'declared-claim',
   });
@@ -190,7 +190,7 @@ test('executeJob stops streaming a response once it passes the persistence ceili
     },
   }), { status: 200 }));
   const job = await ScrapeJob.create({
-    url: 'https://example.com/oversized-stream',
+    url: 'https://lostark.bible/oversized-stream',
     status: 'in_progress',
     claimId: 'stream-claim',
   });
@@ -209,7 +209,7 @@ test('executeJob rejects decoded text that would exceed the persistence ceiling'
   const invalidUtf8 = new Uint8Array(4 * MIB + 1).fill(0xff);
   t.mock.method(globalThis, 'fetch', async () => new Response(invalidUtf8, { status: 200 }));
   const job = await ScrapeJob.create({
-    url: 'https://example.com/expanded-utf8',
+    url: 'https://lostark.bible/expanded-utf8',
     status: 'in_progress',
     claimId: 'expanded-claim',
   });
@@ -229,12 +229,12 @@ test('claimAndProcessOne picks the oldest pending job when several are waiting',
 
   try {
     const oldJob = await ScrapeJob.create({
-      url: 'https://example.com/a',
+      url: 'https://lostark.bible/a',
       status: 'pending',
       createdAt: new Date(Date.now() - 60_000),
     });
     await ScrapeJob.create({
-      url: 'https://example.com/b',
+      url: 'https://lostark.bible/b',
       status: 'pending',
       createdAt: new Date(),
     });
@@ -249,12 +249,12 @@ test('claimAndProcessOne picks the oldest pending job when several are waiting',
 
 test('claimAndProcessOne ignores non-pending jobs', async () => {
   await ScrapeJob.create({
-    url: 'https://example.com/in-progress',
+    url: 'https://lostark.bible/in-progress',
     status: 'in_progress',
     startedAt: new Date(),
   });
   await ScrapeJob.create({
-    url: 'https://example.com/done',
+    url: 'https://lostark.bible/done',
     status: 'done',
     completedAt: new Date(),
     result: { status: 200, headers: {}, body: 'old' },
@@ -268,7 +268,7 @@ test('a reclaimed scrape lease discards the stale worker result', async () => {
   const originalFetch = globalThis.fetch;
   try {
     await ScrapeJob.create({
-      url: 'https://example.com/lease',
+      url: 'https://lostark.bible/lease',
       status: 'pending',
     });
 
@@ -302,7 +302,7 @@ test('a reclaimed scrape lease discards the stale worker result', async () => {
 test('scrape worker does not claim an expired pending job', async () => {
   const deadlineAt = new Date('2026-08-30T00:00:00Z');
   await ScrapeJob.create({
-    url: 'https://example.com/expired',
+    url: 'https://lostark.bible/expired',
     status: 'pending',
     deadlineAt,
   });
@@ -312,4 +312,16 @@ test('scrape worker does not claim an expired pending job', async () => {
     claimId: 'should-not-claim',
   });
   assert.equal(claim, null);
+});
+
+test('executeJob refuses a URL that is not https://lostark.bible without fetching it', async t => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => new Response('should not run'));
+  for (const url of ['https://example.com/x', 'http://lostark.bible/x', 'https://lostark.bible.evil.test/x', 'not a url']) {
+    const job = await ScrapeJob.create({ url, status: 'in_progress', claimId: `claim-${url}` });
+    const outcome = await executeJob(job, { logger: silentLogger });
+    assert.equal(outcome.state, 'failed', url);
+    const fresh = await ScrapeJob.findById(job._id).lean();
+    assert.match(fresh.error, /lostark\.bible/, url);
+  }
+  assert.equal(fetchMock.mock.callCount(), 0);
 });

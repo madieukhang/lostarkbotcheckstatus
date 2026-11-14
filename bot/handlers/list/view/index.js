@@ -49,8 +49,10 @@ export async function loadListViewEvidenceEntry(ref, guildId) {
   return entry ? decorateListEntry(entry, parsed.listType) : null;
 }
 
+// Scope narrows only the blacklist, so a global or server filter over every
+// list reads the blacklist alone; `all` keeps every list.
 function resolveTypes(type, scopeFilter) {
-  if (scopeFilter && type === 'all') return ['black'];
+  if (scopeFilter && scopeFilter !== 'all' && type === 'all') return ['black'];
   return type === 'all' ? ['black', 'white', 'watch'] : [type];
 }
 

@@ -101,3 +101,15 @@ test('storing a confirmed image again does not mark it pending', async () => {
   await storeEvidenceImage({ buffer: pngWith('kept'), archive: { messageId: 'm2', channelId: 'evidence' }, pending: true });
   assert.equal((await EvidenceImage.findById(sha).lean()).pending, false);
 });
+
+test('an archive message is known when a stored image, an entry or a request points at it', async () => {
+  const { isKnownArchiveMessage } = await import('../bot/utils/evidenceStore.js');
+  await storeEvidenceImage({
+    buffer: pngWith('known'), contentType: 'image/png', filename: 'known.png',
+    archive: { messageId: 'm-stored', channelId: 'old-evidence' },
+  });
+  await Whitelist.create({ name: 'Knownentry', reason: 'r', imageMessageId: 'm-entry', imageChannelId: 'old-evidence' });
+  await PendingApproval.create({ requestId: 'req-k', guildId: 'g', channelId: 'c', name: 'Knownreq', type: 'black', requestedByUserId: 'u', imageMessageId: 'm-request' });
+  for (const id of ['m-stored', 'm-entry', 'm-request']) assert.equal(await isKnownArchiveMessage(id), true, id);
+  for (const id of ['m-unknown', '']) assert.equal(await isKnownArchiveMessage(id), false, id || 'empty');
+});

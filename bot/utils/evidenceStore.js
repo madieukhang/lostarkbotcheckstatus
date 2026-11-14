@@ -126,6 +126,23 @@ export async function listArchivedMessageIds() {
   return new Set(await EvidenceImage.distinct('archiveMessageIds'));
 }
 
+/**
+ * Whether an evidence-channel message belongs to the evidence archive: a
+ * stored image has had it, or a list entry or a pending request points at it.
+ * Message ids are unique across Discord, so the id alone decides.
+ * @param {string} messageId - the archive message
+ * @returns {Promise<boolean>} true when the database knows the message
+ */
+export async function isKnownArchiveMessage(messageId) {
+  if (!messageId) return false;
+  const checks = [
+    EvidenceImage.exists({ archiveMessageIds: messageId }),
+    ...LIST_MODELS.map((model) => model.exists({ imageMessageId: messageId })),
+    PendingApproval.exists({ $or: [{ imageMessageId: messageId }, { 'bulkRows.imageMessageId': messageId }] }),
+  ];
+  return (await Promise.all(checks)).some(Boolean);
+}
+
 // Whether a list entry or a pending approval points at the image, by any
 // archive message it has had or, for an entry, by its hash.
 async function isEvidenceReferenced(image) {

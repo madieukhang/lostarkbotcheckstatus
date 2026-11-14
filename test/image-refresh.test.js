@@ -140,3 +140,19 @@ test('a stored link is still shown when Discord does not answer the refresh', as
   assert.equal(signals.length, 1);
   assert.ok(signals[0] instanceof AbortSignal, 'the refresh request carries a timeout signal');
 });
+
+test('only Discord hosts and their subdomains are sent to the refresh endpoint', async t => {
+  const asked = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    asked.push(String(url));
+    throw new Error('stop after the first request');
+  });
+  for (const url of ['https://notdiscordapp.com/x.png', 'https://evil-discordapp.net/x.png']) {
+    assert.deepEqual(await refreshLegacyImageUrl(url, { token: 'bot-token' }), { url, error: '' });
+  }
+  assert.deepEqual(asked, []);
+  for (const url of ['https://cdn.discordapp.com/x.png', 'https://media.discordapp.net/x.png']) {
+    await assert.rejects(refreshLegacyImageUrl(url, { token: 'bot-token' }));
+  }
+  assert.equal(asked.length, 2);
+});

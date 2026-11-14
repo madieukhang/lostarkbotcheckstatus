@@ -54,3 +54,15 @@ export function getEnrichSession(sessionId) {
 export function clearEnrichSession(sessionId) {
   sessionStore.clear(sessionId);
 }
+
+/**
+ * Remove a session and hand it to one caller: of two clicks that both found
+ * it, only the first to take it gets it back.
+ * @param {string} sessionId - the session to take
+ * @returns {object|null} the session, or null when it was already taken or expired
+ */
+export function takeEnrichSession(sessionId) {
+  const session = sessionStore.get(sessionId);
+  if (session) sessionStore.clear(sessionId);
+  return session;
+}

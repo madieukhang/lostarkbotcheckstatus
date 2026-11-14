@@ -11,7 +11,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 
-import { resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
+import { isEvidenceArchiveMessage, resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
 import { buildAlertEmbed, AlertSeverity, NoticeKind } from '../../../utils/alertEmbed.js';
 import { deferEphemeralReply, editEmbed } from '../../../utils/interactionReplies.js';
 import { ICONS } from '../../../utils/ui.js';
@@ -76,6 +76,7 @@ function parseEvidenceCustomId(customId) {
  * @param {object} deps
  * @param {Client} deps.client - the bot client
  * @param {Function} [deps.resolveImageFn] - evidence resolver
+ * @param {Function} [deps.isArchiveMessageFn] - whether the custom id names an evidence archive message
  * @param {Function} [deps.getUserLanguageFn] - clicker language lookup
  * @param {object} [deps.UserPreferenceModel] - language preference model
  * @returns {Function} the interaction handler
@@ -83,6 +84,7 @@ function parseEvidenceCustomId(customId) {
 export function createBroadcastEvidenceButtonHandler({
   client,
   resolveImageFn = resolveDisplayImageUrl,
+  isArchiveMessageFn = isEvidenceArchiveMessage,
   getUserLanguageFn = getUserLanguage,
   UserPreferenceModel = UserPreference,
 }) {
@@ -90,8 +92,11 @@ export function createBroadcastEvidenceButtonHandler({
     await deferEphemeralReply(interaction);
     const lang = await getUserLanguageFn(interaction.user?.id, { UserPreferenceModel });
 
+    // The custom id names any channel and message; the bot can read channels
+    // the clicker cannot, so only evidence archive messages are opened.
     const ids = parseEvidenceCustomId(interaction.customId);
-    const displayUrl = ids
+    const allowed = ids && await isArchiveMessageFn(ids);
+    const displayUrl = allowed
       ? await resolveImageFn({ imageMessageId: ids.messageId, imageChannelId: ids.channelId }, client)
       : '';
 

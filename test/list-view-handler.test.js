@@ -540,3 +540,13 @@ for (const type of ['all', 'black']) {
     assert.equal(notice.description, copy.description);
   });
 }
+
+test('/la-list view type:all scope:all reads all three lists', async () => {
+  const read = [];
+  const resolveListContext = (listType) => ({
+    label: listType, color: 0, icon: '',
+    model: { find() { return { sort() { return { async lean() { read.push(listType); return []; } }; } }; } },
+  });
+  await loadListEntries({ isOwnerGuild: false, scopeFilter: 'all', type: 'all', viewGuildId: 'g1' }, { resolveListContext });
+  assert.deepEqual(read.sort(), ['black', 'watch', 'white']);
+});

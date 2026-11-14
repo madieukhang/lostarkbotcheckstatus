@@ -70,6 +70,7 @@ import {
   getEnrichSession,
   markCooldown,
   refreshEnrichSession,
+  takeEnrichSession,
   touchEnrichSession,
 } from './state.js';
 import { buildEnrichProgressEmbed, buildEnrichSuccessEmbed } from './ui.js';
@@ -837,6 +838,12 @@ export function createEnrichHandlers({ services }) {
     const sessionId = interaction.customId.split(':')[2];
     const session = await requireOwnedEnrichSession(interaction, sessionId, 'actionConfirm');
     if (!session) return;
+    // Two quick clicks can both pass the check above before either writes;
+    // the first to take the session confirms, the other only acknowledges.
+    if (!takeEnrichSession(sessionId)) {
+      await deferUpdate(interaction);
+      return;
+    }
     const lang = await resolveInteractionLang(interaction);
 
     await deferUpdate(interaction);

@@ -1,5 +1,7 @@
 # Changelog
 
+- Small safety fixes. `/la-list view type:all scope:all` shows the whitelist and watchlist too (it showed only the blacklist). Two quick clicks on an enrich **Confirm** now save and announce the new alts once. A broadcast's **View evidence** button opens only messages of the evidence archive, so a forged button cannot show an attachment from another channel the bot can read. Only Discord's own hosts and their subdomains are sent to Discord to re-sign an old image link (`notdiscordapp.com` was accepted). The Bible worker fetches only `https://lostark.bible` and fails any other job.
+
 - The reporter stays private. When `/la-list remove` refuses because someone else added the entry, the card no longer names them, and the note **History** names each note's writer only for officers and seniors; a member who was reported can no longer learn who reported them from either.
 
 - `/la-list edit` follows the approver roles. A global entry is checked in every server, so its owner now needs an approver to add `additional_names` to it, move it to another list or change its scope; a reason, raid or image change on an own entry still applies at once, and an owner's server entry is unchanged. A member approver's auto-approval covers only their own adds, so editing someone else's entry now goes to the officers and seniors like any other member's edit.

@@ -36,6 +36,7 @@ test('broadcast evidence handler acknowledges before refreshing and returns the 
   let editedPayload;
   const handler = createBroadcastEvidenceButtonHandler({
     client: { id: 'client' },
+    isArchiveMessageFn: async () => true,
     resolveImageFn: async ({ imageMessageId, imageChannelId }) => {
       calls.push(`refresh:${imageChannelId}/${imageMessageId}`);
       return 'https://cdn.example.test/fresh.png';
@@ -63,6 +64,7 @@ test('broadcast evidence handler explains when archived evidence is gone', async
   let editedPayload;
   const handler = createBroadcastEvidenceButtonHandler({
     client: {},
+    isArchiveMessageFn: async () => true,
     resolveImageFn: async () => '',
   });
 
@@ -82,6 +84,7 @@ test('broadcast evidence button uses the clicker language, not the message autho
   let editedPayload;
   const handler = createBroadcastEvidenceButtonHandler({
     client: {},
+    isArchiveMessageFn: async () => true,
     resolveImageFn: async () => '',
     getUserLanguageFn: async (userId) => {
       resolvedUserId = userId;
@@ -98,4 +101,38 @@ test('broadcast evidence button uses the clicker language, not the message autho
 
   assert.equal(resolvedUserId, 'clicker-b');
   assert.ok(editedPayload.embeds[0].toJSON().title.includes(t('dialogue.evidence.missing', 'vi').title));
+});
+
+test('broadcast evidence refuses a message outside the evidence archive without reading it', async () => {
+  let editedPayload;
+  let reads = 0;
+  const gated = [];
+  const handler = createBroadcastEvidenceButtonHandler({
+    client: {},
+    isArchiveMessageFn: async (ids) => { gated.push(ids); return false; },
+    resolveImageFn: async () => { reads += 1; return 'https://cdn.example.test/private.png'; },
+    getUserLanguageFn: async () => 'en',
+  });
+  await handler({
+    user: { id: 'clicker' },
+    customId: `${BROADCAST_EVIDENCE_PREFIX}:111:222`,
+    async deferReply() {},
+    async editReply(payload) { editedPayload = payload; },
+  });
+  assert.deepEqual(gated, [{ channelId: '111', messageId: '222' }]);
+  assert.equal(reads, 0);
+  assert.ok(editedPayload.embeds[0].toJSON().title.includes(t('dialogue.evidence.missing', 'en').title));
+});
+
+test('an archive message opens from the evidence channel or when the database knows it', async () => {
+  const { isEvidenceArchiveMessage } = await import('../bot/utils/imageRehost.js');
+  const known = new Set(['m-old']);
+  const deps = { getChannelIdFn: async () => 'evidence', isKnownFn: async (id) => known.has(id) };
+  assert.equal(await isEvidenceArchiveMessage({ channelId: 'evidence', messageId: 'm-new' }, deps), true);
+  assert.equal(await isEvidenceArchiveMessage({ channelId: 'old-evidence', messageId: 'm-old' }, deps), true);
+  assert.equal(await isEvidenceArchiveMessage({ channelId: 'private', messageId: 'm-secret' }, deps), false);
+  for (const notSet of [null, '']) {
+    const unset = { getChannelIdFn: async () => notSet, isKnownFn: async () => false };
+    assert.equal(await isEvidenceArchiveMessage({ channelId: '', messageId: 'm' }, unset), false, String(notSet));
+  }
 });

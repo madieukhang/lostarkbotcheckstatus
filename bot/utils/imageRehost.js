@@ -32,6 +32,7 @@ import { readBodyWithin } from './responseBody.js';
 import {
   EVIDENCE_COPY_MAX_BYTES,
   findEvidenceImage,
+  isKnownArchiveMessage,
   recordArchiveCopy,
   repointEntries,
   storeEvidenceImage,
@@ -159,6 +160,26 @@ async function getEvidenceChannelId() {
   if (!config.ownerGuildId) return null;
   const ownerConfig = await getGuildConfig(config.ownerGuildId);
   return ownerConfig?.evidenceChannelId || null;
+}
+
+/**
+ * Whether a broadcast button may open an archive message. Its custom id
+ * names the channel and message, so it is trusted only for the evidence
+ * channel, or for a message the database knows (one archived while an
+ * earlier evidence channel was set).
+ * @param {{channelId: string, messageId: string}} ids - from the custom id
+ * @param {object} [deps]
+ * @param {Function} [deps.getChannelIdFn] - the evidence channel, or null
+ * @param {Function} [deps.isKnownFn] - whether the database knows a message id
+ * @returns {Promise<boolean>} true when the message may be shown
+ */
+export async function isEvidenceArchiveMessage(
+  { channelId, messageId },
+  { getChannelIdFn = getEvidenceChannelId, isKnownFn = isKnownArchiveMessage } = {}
+) {
+  const evidenceChannelId = await getChannelIdFn();
+  if (evidenceChannelId && channelId === evidenceChannelId) return true;
+  return isKnownFn(messageId);
 }
 
 /**
@@ -419,7 +440,7 @@ export async function probeArchiveImage(messageId, channelId, client) {
 function isDiscordCdnUrl(url) {
   try {
     const { hostname } = new URL(url);
-    return hostname.endsWith('discordapp.com') || hostname.endsWith('discordapp.net');
+    return ['discordapp.com', 'discordapp.net'].some((host) => hostname === host || hostname.endsWith(`.${host}`));
   } catch {
     return false;
   }

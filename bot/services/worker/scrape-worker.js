@@ -23,6 +23,21 @@ const DEFAULT_JOB_LEASE_MS = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 2 * 60 * 1000;
 })();
 
+// Jobs are read from the database, and the worker runs on a home network;
+// it fetches only lostark.bible over https, so a job naming another host
+// fails instead of reaching it.
+const BIBLE_ORIGIN = 'https://lostark.bible';
+
+function assertBibleUrl(url) {
+  let origin = '';
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    // An unparsable URL is refused below like any other host.
+  }
+  if (origin !== BIBLE_ORIGIN) throw new Error(`refused: the job URL is not on ${BIBLE_ORIGIN}`);
+}
+
 function abbreviateUrl(url) {
   if (typeof url !== 'string') return '';
   if (url.length <= 100) return url;
@@ -81,6 +96,7 @@ export async function executeJob(job, { logger = console } = {}) {
     : FETCH_DEFAULT_TIMEOUT_MS;
 
   try {
+    assertBibleUrl(job.url);
     const res = await fetch(job.url, {
       headers: FETCH_HEADERS,
       signal: AbortSignal.timeout(timeoutMs),
