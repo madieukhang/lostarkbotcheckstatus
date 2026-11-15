@@ -324,6 +324,7 @@ export default {
     leave: {
       ownerOnly: { title: 'Bot owner 限定ですの', description: 'サーバーから外せるのは LoaLogs アプリの owner だけですわ。' },
       protected: { title: 'このサーバーは保護されていますの', description: '`{guild}` は owner サーバー、または bot が投稿するチャンネルのあるサーバーですので、LoaLogs は残りますわ。' },
+      unavailable: { title: 'このサーバーは今は利用できませんの', description: 'Discord が `{guild}` を unavailable と報告しているので、保護対象かどうか LoaLogs には分かりませんわ。Discord が戻ってからもう一度お試しくださいませ。' },
       confirm: { title: 'このサーバーから LoaLogs を外しますの？', description: 'LoaLogs は **{guild}** から退出しますわ。設定と list entry は保存されたままですので、招待し直せば元通りですの。このカードはあなただけに見えて、60 秒で期限切れになりますわ。' },
       fields: { members: 'メンバー', joined: 'Bot 参加日' },
       buttons: { confirm: 'サーバーから退出', cancel: 'キャンセル' },

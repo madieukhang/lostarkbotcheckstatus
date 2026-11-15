@@ -288,14 +288,16 @@ test('suggestions keep working when a guild is unavailable', async (testContext)
   ]);
 });
 
-test('the confirmation card of an unavailable guild shows its id and no NaN date', async (testContext) => {
+test('an unavailable guild is refused by its id before any confirmation card', async (testContext) => {
   useConfig(testContext);
-  const { interaction } = makeLeaveInteraction(makeClient([makeUnavailableGuild('g-x')]));
+  const guild = makeUnavailableGuild('g-x');
+  const { interaction } = makeLeaveInteraction(makeClient([guild]));
   await handleLeaveAction(interaction, 'g-x', 'en');
-  const values = embedOf(interaction.edits[0]).fields.map(({ value }) => value).join('\n');
-  assert.ok(values.includes('g-x'));
-  assert.ok(!values.includes('NaN'));
-  assert.ok(!values.includes('undefined'));
+  const embed = embedOf(lastEdit(interaction));
+  assert.ok(embed.title.includes(titleKey('dialogue.remote.leave.unavailable')));
+  assert.ok(embed.description.includes('g-x'));
+  assert.ok(!JSON.stringify(embed).includes('undefined'));
+  assert.equal(guild.leaveCalls, 0);
 });
 
 test('suggestion labels never end in half an emoji', async (testContext) => {

@@ -348,6 +348,7 @@ export default {
     leave: {
       ownerOnly: { title: 'Chỉ chủ bot mới dùng được', description: 'Chỉ chủ của ứng dụng LoaLogs mới rút được bot khỏi server nhé.' },
       protected: { title: 'Server này được bảo vệ', description: 'LoaLogs ở lại `{guild}`: đây là server chủ hoặc server có kênh bot đang gửi tin.' },
+      unavailable: { title: 'Server này đang không truy cập được', description: 'Discord báo `{guild}` đang unavailable, nên LoaLogs không biết server này có được bảo vệ không. Thử lại khi Discord ổn định nhé.' },
       confirm: { title: 'Rút LoaLogs khỏi server này?', description: 'LoaLogs sẽ rời **{guild}**. Thiết lập và các mục danh sách vẫn được giữ, mời bot lại là có lại ngay. Chỉ cậu thấy thẻ này, và nó hết hạn sau 60 giây.' },
       fields: { members: 'Thành viên', joined: 'Bot vào ngày' },
       buttons: { confirm: 'Rời server', cancel: 'Hủy' },

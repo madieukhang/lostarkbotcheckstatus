@@ -36,6 +36,12 @@ const LEAVE_RULES = Object.freeze([
     refuses: ({ client, guildId }) => !client.guilds.cache.has(guildId),
   },
   {
+    // An unavailable guild has no channels in the cache, so the protected
+    // check below cannot see whether it hosts a configured channel.
+    refusal: { kind: NoticeKind.BUSY, key: 'dialogue.remote.leave.unavailable' },
+    refuses: ({ client, guildId }) => client.guilds.cache.get(guildId)?.available === false,
+  },
+  {
     refusal: { kind: NoticeKind.GUARD, key: 'dialogue.remote.leave.protected' },
     refuses: ({ client, guildId }) => getProtectedGuildIds(client).has(guildId),
   },

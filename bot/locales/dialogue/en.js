@@ -410,6 +410,7 @@ export default {
     leave: {
       ownerOnly: { title: 'Bot owner only', description: 'Only the owner of the LoaLogs application can remove it from a server.' },
       protected: { title: 'This server is protected', description: 'LoaLogs stays in `{guild}`: it is the owner server or holds a channel the bot posts to.' },
+      unavailable: { title: 'This server is unavailable right now', description: 'Discord reports `{guild}` as unavailable, so LoaLogs cannot tell whether it is protected. Try again once Discord is back.' },
       confirm: { title: 'Remove LoaLogs from this server?', description: 'LoaLogs leaves **{guild}**. Its settings and list entries stay saved, so inviting it back restores them. Only you see this card; it expires in 60 seconds.' },
       fields: { members: 'Members', joined: 'Bot joined' },
       buttons: { confirm: 'Leave server', cancel: 'Cancel' },

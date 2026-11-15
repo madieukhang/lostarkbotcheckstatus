@@ -1,5 +1,7 @@
 # Changelog
 
+- `/la-remote action:leave` refuses a server Discord reports as unavailable: during an outage its channels are not cached, so the bot could not tell whether it is protected. Try again once Discord is back.
+
 - A download that only starts with `BM` is no longer taken for a bitmap: a BMP must also carry a known header size, so plain text labelled as an image is refused like other non-images. The Bible worker follows a redirect only while it stays on `https://lostark.bible` and fails a job whose redirect leads anywhere else. A ScraperAPI key refusal reads at most 64 KiB of its error body for the log line.
 
 - Stored text shows as typed everywhere it appears, not only on the cards fixed before: `/la-check` report lines, the `/la-roster` hidden-roster rows, `/la-list view` pages and its evidence detail, note cards, duplicate comparisons, the edit change summary, the senior bulk-approval DM, the bulk broadcast and the multiadd preview. A reason written as `[Verify your account](https://...)` no longer shows as a link there, and a custom watchlist raid can no longer close its code span. The note **History** no longer fails on a reason full of brackets.
