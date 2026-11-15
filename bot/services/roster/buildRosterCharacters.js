@@ -7,7 +7,6 @@
  * can render a single embed without try/catch sprawl.
  */
 
-import { JSDOM } from 'jsdom';
 import { normalizeNameKey } from '../../utils/names.js';
 import { readBibleText } from '../../utils/bibleData.js';
 
@@ -15,10 +14,8 @@ import { buildBibleFetchOptions } from './bibleFetch.js';
 import { bibleClient } from './bibleClient.js';
 import { fetchCharacterMeta } from './characterMeta.js';
 import { inferHiddenRosterItemLevel } from './search.js';
-import { createRosterVirtualConsole } from './dom.js';
+import { parseRosterDocument } from './dom.js';
 import { parseCharacterMetaFromHtml, parseItemLevelValue, parseRosterCharactersFromHtml } from './parsers.js';
-
-const virtualConsole = createRosterVirtualConsole();
 
 // Bible answers 404 for a name it does not know, so that status means no
 // roster rather than a failed request.
@@ -126,7 +123,7 @@ async function buildRosterCharactersOnce(name, options) {
       failReason = describeFailedBibleStatus(response.status);
     } else {
       const html = await readBibleText(response);
-      const { document } = new JSDOM(html, { virtualConsole }).window;
+      const document = await parseRosterDocument(html);
 
       // Use the canonical parser that /la-roster also uses. It returns
       // per-character records with name + itemLevel + combatScore +

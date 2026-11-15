@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { MessageFlags } from 'discord.js';
 
 import { createTrustHandlers } from '../bot/handlers/list/trust/index.js';
+import UserPreference from '../bot/models/UserPreference.js';
 
-test('/la-list trust rejects non-officers with an ephemeral alert', async () => {
+test('/la-list trust rejects non-officers with an ephemeral alert', async (t) => {
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => null }));
   const calls = [];
   const interaction = {
     user: { id: 'not-an-officer', tag: 'NotOfficer#0001' },

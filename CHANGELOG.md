@@ -1,5 +1,7 @@
 # Changelog
 
+- Internal: jsdom loads when the bot first parses a page (a lostark.bible roster or the server status page), not at startup; `bot/services/roster/dom.js` is the only module that loads it. Most test files no longer load it, and one `/la-list trust` test no longer waits 10 seconds for a database read, so the test suite ran in 66 s instead of 101 s back to back. Also drops an unused argument to the trust handlers.
+
 - Text cut to fit no longer ends on half an emoji. A long reason, note or raid label was cut by raw length, which could split an emoji and leave a broken character at the end: on `/la-list view` pages, `/la-roster` status lines, approval and broadcast rows, the multiadd preview, note cards, and the `/la-search` details menu. Every such cut now ends on a whole character.
 
 - `/la-remote action:leave` refuses a server Discord reports as unavailable: during an outage its channels are not cached, so the bot could not tell whether it is protected. Try again once Discord is back.

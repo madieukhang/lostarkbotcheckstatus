@@ -18,9 +18,9 @@ function fixture({ ariaLabel = null, modifier = '' } = {}) {
   `;
 }
 
-test('Thaemine busy/full aria labels are definitive online states', () => {
+test('Thaemine busy/full aria labels are definitive online states', async () => {
   for (const ariaLabel of ['Thaemine is busy', 'Thaemine is full']) {
-    const statuses = parseServerStatuses(
+    const statuses = await parseServerStatuses(
       fixture({ ariaLabel }),
       ['Thaemine'],
       { logger: silentLogger },
@@ -29,8 +29,8 @@ test('Thaemine busy/full aria labels are definitive online states', () => {
   }
 });
 
-test('unknown Thaemine aria text falls through to the CSS modifier', () => {
-  const statuses = parseServerStatuses(
+test('unknown Thaemine aria text falls through to the CSS modifier', async () => {
+  const statuses = await parseServerStatuses(
     fixture({ ariaLabel: 'Thaemine status unavailable', modifier: 'busy' }),
     ['Thaemine'],
     { logger: silentLogger },
@@ -38,14 +38,14 @@ test('unknown Thaemine aria text falls through to the CSS modifier', () => {
   assert.equal(statuses.get('Thaemine'), STATUS.ONLINE);
 });
 
-test('Thaemine base status class without a modifier means offline', () => {
-  const statuses = parseServerStatuses(fixture(), ['Thaemine'], { logger: silentLogger });
+test('Thaemine base status class without a modifier means offline', async () => {
+  const statuses = await parseServerStatuses(fixture(), ['Thaemine'], { logger: silentLogger });
   assert.equal(statuses.get('Thaemine'), STATUS.OFFLINE);
 });
 
-test('a maintenance class wins over an offline aria label, so the wrench is never read as offline', () => {
+test('a maintenance class wins over an offline aria label, so the wrench is never read as offline', async () => {
   const lines = [];
-  const statuses = parseServerStatuses(
+  const statuses = await parseServerStatuses(
     fixture({ ariaLabel: 'Thaemine is offline', modifier: 'maintenance' }),
     ['Thaemine'],
     { logger: { log: (line) => lines.push(line), error() {} } },
@@ -55,8 +55,8 @@ test('a maintenance class wins over an offline aria label, so the wrench is neve
   assert.ok(lines.some((line) => line.includes('"Thaemine is offline"') && line.includes('--maintenance')), lines.join('\n'));
 });
 
-test('an online aria label still wins over a stale offline class', () => {
-  const statuses = parseServerStatuses(
+test('an online aria label still wins over a stale offline class', async () => {
+  const statuses = await parseServerStatuses(
     fixture({ ariaLabel: 'Thaemine is online' }),
     ['Thaemine'],
     { logger: silentLogger },

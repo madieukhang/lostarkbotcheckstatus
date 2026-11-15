@@ -26,8 +26,8 @@
  *   (no modifier) → offline
  */
 
-import { JSDOM } from 'jsdom';
 import config from '../config.js';
+import { parseHtmlDocument } from '../services/roster/dom.js';
 import { readBodyWithin } from '../utils/responseBody.js';
 
 // ─── Status constants ─────────────────────────────────────────────────────────
@@ -128,10 +128,10 @@ function resolveStatusFromAriaLabel(ariaLabel) {
  * @param {string[]} serverNames
  * @param {object} [options]
  * @param {object} [options.logger=console]
- * @returns {Map<string, string>}
+ * @returns {Promise<Map<string, string>>}
  */
-export function parseServerStatuses(html, serverNames, { logger = console } = {}) {
-  const { document } = new JSDOM(html).window;
+export async function parseServerStatuses(html, serverNames, { logger = console } = {}) {
+  const document = await parseHtmlDocument(html);
   const serverRows = document.querySelectorAll(`.${CLS.SERVER_ROW}`);
 
   logger.log?.(`[serverStatus] Checking ${serverNames.length} server(s): ${serverNames.join(', ')}`);

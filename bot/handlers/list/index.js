@@ -46,7 +46,7 @@ export function createListHandlers({ client }) {
     ...createNoteHandlers({ services }),
     ...createQuickAddHandlers(),
     ...createRemoveHandlers({ services }),
-    ...createTrustHandlers({ client }),
+    ...createTrustHandlers(),
     ...createViewHandlers({ client }),
   };
 }

@@ -7,8 +7,7 @@
  */
 
 import { createArtistEmbed } from '../../utils/artistVoice.js';
-import { JSDOM } from 'jsdom';
-import { createRosterVirtualConsole } from '../../services/roster/dom.js';
+import { parseRosterDocument } from '../../services/roster/dom.js';
 import { connectDB } from '../../db.js';
 import { COLORS } from '../../utils/ui.js';
 import { buildAlertEmbed, NoticeKind } from '../../utils/alertEmbed.js';
@@ -48,8 +47,6 @@ import { buildDeepScanNotRunNotice } from './deepResult.js';
 import { runVisibleRosterDeepScan } from './visibleDeepScan.js';
 import { resolveRosterScanOutcome } from './completion.js';
 import { buildRosterEvidenceRows } from './evidenceButton.js';
-
-const virtualConsole = createRosterVirtualConsole();
 
 /**
  * Render one visible-roster row. Both numeric stats use Discord code badges;
@@ -97,7 +94,7 @@ async function fetchRosterCharacters(name, deep) {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   const html = await readBibleText(response);
-  const { document } = new JSDOM(html, { virtualConsole }).window;
+  const document = await parseRosterDocument(html);
   // The in-game server rides in the same SSR payload this page already
   // carries, so reading it here costs nothing extra.
   const world = parseCharacterMetaFromHtml(html)?.world || '';
