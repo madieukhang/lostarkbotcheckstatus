@@ -4,14 +4,24 @@ const CHOICE_TEXT_MAX = 100;
 const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/;
 
 /**
- * Cut an autocomplete choice name or value to Discord's 100-character limit
- * without leaving half of an emoji (a lone high surrogate) at the end.
+ * Cut text to a length without leaving half of a two-unit character (an
+ * emoji) at the end: a lone high surrogate is not well-formed text.
+ * @param {unknown} value - the text; null and undefined become ''
+ * @param {number} limit - most UTF-16 units to keep
+ * @returns {string} at most `limit` units, ending on a whole character
+ */
+export function cutText(value, limit) {
+  const cut = String(value ?? '').slice(0, limit);
+  return TRAILING_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+}
+
+/**
+ * Cut an autocomplete choice name or value to Discord's 100-character limit.
  * @param {string} value - choice text
  * @returns {string} at most 100 UTF-16 units, ending on a whole character
  */
 export function cutChoiceText(value) {
-  const cut = String(value).slice(0, CHOICE_TEXT_MAX);
-  return TRAILING_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+  return cutText(String(value), CHOICE_TEXT_MAX);
 }
 
 /**
@@ -65,12 +75,20 @@ export function isSafeLogsUrl(value) {
   }
 }
 
-/** Trim an inline Discord label and reserve space for its truncation suffix. */
+/**
+ * Trim an inline Discord label and cut it to a limit, suffix included. The
+ * cut ends on a whole character.
+ * @param {unknown} value - the label; a falsy value becomes ''
+ * @param {number} limit - longest result in UTF-16 units
+ * @param {string} [suffix='...'] - marks a cut; left out when the limit is
+ *   no longer than it
+ * @returns {string} the trimmed label, cut when it is over the limit
+ */
 export function truncateInlineText(value, limit, suffix = '...') {
   const text = String(value || '').trim();
   if (!text || text.length <= limit) return text;
-  if (limit <= suffix.length) return text.slice(0, limit);
-  return `${text.slice(0, limit - suffix.length)}${suffix}`;
+  if (limit <= suffix.length) return cutText(text, limit);
+  return `${cutText(text, limit - suffix.length)}${suffix}`;
 }
 
 /**

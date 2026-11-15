@@ -11,11 +11,15 @@ import { buildScopedListQuery } from '../../utils/scope.js';
 import { resetSelectMenu } from '../../utils/selectMenu.js';
 import { hasEvidence, resolveDisplayImageUrl } from '../../utils/imageRehost.js';
 import { catchListenerErrors } from '../../utils/async.js';
+import { cutText } from '../../utils/discordText.js';
 import UserPreference from '../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
 import { decorateListEntry, getListContext, isOfficerOrSenior } from '../list/helpers.js';
 import { loadCheckDetailStatMap } from '../list/check/index.js';
 import { buildCheckEntryDetailsEmbed } from '../list/check/ui.js';
+
+// Discord's limit on a select option's label and description.
+const SELECT_OPTION_TEXT_MAX = 100;
 
 /** Show an attachment marker only for the report opened by the details menu. */
 export function pickEvidenceEntry(result) {
@@ -51,8 +55,8 @@ export function buildSearchDetailComponents(detailResults, lang = 'en') {
         .addOptions(
           detailResults.slice(0, 24).map(({ result, index, entry, listType }) => {
             return {
-              label: result.name.slice(0, 100),
-              description: (entry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),
+              label: cutText(result.name, SELECT_OPTION_TEXT_MAX),
+              description: cutText(entry.reason || t('listView.navigation.noReason', lang), SELECT_OPTION_TEXT_MAX),
               value: String(index),
               emoji: getListContext(listType).icon,
             };

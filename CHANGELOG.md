@@ -1,5 +1,7 @@
 # Changelog
 
+- Text cut to fit no longer ends on half an emoji. A long reason, note or raid label was cut by raw length, which could split an emoji and leave a broken character at the end: on `/la-list view` pages, `/la-roster` status lines, approval and broadcast rows, the multiadd preview, note cards, and the `/la-search` details menu. Every such cut now ends on a whole character.
+
 - `/la-remote action:leave` refuses a server Discord reports as unavailable: during an outage its channels are not cached, so the bot could not tell whether it is protected. Try again once Discord is back.
 
 - A download that only starts with `BM` is no longer taken for a bitmap: a BMP must also carry a known header size, so plain text labelled as an image is refused like other non-images. The Bible worker follows a redirect only while it stays on `https://lostark.bible` and fails a job whose redirect leads anywhere else. A ScraperAPI key refusal reads at most 64 KiB of its error body for the log line.

@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { cutChoiceText, escapeEmbedText, truncateInlineText } from '../bot/utils/discordText.js';
+import {
+  cutChoiceText,
+  cutText,
+  escapeEmbedText,
+  storedText,
+  truncateInlineText,
+} from '../bot/utils/discordText.js';
 
 test('cutChoiceText keeps a choice within 100 units without splitting an emoji', () => {
   assert.equal(cutChoiceText('short'), 'short');
@@ -26,4 +32,26 @@ test('truncateInlineText reserves suffix space within Discord label limits', () 
   assert.ok(result.endsWith('...'));
   assert.equal(truncateInlineText('abcdef', 4, '…'), 'abc…');
   assert.equal(truncateInlineText('abcdef', 2), 'ab');
+});
+
+test('cutText keeps at most the limit and ends on a whole character', () => {
+  assert.equal(cutText('abcdef', 3), 'abc');
+  assert.equal(cutText('ab😀cd', 3), 'ab');
+  assert.equal(cutText('ab😀cd', 4), 'ab😀');
+  assert.equal(cutText('short', 20), 'short');
+  assert.equal(cutText(null, 5), '');
+});
+
+test('truncateInlineText never ends its cut on half an emoji', () => {
+  // 20 - 3 for the suffix lands inside the first emoji.
+  assert.equal(truncateInlineText(`${'x'.repeat(16)}${'😀'.repeat(10)}`, 20), `${'x'.repeat(16)}...`);
+  // A limit no longer than the suffix cuts without one.
+  assert.equal(truncateInlineText('a😀b', 2), 'a');
+});
+
+test('storedText cuts a reason full of emoji on a whole character', () => {
+  const cut = storedText(`griefed raids ${'😡'.repeat(40)}`, 80);
+  assert.ok(cut.isWellFormed(), JSON.stringify(cut));
+  assert.ok(cut.length <= 80);
+  assert.ok(cut.endsWith('😡...'), JSON.stringify(cut));
 });

@@ -42,6 +42,15 @@ test('search details include every report type without images and keep each sear
   assert.deepEqual(buildSearchDetailComponents([]), []);
 });
 
+test('search detail options never end in half an emoji', () => {
+  const longReason = { ...entry, reason: `${'x'.repeat(99)}😀tail` };
+  const details = getSearchDetailResults([{ name: `${'n'.repeat(99)}😀`, black: longReason }]);
+  const [row] = buildSearchDetailComponents(details, 'en');
+  const [option] = row.toJSON().components[0].options;
+  assert.equal(option.label, 'n'.repeat(99));
+  assert.equal(option.description, 'x'.repeat(99));
+});
+
 test('search detail reload keeps blacklist guild scope and uses the stored entry identity', async () => {
   for (const listType of ['black', 'watch', 'white']) {
     let received;
