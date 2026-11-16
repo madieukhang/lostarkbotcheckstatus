@@ -1,5 +1,7 @@
 # Changelog
 
+- README reorganized: one short line per command in separate tables (everyone, lists, auto-check channel, setup, owner server), the list rules gathered under "How lists work", the OCR modes under "Screenshot checks", and the tuning variables folded away. Corrected: the Node versions, the twelve models (the old diagram showed a roster cache that does not exist), the per-list unique indexes and nine undocumented variables.
+
 - A display name a member chose shows as text wherever another person reads it: the approval cards and DMs (single and bulk, approved or rejected), the duplicate card's "Added by", the note card and the note History, and the evidence archive post. A name written as `[text](link)` no longer shows as a link. Image download errors in the multiadd summary, which is also posted in the requesting channel, no longer include the status text or content type the image host sent; those stay in the log.
 
 - Two more cuts end on a whole character: the `Custom · ...` suggestion for a long watchlist raid label typed with an emoji, and a `/la-check` card whose eight reported names carry long reasons past Discord's 4096-character limit. Both could end on half an emoji. The cut lives in `bot/utils/textCut.js`, which imports nothing, so the raid catalog uses it without loading discord.js.
