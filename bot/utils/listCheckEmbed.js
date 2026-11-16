@@ -27,6 +27,7 @@ import { t, tPick } from '../services/i18n/index.js';
 import { groupListCheckResults } from '../services/list-check/displayGroups.js';
 import { didListCheckNameChange } from '../services/list-check/matchResolution.js';
 import { COLORS } from './ui.js';
+import { cutText } from './textCut.js';
 
 function countListCheckStates(results) {
   const counts = {
@@ -248,9 +249,9 @@ export function buildListCheckEmbed({
   });
 
   // Description leads with the per-name list; the outcome breakdown is in
-  // the title. Ceiling is 4096; the slice is a safety net for long
+  // the title. Ceiling is 4096; the cut is a safety net for long
   // reasons / many similar-name suggestions.
-  const description = (`${formattedLines.join('\n')}${resultNotes}`).slice(0, 4096);
+  const description = cutText(`${formattedLines.join('\n')}${resultNotes}`, 4096);
 
   // No Checked / Flagged / Cleared stats grid: the outcome breakdown in the
   // title carries the same per-status counts, so an aggregate cleared count

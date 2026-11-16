@@ -24,3 +24,15 @@ test('check-card color resolves from COLORS tokens', () => {
   assert.equal(build([{ trustedEntry: {} }]).color, COLORS.success);
   assert.equal(build([{}]).color, COLORS.info);
 });
+
+test('a check card past 4096 characters ends its description on a whole character', () => {
+  // Eight reported names with long reasons pass the limit; the cut lands inside the emoji.
+  const description = buildListCheckEmbed({
+    results: [{}],
+    formattedLines: [`${'x'.repeat(4095)}😀tail`],
+    limitedNamesCount: 1,
+    mode: 'slash',
+    lang: 'en',
+  }).embed.toJSON().description;
+  assert.equal(description, 'x'.repeat(4095));
+});

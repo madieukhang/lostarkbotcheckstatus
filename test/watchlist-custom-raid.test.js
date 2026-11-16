@@ -208,3 +208,9 @@ test('la-list autocomplete route supports edit and custom add for type:watch', a
   await route(interaction);
   assert.deepEqual(responses[2], [{ name: 'Serca Hard', value: 'Serca Hard' }]);
 });
+
+test('a long custom raid label never ends its choice name on half an emoji', () => {
+  // "Custom · " is 9 units, so the emoji's two units sit at 99 and 100.
+  const [custom] = getRaidAutocompleteChoices(`${'x'.repeat(90)}😀tail`, { allowCustom: true });
+  assert.equal(custom.name, `Custom · ${'x'.repeat(90)}`);
+});

@@ -3,6 +3,8 @@
  * label/availability. Historical values stay here forever so entries created
  * while a raid was selectable continue to render and normalize correctly.
  */
+import { cutText } from '../utils/textCut.js';
+
 const RAID_CATALOG = [
   // Normal raids are retired from new selections now that their solo modes
   // cover the common use case. Keep the values for existing entries and old
@@ -112,7 +114,7 @@ export function getRaidAutocompleteChoices(
 
   if (allowCustom && input && !hasCanonicalMatch) {
     choices.push({
-      name: `Custom · ${input}`.slice(0, 100),
+      name: cutText(`Custom · ${input}`, 100),
       value: input,
     });
   }
