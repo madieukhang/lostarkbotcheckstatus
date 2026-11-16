@@ -16,6 +16,7 @@ import { createArtistEmbed } from '../../../utils/artistVoice.js';
 
 import {
   buildListAddApprovalEmbed,
+  formatRequesterValue,
   getApproverRecipientIds,
   getSeniorApproverIds,
   listTypeIcon,
@@ -289,7 +290,7 @@ export function createApprovalServices({
         .setDescription([headerLine, '', previewLines.join('\n').slice(0, 3800)].join('\n'))
         .setColor(color)
         .addFields(
-          { name: `👤 ${t('dialogue.approval.fields.requestedBy', lang)}`, value: `${pending.requesterDisplayName || pending.requesterTag || t('dialogue.common.unknown', lang)} (<@${pending.requesterId}>)`, inline: false },
+          { name: `👤 ${t('dialogue.approval.fields.requestedBy', lang)}`, value: formatRequesterValue(pending.requesterDisplayName || pending.requesterTag, pending.requesterId, t('dialogue.common.unknown', lang)), inline: false },
           { name: `🏠 ${t('dialogue.approval.fields.server', lang)}`, value: escapeEmbedText(guild?.name || pending.guildId || t('dialogue.common.unknown', lang)), inline: true },
           { name: `📊 ${t('dialogue.approval.fields.total', lang)}`, value: String(pending.rows.length), inline: true },
           { name: `🆔 ${t('dialogue.approval.fields.requestId', lang)}`, value: `\`${pending.requestId.slice(0, 8)}\``, inline: true },

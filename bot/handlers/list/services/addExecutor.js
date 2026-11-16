@@ -26,6 +26,7 @@ import {
   upsertRosterSnapshots,
 } from '../../../services/roster/index.js';
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
+import { escapeEmbedText } from '../../../utils/discordText.js';
 import { buildNameRosterQuery } from '../../../utils/listEntryMap.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { isOfficerOrSenior } from '../../../utils/approverRoles.js';
@@ -272,7 +273,7 @@ function buildDuplicateMetadataFields(existed, isRosterMatch, lang, statMap, sho
     } : null,
     showAddedBy ? {
       name: `👤 ${t('dialogue.listAdd.duplicate.addedBy', lang)}`,
-      value: existed.addedByDisplayName || existed.addedByTag || fallback,
+      value: escapeEmbedText(existed.addedByDisplayName || existed.addedByTag || fallback),
       inline: true,
     } : null,
     {

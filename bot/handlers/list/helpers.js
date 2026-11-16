@@ -57,6 +57,18 @@ export function isListType(type) {
   return Object.hasOwn(LIST_CONTEXTS, type);
 }
 
+/**
+ * The "Requested by" value of an approval card: the name the member chose,
+ * shown as text so it cannot carry a link, then their mention.
+ * @param {string} name - display name or tag
+ * @param {string} userId - Discord user id of the requester
+ * @param {string} [fallback=''] - shown when there is no name
+ * @returns {string} field value
+ */
+export function formatRequesterValue(name, userId, fallback = '') {
+  return `${escapeEmbedText(name || fallback)} (<@${userId}>)`;
+}
+
 export function listTypeIcon(type) {
   return (isListType(type) ? LIST_CONTEXTS[type] : LIST_CONTEXTS.watch).icon;
 }
@@ -467,7 +479,7 @@ export function buildListAddApprovalEmbed(guild, payload, options = {}) {
     view.showsRequester
       ? {
           name: `👤 ${t('dialogue.approval.fields.requestedBy', lang)}`,
-          value: `${payload.requestedByDisplayName} (<@${payload.requestedByUserId}>)`,
+          value: formatRequesterValue(payload.requestedByDisplayName, payload.requestedByUserId),
           inline: false,
         }
       : null,

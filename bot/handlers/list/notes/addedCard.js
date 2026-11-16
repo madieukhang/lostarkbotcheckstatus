@@ -6,7 +6,7 @@
 import { ActionRowBuilder } from 'discord.js';
 import { t } from '../../../services/i18n/index.js';
 import { buildAlertEmbed, AlertSeverity } from '../../../utils/alertEmbed.js';
-import { codeSpanText } from '../../../utils/discordText.js';
+import { codeSpanText, escapeEmbedText } from '../../../utils/discordText.js';
 import { normalizeNameKey } from '../../../utils/names.js';
 import { padInlineRow, relativeTime } from '../../../utils/ui.js';
 import { buildListEntryReasonField, buildListEntryRostersField, formatListScopeTag } from '../entryCardFields.js';
@@ -43,7 +43,7 @@ export function buildNoteAddedPayload({ entry, type, addedAlts, statMap, lang })
       ...padInlineRow([
         note.raid ? { name: `🗡️ ${t('dialogue.broadcast.fields.raid', lang)}`, value: `\`${codeSpanText(note.raid)}\``, inline: true } : null,
         { name: `🕐 ${t('dialogue.notes.added.noted', lang)}`, value: relativeTime(note.at), inline: true },
-        { name: `👤 ${t('dialogue.notes.added.notedBy', lang)}`, value: note.byName || t('dialogue.broadcast.notAvailable', lang), inline: true },
+        { name: `👤 ${t('dialogue.notes.added.notedBy', lang)}`, value: note.byName ? escapeEmbedText(note.byName) : t('dialogue.broadcast.notAvailable', lang), inline: true },
       ].filter(Boolean)),
       buildListEntryRostersField({ names: entry.allCharacters, primaryName: entry.name, statMap, lang, newNames: addedAlts }),
     ].filter(Boolean),

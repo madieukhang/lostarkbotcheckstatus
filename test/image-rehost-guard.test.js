@@ -212,3 +212,30 @@ test('a public image is still archived, through a redirect', async t => {
   assert.equal(uploads.length, 1);
   assert.equal(result.messageId, 'archived');
 });
+
+test('text the image host chose stays out of the error a summary card shows', async t => {
+  // The multiadd summary posts these errors in the requesting channel.
+  const PHISH = '[Verify your account](https://evil.example/login)';
+  const cases = [
+    { response: new Response(null, { status: 404, statusText: PHISH }), shown: 'download HTTP 404' },
+    { response: new Response('x', { headers: { 'content-type': PHISH } }), shown: 'download is not an image' },
+  ];
+  for (const { response, shown } of cases) {
+    const { client } = setup(t, { responses: [response] });
+    const error = await rehostImage('https://evidence.example/a.png', client, { throwOnError: true }).catch((err) => err);
+    assert.equal(error.message, shown);
+    const logged = console.warn.mock.calls.map((call) => call.arguments.join(' ')).join('\n');
+    assert.ok(logged.includes(PHISH), logged);
+  }
+});
+
+test('the archive post shows the display name a member chose as text', async t => {
+  const { uploads, client } = setup(t, { responses: [image()] });
+  await rehostImage('https://cdn.example/proof.png', client, {
+    entryName: 'Main', addedBy: '[Verify your account](https://evil.example/login)', listType: 'black',
+  });
+  const description = uploads[0].embeds[0].toJSON().description;
+  // An escaped bracket cannot open a link; 92 is the backslash.
+  const bs = String.fromCharCode(92);
+  assert.ok(description.includes(bs + '[Verify your account' + bs + '](https://evil.example/login)'), description);
+});

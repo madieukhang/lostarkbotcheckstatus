@@ -8,7 +8,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { t } from '../../../services/i18n/index.js';
 import { createArtistEmbed } from '../../../utils/artistVoice.js';
-import { storedText } from '../../../utils/discordText.js';
+import { escapeEmbedText, storedText } from '../../../utils/discordText.js';
 import { formatListScopeTag } from '../entryCardFields.js';
 import { getListContext } from '../helpers.js';
 import { NOTE_PAGE_PREFIX, formatNoteDate, readEntryNotes } from './entryNotes.js';
@@ -24,7 +24,7 @@ function noteField(note, index, total, lang, showAuthors) {
   const tail = [
     index === 0 ? t('dialogue.notes.history.original', lang) : '',
     index === total - 1 && total > 1 ? t('dialogue.notes.history.latest', lang) : '',
-    showAuthors && note.byName ? t('dialogue.notes.history.by', lang, { name: note.byName }) : '',
+    showAuthors && note.byName ? t('dialogue.notes.history.by', lang, { name: escapeEmbedText(note.byName) }) : '',
   ].filter(Boolean).join(' · ');
   const reason = storedText(note.reason, NOTE_REASON_LIMIT) || t('dialogue.broadcast.notAvailable', lang);
   return {

@@ -9,7 +9,7 @@ import {
   editEmbed,
 } from '../../../utils/interactionReplies.js';
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
-import { buildApprovalRetryRow, listTypeIcon } from '../helpers.js';
+import { buildApprovalRetryRow, formatRequesterValue, listTypeIcon } from '../helpers.js';
 import { createApprovalDecisionHandler, handleApprovalClaimError } from '../services/approvalInteraction.js';
 
 /**
@@ -106,7 +106,7 @@ export function createMultiaddApprovalButtonHandler(deps) {
           .setDescription(t('dialogue.multiadd.approval.rejectedDescription', targetLang, { user: interaction.user.id }))
           .setColor(COLORS.danger)
           .addFields(
-            { name: `👤 ${t('dialogue.approval.fields.requestedBy', targetLang)}`, value: `${payload.requestedByDisplayName || payload.requestedByTag || t('dialogue.common.unknown', targetLang)} (<@${payload.requestedByUserId}>)`, inline: false },
+            { name: `👤 ${t('dialogue.approval.fields.requestedBy', targetLang)}`, value: formatRequesterValue(payload.requestedByDisplayName || payload.requestedByTag, payload.requestedByUserId, t('dialogue.common.unknown', targetLang)), inline: false },
             { name: `📊 ${t('dialogue.multiadd.approval.rowsDiscarded', targetLang)}`, value: breakdown.length > 0 ? breakdown.join(' · ') : `**${payload.bulkRows.length}**`, inline: true },
             { name: `🆔 ${t('dialogue.approval.fields.requestId', targetLang)}`, value: `\`${payload.requestId.slice(0, 8)}\``, inline: true },
           )

@@ -29,6 +29,7 @@ import config from '../config.js';
 import { getGuildConfig } from './scope.js';
 import { AlertSeverity, buildAlertEmbed } from './alertEmbed.js';
 import { readBodyWithin } from './responseBody.js';
+import { escapeEmbedText } from './discordText.js';
 import {
   EVIDENCE_COPY_MAX_BYTES,
   findEvidenceImage,
@@ -214,9 +215,11 @@ export async function isEvidenceArchiveMessage(
 export async function rehostImage(originalUrl, client, meta = {}) {
   const throwOnError = meta.throwOnError === true;
   // Local helper: choose between throw and return-null based on the option,
-  // and always log to console for Railway log forensics.
-  const fail = (msg) => {
-    console.warn(`[imageRehost] ${msg}`);
+  // and always log to console for Railway log forensics. The thrown message
+  // can reach a channel through the multiadd summary, so `detail`, text the
+  // image host chose, goes to the log only.
+  const fail = (msg, detail = '') => {
+    console.warn(`[imageRehost] ${msg}${detail ? ` (${detail})` : ''}`);
     if (throwOnError) throw new Error(msg);
     return null;
   };
@@ -244,7 +247,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   const { response } = download;
 
   if (!response.ok) {
-    return fail(`download HTTP ${response.status}${response.statusText ? ` (${response.statusText})` : ''}`);
+    return fail(`download HTTP ${response.status}`, response.statusText);
   }
 
   // Only an image goes into the archive. A body typed as an image or without
@@ -252,10 +255,11 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   // signature; any other type is not read.
   const contentType = response.headers.get('content-type') || '';
   const typedImage = /^image\//i.test(contentType);
-  const notAnImage = `download is not an image (${contentType || 'no content type'})`;
+  const notAnImage = 'download is not an image';
+  const typeDetail = contentType || 'no content type';
   if (!typedImage && !UNTYPED_CONTENT_TYPE.test(contentType)) {
     await response.body?.cancel().catch(() => {});
-    return fail(notAnImage);
+    return fail(notAnImage, typeDetail);
   }
 
   let buffer;
@@ -267,7 +271,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
       : `download read body failed: ${err.message}`);
   }
   const sniffedExt = imageSignatureExtension(buffer);
-  if (!sniffedExt) return fail(notAnImage);
+  if (!sniffedExt) return fail(notAnImage, typeDetail);
 
   const filename = imageFilenameFromUrl(originalUrl, `evidence.${sniffedExt}`);
 
@@ -275,7 +279,7 @@ export async function rehostImage(originalUrl, client, meta = {}) {
   // human looking at #evidence-archive can see what each image is for.
   const auditLines = [];
   if (meta.entryName) auditLines.push(`${EVIDENCE_LIST_ICON[meta.listType] || '📎'} ${meta.entryName}`);
-  if (meta.addedBy) auditLines.push(`Added by: ${meta.addedBy}`);
+  if (meta.addedBy) auditLines.push(`Added by: ${escapeEmbedText(meta.addedBy)}`);
   const [title, ...details] = auditLines;
   let archived;
   try {

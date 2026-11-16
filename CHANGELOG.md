@@ -1,5 +1,7 @@
 # Changelog
 
+- A display name a member chose shows as text wherever another person reads it: the approval cards and DMs (single and bulk, approved or rejected), the duplicate card's "Added by", the note card and the note History, and the evidence archive post. A name written as `[text](link)` no longer shows as a link. Image download errors in the multiadd summary, which is also posted in the requesting channel, no longer include the status text or content type the image host sent; those stay in the log.
+
 - Two more cuts end on a whole character: the `Custom · ...` suggestion for a long watchlist raid label typed with an emoji, and a `/la-check` card whose eight reported names carry long reasons past Discord's 4096-character limit. Both could end on half an emoji. The cut lives in `bot/utils/textCut.js`, which imports nothing, so the raid catalog uses it without loading discord.js.
 
 - Internal: jsdom loads when the bot first parses a page (a lostark.bible roster or the server status page), not at startup; `bot/services/roster/dom.js` is the only module that loads it. Most test files no longer load it, and one `/la-list trust` test no longer waits 10 seconds for a database read, so the test suite ran in 66 s instead of 101 s back to back. Also drops an unused argument to the trust handlers.

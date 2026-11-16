@@ -15,7 +15,8 @@ import { buildNoteHistoryPayload } from '../bot/handlers/list/notes/historyView.
 import { buildDuplicateApprovalEmbed } from '../bot/handlers/list/duplicate-ui.js';
 import { buildListEditPlan } from '../bot/handlers/list/edit/plan.js';
 import { buildListEntryInlineFields } from '../bot/handlers/list/entryCardFields.js';
-import { getListContext } from '../bot/handlers/list/helpers.js';
+import { buildListAddApprovalEmbed, getListContext } from '../bot/handlers/list/helpers.js';
+import { buildDuplicateListAddResult } from '../bot/handlers/list/services/addExecutor.js';
 
 // Text one member stores is shown to every guild, so a masked link in it
 // must show as typed and never as a link.
@@ -190,4 +191,29 @@ test('the note History card fits a 1000-character reason of brackets', () => {
   });
   const value = payload.embeds[0].toJSON().fields[0].value;
   assert.ok(value.length <= 1024, String(value.length));
+});
+
+test('a display name a member chose shows as text on approval, duplicate and note cards', () => {
+  const note = { at: new Date(), reason: 'dead', raid: '', byName: PHISH };
+  const cards = {
+    approval: buildListAddApprovalEmbed({ id: 'g', name: 'Guild' }, {
+      requestId: 'r', action: 'add', type: 'black', scope: 'global', name: 'Main', reason: 'dead', raid: '',
+      requestedByUserId: 'u1', requestedByDisplayName: PHISH,
+    }, { lang: 'en' }),
+    duplicate: buildDuplicateListAddResult({
+      existed: { ...STORED, addedByDisplayName: PHISH }, name: 'Main', labelCap: 'Blacklist', type: 'black',
+      lang: 'en', showAddedBy: true,
+    }).embeds[0],
+    noteAdded: buildNoteAddedPayload({
+      entry: { ...STORED, notes: [note] }, type: 'black', addedAlts: [], statMap: new Map(), lang: 'en',
+    }).embeds[0],
+    history: buildNoteHistoryPayload({
+      entry: { ...STORED, notes: [note] }, type: 'black', page: 1, lang: 'en', showAuthors: true,
+    }).embeds[0],
+  };
+  for (const [card, embed] of Object.entries(cards)) {
+    const text = shownText(embed);
+    assert.equal(LIVE_PHISH.test(text), false, `${card}: live masked link in ${text}`);
+    assert.ok(text.includes(SHOWN), `${card}: ${text}`);
+  }
 });
