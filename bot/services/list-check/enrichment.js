@@ -7,7 +7,7 @@ import {
   createNameSuggestionContext,
   fetchNameSuggestions,
 } from '../roster/search.js';
-import { upsertRosterSnapshots } from '../roster/rosterSnapshots.js';
+import { saveRosterSnapshotsBestEffort, upsertRosterSnapshots } from '../roster/rosterSnapshots.js';
 import { getWorkerHealth } from '../worker/heartbeat.js';
 import {
   asciiFoldName,
@@ -22,6 +22,11 @@ import { applyMarkedSiblingLevelCorrections } from './partyCorrections.js';
 const LOOKUP_RESOLVED = 'resolved';
 const LOOKUP_UNRESOLVED = 'unresolved';
 const LOOKUP_UNAVAILABLE = 'unavailable';
+// A snapshot older than this is looked up again when its name is checked, so
+// names that keep showing up in checks refresh without a background job.
+const STALE_SNAPSHOT_MS = 7 * 24 * 60 * 60 * 1000;
+// Stale names refreshed per check, oldest first, in one parallel round.
+const STALE_REFRESH_LIMIT = 3;
 
 const SUGGESTION_MATCH_LOGGERS = {
   diacritic: ({ originalName, chosenName }) =>
@@ -47,6 +52,83 @@ const DEEP_RECOVERY_STRATEGIES = Object.freeze([
   { label: 'Prefix-indel recovery', recover: recoverViaPrefixIndel },
 ]);
 
+/**
+ * Checked names whose class and item level came from a snapshot older than a
+ * week, oldest first. A result without a snapshot date is left alone.
+ * @param {object[]} results - list-check results
+ * @param {number} [now=Date.now()] - current time in ms
+ * @returns {object[]} at most STALE_REFRESH_LIMIT results
+ */
+function selectStaleSnapshotItems(results, now = Date.now()) {
+  return results
+    .map((item) => ({ item, updatedAt: new Date(item.snapUpdatedAt ?? NaN).getTime() }))
+    .filter(({ item, updatedAt }) => item.snapClassId && item.snapItemLevel && now - updatedAt > STALE_SNAPSHOT_MS)
+    .sort((a, b) => a.updatedAt - b.updatedAt)
+    .slice(0, STALE_REFRESH_LIMIT)
+    .map(({ item }) => item);
+}
+
+/**
+ * Stats for one exact name: the roster page through the worker when it is
+ * online, else Bible's name search. A near match is never taken.
+ * @param {string} name - checked name
+ * @param {{online: boolean, searchOptions: Function, lookupTimeoutMs: number}} route
+ * @returns {Promise<object|null>} classId, itemLevel and, from a roster page,
+ *   combatScore and world; null when Bible lists no such name
+ */
+async function fetchExactStats(name, { online, searchOptions, lookupTimeoutMs }) {
+  const isName = (candidate) => normalizeNameKey(candidate) === normalizeNameKey(name);
+  if (online) {
+    const roster = await buildRosterCharacters(name, {
+      viaWorker: true,
+      retryOnRateLimit: false,
+      timeoutMs: lookupTimeoutMs,
+    }).catch(() => null);
+    const record = roster?.hasValidRoster ? roster.rosterCharacters?.find((c) => isName(c.name)) : null;
+    if (record) return record;
+  }
+  const suggestions = await fetchNameSuggestions(name, searchOptions());
+  const match = suggestions?.find((suggestion) => isName(suggestion.name));
+  return match ? { classId: match.cls, itemLevel: match.itemLevel } : null;
+}
+
+// Stats only: the name, how its identity was verified and its alts stay as the
+// snapshot and the list lookups left them. Item level keeps the higher value,
+// since Bible's search index can lag behind its character pages.
+function applyStaleRefresh(item, { classId, itemLevel, combatScore, world }) {
+  if (classId) Object.assign(item, { snapClassId: classId, snapClassName: getClassName(classId) });
+  item.snapItemLevel = Math.max(Number(item.snapItemLevel) || 0, Number(itemLevel) || 0);
+  if (combatScore && combatScore !== '?') item.snapCombatScore = String(combatScore);
+  return {
+    name: item.name,
+    classId: item.snapClassId,
+    itemLevel: item.snapItemLevel,
+    combatScore: item.snapCombatScore,
+    world: world || '',
+  };
+}
+
+/**
+ * Refresh and save the stats of stale checked names. A name Bible no longer
+ * lists keeps its old stats, and a later check tries it again.
+ * @param {object[]} items - from selectStaleSnapshotItems
+ * @param {{online: boolean, searchOptions: Function, lookupTimeoutMs: number, concurrency: number}} route
+ * @returns {Promise<void>}
+ */
+async function refreshStaleSnapshots(items, route) {
+  if (items.length === 0) return;
+  const refreshed = [];
+  await mapWithConcurrency(items, route.concurrency, async (item) => {
+    try {
+      const fresh = await fetchExactStats(item.name, route);
+      if (fresh) refreshed.push(applyStaleRefresh(item, fresh));
+    } catch (err) {
+      console.warn(`[listcheck] Stale snapshot refresh skipped for ${item.name}: ${err.message}`);
+    }
+  });
+  await saveRosterSnapshotsBestEffort(refreshed, '', { label: '[listcheck]' });
+}
+
 export async function enrichListCheckResults(
   results,
   { suggestionCache, suggestionContext } = {},
@@ -54,7 +136,8 @@ export async function enrichListCheckResults(
   const itemsNeedingEnrichment = results.filter(
     (item) => !item.snapClassId || !item.snapItemLevel
   );
-  if (itemsNeedingEnrichment.length === 0) {
+  const staleItems = selectStaleSnapshotItems(results);
+  if (itemsNeedingEnrichment.length === 0 && staleItems.length === 0) {
     return { correctionApplied: false, correctionMs: 0 };
   }
 
@@ -82,6 +165,13 @@ export async function enrichListCheckResults(
       suggestionContext: lookupContext,
       ...extra,
     };
+  }
+  const staleRoute = { online: health.online, searchOptions, lookupTimeoutMs, concurrency };
+  if (itemsNeedingEnrichment.length === 0) {
+    // Only stale stats to refresh: no name gets resolved, so the party-level
+    // corrections below stay as they were without this refresh.
+    await refreshStaleSnapshots(staleItems, staleRoute);
+    return { correctionApplied: false, correctionMs: 0 };
   }
 
   function applyEnrichment(
@@ -289,6 +379,7 @@ export async function enrichListCheckResults(
     },
   );
 
+  await refreshStaleSnapshots(staleItems, staleRoute);
   if (pendingSnapshots.size > 0) {
     try {
       await upsertRosterSnapshots([...pendingSnapshots.values()], '');
@@ -314,6 +405,7 @@ export async function enrichListCheckResults(
     `worker=${workerResolved}`,
     `deep=${deepResolved}/${deepCandidates.length}`,
     `deepSkipped=${Math.max(0, unresolvedItems.length - deepCandidates.length)}`,
+    `stale=${staleItems.length}`,
     `network=${lookupStats.networkLookups || 0}`,
     `requestCache=${lookupStats.requestCacheHits || 0}`,
     `sharedCache=${lookupStats.sharedCacheHits || 0}`,

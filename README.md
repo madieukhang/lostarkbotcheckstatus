@@ -164,6 +164,7 @@ at most 3 screenshot checks waiting in an auto-check channel and attach up to 10
 - Daily runs `gemini-3.1-flash-lite → gemini-3.5-flash-lite`. Analysis runs `gemini-3.8-flash → gemini-3.7-flash → gemini-3.6-flash → gemini-3.5-flash`.
 - Neither the fallback nor the optional diacritic correction pass crosses profiles, and cached results are kept apart by profile and model chain. Both profiles use the bounded JSON prompt, low thinking and the same timeout and cooldown policy.
 - Rate limits count API calls per model and project, not images: one image may need a fallback or a correction pass. Settings do not create new quota.
+- Item level and combat score come from the bot's stored roster data. A check looks a name up again when that data is over a week old, at most three names per check (the oldest first), by exact name only; it never renames a character for this.
 
 ## Data
 

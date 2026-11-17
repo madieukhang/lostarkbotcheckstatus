@@ -93,6 +93,8 @@ function createInitialListCheckResult(name, inputSource, maps, snapshots) {
     snapClassName: snapshot?.classId ? getClassName(snapshot.classId) : '',
     snapItemLevel: snapshot?.itemLevel || 0,
     snapCombatScore: snapshot?.combatScore || '',
+    // Lets the enrichment look a week-old snapshot up again.
+    snapUpdatedAt: snapshot?.updatedAt || null,
     discoveredAlts: [],
   };
 }
