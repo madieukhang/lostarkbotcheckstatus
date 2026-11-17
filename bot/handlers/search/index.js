@@ -9,6 +9,7 @@ import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
 import {
   createNameSuggestionContext,
   fetchNameSuggestions,
+  higherItemLevel,
 } from '../../services/roster/index.js';
 import { loadListLookup } from '../../services/list-check/lookup.js';
 import { getUserLanguage, t } from '../../services/i18n/index.js';
@@ -149,10 +150,8 @@ export async function handleSearchCommand(interaction) {
     ]);
     dbMs = Date.now() - dbStartedAt;
 
-    // Snapshots add combatScore, which Bible suggestions lack. For item
-    // level either source can be the stale one: a snapshot dates from the
-    // last lookup of that name, and Bible's search index can lag behind its
-    // character pages, so each result keeps the higher of the two.
+    // Snapshots add combatScore, which Bible suggestions lack; item level
+    // takes the higher of the two (higherItemLevel says why).
     const snapshotMap = buildNameKeyMap(allSnapshots);
     // Load class metadata for via/visible alt names in one DB batch; decorating
     // a search card must not launch extra Bible calls for each related name.
@@ -177,7 +176,7 @@ export async function handleSearchCommand(interaction) {
         ...s,
         identityVerified: true,
         identityVerificationSource: 'bible-search',
-        itemLevel: Math.max(Number(snap?.itemLevel) || 0, Number(s.itemLevel) || 0) || s.itemLevel,
+        itemLevel: higherItemLevel(snap?.itemLevel, s.itemLevel) || s.itemLevel,
         black: lookup.maps.black.get(key) || null,
         white: lookup.maps.white.get(key) || null,
         watch: lookup.maps.watch.get(key) || null,

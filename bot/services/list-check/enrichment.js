@@ -7,7 +7,7 @@ import {
   createNameSuggestionContext,
   fetchNameSuggestions,
 } from '../roster/search.js';
-import { saveRosterSnapshotsBestEffort, upsertRosterSnapshots } from '../roster/rosterSnapshots.js';
+import { higherItemLevel, saveRosterSnapshotsBestEffort } from '../roster/rosterSnapshots.js';
 import { getWorkerHealth } from '../worker/heartbeat.js';
 import {
   asciiFoldName,
@@ -83,7 +83,10 @@ async function fetchExactStats(name, { online, searchOptions, lookupTimeoutMs })
       viaWorker: true,
       retryOnRateLimit: false,
       timeoutMs: lookupTimeoutMs,
-    }).catch(() => null);
+    }).catch((err) => {
+      console.warn(`[listcheck] Stale refresh worker lookup threw for ${name}, using search: ${err.message}`);
+      return null;
+    });
     const record = roster?.hasValidRoster ? roster.rosterCharacters?.find((c) => isName(c.name)) : null;
     if (record) return record;
   }
@@ -93,11 +96,10 @@ async function fetchExactStats(name, { online, searchOptions, lookupTimeoutMs })
 }
 
 // Stats only: the name, how its identity was verified and its alts stay as the
-// snapshot and the list lookups left them. Item level keeps the higher value,
-// since Bible's search index can lag behind its character pages.
+// snapshot and the list lookups left them.
 function applyStaleRefresh(item, { classId, itemLevel, combatScore, world }) {
   if (classId) Object.assign(item, { snapClassId: classId, snapClassName: getClassName(classId) });
-  item.snapItemLevel = Math.max(Number(item.snapItemLevel) || 0, Number(itemLevel) || 0);
+  item.snapItemLevel = higherItemLevel(item.snapItemLevel, itemLevel);
   if (combatScore && combatScore !== '?') item.snapCombatScore = String(combatScore);
   return {
     name: item.name,
@@ -380,15 +382,9 @@ export async function enrichListCheckResults(
   );
 
   await refreshStaleSnapshots(staleItems, staleRoute);
-  if (pendingSnapshots.size > 0) {
-    try {
-      await upsertRosterSnapshots([...pendingSnapshots.values()], '');
-    } catch (saveErr) {
-      // Persistence is best effort. The current response still uses the
-      // in-memory metadata and a later request can retry the snapshot write.
-      console.warn(`[listcheck] Snapshot batch upsert failed: ${saveErr.message}`);
-    }
-  }
+  // The current response uses the in-memory metadata either way; a later
+  // request retries a failed write.
+  await saveRosterSnapshotsBestEffort([...pendingSnapshots.values()], '', { label: '[listcheck]' });
 
   const primaryResolved = primaryStatuses.filter(
     (status) => status === LOOKUP_RESOLVED

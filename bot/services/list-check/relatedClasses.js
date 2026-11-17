@@ -10,7 +10,7 @@ import { getClassName } from '../../models/Class.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 import { normalizeNameKey, rememberNormalizedName } from '../../utils/names.js';
 import { fetchNameSuggestions } from '../roster/search.js';
-import { upsertRosterSnapshots } from '../roster/rosterSnapshots.js';
+import { saveRosterSnapshotsBestEffort } from '../roster/rosterSnapshots.js';
 import {
   LIST_CHECK_ALT_PREVIEW_LIMIT,
   pickAltsForDisplay,
@@ -70,13 +70,9 @@ async function persistSnapshots(records) {
     group.push(record);
     recordsByRoster.set(record.rosterName, group);
   }
-  await Promise.all([...recordsByRoster].map(async ([rosterName, group]) => {
-    try {
-      await upsertRosterSnapshots(group, rosterName);
-    } catch (err) {
-      console.warn('[listcheck] Related-name snapshot save failed (non-fatal):', err.message);
-    }
-  }));
+  await Promise.all([...recordsByRoster].map(([rosterName, group]) => (
+    saveRosterSnapshotsBestEffort(group, rosterName, { label: '[listcheck]' })
+  )));
 }
 
 async function hydrateMissingClasses(

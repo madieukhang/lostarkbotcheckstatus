@@ -23,8 +23,8 @@ import {
   parseRosterCharactersFromHtml,
   handleRosterBlackListCheck,
   handleRosterWhiteListCheck,
+  saveRosterSnapshotsBestEffort,
   stampRosterWorld,
-  upsertRosterSnapshots,
 } from '../../services/roster/index.js';
 import { normalizeCharacterName } from '../../utils/names.js';
 import { escapeLinkBrackets, truncateInlineText } from '../../utils/discordText.js';
@@ -260,9 +260,9 @@ async function handleVisibleRosterResult({ interaction, guildId, replyEditor, na
   await connectDB();
   const previousSnapshotsPromise = loadPreviousSnapshotMap(characters).then(previousSnapshots => {
     // Capture old stats before writing; list lookup failure must not prevent
-    // a successful roster fetch from refreshing its snapshots.
-    upsertRosterSnapshots(characters, name)
-      .catch((err) => console.warn('[roster] Snapshot save failed:', err.message));
+    // a successful roster fetch from refreshing its snapshots. Not awaited:
+    // the save never rejects and the card does not wait for it.
+    saveRosterSnapshotsBestEffort(characters, name);
     return previousSnapshots;
   });
   const [previousSnapshots, matches] = await Promise.all([

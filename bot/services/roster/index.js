@@ -20,6 +20,7 @@ export {
 
 export {
   findRosterSnapshot,
+  higherItemLevel,
   saveRosterSnapshotsBestEffort,
   upsertRosterSnapshots,
 } from './rosterSnapshots.js';

@@ -76,6 +76,18 @@ export async function upsertRosterSnapshots(
 }
 
 /**
+ * The item level to show when a stored snapshot and a fresh lookup disagree.
+ * Either can be the stale one: a snapshot dates from the last lookup of that
+ * name, and Bible's search index can lag behind its character pages. Item
+ * level practically never drops, so the higher value wins.
+ * @param {...unknown} levels - item levels; non-numbers count as 0
+ * @returns {number} the highest positive level, or 0
+ */
+export function higherItemLevel(...levels) {
+  return Math.max(0, ...levels.map((level) => Number(level) || 0));
+}
+
+/**
  * Save the snapshots of a roster a command just fetched, without letting a
  * database failure break that command: list cards read item level and combat
  * score from these snapshots, and the fetch result itself stays usable.

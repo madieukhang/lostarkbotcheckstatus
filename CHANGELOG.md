@@ -1,5 +1,7 @@
 # Changelog
 
+- Internal: every best-effort roster snapshot save (the check batch, related names, `/la-roster`) goes through `saveRosterSnapshotsBestEffort`, and `higherItemLevel` holds the one rule for which item level to show. The stale-name refresh logs a failed worker lookup before it falls back to the name search.
+
 - `/la-check` and auto-check look a name up again when its stored stats are more than a week old (at most three names per check, the oldest first, by exact name only), so characters that keep showing up in checks get their current item level on the result and on list cards.
 
 - `/la-search` shows the higher of the item level Bible's search returns and the stored one; before, any stored value replaced the live search result, so a character who had progressed since the last lookup showed the old level. `/la-list enrich` and `/la-roster` on a hidden roster now save the stats they fetched, like the other lookups, so list cards pick them up.
