@@ -28,12 +28,14 @@ import Blacklist from '../../models/Blacklist.js';
 import Whitelist from '../../models/Whitelist.js';
 import { t, tPick } from '../../services/i18n/index.js';
 import {
+  buildHiddenRosterRecords,
   detectAltsViaStronghold,
   fetchCharacterMeta,
   fetchGuildMembers,
   fetchNameSuggestions,
   formatSuggestionLines,
   isBibleRequestFailure,
+  saveRosterSnapshotsBestEffort,
 } from '../../services/roster/index.js';
 import { sendScanCompletionDm, buildResultMessageUrl } from '../../utils/scanCompletionDm.js';
 import { profileUrl as bibleProfileUrl } from '../../utils/rosterLink.js';
@@ -331,6 +333,12 @@ export async function handleHiddenRosterResult({ interaction, guildId, replyEdit
       bibleFailed = isBibleRequestFailure(result);
     },
   });
+  // List cards read item level from the roster snapshots. A snapshot write
+  // sets class and item level both, so a meta missing either is not saved
+  // over a stored value.
+  if (meta?.itemLevel > 0 && meta.classId) {
+    await saveRosterSnapshotsBestEffort(buildHiddenRosterRecords(name, meta), name);
+  }
   if (!meta?.guildName) {
     if (bibleFailed) await replyWithBibleUnavailable(replyEditor, lang);
     else await replyWithHiddenRosterSuggestions(replyEditor, name, lang);

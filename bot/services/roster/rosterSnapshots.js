@@ -74,3 +74,24 @@ export async function upsertRosterSnapshots(
   if (operations.length === 0) return null;
   return RosterSnapshotModel.bulkWrite(operations, { ordered: false });
 }
+
+/**
+ * Save the snapshots of a roster a command just fetched, without letting a
+ * database failure break that command: list cards read item level and combat
+ * score from these snapshots, and the fetch result itself stays usable.
+ * @param {object[]} rosterCharacters - fetched character records
+ * @param {string} rosterName - roster the records belong to
+ * @param {{label?: string, upsertFn?: Function}} [options] - log prefix;
+ *   the upsert is injectable for tests
+ * @returns {Promise<void>}
+ */
+export async function saveRosterSnapshotsBestEffort(rosterCharacters, rosterName, {
+  label = '[roster]',
+  upsertFn = upsertRosterSnapshots,
+} = {}) {
+  try {
+    await upsertFn(rosterCharacters || [], rosterName);
+  } catch (err) {
+    console.warn(`${label} Snapshot save after roster fetch failed (non-fatal):`, err.message);
+  }
+}

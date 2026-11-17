@@ -51,6 +51,23 @@ export function stampRosterWorld(characters, world) {
     : characters;
 }
 
+/**
+ * The one-character roster of a hidden roster, built from the profile meta:
+ * Bible shows that character's class and item level but no roster or combat score.
+ * @param {string} name - the character looked up
+ * @param {object} meta - fetchCharacterMeta result (classId, itemLevel, world)
+ * @param {number|null} [itemLevel=meta.itemLevel] - item level to record
+ * @returns {object[]} one roster record, stamped with the meta's world
+ */
+export function buildHiddenRosterRecords(name, meta, itemLevel = meta?.itemLevel) {
+  return stampRosterWorld([{
+    name,
+    classId: meta?.classId || '',
+    itemLevel: itemLevel || 0,
+    combatScore: '',
+  }], meta?.world);
+}
+
 function readTargetStats(targetRecord) {
   const parsedItemLevel = parseItemLevelValue(targetRecord?.itemLevel);
   return {
@@ -176,14 +193,7 @@ async function buildRosterCharactersOnce(name, options) {
           rosterVisibility = 'hidden';
           targetItemLevel = meta.itemLevel ?? await inferHiddenRosterItemLevel(name, options);
           allCharacters = [name];
-          rosterCharacters = [{
-            name,
-            classId: meta.classId || '',
-            itemLevel: targetItemLevel || 0,
-            combatScore: '',
-          }];
-
-          rosterCharacters = stampRosterWorld(rosterCharacters, meta.world);
+          rosterCharacters = buildHiddenRosterRecords(name, meta, targetItemLevel);
         }
       }
     }

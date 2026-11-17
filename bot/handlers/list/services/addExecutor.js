@@ -23,7 +23,7 @@ import {
   fetchCharacterMeta,
   fetchNameSuggestions,
   findRosterSnapshot,
-  upsertRosterSnapshots,
+  saveRosterSnapshotsBestEffort,
 } from '../../../services/roster/index.js';
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { escapeEmbedText } from '../../../utils/discordText.js';
@@ -196,14 +196,6 @@ export async function buildUnusableRosterResult(name, roster, lang, {
   if (roster.failReason) return buildBibleUnavailableResult(lang);
   const suggestions = await fetchSuggestions(name) || [];
   return buildMissingRosterResult(name, suggestions, lang);
-}
-
-async function saveRosterSnapshotsBestEffort(rosterCharacters, name) {
-  try {
-    await upsertRosterSnapshots(rosterCharacters, name);
-  } catch (err) {
-    console.warn('[list] Snapshot save after roster fetch failed (non-fatal):', err.message);
-  }
 }
 
 /**
@@ -605,7 +597,7 @@ export function createListAddExecutor({ client, broadcastListChange }) {
     const unusableRoster = await buildUnusableRosterResult(name, roster, lang);
     if (unusableRoster) return unusableRoster;
 
-    await saveRosterSnapshotsBestEffort(roster.rosterCharacters, name);
+    await saveRosterSnapshotsBestEffort(roster.rosterCharacters, name, { label: '[list]' });
     const record = statMapFromRosterCharacters(roster.rosterCharacters).get(normalizeNameKey(name)) || null;
     const itemLevelRejection = buildItemLevelRejection({
       name,

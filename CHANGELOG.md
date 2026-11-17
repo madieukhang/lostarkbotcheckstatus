@@ -1,5 +1,7 @@
 # Changelog
 
+- `/la-search` shows the higher of the item level Bible's search returns and the stored one; before, any stored value replaced the live search result, so a character who had progressed since the last lookup showed the old level. `/la-list enrich` and `/la-roster` on a hidden roster now save the stats they fetched, like the other lookups, so list cards pick them up.
+
 - `/la-list trust action:add` (a new trust or a refresh) now saves the roster it fetched from lostark.bible, so `/la-list view` and the other list cards show the item level and combat score of that lookup instead of an older one. Before, the trust flow kept only the alt names.
 
 - README reorganized: one short line per command in separate tables (everyone, lists, auto-check channel, setup, owner server), the list rules gathered under "How lists work", the OCR modes under "Screenshot checks", and the tuning variables folded away. Corrected: the Node versions, the twelve models (the old diagram showed a roster cache that does not exist), the per-list unique indexes and nine undocumented variables.

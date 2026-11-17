@@ -3,7 +3,12 @@ import Blacklist from '../../../models/Blacklist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
-import { buildRosterCharacters, findRosterSnapshot, upsertRosterSnapshots } from '../../../services/roster/index.js';
+import {
+  buildRosterCharacters,
+  findRosterSnapshot,
+  saveRosterSnapshotsBestEffort,
+  upsertRosterSnapshots,
+} from '../../../services/roster/index.js';
 import {
   normalizeCharacterName,
   normalizeNameKey,
@@ -137,11 +142,10 @@ export async function persistTrustedRoster(args, {
   upsertRosterSnapshotsFn = upsertRosterSnapshots,
 } = {}) {
   await saveTrustedEntry(args, TrustedUserModel);
-  try {
-    await upsertRosterSnapshotsFn(args.rosterResult?.rosterCharacters || [], args.name);
-  } catch (err) {
-    console.warn('[list] Snapshot save after trust roster fetch failed (non-fatal):', err.message);
-  }
+  await saveRosterSnapshotsBestEffort(args.rosterResult?.rosterCharacters, args.name, {
+    label: '[list]',
+    upsertFn: upsertRosterSnapshotsFn,
+  });
 }
 
 function buildTrustSuccessFields({ existing, name, reason, allCharacters, rosterResult, rosterKept, interaction, lang }) {

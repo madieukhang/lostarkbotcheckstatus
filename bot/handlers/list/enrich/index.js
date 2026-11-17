@@ -39,6 +39,7 @@ import {
   detectAltsViaStronghold,
   buildRosterCharacters,
   findRosterSnapshot,
+  saveRosterSnapshotsBestEffort,
 } from '../../../services/roster/index.js';
 import { normalizeCharacterName, normalizeNameKey } from '../../../utils/names.js';
 import { isPrivilegedStrongholdScanUser } from '../../../utils/scanPermissions.js';
@@ -163,15 +164,29 @@ async function editEnrichError(replyEditor, key, lang, values = {}, { clearConte
   await replyEditor.edit(payload);
 }
 
-async function resolveEnrichTargetVisibility({ name, existingSession, lang, replyEditor }) {
+/**
+ * Whether the entry's roster is hidden, probing lostark.bible once per scan
+ * session. The probed roster is saved as snapshots, since list cards read item
+ * level and combat score from them.
+ * @param {object} args - name, existingSession, lang and replyEditor of the scan;
+ *   `buildRosterCharactersFn` and `saveSnapshotsFn` are injectable for tests
+ * @returns {Promise<{ok: boolean, targetIsHidden?: boolean}>} `ok: false` after
+ *   the missing-profile notice was shown
+ */
+export async function resolveEnrichTargetVisibility({
+  name, existingSession, lang, replyEditor,
+  buildRosterCharactersFn = buildRosterCharacters,
+  saveSnapshotsFn = saveRosterSnapshotsBestEffort,
+}) {
   if (existingSession?.targetIsHidden !== undefined) {
     return { ok: true, targetIsHidden: existingSession.targetIsHidden };
   }
-  const probe = await buildRosterCharacters(name, {
+  const probe = await buildRosterCharactersFn(name, {
     hiddenRosterFallback: true,
     viaWorker: true,
   });
   if (probe.hasValidRoster) {
+    await saveSnapshotsFn(probe.rosterCharacters, name, { label: '[enrich]' });
     return { ok: true, targetIsHidden: probe.rosterVisibility === 'hidden' };
   }
   await editEnrichError(replyEditor, 'dialogue.enrich.profileMissing', lang, { name });

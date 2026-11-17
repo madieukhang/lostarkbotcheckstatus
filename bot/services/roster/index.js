@@ -12,6 +12,7 @@ export {
 } from './search.js';
 
 export {
+  buildHiddenRosterRecords,
   buildRosterCharacters,
   isBibleRequestFailure,
   stampRosterWorld,
@@ -19,6 +20,7 @@ export {
 
 export {
   findRosterSnapshot,
+  saveRosterSnapshotsBestEffort,
   upsertRosterSnapshots,
 } from './rosterSnapshots.js';
 

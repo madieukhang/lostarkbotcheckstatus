@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
-const { findRosterSnapshot, upsertRosterSnapshots } = await import('../bot/services/roster/rosterSnapshots.js');
+const { findRosterSnapshot, saveRosterSnapshotsBestEffort, upsertRosterSnapshots } = await import('../bot/services/roster/rosterSnapshots.js');
 
 test('findRosterSnapshot resolves null on a failed read and leaves one warning', async (t) => {
   const warn = t.mock.method(console, 'warn', () => {});
@@ -56,4 +56,18 @@ test('upsertRosterSnapshots is a no-op for an empty roster', async () => {
 
   assert.equal(result, null);
   assert.equal(called, false);
+});
+
+test('saveRosterSnapshotsBestEffort saves through the upsert and logs a failure instead of throwing', async (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const calls = [];
+  const roster = [{ name: 'Shawlion', itemLevel: 1755 }];
+  await saveRosterSnapshotsBestEffort(roster, 'Shawlion', {
+    label: '[test]',
+    upsertFn: async (...args) => { calls.push(args); throw new Error('database down'); },
+  });
+  assert.deepEqual(calls, [[roster, 'Shawlion']]);
+  assert.equal(warn.mock.callCount(), 1);
+  const logged = warn.mock.calls[0].arguments.join(' ');
+  assert.ok(logged.startsWith('[test] ') && logged.includes('database down'), logged);
 });

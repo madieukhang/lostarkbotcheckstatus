@@ -398,3 +398,21 @@ test('the text cooldown expires after its 10 second window', async context => {
   await send('after-window');
   assert.equal(lookups(), 2);
 });
+
+test('a hidden roster lookup saves the character it read as a snapshot', async context => {
+  mockBibleProfile(context, { meta: () => metaDataResponse() });
+  stubListQueries(context);
+  const saved = [];
+  context.mock.method(RosterSnapshot, 'bulkWrite', async operations => {
+    saved.push(...operations.map(operation => ({ name: operation.updateOne.filter.name, ...operation.updateOne.update.$set })));
+    return {};
+  });
+  await handleHiddenRosterResult({
+    interaction: { user: { id: 'officer' } }, guildId: 'guild', lang: 'en', name: 'Hiddenone', deep: false,
+    deepOptions: {}, replyEditor: { edit: async () => {}, getMessage: () => null },
+  });
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].name, 'Hiddenone');
+  assert.equal(saved[0].itemLevel, 1725.55);
+  assert.equal(saved[0].classId, 'bard');
+});
