@@ -3,7 +3,7 @@ import Blacklist from '../../../models/Blacklist.js';
 import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
-import { buildRosterCharacters, findRosterSnapshot } from '../../../services/roster/index.js';
+import { buildRosterCharacters, findRosterSnapshot, upsertRosterSnapshots } from '../../../services/roster/index.js';
 import {
   normalizeCharacterName,
   normalizeNameKey,
@@ -93,10 +93,10 @@ async function rejectBlacklistedTrust(interaction, name, allCharacters, lang) {
   return true;
 }
 
-async function persistTrustedRoster({ existing, name, reason, allCharacters, rosterResult, rosterKept, interaction }) {
+async function saveTrustedEntry({ existing, name, reason, allCharacters, rosterResult, rosterKept, interaction }, TrustedUserModel) {
   const source = rosterResult?.hasValidRoster ? 'bible' : 'manual';
   if (!existing) {
-    await TrustedUser.create({
+    await TrustedUserModel.create({
       name,
       reason,
       allCharacters,
@@ -108,10 +108,10 @@ async function persistTrustedRoster({ existing, name, reason, allCharacters, ros
     return;
   }
   if (rosterKept) {
-    if (reason) await TrustedUser.updateOne({ _id: existing._id }, { $set: { reason } });
+    if (reason) await TrustedUserModel.updateOne({ _id: existing._id }, { $set: { reason } });
     return;
   }
-  await TrustedUser.updateOne(
+  await TrustedUserModel.updateOne(
     { _id: existing._id },
     { $set: {
       ...(reason ? { reason } : {}),
@@ -120,6 +120,28 @@ async function persistTrustedRoster({ existing, name, reason, allCharacters, ros
       enrichedAt: new Date(),
     } }
   );
+}
+
+/**
+ * Save a trusted entry from a trust addition or refresh, then the roster
+ * lostark.bible returned for it: list cards read item level and combat score
+ * from the roster snapshots, so dropping it would leave them stale. The
+ * snapshot save is best effort and a failure there keeps the trusted entry.
+ * @param {object} args - the existing entry or null, name, reason,
+ *   allCharacters, rosterResult, rosterKept and interaction of the addition
+ * @param {{TrustedUserModel?: object, upsertRosterSnapshotsFn?: Function}} [deps] - injectable for tests
+ * @returns {Promise<void>}
+ */
+export async function persistTrustedRoster(args, {
+  TrustedUserModel = TrustedUser,
+  upsertRosterSnapshotsFn = upsertRosterSnapshots,
+} = {}) {
+  await saveTrustedEntry(args, TrustedUserModel);
+  try {
+    await upsertRosterSnapshotsFn(args.rosterResult?.rosterCharacters || [], args.name);
+  } catch (err) {
+    console.warn('[list] Snapshot save after trust roster fetch failed (non-fatal):', err.message);
+  }
 }
 
 function buildTrustSuccessFields({ existing, name, reason, allCharacters, rosterResult, rosterKept, interaction, lang }) {

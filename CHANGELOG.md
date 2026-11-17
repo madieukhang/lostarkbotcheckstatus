@@ -1,5 +1,7 @@
 # Changelog
 
+- `/la-list trust action:add` (a new trust or a refresh) now saves the roster it fetched from lostark.bible, so `/la-list view` and the other list cards show the item level and combat score of that lookup instead of an older one. Before, the trust flow kept only the alt names.
+
 - README reorganized: one short line per command in separate tables (everyone, lists, auto-check channel, setup, owner server), the list rules gathered under "How lists work", the OCR modes under "Screenshot checks", and the tuning variables folded away. Corrected: the Node versions, the twelve models (the old diagram showed a roster cache that does not exist), the per-list unique indexes and nine undocumented variables.
 
 - A display name a member chose shows as text wherever another person reads it: the approval cards and DMs (single and bulk, approved or rejected), the duplicate card's "Added by", the note card and the note History, and the evidence archive post. A name written as `[text](link)` no longer shows as a link. Image download errors in the multiadd summary, which is also posted in the requesting channel, no longer include the status text or content type the image host sent; those stay in the log.
