@@ -376,6 +376,7 @@ const jp = {
       refresh: '更新',
       expired: '期限切れ · /la-list view を再実行',
       noReason: 'No reason',
+      noteCount: 'メモ {count}件',
     },
     empty: {
       allTitle: 'すべての list は空です',

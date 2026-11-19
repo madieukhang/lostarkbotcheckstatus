@@ -376,6 +376,7 @@ const vi = {
       refresh: 'Làm mới',
       expired: 'Hết hạn · chạy lại /la-list view',
       noReason: 'Chưa có lý do',
+      noteCount: '{count} ghi chú',
     },
     empty: {
       allTitle: 'Tất cả list đang trống',

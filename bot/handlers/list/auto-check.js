@@ -8,7 +8,7 @@
  *   2. Fallback to AUTO_CHECK_CHANNEL_IDS env var (global)
  */
 
-import { ActionRowBuilder, Events, StringSelectMenuBuilder } from 'discord.js';
+import { Events } from 'discord.js';
 import config from '../../config.js';
 import { getUserOcrMode } from '../../services/list-check/preferences.js';
 import GuildConfig from '../../models/GuildConfig.js';
@@ -32,6 +32,7 @@ import {
 } from '../../utils/names.js';
 import { getGuildLanguage, t, tPick } from '../../services/i18n/index.js';
 import { buildAutoCheckEvidenceRow, buildQueueFullAlert } from './check/index.js';
+import { buildQuickAddRow } from './quickadd/index.js';
 import { runRosterLookup } from '../roster/command.js';
 import { isOfficerOrSenior } from '../../utils/approverRoles.js';
 
@@ -428,24 +429,10 @@ export function createAutoCheckMessageHandler({
   }
 
   function buildAutoCheckComponents(results, lang) {
-    const components = [];
-    const unflaggedNames = results.filter(isQuickAddCandidate);
-    if (unflaggedNames.length > 0) {
-      components.push(new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId('quickadd_select')
-          .setPlaceholder(t('quickAdd.selectPlaceholder', lang))
-          .addOptions(unflaggedNames.slice(0, 25).map((result) => ({
-            label: result.name,
-            description: t('quickAdd.noListHit', lang),
-            value: result.name,
-            emoji: '❓',
-          })))
-      ));
-    }
-    const evidenceRow = buildAutoCheckEvidenceRowFn(results, lang);
-    if (evidenceRow) components.push(evidenceRow);
-    return components;
+    return [
+      buildQuickAddRow(results.filter(isQuickAddCandidate), lang),
+      buildAutoCheckEvidenceRowFn(results, lang),
+    ].filter(Boolean);
   }
 
   async function rejectUnverifiedBatch(

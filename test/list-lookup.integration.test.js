@@ -33,6 +33,7 @@ test('bulk checks omit report histories while retaining identity, latest report 
   for (const listType of ['black', 'white', 'watch']) {
     const entry = maps[listType].get('alias');
     assert.equal(Object.hasOwn(entry, 'notes'), false, `${listType} does not load history for a summary lookup`);
+    assert.equal(entry.noteCount, report.notes.length, `${listType} still counts its notes`);
     assert.equal(entry.name, report.name);
     assert.deepEqual(entry.allCharacters, report.allCharacters);
     assert.equal(entry.reason, report.reason);
@@ -45,6 +46,12 @@ test('bulk checks omit report histories while retaining identity, latest report 
   assert.equal(maps.trusted.get('alias').reason, 'Trusted roster');
   const fullEntry = await Blacklist.findById(maps.black.get('alias')._id).lean();
   assert.equal(fullEntry.notes.length, report.notes.length, 'the detail read still returns the complete stored history');
+});
+
+test('an entry saved before notes existed counts as one note', async () => {
+  await Blacklist.create({ name: 'Legacy', reason: 'Only the add report' });
+  const { maps } = await loadListLookup(['Legacy']);
+  assert.equal(maps.black.get('legacy').noteCount, 1);
 });
 
 test('summary projection keeps current-server precedence and hides another server report', async () => {

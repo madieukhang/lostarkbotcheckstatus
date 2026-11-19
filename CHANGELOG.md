@@ -1,5 +1,8 @@
 # Changelog
 
+- Check and `/la-search` cards show how many notes a listed entry has once it has more than one: `2 📝` after the item level and CP, and `Name · 2 notes` in the check card's details menu. The bulk lookup still loads no note text; it reads only the length of the history.
+- The Quick Add menu ends with **Select none**, like the details menu. Closing the add form used to leave the name picked, and picking the same name again sent nothing, so the form could not be reopened. The menu now lists at most 24 names so Select none fits under Discord's 25-option cap.
+
 - New raid choice `Other` for a raid outside the list, last in every raid picker (`/la-list add` and `edit`, the add and edit forms, Quick-Add and the multiadd workbook) and open to all three lists, unlike a custom watchlist label.
 
 - Internal: every best-effort roster snapshot save (the check batch, related names, `/la-roster`) goes through `saveRosterSnapshotsBestEffort`, and `higherItemLevel` holds the one rule for which item level to show. The stale-name refresh logs a failed worker lookup before it falls back to the name search.

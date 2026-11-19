@@ -274,3 +274,20 @@ test('related names carry their class once the check has snapshots for them', ()
     Object.assign(CLASS_EMOJI_MAP, previousEmoji);
   }
 });
+
+test('a listed name with more than one note shows the note count after its stats', () => {
+  const [line] = formatCheckResults([{
+    name: 'Upcheerios',
+    blackEntry: { name: 'Upcheerios', reason: 'sus sup', raid: 'Guardian Raid', scope: 'global', noteCount: 2 },
+    snapClassName: 'Bard',
+    snapItemLevel: 1752.5,
+    snapCombatScore: '≈4035.73',
+  }]);
+  assert.match(line.split('\n')[0], /`≈4035\.73 CP` · 2 📝$/u);
+
+  const [single] = formatCheckResults([{
+    name: 'Onenote',
+    watchEntry: { name: 'Onenote', reason: 'one report', noteCount: 1 },
+  }]);
+  assert.doesNotMatch(single, /📝/u);
+});

@@ -53,8 +53,8 @@ The rules behind these commands are in [How lists work](#how-lists-work).
 
 | Message | What it does |
 |---|---|
-| A screenshot | Up to 3 images per message, 8 names each (24 in all). The result's dropdown opens Quick Add: the add form with the name filled in and blacklist chosen, answered privately |
-| `check NameOne NameTwo` | Cross-check up to 8 typed names, separated by spaces, commas, semicolons or new lines. A listed hit opens a detail card with cached iLvl/CP, who added it, tracked alts and evidence |
+| A screenshot | Up to 3 images per message, 8 names each (24 in all). The result's dropdown opens Quick Add: the add form with the name filled in and blacklist chosen, answered privately; its last option, Select none, clears the pick so a closed form can be opened again |
+| `check NameOne NameTwo` | Cross-check up to 8 typed names, separated by spaces, commas, semicolons or new lines. A listed hit opens a detail card with cached iLvl/CP, who added it, tracked alts and evidence. An entry with more than one note shows the count after its stats (`2 📝`) and in the details menu (`2 notes`) |
 | `roster NameOne` (or `roster: NameOne`) | One roster lookup, like plain `/la-roster` with no deep scan. Shares the text-check cooldown and works without OCR |
 
 ### Server setup

@@ -6,10 +6,45 @@
  * /la-list add (handlers/list/form), answered privately.
  */
 
+import { ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
+
 import { connectDB } from '../../../db.js';
 import UserPreference from '../../../models/UserPreference.js';
-import { getUserLanguage } from '../../../services/i18n/index.js';
+import { getUserLanguage, t } from '../../../services/i18n/index.js';
+import { resetSelectMenu } from '../../../utils/selectMenu.js';
 import { LIST_FORM_IDS, buildListAddFormModal } from '../form/fields.js';
+
+const QUICK_ADD_SELECT_ID = 'quickadd_select';
+const SELECT_NONE = 'none';
+
+/**
+ * Build the Quick-Add menu. It ends with Select none: a closed form leaves
+ * its name picked, and Discord sends nothing when the same name is picked
+ * again, so clearing the pick is what lets the form open a second time.
+ * @param {Array<{name: string}>} candidates - checked names eligible for Quick Add
+ * @param {string} lang - card language
+ * @returns {ActionRowBuilder|null} the menu row, or null with no candidate
+ */
+export function buildQuickAddRow(candidates, lang) {
+  if (candidates.length === 0) return null;
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(QUICK_ADD_SELECT_ID)
+      .setPlaceholder(t('quickAdd.selectPlaceholder', lang))
+      // Discord allows 25 options; the last one is Select none.
+      .addOptions(candidates.slice(0, 24).map((result) => ({
+        label: result.name,
+        description: t('quickAdd.noListHit', lang),
+        value: result.name,
+        emoji: '❓',
+      })))
+      .addOptions({
+        label: t('listView.navigation.selectNone', lang),
+        value: SELECT_NONE,
+        emoji: '↩️',
+      }),
+  );
+}
 
 /**
  * Build the Quick-Add handler bag.
@@ -18,6 +53,10 @@ import { LIST_FORM_IDS, buildListAddFormModal } from '../form/fields.js';
 export function createQuickAddHandlers() {
   async function handleQuickAddSelect(interaction) {
     const name = interaction.values[0];
+    if (name === SELECT_NONE) {
+      await resetSelectMenu(interaction, QUICK_ADD_SELECT_ID);
+      return;
+    }
     await connectDB();
     const lang = await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
     await interaction.showModal(buildListAddFormModal(lang, {

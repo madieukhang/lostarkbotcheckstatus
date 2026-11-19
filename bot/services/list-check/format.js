@@ -2,6 +2,7 @@ import { getClassEmoji, isSupportClass } from '../../models/Class.js';
 import { codeSpanText, escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
+import { ICONS } from '../../utils/ui.js';
 import { t } from '../i18n/index.js';
 import { groupListCheckResults } from './displayGroups.js';
 import { didListCheckNameChange } from './matchResolution.js';
@@ -106,6 +107,11 @@ function getStatSuffix(item) {
     : '';
 }
 
+// Only a history worth opening is counted; one note is the reason line itself.
+function getNoteSuffix(entry) {
+  return entry?.noteCount > 1 ? ` · ${entry.noteCount} ${ICONS.note}` : '';
+}
+
 function formatBranch(parts) {
   const content = parts.filter(Boolean).join(' · ');
   return content ? `   ↳ ${content}` : '';
@@ -182,8 +188,9 @@ function formatStandardResult(item, state, classPrefix, statSuffix, branches, la
     ? ` (${t('dialogue.check.format.local', lang)})`
     : '';
   const trustedTag = isListHit && item.trustedEntry ? ' 🛡️' : '';
+  const noteSuffix = getNoteSuffix(item[state.entryKey]);
   return {
-    line: `${state.icon} ${classPrefix}${formatResultName(item, isListHit || linkUnlisted)}${scopeTag}${trustedTag}${statSuffix}${formatBranchBlock(branches)}`,
+    line: `${state.icon} ${classPrefix}${formatResultName(item, isListHit || linkUnlisted)}${scopeTag}${trustedTag}${statSuffix}${noteSuffix}${formatBranchBlock(branches)}`,
     priority: state.priority,
   };
 }
@@ -207,7 +214,7 @@ function formatTrustedResult(item, state, classPrefix, statSuffix, branches, lan
  * Build one character row without grouping or changing the caller's order.
  *
  * Layout:
- *   [status-icon] [class-icon] **Name** · `ilvl` · `nnn CP`
+ *   [status-icon] [class-icon] **Name** · `ilvl` · `nnn CP` · 2 📝  (from two notes)
  *      ↳ reason · [raid]                        (when reported)
  *      ↳ via Other                             (for an indirect match)
  *      ↳ via Other · trusted                    (only when trusted via roster)

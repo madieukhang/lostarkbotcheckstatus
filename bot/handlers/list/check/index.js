@@ -88,9 +88,13 @@ export function buildAutoCheckEvidenceRow(results, lang = 'en') {
       .addOptions(
         candidates.slice(0, 24).map(({ result, entry, listType }) => {
           const ctx = getListContext(listType);
-          const label = didListCheckNameChange(result)
+          const name = didListCheckNameChange(result)
             ? `${result.inputName} → ${result.name}`
             : String(result.name || result.inputName || 'Unknown');
+          // The closed menu shows only the label, so the note count rides on it.
+          const label = entry.noteCount > 1
+            ? `${name} · ${t('listView.navigation.noteCount', lang, { count: entry.noteCount })}`
+            : name;
           return {
             label: label.slice(0, 100),
             description: (entry.reason || t('listView.navigation.noReason', lang)).slice(0, 100),

@@ -527,6 +527,7 @@ const en = {
       refresh: 'Refresh',
       expired: 'Session expired · re-run /la-list view',
       noReason: 'No reason',
+      noteCount: '{count} notes',
     },
     empty: {
       allTitle: 'All Lists Empty',

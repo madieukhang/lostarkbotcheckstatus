@@ -47,6 +47,7 @@ export const ICONS = Object.freeze({
   // action
   search: '🔍',
   evidence: '📎',
+  note: '📝',
   refresh: '🔄',
   prev: '◀',
   next: '▶',

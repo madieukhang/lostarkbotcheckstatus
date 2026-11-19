@@ -216,3 +216,13 @@ test('check details headline escapes brackets in the stored name like the tracke
   assert.doesNotMatch(description, /\[Odd\]name\]/);
   assert.match(description, /\[Odd\\]name\]\(/);
 });
+
+test('check details dropdown names how many notes a listed name has', () => {
+  const select = buildAutoCheckEvidenceRow([
+    { name: 'Upcheerios', blackEntry: { _id: 'd'.repeat(24), reason: 'sus sup', noteCount: 2 } },
+    { name: 'Onenote', watchEntry: { _id: 'e'.repeat(24), reason: 'one report', noteCount: 1 } },
+  ], 'vi').toJSON().components[0];
+
+  assert.equal(select.options[0].label, 'Upcheerios · 2 ghi chú');
+  assert.equal(select.options[1].label, 'Onenote');
+});
