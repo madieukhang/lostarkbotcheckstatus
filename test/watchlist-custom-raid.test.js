@@ -124,6 +124,20 @@ test('Belgardin Nor, Hard and NM are offered right after Horizon', () => {
   assert.equal(resolveRaidLabel('  belgardin nm  '), 'Belgardin NM');
 });
 
+test('Other is the last raid choice on every list and every add path', async () => {
+  assert.equal(getSelectableRaidValues().at(-1), 'Other');
+  assert.deepEqual(getRaidAutocompleteChoices('oth'), [{ name: 'Other', value: 'Other' }]);
+  for (const type of ['black', 'white', 'watch']) {
+    assert.equal(resolveListAddRaidLabel(type, '  other  '), 'Other', type);
+  }
+
+  const ExcelJS = (await import('exceljs')).default;
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await buildMultiaddTemplate());
+  const formula = workbook.getWorksheet('Entries').getCell('D9').dataValidation.formulae[0];
+  assert.match(formula, /,Other"$/);
+});
+
 test('Brel autocomplete hides at the cutoff but keeps the selected storage label', () => {
   assert.deepEqual(
     getRaidAutocompleteChoices('Brel', { now: '2026-09-01T16:59:59.999Z' }),

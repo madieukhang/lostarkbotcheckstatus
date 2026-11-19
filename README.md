@@ -102,8 +102,8 @@ not a permission.
 entry takes precedence in view and check output. The owner guild sees every server-scoped entry
 with a `[S:GuildName]` label; other guilds see their own server entries plus everything global.
 
-**Adding.** Every add names its raid (command, form, Quick-Add and multiadd), and a reason is at
-most 1000 characters. When the character is already listed, the duplicate card offers
+**Adding.** Every add names its raid (command, form, Quick-Add and multiadd), with `Other` for a
+raid outside the list, and a reason is at most 1000 characters. When the character is already listed, the duplicate card offers
 **Add to history**: the typed reason and raid become the entry's latest note, the roster fetched
 for the add is merged into its tracked alts, and a new screenshot replaces the evidence. The card
 names who added the entry only for officers and seniors. A member's server-scoped add that finds

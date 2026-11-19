@@ -39,6 +39,9 @@ const RAID_CATALOG = [
     // Hide at 00:00 on 2 September 2026 in Vietnam (UTC+7).
     selectableUntil: '2026-09-01T17:00:00.000Z',
   },
+  // A raid outside this list. Kept last so every selector shows it after the
+  // real raids; unlike a custom label it is open to every list.
+  { value: 'Other' },
 ];
 
 const RAID_VALUE_BY_LABEL = new Map();

@@ -1,5 +1,7 @@
 # Changelog
 
+- New raid choice `Other` for a raid outside the list, last in every raid picker (`/la-list add` and `edit`, the add and edit forms, Quick-Add and the multiadd workbook) and open to all three lists, unlike a custom watchlist label.
+
 - Internal: every best-effort roster snapshot save (the check batch, related names, `/la-roster`) goes through `saveRosterSnapshotsBestEffort`, and `higherItemLevel` holds the one rule for which item level to show. The stale-name refresh logs a failed worker lookup before it falls back to the name search.
 
 - `/la-check` and auto-check look a name up again when its stored stats are more than a week old (at most three names per check, the oldest first, by exact name only), so characters that keep showing up in checks get their current item level on the result and on list cards.
