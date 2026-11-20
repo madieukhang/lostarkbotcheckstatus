@@ -11,7 +11,7 @@ import TrustedUser from '../../../models/TrustedUser.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { catchListenerErrors, createLatestOnlyQueue } from '../../../utils/async.js';
 import { hasEvidence, resolveDisplayImageUrl } from '../../../utils/imageRehost.js';
-import { NoticeKind } from '../../../utils/alertEmbed.js';
+import { buildAlertEmbed, NoticeKind } from '../../../utils/alertEmbed.js';
 import {
   deferReply,
   editAlert,
@@ -206,9 +206,9 @@ export function createViewHandlers({
         return;
       }
 
-      if (allEntries.length === 0) {
+      const buildEmptyCopy = () => {
         const label = type === 'all' ? '' : getListContext(type).label;
-        const emptyCopy = label
+        return label
           ? {
             title: t('listView.empty.typedTitle', lang, { label }),
             description: t('listView.empty.typedDescription', lang, { label }),
@@ -217,7 +217,10 @@ export function createViewHandlers({
             title: t('listView.empty.allTitle', lang),
             description: t('listView.empty.allDescription', lang),
           };
-        await editAlert(interaction, { kind: NoticeKind.EMPTY, ...emptyCopy });
+      };
+
+      if (allEntries.length === 0) {
+        await editAlert(interaction, { kind: NoticeKind.EMPTY, ...buildEmptyCopy() });
         return;
       }
 
@@ -276,7 +279,10 @@ export function createViewHandlers({
       let collectorEnded = false;
       const renderQueue = createLatestOnlyQueue(async () => {
         if (collectorEnded) return;
-        await editEmbed(interaction, buildListPageEmbed(pageOptions()), {
+        const embed = allEntries.length === 0
+          ? buildAlertEmbed({ kind: NoticeKind.EMPTY, ...buildEmptyCopy() })
+          : buildListPageEmbed(pageOptions());
+        await editEmbed(interaction, embed, {
           components: buildListViewComponents(componentOptions()),
         });
       }, {

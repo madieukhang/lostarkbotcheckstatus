@@ -14,7 +14,14 @@ export async function requireSetupGuildTextChannel(
   lang,
   { editAlertFn = editAlert } = {},
 ) {
-  const channel = interaction.options.getChannel('channel', true);
+  const channel = interaction.options.getChannel('channel');
+  if (!channel) {
+    await editAlertFn(interaction, {
+      kind: NoticeKind.INPUT,
+      ...t('dialogue.setup.missingOption', lang, { option: 'channel' }),
+    });
+    return null;
+  }
   if (channel.type === ChannelType.GuildText) return channel;
 
   await editAlertFn(interaction, {

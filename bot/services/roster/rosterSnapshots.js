@@ -84,7 +84,7 @@ export async function upsertRosterSnapshots(
  * @returns {number} the highest positive level, or 0
  */
 export function higherItemLevel(...levels) {
-  return Math.max(0, ...levels.map((level) => Number(level) || 0));
+  return Math.max(0, ...levels.map((level) => parsePositiveNumber(level)));
 }
 
 /**

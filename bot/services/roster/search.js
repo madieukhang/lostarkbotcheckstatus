@@ -71,40 +71,58 @@ function trimSharedSuggestionCache() {
   }
 }
 
-function getSharedSuggestion(cacheKey) {
+const sharedSuggestionInFlight = new Map();
+
+// In-flight sharing must match transport policy so a direct-only caller never
+// poisons a ScraperAPI/worker caller (or vice versa). Callers with a private
+// AbortSignal skip shared in-flight tracking altogether.
+function buildSuggestionInFlightKey(cacheKey, options = {}) {
+  if (!cacheKey || options.signal) return null;
+  return JSON.stringify({
+    name: cacheKey,
+    allowScraperApi: options.allowScraperApi !== false,
+    preferScraperApi: options.preferScraperApi === true,
+    fallbackOnRateLimit: options.fallbackOnRateLimit === true,
+    viaWorker: options.viaWorker === true,
+    timeoutMs: options.timeoutMs || 0,
+  });
+}
+
+function getSharedSuggestion(cacheKey, inFlightKey) {
   const entry = sharedSuggestionCache.get(cacheKey);
-  if (!entry) return CACHE_MISS;
-  if (!entry.promise && Date.now() >= entry.expiresAt) {
-    sharedSuggestionCache.delete(cacheKey);
-    return CACHE_MISS;
+  if (entry) {
+    if (Date.now() >= entry.expiresAt) {
+      sharedSuggestionCache.delete(cacheKey);
+    } else {
+      // Map insertion order doubles as a compact LRU list.
+      sharedSuggestionCache.delete(cacheKey);
+      sharedSuggestionCache.set(cacheKey, entry);
+      return entry.value;
+    }
   }
-
-  // Map insertion order doubles as a compact LRU list.
-  sharedSuggestionCache.delete(cacheKey);
-  sharedSuggestionCache.set(cacheKey, entry);
-  return entry.promise || entry.value;
+  if (inFlightKey && sharedSuggestionInFlight.has(inFlightKey)) {
+    return sharedSuggestionInFlight.get(inFlightKey);
+  }
+  return CACHE_MISS;
 }
 
-function setSharedSuggestionPending(cacheKey, promise) {
-  sharedSuggestionCache.delete(cacheKey);
-  trimSharedSuggestionCache();
-  sharedSuggestionCache.set(cacheKey, { promise, value: null, expiresAt: Infinity });
+function setSharedSuggestionPending(inFlightKey, promise) {
+  if (!inFlightKey) return;
+  sharedSuggestionInFlight.set(inFlightKey, promise);
 }
 
-function settleSharedSuggestion(cacheKey, promise, result) {
-  const current = sharedSuggestionCache.get(cacheKey);
-  if (!current || current.promise !== promise) return;
-  if (!Array.isArray(result)) {
-    sharedSuggestionCache.delete(cacheKey);
-    return;
+function settleSharedSuggestion(cacheKey, inFlightKey, promise, result) {
+  if (inFlightKey && sharedSuggestionInFlight.get(inFlightKey) === promise) {
+    sharedSuggestionInFlight.delete(inFlightKey);
   }
+  if (!Array.isArray(result)) return;
 
   const ttlMs = result.length > 0
     ? config.nameSuggestionCacheTtlMs
     : config.nameSuggestionEmptyCacheTtlMs;
   sharedSuggestionCache.delete(cacheKey);
+  trimSharedSuggestionCache();
   sharedSuggestionCache.set(cacheKey, {
-    promise: null,
     value: result,
     expiresAt: Date.now() + ttlMs,
   });
@@ -113,6 +131,7 @@ function settleSharedSuggestion(cacheKey, promise, result) {
 /** Test/maintenance hook; production eviction normally happens via TTL/LRU. */
 export function clearNameSuggestionCache() {
   sharedSuggestionCache.clear();
+  sharedSuggestionInFlight.clear();
 }
 
 function decodeSearchResponse(json) {
@@ -168,6 +187,7 @@ function incrementLookupStat(stats, key) {
 
 function resolveCachedSuggestion({
   cacheKey,
+  inFlightKey,
   requestCache,
   canCache,
   stats,
@@ -178,7 +198,7 @@ function resolveCachedSuggestion({
   }
   if (!cacheKey) return { hit: false, value: null };
 
-  const shared = getSharedSuggestion(cacheKey);
+  const shared = getSharedSuggestion(cacheKey, inFlightKey);
   if (shared === CACHE_MISS) return { hit: false, value: null };
 
   incrementLookupStat(stats, 'sharedCacheHits');
@@ -215,6 +235,7 @@ export async function fetchNameSuggestions(name, options = {}) {
   // duplicate Bible calls for a name we already have in flight.
   const queryName = normalizeSuggestionQuery(name);
   const cacheKey = normalizeNameKey(queryName);
+  const inFlightKey = buildSuggestionInFlightKey(cacheKey, fetchOptions);
   const requestCache = suggestionContext?.cache instanceof Map
     ? suggestionContext.cache
     : suggestionCache;
@@ -222,7 +243,7 @@ export async function fetchNameSuggestions(name, options = {}) {
   const stats = ensureLookupStats(suggestionContext);
   // Cache resolution must stay synchronous until a new in-flight request is
   // registered; yielding here lets concurrent calls both observe a miss.
-  const cached = resolveCachedSuggestion({ cacheKey, requestCache, canCache, stats });
+  const cached = resolveCachedSuggestion({ cacheKey, inFlightKey, requestCache, canCache, stats });
   if (cached.hit) return cached.value;
 
   if (suggestionContext) {
@@ -254,11 +275,11 @@ export async function fetchNameSuggestions(name, options = {}) {
     }
   })();
 
-  if (cacheKey) setSharedSuggestionPending(cacheKey, request);
+  if (inFlightKey) setSharedSuggestionPending(inFlightKey, request);
   if (canCache) requestCache.set(cacheKey, request);
 
   const result = await request;
-  if (cacheKey) settleSharedSuggestion(cacheKey, request, result);
+  if (cacheKey) settleSharedSuggestion(cacheKey, inFlightKey, request, result);
   // Keep successful and empty lookups for this request. Transport or
   // contract failures remain retryable if the upstream recovers.
   if (canCache && result === null) requestCache.delete(cacheKey);

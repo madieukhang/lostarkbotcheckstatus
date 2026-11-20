@@ -56,3 +56,14 @@ test('the Quick Add menu ends with Select none, which clears the pick without a 
   assert.equal(updates.length, 1);
   assert.equal(updates[0].components[0].components[0].options.some((option) => option.default), false);
 });
+
+test('buildQuickAddRow deduplicates candidates that resolved to the same character name', () => {
+  const row = buildQuickAddRow([
+    { name: 'Lunaria' },
+    { name: 'Lunaria' },
+    { name: 'lunaria' },
+    { name: 'Mokoko' },
+  ], 'en').toJSON();
+  const values = row.components[0].options.map((option) => option.value);
+  assert.deepEqual(values, ['Lunaria', 'Mokoko', 'none']);
+});

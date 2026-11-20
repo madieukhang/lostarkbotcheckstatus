@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
 import Blacklist from '../bot/models/Blacklist.js';
+import TrustedUser from '../bot/models/TrustedUser.js';
 import UserPreference from '../bot/models/UserPreference.js';
 import { disconnectDB } from '../bot/db.js';
 import { clearUserLanguageCache } from '../bot/services/i18n/index.js';
@@ -125,6 +126,7 @@ test('a blank requester id never counts as the owner of an ownerless server entr
 function setup(t) {
   t.mock.method(mongoose, 'connect', async () => mongoose);
   t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  t.mock.method(TrustedUser, 'findOne', () => ({ collation() { return this; }, lean: async () => null }));
   clearUserLanguageCache();
   t.after(async () => { clearUserLanguageCache(); await disconnectDB(); });
   const broadcasts = [];
@@ -260,4 +262,27 @@ test('an unknown or expired key answers that the card expired', async t => {
   const stale = click('listnote_add:000000000000', 'owner');
   await handlers.handleListNoteAddButton(stale.interaction);
   assert.match(JSON.stringify(stale.calls.replies[0]), /expired/);
+});
+
+test('Add to history rechecks TrustedUser against the existing entry and fetched roster before writing', async t => {
+  const { handlers, broadcasts } = setup(t);
+  const trustedQueries = [];
+  t.mock.method(TrustedUser, 'findOne', (query) => {
+    trustedQueries.push(JSON.stringify(query));
+    return {
+      collation() { return this; },
+      lean: async () => ({ name: 'Lovesiiii', reason: 'Guild officer' }),
+    };
+  });
+  t.mock.method(Blacklist, 'findById', () => ({ lean: async () => existing }));
+  t.mock.method(Blacklist, 'findOneAndUpdate', () => assert.fail('a trusted entry must not accept a note'));
+  const key = addKeyOf(attachNoteControls(duplicate(), payload, 'en'));
+  const owner = click(key, 'owner');
+  await handlers.handleListNoteAddButton(owner.interaction);
+  assert.equal(trustedQueries.length, 1);
+  assert.match(trustedQueries[0], /Lovesiiii/);
+  assert.match(trustedQueries[0], /Pepsji/);
+  assert.match(JSON.stringify(owner.calls.edits[0].embeds[0].toJSON()), /Guild officer/);
+  assert.deepEqual(owner.calls.edits[0].components, []);
+  assert.equal(broadcasts.length, 0);
 });

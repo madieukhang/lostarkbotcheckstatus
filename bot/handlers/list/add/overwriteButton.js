@@ -117,10 +117,7 @@ export function createListAddOverwriteButtonHandler({
         hiddenRosterFallback: true,
       }).catch(() => null);
       const rosterNames = rosterResult?.hasValidRoster ? rosterResult.allCharacters || [] : [];
-      const trustedNow = await findTrustedEditConflict({
-        name: typedName,
-        allCharacters: rosterNames.length > 0 ? rosterNames : dupeEntry.allCharacters || [],
-      });
+      const trustedNow = await findTrustedEditConflict(dupeEntry, [typedName, ...rosterNames]);
       if (trustedNow) {
         await claim.complete();
         await updateApprovers(targetLang => ({

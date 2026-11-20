@@ -32,6 +32,17 @@ test('a declared Content-Length over the ceiling is refused before the body is r
   assert.ok(pulls.count <= 1, `pulled ${pulls.count} MiB`);
 });
 
+test('readBodyWithin handles null response bodies without throwing TypeError', async () => {
+  const empty = await readBodyWithin(new Response(null, { status: 204 }), 1024);
+  assert.deepEqual(empty, Buffer.alloc(0));
+
+  const oversizedNull = new Response(null, {
+    status: 204,
+    headers: { 'content-length': '2048' },
+  });
+  await assert.rejects(readBodyWithin(oversizedNull, 1024), { code: 'BODY_TOO_LARGE' });
+});
+
 test('rehost stops reading an oversized body at its 24 MiB ceiling and sets a download deadline', async t => {
   const ownerGuildId = config.ownerGuildId;
   config.ownerGuildId = 'bounded-download-owner';

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import config from '../bot/config.js';
-import { fetchWithFallback } from '../bot/services/roster/bibleFetch.js';
+import { buildBibleFetchOptions, fetchWithFallback } from '../bot/services/roster/bibleFetch.js';
 
 test('caller deadline covers direct and ScraperAPI attempts and stops key rotation', async () => {
   const originalFetch = globalThis.fetch;
@@ -68,4 +68,24 @@ test('a refused ScraperAPI key logs the start of its error body without reading 
   });
   await fetchWithFallback('https://lostark.bible/error-body').catch(() => {});
   assert.ok(pulls <= 2, `read ${pulls} MiB of an error body`);
+});
+
+test('buildBibleFetchOptions defers timeoutMs signal creation for viaWorker calls while direct fallback still enforces it', async (t) => {
+  const workerOpts = buildBibleFetchOptions({ viaWorker: true, timeoutMs: 25, allowScraperApi: false });
+  assert.equal(workerOpts.signal, undefined, 'viaWorker must leave timeoutMs + buffer handling to workerBibleClient');
+  assert.equal(workerOpts.timeoutMs, 25);
+
+  let observedSignal;
+  t.mock.method(globalThis, 'fetch', async (_url, init = {}) => {
+    observedSignal = init.signal;
+    return new Promise((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+    });
+  });
+
+  await assert.rejects(
+    () => fetchWithFallback('https://lostark.bible/via-worker-direct-fallback', workerOpts),
+    (err) => err?.name === 'TimeoutError',
+  );
+  assert.ok(observedSignal?.aborted, 'direct fallback must still enforce options.timeoutMs');
 });

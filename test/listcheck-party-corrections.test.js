@@ -146,6 +146,44 @@ test('party correction selects a unique accented sibling near the party median',
   });
 });
 
+test('party correction clears discoveredAlts from the replaced low-level character', async () => {
+  const originalFind = RosterSnapshot.find;
+  RosterSnapshot.find = () => ({
+    collation: () => ({
+      lean: async () => [{
+        name: 'Crüelfighter',
+        itemLevel: 1768,
+        classId: 'berserker',
+        combatScore: '95000',
+      }],
+    }),
+  });
+
+  const target = {
+    name: 'Cruelfighter',
+    snapItemLevel: 1640,
+    snapClassId: 'bard',
+    snapClassName: 'Bard',
+    snapCombatScore: '12000',
+    discoveredAlts: ['CruelAlt'],
+  };
+  const results = [
+    target,
+    { name: 'PartyA', snapItemLevel: 1750 },
+    { name: 'PartyB', snapItemLevel: 1755 },
+    { name: 'PartyC', snapItemLevel: 1760 },
+  ];
+
+  try {
+    await applyMarkedSiblingLevelCorrections(results);
+  } finally {
+    RosterSnapshot.find = originalFind;
+  }
+
+  assert.equal(target.name, 'Crüelfighter');
+  assert.deepEqual(target.discoveredAlts, []);
+});
+
 test('party corrections use one immutable level snapshot for the whole batch', async () => {
   const originalFind = RosterSnapshot.find;
   RosterSnapshot.find = () => ({

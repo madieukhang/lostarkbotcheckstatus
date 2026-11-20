@@ -112,3 +112,41 @@ test('the evidence card embeds its screenshot under a linked title', () => {
   assert.match(embed.title, /Tenshi/u);
   assert.ok(embed.url);
 });
+
+test('/la-evidence defers the reply before querying MongoDB for locale', async (t) => {
+  const { default: mongoose } = await import('mongoose');
+  const { default: UserPreference } = await import('../bot/models/UserPreference.js');
+  const { disconnectDB } = await import('../bot/db.js');
+  const { clearUserLanguageCache } = await import('../bot/services/i18n/index.js');
+  const { createEvidenceHandlers } = await import('../bot/handlers/list/evidence/command.js');
+
+  clearUserLanguageCache();
+  t.after(async () => { clearUserLanguageCache(); await disconnectDB(); });
+
+  const order = [];
+  t.mock.method(mongoose, 'connect', async () => {
+    order.push('connectDB');
+    return mongoose;
+  });
+  t.mock.method(UserPreference, 'findOne', () => ({
+    lean: async () => {
+      order.push('UserPreference.findOne');
+      return { language: 'en' };
+    },
+  }));
+
+  const { handleListEvidenceCommand } = createEvidenceHandlers({ client: {} });
+  await handleListEvidenceCommand({
+    guild: { id: 'guild-1' },
+    user: { id: 'evidence-viewer-1' },
+    options: {
+      getString: () => '   ',
+      getBoolean: () => false,
+    },
+    deferReply: async () => { order.push('deferReply'); },
+    editReply: async () => { order.push('editReply'); },
+  });
+
+  assert.equal(order[0], 'deferReply', `expected deferReply first, got: ${order.join(' -> ')}`);
+  assert.ok(order.indexOf('connectDB') < order.indexOf('UserPreference.findOne'), `expected connectDB before locale query, got: ${order.join(' -> ')}`);
+});

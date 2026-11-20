@@ -122,14 +122,15 @@ export function createEvidenceHandlers({ client }) {
     const isPrivileged = isOfficerOrSenior(interaction.user.id);
     const usePublic = requestedPublic && isPrivileged;
     const viewerGuildId = interaction.guild?.id || '';
-    const lang = usePublic
-      ? await getGuildLanguage(viewerGuildId, { GuildConfigModel: GuildConfig })
-      : await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
 
     await deferReply(interaction, { ephemeral: !usePublic });
 
+    let lang = 'en';
     try {
       await connectDB();
+      lang = usePublic
+        ? await getGuildLanguage(viewerGuildId, { GuildConfigModel: GuildConfig })
+        : await getUserLanguage(interaction.user.id, { UserPreferenceModel: UserPreference });
       const { type: preferredType, entryId, name } = parseNameValue(rawNameOpt);
 
       // Autocomplete path: value carried an _id, look up unambiguously.

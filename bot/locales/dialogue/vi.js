@@ -293,6 +293,10 @@ export default {
       description: '`{action}` không phải action của `/la-setup`.',
       tip: 'Chọn một action trong danh sách gợi ý hiện ra khi gõ vào ô action nhé',
     },
+    missingOption: {
+      title: 'Thiếu tham số bắt buộc',
+      description: 'Thao tác này cần điền thêm ô `{option}:` nhé.',
+    },
     unknownLanguage: {
       title: 'Tớ không biết ngôn ngữ này',
       description: '`{language}` không phải ngôn ngữ tớ hỗ trợ.',

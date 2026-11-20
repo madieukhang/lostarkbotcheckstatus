@@ -81,3 +81,40 @@ test('/la-setup set-language refuses a language it does not support and saves no
   assert.match(card.title, /Unknown language/);
   assert.match(card.description, /klingon/);
 });
+
+for (const [action, optionName] of [
+  ['set-auto-channel', 'channel'],
+  ['set-notify-channel', 'channel'],
+  ['set-language', 'language'],
+  ['set-default-scope', 'scope'],
+]) {
+  test(`/la-setup ${action} returns an input notice instead of throwing when ${optionName} is omitted`, async (t) => {
+    clearUserLanguageCache();
+    t.after(clearUserLanguageCache);
+    t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+
+    const edits = [];
+    await handleSetupCommand({
+      guild: { id: 'guild-1' },
+      user: { id: 'admin-1', tag: 'Admin' },
+      memberPermissions: { has: () => true },
+      options: {
+        getString: (name, required) => {
+          if (name === 'action') return action;
+          if (required) throw new TypeError(`Required option "${name}" not found.`);
+          return null;
+        },
+        getChannel: (name, required) => {
+          if (required) throw new TypeError(`Required option "${name}" not found.`);
+          return null;
+        },
+      },
+      deferReply: async () => {},
+      editReply: async (payload) => { edits.push(payload); },
+    });
+
+    assert.equal(edits.length, 1);
+    const card = edits[0].embeds[0].toJSON();
+    assert.match(card.description, new RegExp(`\`${optionName}:\``));
+  });
+}

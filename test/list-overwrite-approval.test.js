@@ -115,3 +115,58 @@ for (const protectedAlt of [true, false]) {
     assert.equal(edits.at(-1).components[0].toJSON().components[0].label, 'Added to History');
   });
 }
+
+test('Add to history checks the existing entry name and tracked alts against Trusted even when roster fetch returns names', async (t) => {
+  t.mock.method(mongoose, 'connect', async () => mongoose);
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  clearUserLanguageCache();
+  t.after(async () => { clearUserLanguageCache(); await disconnectDB(); });
+
+  const payload = {
+    requestId: 'pending-dupe-trusted', name: 'AltChar', type: 'black', duplicateEntryId: 'original-id',
+    approverIds: ['officer'], scope: 'global', reason: 'New report', raid: 'Kazeros Hard',
+    requestedByUserId: 'requester', requestedByDisplayName: 'Requester',
+  };
+  mockPendingApprovalModel(t, PendingApproval, payload);
+  const original = {
+    _id: 'original-id',
+    name: 'TrustedMain',
+    reason: 'Old',
+    allCharacters: ['TrustedMain', 'AltChar', 'StoredAlt'],
+    scope: 'global',
+    guildId: '',
+  };
+  const writes = [];
+  const queries = [];
+  t.mock.method(Blacklist, 'findById', () => Object.assign(Promise.resolve(original), { lean: async () => original }));
+  t.mock.method(Blacklist, 'findOneAndUpdate', (filter, update) => {
+    writes.push({ filter, update });
+    return { lean: async () => original };
+  });
+  t.mock.method(TrustedUser, 'findOne', (query) => {
+    queries.push(JSON.stringify(query));
+    const hitsMain = JSON.stringify(query).includes('TrustedMain');
+    return {
+      collation() { return this; },
+      lean: async () => (hitsMain ? { name: 'TrustedMain', reason: 'Guild officer' } : null),
+    };
+  });
+
+  let decision;
+  await createListAddOverwriteButtonHandler({
+    buildRosterCharactersFn: async () => ({ hasValidRoster: true, allCharacters: ['AltChar'] }),
+    syncApproverDmMessages: async () => {},
+    broadcastListChange: async () => assert.fail('Trusted entry must not broadcast a write'),
+    notifyRequesterAboutDecision: async (_payload, result) => { decision = result; },
+  })({
+    customId: 'listadd_overwrite:pending-dupe-trusted', user: { id: 'officer', tag: 'Officer' }, message: { id: 'dm' },
+    client: { guilds: { cache: new Map() } },
+    deferUpdate: async () => {}, editReply: async () => {},
+  });
+
+  assert.match(queries[0], /TrustedMain/);
+  assert.match(queries[0], /StoredAlt/);
+  assert.match(queries[0], /AltChar/);
+  assert.equal(writes.length, 0);
+  assert.deepEqual(decision, { ok: false });
+});

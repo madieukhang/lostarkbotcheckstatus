@@ -206,3 +206,34 @@ test('interaction router refuses a repeated costly command and form submit befor
   assert.deepEqual(calls, ['check', 'form']);
   assert.equal(replies.length, 2);
 });
+
+test('interaction router catches cooldown reply failures on modal submits instead of rejecting', async (t) => {
+  const { resetCommandCooldowns } = await import('../bot/app/commandCooldowns.js');
+  const { LIST_FORM_IDS } = await import('../bot/handlers/list/form/fields.js');
+  const { default: UserPreference } = await import('../bot/models/UserPreference.js');
+  const { createInteractionRouter } = await import('../bot/app/interaction-router.js');
+  t.mock.method(UserPreference, 'findOne', () => ({ lean: async () => ({ language: 'en' }) }));
+  t.mock.method(console, 'warn', () => {});
+  t.mock.method(console, 'error', () => {});
+  resetCommandCooldowns();
+  t.after(() => resetCommandCooldowns());
+
+  const handleInteraction = createInteractionRouter({ client: {} });
+  const transient = Object.assign(new Error('Unknown interaction'), { code: 10062 });
+  const modalSubmit = (shouldFailReply) => ({
+    customId: LIST_FORM_IDS.addModal,
+    user: { id: 'modal-cooldown-member' },
+    isButton: () => false,
+    isStringSelectMenu: () => false,
+    isModalSubmit: () => true,
+    isAutocomplete: () => false,
+    isChatInputCommand: () => false,
+    reply: async () => { if (shouldFailReply) throw transient; },
+    editReply: async () => {},
+  });
+
+  // First modal submit starts the cooldown bucket (modal handler catches internally).
+  await handleInteraction(modalSubmit(false));
+  // Second submit within cooldown hits refuseCoolingDown -> reply rejects with 10062.
+  await assert.doesNotReject(() => handleInteraction(modalSubmit(true)));
+});

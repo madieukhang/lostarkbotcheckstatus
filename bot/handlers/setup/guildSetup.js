@@ -698,7 +698,14 @@ async function handleSetupRepin(interaction, lang) {
 }
 
 async function handleSetupLanguage(interaction, lang) {
-  const requested = interaction.options.getString('language', true);
+  const requested = (interaction.options.getString('language') || '').trim();
+  if (!requested) {
+    await editAlert(interaction, {
+      kind: NoticeKind.INPUT,
+      ...t('dialogue.setup.missingOption', lang, { option: 'language' }),
+    });
+    return;
+  }
   // The option is autocomplete-only, so Discord accepts any typed text, and
   // setGuildLanguage would store an unknown code as the default language.
   const supported = getSupportedLanguages();
@@ -871,7 +878,14 @@ export async function handleSetupCommand(interaction) {
  * Handle the set-default-scope action
  */
 async function handleSetupDefaultScope(interaction, lang) {
-  const scope = interaction.options.getString('scope', true);
+  const scope = interaction.options.getString('scope');
+  if (!scope) {
+    await editAlert(interaction, {
+      kind: NoticeKind.INPUT,
+      ...t('dialogue.setup.missingOption', lang, { option: 'scope' }),
+    });
+    return;
+  }
 
   await connectDB();
 

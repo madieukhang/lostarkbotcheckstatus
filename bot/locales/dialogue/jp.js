@@ -269,6 +269,10 @@ export default {
       description: '`{action}` は `/la-setup` の action ではありませんの。',
       tip: 'action 欄に入力すると出る候補から選んでくださいませ',
     },
+    missingOption: {
+      title: '必要な項目が抜けていますわ',
+      description: 'この操作には `{option}:` の指定が必要ですの。',
+    },
     unknownLanguage: {
       title: '知らない言語ですわ',
       description: '`{language}` は対応していない言語ですの。',

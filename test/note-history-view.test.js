@@ -138,3 +138,25 @@ test('the History and page buttons show writers only to officers and seniors', a
     }
   }
 });
+
+test('an officer clicking History in an approval DM can open a server-scoped blacklist entry while non-officers stay scoped', async (t) => {
+  mockLanguage(t);
+  const entry = entryWith([note(2, 'one'), note(3, 'two')], { scope: 'server', guildId: 'guild-a' });
+  const queries = [];
+  t.mock.method(Blacklist, 'findOne', (query) => {
+    queries.push(query);
+    return { lean: async () => (query.$and ? null : entry) };
+  });
+
+  const officerHandlers = createNoteHandlers({ services: {}, isOfficerOrSeniorFn: () => true });
+  const officerDm = buttonInteraction(`listnote_history:black:${entry._id}:1`, null);
+  await officerHandlers.handleListNoteHistoryButton(officerDm.interaction);
+  assert.deepEqual(queries[0], { _id: entry._id });
+  assert.equal(officerDm.calls.edits[0].embeds[0].toJSON().title, '📜 Note history · Lovesiiii');
+
+  const memberHandlers = createNoteHandlers({ services: {}, isOfficerOrSeniorFn: () => false });
+  const memberDm = buttonInteraction(`listnote_history:black:${entry._id}:1`, null);
+  await memberHandlers.handleListNoteHistoryButton(memberDm.interaction);
+  assert.ok(queries[1].$and, 'non-officer DM click must remain scoped to global entries');
+  assert.doesNotMatch(JSON.stringify(memberDm.calls.edits[0]), /Note history/);
+});

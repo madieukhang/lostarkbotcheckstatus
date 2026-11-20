@@ -382,7 +382,17 @@ export async function dispatchComponentInteraction(interaction, {
     {
       matches: () => interaction.isModalSubmit(),
       handle: async () => {
-        if (await refuseCoolingDown(interaction)) return;
+        try {
+          if (await refuseCoolingDown(interaction)) return;
+        } catch (err) {
+          if (isTransientInteractionError(err)) {
+            logTransientInteraction(`modal:${interaction.customId || 'unknown'}`, err);
+            return;
+          }
+          console.error('[bot] Modal cooldown error:', err?.message || err);
+          await replyOrEdit(interaction, err);
+          return;
+        }
         await dispatchCustomIdRoute(interaction, modalRoutes);
       },
     },

@@ -11,6 +11,7 @@ import { ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
 import { connectDB } from '../../../db.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
+import { normalizeNameKey } from '../../../utils/names.js';
 import { resetSelectMenu } from '../../../utils/selectMenu.js';
 import { LIST_FORM_IDS, buildListAddFormModal } from '../form/fields.js';
 
@@ -26,16 +27,26 @@ const SELECT_NONE = 'none';
  * @returns {ActionRowBuilder|null} the menu row, or null with no candidate
  */
 export function buildQuickAddRow(candidates, lang) {
-  if (candidates.length === 0) return null;
+  const seen = new Set();
+  const unique = [];
+  for (const result of candidates) {
+    const name = String(result?.name || '').trim();
+    const key = normalizeNameKey(name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(name);
+    if (unique.length >= 24) break;
+  }
+  if (unique.length === 0) return null;
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(QUICK_ADD_SELECT_ID)
       .setPlaceholder(t('quickAdd.selectPlaceholder', lang))
       // Discord allows 25 options; the last one is Select none.
-      .addOptions(candidates.slice(0, 24).map((result) => ({
-        label: result.name,
+      .addOptions(unique.map((name) => ({
+        label: name,
         description: t('quickAdd.noListHit', lang),
-        value: result.name,
+        value: name,
         emoji: '❓',
       })))
       .addOptions({

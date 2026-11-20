@@ -49,10 +49,11 @@ export function buildBibleFetchOptions(options = {}) {
   };
   // A caller may provide one signal for an entire multi-request phase. Keep
   // that absolute deadline instead of silently restarting the timeout for
-  // every direct/proxy attempt.
+  // every direct/proxy attempt. Worker calls keep timeoutMs without a local
+  // signal so workerBibleClient can add its Mongo round-trip buffer.
   if (options.signal) {
     fetchOptions.signal = options.signal;
-  } else if (options.timeoutMs) {
+  } else if (options.timeoutMs && !fetchOptions.viaWorker) {
     fetchOptions.signal = AbortSignal.timeout(options.timeoutMs);
   }
   return fetchOptions;
@@ -158,8 +159,13 @@ export async function fetchWithFallback(url, options = {}) {
     allowScraperApi = true,
     preferScraperApi = false,
     fallbackOnRateLimit = false,
+    viaWorker: _viaWorker,
+    timeoutMs,
     ...fetchOptions
   } = options;
+  if (!fetchOptions.signal && timeoutMs) {
+    fetchOptions.signal = AbortSignal.timeout(timeoutMs);
+  }
   const hasKey = allowScraperApi && config.scraperApiKeys?.length > 0;
   const proxyOptions = { signal: fetchOptions.signal };
 

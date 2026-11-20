@@ -409,7 +409,30 @@ async function requestGeminiWithFallback({
       };
     }
 
-    const payload = await aiRes.json();
+    let payload;
+    try {
+      payload = await aiRes.json();
+    } catch (error) {
+      failures.push(`${model}: ${error.name || error.message}`);
+      const cooldownMs = coolDownGeminiModel(
+        model,
+        modelSignal.aborted ? 'timeout' : 'response read error',
+      );
+      if (requestSignal.aborted) {
+        return { ok: false, type: 'network', model, error, failures };
+      }
+      if (modelSignal.aborted && hasFallback) {
+        protectNextFallback = false;
+        onRetry({ type: 'timeout', model, error, timeoutMs: attemptTimeoutMs, cooldownMs });
+        continue;
+      }
+      if (hasFallback) {
+        protectNextFallback = true;
+        onRetry({ type: 'network', model, error, cooldownMs });
+        continue;
+      }
+      return { ok: false, type: 'network', model, error, failures };
+    }
     onModelUsage(payload?.usageMetadata);
     const parsed = await parseResponse({
       ...extractGeminiResponse(payload),

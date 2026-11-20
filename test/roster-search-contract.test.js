@@ -280,3 +280,53 @@ test('visual-substitution recovery caps candidate fan-out', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('fetchNameSuggestions does not share in-flight promises across different transport policies or caller signals', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKeys = [...config.scraperApiKeys];
+  config.scraperApiKeys.splice(0, config.scraperApiKeys.length, 'fake-search-key');
+
+  let releaseDirect;
+  const directGate = new Promise((resolve) => { releaseDirect = resolve; });
+  let callerAbortSignal = null;
+  const table = [{ _: 1 }, [2], [3, 4, 5], 'Shawlion', 'bard', 1755];
+
+  globalThis.fetch = async (url, init = {}) => {
+    const requestedUrl = String(url);
+    if (requestedUrl.startsWith('https://api.scraperapi.com/')) {
+      return Response.json({ type: 'result', data: JSON.stringify(table) });
+    }
+    if (callerAbortSignal && init.signal === callerAbortSignal) {
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+      });
+    }
+    await directGate;
+    return new Response('blocked', { status: 403 });
+  };
+
+  try {
+    // Case A: allowScraperApi:false hitting 403 must not poison allowScraperApi:true.
+    const restrictedPromise = fetchNameSuggestions('Shawlion', { allowScraperApi: false });
+    const scraperPromise = fetchNameSuggestions('Shawlion', { allowScraperApi: true });
+    releaseDirect();
+    const [restricted, viaScraper] = await Promise.all([restrictedPromise, scraperPromise]);
+    assert.equal(restricted, null);
+    assert.deepEqual(viaScraper, [{ name: 'Shawlion', cls: 'bard', itemLevel: 1755 }]);
+
+    // Case B: an aborting caller signal must not poison a signal-free caller.
+    clearNameSuggestionCache();
+    const controller = new AbortController();
+    callerAbortSignal = controller.signal;
+    const abortedPromise = fetchNameSuggestions('Abortcheck', { allowScraperApi: false, signal: controller.signal });
+    const healthyPromise = fetchNameSuggestions('Abortcheck', { allowScraperApi: true });
+    controller.abort(new DOMException('caller timed out', 'TimeoutError'));
+    const [aborted, healthy] = await Promise.all([abortedPromise, healthyPromise]);
+    assert.equal(aborted, null);
+    assert.deepEqual(healthy, [{ name: 'Shawlion', cls: 'bard', itemLevel: 1755 }]);
+  } finally {
+    config.scraperApiKeys.splice(0, config.scraperApiKeys.length, ...originalKeys);
+    globalThis.fetch = originalFetch;
+    clearNameSuggestionCache();
+  }
+});

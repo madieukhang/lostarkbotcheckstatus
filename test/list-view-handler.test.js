@@ -149,6 +149,38 @@ test('list-view detail carries the History button from two notes', async t => {
   assert.equal(detailReply.components[0].toJSON().components[0].custom_id, `listnote_history:black:${entry._id}:1`);
 });
 
+test('list-view Refresh renders an empty notice instead of failing when the last entry was removed', async (t) => {
+  const warnings = [];
+  t.mock.method(console, 'warn', (...args) => warnings.push(args.join(' ')));
+  let rows = [{ _id: 'a'.repeat(24), name: 'LastRow', reason: 'Report', _listType: 'black', _icon: '⛔', _color: 0xed4245 }];
+  let collect;
+  const edits = [];
+  await createViewHandlers({
+    client: {}, connectDatabase: async () => {}, getLanguage: async () => 'en',
+    loadStatMap: async () => new Map(), loadEntries: async () => rows,
+  }).handleListViewCommand({
+    user: { id: 'viewer' }, guild: { id: 'guild' }, options: { getString: (key) => (key === 'type' ? 'black' : null) },
+    deferReply: async () => {},
+    editReply: async (payload) => {
+      edits.push(payload);
+      return {
+        createMessageComponentCollector: () => ({ on: (event, cb) => { if (event === 'collect') collect = cb; } }),
+      };
+    },
+  });
+
+  rows = [];
+  await collect({ customId: 'listview_refresh', user: { id: 'viewer' }, deferUpdate: async () => {} });
+  // Flush the latest-only render queue microtask.
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(warnings, [], 'refreshing into an empty list must not fail embed validation');
+  assert.equal(edits.length, 2);
+  const refreshedEmbed = edits[1].embeds[0].toJSON();
+  assert.ok(refreshedEmbed.description && refreshedEmbed.description.length > 0);
+  assert.ok(refreshedEmbed.title.includes(translate('listView.empty.typedTitle', 'en', { label: 'blacklist' })));
+});
+
 test('list-view collector survives a button Discord has already expired', async t => {
   t.mock.method(console, 'warn', () => {});
   let collect;

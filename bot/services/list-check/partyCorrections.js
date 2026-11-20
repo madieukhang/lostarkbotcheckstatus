@@ -158,6 +158,9 @@ export async function applyMarkedSiblingLevelCorrections(results) {
     item.snapClassName = best.classId ? getClassName(best.classId) : '';
     item.snapItemLevel = Number(best.itemLevel) || 0;
     item.snapCombatScore = best.combatScore || '';
+    // Clear alts scraped for the replaced low-level character so they cannot
+    // trigger false list/trusted matches or pollute allCharacters in MongoDB.
+    if (item.discoveredAlts !== undefined) item.discoveredAlts = [];
     item.identityVerified = true;
     item.identityVerificationSource = 'roster-snapshot';
   }

@@ -19,9 +19,10 @@ export async function readBodyWithin(response, maxBytes) {
     { code: 'BODY_TOO_LARGE' },
   );
   if (Number(response.headers.get('content-length')) > maxBytes) {
-    await response.body.cancel();
+    await response.body?.cancel();
     throw tooLarge();
   }
+  if (!response.body) return Buffer.alloc(0);
   const chunks = [];
   let received = 0;
   // Leaving the loop early cancels the stream.

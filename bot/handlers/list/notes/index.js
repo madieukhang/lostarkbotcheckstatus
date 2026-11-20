@@ -8,9 +8,11 @@ import { connectDB } from '../../../db.js';
 import UserPreference from '../../../models/UserPreference.js';
 import { getUserLanguage, t } from '../../../services/i18n/index.js';
 import { NoticeKind } from '../../../utils/alertEmbed.js';
-import { deferEphemeralReply, deferUpdate, editAlert, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
+import { deferEphemeralReply, deferUpdate, editAlert, editEmbed, editPayload, replyAlert } from '../../../utils/interactionReplies.js';
+import { normalizeNameKey } from '../../../utils/names.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
-import { canChangeEntryWithoutApproval, getListContext, isOfficerOrSenior, isRequesterAutoApprover } from '../helpers.js';
+import { buildTrustedBlockEmbed, canChangeEntryWithoutApproval, getListContext, isOfficerOrSenior, isRequesterAutoApprover } from '../helpers.js';
+import { findTrustedEditConflict } from '../edit/trustedGuard.js';
 import { statMapFromRosterCharacters } from '../trackedAltsRender.js';
 import { buildNoteAddedPayload } from './addedCard.js';
 import { appendEntryNote, listAddedAlts } from './appendNote.js';
@@ -23,21 +25,23 @@ const NOTE_REFUSAL_KINDS = Object.freeze({
   notYours: NoticeKind.GUARD,
 });
 
-// Same visibility as the check details card: a server-scoped entry only
-// opens inside its own server.
-async function loadHistoryEntry(interaction) {
+// Guild clicks stay scoped like the check details card. Approver DMs carry no
+// guild context, so officers and seniors may open server-scoped duplicates there.
+async function loadHistoryEntry(interaction, allowUnscopedDm = false) {
   const [, type, entryId, page] = interaction.customId.split(':');
   await connectDB();
-  const entry = await getListContext(type).model.findOne(
-    buildScopedListQuery(type, { _id: entryId }, interaction.guild?.id || interaction.guildId || ''),
-  ).lean();
+  const guildId = interaction.guild?.id || interaction.guildId || '';
+  const query = !guildId && allowUnscopedDm
+    ? { _id: entryId }
+    : buildScopedListQuery(type, { _id: entryId }, guildId);
+  const entry = await getListContext(type).model.findOne(query).lean();
   return { type, entry, page: Number(page) };
 }
 
 // Writers are shown only to officers and seniors, so a member cannot read
 // who reported them from the history.
 async function renderHistory(interaction, lang, showAuthors) {
-  const { type, entry, page } = await loadHistoryEntry(interaction);
+  const { type, entry, page } = await loadHistoryEntry(interaction, showAuthors);
   if (!entry) {
     await editAlert(interaction, { kind: NoticeKind.EXPIRED, ...t('dialogue.check.entryRemoved', lang) });
     return;
@@ -91,21 +95,34 @@ export function createNoteHandlers({
     let entry;
     let saved;
     let allowed = true;
+    let trustedNow = null;
     // Taken above so a second click cannot save the report twice; given back
     // when the save fails, which the card key on the note makes safe to retry.
     try {
       await deferUpdate(interaction);
       await connectDB();
       entry = await model.findById(entryId).lean();
-      // The entry may have changed scope since the card was offered.
+      // The entry may have changed scope or become trusted since the card was offered.
       allowed = !entry || canChangeEntryWithoutApproval(payload, entry, isRequesterAutoApproverFn);
-      saved = entry && allowed ? await appendEntryNote({ model, entry, payload, rosterNames, requestId: key }) : null;
+      if (entry && allowed) {
+        trustedNow = await findTrustedEditConflict(entry, [payload.name, ...(rosterNames || [])]);
+      }
+      saved = entry && allowed && !trustedNow
+        ? await appendEntryNote({ model, entry, payload, rosterNames, requestId: key })
+        : null;
     } catch (err) {
       restorePendingNote(key, pending);
       throw err;
     }
     if (!allowed) {
       await editAlert(interaction, { kind: NoticeKind.GUARD, ...t('dialogue.notes.needsApproval', lang) }, { components: [] });
+      return;
+    }
+    if (trustedNow) {
+      await editEmbed(interaction, buildTrustedBlockEmbed(payload.name, trustedNow.reason, {
+        lang,
+        record: statMapFromRosterCharacters(rosterCharacters).get(normalizeNameKey(payload.name)),
+      }), { components: [] });
       return;
     }
     if (!saved) {

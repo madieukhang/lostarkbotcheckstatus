@@ -1070,3 +1070,59 @@ test('extractNamesFromImage rejects declared bodies that cannot fit after base64
     clearOcrCache();
   }
 });
+
+test('extractNamesFromImage fails over when reading Gemini JSON body rejects after 200 headers', async () => {
+  clearOcrCache();
+  clearGeminiModelCooldowns();
+  const originalFetch = globalThis.fetch;
+  const originalKey = config.geminiApiKey;
+  const originalModels = [...config.geminiModels];
+  const requestedModels = [];
+
+  config.geminiApiKey = 'fake-gemini-key';
+  config.geminiModels.splice(0, config.geminiModels.length, 'body-timeout-model', 'healthy-fallback-model');
+  globalThis.fetch = async (url) => {
+    const requestedUrl = String(url);
+    if (requestedUrl === 'https://cdn.discordapp.com/body-timeout.png') {
+      return new Response(Buffer.from([1, 2, 3, 4]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      });
+    }
+    if (requestedUrl.includes('generativelanguage.googleapis.com')) {
+      const model = decodeURIComponent(requestedUrl.match(/models\/([^:]+):/)?.[1] || '');
+      requestedModels.push(model);
+      if (model === 'body-timeout-model') {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          json: async () => { throw new DOMException('body timeout', 'TimeoutError'); },
+        };
+      }
+      return Response.json({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text: '["Recovered"]' }] },
+        }],
+      });
+    }
+    throw new Error(`unexpected URL: ${requestedUrl}`);
+  };
+
+  try {
+    const names = await extractNamesFromImage({
+      id: 'body-timeout',
+      url: 'https://cdn.discordapp.com/body-timeout.png',
+      contentType: 'image/png',
+    });
+    assert.deepEqual(names, ['Recovered']);
+    assert.deepEqual(requestedModels, ['body-timeout-model', 'healthy-fallback-model']);
+  } finally {
+    config.geminiApiKey = originalKey;
+    config.geminiModels.splice(0, config.geminiModels.length, ...originalModels);
+    globalThis.fetch = originalFetch;
+    clearOcrCache();
+    clearGeminiModelCooldowns();
+  }
+});

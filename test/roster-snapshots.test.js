@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 process.env.MONGODB_URI ||= 'mongodb://localhost:27017/test';
 
-const { findRosterSnapshot, saveRosterSnapshotsBestEffort, upsertRosterSnapshots } = await import('../bot/services/roster/rosterSnapshots.js');
+const { findRosterSnapshot, higherItemLevel, saveRosterSnapshotsBestEffort, upsertRosterSnapshots } = await import('../bot/services/roster/rosterSnapshots.js');
 
 test('findRosterSnapshot resolves null on a failed read and leaves one warning', async (t) => {
   const warn = t.mock.method(console, 'warn', () => {});
@@ -70,4 +70,10 @@ test('saveRosterSnapshotsBestEffort saves through the upsert and logs a failure 
   assert.equal(warn.mock.callCount(), 1);
   const logged = warn.mock.calls[0].arguments.join(' ');
   assert.ok(logged.startsWith('[test] ') && logged.includes('database down'), logged);
+});
+
+test('higherItemLevel parses comma-formatted item levels from HTML roster records', () => {
+  assert.equal(higherItemLevel(1725, '1,755.00'), 1755);
+  assert.equal(higherItemLevel('1,745.83', 1710), 1745.83);
+  assert.equal(higherItemLevel(null, undefined, 'invalid'), 0);
 });

@@ -346,6 +346,10 @@ export default {
       description: '`{action}` is not a `/la-setup` action.',
       tip: 'Pick one from the list that appears as you type in action',
     },
+    missingOption: {
+      title: 'Missing required option',
+      description: 'This action needs the `{option}:` option.',
+    },
     unknownLanguage: {
       title: 'Unknown language',
       description: '`{language}` is not a language I support.',
