@@ -43,41 +43,40 @@ import { getUserOcrMode } from '../../../services/list-check/preferences.js';
 import { buildScopedListQuery } from '../../../utils/scope.js';
 import { resetSelectMenu } from '../../../utils/selectMenu.js';
 
-function pickListEntryForDetails(result) {
-  for (const [listType, entry] of [
-    ['black', result.blackEntry],
-    ['watch', result.watchEntry],
-    ['white', result.whiteEntry],
-  ]) {
-    if (entry) {
-      return { entry, listType };
-    }
-  }
-  return null;
+const DETAIL_LIST_ENTRIES = Object.freeze([
+  ['black', 'blackEntry'],
+  ['watch', 'watchEntry'],
+  ['white', 'whiteEntry'],
+]);
+
+function collectListEntriesForDetails(result) {
+  return DETAIL_LIST_ENTRIES
+    .map(([listType, entryKey]) => ({ entry: result?.[entryKey], listType }))
+    .filter(({ entry }) => Boolean(entry));
 }
 
 /**
  * Build the auto-check / /la-check details dropdown. Every result backed by
  * a blacklist, watchlist, or whitelist entry is selectable even when the
- * entry has no evidence image. Blacklist wins when one checked name happens
- * to match multiple lists, because it is the highest-severity result shown on
- * the check card. The legacy custom id is kept so already-rendered evidence
- * menus continue to work after deploy.
+ * entry has no evidence image. Multi-list matches expose each distinct list
+ * entry in severity order (black -> watch -> white), deduplicated by
+ * `<listType>:<_id>`. The legacy custom id is kept so already-rendered
+ * evidence menus continue to work after deploy.
  */
 export function buildAutoCheckEvidenceRow(results, lang = 'en') {
   const candidates = [];
   const seenEntryRefs = new Set();
   for (const result of results) {
-    const picked = pickListEntryForDetails(result);
-    if (!picked) continue;
-    const entryRef = `${picked.listType}:${picked.entry._id}`;
-    if (seenEntryRefs.has(entryRef)) continue;
-    seenEntryRefs.add(entryRef);
-    candidates.push({
-      result,
-      entry: picked.entry,
-      listType: picked.listType,
-    });
+    for (const { entry, listType } of collectListEntriesForDetails(result)) {
+      const entryRef = `${listType}:${entry._id}`;
+      if (seenEntryRefs.has(entryRef)) continue;
+      seenEntryRefs.add(entryRef);
+      candidates.push({
+        result,
+        entry,
+        listType,
+      });
+    }
   }
   if (candidates.length === 0) return null;
 

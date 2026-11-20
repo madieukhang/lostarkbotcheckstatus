@@ -24,9 +24,9 @@ function linkName(name, item) {
 }
 
 const LIST_ENTRY_BRANCHES = [
-  ['black', 'blackEntry'],
-  ['white', 'whiteEntry'],
-  ['watch', 'watchEntry'],
+  { listType: 'black', entryKey: 'blackEntry', icon: '⛔' },
+  { listType: 'watch', entryKey: 'watchEntry', icon: '⚠️' },
+  { listType: 'white', entryKey: 'whiteEntry', icon: '✅' },
 ];
 
 const RESULT_STATES = [
@@ -66,7 +66,7 @@ function formatMatchContext(item, entry, listType, lang) {
 
 /**
  * Pick the alt list to display for an item, in this priority order:
- *   1. Blacklist > Whitelist > Watchlist > Trusted entry's allCharacters
+ *   1. Blacklist > Watchlist > Whitelist > Trusted entry's allCharacters
  *      (the entry was recorded with its account roster snapshot).
  *   2. `item.discoveredAlts` from the online enrichment branch
  *      (worker-online buildRosterCharacters; only when roster was
@@ -75,8 +75,9 @@ function formatMatchContext(item, entry, listType, lang) {
  * branch, then dedupes case-insensitively.
  */
 export function pickAltsForDisplay(item, excludedNames = collectAltExcludedNames(item)) {
-  const sourceEntry = item.blackEntry || item.whiteEntry || item.watchEntry || item.trustedEntry;
-  const raw = (sourceEntry?.allCharacters && sourceEntry.allCharacters.length > 0)
+  const sourceEntry = [item.blackEntry, item.watchEntry, item.whiteEntry, item.trustedEntry]
+    .find((entry) => Array.isArray(entry?.allCharacters) && entry.allCharacters.length > 0);
+  const raw = sourceEntry
     ? sourceEntry.allCharacters
     : (Array.isArray(item.discoveredAlts) ? item.discoveredAlts : []);
   if (raw.length === 0) return [];
@@ -135,17 +136,61 @@ function formatCorrectionBranch(item, lang) {
   })]);
 }
 
-function formatListEntryBranches(item, entry, listType, lang) {
-  if (!entry) return [];
+function buildEntryReportParts(entry, { includeNoteCount = false } = {}) {
   return [
+    wrapTrimmed(entry.reason, (reason) => `*${escapeLinkBrackets(reason)}*`),
+    wrapTrimmed(entry.raid, (raid) => `\`${codeSpanText(raid)}\``),
+    includeNoteCount && entry.noteCount > 1 ? `${entry.noteCount} ${ICONS.note}` : '',
+  ].filter(Boolean);
+}
+
+function formatLabeledReportBranch(icon, reportParts) {
+  if (reportParts.length === 0) return '';
+  return formatBranch([`${icon} ${reportParts[0]}`, ...reportParts.slice(1)]);
+}
+
+function formatMatchedListBranches(item, lang) {
+  const matched = LIST_ENTRY_BRANCHES
+    .filter(({ entryKey }) => Boolean(item[entryKey]))
+    .map(({ listType, entryKey, icon }, index) => {
+      const entry = item[entryKey];
+      return {
+        icon,
+        reportParts: buildEntryReportParts(entry, { includeNoteCount: index > 0 }),
+        matchContext: formatMatchContext(item, entry, listType, lang),
+      };
+    });
+
+  if (matched.length === 0) return [];
+  if (matched.length === 1) {
+    const [{ reportParts, matchContext }] = matched;
     // Keep the report itself compact: reason and raid describe the same entry.
     // An indirect match is navigation context, so it gets a separate line.
-    formatBranch([
-      wrapTrimmed(entry.reason, (reason) => `*${escapeLinkBrackets(reason)}*`),
-      wrapTrimmed(entry.raid, (raid) => `\`${codeSpanText(raid)}\``),
-    ]),
-    formatBranch([formatMatchContext(item, entry, listType, lang)]),
-  ].filter(Boolean);
+    return [formatBranch(reportParts), formatBranch([matchContext])].filter(Boolean);
+  }
+
+  // Group consecutive matches that resolved through the same via/roster path so
+  // shared navigation context is rendered once after all of their report lines.
+  const groups = [];
+  for (const branch of matched) {
+    const previousGroup = groups.at(-1);
+    const canShareContext = Boolean(branch.matchContext)
+      && previousGroup?.[0]?.matchContext === branch.matchContext;
+    if (canShareContext) previousGroup.push(branch);
+    else groups.push([branch]);
+  }
+
+  return groups.flatMap((group) => {
+    const reportLines = group
+      .map(({ icon, reportParts }) => formatLabeledReportBranch(icon, reportParts))
+      .filter(Boolean);
+    const first = group[0];
+    if (!first.matchContext) return reportLines;
+    const contextText = reportLines.length === 0 && group.length === 1
+      ? `${first.icon} ${first.matchContext}`
+      : first.matchContext;
+    return [...reportLines, formatBranch([contextText])].filter(Boolean);
+  });
 }
 
 function formatAltsBranch(item, lang) {
@@ -166,9 +211,7 @@ function formatAltsBranch(item, lang) {
 function collectResultBranches(item, lang) {
   return [
     formatCorrectionBranch(item, lang),
-    ...LIST_ENTRY_BRANCHES.flatMap(([listType, entryKey]) => (
-      formatListEntryBranches(item, item[entryKey], listType, lang)
-    )),
+    ...formatMatchedListBranches(item, lang),
     formatAltsBranch(item, lang),
   ].filter(Boolean);
 }
@@ -215,8 +258,8 @@ function formatTrustedResult(item, state, classPrefix, statSuffix, branches, lan
  *
  * Layout:
  *   [status-icon] [class-icon] **Name** · `ilvl` · `nnn CP` · 2 📝  (from two notes)
- *      ↳ reason · [raid]                        (when reported)
- *      ↳ via Other                             (for an indirect match)
+ *      ↳ reason · [raid]                        (when reported; prefixed with list icon on multi-list hits)
+ *      ↳ via Other                             (for an indirect match; shared via lines collapse once)
  *      ↳ via Other · trusted                    (only when trusted via roster)
  *      ↳ alts: A, B, C +N more                  (when alts are known)
  *

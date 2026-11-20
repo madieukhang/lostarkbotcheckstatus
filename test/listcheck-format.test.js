@@ -291,3 +291,48 @@ test('a listed name with more than one note shows the note count after its stats
   }]);
   assert.doesNotMatch(single, /📝/u);
 });
+
+test('formatCheckResults labels multi-list branches and collapses a shared via line', () => {
+  const [line] = formatCheckResults([{
+    name: 'Hongcóbéo',
+    snapClassName: 'Aeromancer',
+    snapItemLevel: 1730,
+    snapCombatScore: '≈4058.04',
+    blackEntry: {
+      name: 'Burgerxúcxích',
+      scope: 'server',
+      reason: 'lướt ít thôi',
+      raid: 'Kazeros Hard',
+      noteCount: 2,
+    },
+    watchEntry: {
+      name: 'Burgerxúcxích',
+      reason: 'vua ngủ gật',
+      noteCount: 3,
+    },
+  }], 'vi');
+
+  const [headline, ...branches] = line.split('\n');
+  assert.match(headline, /^⛔ .*\*\*\[Hongcóbéo\]\(\S+\)\*\* \(Nội bộ\) · `1730\.00` · `≈4058\.04 CP` · 2 📝$/u);
+  assert.equal(branches.length, 3);
+  assert.equal(branches[0], '   ↳ ⛔ *lướt ít thôi* · `Kazeros Hard`');
+  assert.equal(branches[1], '   ↳ ⚠️ *vua ngủ gật* · 3 📝');
+  assert.match(branches[2], /^   ↳ via \*\*\[Burgerxúcxích\]\(\S+\)\*\*$/u);
+  assert.equal((line.match(/via \*\*\[Burgerxúcxích\]/gu) || []).length, 1);
+});
+
+test('formatCheckResults orders multi-list branches black -> watch -> white with distinct contexts', () => {
+  const [line] = formatCheckResults([{
+    name: 'Multihit',
+    blackEntry: { name: 'Multihit', reason: 'Black report' },
+    whiteEntry: { name: 'Whitemain', reason: 'White note' },
+    watchEntry: { name: 'Watchmain', reason: '' },
+  }], 'en');
+
+  const [, ...branches] = line.split('\n');
+  assert.equal(branches.length, 4);
+  assert.equal(branches[0], '   ↳ ⛔ *Black report*');
+  assert.match(branches[1], /^   ↳ ⚠️ via \*\*\[Watchmain\]\(\S+\)\*\*$/u);
+  assert.equal(branches[2], '   ↳ ✅ *White note*');
+  assert.match(branches[3], /^   ↳ via \*\*\[Whitemain\]\(\S+\)\*\*$/u);
+});

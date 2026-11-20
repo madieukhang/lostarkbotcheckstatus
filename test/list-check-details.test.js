@@ -33,9 +33,16 @@ test('check details dropdown includes a blacklist entry without an evidence imag
 
   const select = row.toJSON().components[0];
   assert.match(select.placeholder, /Xem chi tiết/u);
-  assert.equal(select.options.length, 2);
+  assert.equal(select.options.length, 3);
   assert.equal(select.options[0].label, 'Checkedalt');
+  assert.equal(select.options[0].description, 'Blacklist report');
   assert.equal(select.options[0].value, `black:${blackId}`);
+  assert.equal(select.options[0].emoji?.name, '⛔');
+  assert.equal(select.options[1].label, 'Checkedalt');
+  assert.equal(select.options[1].description, 'Watch report');
+  assert.equal(select.options[1].value, `watch:${watchId}`);
+  assert.equal(select.options[1].emoji?.name, '⚠️');
+  assert.equal(select.options[2].value, 'none');
 });
 
 test('check details dropdown de-duplicates multiple checked alts from one entry', () => {
@@ -53,6 +60,23 @@ test('check details dropdown de-duplicates multiple checked alts from one entry'
   const select = row.toJSON().components[0];
   assert.equal(select.options.length, 2);
   assert.equal(select.options[0].value, `black:${blackId}`);
+});
+
+test('check details dropdown de-duplicates multi-list hits shared across checked alts', () => {
+  const blackId = 'e'.repeat(24);
+  const watchId = 'f'.repeat(24);
+  const sharedBlack = { _id: blackId, name: 'Rosterprimary', reason: 'Black report' };
+  const sharedWatch = { _id: watchId, name: 'Rosterprimary', reason: 'Watch report' };
+  const row = buildAutoCheckEvidenceRow([
+    { name: 'Altone', blackEntry: sharedBlack, watchEntry: sharedWatch },
+    { name: 'Alttwo', blackEntry: sharedBlack, watchEntry: sharedWatch },
+  ], 'en');
+
+  const select = row.toJSON().components[0];
+  assert.deepEqual(
+    select.options.map((option) => option.value),
+    [`black:${blackId}`, `watch:${watchId}`, 'none'],
+  );
 });
 
 test('check details dropdown keeps the screenshot name visible after canonical correction', () => {
