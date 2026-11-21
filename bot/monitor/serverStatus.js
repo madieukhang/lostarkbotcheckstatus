@@ -42,7 +42,7 @@ export const STATUS = {
 // The live page is about 94 KB decompressed and sends no Content-Length.
 const STATUS_PAGE_MAX_BYTES = 2 * 1024 * 1024;
 
-// Exact class name prefixes from the live page – kept as constants so a
+// Exact class name prefixes from the live page - kept as constants so a
 // single change here updates every selector in the file.
 const CLS = {
   SERVER_ROW:  'ags-ServerStatus-content-responses-response-server',

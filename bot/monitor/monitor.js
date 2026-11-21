@@ -189,7 +189,7 @@ export async function checkStatus(client, { undelivered = new Set() } = {}) {
     console.log(`[monitor] ${server}: ${currentStatus} (was: ${previousStatus})`);
 
     if (transition.shouldNotify) {
-      console.log(`[monitor] ${server} came online – sending notification.`);
+      console.log(`[monitor] ${server} came online - sending notification.`);
       const sent = await sendOnlineNotification(client, server);
       await finishRecoveryNotification({
         server,

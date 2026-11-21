@@ -314,6 +314,35 @@ async function requestGeminiWithFallback({
   // that timeout already consumed the protected portion of the deadline.
   let protectNextFallback = true;
 
+  function handleAttemptFailure({
+    error,
+    model,
+    hasFallback,
+    attemptTimeoutMs,
+    modelSignal,
+    label,
+  }) {
+    failures.push(`${model}: ${error.name || error.message}`);
+    const cooldownMs = coolDownGeminiModel(
+      model,
+      modelSignal.aborted ? 'timeout' : label,
+    );
+    if (requestSignal.aborted) {
+      return { retry: false, result: { ok: false, type: 'network', model, error, failures } };
+    }
+    if (modelSignal.aborted && hasFallback) {
+      protectNextFallback = false;
+      onRetry({ type: 'timeout', model, error, timeoutMs: attemptTimeoutMs, cooldownMs });
+      return { retry: true };
+    }
+    if (hasFallback) {
+      protectNextFallback = true;
+      onRetry({ type: 'network', model, error, cooldownMs });
+      return { retry: true };
+    }
+    return { retry: false, result: { ok: false, type: 'network', model, error, failures } };
+  }
+
   for (let i = 0; i < models.length; i += 1) {
     const model = models[i];
     const hasFallback = i < models.length - 1;
@@ -360,25 +389,16 @@ async function requestGeminiWithFallback({
       });
     } catch (error) {
       onModelElapsed({ model, elapsedMs: Date.now() - modelStartedAt });
-      failures.push(`${model}: ${error.name || error.message}`);
-      const cooldownMs = coolDownGeminiModel(
+      const outcome = handleAttemptFailure({
+        error,
         model,
-        modelSignal.aborted ? 'timeout' : 'network error',
-      );
-      if (requestSignal.aborted) {
-        return { ok: false, type: 'network', model, error, failures };
-      }
-      if (modelSignal.aborted && hasFallback) {
-        protectNextFallback = false;
-        onRetry({ type: 'timeout', model, error, timeoutMs: attemptTimeoutMs, cooldownMs });
-        continue;
-      }
-      if (hasFallback) {
-        protectNextFallback = true;
-        onRetry({ type: 'network', model, error, cooldownMs });
-        continue;
-      }
-      return { ok: false, type: 'network', model, error, failures };
+        hasFallback,
+        attemptTimeoutMs,
+        modelSignal,
+        label: 'network error',
+      });
+      if (outcome.retry) continue;
+      return outcome.result;
     }
     onModelElapsed({ model, elapsedMs: Date.now() - modelStartedAt });
 
@@ -413,25 +433,16 @@ async function requestGeminiWithFallback({
     try {
       payload = await aiRes.json();
     } catch (error) {
-      failures.push(`${model}: ${error.name || error.message}`);
-      const cooldownMs = coolDownGeminiModel(
+      const outcome = handleAttemptFailure({
+        error,
         model,
-        modelSignal.aborted ? 'timeout' : 'response read error',
-      );
-      if (requestSignal.aborted) {
-        return { ok: false, type: 'network', model, error, failures };
-      }
-      if (modelSignal.aborted && hasFallback) {
-        protectNextFallback = false;
-        onRetry({ type: 'timeout', model, error, timeoutMs: attemptTimeoutMs, cooldownMs });
-        continue;
-      }
-      if (hasFallback) {
-        protectNextFallback = true;
-        onRetry({ type: 'network', model, error, cooldownMs });
-        continue;
-      }
-      return { ok: false, type: 'network', model, error, failures };
+        hasFallback,
+        attemptTimeoutMs,
+        modelSignal,
+        label: 'response read error',
+      });
+      if (outcome.retry) continue;
+      return outcome.result;
     }
     onModelUsage(payload?.usageMetadata);
     const parsed = await parseResponse({

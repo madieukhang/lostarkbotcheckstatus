@@ -9,6 +9,26 @@ import { NoticeKind } from '../../utils/alertEmbed.js';
 import { editAlert } from '../../utils/interactionReplies.js';
 import { t } from '../../services/i18n/index.js';
 
+/**
+ * Edit the deferred setup reply with a localized missing-option input notice.
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * @param {string} option - missing slash option name
+ * @param {string} lang - reply language
+ * @param {{editAlertFn?: Function}} [options]
+ * @returns {Promise<void>}
+ */
+export async function reportMissingSetupOption(
+  interaction,
+  option,
+  lang,
+  { editAlertFn = editAlert } = {},
+) {
+  await editAlertFn(interaction, {
+    kind: NoticeKind.INPUT,
+    ...t('dialogue.setup.missingOption', lang, { option }),
+  });
+}
+
 export async function requireSetupGuildTextChannel(
   interaction,
   lang,
@@ -16,10 +36,7 @@ export async function requireSetupGuildTextChannel(
 ) {
   const channel = interaction.options.getChannel('channel');
   if (!channel) {
-    await editAlertFn(interaction, {
-      kind: NoticeKind.INPUT,
-      ...t('dialogue.setup.missingOption', lang, { option: 'channel' }),
-    });
+    await reportMissingSetupOption(interaction, 'channel', lang, { editAlertFn });
     return null;
   }
   if (channel.type === ChannelType.GuildText) return channel;

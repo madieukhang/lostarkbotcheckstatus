@@ -37,6 +37,7 @@ import {
   postSetupWelcome,
   postListNotifySetupWelcome,
   reportMissingChannelPermissions,
+  reportMissingSetupOption,
   requireSetupGuildTextChannel,
   resolveGuildTextChannel,
   resolveListNotifyWelcomePinContext,
@@ -700,10 +701,7 @@ async function handleSetupRepin(interaction, lang) {
 async function handleSetupLanguage(interaction, lang) {
   const requested = (interaction.options.getString('language') || '').trim();
   if (!requested) {
-    await editAlert(interaction, {
-      kind: NoticeKind.INPUT,
-      ...t('dialogue.setup.missingOption', lang, { option: 'language' }),
-    });
+    await reportMissingSetupOption(interaction, 'language', lang);
     return;
   }
   // The option is autocomplete-only, so Discord accepts any typed text, and
@@ -880,10 +878,7 @@ export async function handleSetupCommand(interaction) {
 async function handleSetupDefaultScope(interaction, lang) {
   const scope = interaction.options.getString('scope');
   if (!scope) {
-    await editAlert(interaction, {
-      kind: NoticeKind.INPUT,
-      ...t('dialogue.setup.missingOption', lang, { option: 'scope' }),
-    });
+    await reportMissingSetupOption(interaction, 'scope', lang);
     return;
   }
 

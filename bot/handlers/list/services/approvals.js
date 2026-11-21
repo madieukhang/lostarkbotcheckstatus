@@ -63,6 +63,17 @@ const DECISION_SEVERITY = Object.freeze({
   noted: AlertSeverity.SUCCESS,
 });
 
+const DECISION_OUTCOME_RULES = Object.freeze([
+  { applies: (rejected, result) => rejected && Boolean(result?.isDuplicate), decision: 'duplicate' },
+  { applies: (rejected) => Boolean(rejected), decision: 'rejected' },
+  { applies: (_rejected, result) => result?.ok === false, decision: 'failed' },
+  { applies: (_rejected, result) => Boolean(result?.isNoted), decision: 'noted' },
+]);
+
+function resolveDecisionOutcome(rejected, result) {
+  return DECISION_OUTCOME_RULES.find((rule) => rule.applies(rejected, result))?.decision || 'approved';
+}
+
 /**
  * Build the requester's decision card in the /la-list add card grammar:
  * `List · Decision · Name`, one hero line, then list, raid and scope. The
@@ -357,9 +368,7 @@ export function createApprovalServices({
         getGuildLanguageFn(guild.id, { GuildConfigModel }),
         findRosterSnapshot(payload.name),
       ]);
-      const decision = rejected
-        ? (result?.isDuplicate ? 'duplicate' : 'rejected')
-        : (result?.ok === false ? 'failed' : result?.isNoted ? 'noted' : 'approved');
+      const decision = resolveDecisionOutcome(rejected, result);
 
       const decisionPayload = {
         // Keep only the ping outside the card; all readable copy belongs to

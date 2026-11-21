@@ -315,46 +315,9 @@ function broadcastAppliedEdit(args, editedEntry) {
  *   allCharacters, …) and the updater identity.
  * @returns {Promise<void>}
  */
-export async function applyListEditNow({
-  interaction,
-  client,
-  broadcastListChange,
-  existing,
-  currentType,
-  targetType,
-  isTypeChange,
-  isScopeChange,
-  targetScope,
-  editGuildId,
-  editGuildDefaultScope,
-  newReason,
-  newRaid,  newImageUrl,
-  newImageRehost,
-  newScope,
-  additionalNamesParsed,
-  isOwner,
-  lang = 'en',
-}) {
-  const args = {
-    interaction,
-    client,
-    broadcastListChange,
-    existing,
-    currentType,
-    targetType,
-    isTypeChange,
-    isScopeChange,
-    targetScope,
-    editGuildId,
-    editGuildDefaultScope,
-    newReason,
-    newRaid,    newImageUrl,
-    newImageRehost,
-    newScope,
-    additionalNamesParsed,
-    isOwner,
-    lang,
-  };
+export async function applyListEditNow(rawArgs) {
+  const args = { lang: 'en', ...rawArgs };
+  const { interaction, isTypeChange, lang } = args;
   try {
     const editedEntry = isTypeChange
       ? await applyTypeChange(args)

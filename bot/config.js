@@ -54,7 +54,7 @@ validateEnv(['DISCORD_TOKEN', 'CHANNEL_ID', 'MONGODB_URI']);
 function parseInterval() {
   const raw = parseInt(process.env.CHECK_INTERVAL, 10);
   if (isNaN(raw) || raw < 10) {
-    console.warn('[config] CHECK_INTERVAL not set or too low – defaulting to 30 seconds.');
+    console.warn('[config] CHECK_INTERVAL not set or too low - defaulting to 30 seconds.');
     return 30_000;
   }
   return raw * 1000; // convert to milliseconds
