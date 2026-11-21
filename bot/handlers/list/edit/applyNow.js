@@ -12,6 +12,7 @@ import { hasEvidence, resolveDisplayImageUrl } from '../../../utils/imageRehost.
 import { NoticeKind } from '../../../utils/alertEmbed.js';
 import { editAlert, editAlertAfterSavedWrite, editEmbed } from '../../../utils/interactionReplies.js';
 import { getInteractionDisplayName } from '../../../utils/names.js';
+import { buildScopedListQuery } from '../../../utils/scope.js';
 import { t } from '../../../services/i18n/index.js';
 import { loadCheckDetailStatMap } from '../check/index.js';
 import { moveListEntry } from '../services/moveEntry.js';
@@ -21,18 +22,20 @@ import {
   buildListEditSuccessEmbeds,
 } from '../helpers.js';
 
+/**
+ * Build the duplicate-check query before a cross-list move. Blacklist moves
+ * stay inside the global + editing-guild scope boundary.
+ * @param {{name: string}} existing
+ * @param {'black'|'white'|'watch'} targetType
+ * @param {string} editGuildId
+ * @returns {object}
+ */
 export function buildMovePreflightQuery(existing, targetType, editGuildId) {
   const nameMatch = { $or: [{ name: existing.name }, { allCharacters: existing.name }] };
-  if (targetType !== 'black') return nameMatch;
-  return {
-    $and: [nameMatch, {
-      $or: [
-        { scope: 'global' },
-        { scope: { $exists: false } },
-        { scope: 'server', guildId: editGuildId },
-      ],
-    }],
-  };
+  return buildScopedListQuery(targetType, nameMatch, editGuildId || '', {
+    ownerSeesAll: false,
+    includeEmptyServerScope: true,
+  });
 }
 
 export function resolveMoveImageFields(existing, newImageUrl, newImageRehost) {
@@ -68,7 +71,8 @@ export function buildMovedEntryData({
   editGuildId,
   editGuildDefaultScope,
   newReason,
-  newRaid,  newImageUrl,
+  newRaid,
+  newImageUrl,
   newImageRehost,
   newScope,
   additionalNamesParsed,
@@ -115,7 +119,8 @@ function resolveUpdatedImageFields(newImageUrl, newImageRehost) {
 
 export function buildInPlaceUpdatePlan({
   newReason,
-  newRaid,  newImageUrl,
+  newRaid,
+  newImageUrl,
   newImageRehost,
   isScopeChange,
   targetScope,
@@ -220,7 +225,8 @@ async function applyTypeChange(args) {
     entry: movedEntry,
     previousEntry,
     previousType: args.currentType,
-    evidenceChanged: Boolean(args.newImageUrl),    addedAlts: args.additionalNamesParsed.added,
+    evidenceChanged: Boolean(args.newImageUrl),
+    addedAlts: args.additionalNamesParsed.added,
     type: args.targetType,
     isMove: true,
     lang: args.lang,
@@ -274,7 +280,8 @@ async function applyInPlaceEdit(args) {
     entry: editedEntry,
     previousEntry: args.existing,
     previousType: args.currentType,
-    evidenceChanged: Boolean(args.newImageUrl),    addedAlts: args.additionalNamesParsed.added,
+    evidenceChanged: Boolean(args.newImageUrl),
+    addedAlts: args.additionalNamesParsed.added,
     type: args.currentType,
     isMove: false,
     lang: args.lang,

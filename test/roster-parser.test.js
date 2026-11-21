@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
-import { parseRosterCharactersFromHtml } from '../bot/services/roster/parsers.js';
+import { normalizeCombatScore, parseRosterCharactersFromHtml } from '../bot/services/roster/parsers.js';
 
 // lostark.bible renders a card only for characters it updated recently,
 // while the page's data payload lists the whole roster.
@@ -79,4 +79,13 @@ test('a payload in a shape the parser does not know falls back to the cards and 
 
 test('a page with no character cards still reads as no roster', async () => {
   assert.deepEqual(await parse(rosterPage({ cards: [], payload: [ALPHA, BETA] })), []);
+});
+
+test('normalizeCombatScore drops empty placeholders and trims valid values', () => {
+  for (const empty of [null, undefined, '', '   ', '?', ' ? ', 0, false]) {
+    assert.equal(normalizeCombatScore(empty), '');
+  }
+  assert.equal(normalizeCombatScore('4501.2'), '4501.2');
+  assert.equal(normalizeCombatScore('  ≈4501.2  '), '≈4501.2');
+  assert.equal(normalizeCombatScore(4501.2), '4501.2');
 });

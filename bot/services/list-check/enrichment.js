@@ -3,6 +3,7 @@ import { getClassName, resolveClassId } from '../../models/Class.js';
 import { mapWithConcurrency } from '../../utils/async.js';
 import { normalizeCharacterName, normalizeNameKey } from '../../utils/names.js';
 import { buildRosterCharacters } from '../roster/buildRosterCharacters.js';
+import { normalizeCombatScore } from '../roster/parsers.js';
 import {
   createNameSuggestionContext,
   fetchNameSuggestions,
@@ -100,7 +101,8 @@ async function fetchExactStats(name, { online, searchOptions, lookupTimeoutMs })
 function applyStaleRefresh(item, { classId, itemLevel, combatScore, world }) {
   if (classId) Object.assign(item, { snapClassId: classId, snapClassName: getClassName(classId) });
   item.snapItemLevel = higherItemLevel(item.snapItemLevel, itemLevel);
-  if (combatScore && combatScore !== '?') item.snapCombatScore = String(combatScore);
+  const cleanedCombatScore = normalizeCombatScore(combatScore);
+  if (cleanedCombatScore) item.snapCombatScore = cleanedCombatScore;
   return {
     name: item.name,
     classId: item.snapClassId,
@@ -181,6 +183,7 @@ export async function enrichListCheckResults(
     { classId, itemLevel, combatScore, world = '' },
     verificationSource,
   ) {
+    const cleanedCombatScore = normalizeCombatScore(combatScore);
     Object.assign(item, {
       identityVerified: true,
       identityVerificationSource: verificationSource,
@@ -189,7 +192,7 @@ export async function enrichListCheckResults(
         snapClassName: getClassName(classId),
       } : {}),
       ...(typeof itemLevel === 'number' && itemLevel > 0 ? { snapItemLevel: itemLevel } : {}),
-      ...(combatScore && combatScore !== '?' ? { snapCombatScore: String(combatScore) } : {}),
+      ...(cleanedCombatScore ? { snapCombatScore: cleanedCombatScore } : {}),
     });
     pendingSnapshots.set(normalizeNameKey(item.name), {
       name: item.name,

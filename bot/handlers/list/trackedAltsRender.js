@@ -9,7 +9,7 @@
  */
 
 import { getClassEmoji, getClassName } from '../../models/Class.js';
-import { parsePositiveNumber } from '../../services/roster/parsers.js';
+import { normalizeCombatScore, parsePositiveNumber } from '../../services/roster/parsers.js';
 import { escapeLinkBrackets } from '../../utils/discordText.js';
 import { normalizeNameKey } from '../../utils/names.js';
 import { rosterUrl } from '../../utils/rosterLink.js';
@@ -26,8 +26,8 @@ function classNameFromRecord(record) {
  */
 export function formatRosterStatBadges(record) {
   const itemLevel = parsePositiveNumber(record?.itemLevel);
-  const combatScore = String(record?.combatScore ?? '').trim();
-  const combatPower = combatScore && combatScore !== '?'
+  const combatScore = normalizeCombatScore(record?.combatScore);
+  const combatPower = combatScore
     ? (/\sCP$/iu.test(combatScore) ? combatScore : `${combatScore} CP`)
     : '';
 

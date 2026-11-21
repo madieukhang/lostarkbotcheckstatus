@@ -15,7 +15,12 @@ import { bibleClient } from './bibleClient.js';
 import { fetchCharacterMeta } from './characterMeta.js';
 import { inferHiddenRosterItemLevel } from './search.js';
 import { parseRosterDocument } from './dom.js';
-import { parseCharacterMetaFromHtml, parseItemLevelValue, parseRosterCharactersFromHtml } from './parsers.js';
+import {
+  normalizeCombatScore,
+  parseCharacterMetaFromHtml,
+  parseItemLevelValue,
+  parseRosterCharactersFromHtml,
+} from './parsers.js';
 
 // Bible answers 404 for a name it does not know, so that status means no
 // roster rather than a failed request.
@@ -72,9 +77,7 @@ function readTargetStats(targetRecord) {
   const parsedItemLevel = parseItemLevelValue(targetRecord?.itemLevel);
   return {
     itemLevel: parsedItemLevel > 0 ? parsedItemLevel : null,
-    combatScore: targetRecord?.combatScore && targetRecord.combatScore !== '?'
-      ? targetRecord.combatScore
-      : null,
+    combatScore: normalizeCombatScore(targetRecord?.combatScore) || null,
     className: targetRecord?.className || null,
   };
 }

@@ -18,6 +18,19 @@ export function parsePositiveNumber(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
+/**
+ * Clean a raw combat score for storage and display. Trims whitespace and
+ * drops empty/falsy values and the missing-value placeholder '?' so every
+ * roster and card surface applies the same unknown-CP rule.
+ * @param {unknown} value - raw combat score such as "≈4501.2", "4501.2", or "?"
+ * @returns {string} cleaned score text, or '' when unavailable
+ */
+export function normalizeCombatScore(value) {
+  if (value === null || value === undefined || value === 0 || value === false) return '';
+  const text = String(value).trim();
+  return text && text !== '?' ? text : '';
+}
+
 export function extractCharacterItemLevelFromHtml(html) {
   const patterns = [
     /itemLevel:(\d+(?:\.\d+)?)/,

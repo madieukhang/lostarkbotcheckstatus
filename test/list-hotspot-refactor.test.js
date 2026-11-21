@@ -75,6 +75,30 @@ test('immediate list move keeps blacklist scope boundaries and permanent image r
   assert.deepEqual(buildMovePreflightQuery(existing, 'white', 'guild-1'), {
     $or: [{ name: 'Mainchar' }, { allCharacters: 'Mainchar' }],
   });
+  assert.deepEqual(buildMovePreflightQuery(existing, 'black', 'guild-1'), {
+    $and: [
+      { $or: [{ name: 'Mainchar' }, { allCharacters: 'Mainchar' }] },
+      {
+        $or: [
+          { scope: 'global' },
+          { scope: { $exists: false } },
+          { scope: 'server', guildId: 'guild-1' },
+        ],
+      },
+    ],
+  });
+  assert.deepEqual(buildMovePreflightQuery(existing, 'black', ''), {
+    $and: [
+      { $or: [{ name: 'Mainchar' }, { allCharacters: 'Mainchar' }] },
+      {
+        $or: [
+          { scope: 'global' },
+          { scope: { $exists: false } },
+          { scope: 'server', guildId: '' },
+        ],
+      },
+    ],
+  });
   assert.deepEqual(resolveMoveImageFields(existing, '', null), {
     imageUrl: '',
     imageMessageId: 'old-message',
@@ -87,7 +111,8 @@ test('immediate list move keeps blacklist scope boundaries and permanent image r
     editGuildId: 'guild-1',
     editGuildDefaultScope: 'global',
     newReason: 'New reason',
-    newRaid: '',    newImageUrl: 'https://cdn.example/new.png',
+    newRaid: '',
+    newImageUrl: 'https://cdn.example/new.png',
     newImageRehost: { messageId: 'new-message', channelId: 'new-channel' },
     newScope: 'server',
     additionalNamesParsed: { added: ['Manualalt'] },
@@ -107,7 +132,8 @@ test('immediate list move keeps blacklist scope boundaries and permanent image r
 test('immediate in-place plan keeps image and scope fields atomic while appending alts', () => {
   const { updateFields, updateOps } = buildInPlaceUpdatePlan({
     newReason: 'New reason',
-    newRaid: '',    newImageUrl: 'https://cdn.example/new.png',
+    newRaid: '',
+    newImageUrl: 'https://cdn.example/new.png',
     newImageRehost: null,
     isScopeChange: true,
     targetScope: 'server',

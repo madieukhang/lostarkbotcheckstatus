@@ -14,6 +14,7 @@ import RosterSnapshot from '../../../models/RosterSnapshot.js';
 import { getClassEmoji, getClassName } from '../../../models/Class.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../../models/collation.js';
 import { buildRosterCharacters } from '../../../services/roster/buildRosterCharacters.js';
+import { normalizeCombatScore } from '../../../services/roster/parsers.js';
 import { upsertRosterSnapshots } from '../../../services/roster/rosterSnapshots.js';
 import { getGuildLanguage, t } from '../../../services/i18n/index.js';
 import { COLORS, padInlineRow, relativeTime } from '../../../utils/ui.js';
@@ -48,11 +49,6 @@ const BROADCAST_CONCURRENCY = 4;
 function parseItemLevel(value) {
   const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
-
-function normalizeCombatScore(value) {
-  const text = String(value || '').trim();
-  return text && text !== '?' ? text : '';
 }
 
 function normalizeRosterStatRecord(record) {

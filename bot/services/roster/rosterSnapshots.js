@@ -6,7 +6,7 @@
 
 import RosterSnapshot from '../../models/RosterSnapshot.js';
 import { CASE_INSENSITIVE_COLLATION } from '../../models/collation.js';
-import { parsePositiveNumber } from './parsers.js';
+import { normalizeCombatScore, parsePositiveNumber } from './parsers.js';
 
 /**
  * Read one character's snapshot for the class icon on a card. Only the icon
@@ -23,11 +23,6 @@ export function findRosterSnapshot(name, { RosterSnapshotModel = RosterSnapshot 
       console.warn('[roster] Snapshot read failed (card shows no class icon):', err?.message || err);
       return null;
     });
-}
-
-function normalizeCombatScore(value) {
-  const text = String(value ?? '').trim();
-  return text && text !== '?' ? text : '';
 }
 
 /**
